@@ -1,0 +1,43 @@
+# Secrets — never commit
+.env
+.env.local
+.env.*.local
+!.env.production.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Sqlite (dev fallback DB)
+ziggo.db
+ziggo.db-shm
+ziggo.db-wal
+*.sqlite
+*.sqlite3
+
+# Flutter
+ziggo_app/.dart_tool/
+ziggo_app/build/
+ziggo_app/.flutter-plugins
+ziggo_app/.flutter-plugins-dependencies
+ziggo_app/ios/Pods/
+ziggo_app/ios/.symlinks/
+ziggo_app/macos/Pods/
+ziggo_app/macos/.symlinks/
+
+# IDE
+.idea/
+.vscode/
+
+# Admin uploads (kept in docker volume, not git)
+ziggo_backend/app/admin_panel/static/uploads/
+
+# OS junk
+.DS_Store
+Thumbs.db

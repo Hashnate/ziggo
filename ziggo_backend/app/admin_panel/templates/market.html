@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Market Vendors | Ziggo Admin{% endblock %}
+{% block page_title %}Market Vendor Management{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="p-6 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="font-bold text-ziggo">Vendors ({{ vendors | length }})</h3>
+        <a href="/admin/market/new"
+           class="bg-ziggo text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-ziggo-light transition-all inline-flex items-center">
+            <i class="fas fa-plus mr-2"></i> Add Vendor
+        </a>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
+                <tr>
+                    <th class="px-6 py-3">ID</th>
+                    <th class="px-6 py-3">Name</th>
+                    <th class="px-6 py-3">Category</th>
+                    <th class="px-6 py-3">Address</th>
+                    <th class="px-6 py-3 text-right">Rating</th>
+                    <th class="px-6 py-3">Status</th>
+                    <th class="px-6 py-3"></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for v in vendors %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-3 text-sm font-medium">#{{ v.id }}</td>
+                    <td class="px-6 py-3">
+                        <p class="text-sm font-bold text-ziggo">{{ v.name }}</p>
+                        <p class="text-xs text-gray-400">{{ v.description or '' }}</p>
+                    </td>
+                    <td class="px-6 py-3 text-sm">
+                        <span class="px-2 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700">{{ v.category or '-' }}</span>
+                    </td>
+                    <td class="px-6 py-3 text-xs text-gray-600">{{ v.address or '' }}</td>
+                    <td class="px-6 py-3 text-right text-sm">
+                        <i class="fas fa-star text-yellow-400 text-xs"></i> {{ v.rating or 0 }}
+                    </td>
+                    <td class="px-6 py-3">
+                        <span class="px-2 py-1 rounded-full text-xs font-bold {% if v.is_active %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-500{% endif %}">
+                            {{ 'Active' if v.is_active else 'Inactive' }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-3">
+                        <a href="/admin/market/{{ v.id }}" class="text-blue-600 hover:underline text-sm font-bold">
+                            Manage products →
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="px-6 py-10 text-center text-gray-400">
+                        No vendors yet. <a href="/admin/market/new" class="text-blue-600 hover:underline font-bold">Add your first one</a>.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

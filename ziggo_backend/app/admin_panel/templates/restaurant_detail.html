@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}{{ restaurant.name }} | Ziggo Admin{% endblock %}
+{% block page_title %}{{ restaurant.name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-6xl mx-auto">
+    <a href="/admin/restaurants" class="inline-flex items-center text-sm font-bold text-gray-500 hover:text-ziggo">
+        <i class="fas fa-arrow-left mr-2"></i> Back to restaurants
+    </a>
+
+    <!-- Restaurant summary card -->
+    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 flex flex-wrap items-center gap-6">
+        <div class="w-20 h-20 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center text-3xl">
+            <i class="fas fa-utensils"></i>
+        </div>
+        <div class="flex-1 min-w-[200px]">
+            <h2 class="text-2xl font-black text-ziggo">{{ restaurant.name }}</h2>
+            <p class="text-sm text-gray-500">{{ restaurant.cuisine or '' }} • {{ restaurant.address or '' }}</p>
+            <div class="mt-2 flex flex-wrap gap-4 text-xs text-gray-600 font-bold">
+                <span><i class="fas fa-star text-yellow-400"></i> {{ restaurant.rating or 0 }}</span>
+                <span><i class="fas fa-clock"></i> {{ restaurant.eta_minutes or 30 }} min</span>
+                <span><i class="fas fa-truck"></i> Rs.{{ "{:,.0f}".format(restaurant.delivery_fee or 0) }}</span>
+                <span><i class="fas fa-business-time"></i> {{ restaurant.opening_time or '' }} – {{ restaurant.closing_time or '' }}</span>
+                <span class="px-2 py-0.5 rounded-full {% if restaurant.is_active %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-500{% endif %}">{{ 'Active' if restaurant.is_active else 'Inactive' }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left: existing categories & items -->
+        <div class="lg:col-span-2 space-y-4">
+            <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                <div class="p-6 border-b border-gray-100">
+                    <h3 class="font-black text-ziggo">Menu</h3>
+                    <p class="text-xs text-gray-400">{{ items | length }} item{{ '' if items|length == 1 else 's' }} across {{ categories | length }} categor{{ 'y' if categories|length == 1 else 'ies' }}</p>
+                </div>
+                <div class="divide-y divide-gray-100">
+                    {% for cat in categories %}
+                    <div class="p-6">
+                        <h4 class="font-black text-ziggo-accent uppercase tracking-widest text-xs mb-3">{{ cat.name }}</h4>
+                        {% set cat_items = items | selectattr('category_id', 'equalto', cat.id) | list %}
+                        {% if cat_items %}
+                            <div class="space-y-2">
+                            {% for it in cat_items %}
+                                <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                                    <div class="w-2 h-2 rounded-full {% if it.is_veg %}bg-green-500{% else %}bg-red-500{% endif %}"></div>
+                                    <div class="flex-1">
+                                        <p class="font-bold text-sm text-ziggo">{{ it.name }}</p>
+                                        {% if it.description %}<p class="text-xs text-gray-500">{{ it.description }}</p>{% endif %}
+                                    </div>
+                                    <span class="font-black text-sm">Rs.{{ "{:,.0f}".format(it.price) }}</span>
+                                </div>
+                            {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-xs text-gray-400 italic">No items in this category yet.</p>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <div class="p-10 text-center text-gray-400">
+                        <i class="fas fa-utensils text-3xl mb-3"></i>
+                        <p class="text-sm font-bold">No menu yet. Add a category to get started →</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: forms to add category and item -->
+        <div class="space-y-4">
+            <!-- Add category -->
+            <form method="post" action="/admin/restaurants/{{ restaurant.id }}/categories/new"
+                  class="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 space-y-4">
+                <h3 class="font-black text-ziggo">Add category</h3>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Name</label>
+                    <input name="name" required placeholder="e.g. Mains, Drinks"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Display order</label>
+                    <input name="display_order" type="number" value="0"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <button class="w-full px-4 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light">
+                    <i class="fas fa-plus mr-2"></i> Add Category
+                </button>
+            </form>
+
+            <!-- Add menu item -->
+            {% if categories %}
+            <form method="post" action="/admin/restaurants/{{ restaurant.id }}/items/new"
+                  class="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 space-y-4">
+                <h3 class="font-black text-ziggo">Add menu item</h3>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Category</label>
+                    <select name="category_id" required
+                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                        {% for cat in categories %}
+                        <option value="{{ cat.id }}">{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Name</label>
+                    <input name="name" required placeholder="e.g. Chicken Kottu"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Description</label>
+                    <input name="description" placeholder="optional"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Price (Rs.)</label>
+                    <input name="price" type="number" step="0.01" min="0" required
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Prep time (min)</label>
+                    <input name="prep_time_min" type="number" value="15" min="1"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Image URL</label>
+                    <input name="image_url" placeholder="optional"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+                    <input name="is_veg" type="checkbox" class="w-4 h-4">
+                    <span class="text-sm font-bold text-gray-700">Vegetarian</span>
+                </label>
+                <button class="w-full px-4 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light">
+                    <i class="fas fa-plus mr-2"></i> Add Item
+                </button>
+            </form>
+            {% else %}
+            <div class="bg-yellow-50 border border-yellow-200 rounded-3xl p-6 text-sm text-yellow-800 font-bold">
+                Add a category first before adding menu items.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

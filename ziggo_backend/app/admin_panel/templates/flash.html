@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Ziggo Flash | Ziggo Admin{% endblock %}
+{% block page_title %}Ziggo Flash — Parcel Deliveries{% endblock %}
+
+{% block content %}
+<!-- Stats bar -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+    <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+        <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-3">
+            <i class="fas fa-box"></i>
+        </div>
+        <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Total Deliveries</p>
+        <p class="text-2xl font-black text-ziggo">{{ stats.total }}</p>
+    </div>
+    <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+        <div class="w-10 h-10 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center mb-3">
+            <i class="fas fa-truck"></i>
+        </div>
+        <p class="text-xs font-black text-gray-400 uppercase tracking-widest">In Progress</p>
+        <p class="text-2xl font-black text-ziggo">{{ stats.active }}</p>
+    </div>
+    <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+        <div class="w-10 h-10 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center mb-3">
+            <i class="fas fa-check-double"></i>
+        </div>
+        <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Delivered Today</p>
+        <p class="text-2xl font-black text-ziggo">{{ stats.delivered_today }}</p>
+    </div>
+    <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+        <div class="w-10 h-10 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mb-3">
+            <i class="fas fa-coins"></i>
+        </div>
+        <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Revenue (Lifetime)</p>
+        <p class="text-2xl font-black text-ziggo">Rs.{{ "{:,.0f}".format(stats.revenue or 0) }}</p>
+    </div>
+</div>
+
+<div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="p-6 border-b border-gray-100">
+        <h3 class="font-bold text-ziggo">All deliveries ({{ orders | length }})</h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
+                <tr>
+                    <th class="px-6 py-3">Ref</th>
+                    <th class="px-6 py-3">Parcel</th>
+                    <th class="px-6 py-3">Sender → Receiver</th>
+                    <th class="px-6 py-3">Route</th>
+                    <th class="px-6 py-3">Courier</th>
+                    <th class="px-6 py-3">Status</th>
+                    <th class="px-6 py-3">Fare</th>
+                    <th class="px-6 py-3">Booked</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for o in orders %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-3 text-sm font-bold text-blue-700">{{ o.booking_ref }}</td>
+                    <td class="px-6 py-3">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-box-open text-xs"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-black uppercase">{{ o.parcel_type or 'parcel' }}</p>
+                                {% if o.parcel_weight_kg %}
+                                <p class="text-[10px] text-gray-400 font-bold">{{ o.parcel_weight_kg }} kg</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-3 text-xs">
+                        <p class="font-bold text-ziggo">
+                            {{ o.customer.user.full_name if o.customer and o.customer.user else o.customer.user.phone_number if o.customer else '-' }}
+                        </p>
+                        <p class="text-gray-500">
+                            → {{ o.receiver_name or '' }}
+                            {% if o.receiver_phone %}<span class="text-gray-400">({{ o.receiver_phone }})</span>{% endif %}
+                        </p>
+                    </td>
+                    <td class="px-6 py-3 text-xs text-gray-600 max-w-[220px]">
+                        <div class="flex items-center gap-1"><i class="fas fa-circle text-blue-400 text-[6px]"></i> {{ (o.pickup_address or '')[:30] }}…</div>
+                        <div class="flex items-center gap-1 text-gray-400"><i class="fas fa-map-marker-alt text-red-400 text-[8px]"></i> {{ (o.drop_address or '')[:30] }}…</div>
+                    </td>
+                    <td class="px-6 py-3 text-xs">
+                        {% if o.driver %}
+                            <p class="font-bold">{{ o.driver.user.full_name if o.driver.user else '' }}</p>
+                            <p class="text-gray-400">{{ o.driver.vehicle_number or '' }}</p>
+                        {% else %}
+                            <span class="text-gray-400">— unassigned</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-3">
+                        <span class="px-2 py-1 rounded-full text-xs font-bold
+                          {% if o.status.value == 'completed' %}bg-green-100 text-green-700
+                          {% elif o.status.value == 'cancelled' %}bg-red-100 text-red-700
+                          {% elif o.status.value in ['searching','accepted','arrived','started'] %}bg-orange-100 text-orange-700
+                          {% else %}bg-gray-100 text-gray-700{% endif %}">
+                          {{ o.status.value }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-3 text-sm font-bold">Rs.{{ "{:,.0f}".format(o.final_amount or 0) }}</td>
+                    <td class="px-6 py-3 text-xs text-gray-500">{{ o.booked_at.strftime("%Y-%m-%d %H:%M") if o.booked_at else '' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8" class="px-6 py-10 text-center text-gray-400">No parcel deliveries yet</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

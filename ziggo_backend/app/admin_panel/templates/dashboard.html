@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | Ziggo Admin{% endblock %}
+{% block page_title %}Overview{% endblock %}
+
+{% block content %}
+<!-- Hero card -->
+<div class="rounded-3xl p-7 mb-8 text-white relative overflow-hidden shadow-soft-lg"
+     style="background: linear-gradient(135deg, #172554 0%, #1E40AF 55%, #3B82F6 100%);">
+    <div class="absolute -right-10 -top-10 w-56 h-56 rounded-full" style="background: rgba(251,191,36,0.18); filter: blur(40px);"></div>
+    <div class="absolute -left-6 -bottom-12 w-48 h-48 rounded-full" style="background: rgba(59,130,246,0.25); filter: blur(40px);"></div>
+    <div class="relative flex flex-wrap items-end justify-between gap-6">
+        <div>
+            <span class="inline-block px-3 py-1 rounded-full bg-white/20 text-[10px] font-black uppercase tracking-[0.18em]">Welcome back</span>
+            <h2 class="mt-3 text-3xl md:text-4xl font-black tracking-tight">Ziggo at a glance</h2>
+            <p class="mt-2 text-white/75 max-w-xl font-medium">Real-time KPIs across rides, food, market, and finance. Drill into any tile to dig deeper.</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="/admin/finance" class="px-5 py-3 rounded-2xl bg-white text-ziggo-dark font-black text-sm hover:shadow-soft transition flex items-center gap-2">
+                <i class="fas fa-coins"></i> Finance
+            </a>
+            <a href="/admin/bookings" class="px-5 py-3 rounded-2xl bg-white/15 text-white font-black text-sm hover:bg-white/25 transition flex items-center gap-2">
+                <i class="fas fa-list"></i> Live bookings
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Stats grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+    <a href="/admin/customers" class="zi-stat block group">
+        <div class="stat-icon mb-4" style="background: linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%); color: #1E40AF;">
+            <i class="fas fa-users"></i>
+        </div>
+        <p class="text-xs uppercase font-black text-ziggo-faint tracking-widest">Total customers</p>
+        <h3 class="text-3xl font-black text-ziggo-ink mt-1 leading-none">{{ stats.total_customers }}</h3>
+        <p class="text-xs font-bold text-green-600 mt-2"><i class="fas fa-circle text-[6px] mr-1"></i> Live</p>
+    </a>
+
+    <a href="/admin/drivers" class="zi-stat block group">
+        <div class="stat-icon mb-4" style="background: linear-gradient(135deg, #FFEDD5 0%, #FED7AA 100%); color: #C2410C;">
+            <i class="fas fa-motorcycle"></i>
+        </div>
+        <p class="text-xs uppercase font-black text-ziggo-faint tracking-widest">Total drivers</p>
+        <h3 class="text-3xl font-black text-ziggo-ink mt-1 leading-none">{{ stats.total_drivers }}</h3>
+        <p class="text-xs font-bold text-orange-600 mt-2"><i class="fas fa-circle text-[6px] mr-1"></i> {{ stats.online_drivers }} online now</p>
+    </a>
+
+    <a href="/admin/bookings" class="zi-stat block group">
+        <div class="stat-icon mb-4" style="background: linear-gradient(135deg, #DCFCE7 0%, #BBF7D0 100%); color: #15803D;">
+            <i class="fas fa-route"></i>
+        </div>
+        <p class="text-xs uppercase font-black text-ziggo-faint tracking-widest">Total bookings</p>
+        <h3 class="text-3xl font-black text-ziggo-ink mt-1 leading-none">{{ stats.total_bookings }}</h3>
+        <p class="text-xs font-bold text-ziggo-faint mt-2"><i class="fas fa-circle text-[6px] mr-1"></i> Lifetime</p>
+    </a>
+
+    <a href="/admin/finance" class="zi-stat block group">
+        <div class="stat-icon mb-4" style="background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); color: #B45309;">
+            <i class="fas fa-coins"></i>
+        </div>
+        <p class="text-xs uppercase font-black text-ziggo-faint tracking-widest">Total revenue</p>
+        <h3 class="text-3xl font-black text-ziggo-ink mt-1 leading-none">Rs.{{ "{:,.0f}".format(stats.revenue or 0) }}</h3>
+        <p class="text-xs font-bold text-ziggo-faint mt-2"><i class="fas fa-circle text-[6px] mr-1"></i> Completed rides</p>
+    </a>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Revenue Chart -->
+    <div class="lg:col-span-2 zi-card p-6">
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h3 class="text-lg font-black text-ziggo-ink">Revenue performance</h3>
+                <p class="text-xs text-ziggo-faint mt-1 font-bold">Daily revenue across all services</p>
+            </div>
+            <select class="bg-ziggo-canvas/80 text-sm rounded-xl px-3 py-2 outline-none font-bold">
+                <option>Last 7 days</option>
+                <option>Last 30 days</option>
+            </select>
+        </div>
+        <div class="h-80">
+            <canvas id="revenueChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Activity stream -->
+    <div class="zi-card p-6">
+        <div class="flex items-center justify-between mb-5">
+            <h3 class="text-lg font-black text-ziggo-ink">Today's activity</h3>
+            <span class="zi-chip" style="background: #DCFCE7; color: #15803D;">Live</span>
+        </div>
+        <div class="space-y-4">
+            <div class="flex items-center gap-3 p-3 rounded-2xl bg-green-50/60">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center text-green-600 bg-white shadow-soft-sm">
+                    <i class="fas fa-check"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-black text-ziggo-ink">{{ stats.completed_today }} completed rides</p>
+                    <p class="text-[11px] text-ziggo-faint font-bold uppercase tracking-wider">Today</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 p-3 rounded-2xl bg-red-50/60">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center text-red-500 bg-white shadow-soft-sm">
+                    <i class="fas fa-times"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-black text-ziggo-ink">{{ stats.cancelled_today }} cancelled rides</p>
+                    <p class="text-[11px] text-ziggo-faint font-bold uppercase tracking-wider">Today</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 p-3 rounded-2xl bg-blue-50/60">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center text-blue-600 bg-white shadow-soft-sm">
+                    <i class="fas fa-id-card"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-black text-ziggo-ink">{{ stats.pending_drivers }} driver applications</p>
+                    <p class="text-[11px] text-ziggo-faint font-bold uppercase tracking-wider">Awaiting review</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 p-3 rounded-2xl bg-orange-50/60">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center text-orange-600 bg-white shadow-soft-sm">
+                    <i class="fas fa-bolt"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-black text-ziggo-ink">{{ stats.online_drivers }} drivers online</p>
+                    <p class="text-[11px] text-ziggo-faint font-bold uppercase tracking-wider">Right now</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-6 p-4 rounded-2xl text-white relative overflow-hidden"
+             style="background: linear-gradient(135deg, #172554 0%, #1E40AF 100%); box-shadow: 0 16px 32px -14px rgba(30,64,175,0.45);">
+            <div class="absolute -right-4 -top-4 w-20 h-20 rounded-full" style="background: rgba(251,191,36,0.25); filter: blur(20px);"></div>
+            <p class="text-[10px] font-black uppercase tracking-[0.16em] text-white/65 mb-1 relative">Average surge (live)</p>
+            <div class="flex items-end justify-between relative">
+                <span class="text-3xl font-black leading-none">{{ "{:.2f}".format(stats.avg_surge or 1) }}<span class="text-base text-white/70">x</span></span>
+                <i class="fas fa-bolt text-ziggo-accent text-xl"></i>
+            </div>
+            <p class="text-[10px] mt-2 opacity-70 relative">From <a href="/admin/fare-settings" class="underline font-bold">fare settings</a></p>
+        </div>
+    </div>
+</div>
+
+<!-- Quick links -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
+    <a href="/admin/restaurants" class="zi-card zi-card-hover p-5 flex items-center gap-4">
+        <div class="w-12 h-12 rounded-2xl flex items-center justify-center" style="background: linear-gradient(135deg, #FFEDD5 0%, #FED7AA 100%); color: #C2410C;">
+            <i class="fas fa-utensils text-lg"></i>
+        </div>
+        <div>
+            <p class="text-xs font-black uppercase text-ziggo-faint tracking-widest">Food</p>
+            <p class="text-sm font-black text-ziggo-ink mt-0.5">Manage restaurants</p>
+        </div>
+    </a>
+    <a href="/admin/market" class="zi-card zi-card-hover p-5 flex items-center gap-4">
+        <div class="w-12 h-12 rounded-2xl flex items-center justify-center" style="background: linear-gradient(135deg, #DCFCE7 0%, #BBF7D0 100%); color: #15803D;">
+            <i class="fas fa-store text-lg"></i>
+        </div>
+        <div>
+            <p class="text-xs font-black uppercase text-ziggo-faint tracking-widest">Mart</p>
+            <p class="text-sm font-black text-ziggo-ink mt-0.5">Manage vendors</p>
+        </div>
+    </a>
+    <a href="/admin/promotions" class="zi-card zi-card-hover p-5 flex items-center gap-4">
+        <div class="w-12 h-12 rounded-2xl flex items-center justify-center" style="background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); color: #B45309;">
+            <i class="fas fa-percent text-lg"></i>
+        </div>
+        <div>
+            <p class="text-xs font-black uppercase text-ziggo-faint tracking-widest">Marketing</p>
+            <p class="text-sm font-black text-ziggo-ink mt-0.5">Promo codes</p>
+        </div>
+    </a>
+    <a href="/admin/complaints" class="zi-card zi-card-hover p-5 flex items-center gap-4">
+        <div class="w-12 h-12 rounded-2xl flex items-center justify-center" style="background: linear-gradient(135deg, #FECACA 0%, #FCA5A5 100%); color: #B91C1C;">
+            <i class="fas fa-headset text-lg"></i>
+        </div>
+        <div>
+            <p class="text-xs font-black uppercase text-ziggo-faint tracking-widest">Support</p>
+            <p class="text-sm font-black text-ziggo-ink mt-0.5">Complaints</p>
+        </div>
+    </a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const ctx = document.getElementById('revenueChart').getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 0, 320);
+    grad.addColorStop(0, 'rgba(59, 130, 246, 0.28)');
+    grad.addColorStop(1, 'rgba(59, 130, 246, 0.02)');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ stats.revenue_chart_labels | tojson }},
+            datasets: [{
+                label: 'Revenue (Rs.)',
+                data: {{ stats.revenue_chart_data | tojson }},
+                borderColor: '#1E40AF',
+                backgroundColor: grad,
+                fill: true,
+                tension: 0.4,
+                borderWidth: 3,
+                pointBackgroundColor: '#FBBF24',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 7
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#0F172A',
+                    padding: 12,
+                    cornerRadius: 12,
+                    titleFont: { family: 'Outfit', weight: '900' },
+                    bodyFont: { family: 'Outfit', weight: '700' },
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(15, 23, 42, 0.05)' },
+                    ticks: { font: { family: 'Outfit', weight: '700' }, color: '#94A3B8' }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { font: { family: 'Outfit', weight: '700' }, color: '#94A3B8' }
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

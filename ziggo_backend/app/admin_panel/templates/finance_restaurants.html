@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Restaurant revenue | Ziggo Admin{% endblock %}
+{% block page_title %}Restaurant revenue{% endblock %}
+{% block content %}
+<div class="space-y-4">
+    <a href="/admin/finance" class="inline-flex items-center text-sm font-bold text-gray-500 hover:text-ziggo">
+        <i class="fas fa-arrow-left mr-2"></i> Back to overview
+    </a>
+    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-gray-100 flex items-baseline justify-between">
+            <div>
+                <h3 class="font-black text-ziggo">Restaurant revenue & platform commission</h3>
+                <p class="text-xs text-gray-400 mt-1">Items revenue = items total kept by the restaurant. Platform commission = 20% of delivery fees collected.</p>
+            </div>
+            <p class="text-sm font-bold text-gray-500">{{ rows | length }} restaurants</p>
+        </div>
+        <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-xs font-black uppercase text-gray-500 tracking-wider">
+                <tr>
+                    <th class="px-4 py-3 text-left">Restaurant</th>
+                    <th class="px-4 py-3 text-left">Status</th>
+                    <th class="px-4 py-3 text-right">Items revenue</th>
+                    <th class="px-4 py-3 text-right">Delivery fees</th>
+                    <th class="px-4 py-3 text-right">Platform cut</th>
+                    <th class="px-4 py-3 text-right">Delivered</th>
+                    <th class="px-4 py-3 text-right">Cancelled</th>
+                    <th class="px-4 py-3 text-right">Open</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for r in rows %}
+                <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/admin/finance/restaurants/{{ r.restaurant_id }}'">
+                    <td class="px-4 py-3">
+                        <p class="font-black text-ziggo">{{ r.name }}</p>
+                        <p class="text-xs text-gray-400">{{ r.cuisine or '—' }}</p>
+                    </td>
+                    <td class="px-4 py-3">
+                        <span class="px-2 py-0.5 rounded-full text-xs font-black
+                            {% if r.is_active and r.is_open %}bg-green-100 text-green-700
+                            {% elif r.is_active %}bg-gray-100 text-gray-600
+                            {% else %}bg-red-100 text-red-700{% endif %}">
+                            {% if not r.is_active %}SUSPENDED
+                            {% elif r.is_open %}OPEN
+                            {% else %}CLOSED{% endif %}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-right font-black text-ziggo">Rs.{{ "{:,.0f}".format(r.items_revenue) }}</td>
+                    <td class="px-4 py-3 text-right">Rs.{{ "{:,.0f}".format(r.delivery_fees_collected) }}</td>
+                    <td class="px-4 py-3 text-right font-black text-green-600">Rs.{{ "{:,.0f}".format(r.platform_commission) }}</td>
+                    <td class="px-4 py-3 text-right">{{ r.delivered }}</td>
+                    <td class="px-4 py-3 text-right text-red-500">{{ r.cancelled }}</td>
+                    <td class="px-4 py-3 text-right text-amber-600">{{ r.pending_or_active }}</td>
+                </tr>
+                {% endfor %}
+                {% if not rows %}
+                <tr><td colspan="8" class="p-10 text-center text-gray-400 text-sm font-bold">No restaurants yet.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

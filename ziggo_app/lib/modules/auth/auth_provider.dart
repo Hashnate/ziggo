@@ -1,0 +1,132 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+
+import '../../core/network/api_client.dart';
+import '../../core/storage/token_storage.dart';
+
+enum AuthStatus { unauthenticated, authenticating, authenticated, error }
+
+class AuthProvider extends ChangeNotifier {
+  AuthStatus _status = AuthStatus.unauthenticated;
+  String? _token;
+  String? _role;
+  int? _userId;
+  String? _phoneNumber;
+  String? _fullName;
+  String? _email;
+  String? _lastError;
+  String? _devOtp;
+
+  AuthStatus get status => _status;
+  String? get token => _token;
+  String? get role => _role;
+  int? get userId => _userId;
+  String? get phoneNumber => _phoneNumber;
+  String? get fullName => _fullName;
+  String? get email => _email;
+  String? get lastError => _lastError;
+  String? get devOtp => _devOtp;
+
+  Future<void> bootstrap() async {
+    final t = await TokenStorage.getToken();
+    final r = await TokenStorage.getRole();
+    final uid = await TokenStorage.getUserId();
+    if (t != null && r != null) {
+      _token = t;
+      _role = r;
+      _userId = uid;
+      _status = AuthStatus.authenticated;
+      notifyListeners();
+      await _refreshMe();
+    }
+  }
+
+  Future<bool> sendOTP(String phoneNumber) async {
+    _lastError = null;
+    try {
+      final resp = await ApiClient.instance.dio.post(
+        '/auth/send-otp',
+        data: {'phone_number': phoneNumber},
+      );
+      _devOtp = resp.data['dev_otp'] as String?;
+      _phoneNumber = phoneNumber;
+      notifyListeners();
+      return true;
+    } on DioException catch (e) {
+      _lastError = e.response?.data?['detail']?.toString() ?? e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> verifyOTP(
+    String phoneNumber,
+    String otp,
+    String role, {
+    String? fullName,
+  }) async {
+    _status = AuthStatus.authenticating;
+    _lastError = null;
+    notifyListeners();
+
+    try {
+      final resp = await ApiClient.instance.dio.post(
+        '/auth/verify-otp',
+        data: {
+          'phone_number': phoneNumber,
+          'otp': otp,
+          'role': role,
+          if (fullName != null && fullName.isNotEmpty) 'full_name': fullName,
+        },
+      );
+      _token = resp.data['access_token'] as String;
+      _role = resp.data['role'] as String;
+      _userId = resp.data['user_id'] as int;
+      _phoneNumber = phoneNumber;
+      await TokenStorage.save(token: _token!, role: _role!, userId: _userId!);
+
+      _status = AuthStatus.authenticated;
+      notifyListeners();
+      await _refreshMe();
+      return true;
+    } on DioException catch (e) {
+      _lastError = e.response?.data?['detail']?.toString() ?? e.message;
+      _status = AuthStatus.error;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<void> _refreshMe() async {
+    try {
+      final resp = await ApiClient.instance.dio.get('/auth/me');
+      _fullName = resp.data['full_name'] as String?;
+      _email = resp.data['email'] as String?;
+      _phoneNumber = resp.data['phone_number'] as String?;
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<void> updateProfile({String? fullName, String? email}) async {
+    final body = <String, dynamic>{};
+    if (fullName != null) body['full_name'] = fullName;
+    if (email != null) body['email'] = email;
+    if (body.isEmpty) return;
+    final resp = await ApiClient.instance.dio.patch('/customer/profile', data: body);
+    _fullName = resp.data['full_name'] as String?;
+    _email = resp.data['email'] as String?;
+    notifyListeners();
+  }
+
+  Future<void> logout() async {
+    _status = AuthStatus.unauthenticated;
+    _token = null;
+    _role = null;
+    _userId = null;
+    _phoneNumber = null;
+    _fullName = null;
+    _email = null;
+    await TokenStorage.clear();
+    notifyListeners();
+  }
+}

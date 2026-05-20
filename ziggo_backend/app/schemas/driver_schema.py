@@ -1,0 +1,62 @@
+from pydantic import BaseModel, EmailStr, Field
+from typing import Optional
+
+
+class DriverLocationUpdate(BaseModel):
+    lat: float
+    lng: float
+
+
+class DriverOnlineToggle(BaseModel):
+    is_online: bool
+
+
+class DriverRegisterRequest(BaseModel):
+    """Submitted from the mobile app right after the driver's first OTP login."""
+    full_name: str
+    email: Optional[EmailStr] = None
+    nic_number: str
+    license_number: str
+    vehicle_type: str  # bike | tuk | car | van | truck
+    vehicle_number: str
+    vehicle_model: str
+    vehicle_color: str
+
+
+class AdminDriverCreateRequest(BaseModel):
+    """Admin creates a driver in one shot (creates User + Driver)."""
+    phone_number: str = Field(..., pattern=r"^\d{10}$")
+    full_name: str
+    email: Optional[EmailStr] = None
+    nic_number: str
+    license_number: str
+    vehicle_type: str
+    vehicle_number: str
+    vehicle_model: str
+    vehicle_color: str
+    auto_approve: bool = True
+
+
+class DriverProfileResponse(BaseModel):
+    id: int
+    full_name: Optional[str] = None
+    phone_number: Optional[str] = None
+    profile_photo: Optional[str] = None
+    vehicle_type: Optional[str] = None
+    vehicle_number: Optional[str] = None
+    vehicle_model: Optional[str] = None
+    vehicle_color: Optional[str] = None
+    nic_number: Optional[str] = None
+    license_number: Optional[str] = None
+    is_online: bool
+    is_approved: bool
+    profile_complete: bool
+    status: Optional[str] = None
+    rating: Optional[float] = None
+    today_earnings: Optional[float] = None
+    today_rides: Optional[int] = None
+    total_earnings: Optional[float] = None
+    acceptance_rate: Optional[float] = None
+
+    class Config:
+        from_attributes = True

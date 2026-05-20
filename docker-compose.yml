@@ -1,0 +1,93 @@
+# Ziggo — production docker-compose for shared-host deployment.
+#
+# Two containers on an internal-only network:
+#   - ziggo_postgres : Postgres 16, NOT exposed to the host (only ziggo_backend reaches it)
+#   - ziggo_backend  : FastAPI + uvicorn, exposed on host port ${ZIGGO_PORT:-8030}
+#
+# The host nginx reverse-proxies a domain (e.g. ziggo.example.com or
+# example.com/ziggo) to 127.0.0.1:${ZIGGO_PORT}.
+#
+# Persistence:
+#   ziggo_pgdata     : Postgres data dir
+#   ziggo_uploads    : admin panel uploads (driver photos etc.) — survive rebuilds
+#
+# Bring up:
+#   cd /var/www/ziggo
+#   cp ziggo_backend/.env.production.example .env
+#   # edit .env: set SECRET_KEY, POSTGRES_PASSWORD
+#   docker compose up -d --build
+#
+# Logs:    docker compose logs -f ziggo_backend
+# Shell:   docker compose exec ziggo_backend bash
+# DB:      docker compose exec ziggo_postgres psql -U ziggo -d ziggo
+# Stop:    docker compose down       (keeps volumes)
+# Nuke:    docker compose down -v    (deletes volumes — destroys data!)
+
+services:
+  ziggo_postgres:
+    image: postgres:16-alpine
+    container_name: ziggo_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ziggo}
+      POSTGRES_USER: ${POSTGRES_USER:-ziggo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+    volumes:
+      - ziggo_pgdata:/var/lib/postgresql/data
+    networks:
+      - ziggo_net
+    # No `ports:` block — Postgres is only reachable from the backend container.
+    # If you want to connect from the host (psql / pgAdmin), uncomment AND pick
+    # a port that doesn't clash with the host MariaDB on 3306:
+    # ports:
+    #   - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ziggo} -d ${POSTGRES_DB:-ziggo}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  ziggo_backend:
+    build:
+      context: ./ziggo_backend
+      dockerfile: Dockerfile
+    container_name: ziggo_backend
+    restart: unless-stopped
+    depends_on:
+      ziggo_postgres:
+        condition: service_healthy
+    environment:
+      # Async URL the FastAPI app uses (asyncpg driver)
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ziggo}:${POSTGRES_PASSWORD}@ziggo_postgres:5432/${POSTGRES_DB:-ziggo}
+      # Sync URL for alembic / one-off scripts (psycopg driver)
+      SYNC_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-ziggo}:${POSTGRES_PASSWORD}@ziggo_postgres:5432/${POSTGRES_DB:-ziggo}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set in .env}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-11520}
+      DEV_MODE: ${DEV_MODE:-false}
+      PROJECT_NAME: ${PROJECT_NAME:-Ziggo}
+      API_V1_STR: ${API_V1_STR:-/api/v1}
+      # Optional third-party (uncomment in .env if/when you wire them):
+      # TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      # TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      # TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:-}
+      # STRIPE_API_KEY: ${STRIPE_API_KEY:-}
+      # GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+    volumes:
+      # Persist admin panel uploads (driver photos etc.) across container rebuilds
+      - ziggo_uploads:/app/app/admin_panel/static/uploads
+    ports:
+      # Bind to loopback only — the host nginx (already running) terminates TLS
+      # and reverse-proxies to this port. Change to "0.0.0.0:${ZIGGO_PORT:-8030}"
+      # if you need to reach the container directly for debugging.
+      - "127.0.0.1:${ZIGGO_PORT:-8030}:8000"
+    networks:
+      - ziggo_net
+
+networks:
+  ziggo_net:
+    driver: bridge
+
+volumes:
+  ziggo_pgdata:
+  ziggo_uploads:

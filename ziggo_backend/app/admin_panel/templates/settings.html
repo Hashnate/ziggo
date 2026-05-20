@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}Fare Settings | Ziggo Admin{% endblock %}
+{% block page_title %}Fare Settings{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="p-8 border-b border-gray-100 bg-gray-50/50">
+        <h3 class="text-xl font-black text-ziggo">Service Base Fares</h3>
+        <p class="text-sm text-gray-500 font-bold mt-1">Live values used by the fare estimator. Update rates below to apply changes instantly.</p>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
+                <tr>
+                    <th class="px-6 py-4">Service</th>
+                    <th class="px-6 py-4 text-right">Base fare</th>
+                    <th class="px-6 py-4 text-right">Per km</th>
+                    <th class="px-6 py-4 text-right">Per min</th>
+                    <th class="px-6 py-4 text-right">Min fare</th>
+                    <th class="px-6 py-4 text-right">Platform %</th>
+                    <th class="px-6 py-4 text-right">Surge x</th>
+                    <th class="px-6 py-4">Updated</th>
+                    <th class="px-6 py-4 text-center">Action</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for f in fares %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-3 font-black text-ziggo uppercase">{{ f.service_type }}</td>
+                    <td class="px-6 py-3 text-right">Rs.{{ "{:,.2f}".format(f.base_fare or 0) }}</td>
+                    <td class="px-6 py-3 text-right">Rs.{{ "{:,.2f}".format(f.per_km_rate or 0) }}</td>
+                    <td class="px-6 py-3 text-right">Rs.{{ "{:,.2f}".format(f.per_minute_rate or 0) }}</td>
+                    <td class="px-6 py-3 text-right">Rs.{{ "{:,.2f}".format(f.min_fare or 0) }}</td>
+                    <td class="px-6 py-3 text-right">{{ "{:,.1f}".format(f.platform_fee_percent or 0) }}%</td>
+                    <td class="px-6 py-3 text-right font-bold">{{ "{:,.2f}".format(f.surge_multiplier or 1) }}x</td>
+                    <td class="px-6 py-3 text-xs text-gray-500">{{ f.updated_at.strftime("%Y-%m-%d %H:%M") if f.updated_at else '' }}</td>
+                    <td class="px-6 py-3 text-center">
+                        <button onclick='openEditModal({
+                            id: {{ f.id }},
+                            service_type: "{{ f.service_type }}",
+                            base_fare: {{ f.base_fare or 0 }},
+                            per_km_rate: {{ f.per_km_rate or 0 }},
+                            per_minute_rate: {{ f.per_minute_rate or 0 }},
+                            min_fare: {{ f.min_fare or 0 }},
+                            platform_fee_percent: {{ f.platform_fee_percent or 0 }},
+                            surge_multiplier: {{ f.surge_multiplier or 1 }}
+                        })' class="p-2 text-ziggo hover:bg-ziggo/10 rounded-lg transition-colors">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="9" class="px-6 py-10 text-center text-gray-400">No fare settings configured. Run seed.py.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="editModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+        <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+            <h3 class="text-xl font-black text-ziggo">Update <span id="modalServiceType"></span> Fare</h3>
+            <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form action="/admin/fare-settings/update" method="POST" class="p-8 space-y-4">
+            <input type="hidden" name="id" id="modalId">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Base Fare (Rs)</label>
+                    <input type="number" step="0.01" name="base_fare" id="modalBaseFare" required class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Per KM (Rs)</label>
+                    <input type="number" step="0.01" name="per_km_rate" id="modalPerKm" required class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Per Min (Rs)</label>
+                    <input type="number" step="0.01" name="per_minute_rate" id="modalPerMin" required class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Min Fare (Rs)</label>
+                    <input type="number" step="0.01" name="min_fare" id="modalMinFare" required class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Platform %</label>
+                    <input type="number" step="0.1" name="platform_fee_percent" id="modalPlatform" required class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Surge Multiplier</label>
+                    <input type="number" step="0.01" name="surge_multiplier" id="modalSurge" required class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+            </div>
+            <div class="pt-4 flex justify-end gap-3">
+                <button type="button" onclick="closeModal()" class="px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50">Cancel</button>
+                <button type="submit" class="px-8 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light">Update Fare</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openEditModal(fare) {
+    document.getElementById('modalServiceType').innerText = fare.service_type.toUpperCase();
+    document.getElementById('modalId').value = fare.id;
+    document.getElementById('modalBaseFare').value = fare.base_fare;
+    document.getElementById('modalPerKm').value = fare.per_km_rate;
+    document.getElementById('modalPerMin').value = fare.per_minute_rate;
+    document.getElementById('modalMinFare').value = fare.min_fare;
+    document.getElementById('modalPlatform').value = fare.platform_fee_percent;
+    document.getElementById('modalSurge').value = fare.surge_multiplier;
+    
+    document.getElementById('editModal').classList.remove('hidden');
+    document.getElementById('editModal').classList.add('flex');
+}
+
+function closeModal() {
+    document.getElementById('editModal').classList.add('hidden');
+    document.getElementById('editModal').classList.remove('flex');
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('editModal');
+    if (event.target == modal) {
+        closeModal();
+    }
+}
+</script>
+{% endblock %}

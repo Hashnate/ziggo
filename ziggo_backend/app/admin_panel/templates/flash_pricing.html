@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+
+{% block title %}Flash Pricing | Ziggo Admin{% endblock %}
+{% block page_title %}Flash Parcel Pricing{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Header / Intro -->
+    <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-6 flex items-center justify-between">
+        <div>
+            <h3 class="text-xl font-black text-ziggo">Parcel weight tiers</h3>
+            <p class="text-sm text-ziggo-muted font-bold mt-1">
+                Each tier adds a flat <span class="text-ziggo">surcharge</span> on top of the distance-based fare when a customer ships a parcel.
+                Bands must be contiguous; leave <span class="font-mono">Max weight</span> empty for the open-ended top tier.
+            </p>
+        </div>
+        <button onclick="openCreateModal()" class="px-5 py-3 bg-ziggo text-white rounded-2xl font-black shadow-brand hover:bg-ziggo-light transition">
+            <i class="fas fa-plus mr-2"></i> Add tier
+        </button>
+    </div>
+
+    <!-- Tiers table -->
+    <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-gray-50 text-xs uppercase text-ziggo-muted font-bold">
+                    <tr>
+                        <th class="px-6 py-4">Order</th>
+                        <th class="px-6 py-4">Label</th>
+                        <th class="px-6 py-4 text-right">Min (kg)</th>
+                        <th class="px-6 py-4 text-right">Max (kg)</th>
+                        <th class="px-6 py-4 text-right">Represents</th>
+                        <th class="px-6 py-4 text-right">Surcharge</th>
+                        <th class="px-6 py-4">Icon</th>
+                        <th class="px-6 py-4">Status</th>
+                        <th class="px-6 py-4 text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-ziggo-line">
+                    {% for t in tiers %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-3 font-black">{{ t.display_order }}</td>
+                        <td class="px-6 py-3 font-black text-ziggo">{{ t.label }}</td>
+                        <td class="px-6 py-3 text-right">{{ "{:,.2f}".format(t.min_weight_kg or 0) }}</td>
+                        <td class="px-6 py-3 text-right">{% if t.max_weight_kg is none %}<span class="text-ziggo-faint">∞</span>{% else %}{{ "{:,.2f}".format(t.max_weight_kg) }}{% endif %}</td>
+                        <td class="px-6 py-3 text-right">{{ "{:,.2f}".format(t.representative_weight_kg or 0) }} kg</td>
+                        <td class="px-6 py-3 text-right font-bold">Rs.{{ "{:,.2f}".format(t.surcharge or 0) }}</td>
+                        <td class="px-6 py-3 text-xs font-mono text-ziggo-muted">{{ t.icon }}</td>
+                        <td class="px-6 py-3">
+                            {% if t.is_active %}
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-black rounded-full bg-emerald-50 text-emerald-700">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active
+                                </span>
+                            {% else %}
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-black rounded-full bg-gray-100 text-gray-500">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span> Disabled
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-3">
+                            <div class="flex items-center justify-center gap-2">
+                                <button onclick='openEditModal({
+                                    id: {{ t.id }},
+                                    label: "{{ t.label }}",
+                                    min_weight_kg: {{ t.min_weight_kg or 0 }},
+                                    max_weight_kg: {% if t.max_weight_kg is none %}""{% else %}{{ t.max_weight_kg }}{% endif %},
+                                    representative_weight_kg: {{ t.representative_weight_kg or 0 }},
+                                    surcharge: {{ t.surcharge or 0 }},
+                                    icon: "{{ t.icon }}",
+                                    display_order: {{ t.display_order or 0 }}
+                                })' class="p-2 text-ziggo hover:bg-ziggo/10 rounded-lg transition" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <form action="/admin/flash-pricing/{{ t.id }}/toggle" method="POST" class="inline">
+                                    <button type="submit" class="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition" title="Toggle active">
+                                        <i class="fas {% if t.is_active %}fa-eye-slash{% else %}fa-eye{% endif %}"></i>
+                                    </button>
+                                </form>
+                                <form action="/admin/flash-pricing/{{ t.id }}/delete" method="POST" class="inline" onsubmit="return confirm('Delete tier &quot;{{ t.label }}&quot;? This cannot be undone.');">
+                                    <button type="submit" class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="9" class="px-6 py-12 text-center text-ziggo-faint font-bold">No weight tiers configured yet. Click "Add tier" to create one.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Create / Edit Modal -->
+<div id="tierModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl">
+        <div class="p-6 border-b border-ziggo-line flex justify-between items-center bg-gray-50/50">
+            <h3 class="text-xl font-black text-ziggo" id="modalTitle">New weight tier</h3>
+            <button onclick="closeModal()" class="text-ziggo-faint hover:text-ziggo-ink">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form id="tierForm" method="POST" class="p-8 space-y-5">
+            <input type="hidden" name="id" id="modalId">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="col-span-2">
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Label</label>
+                    <input type="text" name="label" id="modalLabel" required placeholder="e.g. Heavy" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Min weight (kg)</label>
+                    <input type="number" step="0.01" min="0" name="min_weight_kg" id="modalMin" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Max weight (kg)</label>
+                    <input type="number" step="0.01" min="0" name="max_weight_kg" id="modalMax" placeholder="leave empty for ∞" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Representative weight</label>
+                    <input type="number" step="0.01" min="0" name="representative_weight_kg" id="modalRep" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    <p class="text-[10px] text-ziggo-faint font-bold mt-1 uppercase tracking-wider">Sent as parcel_weight_kg when customer picks this tier</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Surcharge (Rs)</label>
+                    <input type="number" step="0.01" min="0" name="surcharge" id="modalSurcharge" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Display order</label>
+                    <input type="number" name="display_order" id="modalOrder" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Icon</label>
+                    <select name="icon" id="modalIcon" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white">
+                        <option value="feed">feed (paper / docs)</option>
+                        <option value="shopping_bag">shopping_bag</option>
+                        <option value="inventory_2">inventory_2 (box)</option>
+                        <option value="local_shipping">local_shipping (truck)</option>
+                        <option value="backpack">backpack</option>
+                        <option value="luggage">luggage</option>
+                    </select>
+                </div>
+            </div>
+            <div class="pt-2 flex justify-end gap-3">
+                <button type="button" onclick="closeModal()" class="px-6 py-3 border border-ziggo-line rounded-xl font-black text-ziggo-muted hover:bg-gray-50">Cancel</button>
+                <button type="submit" class="px-8 py-3 bg-ziggo text-white rounded-xl font-black hover:bg-ziggo-light shadow-brand">
+                    <span id="modalSubmitText">Save tier</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openCreateModal() {
+    document.getElementById('modalTitle').innerText = 'New weight tier';
+    document.getElementById('modalSubmitText').innerText = 'Create tier';
+    document.getElementById('tierForm').action = '/admin/flash-pricing/new';
+    document.getElementById('modalId').value = '';
+    document.getElementById('modalLabel').value = '';
+    document.getElementById('modalMin').value = 0;
+    document.getElementById('modalMax').value = '';
+    document.getElementById('modalRep').value = 0;
+    document.getElementById('modalSurcharge').value = 0;
+    document.getElementById('modalOrder').value = 0;
+    document.getElementById('modalIcon').value = 'inventory_2';
+    document.getElementById('tierModal').classList.remove('hidden');
+    document.getElementById('tierModal').classList.add('flex');
+}
+
+function openEditModal(t) {
+    document.getElementById('modalTitle').innerText = 'Edit tier — ' + t.label;
+    document.getElementById('modalSubmitText').innerText = 'Save changes';
+    document.getElementById('tierForm').action = '/admin/flash-pricing/update';
+    document.getElementById('modalId').value = t.id;
+    document.getElementById('modalLabel').value = t.label;
+    document.getElementById('modalMin').value = t.min_weight_kg;
+    document.getElementById('modalMax').value = t.max_weight_kg;
+    document.getElementById('modalRep').value = t.representative_weight_kg;
+    document.getElementById('modalSurcharge').value = t.surcharge;
+    document.getElementById('modalOrder').value = t.display_order;
+    document.getElementById('modalIcon').value = t.icon;
+    document.getElementById('tierModal').classList.remove('hidden');
+    document.getElementById('tierModal').classList.add('flex');
+}
+
+function closeModal() {
+    document.getElementById('tierModal').classList.add('hidden');
+    document.getElementById('tierModal').classList.remove('flex');
+}
+
+window.onclick = function(event) {
+    const modal = document.getElementById('tierModal');
+    if (event.target == modal) closeModal();
+}
+</script>
+{% endblock %}

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ziggo Admin · Sign in</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        ziggo: {
+                            DEFAULT: '#1E40AF',
+                            dark: '#172554',
+                            light: '#3B82F6',
+                            soft: '#DBEAFE',
+                            accent: '#FBBF24',
+                            ink: '#0F172A',
+                            muted: '#64748B',
+                            faint: '#94A3B8',
+                            canvas: '#F5F7FB',
+                            line: '#EEF1F6'
+                        }
+                    },
+                    fontFamily: { sans: ['Outfit', 'sans-serif'] },
+                    boxShadow: {
+                        'soft': '0 24px 60px -20px rgba(15, 23, 42, 0.14), 0 4px 10px -3px rgba(15, 23, 42, 0.04)',
+                        'brand': '0 16px 40px -12px rgba(30, 64, 175, 0.45)'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Outfit', sans-serif; color: #0F172A; }
+        .ambient-orb {
+            position: absolute;
+            border-radius: 9999px;
+            filter: blur(60px);
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        input.brand-field {
+            transition: all 0.18s ease;
+            background: #F5F7FB;
+            border: 1.5px solid transparent;
+        }
+        input.brand-field:focus {
+            outline: none;
+            background: #fff;
+            border-color: #3B82F6;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.14);
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-ziggo-canvas relative overflow-hidden">
+
+    <!-- Ambient brand orbs -->
+    <div class="ambient-orb" style="background:#3B82F6; width:360px; height:360px; top:-120px; left:-100px;"></div>
+    <div class="ambient-orb" style="background:#FBBF24; width:300px; height:300px; bottom:-100px; right:-80px;"></div>
+
+    <div class="relative min-h-screen flex items-center justify-center p-6">
+        <div class="w-full max-w-md">
+
+            <!-- Brand -->
+            <div class="flex flex-col items-center mb-8">
+                <div class="w-20 h-20 rounded-3xl overflow-hidden mb-4 flex items-center justify-center" style="background: #fff; padding: 6px; box-shadow: 0 18px 44px -14px rgba(30, 64, 175, 0.45), inset 0 0 0 1px rgba(15,23,42,0.06);">
+                    <img src="/static/img/logo.jpeg" alt="Ziggo" class="w-full h-full object-cover rounded-2xl">
+                </div>
+                <p class="text-[10px] uppercase tracking-[0.32em] font-bold text-ziggo-faint">Welcome back to</p>
+                <img src="/static/img/ziggo.png" alt="Ziggo" class="h-9 mt-2" onerror="this.outerHTML='<h1 class=\'text-3xl font-black text-ziggo-ink tracking-tight mt-1\'>Ziggo Admin</h1>';">
+                <p class="text-sm text-ziggo-muted mt-2">Sign in to manage rides, drivers and more.</p>
+            </div>
+
+            <!-- Card -->
+            <div class="bg-white rounded-3xl shadow-soft p-7">
+
+                {% if error %}
+                <div class="mb-5 p-3 rounded-2xl bg-red-50 border border-red-100 text-red-700 text-sm font-semibold flex items-center gap-2">
+                    <i class="fas fa-circle-exclamation"></i>
+                    <span>{{ error }}</span>
+                </div>
+                {% endif %}
+
+                <form action="/admin/login" method="POST" class="space-y-5">
+
+                    <div>
+                        <label for="phone_number" class="block text-[11px] font-black tracking-[0.18em] text-ziggo-faint uppercase mb-2">Phone number</label>
+                        <div class="relative">
+                            <i class="fas fa-phone absolute left-4 top-1/2 -translate-y-1/2 text-ziggo-faint text-sm"></i>
+                            <input type="tel" name="phone_number" id="phone_number"
+                                   class="brand-field w-full pl-11 pr-4 py-3.5 rounded-2xl text-sm font-semibold"
+                                   required value="0700000000" maxlength="10" minlength="10" pattern="\d{10}">
+                        </div>
+                        <p class="text-[11px] text-ziggo-faint mt-2">Seed admin: <code class="font-mono text-ziggo">0700000000</code></p>
+                    </div>
+
+                    <div>
+                        <label for="password" class="block text-[11px] font-black tracking-[0.18em] text-ziggo-faint uppercase mb-2">Password</label>
+                        <div class="relative">
+                            <i class="fas fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-ziggo-faint text-sm"></i>
+                            <input type="password" name="password" id="password"
+                                   class="brand-field w-full pl-11 pr-4 py-3.5 rounded-2xl text-sm font-semibold"
+                                   placeholder="••••••••" required value="admin123">
+                        </div>
+                        <p class="text-[11px] text-ziggo-faint mt-2">Default: <code class="font-mono text-ziggo">admin123</code></p>
+                    </div>
+
+                    <div class="flex items-center justify-between pt-1">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input id="remember-me" name="remember-me" type="checkbox" class="w-4 h-4 rounded text-ziggo border-ziggo-line focus:ring-ziggo-light">
+                            <span class="text-sm font-semibold text-ziggo-muted">Remember me</span>
+                        </label>
+                        <a href="#" class="text-sm font-bold text-ziggo hover:text-ziggo-light transition">Forgot password?</a>
+                    </div>
+
+                    <button type="submit"
+                            class="w-full py-3.5 rounded-2xl text-sm font-black tracking-wide text-white shadow-brand transition active:scale-[0.98]"
+                            style="background: linear-gradient(135deg, #1E40AF 0%, #3B82F6 100%);">
+                        SIGN IN <i class="fas fa-arrow-right ml-1"></i>
+                    </button>
+                </form>
+            </div>
+
+            <p class="text-center text-[11px] text-ziggo-faint mt-6 font-semibold">
+                © Ziggo · Internal use only
+            </p>
+        </div>
+    </div>
+</body>
+</html>

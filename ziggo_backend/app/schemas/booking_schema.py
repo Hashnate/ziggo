@@ -1,0 +1,135 @@
+from pydantic import BaseModel, Field
+from typing import Optional
+from datetime import datetime
+
+from ..models.booking import BookingStatus
+
+
+class FareEstimateRequest(BaseModel):
+    service_type: str
+    pickup_lat: float
+    pickup_lng: float
+    drop_lat: float
+    drop_lng: float
+    promo_code: Optional[str] = None
+    trip_type: str = "one_way"  # one_way | return
+    is_flash: bool = False
+    parcel_weight_kg: Optional[float] = None
+    # Rental fields — when is_rental=True we ignore drop_* and price by
+    # hourly_rate * rental_hours.
+    is_rental: bool = False
+    rental_hours: Optional[int] = Field(default=None, ge=1, le=24)
+
+
+class FareEstimateResponse(BaseModel):
+    service_type: str
+    distance_km: float
+    duration_min: int
+    fare_amount: float
+    discount_amount: float
+    final_amount: float
+    platform_fee: float
+    driver_earnings: float
+    promo_code: Optional[str] = None
+    surge_multiplier: float
+    flash_surcharge: float = 0
+
+
+class BookingCreate(BaseModel):
+    service_type: str
+    pickup_lat: float
+    pickup_lng: float
+    pickup_address: str
+    drop_lat: float
+    drop_lng: float
+    drop_address: str
+    payment_method: str = "cash"
+    promo_code: Optional[str] = None
+    trip_type: str = "one_way"  # one_way | return
+    # Flash parcel fields (only set when this is a parcel delivery, not a ride)
+    is_flash: bool = False
+    parcel_type: Optional[str] = None
+    parcel_weight_kg: Optional[float] = None
+    receiver_name: Optional[str] = None
+    receiver_phone: Optional[str] = None
+    parcel_instructions: Optional[str] = None
+    # Rental fields — when is_rental=True the customer is hiring the vehicle
+    # for rental_hours. drop_* can be the same as pickup_* (no fixed dropoff).
+    is_rental: bool = False
+    rental_hours: Optional[int] = Field(default=None, ge=1, le=24)
+
+
+class DriverMini(BaseModel):
+    id: int
+    full_name: Optional[str] = None
+    rating: Optional[float] = None
+    vehicle_type: Optional[str] = None
+    vehicle_number: Optional[str] = None
+    vehicle_model: Optional[str] = None
+    phone_number: Optional[str] = None
+    current_lat: Optional[float] = None
+    current_lng: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+
+class BookingResponse(BaseModel):
+    id: int
+    booking_ref: str
+    status: BookingStatus
+    service_type: str
+    trip_type: str = "one_way"
+
+    pickup_lat: float
+    pickup_lng: float
+    pickup_address: str
+    drop_lat: float
+    drop_lng: float
+    drop_address: str
+
+    distance_km: Optional[float] = None
+    duration_min: Optional[int] = None
+    fare_amount: Optional[float] = None
+    discount_amount: Optional[float] = None
+    final_amount: Optional[float] = None
+
+    payment_method: Optional[str] = None
+    payment_status: Optional[str] = None
+    promo_code: Optional[str] = None
+
+    booked_at: Optional[datetime] = None
+    accepted_at: Optional[datetime] = None
+    arrived_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    cancelled_at: Optional[datetime] = None
+    cancellation_reason: Optional[str] = None
+
+    customer_rating: Optional[int] = None
+    driver: Optional[DriverMini] = None
+
+    # Flash parcel fields (only present when is_flash=True)
+    is_flash: bool = False
+    parcel_type: Optional[str] = None
+    parcel_weight_kg: Optional[float] = None
+    receiver_name: Optional[str] = None
+    receiver_phone: Optional[str] = None
+    parcel_instructions: Optional[str] = None
+
+    # Rental fields (only present when is_rental=True)
+    is_rental: bool = False
+    rental_hours: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
+class BookingStatusUpdate(BaseModel):
+    status: BookingStatus
+    reason: Optional[str] = None
+
+
+class BookingRateRequest(BaseModel):
+    rating: int = Field(ge=1, le=5)
+    feedback: Optional[str] = None

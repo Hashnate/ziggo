@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Driver finance | Ziggo Admin{% endblock %}
+{% block page_title %}{{ data.driver.name or 'Driver' }}{% endblock %}
+{% block content %}
+{% set d = data.driver %}{% set t = data.totals %}
+<div class="space-y-6 max-w-6xl mx-auto">
+    <a href="/admin/finance/drivers" class="inline-flex items-center text-sm font-bold text-gray-500 hover:text-ziggo">
+        <i class="fas fa-arrow-left mr-2"></i> Back to driver earnings
+    </a>
+
+    <!-- Driver summary -->
+    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 flex flex-wrap items-center gap-6">
+        <div class="w-20 h-20 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-3xl">
+            <i class="fas fa-motorcycle"></i>
+        </div>
+        <div class="flex-1 min-w-[220px]">
+            <h2 class="text-2xl font-black text-ziggo">{{ d.name or '—' }}</h2>
+            <p class="text-sm text-gray-500">{{ d.phone or '—' }} · <span class="capitalize">{{ d.vehicle_type or '—' }}</span> · {{ d.vehicle_number or '—' }}</p>
+            <div class="mt-2 flex flex-wrap gap-3 text-xs text-gray-600 font-bold">
+                <span><i class="fas fa-star text-yellow-400"></i> {{ d.rating }}</span>
+                <span class="px-2 py-0.5 rounded-full {% if d.is_online %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-500{% endif %}">{{ 'ONLINE' if d.is_online else 'OFFLINE' }}</span>
+                <span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 capitalize">{{ d.status or '—' }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Totals -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+            <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Lifetime earnings</p>
+            <p class="text-2xl font-black text-ziggo mt-1">Rs.{{ "{:,.0f}".format(t.lifetime_earnings) }}</p>
+        </div>
+        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+            <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Platform fees paid</p>
+            <p class="text-2xl font-black text-amber-600 mt-1">Rs.{{ "{:,.0f}".format(t.lifetime_platform_paid) }}</p>
+        </div>
+        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+            <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Rides / Parcels</p>
+            <p class="text-2xl font-black mt-1">{{ t.rides }} <span class="text-sm text-gray-400">+ {{ t.flash }} flash</span></p>
+        </div>
+        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+            <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Food / Market</p>
+            <p class="text-2xl font-black mt-1">{{ t.food }} <span class="text-sm text-gray-400">+ {{ t.market }}</span></p>
+        </div>
+    </div>
+
+    <!-- Transactions -->
+    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-gray-100 flex items-baseline justify-between">
+            <h3 class="font-black text-ziggo">Transaction history</h3>
+            <p class="text-xs text-gray-400">{{ data.transactions | length }} latest</p>
+        </div>
+        <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-xs font-black uppercase text-gray-500 tracking-wider">
+                <tr>
+                    <th class="px-4 py-3 text-left">Kind</th>
+                    <th class="px-4 py-3 text-left">Ref</th>
+                    <th class="px-4 py-3 text-left">When</th>
+                    <th class="px-4 py-3 text-left">Status</th>
+                    <th class="px-4 py-3 text-left">Payment</th>
+                    <th class="px-4 py-3 text-right">Customer paid</th>
+                    <th class="px-4 py-3 text-right">Platform fee</th>
+                    <th class="px-4 py-3 text-right">Driver earned</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for t in data.transactions %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3">
+                        <span class="px-2 py-0.5 rounded-full text-xs font-black
+                            {% if t.kind == 'Ride' %}bg-blue-50 text-blue-700
+                            {% elif t.kind == 'Flash parcel' %}bg-cyan-50 text-cyan-700
+                            {% elif t.kind == 'Food delivery' %}bg-orange-50 text-orange-700
+                            {% else %}bg-green-50 text-green-700{% endif %}">
+                            {{ t.kind }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 font-mono text-xs">{{ t.ref }}</td>
+                    <td class="px-4 py-3 text-xs text-gray-500">{{ t.when[:16].replace('T', ' ') if t.when else '—' }}</td>
+                    <td class="px-4 py-3 text-xs capitalize">{{ t.status.replace('_', ' ') }}</td>
+                    <td class="px-4 py-3 text-xs uppercase">{{ t.payment }}</td>
+                    <td class="px-4 py-3 text-right">Rs.{{ "{:,.0f}".format(t.customer_paid) }}</td>
+                    <td class="px-4 py-3 text-right text-amber-600">Rs.{{ "{:,.0f}".format(t.platform_fee) }}</td>
+                    <td class="px-4 py-3 text-right font-black text-green-700">Rs.{{ "{:,.0f}".format(t.amount) }}</td>
+                </tr>
+                {% endfor %}
+                {% if not data.transactions %}
+                <tr><td colspan="8" class="p-10 text-center text-gray-400 text-sm font-bold">No transactions yet.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

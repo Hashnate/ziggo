@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Customer finance | Ziggo Admin{% endblock %}
+{% block page_title %}{{ data.customer.name or 'Customer' }}{% endblock %}
+{% block content %}
+{% set c = data.customer %}{% set t = data.totals %}
+<div class="space-y-6 max-w-6xl mx-auto">
+    <a href="/admin/finance/customers" class="inline-flex items-center text-sm font-bold text-gray-500 hover:text-ziggo">
+        <i class="fas fa-arrow-left mr-2"></i> Back to customer spend
+    </a>
+    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 flex flex-wrap items-center gap-6">
+        <div class="w-20 h-20 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center text-3xl">
+            <i class="fas fa-user"></i>
+        </div>
+        <div class="flex-1 min-w-[220px]">
+            <h2 class="text-2xl font-black text-ziggo">{{ c.name or '—' }}</h2>
+            <p class="text-sm text-gray-500">{{ c.phone or '—' }}</p>
+            <div class="mt-2 flex flex-wrap gap-3 text-xs text-gray-600 font-bold">
+                {% if c.gold_member %}<span class="px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">GOLD MEMBER</span>{% endif %}
+                <span>Customer #{{ c.id }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+            <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Wallet balance</p>
+            <p class="text-2xl font-black text-purple-600 mt-1">Rs.{{ "{:,.0f}".format(c.wallet_balance) }}</p>
+        </div>
+        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+            <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Total spend</p>
+            <p class="text-2xl font-black text-ziggo mt-1">Rs.{{ "{:,.0f}".format(t.total_spend) }}</p>
+        </div>
+        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+            <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Total orders</p>
+            <p class="text-2xl font-black mt-1">{{ t.total_orders }}</p>
+        </div>
+    </div>
+
+    <!-- Wallet transactions -->
+    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-gray-100">
+            <h3 class="font-black text-ziggo">Wallet transactions</h3>
+        </div>
+        <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-xs font-black uppercase text-gray-500 tracking-wider">
+                <tr>
+                    <th class="px-4 py-3 text-left">Type</th>
+                    <th class="px-4 py-3 text-left">When</th>
+                    <th class="px-4 py-3 text-left">Description</th>
+                    <th class="px-4 py-3 text-right">Amount</th>
+                    <th class="px-4 py-3 text-right">Balance after</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for t in data.wallet_transactions %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3">
+                        <span class="px-2 py-0.5 rounded-full text-xs font-black
+                            {% if t.type|lower == 'credit' %}bg-green-50 text-green-700{% else %}bg-red-50 text-red-700{% endif %}">
+                            {{ t.type|upper }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-xs text-gray-500">{{ t.when[:16].replace('T', ' ') if t.when else '—' }}</td>
+                    <td class="px-4 py-3 text-xs">{{ t.description or '—' }}</td>
+                    <td class="px-4 py-3 text-right font-black {% if t.type|lower == 'credit' %}text-green-600{% else %}text-red-500{% endif %}">
+                        {{ '+' if t.type|lower == 'credit' else '-' }}Rs.{{ "{:,.0f}".format(t.amount) }}
+                    </td>
+                    <td class="px-4 py-3 text-right text-gray-600">Rs.{{ "{:,.0f}".format(t.balance_after) }}</td>
+                </tr>
+                {% endfor %}
+                {% if not data.wallet_transactions %}
+                <tr><td colspan="5" class="p-8 text-center text-gray-400 text-sm font-bold">No wallet transactions yet.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+
+    <!-- Orders timeline -->
+    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-gray-100">
+            <h3 class="font-black text-ziggo">Order history</h3>
+        </div>
+        <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-xs font-black uppercase text-gray-500 tracking-wider">
+                <tr>
+                    <th class="px-4 py-3 text-left">Kind</th>
+                    <th class="px-4 py-3 text-left">Ref</th>
+                    <th class="px-4 py-3 text-left">When</th>
+                    <th class="px-4 py-3 text-left">Status</th>
+                    <th class="px-4 py-3 text-left">Payment</th>
+                    <th class="px-4 py-3 text-right">Amount</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for o in data.orders %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3">
+                        <span class="px-2 py-0.5 rounded-full text-xs font-black
+                            {% if o.kind == 'Ride' %}bg-blue-50 text-blue-700
+                            {% elif o.kind == 'Flash parcel' %}bg-cyan-50 text-cyan-700
+                            {% elif o.kind == 'Food' %}bg-orange-50 text-orange-700
+                            {% else %}bg-green-50 text-green-700{% endif %}">
+                            {{ o.kind }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 font-mono text-xs">{{ o.ref }}</td>
+                    <td class="px-4 py-3 text-xs text-gray-500">{{ o.when[:16].replace('T', ' ') if o.when else '—' }}</td>
+                    <td class="px-4 py-3 text-xs capitalize">{{ o.status.replace('_', ' ') }}</td>
+                    <td class="px-4 py-3 text-xs uppercase">{{ o.payment }}</td>
+                    <td class="px-4 py-3 text-right font-black">Rs.{{ "{:,.0f}".format(o.amount) }}</td>
+                </tr>
+                {% endfor %}
+                {% if not data.orders %}
+                <tr><td colspan="6" class="p-8 text-center text-gray-400 text-sm font-bold">No orders yet.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

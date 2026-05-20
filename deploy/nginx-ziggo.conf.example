@@ -1,0 +1,61 @@
+# Ziggo — host nginx config example.
+#
+# Drop this into /etc/nginx/sites-available/ziggo, edit the server_name,
+# symlink to sites-enabled, then reload:
+#
+#   sudo cp deploy/nginx-ziggo.conf.example /etc/nginx/sites-available/ziggo
+#   sudo nano /etc/nginx/sites-available/ziggo            # set server_name
+#   sudo ln -s /etc/nginx/sites-available/ziggo /etc/nginx/sites-enabled/ziggo
+#   sudo nginx -t && sudo systemctl reload nginx
+#
+# After confirming HTTP works, run certbot for HTTPS:
+#   sudo certbot --nginx -d ziggo.example.com
+# certbot will rewrite this file to add the SSL block automatically.
+#
+# Notes:
+#   - 127.0.0.1:8030 is where docker-compose binds the backend (ZIGGO_PORT)
+#   - The WebSocket block (/ws) needs Upgrade headers, otherwise drivers
+#     never get ride requests in real time.
+#   - The admin panel lives under /admin and uses cookie sessions, so keep
+#     X-Forwarded-Proto so itsdangerous sees the original scheme.
+
+upstream ziggo_backend {
+    server 127.0.0.1:8030;
+    keepalive 16;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ziggo.example.com;          # <-- change to your domain
+
+    # certbot will append a 443 block below this one when you run it.
+
+    # Upload size — driver photos, etc.
+    client_max_body_size 20m;
+
+    # Long-lived WebSocket connection for ride/driver realtime events.
+    location /ws {
+        proxy_pass http://ziggo_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+    # Everything else: REST API, admin panel, static uploads
+    location / {
+        proxy_pass http://ziggo_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 90s;
+    }
+}

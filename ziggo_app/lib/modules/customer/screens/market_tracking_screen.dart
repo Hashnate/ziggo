@@ -1,0 +1,565 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../../app/app_colors.dart';
+import '../../../app/app_styles.dart';
+import '../../../core/widgets/motion.dart';
+import '../market_provider.dart';
+
+class MarketTrackingScreen extends StatefulWidget {
+  final String orderRef;
+  const MarketTrackingScreen({super.key, required this.orderRef});
+
+  @override
+  State<MarketTrackingScreen> createState() => _MarketTrackingScreenState();
+}
+
+class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
+  Map<String, dynamic>? _order;
+  Timer? _poll;
+  String? _lastSeenStatus;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+    _poll = Timer.periodic(const Duration(seconds: 5), (_) => _refresh());
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refresh() async {
+    final orders = await context.read<MarketProvider>().fetchMyOrders();
+    final match = orders.firstWhere(
+      (o) => o['order_ref'] == widget.orderRef,
+      orElse: () => <String, dynamic>{},
+    );
+    if (!mounted) return;
+    final newStatus = match.isEmpty ? null : match['status']?.toString();
+    // Show a one-shot snackbar the moment a fresh status arrives, so the
+    // customer is alerted to important transitions (cancellation in
+    // particular) instead of having to notice the badge change.
+    if (_lastSeenStatus != null && newStatus != null && newStatus != _lastSeenStatus) {
+      _showStatusToast(newStatus, match['cancellation_reason']?.toString());
+    }
+    _lastSeenStatus = newStatus;
+    setState(() => _order = match.isEmpty ? null : match);
+  }
+
+  void _showStatusToast(String status, String? reason) {
+    String msg;
+    Color color = AppColors.primary;
+    IconData icon = Icons.info_rounded;
+    switch (status) {
+      case 'cancelled':
+        msg = reason == null || reason.isEmpty
+            ? 'Your order was cancelled by the store.'
+            : 'Order cancelled: $reason';
+        color = AppColors.error;
+        icon = Icons.cancel_rounded;
+        break;
+      case 'confirmed':
+        msg = 'The store accepted your order.';
+        color = AppColors.success;
+        icon = Icons.check_circle_rounded;
+        break;
+      case 'ready_for_pickup':
+        msg = 'Your order is ready — finding a rider.';
+        color = AppColors.market;
+        icon = Icons.shopping_bag_rounded;
+        break;
+      case 'out_for_delivery':
+        msg = 'A rider has picked up your order.';
+        color = AppColors.warning;
+        icon = Icons.delivery_dining_rounded;
+        break;
+      case 'delivered':
+        msg = 'Order delivered. Enjoy!';
+        color = AppColors.success;
+        icon = Icons.done_all_rounded;
+        break;
+      default:
+        return;
+    }
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(icon, color: Colors.white),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(msg,
+                  style: const TextStyle(fontWeight: FontWeight.w900)),
+            ),
+          ],
+        ),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+      ),
+    );
+  }
+
+  static const _steps = [
+    _Step('pending', 'Order placed', Icons.receipt_long_rounded),
+    _Step('confirmed', 'Confirmed', Icons.check_circle_rounded),
+    _Step('processing', 'Packing your order', Icons.inventory_2_rounded),
+    _Step('ready_for_pickup', 'Ready for pickup', Icons.shopping_bag_rounded),
+    _Step('out_for_delivery', 'Out for delivery', Icons.delivery_dining_rounded),
+    _Step('delivered', 'Delivered', Icons.done_all_rounded),
+  ];
+
+  int _idx(String status) {
+    // Legacy `shipped` value maps to out_for_delivery for back-compat.
+    if (status == 'shipped') status = 'out_for_delivery';
+    final i = _steps.indexWhere((s) => s.status == status);
+    return i < 0 ? 0 : i;
+  }
+
+  Widget _cancelledView() {
+    final reason = _order?['cancellation_reason']?.toString() ?? '';
+    final amount = (_order!['final_amount'] as num? ?? 0).toDouble();
+    final paymentMethod =
+        (_order!['payment_method'] ?? '').toString().toUpperCase();
+    final paymentStatus =
+        (_order!['payment_status'] ?? '').toString().toLowerCase();
+    final refunded = paymentStatus == 'refunded';
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
+      children: staggered([
+        Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFFDC2626), Color(0xFFB91C1C)],
+            ),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: AppStyles.shadowLg,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.22),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(Icons.cancel_rounded,
+                        color: Colors.white, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.22),
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: const Text(
+                            'ORDER CANCELLED',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'The store could not\nfulfil your order',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 20,
+                            letterSpacing: -0.3,
+                            height: 1.15,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                    child: Text(
+                      'Rs.${amount.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        color: Color(0xFFB91C1C),
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.22),
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                    child: Text(
+                      paymentMethod,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 11,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        if (reason.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: AppColors.cardBorder),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'REASON FROM THE STORE',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textTertiary,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  reason,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: refunded
+                ? AppColors.success.withOpacity(0.08)
+                : AppColors.surfaceMuted,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: refunded
+                  ? AppColors.success.withOpacity(0.4)
+                  : AppColors.cardBorder,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: (refunded ? AppColors.success : AppColors.textTertiary)
+                      .withOpacity(0.16),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  refunded
+                      ? Icons.account_balance_wallet_rounded
+                      : Icons.info_outline_rounded,
+                  color: refunded ? AppColors.success : AppColors.textSecondary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  refunded
+                      ? 'Rs.${amount.toStringAsFixed(0)} has been refunded to your wallet.'
+                      : paymentMethod == 'CASH'
+                          ? 'No payment was taken — nothing to refund.'
+                          : 'If you were charged, the refund will appear in your wallet shortly.',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13.5,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ]),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final status = _order?['status']?.toString() ?? 'pending';
+    final cur = _idx(status);
+    final isCancelled = status == 'cancelled';
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        title: Text(widget.orderRef,
+            style: const TextStyle(letterSpacing: 0.4, fontWeight: FontWeight.w900)),
+      ),
+      body: _order == null
+          ? const Center(child: CircularProgressIndicator())
+          : isCancelled
+              ? _cancelledView()
+              : ListView(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
+              children: staggered([
+                Container(
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF22C55E), Color(0xFF16A34A)],
+                    ),
+                    borderRadius: BorderRadius.circular(28),
+                    boxShadow: AppStyles.shadowLg,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.22),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Icon(_steps[cur].icon, color: Colors.white, size: 24),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.22),
+                                    borderRadius: BorderRadius.circular(100),
+                                  ),
+                                  child: const Text(
+                                    'CURRENT STATUS',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 1,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _steps[cur].label,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 18,
+                                    letterSpacing: -0.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            child: Text(
+                              'Rs.${(_order!['final_amount'] as num).toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                color: AppColors.market,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.22),
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            child: Text(
+                              (_order!['payment_method'] ?? '').toString().toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 11,
+                                letterSpacing: 0.6,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: AppColors.cardBorder),
+                  ),
+                  child: Column(
+                    children: List.generate(_steps.length, (i) {
+                      final s = _steps[i];
+                      final done = i <= cur;
+                      final isLast = i == _steps.length - 1;
+                      return IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Column(
+                              children: [
+                                AnimatedContainer(
+                                  duration: const Duration(milliseconds: 250),
+                                  width: 36,
+                                  height: 36,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: done ? AppColors.market : AppColors.surfaceMuted,
+                                    shape: BoxShape.circle,
+                                    boxShadow: done
+                                        ? [
+                                            BoxShadow(
+                                              color: AppColors.market.withOpacity(0.35),
+                                              blurRadius: 12,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                          ]
+                                        : null,
+                                  ),
+                                  child: Icon(
+                                    s.icon,
+                                    color: done ? Colors.white : AppColors.textTertiary,
+                                    size: 18,
+                                  ),
+                                ),
+                                if (!isLast)
+                                  Expanded(
+                                    child: Container(
+                                      width: 3,
+                                      margin: const EdgeInsets.symmetric(vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: i < cur ? AppColors.market : AppColors.divider,
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Padding(
+                                padding: EdgeInsets.only(bottom: isLast ? 0 : 18),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      s.label,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 14,
+                                        color: done
+                                            ? AppColors.textPrimary
+                                            : AppColors.textTertiary,
+                                      ),
+                                    ),
+                                    if (i == cur)
+                                      const Padding(
+                                        padding: EdgeInsets.only(top: 2),
+                                        child: Text(
+                                          'In progress...',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: AppColors.market,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 0.3,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+              ]),
+            ),
+    );
+  }
+}
+
+class _Step {
+  final String status;
+  final String label;
+  final IconData icon;
+  const _Step(this.status, this.label, this.icon);
+}

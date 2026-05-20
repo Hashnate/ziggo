@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Customer spend | Ziggo Admin{% endblock %}
+{% block page_title %}Customer spend{% endblock %}
+{% block content %}
+<div class="space-y-4">
+    <a href="/admin/finance" class="inline-flex items-center text-sm font-bold text-gray-500 hover:text-ziggo">
+        <i class="fas fa-arrow-left mr-2"></i> Back to overview
+    </a>
+    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-gray-100 flex items-baseline justify-between">
+            <div>
+                <h3 class="font-black text-ziggo">Customer spend & wallet</h3>
+                <p class="text-xs text-gray-400 mt-1">Sum of completed/delivered orders across all services.</p>
+            </div>
+            <p class="text-sm font-bold text-gray-500">{{ rows | length }} customers</p>
+        </div>
+        <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-xs font-black uppercase text-gray-500 tracking-wider">
+                <tr>
+                    <th class="px-4 py-3 text-left">Customer</th>
+                    <th class="px-4 py-3 text-right">Wallet</th>
+                    <th class="px-4 py-3 text-right">Total spend</th>
+                    <th class="px-4 py-3 text-right">Rides</th>
+                    <th class="px-4 py-3 text-right">Flash</th>
+                    <th class="px-4 py-3 text-right">Food</th>
+                    <th class="px-4 py-3 text-right">Market</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for r in rows %}
+                <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/admin/finance/customers/{{ r.customer_id }}'">
+                    <td class="px-4 py-3">
+                        <div class="flex items-center gap-2">
+                            <p class="font-black text-ziggo">{{ r.name or '—' }}</p>
+                            {% if r.gold_member %}<span class="px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 text-xs font-black">GOLD</span>{% endif %}
+                        </div>
+                        <p class="text-xs text-gray-400">{{ r.phone or '—' }}</p>
+                    </td>
+                    <td class="px-4 py-3 text-right font-black text-purple-600">Rs.{{ "{:,.0f}".format(r.wallet_balance) }}</td>
+                    <td class="px-4 py-3 text-right font-black text-ziggo">Rs.{{ "{:,.0f}".format(r.total_spend) }}</td>
+                    <td class="px-4 py-3 text-right">{{ r.rides }} <span class="text-xs text-gray-400">/ Rs.{{ "{:,.0f}".format(r.ride_spend) }}</span></td>
+                    <td class="px-4 py-3 text-right">{{ r.flash }} <span class="text-xs text-gray-400">/ Rs.{{ "{:,.0f}".format(r.flash_spend) }}</span></td>
+                    <td class="px-4 py-3 text-right">{{ r.food_orders }} <span class="text-xs text-gray-400">/ Rs.{{ "{:,.0f}".format(r.food_spend) }}</span></td>
+                    <td class="px-4 py-3 text-right">{{ r.market_orders }} <span class="text-xs text-gray-400">/ Rs.{{ "{:,.0f}".format(r.market_spend) }}</span></td>
+                </tr>
+                {% endfor %}
+                {% if not rows %}
+                <tr><td colspan="7" class="p-10 text-center text-gray-400 text-sm font-bold">No customers yet.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

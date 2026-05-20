@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Driver earnings | Ziggo Admin{% endblock %}
+{% block page_title %}Driver earnings{% endblock %}
+{% block content %}
+<div class="space-y-4">
+    <a href="/admin/finance" class="inline-flex items-center text-sm font-bold text-gray-500 hover:text-ziggo">
+        <i class="fas fa-arrow-left mr-2"></i> Back to overview
+    </a>
+    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-gray-100 flex items-baseline justify-between">
+            <div>
+                <h3 class="font-black text-ziggo">Driver earnings & payouts</h3>
+                <p class="text-xs text-gray-400 mt-1">Sum of driver_earnings on completed rides + 80% of delivery fees on food/market.</p>
+            </div>
+            <p class="text-sm font-bold text-gray-500">{{ rows | length }} drivers</p>
+        </div>
+        <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-xs font-black uppercase text-gray-500 tracking-wider">
+                <tr>
+                    <th class="px-4 py-3 text-left">Driver</th>
+                    <th class="px-4 py-3 text-left">Vehicle</th>
+                    <th class="px-4 py-3 text-left">Status</th>
+                    <th class="px-4 py-3 text-right">Total earnings</th>
+                    <th class="px-4 py-3 text-right">This month</th>
+                    <th class="px-4 py-3 text-right">This week</th>
+                    <th class="px-4 py-3 text-right">Today</th>
+                    <th class="px-4 py-3 text-right">Rides</th>
+                    <th class="px-4 py-3 text-right">Food</th>
+                    <th class="px-4 py-3 text-right">Market</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for r in rows %}
+                <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/admin/finance/drivers/{{ r.driver_id }}'">
+                    <td class="px-4 py-3">
+                        <p class="font-black text-ziggo">{{ r.name or '—' }}</p>
+                        <p class="text-xs text-gray-400">{{ r.phone or '—' }}</p>
+                    </td>
+                    <td class="px-4 py-3 capitalize">{{ r.vehicle_type or '—' }}</td>
+                    <td class="px-4 py-3">
+                        <span class="px-2 py-0.5 rounded-full text-xs font-black
+                            {% if r.status == 'approved' and r.is_online %}bg-green-100 text-green-700
+                            {% elif r.status == 'approved' %}bg-gray-100 text-gray-600
+                            {% else %}bg-amber-100 text-amber-700{% endif %}">
+                            {{ 'ONLINE' if r.is_online else (r.status or '—') | upper }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-right font-black text-ziggo">Rs.{{ "{:,.0f}".format(r.total_earnings) }}</td>
+                    <td class="px-4 py-3 text-right">Rs.{{ "{:,.0f}".format(r.this_month) }}</td>
+                    <td class="px-4 py-3 text-right">Rs.{{ "{:,.0f}".format(r.this_week) }}</td>
+                    <td class="px-4 py-3 text-right">Rs.{{ "{:,.0f}".format(r.today) }}</td>
+                    <td class="px-4 py-3 text-right">{{ r.rides }}</td>
+                    <td class="px-4 py-3 text-right">{{ r.food_deliveries }}</td>
+                    <td class="px-4 py-3 text-right">{{ r.market_deliveries }}</td>
+                </tr>
+                {% endfor %}
+                {% if not rows %}
+                <tr><td colspan="10" class="p-10 text-center text-gray-400 text-sm font-bold">No drivers yet.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

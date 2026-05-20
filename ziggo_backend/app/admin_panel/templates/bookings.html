@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Live Ride Tracking | Ziggo Admin{% endblock %}
+{% block page_title %}Live Ride Tracking & Bookings{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    #map { height: 100%; min-height: 500px; border-radius: 1rem; z-index: 1; }
+    .custom-marker { filter: drop-shadow(0 2px 5px rgba(0,0,0,0.2)); }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set active_statuses = ['searching', 'accepted', 'arrived', 'started'] %}
+{% set active_bookings = bookings | selectattr('status.value', 'in', active_statuses) | list %}
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-160px)]">
+    <!-- Map Area -->
+    <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-4 relative flex flex-col">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold text-ziggo">Live Map View</h3>
+            <span class="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full flex items-center gap-2">
+                <span class="w-2 h-2 bg-green-500 rounded-full inline-block"></span>
+                {{ active_bookings | length }} active
+            </span>
+        </div>
+        <div class="flex-1 bg-gray-50 rounded-xl overflow-hidden" id="map"></div>
+    </div>
+
+    <!-- Active Rides Sidebar -->
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col overflow-hidden">
+        <div class="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+            <h3 class="font-bold text-ziggo">Active Rides</h3>
+            <span class="bg-ziggo text-white text-xs px-2 py-1 rounded-lg">{{ active_bookings | length }}</span>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-3">
+            {% for b in active_bookings %}
+            <div class="p-3 border border-gray-100 rounded-xl hover:shadow-md transition-all cursor-pointer"
+                 onclick="focusRide({{ b.pickup_lat }}, {{ b.pickup_lng }})">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-1 rounded-md">{{ b.booking_ref }}</span>
+                    <span class="text-xs font-bold text-ziggo bg-white border border-gray-200 px-2 py-1 rounded-md uppercase">{{ b.status.value }}</span>
+                </div>
+                <p class="text-sm font-medium text-gray-800">
+                    <i class="fas fa-user text-gray-400 mr-1"></i>
+                    {{ b.customer.user.full_name or b.customer.user.phone_number if b.customer else 'Customer' }}
+                </p>
+                {% if b.driver %}
+                <p class="text-xs text-gray-500 mt-1">
+                    <i class="fas fa-car text-ziggo-accent mr-1"></i>
+                    {{ b.driver.user.full_name if b.driver.user else '' }} • {{ b.driver.vehicle_number or '' }}
+                </p>
+                {% endif %}
+                <p class="text-xs text-gray-400 mt-1">
+                    Rs.{{ "{:,.0f}".format(b.final_amount or 0) }} • {{ b.service_type }}
+                </p>
+            </div>
+            {% else %}
+            <p class="text-center text-gray-400 text-sm py-10">No active rides</p>
+            {% endfor %}
+        </div>
+
+        <div class="p-4 border-t border-gray-100 bg-gray-50">
+            <a href="#all-bookings" class="block text-center text-sm font-bold text-ziggo hover:underline">
+                View all {{ bookings | length }} bookings ↓
+            </a>
+        </div>
+    </div>
+</div>
+
+<div id="all-bookings" class="mt-8 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="p-6 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-ziggo">All Bookings (latest {{ bookings | length }})</h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
+                <tr>
+                    <th class="px-6 py-3">Ref</th>
+                    <th class="px-6 py-3">Customer</th>
+                    <th class="px-6 py-3">Driver</th>
+                    <th class="px-6 py-3">Route</th>
+                    <th class="px-6 py-3">Status</th>
+                    <th class="px-6 py-3">Fare</th>
+                    <th class="px-6 py-3">Booked</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for b in bookings %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-3 text-sm font-bold text-blue-700">{{ b.booking_ref }}</td>
+                    <td class="px-6 py-3 text-sm">
+                        {{ b.customer.user.full_name or b.customer.user.phone_number if b.customer else '-' }}
+                    </td>
+                    <td class="px-6 py-3 text-sm">
+                        {% if b.driver %}
+                            {{ b.driver.user.full_name if b.driver.user else '' }}
+                            <span class="text-xs text-gray-400">{{ b.driver.vehicle_number or '' }}</span>
+                        {% else %}<span class="text-gray-400">—</span>{% endif %}
+                    </td>
+                    <td class="px-6 py-3 text-xs text-gray-600">
+                        <div>{{ b.pickup_address[:30] if b.pickup_address else '' }}…</div>
+                        <div class="text-gray-400">→ {{ b.drop_address[:30] if b.drop_address else '' }}…</div>
+                    </td>
+                    <td class="px-6 py-3 text-sm">
+                        <span class="px-2 py-1 rounded-full text-xs font-bold
+                          {% if b.status.value == 'completed' %}bg-green-100 text-green-700
+                          {% elif b.status.value == 'cancelled' %}bg-red-100 text-red-700
+                          {% elif b.status.value in ['searching','accepted','arrived','started'] %}bg-orange-100 text-orange-700
+                          {% else %}bg-gray-100 text-gray-700{% endif %}">
+                          {{ b.status.value }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-3 text-sm font-bold">Rs.{{ "{:,.0f}".format(b.final_amount or 0) }}</td>
+                    <td class="px-6 py-3 text-xs text-gray-500">{{ b.booked_at.strftime("%Y-%m-%d %H:%M") if b.booked_at else '' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="px-6 py-10 text-center text-gray-400">No bookings yet</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    var map = L.map('map').setView([6.9271, 79.8612], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    var carIcon = L.divIcon({className:'custom-marker', html:'<i class="fas fa-car text-2xl" style="color:#FBB03B"></i>', iconSize:[30,30], iconAnchor:[15,15]});
+    var pickIcon = L.divIcon({className:'custom-marker', html:'<i class="fas fa-circle text-blue-500 text-xl"></i>', iconSize:[20,20], iconAnchor:[10,10]});
+    var dropIcon = L.divIcon({className:'custom-marker', html:'<i class="fas fa-map-marker-alt text-red-500 text-2xl"></i>', iconSize:[30,30], iconAnchor:[15,30]});
+
+    {% for b in active_bookings %}
+    L.marker([{{ b.pickup_lat }}, {{ b.pickup_lng }}], {icon: pickIcon}).addTo(map)
+        .bindPopup("<b>{{ b.booking_ref }}</b><br>Pickup • {{ b.service_type }}");
+    L.marker([{{ b.drop_lat }}, {{ b.drop_lng }}], {icon: dropIcon}).addTo(map)
+        .bindPopup("<b>{{ b.booking_ref }}</b><br>Drop");
+    L.polyline([[{{ b.pickup_lat }}, {{ b.pickup_lng }}],[{{ b.drop_lat }}, {{ b.drop_lng }}]],
+        {color:'#1A2A4F', weight:3, dashArray:'6'}).addTo(map);
+    {% if b.driver and b.driver.current_lat %}
+    L.marker([{{ b.driver.current_lat }}, {{ b.driver.current_lng }}], {icon: carIcon}).addTo(map)
+        .bindPopup("<b>{{ b.driver.user.full_name if b.driver.user else 'Driver' }}</b><br>{{ b.driver.vehicle_number }}");
+    {% endif %}
+    {% endfor %}
+
+    function focusRide(lat, lng) { map.flyTo([lat, lng], 16, {duration:1.0}); }
+    setTimeout(function() { map.invalidateSize(); }, 500);
+</script>
+{% endblock %}

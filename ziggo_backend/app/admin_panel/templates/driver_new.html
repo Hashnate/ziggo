@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}Add Driver | Ziggo Admin{% endblock %}
+{% block page_title %}Add New Driver{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+    <form method="post" action="/admin/drivers/new" enctype="multipart/form-data" class="p-8 space-y-6">
+        {% if error %}
+        <div class="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl font-bold text-sm">
+            <i class="fas fa-exclamation-circle mr-1"></i> {{ error }}
+        </div>
+        {% endif %}
+
+        <div>
+            <h3 class="text-lg font-black text-ziggo mb-4">Profile Photo</h3>
+            <div class="flex items-center gap-5">
+                <div id="photoPreview" class="w-24 h-24 rounded-2xl bg-ziggo-soft/50 border-2 border-dashed border-ziggo-line flex items-center justify-center overflow-hidden">
+                    <i class="fas fa-user text-ziggo-faint text-3xl"></i>
+                </div>
+                <div class="flex-1">
+                    <label for="profile_photo" class="inline-flex items-center gap-2 cursor-pointer px-4 py-2.5 bg-ziggo-soft text-ziggo rounded-xl font-bold text-sm hover:bg-ziggo-soft/70 transition">
+                        <i class="fas fa-upload"></i>
+                        <span id="photoLabel">Choose photo</span>
+                    </label>
+                    <input id="profile_photo" name="profile_photo" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="previewPhoto(this)">
+                    <p class="text-xs text-ziggo-faint font-bold mt-2">JPG, PNG or WEBP. Max 5 MB. Optional.</p>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h3 class="text-lg font-black text-ziggo mb-4">Personal Details</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Phone Number</label>
+                    <input name="phone_number" required value="{{ form.phone_number or '' }}"
+                           type="tel" maxlength="10" minlength="10" pattern="\d{10}"
+                           placeholder="0712345678"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Full Name</label>
+                    <input name="full_name" required value="{{ form.full_name or '' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Email (optional)</label>
+                    <input name="email" type="email" value="{{ form.email or '' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">NIC Number</label>
+                    <input name="nic_number" required value="{{ form.nic_number or '' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h3 class="text-lg font-black text-ziggo mb-4">Vehicle Details</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">License Number</label>
+                    <input name="license_number" required value="{{ form.license_number or '' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Vehicle Type</label>
+                    <select name="vehicle_type" required
+                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                        {% set selected = form.vehicle_type or 'car' %}
+                        <option value="bike" {% if selected == 'bike' %}selected{% endif %}>Bike</option>
+                        <option value="tuk" {% if selected == 'tuk' %}selected{% endif %}>Tuk-tuk</option>
+                        <option value="car" {% if selected == 'car' %}selected{% endif %}>Car</option>
+                        <option value="van" {% if selected == 'van' %}selected{% endif %}>Van</option>
+                        <option value="truck" {% if selected == 'truck' %}selected{% endif %}>Truck</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Vehicle Number</label>
+                    <input name="vehicle_number" required value="{{ form.vehicle_number or '' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo"
+                           placeholder="WP-1234">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Vehicle Model</label>
+                    <input name="vehicle_model" required value="{{ form.vehicle_model or '' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo"
+                           placeholder="Toyota Aqua">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Vehicle Color</label>
+                    <input name="vehicle_color" required value="{{ form.vehicle_color or '' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo"
+                           placeholder="White">
+                </div>
+                <div class="flex items-center mt-6">
+                    <label class="inline-flex items-center cursor-pointer">
+                        <input name="auto_approve" type="checkbox" {% if form.auto_approve != '' and form.auto_approve != None %}checked{% else %}checked{% endif %}
+                               class="w-5 h-5 text-ziggo-accent border-gray-300 rounded">
+                        <span class="ml-2 text-sm font-bold text-gray-700">Auto-approve this driver</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="pt-6 border-t border-gray-100 flex justify-end gap-3">
+            <a href="/admin/drivers" class="px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50">Cancel</a>
+            <button type="submit" class="px-8 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light">
+                <i class="fas fa-plus mr-2"></i> Create Driver
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+function previewPhoto(input) {
+    const preview = document.getElementById('photoPreview');
+    const label = document.getElementById('photoLabel');
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    if (file.size > 5 * 1024 * 1024) {
+        alert('Photo must be under 5 MB');
+        input.value = '';
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        preview.innerHTML = '<img src="' + e.target.result + '" class="w-full h-full object-cover">';
+    };
+    reader.readAsDataURL(file);
+    label.textContent = 'Change photo';
+}
+</script>
+{% endblock %}

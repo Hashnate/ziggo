@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Complaints | Ziggo Admin{% endblock %}
+{% block page_title %}Complaints & Support{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="p-6 border-b border-gray-100">
+        <h3 class="font-bold text-ziggo">Complaints ({{ complaints | length }})</h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
+                <tr>
+                    <th class="px-6 py-3">ID</th>
+                    <th class="px-6 py-3">Category</th>
+                    <th class="px-6 py-3">Subject</th>
+                    <th class="px-6 py-3">Status</th>
+                    <th class="px-6 py-3">Created</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for c in complaints %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-3 text-sm font-medium">#{{ c.id }}</td>
+                    <td class="px-6 py-3 text-sm">{{ c.category or '' }}</td>
+                    <td class="px-6 py-3 text-sm">{{ c.subject or '' }}</td>
+                    <td class="px-6 py-3">
+                        <span class="px-2 py-1 rounded-full text-xs font-bold
+                          {% if c.status == 'resolved' %}bg-green-100 text-green-700
+                          {% elif c.status == 'in_progress' %}bg-blue-100 text-blue-700
+                          {% else %}bg-orange-100 text-orange-700{% endif %}">{{ c.status or 'pending' }}</span>
+                    </td>
+                    <td class="px-6 py-3 text-xs text-gray-500">{{ c.created_at.strftime("%Y-%m-%d %H:%M") if c.created_at else '' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="px-6 py-10 text-center text-gray-400">No complaints</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

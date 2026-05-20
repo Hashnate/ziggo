@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Restaurants | Ziggo Admin{% endblock %}
+{% block page_title %}Restaurant Management{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="p-6 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="font-bold text-ziggo">Restaurants ({{ restaurants | length }})</h3>
+        <a href="/admin/restaurants/new"
+           class="bg-ziggo text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-ziggo-light transition-all inline-flex items-center">
+            <i class="fas fa-plus mr-2"></i> Add Restaurant
+        </a>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
+                <tr>
+                    <th class="px-6 py-3">ID</th>
+                    <th class="px-6 py-3">Name</th>
+                    <th class="px-6 py-3">Owner</th>
+                    <th class="px-6 py-3">Cuisine</th>
+                    <th class="px-6 py-3">Address</th>
+                    <th class="px-6 py-3 text-right">Rating</th>
+                    <th class="px-6 py-3 text-right">Delivery</th>
+                    <th class="px-6 py-3">Hours</th>
+                    <th class="px-6 py-3">Status</th>
+                    <th class="px-6 py-3"></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for r in restaurants %}
+                <tr class="hover:bg-gray-50 {% if not r.is_active %}bg-amber-50/40{% endif %}">
+                    <td class="px-6 py-3 text-sm font-medium">#{{ r.id }}</td>
+                    <td class="px-6 py-3">
+                        <p class="text-sm font-bold text-ziggo">{{ r.name }}</p>
+                        <p class="text-xs text-gray-400">{{ r.description or '' }}</p>
+                    </td>
+                    <td class="px-6 py-3 text-xs text-gray-600">
+                        {% if r.owner_phone %}
+                            <span class="font-mono">{{ r.owner_phone }}</span>
+                            <span class="block text-[10px] text-gray-400">self-registered</span>
+                        {% else %}
+                            <span class="text-gray-400">admin-added</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-3 text-sm">{{ r.cuisine or '-' }}</td>
+                    <td class="px-6 py-3 text-xs text-gray-600">{{ r.address or '' }}</td>
+                    <td class="px-6 py-3 text-right text-sm">
+                        <i class="fas fa-star text-yellow-400 text-xs"></i> {{ r.rating or 0 }}
+                    </td>
+                    <td class="px-6 py-3 text-right text-sm font-bold">Rs.{{ "{:,.0f}".format(r.delivery_fee or 0) }}</td>
+                    <td class="px-6 py-3 text-xs text-gray-500">{{ r.opening_time or '' }} - {{ r.closing_time or '' }}</td>
+                    <td class="px-6 py-3">
+                        {% if r.is_active %}
+                            <span class="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">Active</span>
+                        {% else %}
+                            <span class="px-2 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700">Pending approval</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-3">
+                        <div class="flex items-center gap-2">
+                            {% if r.is_active %}
+                                <form method="post" action="/admin/restaurants/{{ r.id }}/suspend" onsubmit="return confirm('Suspend this restaurant? It will stop receiving orders.');">
+                                    <button class="text-red-600 hover:underline text-xs font-bold">Suspend</button>
+                                </form>
+                            {% else %}
+                                <form method="post" action="/admin/restaurants/{{ r.id }}/approve">
+                                    <button class="bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-700">Approve</button>
+                                </form>
+                            {% endif %}
+                            <a href="/admin/restaurants/{{ r.id }}" class="text-blue-600 hover:underline text-sm font-bold">Manage →</a>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10" class="px-6 py-10 text-center text-gray-400">
+                        No restaurants yet. <a href="/admin/restaurants/new" class="text-blue-600 hover:underline font-bold">Add your first one</a>.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
