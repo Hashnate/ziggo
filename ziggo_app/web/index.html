@@ -32,9 +32,8 @@
   <title>ziggo_app</title>
   <link rel="manifest" href="manifest.json">
 
-  <!-- Google Maps JS SDK — required by google_maps_flutter on web.
-       The key is the same one in AndroidManifest.xml / MapsService for dev. -->
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAxGlCCI4yoOn3umPPyX1VypSzL2Sutz9U&libraries=places"></script>
+  <!-- Google Maps JS SDK script tag is injected at runtime from Dart
+       (lib/main.dart) using the key from .env. No hardcoded key here. -->
 </head>
 <body>
   <!--

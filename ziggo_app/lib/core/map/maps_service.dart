@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -36,15 +37,18 @@ class DirectionsResult {
 
 /// Thin client over the Google Maps web-service APIs (Places + Directions).
 ///
-/// NOTE: the API key is shipped in the app binary here. That's fine for local
-/// development, but for production these calls should be proxied through the
-/// FastAPI backend (which already has a `GOOGLE_MAPS_API_KEY` setting) so the
-/// key never leaves the server.
+/// The API key is loaded at app startup from `ziggo_app/.env` (gitignored)
+/// via `flutter_dotenv` — never hardcoded in source. For full
+/// defence-in-depth, restrict the key in Google Cloud Console to your app's
+/// Android package / iOS bundle ID / web referrer + the specific APIs used.
 class MapsService {
   MapsService._();
   static final MapsService instance = MapsService._();
 
-  static const String _apiKey = 'AIzaSyAxGlCCI4yoOn3umPPyX1VypSzL2Sutz9U';
+  // Read at every call so a hot-reload that re-loads .env is picked up.
+  // Falls back to empty string if the .env file is missing, in which case
+  // every API call short-circuits to an empty result.
+  String get _apiKey => dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
 
   final Dio _dio = Dio(
     BaseOptions(
@@ -56,6 +60,7 @@ class MapsService {
   /// Places Autocomplete — biased to Sri Lanka.
   Future<List<PlacePrediction>> autocomplete(String query, {LatLng? near}) async {
     if (query.trim().length < 2) return const [];
+    if (_apiKey.isEmpty) return const [];
     try {
       final resp = await _dio.get(
         'https://maps.googleapis.com/maps/api/place/autocomplete/json',
@@ -83,6 +88,7 @@ class MapsService {
 
   /// Resolves a place_id to its coordinates.
   Future<LatLng?> placeLatLng(String placeId) async {
+    if (_apiKey.isEmpty) return null;
     try {
       final resp = await _dio.get(
         'https://maps.googleapis.com/maps/api/place/details/json',
@@ -111,6 +117,7 @@ class MapsService {
   ///     that prefix stripped. If nothing readable is left, the address is
   ///     rebuilt from `address_components` (route / sublocality / locality).
   Future<String?> reverseGeocode(LatLng point) async {
+    if (_apiKey.isEmpty) return null;
     try {
       final resp = await _dio.get(
         'https://maps.googleapis.com/maps/api/geocode/json',
@@ -170,6 +177,7 @@ class MapsService {
   /// Directions between two points — returns the decoded route polyline plus
   /// the road distance and duration.
   Future<DirectionsResult?> directions(LatLng origin, LatLng dest) async {
+    if (_apiKey.isEmpty) return null;
     try {
       final resp = await _dio.get(
         'https://maps.googleapis.com/maps/api/directions/json',

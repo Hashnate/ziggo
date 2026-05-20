@@ -3,6 +3,9 @@
 .env.local
 .env.*.local
 !.env.production.example
+!.env.example
+ziggo_app/android/local.properties
+ziggo_app/ios/Flutter/Secrets.xcconfig
 
 # Python
 __pycache__/

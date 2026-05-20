@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 
 import 'app/app_theme.dart';
+import 'core/map/maps_web_loader_stub.dart'
+    if (dart.library.html) 'core/map/maps_web_loader.dart';
 import 'core/network/api_client.dart';
 import 'modules/auth/auth_provider.dart';
 import 'modules/auth/screens/role_selection_screen.dart';
@@ -23,6 +26,17 @@ import 'modules/restaurant/screens/restaurant_home_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Load .env into dotenv.env BEFORE anything reads it (MapsService etc.).
+  // If the file is missing we keep going with empty values rather than
+  // crashing the whole app — the maps will just no-op.
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (_) {
+    // ignore — runs with empty env
+  }
+  // On web, inject the Google Maps JS SDK now that we have the key. No-op on
+  // mobile/desktop where the SDK comes from native config.
+  injectGoogleMapsJs(dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '');
   await ApiClient.init().timeout(
     const Duration(seconds: 4),
     onTimeout: () {},
