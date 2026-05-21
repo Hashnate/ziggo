@@ -22,7 +22,10 @@ class HostResolver {
   static const String _prefsKey = 'ziggo_api_host';
   static const String _envHost =
       String.fromEnvironment('API_HOST', defaultValue: '');
-  static const String fallbackHost = 'http://192.168.1.114:$_port';
+  // Production server (nginx on port 80 → backend container). Override at
+  // build time with `--dart-define=API_HOST=http://your-dev-pc:8000` when
+  // you want the app to hit a local dev backend instead.
+  static const String fallbackHost = 'http://187.127.152.141';
 
   static String? _cached;
   static Future<String>? _inFlight;

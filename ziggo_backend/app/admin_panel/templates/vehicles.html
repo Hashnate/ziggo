@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Vehicles | Ziggo Admin{% endblock %}
+{% block page_title %}Vehicles{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
+    <div class="zi-stat">
+        <div class="flex items-center gap-2">
+            <div class="stat-icon bg-blue-100 text-ziggo text-base"><i class="fas fa-car-side"></i></div>
+            <div>
+                <p class="text-[10px] text-ziggo-faint uppercase font-bold">Total</p>
+                <p class="text-xl font-black text-ziggo-ink">{{ vehicles | length }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="zi-stat">
+        <div class="flex items-center gap-2">
+            <div class="stat-icon bg-emerald-100 text-emerald-600 text-base"><i class="fas fa-broadcast-tower"></i></div>
+            <div>
+                <p class="text-[10px] text-ziggo-faint uppercase font-bold">Online</p>
+                <p class="text-xl font-black text-emerald-600">{{ online_count }}</p>
+            </div>
+        </div>
+    </div>
+    {% for type_key, label, color in [('bike','Bike','rose'),('tuk','Tuk','amber'),('car','Car','sky'),('van','Van','indigo')] %}
+    <div class="zi-stat">
+        <div class="flex items-center gap-2">
+            <div class="stat-icon bg-{{ color }}-100 text-{{ color }}-600 text-base">
+                <i class="fas {% if type_key=='bike' %}fa-motorcycle{% elif type_key=='tuk' %}fa-taxi{% elif type_key=='car' %}fa-car{% else %}fa-shuttle-van{% endif %}"></i>
+            </div>
+            <div>
+                <p class="text-[10px] text-ziggo-faint uppercase font-bold">{{ label }}</p>
+                <p class="text-xl font-black text-ziggo-ink">{{ by_type.get(type_key, 0) }}</p>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="p-6 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="font-bold text-ziggo">All Vehicles ({{ vehicles | length }})</h3>
+        <input type="text" id="vehSearch" placeholder="Search plate, driver, model…"
+               class="px-3 py-2 rounded-xl border border-gray-200 text-sm w-72 focus:outline-none focus:border-ziggo">
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left" id="vehTable">
+            <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
+                <tr>
+                    <th class="px-6 py-3">Plate</th>
+                    <th class="px-6 py-3">Type</th>
+                    <th class="px-6 py-3">Model</th>
+                    <th class="px-6 py-3">Color</th>
+                    <th class="px-6 py-3">Driver</th>
+                    <th class="px-6 py-3">Phone</th>
+                    <th class="px-6 py-3">Status</th>
+                    <th class="px-6 py-3">Online</th>
+                    <th class="px-6 py-3"></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for v in vehicles %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-3 font-bold text-ziggo">{{ v.vehicle_number or '—' }}</td>
+                    <td class="px-6 py-3 text-sm capitalize">
+                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-50 text-ziggo text-xs font-bold">
+                            <i class="fas
+                                {% if v.vehicle_type == 'bike' %}fa-motorcycle
+                                {% elif v.vehicle_type == 'tuk' %}fa-taxi
+                                {% elif v.vehicle_type == 'car' %}fa-car
+                                {% elif v.vehicle_type == 'van' %}fa-shuttle-van
+                                {% elif v.vehicle_type == 'truck' %}fa-truck
+                                {% else %}fa-question{% endif %}"></i>
+                            {{ v.vehicle_type or 'unknown' }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-3 text-sm">{{ v.vehicle_model or '—' }}</td>
+                    <td class="px-6 py-3 text-sm">{{ v.vehicle_color or '—' }}</td>
+                    <td class="px-6 py-3 text-sm font-semibold">{{ v.user.full_name if v.user else '—' }}</td>
+                    <td class="px-6 py-3 text-xs text-gray-500">{{ v.user.phone_number if v.user else '' }}</td>
+                    <td class="px-6 py-3">
+                        <span class="px-2 py-1 rounded-full text-xs font-bold
+                            {% if v.status.value == 'approved' %}bg-green-100 text-green-700
+                            {% elif v.status.value == 'pending' %}bg-amber-100 text-amber-700
+                            {% elif v.status.value == 'suspended' %}bg-red-100 text-red-700
+                            {% else %}bg-gray-100 text-gray-600{% endif %}">
+                            {{ v.status.value }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-3">
+                        {% if v.is_online %}
+                        <span class="inline-flex items-center gap-1 text-xs font-bold text-emerald-600">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Online
+                        </span>
+                        {% else %}
+                        <span class="text-xs text-gray-400">Offline</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-3 text-right">
+                        <a href="/admin/drivers/{{ v.id }}/edit" class="text-ziggo text-xs font-bold hover:underline">Edit</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="9" class="px-6 py-10 text-center text-gray-400">No vehicles registered</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    document.getElementById('vehSearch').addEventListener('input', (e) => {
+        const q = e.target.value.toLowerCase();
+        document.querySelectorAll('#vehTable tbody tr').forEach(tr => {
+            tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+    });
+</script>
+{% endblock %}

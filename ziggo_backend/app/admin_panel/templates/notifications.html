@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}Notifications | Ziggo Admin{% endblock %}
+{% block page_title %}Notifications{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+    <div class="zi-stat">
+        <div class="flex items-center gap-2">
+            <div class="stat-icon bg-blue-100 text-ziggo text-base"><i class="fas fa-bell"></i></div>
+            <div>
+                <p class="text-[10px] text-ziggo-faint uppercase font-bold">Total</p>
+                <p class="text-xl font-black text-ziggo-ink">{{ notifications | length }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="zi-stat">
+        <div class="flex items-center gap-2">
+            <div class="stat-icon bg-rose-100 text-rose-600 text-base"><i class="fas fa-envelope-open-text"></i></div>
+            <div>
+                <p class="text-[10px] text-ziggo-faint uppercase font-bold">Unread</p>
+                <p class="text-xl font-black text-rose-600">{{ unread_count }}</p>
+            </div>
+        </div>
+    </div>
+    {% for label, count in by_type.items() %}
+    <div class="zi-stat">
+        <div>
+            <p class="text-[10px] text-ziggo-faint uppercase font-bold truncate">{{ label }}</p>
+            <p class="text-xl font-black text-ziggo-ink">{{ count }}</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="p-5 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="font-black text-ziggo-ink">Latest notifications ({{ notifications | length }}, last 300)</h3>
+        <select id="typeFilter" class="px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-ziggo">
+            <option value="">All types</option>
+            {% for label in by_type.keys() %}
+            <option value="{{ label }}">{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left" id="notifTable">
+            <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
+                <tr>
+                    <th class="px-6 py-3">Sent</th>
+                    <th class="px-6 py-3">Recipient</th>
+                    <th class="px-6 py-3">Type</th>
+                    <th class="px-6 py-3">Title</th>
+                    <th class="px-6 py-3">Body</th>
+                    <th class="px-6 py-3">Status</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for n in notifications %}
+                <tr class="hover:bg-gray-50" data-type="{{ n.type or 'other' }}">
+                    <td class="px-6 py-3 text-xs text-gray-500 whitespace-nowrap">
+                        {{ n.created_at.strftime("%Y-%m-%d %H:%M") if n.created_at else '' }}
+                    </td>
+                    <td class="px-6 py-3 text-sm">
+                        <p class="font-semibold text-ziggo-ink">{{ n.user.full_name if n.user else '—' }}</p>
+                        <p class="text-[10px] text-ziggo-faint">{{ n.user.phone_number if n.user else '' }}</p>
+                    </td>
+                    <td class="px-6 py-3">
+                        <span class="px-2 py-1 rounded-full text-[10px] font-bold uppercase
+                            {% if n.type == 'ride_update' %}bg-blue-100 text-ziggo
+                            {% elif n.type == 'promo' %}bg-amber-100 text-amber-700
+                            {% elif n.type == 'payment' %}bg-emerald-100 text-emerald-700
+                            {% elif n.type == 'admin_message' %}bg-purple-100 text-purple-700
+                            {% else %}bg-gray-100 text-gray-600{% endif %}">
+                            {{ n.type or 'other' }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-3 text-sm font-semibold">{{ n.title or '—' }}</td>
+                    <td class="px-6 py-3 text-xs text-gray-500 max-w-md truncate">{{ n.body or '' }}</td>
+                    <td class="px-6 py-3">
+                        {% if n.is_read %}
+                        <span class="text-[10px] text-gray-400">Read</span>
+                        {% else %}
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-600">Unread</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="px-6 py-10 text-center text-gray-400">No notifications yet</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    document.getElementById('typeFilter').addEventListener('change', (e) => {
+        const v = e.target.value;
+        document.querySelectorAll('#notifTable tbody tr').forEach(tr => {
+            tr.style.display = !v || tr.dataset.type === v ? '' : 'none';
+        });
+    });
+</script>
+{% endblock %}

@@ -522,6 +522,7 @@ async def suspend_driver_form(
 
 
 @router.get("/customers", response_class=HTMLResponse)
+@router.get("/riders", response_class=HTMLResponse)
 async def admin_customers(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -531,9 +532,11 @@ async def admin_customers(
         select(Customer).options(selectinload(Customer.user)).order_by(Customer.id.desc())
     )
     customers = q.scalars().all()
+    # active_page now reads "riders" to match the renamed sidebar entry; the
+    # legacy /customers URL still works so existing bookmarks don't 404.
     return templates.TemplateResponse(
         "customers.html",
-        {"request": request, "active_page": "customers", "customers": customers},
+        {"request": request, "active_page": "riders", "customers": customers},
     )
 
 
@@ -1441,6 +1444,7 @@ async def admin_promotions(
 
 
 @router.get("/complaints", response_class=HTMLResponse)
+@router.get("/support", response_class=HTMLResponse)
 async def admin_complaints(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -1453,7 +1457,7 @@ async def admin_complaints(
     )
     return templates.TemplateResponse(
         "complaints.html",
-        {"request": request, "active_page": "complaints", "complaints": q.scalars().all()},
+        {"request": request, "active_page": "support", "complaints": q.scalars().all()},
     )
 
 
@@ -1742,4 +1746,730 @@ async def admin_events_delete(
     await db.commit()
     return RedirectResponse(url="/admin/events", status_code=303)
 
+
+# ---------------------------------------------------------------------------
+# Client-requested pages — added 2026-05-21 to match the 19-item sidebar
+# the client supplied. Each is a read-only view backed by existing models
+# (no new migrations). Mutating actions are kept minimal.
+# ---------------------------------------------------------------------------
+
+from decimal import Decimal  # noqa: E402
+import json  # noqa: E402
+
+
+@router.get("/heatmap", response_class=HTMLResponse)
+async def admin_heatmap(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    """Pickup-location heat map for the last 500 bookings (rides + flash)."""
+    q = await db.execute(
+        select(Booking.pickup_lat, Booking.pickup_lng, Booking.service_type)
+        .where(Booking.pickup_lat.isnot(None), Booking.pickup_lng.isnot(None))
+        .order_by(desc(Booking.id))
+        .limit(500)
+    )
+    points = [
+        {"lat": float(r[0]), "lng": float(r[1]), "service": r[2] or ""}
+        for r in q.all()
+    ]
+    return templates.TemplateResponse(
+        "heatmap.html",
+        {
+            "request": request,
+            "active_page": "heatmap",
+            "points_json": json.dumps(points),
+            "point_count": len(points),
+        },
+    )
+
+
+@router.get("/vehicles", response_class=HTMLResponse)
+async def admin_vehicles(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    """Every registered vehicle = every driver row (1 driver = 1 vehicle)."""
+    q = await db.execute(
+        select(Driver)
+        .options(selectinload(Driver.user))
+        .order_by(desc(Driver.id))
+    )
+    vehicles = q.scalars().all()
+    # Per-type counts for the summary cards.
+    by_type: dict[str, int] = {}
+    online_count = 0
+    for v in vehicles:
+        if v.vehicle_type:
+            by_type[v.vehicle_type] = by_type.get(v.vehicle_type, 0) + 1
+        if v.is_online:
+            online_count += 1
+    return templates.TemplateResponse(
+        "vehicles.html",
+        {
+            "request": request,
+            "active_page": "vehicles",
+            "vehicles": vehicles,
+            "by_type": by_type,
+            "online_count": online_count,
+        },
+    )
+
+
+@router.get("/categories", response_class=HTMLResponse)
+async def admin_categories(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    """Service categories = the 5 vehicle types + flash + food + market.
+
+    Pulls FareSetting rows so the admin sees the per-category pricing alongside
+    the live count of drivers/vendors in that category.
+    """
+    from ..models import FareSetting
+
+    fare_q = await db.execute(select(FareSetting))
+    fares = {f.service_type: f for f in fare_q.scalars().all()}
+
+    drv_counts_q = await db.execute(
+        select(Driver.vehicle_type, func.count(Driver.id)).group_by(Driver.vehicle_type)
+    )
+    drv_counts = {row[0]: int(row[1]) for row in drv_counts_q.all() if row[0]}
+
+    booking_counts_q = await db.execute(
+        select(Booking.service_type, func.count(Booking.id)).group_by(Booking.service_type)
+    )
+    booking_counts = {row[0]: int(row[1]) for row in booking_counts_q.all() if row[0]}
+
+    categories = []
+    catalog = [
+        ("bike", "Bike", "fa-motorcycle", "from-rose-400 to-pink-500"),
+        ("tuk", "Tuk-tuk", "fa-taxi", "from-amber-400 to-orange-500"),
+        ("car", "Car", "fa-car", "from-sky-400 to-blue-500"),
+        ("van", "Van", "fa-shuttle-van", "from-indigo-400 to-purple-500"),
+        ("truck", "Truck", "fa-truck", "from-slate-500 to-zinc-700"),
+    ]
+    for key, label, icon, grad in catalog:
+        f = fares.get(key)
+        categories.append({
+            "key": key,
+            "label": label,
+            "icon": icon,
+            "grad": grad,
+            "base_fare": float(f.base_fare) if f else None,
+            "per_km": float(f.per_km_rate) if f else None,
+            "per_min": float(f.per_minute_rate) if f else None,
+            "min_fare": float(f.min_fare) if f else None,
+            "drivers": drv_counts.get(key, 0),
+            "bookings": booking_counts.get(key, 0),
+        })
+    return templates.TemplateResponse(
+        "categories.html",
+        {"request": request, "active_page": "categories", "categories": categories},
+    )
+
+
+@router.get("/live-tracking", response_class=HTMLResponse)
+async def admin_live_tracking(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    """Real-time map of online + approved drivers. Page polls /live-tracking/feed."""
+    return templates.TemplateResponse(
+        "live_tracking.html",
+        {"request": request, "active_page": "live-tracking"},
+    )
+
+
+@router.get("/live-tracking/feed")
+async def admin_live_tracking_feed(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    q = await db.execute(
+        select(Driver)
+        .options(selectinload(Driver.user))
+        .where(
+            Driver.is_online == True,  # noqa: E712
+            Driver.status == DriverStatus.APPROVED,
+            Driver.current_lat.isnot(None),
+            Driver.current_lng.isnot(None),
+        )
+    )
+    drivers = []
+    for d in q.scalars().all():
+        drivers.append({
+            "id": d.id,
+            "name": d.user.full_name if d.user else f"Driver #{d.id}",
+            "phone": d.user.phone_number if d.user else "",
+            "vehicle_type": d.vehicle_type or "",
+            "vehicle_number": d.vehicle_number or "",
+            "lat": float(d.current_lat),
+            "lng": float(d.current_lng),
+            "last_update": d.last_location_update.isoformat() if d.last_location_update else None,
+        })
+    # Also surface in-progress bookings so the admin can see active trips.
+    bq = await db.execute(
+        select(Booking)
+        .options(selectinload(Booking.customer).selectinload(Customer.user))
+        .where(
+            Booking.status.in_([
+                BookingStatus.ACCEPTED,
+                BookingStatus.ARRIVED,
+                BookingStatus.STARTED,
+            ])
+        )
+        .order_by(desc(Booking.id))
+        .limit(50)
+    )
+    active = []
+    for b in bq.scalars().all():
+        active.append({
+            "booking_ref": b.booking_ref,
+            "status": b.status.value if b.status else "",
+            "customer": (b.customer.user.full_name if b.customer and b.customer.user else ""),
+            "pickup_lat": float(b.pickup_lat) if b.pickup_lat else None,
+            "pickup_lng": float(b.pickup_lng) if b.pickup_lng else None,
+            "drop_lat": float(b.drop_lat) if b.drop_lat else None,
+            "drop_lng": float(b.drop_lng) if b.drop_lng else None,
+        })
+    return {"drivers": drivers, "active_bookings": active}
+
+
+@router.get("/reports", response_class=HTMLResponse)
+async def admin_reports(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    """30-day revenue/ride summary + top drivers + top customers."""
+    from datetime import timedelta
+    from ..models import WalletTransaction
+
+    now = datetime.now(timezone.utc)
+    day0 = (now - timedelta(days=29)).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    daily_q = await db.execute(
+        select(
+            func.date(Booking.completed_at).label("day"),
+            func.count(Booking.id).label("rides"),
+            func.coalesce(func.sum(Booking.final_amount), 0).label("revenue"),
+        )
+        .where(
+            Booking.status == BookingStatus.COMPLETED,
+            Booking.completed_at >= day0,
+        )
+        .group_by(func.date(Booking.completed_at))
+        .order_by(func.date(Booking.completed_at))
+    )
+    daily = [
+        {
+            "day": str(r[0]),
+            "rides": int(r[1]),
+            "revenue": float(r[2] or 0),
+        }
+        for r in daily_q.all()
+    ]
+
+    top_drivers_q = await db.execute(
+        select(Driver, func.count(Booking.id).label("rides"),
+               func.coalesce(func.sum(Booking.driver_earnings), 0).label("earnings"))
+        .join(Booking, Booking.driver_id == Driver.id, isouter=True)
+        .options(selectinload(Driver.user))
+        .where(Booking.status == BookingStatus.COMPLETED)
+        .group_by(Driver.id)
+        .order_by(desc("earnings"))
+        .limit(10)
+    )
+    top_drivers = [
+        {
+            "name": d.user.full_name if d.user else f"Driver #{d.id}",
+            "phone": d.user.phone_number if d.user else "",
+            "vehicle": d.vehicle_type or "",
+            "rides": int(rides or 0),
+            "earnings": float(earnings or 0),
+        }
+        for d, rides, earnings in top_drivers_q.all()
+    ]
+
+    top_customers_q = await db.execute(
+        select(Customer, func.count(Booking.id).label("rides"),
+               func.coalesce(func.sum(Booking.final_amount), 0).label("spend"))
+        .join(Booking, Booking.customer_id == Customer.id, isouter=True)
+        .options(selectinload(Customer.user))
+        .where(Booking.status == BookingStatus.COMPLETED)
+        .group_by(Customer.id)
+        .order_by(desc("spend"))
+        .limit(10)
+    )
+    top_customers = [
+        {
+            "name": c.user.full_name if c.user else f"Customer #{c.id}",
+            "phone": c.user.phone_number if c.user else "",
+            "rides": int(rides or 0),
+            "spend": float(spend or 0),
+        }
+        for c, rides, spend in top_customers_q.all()
+    ]
+
+    totals = {
+        "rides_30d": sum(d["rides"] for d in daily),
+        "revenue_30d": sum(d["revenue"] for d in daily),
+        "drivers": (await db.execute(select(func.count(Driver.id)))).scalar() or 0,
+        "riders": (await db.execute(select(func.count(Customer.id)))).scalar() or 0,
+        "topups_30d": float((await db.execute(
+            select(func.coalesce(func.sum(WalletTransaction.amount), 0))
+            .where(WalletTransaction.type == "credit", WalletTransaction.created_at >= day0)
+        )).scalar() or 0),
+    }
+
+    return templates.TemplateResponse(
+        "reports.html",
+        {
+            "request": request,
+            "active_page": "reports",
+            "daily_json": json.dumps(daily),
+            "totals": totals,
+            "top_drivers": top_drivers,
+            "top_customers": top_customers,
+        },
+    )
+
+
+@router.get("/withdrawals", response_class=HTMLResponse)
+async def admin_withdrawals(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    """Driver payout overview.
+
+    No dedicated withdrawal-request model exists yet, so this view derives the
+    pending payout from `total_earnings` minus any `WalletTransaction` rows of
+    type 'withdrawal'. Past payouts are listed in a second table.
+    """
+    from ..models import WalletTransaction
+
+    d_q = await db.execute(
+        select(Driver).options(selectinload(Driver.user)).order_by(desc(Driver.total_earnings))
+    )
+    drivers = d_q.scalars().all()
+
+    paid_q = await db.execute(
+        select(WalletTransaction.user_id, func.coalesce(func.sum(WalletTransaction.amount), 0))
+        .where(WalletTransaction.type == "withdrawal")
+        .group_by(WalletTransaction.user_id)
+    )
+    paid_by_user = {row[0]: float(row[1] or 0) for row in paid_q.all()}
+
+    rows = []
+    total_pending = Decimal("0")
+    for d in drivers:
+        earned = float(d.total_earnings or 0)
+        paid = paid_by_user.get(d.user_id, 0.0)
+        pending = max(earned - paid, 0.0)
+        total_pending += Decimal(str(pending))
+        rows.append({
+            "driver_id": d.id,
+            "user_id": d.user_id,
+            "name": d.user.full_name if d.user else f"Driver #{d.id}",
+            "phone": d.user.phone_number if d.user else "",
+            "vehicle_type": d.vehicle_type or "",
+            "earned": earned,
+            "paid": paid,
+            "pending": pending,
+        })
+
+    hist_q = await db.execute(
+        select(WalletTransaction)
+        .options(selectinload(WalletTransaction.user))
+        .where(WalletTransaction.type == "withdrawal")
+        .order_by(desc(WalletTransaction.id))
+        .limit(100)
+    )
+    history = hist_q.scalars().all()
+
+    return templates.TemplateResponse(
+        "withdrawals.html",
+        {
+            "request": request,
+            "active_page": "withdrawals",
+            "rows": rows,
+            "history": history,
+            "total_pending": float(total_pending),
+        },
+    )
+
+
+@router.post("/withdrawals/{driver_id}/pay")
+async def admin_withdrawals_pay(
+    driver_id: int,
+    amount: str = Form(...),
+    note: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    """Record a manual payout to a driver. Creates a WalletTransaction row of
+    type='withdrawal' so the pending-payout calc in the table subtracts it.
+    """
+    q = await db.execute(select(Driver).where(Driver.id == driver_id))
+    drv = q.scalars().first()
+    if drv is None:
+        raise HTTPException(status_code=404, detail="Driver not found")
+    try:
+        amt = Decimal(str(amount))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid amount")
+    if amt <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+
+    from ..models import WalletTransaction
+    tx = WalletTransaction(
+        user_id=drv.user_id,
+        amount=amt,
+        type="withdrawal",
+        description=note or "Manual payout via admin panel",
+        balance_after=Decimal("0"),
+    )
+    db.add(tx)
+    await db.commit()
+    return RedirectResponse(url="/admin/withdrawals", status_code=303)
+
+
+@router.get("/payments", response_class=HTMLResponse)
+async def admin_payments(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    """All booking payments (cash/card/wallet) in reverse-chronological order."""
+    from ..models import Payment
+
+    q = await db.execute(
+        select(Payment)
+        .options(
+            selectinload(Payment.booking).selectinload(Booking.customer).selectinload(Customer.user),
+        )
+        .order_by(desc(Payment.id))
+        .limit(300)
+    )
+    payments = q.scalars().all()
+
+    totals = {
+        "total": float((await db.execute(
+            select(func.coalesce(func.sum(Payment.amount), 0))
+        )).scalar() or 0),
+        "cash": float((await db.execute(
+            select(func.coalesce(func.sum(Payment.amount), 0))
+            .where(Payment.payment_method == "cash")
+        )).scalar() or 0),
+        "card": float((await db.execute(
+            select(func.coalesce(func.sum(Payment.amount), 0))
+            .where(Payment.payment_method == "card")
+        )).scalar() or 0),
+        "wallet": float((await db.execute(
+            select(func.coalesce(func.sum(Payment.amount), 0))
+            .where(Payment.payment_method == "wallet")
+        )).scalar() or 0),
+    }
+    return templates.TemplateResponse(
+        "payments.html",
+        {
+            "request": request,
+            "active_page": "payments",
+            "payments": payments,
+            "totals": totals,
+        },
+    )
+
+
+@router.get("/topups", response_class=HTMLResponse)
+async def admin_topups(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    """Wallet credit history. Filter: WalletTransaction.type == 'credit'."""
+    from ..models import WalletTransaction
+
+    q = await db.execute(
+        select(WalletTransaction)
+        .options(selectinload(WalletTransaction.user))
+        .where(WalletTransaction.type == "credit")
+        .order_by(desc(WalletTransaction.id))
+        .limit(300)
+    )
+    topups = q.scalars().all()
+    total = float((await db.execute(
+        select(func.coalesce(func.sum(WalletTransaction.amount), 0))
+        .where(WalletTransaction.type == "credit")
+    )).scalar() or 0)
+    count = (await db.execute(
+        select(func.count(WalletTransaction.id))
+        .where(WalletTransaction.type == "credit")
+    )).scalar() or 0
+    return templates.TemplateResponse(
+        "topups.html",
+        {
+            "request": request,
+            "active_page": "topups",
+            "topups": topups,
+            "total": total,
+            "count": int(count),
+        },
+    )
+
+
+@router.post("/topups/manual")
+async def admin_topups_manual(
+    user_phone: str = Form(...),
+    amount: str = Form(...),
+    note: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    """Manually credit a customer's wallet. Used by support when a real top-up
+    fails to post but the bank already cleared.
+    """
+    u_q = await db.execute(select(User).where(User.phone_number == user_phone.strip()))
+    u = u_q.scalars().first()
+    if u is None:
+        raise HTTPException(status_code=404, detail="No user with that phone")
+    c_q = await db.execute(select(Customer).where(Customer.user_id == u.id))
+    c = c_q.scalars().first()
+    if c is None:
+        raise HTTPException(status_code=400, detail="User has no customer profile")
+    try:
+        amt = Decimal(str(amount))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid amount")
+    if amt <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+
+    c.wallet_balance = (c.wallet_balance or Decimal("0")) + amt
+    from ..models import WalletTransaction
+    tx = WalletTransaction(
+        user_id=u.id,
+        amount=amt,
+        type="credit",
+        description=note or "Manual top-up by admin",
+        balance_after=c.wallet_balance,
+    )
+    db.add(tx)
+    await db.commit()
+    return RedirectResponse(url="/admin/topups", status_code=303)
+
+
+@router.get("/services", response_class=HTMLResponse)
+async def admin_services(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    """The user-facing services exposed by Ziggo. Counts are derived from data."""
+    from ..models import Restaurant, MarketVendor, Event
+
+    rides_total = int((await db.execute(
+        select(func.count(Booking.id)).where(Booking.is_flash == False)  # noqa: E712
+    )).scalar() or 0)
+    flash_total = int((await db.execute(
+        select(func.count(Booking.id)).where(Booking.is_flash == True)  # noqa: E712
+    )).scalar() or 0)
+    rentals_total = int((await db.execute(
+        select(func.count(Booking.id)).where(Booking.is_rental == True)  # noqa: E712
+    )).scalar() or 0)
+    restaurants_total = int((await db.execute(select(func.count(Restaurant.id)))).scalar() or 0)
+    vendors_total = int((await db.execute(select(func.count(MarketVendor.id)))).scalar() or 0)
+    events_total = int((await db.execute(select(func.count(Event.id)))).scalar() or 0)
+
+    services = [
+        {"key": "rides", "label": "Rides", "icon": "fa-car",
+         "desc": "Bike, tuk, car, van and truck on-demand rides.",
+         "count": rides_total, "count_label": "rides booked", "url": "/admin/bookings",
+         "grad": "from-blue-500 to-indigo-600"},
+        {"key": "flash", "label": "Flash Parcels", "icon": "fa-bolt",
+         "desc": "Same-city parcel courier dispatched on demand.",
+         "count": flash_total, "count_label": "parcels", "url": "/admin/flash",
+         "grad": "from-amber-400 to-orange-500"},
+        {"key": "rentals", "label": "Vehicle Rentals", "icon": "fa-key",
+         "desc": "Hourly rental of bikes/tuks/vans to roam the city.",
+         "count": rentals_total, "count_label": "rentals", "url": "/admin/bookings",
+         "grad": "from-emerald-400 to-teal-500"},
+        {"key": "food", "label": "Food Delivery", "icon": "fa-utensils",
+         "desc": "Restaurant ordering with driver delivery.",
+         "count": restaurants_total, "count_label": "restaurants", "url": "/admin/restaurants",
+         "grad": "from-rose-400 to-red-500"},
+        {"key": "market", "label": "Market", "icon": "fa-store",
+         "desc": "Grocery & retail vendors shipping via Ziggo drivers.",
+         "count": vendors_total, "count_label": "vendors", "url": "/admin/market",
+         "grad": "from-purple-400 to-fuchsia-500"},
+        {"key": "events", "label": "Events & Tickets", "icon": "fa-music",
+         "desc": "Concert and event ticketing inside the app.",
+         "count": events_total, "count_label": "events", "url": "/admin/events",
+         "grad": "from-sky-400 to-cyan-500"},
+    ]
+    return templates.TemplateResponse(
+        "services.html",
+        {"request": request, "active_page": "services", "services": services},
+    )
+
+
+@router.get("/messages", response_class=HTMLResponse)
+async def admin_messages(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    """Admin-broadcast messages. Stored as Notification rows of type='admin_message'."""
+    from ..models import Notification
+
+    q = await db.execute(
+        select(Notification)
+        .options(selectinload(Notification.user))
+        .where(Notification.type == "admin_message")
+        .order_by(desc(Notification.id))
+        .limit(200)
+    )
+    messages = q.scalars().all()
+    # Group by data field (JSON containing batch_id) so the inbox shows one row
+    # per broadcast instead of one row per recipient.
+    batches: dict[str, dict] = {}
+    for m in messages:
+        meta = {}
+        if m.data:
+            try:
+                meta = json.loads(m.data)
+            except Exception:
+                meta = {}
+        bid = meta.get("batch_id", f"single-{m.id}")
+        if bid not in batches:
+            batches[bid] = {
+                "title": m.title,
+                "body": m.body,
+                "audience": meta.get("audience", "individual"),
+                "sent_at": m.created_at,
+                "count": 0,
+                "first_id": m.id,
+            }
+        batches[bid]["count"] += 1
+    grouped = sorted(batches.values(), key=lambda b: b["first_id"], reverse=True)
+    return templates.TemplateResponse(
+        "messages.html",
+        {"request": request, "active_page": "messages", "batches": grouped},
+    )
+
+
+@router.post("/messages/send")
+async def admin_messages_send(
+    audience: str = Form(...),
+    title: str = Form(...),
+    body: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    """Broadcast a message to all users of the chosen audience.
+
+    audience ∈ {"all", "customer", "driver"}.
+    """
+    import secrets
+    from ..models import Notification
+
+    audience = audience.strip().lower()
+    if audience not in ("all", "customer", "driver"):
+        raise HTTPException(status_code=400, detail="Invalid audience")
+
+    where = []
+    if audience == "customer":
+        where.append(User.role == UserRole.CUSTOMER)
+    elif audience == "driver":
+        where.append(User.role == UserRole.DRIVER)
+    else:
+        where.append(User.role.in_([UserRole.CUSTOMER, UserRole.DRIVER]))
+
+    u_q = await db.execute(select(User.id).where(*where))
+    user_ids = [row[0] for row in u_q.all()]
+
+    batch_id = secrets.token_hex(8)
+    meta = json.dumps({"batch_id": batch_id, "audience": audience})
+    for uid in user_ids:
+        db.add(Notification(
+            user_id=uid,
+            title=title.strip(),
+            body=body.strip(),
+            type="admin_message",
+            data=meta,
+            is_read=False,
+        ))
+    await db.commit()
+    return RedirectResponse(url="/admin/messages", status_code=303)
+
+
+@router.get("/notifications", response_class=HTMLResponse)
+async def admin_notifications(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    """All notifications emitted by the system (latest first, limited 300)."""
+    from ..models import Notification
+
+    q = await db.execute(
+        select(Notification)
+        .options(selectinload(Notification.user))
+        .order_by(desc(Notification.id))
+        .limit(300)
+    )
+    notifications = q.scalars().all()
+
+    by_type_q = await db.execute(
+        select(Notification.type, func.count(Notification.id)).group_by(Notification.type)
+    )
+    by_type = {row[0] or "other": int(row[1]) for row in by_type_q.all()}
+    unread_count = int((await db.execute(
+        select(func.count(Notification.id)).where(Notification.is_read == False)  # noqa: E712
+    )).scalar() or 0)
+    return templates.TemplateResponse(
+        "notifications.html",
+        {
+            "request": request,
+            "active_page": "notifications",
+            "notifications": notifications,
+            "by_type": by_type,
+            "unread_count": unread_count,
+        },
+    )
+
+
+@router.get("/settings", response_class=HTMLResponse)
+async def admin_settings(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(current_admin),
+):
+    """General settings hub — surfaces system info + links to fare/flash configs."""
+    from ..models import FareSetting, FlashWeightTier, PromoCode
+
+    fare_count = int((await db.execute(select(func.count(FareSetting.id)))).scalar() or 0)
+    flash_count = int((await db.execute(select(func.count(FlashWeightTier.id)))).scalar() or 0)
+    promo_count = int((await db.execute(select(func.count(PromoCode.id)))).scalar() or 0)
+
+    info = {
+        "project_name": settings.PROJECT_NAME,
+        "api_prefix": settings.API_V1_STR,
+        "dev_mode": getattr(settings, "DEV_MODE", False),
+        "fare_count": fare_count,
+        "flash_count": flash_count,
+        "promo_count": promo_count,
+        "admin_name": admin.full_name or "Admin",
+        "admin_phone": admin.phone_number,
+        "admin_email": admin.email or "",
+    }
+    return templates.TemplateResponse(
+        "admin_settings.html",
+        {"request": request, "active_page": "settings", "info": info},
+    )
 

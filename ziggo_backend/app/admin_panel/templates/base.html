@@ -224,64 +224,80 @@
 
         <nav class="flex-1 mt-2 px-4 space-y-1 overflow-y-auto">
             <a href="/admin/dashboard" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'dashboard' %}active{% endif %}">
-                <i class="fas fa-chart-line w-5 text-center"></i>
+                <i class="fas fa-th-large w-5 text-center"></i>
                 <span class="text-sm">Dashboard</span>
             </a>
-
-            <p class="px-4 pt-5 pb-2 text-[10px] uppercase tracking-[0.18em] text-ziggo-soft/40 font-bold">Operations</p>
-            <a href="/admin/customers" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'customers' %}active{% endif %}">
-                <i class="fas fa-users w-5 text-center"></i>
-                <span class="text-sm">Customers</span>
-            </a>
-            <a href="/admin/drivers" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'drivers' %}active{% endif %}">
-                <i class="fas fa-motorcycle w-5 text-center"></i>
-                <span class="text-sm">Drivers</span>
-            </a>
             <a href="/admin/bookings" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'bookings' %}active{% endif %}">
-                <i class="fas fa-calendar-check w-5 text-center"></i>
+                <i class="fas fa-car w-5 text-center"></i>
                 <span class="text-sm">Bookings</span>
             </a>
-            <a href="/admin/flash" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'flash' %}active{% endif %}">
-                <i class="fas fa-bolt w-5 text-center"></i>
-                <span class="text-sm">Flash parcels</span>
+            <a href="/admin/heatmap" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'heatmap' %}active{% endif %}">
+                <i class="fas fa-fire w-5 text-center"></i>
+                <span class="text-sm">Demand Heat Map</span>
             </a>
-
-            <p class="px-4 pt-5 pb-2 text-[10px] uppercase tracking-[0.18em] text-ziggo-soft/40 font-bold">Merchants</p>
-            <a href="/admin/restaurants" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'restaurants' %}active{% endif %}">
-                <i class="fas fa-utensils w-5 text-center"></i>
-                <span class="text-sm">Restaurants</span>
+            <a href="/admin/riders" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'riders' %}active{% endif %}">
+                <i class="fas fa-user-friends w-5 text-center"></i>
+                <span class="text-sm">Riders</span>
             </a>
-            <a href="/admin/market" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'market' %}active{% endif %}">
-                <i class="fas fa-store w-5 text-center"></i>
-                <span class="text-sm">Market vendors</span>
+            <a href="/admin/drivers" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'drivers' %}active{% endif %}">
+                <i class="fas fa-id-card w-5 text-center"></i>
+                <span class="text-sm">Drivers</span>
             </a>
-
-            <p class="px-4 pt-5 pb-2 text-[10px] uppercase tracking-[0.18em] text-ziggo-soft/40 font-bold">Finance</p>
-            <a href="/admin/finance" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'finance' %}active{% endif %}">
-                <i class="fas fa-coins w-5 text-center"></i>
-                <span class="text-sm">Finance</span>
+            <a href="/admin/vehicles" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'vehicles' %}active{% endif %}">
+                <i class="fas fa-car-side w-5 text-center"></i>
+                <span class="text-sm">Vehicles</span>
             </a>
-
-            <p class="px-4 pt-5 pb-2 text-[10px] uppercase tracking-[0.18em] text-ziggo-soft/40 font-bold">Configure</p>
-            <a href="/admin/fare-settings" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'fare-settings' %}active{% endif %}">
-                <i class="fas fa-tags w-5 text-center"></i>
-                <span class="text-sm">Fare settings</span>
+            <a href="/admin/categories" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'categories' %}active{% endif %}">
+                <i class="fas fa-layer-group w-5 text-center"></i>
+                <span class="text-sm">Categories</span>
             </a>
-            <a href="/admin/flash-pricing" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'flash-pricing' %}active{% endif %}">
-                <i class="fas fa-weight-hanging w-5 text-center"></i>
-                <span class="text-sm">Flash pricing</span>
+            <a href="/admin/live-tracking" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'live-tracking' %}active{% endif %}">
+                <i class="fas fa-location-arrow w-5 text-center"></i>
+                <span class="text-sm">Live Tracking</span>
             </a>
             <a href="/admin/promotions" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'promotions' %}active{% endif %}">
                 <i class="fas fa-percent w-5 text-center"></i>
                 <span class="text-sm">Promotions</span>
             </a>
-            <a href="/admin/events" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'events' %}active{% endif %}">
-                <i class="fas fa-music w-5 text-center"></i>
-                <span class="text-sm">Events</span>
+            <a href="/admin/reports" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'reports' %}active{% endif %}">
+                <i class="fas fa-chart-bar w-5 text-center"></i>
+                <span class="text-sm">Reports</span>
             </a>
-            <a href="/admin/complaints" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'complaints' %}active{% endif %}">
-                <i class="fas fa-exclamation-circle w-5 text-center"></i>
-                <span class="text-sm">Complaints</span>
+            <a href="/admin/withdrawals" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'withdrawals' %}active{% endif %}">
+                <i class="fas fa-money-bill-wave w-5 text-center"></i>
+                <span class="text-sm">Withdrawals</span>
+            </a>
+            <a href="/admin/payments" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'payments' %}active{% endif %}">
+                <i class="fas fa-credit-card w-5 text-center"></i>
+                <span class="text-sm">Payments</span>
+            </a>
+            <a href="/admin/topups" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'topups' %}active{% endif %}">
+                <i class="fas fa-wallet w-5 text-center"></i>
+                <span class="text-sm">Top-ups</span>
+            </a>
+            <a href="/admin/services" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'services' %}active{% endif %}">
+                <i class="fas fa-concierge-bell w-5 text-center"></i>
+                <span class="text-sm">Services</span>
+            </a>
+            <a href="/admin/support" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'support' %}active{% endif %}">
+                <i class="fas fa-life-ring w-5 text-center"></i>
+                <span class="text-sm">Support</span>
+            </a>
+            <a href="/admin/messages" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'messages' %}active{% endif %}">
+                <i class="fas fa-envelope w-5 text-center"></i>
+                <span class="text-sm">Messages</span>
+            </a>
+            <a href="/admin/notifications" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'notifications' %}active{% endif %}">
+                <i class="fas fa-bell w-5 text-center"></i>
+                <span class="text-sm">Notifications</span>
+            </a>
+            <a href="/admin/settings" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'settings' %}active{% endif %}">
+                <i class="fas fa-cog w-5 text-center"></i>
+                <span class="text-sm">Settings</span>
+            </a>
+            <a href="/admin/logout" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all text-red-300 hover:text-red-200">
+                <i class="fas fa-sign-out-alt w-5 text-center"></i>
+                <span class="text-sm">Logout</span>
             </a>
         </nav>
 

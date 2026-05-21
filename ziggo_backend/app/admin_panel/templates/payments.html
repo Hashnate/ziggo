@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Payments | Ziggo Admin{% endblock %}
+{% block page_title %}Payments{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+    <div class="zi-stat">
+        <p class="text-[10px] text-ziggo-faint uppercase font-bold">Total processed</p>
+        <p class="text-2xl font-black text-ziggo-ink">Rs.{{ "{:,.0f}".format(totals.total) }}</p>
+    </div>
+    <div class="zi-stat">
+        <div class="flex items-center gap-2">
+            <div class="stat-icon bg-emerald-100 text-emerald-600 text-base"><i class="fas fa-money-bill"></i></div>
+            <div>
+                <p class="text-[10px] text-ziggo-faint uppercase font-bold">Cash</p>
+                <p class="text-xl font-black text-emerald-600">Rs.{{ "{:,.0f}".format(totals.cash) }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="zi-stat">
+        <div class="flex items-center gap-2">
+            <div class="stat-icon bg-blue-100 text-ziggo text-base"><i class="fas fa-credit-card"></i></div>
+            <div>
+                <p class="text-[10px] text-ziggo-faint uppercase font-bold">Card</p>
+                <p class="text-xl font-black text-ziggo">Rs.{{ "{:,.0f}".format(totals.card) }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="zi-stat">
+        <div class="flex items-center gap-2">
+            <div class="stat-icon bg-purple-100 text-purple-600 text-base"><i class="fas fa-wallet"></i></div>
+            <div>
+                <p class="text-[10px] text-ziggo-faint uppercase font-bold">Wallet</p>
+                <p class="text-xl font-black text-purple-600">Rs.{{ "{:,.0f}".format(totals.wallet) }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="p-5 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="font-black text-ziggo-ink">Payments ({{ payments | length }}, last 300)</h3>
+        <a href="/admin/finance" class="text-xs font-bold text-ziggo hover:underline">
+            Detailed finance reports <i class="fas fa-arrow-right ml-1"></i>
+        </a>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
+                <tr>
+                    <th class="px-6 py-3">Date</th>
+                    <th class="px-6 py-3">Booking</th>
+                    <th class="px-6 py-3">Customer</th>
+                    <th class="px-6 py-3">Method</th>
+                    <th class="px-6 py-3 text-right">Amount</th>
+                    <th class="px-6 py-3">Status</th>
+                    <th class="px-6 py-3">Txn ID</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for p in payments %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-3 text-xs text-gray-500">{{ p.created_at.strftime("%Y-%m-%d %H:%M") if p.created_at else '' }}</td>
+                    <td class="px-6 py-3 text-xs font-bold text-ziggo">
+                        {% if p.booking %}{{ p.booking.booking_ref }}{% else %}—{% endif %}
+                    </td>
+                    <td class="px-6 py-3 text-sm">
+                        {% if p.booking and p.booking.customer and p.booking.customer.user %}
+                            {{ p.booking.customer.user.full_name }}
+                        {% else %}—{% endif %}
+                    </td>
+                    <td class="px-6 py-3 text-sm capitalize">
+                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold
+                            {% if p.payment_method == 'cash' %}bg-emerald-50 text-emerald-700
+                            {% elif p.payment_method == 'card' %}bg-blue-50 text-ziggo
+                            {% elif p.payment_method == 'wallet' %}bg-purple-50 text-purple-700
+                            {% else %}bg-gray-100 text-gray-600{% endif %}">
+                            <i class="fas
+                                {% if p.payment_method == 'cash' %}fa-money-bill
+                                {% elif p.payment_method == 'card' %}fa-credit-card
+                                {% elif p.payment_method == 'wallet' %}fa-wallet
+                                {% else %}fa-question{% endif %}"></i>
+                            {{ p.payment_method or 'unknown' }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-3 text-right text-sm font-black">Rs.{{ "{:,.2f}".format(p.amount|float) }}</td>
+                    <td class="px-6 py-3">
+                        <span class="px-2 py-1 rounded-full text-[10px] font-bold uppercase
+                            {% if p.status == 'completed' %}bg-green-100 text-green-700
+                            {% elif p.status == 'pending' %}bg-amber-100 text-amber-700
+                            {% elif p.status == 'failed' %}bg-red-100 text-red-700
+                            {% else %}bg-gray-100 text-gray-600{% endif %}">
+                            {{ p.status or 'pending' }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-3 text-xs font-mono text-gray-500 truncate max-w-[12rem]">{{ p.transaction_id or '—' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="px-6 py-10 text-center text-gray-400">No payments yet</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Messages | Ziggo Admin{% endblock %}
+{% block page_title %}Broadcast Messages{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Compose -->
+    <div class="zi-card p-6 lg:col-span-1 h-fit">
+        <h3 class="font-black text-ziggo-ink mb-1">Send broadcast</h3>
+        <p class="text-xs text-ziggo-muted mb-4">Message lands as an in-app notification for the chosen audience.</p>
+        <form method="post" action="/admin/messages/send" class="space-y-3">
+            <div>
+                <label class="text-[10px] uppercase font-bold text-ziggo-faint">Audience</label>
+                <select name="audience" class="w-full mt-1 px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-ziggo">
+                    <option value="all">All users (riders + drivers)</option>
+                    <option value="customer">Riders only</option>
+                    <option value="driver">Drivers only</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-[10px] uppercase font-bold text-ziggo-faint">Title</label>
+                <input name="title" required maxlength="200"
+                       class="w-full mt-1 px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-ziggo"
+                       placeholder="Promo, downtime notice…">
+            </div>
+            <div>
+                <label class="text-[10px] uppercase font-bold text-ziggo-faint">Body</label>
+                <textarea name="body" required rows="6"
+                          class="w-full mt-1 px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-ziggo"
+                          placeholder="Type your message…"></textarea>
+            </div>
+            <button class="zi-btn-primary w-full">
+                <i class="fas fa-paper-plane mr-1"></i> Send
+            </button>
+        </form>
+    </div>
+
+    <!-- History -->
+    <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="p-5 border-b border-gray-100">
+            <h3 class="font-black text-ziggo-ink">Sent ({{ batches | length }})</h3>
+        </div>
+        <div class="divide-y divide-gray-100">
+            {% for b in batches %}
+            <div class="p-5">
+                <div class="flex items-start justify-between gap-4 mb-2">
+                    <div>
+                        <p class="text-sm font-black text-ziggo-ink">{{ b.title }}</p>
+                        <p class="text-[10px] text-ziggo-faint mt-1">
+                            {{ b.sent_at.strftime("%Y-%m-%d %H:%M") if b.sent_at else '' }}
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <span class="px-2 py-1 rounded-full text-[10px] font-bold uppercase
+                            {% if b.audience == 'driver' %}bg-amber-100 text-amber-700
+                            {% elif b.audience == 'customer' %}bg-emerald-100 text-emerald-700
+                            {% else %}bg-blue-100 text-ziggo{% endif %}">
+                            {{ b.audience }}
+                        </span>
+                        <span class="px-2 py-1 rounded-full text-[10px] font-bold bg-ziggo-canvas text-ziggo-ink">
+                            {{ b.count }} recipient{{ '' if b.count == 1 else 's' }}
+                        </span>
+                    </div>
+                </div>
+                <p class="text-sm text-ziggo-muted leading-relaxed whitespace-pre-line">{{ b.body }}</p>
+            </div>
+            {% else %}
+            <div class="p-10 text-center text-gray-400 text-sm">No broadcasts sent yet</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

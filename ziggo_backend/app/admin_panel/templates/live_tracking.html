@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Live Tracking | Ziggo Admin{% endblock %}
+{% block page_title %}Live Tracking{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+    .pulse-dot {
+        width: 14px; height: 14px; border-radius: 50%;
+        background: #10B981; box-shadow: 0 0 0 0 rgba(16,185,129,0.7);
+        animation: pulseRing 1.5s ease-out infinite;
+    }
+    @keyframes pulseRing {
+        0%   { box-shadow: 0 0 0 0 rgba(16,185,129,0.7); }
+        70%  { box-shadow: 0 0 0 14px rgba(16,185,129,0); }
+        100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-4 h-[calc(100vh-220px)]">
+    <div class="lg:col-span-3 zi-card overflow-hidden">
+        <div id="liveMap" style="height: 100%; min-height: 480px;"></div>
+    </div>
+
+    <aside class="zi-card flex flex-col overflow-hidden">
+        <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+            <div>
+                <p class="text-sm font-black text-ziggo-ink">Online drivers</p>
+                <p class="text-[10px] text-ziggo-muted">Auto-refreshes every 10s</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="pulse-dot"></span>
+                <span class="text-xs font-bold text-emerald-600" id="onlineCount">0</span>
+            </div>
+        </div>
+        <div class="flex-1 overflow-y-auto p-3 space-y-2" id="driverList">
+            <p class="text-xs text-ziggo-muted text-center py-8">Loading…</p>
+        </div>
+        <div class="p-3 border-t border-gray-100">
+            <p class="text-xs font-bold text-ziggo-ink mb-1">Active bookings</p>
+            <p class="text-2xl font-black text-ziggo" id="activeCount">0</p>
+        </div>
+    </aside>
+</div>
+
+<script>
+    const map = L.map('liveMap').setView([6.9271, 79.8612], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+
+    const markers = new Map(); // driver_id -> L.marker
+
+    function vehicleIcon(type) {
+        const map = { bike: '🏍️', tuk: '🛺', car: '🚗', van: '🚐', truck: '🚚' };
+        return map[type] || '🚗';
+    }
+
+    function driverIcon(d) {
+        return L.divIcon({
+            className: 'live-driver',
+            iconSize: [40, 40],
+            iconAnchor: [20, 20],
+            html: `<div style="
+                width: 40px; height: 40px; border-radius: 14px;
+                background: linear-gradient(135deg, #1E40AF, #3B82F6);
+                color: white; display: flex; align-items: center; justify-content: center;
+                font-size: 18px; box-shadow: 0 6px 16px -4px rgba(30,64,175,0.6);
+                border: 2px solid white;">${vehicleIcon(d.vehicle_type)}</div>`
+        });
+    }
+
+    async function refresh() {
+        try {
+            const r = await fetch('/admin/live-tracking/feed');
+            const j = await r.json();
+
+            // Update sidebar count
+            document.getElementById('onlineCount').textContent = j.drivers.length;
+            document.getElementById('activeCount').textContent = j.active_bookings.length;
+
+            // Update sidebar list
+            const list = document.getElementById('driverList');
+            if (j.drivers.length === 0) {
+                list.innerHTML = '<p class="text-xs text-ziggo-muted text-center py-8">No drivers online</p>';
+            } else {
+                list.innerHTML = j.drivers.map(d => `
+                    <button onclick="map.setView([${d.lat}, ${d.lng}], 15)"
+                            class="w-full text-left p-3 rounded-xl bg-ziggo-canvas hover:bg-blue-50 transition">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">${vehicleIcon(d.vehicle_type)}</span>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-xs font-bold text-ziggo-ink truncate">${d.name}</p>
+                                <p class="text-[10px] text-ziggo-faint truncate">${d.vehicle_number || 'No plate'}</p>
+                            </div>
+                            <span class="pulse-dot" style="width:8px;height:8px;"></span>
+                        </div>
+                    </button>
+                `).join('');
+            }
+
+            // Update map markers
+            const seenIds = new Set();
+            j.drivers.forEach(d => {
+                seenIds.add(d.id);
+                if (markers.has(d.id)) {
+                    markers.get(d.id).setLatLng([d.lat, d.lng]);
+                } else {
+                    const m = L.marker([d.lat, d.lng], { icon: driverIcon(d) })
+                        .bindPopup(`<b>${d.name}</b><br>${d.vehicle_type} · ${d.vehicle_number || '—'}<br>${d.phone}`)
+                        .addTo(map);
+                    markers.set(d.id, m);
+                }
+            });
+            // Remove stale markers
+            for (const [id, m] of markers.entries()) {
+                if (!seenIds.has(id)) {
+                    map.removeLayer(m);
+                    markers.delete(id);
+                }
+            }
+        } catch (e) {
+            console.error('live tracking refresh failed', e);
+        }
+    }
+
+    refresh();
+    setInterval(refresh, 10000);
+</script>
+{% endblock %}

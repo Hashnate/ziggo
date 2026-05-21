@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}Reports | Ziggo Admin{% endblock %}
+{% block page_title %}Reports{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<!-- 30-day KPI strip -->
+<div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+    <div class="zi-stat">
+        <p class="text-[10px] text-ziggo-faint uppercase font-bold">Rides (30d)</p>
+        <p class="text-2xl font-black text-ziggo-ink">{{ totals.rides_30d }}</p>
+    </div>
+    <div class="zi-stat">
+        <p class="text-[10px] text-ziggo-faint uppercase font-bold">Revenue (30d)</p>
+        <p class="text-2xl font-black text-emerald-600">Rs.{{ "{:,.0f}".format(totals.revenue_30d) }}</p>
+    </div>
+    <div class="zi-stat">
+        <p class="text-[10px] text-ziggo-faint uppercase font-bold">Top-ups (30d)</p>
+        <p class="text-2xl font-black text-amber-600">Rs.{{ "{:,.0f}".format(totals.topups_30d) }}</p>
+    </div>
+    <div class="zi-stat">
+        <p class="text-[10px] text-ziggo-faint uppercase font-bold">Riders</p>
+        <p class="text-2xl font-black text-ziggo-ink">{{ totals.riders }}</p>
+    </div>
+    <div class="zi-stat">
+        <p class="text-[10px] text-ziggo-faint uppercase font-bold">Drivers</p>
+        <p class="text-2xl font-black text-ziggo-ink">{{ totals.drivers }}</p>
+    </div>
+</div>
+
+<!-- Trend chart -->
+<div class="zi-card p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+        <div>
+            <h3 class="text-lg font-black text-ziggo-ink">Daily rides & revenue</h3>
+            <p class="text-xs text-ziggo-muted">Last 30 days, completed bookings only</p>
+        </div>
+    </div>
+    <div style="height: 320px;"><canvas id="dailyChart"></canvas></div>
+</div>
+
+<!-- Leaderboards -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="p-5 border-b border-gray-100 flex items-center gap-2">
+            <i class="fas fa-trophy text-amber-500"></i>
+            <h3 class="font-black text-ziggo-ink">Top drivers by earnings</h3>
+        </div>
+        <table class="w-full text-left">
+            <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
+                <tr>
+                    <th class="px-5 py-3">#</th>
+                    <th class="px-5 py-3">Driver</th>
+                    <th class="px-5 py-3 text-right">Rides</th>
+                    <th class="px-5 py-3 text-right">Earnings</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for d in top_drivers %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-5 py-3 font-bold {% if loop.index == 1 %}text-amber-500{% elif loop.index == 2 %}text-gray-400{% elif loop.index == 3 %}text-amber-700{% else %}text-ziggo-faint{% endif %}">
+                        {{ loop.index }}
+                    </td>
+                    <td class="px-5 py-3">
+                        <p class="text-sm font-semibold text-ziggo-ink">{{ d.name }}</p>
+                        <p class="text-[10px] text-ziggo-faint">{{ d.vehicle }} · {{ d.phone }}</p>
+                    </td>
+                    <td class="px-5 py-3 text-right text-sm font-bold">{{ d.rides }}</td>
+                    <td class="px-5 py-3 text-right text-sm font-black text-emerald-600">Rs.{{ "{:,.0f}".format(d.earnings) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="px-5 py-8 text-center text-gray-400 text-sm">No completed rides yet</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="p-5 border-b border-gray-100 flex items-center gap-2">
+            <i class="fas fa-crown text-purple-500"></i>
+            <h3 class="font-black text-ziggo-ink">Top riders by spend</h3>
+        </div>
+        <table class="w-full text-left">
+            <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
+                <tr>
+                    <th class="px-5 py-3">#</th>
+                    <th class="px-5 py-3">Rider</th>
+                    <th class="px-5 py-3 text-right">Rides</th>
+                    <th class="px-5 py-3 text-right">Spend</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for c in top_customers %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-5 py-3 font-bold text-ziggo-faint">{{ loop.index }}</td>
+                    <td class="px-5 py-3">
+                        <p class="text-sm font-semibold text-ziggo-ink">{{ c.name }}</p>
+                        <p class="text-[10px] text-ziggo-faint">{{ c.phone }}</p>
+                    </td>
+                    <td class="px-5 py-3 text-right text-sm font-bold">{{ c.rides }}</td>
+                    <td class="px-5 py-3 text-right text-sm font-black text-ziggo">Rs.{{ "{:,.0f}".format(c.spend) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="px-5 py-8 text-center text-gray-400 text-sm">No completed rides yet</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const daily = {{ daily_json | safe }};
+    const labels = daily.map(d => d.day);
+    const rides = daily.map(d => d.rides);
+    const revenue = daily.map(d => d.revenue);
+
+    new Chart(document.getElementById('dailyChart'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                { type: 'line', label: 'Revenue (Rs.)', data: revenue, borderColor: '#10B981',
+                  backgroundColor: 'rgba(16,185,129,0.1)', yAxisID: 'y1', tension: 0.35, fill: true },
+                { type: 'bar', label: 'Rides', data: rides, backgroundColor: '#3B82F6', yAxisID: 'y' },
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: {
+                y:  { position: 'left',  beginAtZero: true, title: { display: true, text: 'Rides' } },
+                y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false },
+                      title: { display: true, text: 'Revenue (Rs.)' } },
+            },
+            plugins: { legend: { position: 'top' } }
+        }
+    });
+</script>
+{% endblock %}
