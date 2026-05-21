@@ -1,142 +1,237 @@
 {% extends "base.html" %}
 
 {% block title %}Reports | Ziggo Admin{% endblock %}
-{% block page_title %}Reports{% endblock %}
+{% block page_title %}Insight & Analytics{% endblock %}
 
+{% block top_title %}{% endblock %}
 {% block head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 {% endblock %}
 
 {% block content %}
-<!-- 30-day KPI strip -->
-<div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-    <div class="zi-stat">
-        <p class="text-[10px] text-ziggo-faint uppercase font-bold">Rides (30d)</p>
-        <p class="text-2xl font-black text-ziggo-ink">{{ totals.rides_30d }}</p>
-    </div>
-    <div class="zi-stat">
-        <p class="text-[10px] text-ziggo-faint uppercase font-bold">Revenue (30d)</p>
-        <p class="text-2xl font-black text-emerald-600">Rs.{{ "{:,.0f}".format(totals.revenue_30d) }}</p>
-    </div>
-    <div class="zi-stat">
-        <p class="text-[10px] text-ziggo-faint uppercase font-bold">Top-ups (30d)</p>
-        <p class="text-2xl font-black text-amber-600">Rs.{{ "{:,.0f}".format(totals.topups_30d) }}</p>
-    </div>
-    <div class="zi-stat">
-        <p class="text-[10px] text-ziggo-faint uppercase font-bold">Riders</p>
-        <p class="text-2xl font-black text-ziggo-ink">{{ totals.riders }}</p>
-    </div>
-    <div class="zi-stat">
-        <p class="text-[10px] text-ziggo-faint uppercase font-bold">Drivers</p>
-        <p class="text-2xl font-black text-ziggo-ink">{{ totals.drivers }}</p>
-    </div>
-</div>
+<div class="space-y-6">
 
-<!-- Trend chart -->
-<div class="zi-card p-6 mb-6">
-    <div class="flex items-center justify-between mb-4">
+    <!-- Header -->
+    <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-xl">
+            <i class="fas fa-chart-bar"></i>
+        </div>
         <div>
-            <h3 class="text-lg font-black text-ziggo-ink">Daily rides & revenue</h3>
-            <p class="text-xs text-ziggo-muted">Last 30 days, completed bookings only</p>
+            <h2 class="text-2xl font-black text-ziggo-ink leading-tight">Insight &amp; Analytics</h2>
+            <p class="text-xs text-ziggo-muted font-bold">Rides, revenue and platform health over a date range</p>
         </div>
     </div>
-    <div style="height: 320px;"><canvas id="dailyChart"></canvas></div>
-</div>
 
-<!-- Leaderboards -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div class="p-5 border-b border-gray-100 flex items-center gap-2">
-            <i class="fas fa-trophy text-amber-500"></i>
-            <h3 class="font-black text-ziggo-ink">Top drivers by earnings</h3>
+    <!-- KPI rows (full-width like the reference) -->
+    <div class="space-y-4">
+        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-5">
+            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl">
+                <i class="fas fa-hand-holding-usd"></i>
+            </div>
+            <div>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Admin Net (Commission)</p>
+                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">RS. <span id="kpiNet">0</span></p>
+            </div>
         </div>
-        <table class="w-full text-left">
-            <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
-                <tr>
-                    <th class="px-5 py-3">#</th>
-                    <th class="px-5 py-3">Driver</th>
-                    <th class="px-5 py-3 text-right">Rides</th>
-                    <th class="px-5 py-3 text-right">Earnings</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
-                {% for d in top_drivers %}
-                <tr class="hover:bg-gray-50">
-                    <td class="px-5 py-3 font-bold {% if loop.index == 1 %}text-amber-500{% elif loop.index == 2 %}text-gray-400{% elif loop.index == 3 %}text-amber-700{% else %}text-ziggo-faint{% endif %}">
-                        {{ loop.index }}
-                    </td>
-                    <td class="px-5 py-3">
-                        <p class="text-sm font-semibold text-ziggo-ink">{{ d.name }}</p>
-                        <p class="text-[10px] text-ziggo-faint">{{ d.vehicle }} · {{ d.phone }}</p>
-                    </td>
-                    <td class="px-5 py-3 text-right text-sm font-bold">{{ d.rides }}</td>
-                    <td class="px-5 py-3 text-right text-sm font-black text-emerald-600">Rs.{{ "{:,.0f}".format(d.earnings) }}</td>
-                </tr>
-                {% else %}
-                <tr><td colspan="4" class="px-5 py-8 text-center text-gray-400 text-sm">No completed rides yet</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-5">
+            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl">
+                <i class="fas fa-route"></i>
+            </div>
+            <div>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Total Rides</p>
+                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1" id="kpiRides">0</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-5">
+            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl">
+                <i class="far fa-id-card"></i>
+            </div>
+            <div>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Active Drivers</p>
+                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1" id="kpiDrivers">0</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-5">
+            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl">
+                <i class="far fa-credit-card"></i>
+            </div>
+            <div>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Gross Bookings</p>
+                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">RS. <span id="kpiGross">0</span></p>
+            </div>
+        </div>
     </div>
 
-    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div class="p-5 border-b border-gray-100 flex items-center gap-2">
-            <i class="fas fa-crown text-purple-500"></i>
-            <h3 class="font-black text-ziggo-ink">Top riders by spend</h3>
+    <!-- Filter row -->
+    <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex flex-wrap items-end gap-4">
+        <div class="min-w-[180px]">
+            <label class="block text-[11px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Report type</label>
+            <select id="rptType" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white">
+                <option value="summary" {% if report_type == 'summary' %}selected{% endif %}>Summary</option>
+            </select>
         </div>
-        <table class="w-full text-left">
-            <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
-                <tr>
-                    <th class="px-5 py-3">#</th>
-                    <th class="px-5 py-3">Rider</th>
-                    <th class="px-5 py-3 text-right">Rides</th>
-                    <th class="px-5 py-3 text-right">Spend</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
-                {% for c in top_customers %}
-                <tr class="hover:bg-gray-50">
-                    <td class="px-5 py-3 font-bold text-ziggo-faint">{{ loop.index }}</td>
-                    <td class="px-5 py-3">
-                        <p class="text-sm font-semibold text-ziggo-ink">{{ c.name }}</p>
-                        <p class="text-[10px] text-ziggo-faint">{{ c.phone }}</p>
-                    </td>
-                    <td class="px-5 py-3 text-right text-sm font-bold">{{ c.rides }}</td>
-                    <td class="px-5 py-3 text-right text-sm font-black text-ziggo">Rs.{{ "{:,.0f}".format(c.spend) }}</td>
-                </tr>
-                {% else %}
-                <tr><td colspan="4" class="px-5 py-8 text-center text-gray-400 text-sm">No completed rides yet</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div>
+            <label class="block text-[11px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Start date</label>
+            <input type="date" id="rptStart" value="{{ start_date }}" class="p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+        </div>
+        <div>
+            <label class="block text-[11px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">End date</label>
+            <input type="date" id="rptEnd" value="{{ end_date }}" class="p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+        </div>
+        <button id="rptApply" type="button" class="px-6 py-3 bg-ziggo text-white rounded-2xl font-black shadow-brand hover:bg-ziggo-light transition flex items-center gap-2">
+            <i class="fas fa-filter"></i> Apply
+        </button>
+        <button data-quick="7" type="button" class="px-5 py-3 bg-slate-700 text-white rounded-2xl font-black hover:bg-slate-800 transition">Last 7 Days</button>
+        <button data-quick="30" type="button" class="px-5 py-3 bg-slate-700 text-white rounded-2xl font-black hover:bg-slate-800 transition">Last 30 Days</button>
+        <span id="rptStatus" class="text-xs font-bold text-ziggo-muted ml-auto"></span>
+    </div>
+
+    <!-- Trend chart -->
+    <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-6">
+        <div class="flex items-center gap-2 mb-3">
+            <i class="fas fa-chart-line text-ziggo"></i>
+            <h3 class="font-black text-ziggo-ink">Trend</h3>
+        </div>
+        <div style="height: 320px;"><canvas id="trendChart"></canvas></div>
+    </div>
+
+    <!-- Summary table -->
+    <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-ziggo-line flex items-center gap-2">
+            <i class="fas fa-table text-ziggo"></i>
+            <h3 class="font-black text-ziggo-ink">Summary Details</h3>
+            <span id="rowsCount" class="ml-auto text-xs font-bold text-ziggo-muted"></span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-gray-50 text-[11px] uppercase text-ziggo-muted font-black tracking-wider">
+                    <tr>
+                        <th class="px-6 py-4">Date</th>
+                        <th class="px-6 py-4">Rides</th>
+                        <th class="px-6 py-4">Completed</th>
+                        <th class="px-6 py-4">Cancelled</th>
+                        <th class="px-6 py-4">Revenue</th>
+                        <th class="px-6 py-4">Drivers</th>
+                        <th class="px-6 py-4">Riders</th>
+                    </tr>
+                </thead>
+                <tbody id="rowsBody" class="divide-y divide-ziggo-line"></tbody>
+            </table>
+        </div>
+        <div id="rowsEmpty" class="hidden p-12 text-center">
+            <i class="fas fa-inbox text-3xl text-ziggo-faint mb-3"></i>
+            <p class="text-ziggo-muted font-bold">No bookings in this range.</p>
+        </div>
     </div>
 </div>
 
 <script>
-    const daily = {{ daily_json | safe }};
-    const labels = daily.map(d => d.day);
-    const rides = daily.map(d => d.rides);
-    const revenue = daily.map(d => d.revenue);
+    const initialData = {{ data|tojson }};
+    let chart;
 
-    new Chart(document.getElementById('dailyChart'), {
-        type: 'bar',
-        data: {
-            labels,
-            datasets: [
-                { type: 'line', label: 'Revenue (Rs.)', data: revenue, borderColor: '#10B981',
-                  backgroundColor: 'rgba(16,185,129,0.1)', yAxisID: 'y1', tension: 0.35, fill: true },
-                { type: 'bar', label: 'Rides', data: rides, backgroundColor: '#3B82F6', yAxisID: 'y' },
-            ]
-        },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            scales: {
-                y:  { position: 'left',  beginAtZero: true, title: { display: true, text: 'Rides' } },
-                y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false },
-                      title: { display: true, text: 'Revenue (Rs.)' } },
-            },
-            plugins: { legend: { position: 'top' } }
+    function fmtMoney(n) { return Math.round(n).toLocaleString(); }
+
+    function applyData(d) {
+        document.getElementById('kpiNet').textContent     = fmtMoney(d.totals.admin_net);
+        document.getElementById('kpiRides').textContent   = d.totals.total_rides.toLocaleString();
+        document.getElementById('kpiDrivers').textContent = d.totals.active_drivers.toLocaleString();
+        document.getElementById('kpiGross').textContent   = fmtMoney(d.totals.gross_bookings);
+
+        // Trend chart
+        const labels = d.trend.map(r => r.date);
+        const rides = d.trend.map(r => r.rides);
+        const revenue = d.trend.map(r => r.revenue);
+        if (!chart) {
+            chart = new Chart(document.getElementById('trendChart'), {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: 'Rides', data: rides, borderColor: '#3B82F6', backgroundColor: 'rgba(59,130,246,0.10)',
+                          yAxisID: 'y', tension: 0.35, fill: false, pointRadius: 3 },
+                        { label: 'Revenue (Rs.)', data: revenue, borderColor: '#06B6D4', backgroundColor: 'rgba(6,182,212,0.10)',
+                          yAxisID: 'y1', tension: 0.35, fill: false, pointRadius: 3 },
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        y:  { position: 'left',  beginAtZero: true, title: { display: true, text: 'Rides' } },
+                        y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false },
+                              title: { display: true, text: 'Revenue (Rs.)' } },
+                    },
+                    plugins: { legend: { position: 'top', align: 'center' } }
+                }
+            });
+        } else {
+            chart.data.labels = labels;
+            chart.data.datasets[0].data = rides;
+            chart.data.datasets[1].data = revenue;
+            chart.update();
         }
+
+        // Table
+        const body = document.getElementById('rowsBody');
+        const empty = document.getElementById('rowsEmpty');
+        if (!d.rows.length) {
+            body.innerHTML = '';
+            empty.classList.remove('hidden');
+        } else {
+            empty.classList.add('hidden');
+            body.innerHTML = d.rows.map(r => `
+                <tr class="hover:bg-gray-50/50">
+                    <td class="px-6 py-4 font-black text-ziggo-ink">${r.date}</td>
+                    <td class="px-6 py-4 font-bold text-ziggo-ink">${r.rides}</td>
+                    <td class="px-6 py-4 text-emerald-600 font-bold">${r.completed}</td>
+                    <td class="px-6 py-4 text-rose-600 font-bold">${r.cancelled}</td>
+                    <td class="px-6 py-4 text-ziggo font-black">Rs. ${fmtMoney(r.revenue)}</td>
+                    <td class="px-6 py-4 font-bold">${r.drivers}</td>
+                    <td class="px-6 py-4 font-bold">${r.riders}</td>
+                </tr>
+            `).join('');
+        }
+        document.getElementById('rowsCount').textContent = `${d.rows.length} day${d.rows.length === 1 ? '' : 's'}`;
+    }
+
+    async function reload() {
+        const status = document.getElementById('rptStatus');
+        const start = document.getElementById('rptStart').value;
+        const end = document.getElementById('rptEnd').value;
+        status.textContent = 'Loading…';
+        try {
+            const r = await fetch(`/admin/reports/data?start=${start}&end=${end}&type=summary`);
+            if (!r.ok) {
+                status.textContent = 'Error ' + r.status;
+                return;
+            }
+            const j = await r.json();
+            applyData(j);
+            status.textContent = `${start} → ${end}`;
+        } catch (e) {
+            status.textContent = 'Failed to load';
+        }
+    }
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+    function toISO(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+
+    document.getElementById('rptApply').addEventListener('click', reload);
+    document.querySelectorAll('[data-quick]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const days = parseInt(btn.dataset.quick, 10);
+            const end = new Date();
+            const start = new Date();
+            start.setDate(end.getDate() - (days - 1));
+            document.getElementById('rptStart').value = toISO(start);
+            document.getElementById('rptEnd').value = toISO(end);
+            reload();
+        });
     });
+
+    // First paint: use the data the server already produced (no extra request).
+    applyData(initialData);
+    document.getElementById('rptStatus').textContent =
+        `{{ start_date }} → {{ end_date }}`;
 </script>
 {% endblock %}

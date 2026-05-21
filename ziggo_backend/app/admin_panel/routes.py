@@ -1,5 +1,5 @@
 """Server-rendered admin panel with real DB queries + simple session auth."""
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import os
 
 from fastapi import APIRouter, Request, Form, Depends, HTTPException, UploadFile, File
@@ -1926,6 +1926,186 @@ async def admin_market_activate(
             )
             await db.commit()
     return RedirectResponse(url=f"/admin/market/{vendor_id}", status_code=303)
+
+
+# ---------- Reports / Insight & Analytics ----------
+def _parse_iso_date_or(default_dt, raw: str):
+    if not raw:
+        return default_dt
+    try:
+        return datetime.strptime(raw.strip(), "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return default_dt
+
+
+async def _reports_aggregate(db: AsyncSession, start_dt: datetime, end_dt_exclusive: datetime) -> dict:
+    """Aggregate bookings between [start_dt, end_dt_exclusive) bucketed by day."""
+    from decimal import Decimal as D
+    from sqlalchemy import cast, Date, distinct
+
+    bucket = cast(Booking.booked_at, Date).label("day")
+
+    # Per-day per-status rollup
+    q = await db.execute(
+        select(
+            bucket,
+            Booking.status,
+            func.count(Booking.id),
+            func.coalesce(func.sum(Booking.final_amount), 0),
+            func.coalesce(func.sum(Booking.platform_fee), 0),
+            func.count(distinct(Booking.customer_id)),
+            func.count(distinct(Booking.driver_id)),
+        )
+        .where(Booking.booked_at >= start_dt, Booking.booked_at < end_dt_exclusive)
+        .group_by(bucket, Booking.status)
+        .order_by(bucket)
+    )
+    rows_by_day: dict[str, dict] = {}
+    overall = {"rides": 0, "completed": 0, "cancelled": 0, "revenue": D("0"), "platform": D("0")}
+    drivers_set: set[int] = set()
+
+    # Walk every day in range so the chart and table have zero-filled rows.
+    cur = start_dt.date()
+    end_d = (end_dt_exclusive - timedelta(seconds=1)).date()
+    while cur <= end_d:
+        rows_by_day[cur.isoformat()] = {
+            "date": cur.isoformat(),
+            "rides": 0,
+            "completed": 0,
+            "cancelled": 0,
+            "revenue": D("0"),
+            "drivers": set(),
+            "riders": set(),
+        }
+        cur = cur + timedelta(days=1)
+
+    for day, status, n, revenue, platform, customers, drivers in q.all():
+        key = day.isoformat()
+        r = rows_by_day.setdefault(key, {
+            "date": key, "rides": 0, "completed": 0, "cancelled": 0,
+            "revenue": D("0"), "drivers": set(), "riders": set(),
+        })
+        r["rides"] += n
+        overall["rides"] += n
+        if status == BookingStatus.COMPLETED:
+            r["completed"] += n
+            r["revenue"] += revenue
+            overall["completed"] += n
+            overall["revenue"] += revenue
+            overall["platform"] += platform
+        elif status == BookingStatus.CANCELLED:
+            r["cancelled"] += n
+            overall["cancelled"] += n
+
+    # Distinct riders/drivers per day need a second pass (the group_by-status
+    # query above can't aggregate distinct customer_id correctly because the
+    # status dimension splits the same customer's bookings across rows).
+    # The per-day "drivers" column counts everyone who took a trip that day
+    # (any status). The top-level "Active drivers" KPI only counts drivers
+    # who actually completed a ride — that's the meaningful business metric.
+    qd = await db.execute(
+        select(bucket, Booking.status, Booking.customer_id, Booking.driver_id)
+        .where(Booking.booked_at >= start_dt, Booking.booked_at < end_dt_exclusive)
+    )
+    for day, status, cid, did in qd.all():
+        key = day.isoformat()
+        if key not in rows_by_day:
+            continue
+        if cid is not None:
+            rows_by_day[key]["riders"].add(cid)
+        if did is not None:
+            rows_by_day[key]["drivers"].add(did)
+            if status == BookingStatus.COMPLETED:
+                drivers_set.add(did)
+
+    rows_sorted = sorted(rows_by_day.values(), key=lambda r: r["date"], reverse=True)
+    serialized_rows = [
+        {
+            "date": r["date"],
+            "rides": r["rides"],
+            "completed": r["completed"],
+            "cancelled": r["cancelled"],
+            "revenue": float(r["revenue"]),
+            "drivers": len(r["drivers"]),
+            "riders": len(r["riders"]),
+        }
+        for r in rows_sorted
+    ]
+    trend = [
+        {"date": r["date"], "rides": r["completed"], "revenue": r["revenue"]}
+        for r in serialized_rows
+    ]
+    trend.reverse()  # chart wants oldest → newest
+
+    return {
+        "totals": {
+            "admin_net": float(overall["platform"]),
+            "total_rides": overall["rides"],
+            "active_drivers": len(drivers_set),
+            "gross_bookings": float(overall["revenue"]),
+            "completed": overall["completed"],
+            "cancelled": overall["cancelled"],
+        },
+        "trend": trend,
+        "rows": serialized_rows,
+    }
+
+
+def _default_reports_range() -> tuple[datetime, datetime]:
+    end_dt = datetime.now(timezone.utc).replace(hour=23, minute=59, second=59, microsecond=0)
+    start_dt = (end_dt - timedelta(days=29)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return start_dt, end_dt
+
+
+@router.get("/reports", response_class=HTMLResponse)
+async def admin_reports(
+    request: Request,
+    start: str = "",
+    end: str = "",
+    type: str = "summary",
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    default_start, default_end = _default_reports_range()
+    start_dt = _parse_iso_date_or(default_start, start).replace(hour=0, minute=0, second=0, microsecond=0)
+    end_dt = _parse_iso_date_or(default_end, end).replace(hour=23, minute=59, second=59, microsecond=0)
+    if end_dt < start_dt:
+        start_dt, end_dt = end_dt, start_dt
+    data = await _reports_aggregate(db, start_dt, end_dt + timedelta(seconds=1))
+
+    return templates.TemplateResponse(
+        request,
+        "reports.html",
+        {
+            "request": request,
+            "active_page": "reports",
+            "report_type": type,
+            "start_date": start_dt.strftime("%Y-%m-%d"),
+            "end_date": end_dt.strftime("%Y-%m-%d"),
+            "data": data,
+        },
+    )
+
+
+@router.get("/reports/data")
+async def admin_reports_data(
+    start: str = "",
+    end: str = "",
+    type: str = "summary",  # noqa: F841 — reserved for future report types
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    default_start, default_end = _default_reports_range()
+    start_dt = _parse_iso_date_or(default_start, start).replace(hour=0, minute=0, second=0, microsecond=0)
+    end_dt = _parse_iso_date_or(default_end, end).replace(hour=23, minute=59, second=59, microsecond=0)
+    if end_dt < start_dt:
+        start_dt, end_dt = end_dt, start_dt
+    data = await _reports_aggregate(db, start_dt, end_dt + timedelta(seconds=1))
+    return {
+        **data,
+        "start_date": start_dt.strftime("%Y-%m-%d"),
+        "end_date": end_dt.strftime("%Y-%m-%d"),
+    }
 
 
 @router.get("/promotions", response_class=HTMLResponse)

@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="/static/img/logo.jpeg">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
@@ -29,7 +29,7 @@
                         }
                     },
                     fontFamily: {
-                        sans: ['Outfit', 'sans-serif'],
+                        sans: ['Inter', 'sans-serif'],
                     },
                     borderRadius: {
                         'xl2': '18px',
@@ -50,7 +50,7 @@
     </script>
     <style>
         body {
-            font-family: 'Outfit', sans-serif;
+            font-family: 'Inter', sans-serif;
             color: #0F172A;
             -webkit-font-smoothing: antialiased;
         }
@@ -318,7 +318,9 @@
         <header class="zi-topbar px-8 py-4 flex items-center justify-between border-b border-ziggo-line/60">
             <div class="flex items-center gap-4">
                 <button class="text-ziggo-muted md:hidden"><i class="fas fa-bars text-xl"></i></button>
+                {% block top_title %}
                 <h1 class="text-2xl font-black tracking-tight text-ziggo-ink leading-none">{% block page_title %}Dashboard{% endblock %}</h1>
+                {% endblock %}
             </div>
             <div class="flex items-center gap-3">
                 <button class="zi-bell flex items-center justify-center">
