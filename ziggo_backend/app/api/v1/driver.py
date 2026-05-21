@@ -15,6 +15,7 @@ from ...schemas import (
 )
 from ...services.auth_service import get_current_user, require_role
 from ...services.fare_service import haversine_km
+from ...services.ws_manager import manager
 
 router = APIRouter()
 
@@ -181,6 +182,19 @@ async def update_location(
     d.current_lng = Decimal(str(body.lng))
     d.last_location_update = datetime.now(timezone.utc)
     await db.commit()
+
+    # Push to the admin live-tracking channel so the map can update without polling.
+    await manager.publish("admin_live", "driver_location_update", {
+        "id": d.id,
+        "name": user.full_name or "Driver",
+        "phone": user.phone_number or "",
+        "vehicle_type": d.vehicle_type or "car",
+        "vehicle_number": d.vehicle_number or "",
+        "lat": float(d.current_lat),
+        "lng": float(d.current_lng),
+        "is_online": bool(d.is_online),
+        "last_seen": d.last_location_update.isoformat(),
+    })
     return {"ok": True}
 
 
@@ -204,4 +218,12 @@ async def toggle_online(
             )
     d.is_online = body.is_online
     await db.commit()
+
+    # Broadcast so the admin live map can swap the marker style instantly.
+    await manager.publish("admin_live", "driver_status_update", {
+        "id": d.id,
+        "is_online": bool(d.is_online),
+        "lat": float(d.current_lat) if d.current_lat is not None else None,
+        "lng": float(d.current_lng) if d.current_lng is not None else None,
+    })
     return {"is_online": d.is_online}

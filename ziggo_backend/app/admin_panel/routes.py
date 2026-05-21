@@ -1960,6 +1960,95 @@ async def admin_complaints(
     )
 
 
+# ---------- Live Tracking ----------
+@router.get("/live-tracking", response_class=HTMLResponse)
+async def admin_live_tracking(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    totals_q = await db.execute(
+        select(
+            func.count(Driver.id),
+            func.count(Driver.id).filter(Driver.is_online == True),  # noqa: E712
+        )
+    )
+    total, online = totals_q.one()
+    return templates.TemplateResponse(
+        request,
+        "live_tracking.html",
+        {
+            "request": request,
+            "active_page": "live-tracking",
+            "total_drivers": total,
+            "online_drivers": online,
+            "offline_drivers": (total or 0) - (online or 0),
+        },
+    )
+
+
+@router.get("/live-tracking/feed")
+async def admin_live_tracking_feed(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    """JSON feed for the live-tracking page.
+
+    Returns ALL approved drivers (lat/lng may be null) so the page can render
+    every driver in the under-map list, with their online/offline status.
+    The map itself only plots drivers that have a known location.
+    """
+
+    q = await db.execute(
+        select(Driver)
+        .options(selectinload(Driver.user))
+        .where(Driver.status == DriverStatus.APPROVED)
+        .order_by(Driver.id)
+    )
+    drivers = q.scalars().all()
+
+    totals_q = await db.execute(
+        select(
+            func.count(Driver.id),
+            func.count(Driver.id).filter(Driver.is_online == True),  # noqa: E712
+        )
+    )
+    total, online = totals_q.one()
+
+    active_q = await db.execute(
+        select(func.count(Booking.id)).where(
+            Booking.status.in_([
+                BookingStatus.ACCEPTED, BookingStatus.ARRIVED, BookingStatus.STARTED,
+            ])
+        )
+    )
+    active_bookings_count = active_q.scalar_one()
+
+    return {
+        "drivers": [
+            {
+                "id": d.id,
+                "name": (d.user.full_name if d.user else "Driver") or "Driver",
+                "phone": (d.user.phone_number if d.user else "") or "",
+                "vehicle_type": d.vehicle_type or "car",
+                "vehicle_number": d.vehicle_number or "",
+                "lat": float(d.current_lat) if d.current_lat is not None else None,
+                "lng": float(d.current_lng) if d.current_lng is not None else None,
+                "is_online": bool(d.is_online),
+                "last_seen": d.last_location_update.isoformat() if d.last_location_update else None,
+            }
+            for d in drivers
+        ],
+        "totals": {
+            "online": online or 0,
+            "offline": (total or 0) - (online or 0),
+            "total": total or 0,
+            "active_bookings": active_bookings_count or 0,
+        },
+        "server_time": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 # ---------- Help & Support Center ----------
 SUPPORT_STATUSES = ["open", "in_progress", "resolved", "closed"]
 

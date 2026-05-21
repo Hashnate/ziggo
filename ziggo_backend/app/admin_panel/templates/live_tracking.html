@@ -8,128 +8,522 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
     .pulse-dot {
-        width: 14px; height: 14px; border-radius: 50%;
+        width: 10px; height: 10px; border-radius: 50%;
         background: #10B981; box-shadow: 0 0 0 0 rgba(16,185,129,0.7);
         animation: pulseRing 1.5s ease-out infinite;
     }
     @keyframes pulseRing {
         0%   { box-shadow: 0 0 0 0 rgba(16,185,129,0.7); }
-        70%  { box-shadow: 0 0 0 14px rgba(16,185,129,0); }
+        70%  { box-shadow: 0 0 0 10px rgba(16,185,129,0); }
         100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
     }
+    .layer-toggle {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 14px -4px rgba(15,23,42,0.18);
+        padding: 4px;
+        display: inline-flex;
+        gap: 2px;
+    }
+    .layer-toggle button {
+        padding: 6px 14px;
+        font-weight: 800;
+        font-size: 12px;
+        border-radius: 9px;
+        color: #475569;
+    }
+    .layer-toggle button.active {
+        background: #f1f5f9;
+        color: #0f172a;
+    }
+    .map-fab {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 14px -4px rgba(15,23,42,0.18);
+        width: 40px; height: 40px;
+        display: flex; align-items: center; justify-content: center;
+        color: #0f172a;
+        cursor: pointer;
+        transition: transform 0.15s ease;
+    }
+    .map-fab:hover { transform: scale(1.05); }
+    /* Hide leaflet attribution corner so the map looks more like the reference */
+    .leaflet-control-attribution { font-size: 9px !important; opacity: 0.7; }
+    #liveMap:fullscreen { background: white; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="grid grid-cols-1 lg:grid-cols-4 gap-4 h-[calc(100vh-220px)]">
-    <div class="lg:col-span-3 zi-card overflow-hidden">
-        <div id="liveMap" style="height: 100%; min-height: 480px;"></div>
+<div class="space-y-6">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between flex-wrap gap-4">
+        <div class="flex items-center gap-3">
+            <div class="w-11 h-11 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-xl">
+                <i class="fas fa-broadcast-tower"></i>
+            </div>
+            <div>
+                <h2 class="text-2xl font-black text-ziggo-ink leading-tight">Live Tracking</h2>
+                <p class="text-xs text-ziggo-muted font-bold">Monitoring all active drivers in real-time</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <span class="pulse-dot"></span>
+            <span class="text-xs font-black text-emerald-600 uppercase tracking-wider">Live Feed Active</span>
+            <span class="text-xs text-ziggo-muted font-bold">
+                · <span id="liveOnlineLabel">{{ online_drivers }}</span> Online ·
+                Updated <span id="liveUpdated">--:--:--</span>
+            </span>
+        </div>
     </div>
 
-    <aside class="zi-card flex flex-col overflow-hidden">
-        <div class="p-4 border-b border-gray-100 flex items-center justify-between">
-            <div>
-                <p class="text-sm font-black text-ziggo-ink">Online drivers</p>
-                <p class="text-[10px] text-ziggo-muted">Auto-refreshes every 10s</p>
+    <!-- Stat cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+            <span class="text-4xl font-black text-ziggo-ink leading-none" id="statOnline">{{ online_drivers }}</span>
+            <span class="pulse-dot"></span>
+            <span class="text-xs font-black text-ziggo-muted uppercase tracking-wider">Drivers Online</span>
+        </div>
+        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+            <span class="text-4xl font-black text-ziggo-ink leading-none" id="statOffline">{{ offline_drivers }}</span>
+            <span class="w-2.5 h-2.5 rounded-full bg-gray-300"></span>
+            <span class="text-xs font-black text-ziggo-muted uppercase tracking-wider">Drivers Offline</span>
+        </div>
+        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+            <span class="text-4xl font-black text-ziggo-ink leading-none" id="statTotal">{{ total_drivers }}</span>
+            <i class="fas fa-car text-ziggo"></i>
+            <span class="text-xs font-black text-ziggo-muted uppercase tracking-wider">Total Drivers</span>
+        </div>
+    </div>
+
+    <!-- Map -->
+    <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div id="mapWrap" class="relative">
+            <div id="liveMap" style="height: 600px; min-height: 480px;"></div>
+
+            <!-- Top-left Map / Satellite toggle -->
+            <div class="absolute top-3 left-3 z-[400] layer-toggle">
+                <button id="layerMap" class="active" type="button">Map</button>
+                <button id="layerSat" type="button">Satellite</button>
+            </div>
+
+            <!-- Top-right action buttons -->
+            <div class="absolute top-3 right-3 z-[400] flex flex-col gap-2">
+                <button id="fitAllBtn" type="button" class="map-fab" title="Fit all drivers">
+                    <i class="fas fa-expand-arrows-alt"></i>
+                </button>
+                <button id="fullscreenBtn" type="button" class="map-fab" title="Toggle fullscreen">
+                    <i class="fas fa-expand"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- All drivers list -->
+    <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-ziggo-line flex items-center justify-between flex-wrap gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-blue-100 text-ziggo flex items-center justify-center">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-black text-ziggo-ink">All Drivers</h3>
+                    <p class="text-[11px] text-ziggo-muted font-bold">
+                        <span id="listOnlineCount">0</span> active · <span id="listOfflineCount">0</span> inactive
+                    </p>
+                </div>
             </div>
             <div class="flex items-center gap-2">
-                <span class="pulse-dot"></span>
-                <span class="text-xs font-bold text-emerald-600" id="onlineCount">0</span>
+                <input type="text" id="driverSearch" placeholder="Search by name, plate, phone…"
+                       class="px-3 py-2 rounded-xl border border-ziggo-line text-sm w-64 focus:outline-none focus:border-ziggo">
+                <div class="layer-toggle">
+                    <button data-filter="all" class="active" type="button">All</button>
+                    <button data-filter="online" type="button">Active</button>
+                    <button data-filter="offline" type="button">Inactive</button>
+                </div>
             </div>
         </div>
-        <div class="flex-1 overflow-y-auto p-3 space-y-2" id="driverList">
-            <p class="text-xs text-ziggo-muted text-center py-8">Loading…</p>
+        <div id="driversGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-6">
+            <!-- cards filled in by JS -->
         </div>
-        <div class="p-3 border-t border-gray-100">
-            <p class="text-xs font-bold text-ziggo-ink mb-1">Active bookings</p>
-            <p class="text-2xl font-black text-ziggo" id="activeCount">0</p>
+        <div id="driversEmpty" class="p-12 text-center hidden">
+            <i class="fas fa-users text-3xl text-ziggo-faint mb-3"></i>
+            <p class="text-ziggo-muted font-bold">No drivers match.</p>
         </div>
-    </aside>
+    </div>
 </div>
 
 <script>
-    const map = L.map('liveMap').setView([6.9271, 79.8612], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const map = L.map('liveMap', { zoomControl: true }).setView([6.9271, 79.8612], 13);
+
+    const tileMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; OpenStreetMap'
-    }).addTo(map);
+    });
+    const tileSat = L.tileLayer(
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        { maxZoom: 19, attribution: 'Imagery © Esri' }
+    );
+    tileMap.addTo(map);
 
-    const markers = new Map(); // driver_id -> L.marker
+    const layerMapBtn = document.getElementById('layerMap');
+    const layerSatBtn = document.getElementById('layerSat');
+    layerMapBtn.addEventListener('click', () => {
+        if (map.hasLayer(tileSat)) map.removeLayer(tileSat);
+        if (!map.hasLayer(tileMap)) tileMap.addTo(map);
+        layerMapBtn.classList.add('active'); layerSatBtn.classList.remove('active');
+    });
+    layerSatBtn.addEventListener('click', () => {
+        if (map.hasLayer(tileMap)) map.removeLayer(tileMap);
+        if (!map.hasLayer(tileSat)) tileSat.addTo(map);
+        layerSatBtn.classList.add('active'); layerMapBtn.classList.remove('active');
+    });
 
-    function vehicleIcon(type) {
-        const map = { bike: '🏍️', tuk: '🛺', car: '🚗', van: '🚐', truck: '🚚' };
-        return map[type] || '🚗';
+    document.getElementById('fitAllBtn').addEventListener('click', () => {
+        const points = Array.from(markers.values()).map(m => m.getLatLng());
+        if (points.length === 0) return;
+        const bounds = L.latLngBounds(points);
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+    });
+
+    document.getElementById('fullscreenBtn').addEventListener('click', () => {
+        const el = document.getElementById('liveMap');
+        if (!document.fullscreenElement) {
+            el.requestFullscreen?.();
+        } else {
+            document.exitFullscreen?.();
+        }
+        setTimeout(() => map.invalidateSize(), 250);
+    });
+
+    const markers = new Map();
+
+    function vehicleEmoji(t) {
+        return ({ bike: '🏍️', tuk: '🛺', car: '🚗', van: '🚐', truck: '🚚' })[t] || '🚗';
     }
 
     function driverIcon(d) {
+        const dim = d.is_online ? '' : 'filter: grayscale(0.6); opacity: 0.55;';
+        const bg = d.is_online
+            ? 'linear-gradient(135deg, #1E40AF, #3B82F6)'
+            : 'linear-gradient(135deg, #64748b, #94a3b8)';
         return L.divIcon({
             className: 'live-driver',
             iconSize: [40, 40],
             iconAnchor: [20, 20],
             html: `<div style="
                 width: 40px; height: 40px; border-radius: 14px;
-                background: linear-gradient(135deg, #1E40AF, #3B82F6);
+                background: ${bg};
                 color: white; display: flex; align-items: center; justify-content: center;
                 font-size: 18px; box-shadow: 0 6px 16px -4px rgba(30,64,175,0.6);
-                border: 2px solid white;">${vehicleIcon(d.vehicle_type)}</div>`
+                border: 2px solid white; ${dim}">${vehicleEmoji(d.vehicle_type)}</div>`
         });
     }
 
-    async function refresh() {
+    function formatTime(iso) {
+        try {
+            const d = iso ? new Date(iso) : new Date();
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            const ss = String(d.getSeconds()).padStart(2, '0');
+            return `${hh}:${mm}:${ss}`;
+        } catch (_) {
+            return '--:--:--';
+        }
+    }
+
+    // Drivers cached locally — keyed by id — so we can re-derive totals
+    // after every push event without hitting the server.
+    const driversState = new Map();
+
+    function popupHtml(d) {
+        return `<div style="font-family: inherit;">
+            <p style="font-weight:900;color:#0f172a;margin:0 0 2px;">${d.name}</p>
+            <p style="font-size:11px;color:#475569;margin:0;text-transform:capitalize;">${d.vehicle_type} · ${d.vehicle_number || '—'}</p>
+            <p style="font-size:11px;color:#64748b;margin:4px 0 0;">${d.phone || ''}</p>
+            <p style="font-size:10px;color:${d.is_online ? '#059669' : '#94a3b8'};margin:4px 0 0;font-weight:800;text-transform:uppercase;">
+                ${d.is_online ? '● Online' : '○ Offline'}
+            </p>
+        </div>`;
+    }
+
+    function upsertMarker(d) {
+        driversState.set(d.id, d);
+        // Drivers without a GPS fix yet are kept in state (for the list) but
+        // not plotted on the map.
+        if (d.lat == null || d.lng == null) {
+            if (markers.has(d.id)) {
+                map.removeLayer(markers.get(d.id));
+                markers.delete(d.id);
+            }
+            return;
+        }
+        const ll = [d.lat, d.lng];
+        if (markers.has(d.id)) {
+            const m = markers.get(d.id);
+            m.setLatLng(ll);
+            m.setIcon(driverIcon(d));
+            if (m.getPopup()) m.setPopupContent(popupHtml(d));
+        } else {
+            const m = L.marker(ll, { icon: driverIcon(d) })
+                .bindPopup(popupHtml(d))
+                .addTo(map);
+            markers.set(d.id, m);
+        }
+    }
+
+    // ---- Drivers list (below the map) -------------------------------------
+    let listFilter = 'all';
+    let listSearch = '';
+
+    function escapeHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({
+            '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+        }[c]));
+    }
+
+    function formatLastSeen(iso) {
+        if (!iso) return 'never';
+        const t = new Date(iso).getTime();
+        if (isNaN(t)) return 'never';
+        const diff = Math.floor((Date.now() - t) / 1000);
+        if (diff < 5) return 'just now';
+        if (diff < 60) return diff + 's ago';
+        if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+        if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+        return Math.floor(diff / 86400) + 'd ago';
+    }
+
+    function driverMatchesFilter(d) {
+        if (listFilter === 'online' && !d.is_online) return false;
+        if (listFilter === 'offline' && d.is_online) return false;
+        if (listSearch) {
+            const hay = (d.name + ' ' + d.phone + ' ' + d.vehicle_number + ' ' + d.vehicle_type).toLowerCase();
+            if (!hay.includes(listSearch)) return false;
+        }
+        return true;
+    }
+
+    function renderDriversList() {
+        const grid = document.getElementById('driversGrid');
+        const empty = document.getElementById('driversEmpty');
+
+        const all = Array.from(driversState.values()).sort((a, b) => {
+            if (a.is_online !== b.is_online) return a.is_online ? -1 : 1;
+            return a.name.localeCompare(b.name);
+        });
+        const onlineTotal = all.filter(d => d.is_online).length;
+        document.getElementById('listOnlineCount').textContent = onlineTotal;
+        document.getElementById('listOfflineCount').textContent = all.length - onlineTotal;
+
+        const visible = all.filter(driverMatchesFilter);
+        if (visible.length === 0) {
+            grid.innerHTML = '';
+            empty.classList.remove('hidden');
+            return;
+        }
+        empty.classList.add('hidden');
+
+        grid.innerHTML = visible.map(d => {
+            const pillCls = d.is_online
+                ? 'bg-emerald-50 text-emerald-600'
+                : 'bg-gray-100 text-gray-500';
+            const dot = d.is_online
+                ? '<span class="pulse-dot" style="width:8px;height:8px;"></span>'
+                : '<span class="w-2 h-2 rounded-full bg-gray-300"></span>';
+            const focusable = d.lat != null && d.lng != null;
+            return `
+                <div class="border border-ziggo-line rounded-2xl p-4 hover:shadow-soft-sm transition cursor-pointer ${focusable ? '' : 'opacity-90'}"
+                     ${focusable ? `onclick='focusDriver(${d.id})'` : ''}>
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-11 h-11 rounded-xl bg-gray-100 flex items-center justify-center text-xl">
+                            ${vehicleEmoji(d.vehicle_type)}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-black text-ziggo-ink truncate">${escapeHtml(d.name)}</p>
+                            <p class="text-[11px] text-ziggo-muted truncate">${escapeHtml(d.phone || 'No phone')}</p>
+                        </div>
+                        ${dot}
+                    </div>
+                    <div class="flex items-center justify-between text-[11px] mb-2">
+                        <span class="text-ziggo font-black capitalize">${escapeHtml(d.vehicle_type)} · ${escapeHtml(d.vehicle_number || '—')}</span>
+                        <span class="${pillCls} px-2.5 py-1 rounded-full font-black uppercase tracking-wider">
+                            ${d.is_online ? 'Active' : 'Inactive'}
+                        </span>
+                    </div>
+                    <p class="text-[10px] text-ziggo-faint font-bold">
+                        ${d.lat == null ? 'No GPS fix yet' : 'Last update ' + formatLastSeen(d.last_seen)}
+                    </p>
+                </div>`;
+        }).join('');
+    }
+
+    function focusDriver(id) {
+        const d = driversState.get(id);
+        if (!d || d.lat == null || d.lng == null) return;
+        map.setView([d.lat, d.lng], 16, { animate: true });
+        const m = markers.get(id);
+        if (m) m.openPopup();
+        document.getElementById('liveMap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    document.getElementById('driverSearch').addEventListener('input', (e) => {
+        listSearch = e.target.value.trim().toLowerCase();
+        renderDriversList();
+    });
+
+    document.querySelectorAll('[data-filter]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            listFilter = btn.dataset.filter;
+            renderDriversList();
+        });
+    });
+
+    // Re-render relative timestamps every 10s so "5m ago" stays honest.
+    setInterval(renderDriversList, 10000);
+
+    function recomputeStats() {
+        let online = 0;
+        for (const d of driversState.values()) if (d.is_online) online++;
+        const total = driversState.size;
+        document.getElementById('statOnline').textContent = online;
+        document.getElementById('statOffline').textContent = total - online;
+        document.getElementById('statTotal').textContent = total;
+        document.getElementById('liveOnlineLabel').textContent = online;
+    }
+
+    function markUpdated(iso) {
+        document.getElementById('liveUpdated').textContent = formatTime(iso);
+    }
+
+    async function loadInitial() {
         try {
             const r = await fetch('/admin/live-tracking/feed');
+            if (!r.ok) return;
             const j = await r.json();
 
-            // Update sidebar count
-            document.getElementById('onlineCount').textContent = j.drivers.length;
-            document.getElementById('activeCount').textContent = j.active_bookings.length;
-
-            // Update sidebar list
-            const list = document.getElementById('driverList');
-            if (j.drivers.length === 0) {
-                list.innerHTML = '<p class="text-xs text-ziggo-muted text-center py-8">No drivers online</p>';
-            } else {
-                list.innerHTML = j.drivers.map(d => `
-                    <button onclick="map.setView([${d.lat}, ${d.lng}], 15)"
-                            class="w-full text-left p-3 rounded-xl bg-ziggo-canvas hover:bg-blue-50 transition">
-                        <div class="flex items-center gap-2">
-                            <span class="text-lg">${vehicleIcon(d.vehicle_type)}</span>
-                            <div class="flex-1 min-w-0">
-                                <p class="text-xs font-bold text-ziggo-ink truncate">${d.name}</p>
-                                <p class="text-[10px] text-ziggo-faint truncate">${d.vehicle_number || 'No plate'}</p>
-                            </div>
-                            <span class="pulse-dot" style="width:8px;height:8px;"></span>
-                        </div>
-                    </button>
-                `).join('');
-            }
-
-            // Update map markers
-            const seenIds = new Set();
+            driversState.clear();
+            const seen = new Set();
             j.drivers.forEach(d => {
-                seenIds.add(d.id);
-                if (markers.has(d.id)) {
-                    markers.get(d.id).setLatLng([d.lat, d.lng]);
-                } else {
-                    const m = L.marker([d.lat, d.lng], { icon: driverIcon(d) })
-                        .bindPopup(`<b>${d.name}</b><br>${d.vehicle_type} · ${d.vehicle_number || '—'}<br>${d.phone}`)
-                        .addTo(map);
-                    markers.set(d.id, m);
-                }
+                upsertMarker(d);
+                seen.add(d.id);
             });
-            // Remove stale markers
             for (const [id, m] of markers.entries()) {
-                if (!seenIds.has(id)) {
+                if (!seen.has(id)) {
                     map.removeLayer(m);
                     markers.delete(id);
                 }
             }
+
+            // Server-truth totals (includes drivers with no GPS yet, who aren't on the map)
+            document.getElementById('statOnline').textContent = j.totals.online;
+            document.getElementById('statOffline').textContent = j.totals.offline;
+            document.getElementById('statTotal').textContent = j.totals.total;
+            document.getElementById('liveOnlineLabel').textContent = j.totals.online;
+            markUpdated(j.server_time);
+
+            const gpsDrivers = j.drivers.filter(d => d.lat != null && d.lng != null);
+            if (!window._fittedOnce && gpsDrivers.length > 0) {
+                const bounds = L.latLngBounds(gpsDrivers.map(d => [d.lat, d.lng]));
+                map.fitBounds(bounds, { padding: [60, 60], maxZoom: 14 });
+                window._fittedOnce = true;
+            }
+            renderDriversList();
         } catch (e) {
-            console.error('live tracking refresh failed', e);
+            console.error('initial load failed', e);
         }
     }
 
-    refresh();
-    setInterval(refresh, 10000);
+    // ---- WebSocket subscription -------------------------------------------
+    const liveStatusEl = document.querySelector('.pulse-dot');  // header dot
+    const liveLabelEl = document.querySelector('.text-emerald-600.uppercase');
+
+    function setLive(state) {
+        // state: 'live' | 'reconnecting' | 'offline'
+        if (state === 'live') {
+            liveStatusEl.style.background = '#10B981';
+            liveStatusEl.style.animation = 'pulseRing 1.5s ease-out infinite';
+            liveLabelEl.textContent = 'Live Feed Active';
+            liveLabelEl.classList.remove('text-amber-600'); liveLabelEl.classList.add('text-emerald-600');
+        } else if (state === 'reconnecting') {
+            liveStatusEl.style.background = '#F59E0B';
+            liveStatusEl.style.animation = 'none';
+            liveLabelEl.textContent = 'Reconnecting…';
+            liveLabelEl.classList.remove('text-emerald-600'); liveLabelEl.classList.add('text-amber-600');
+        } else {
+            liveStatusEl.style.background = '#94a3b8';
+            liveStatusEl.style.animation = 'none';
+            liveLabelEl.textContent = 'Disconnected';
+            liveLabelEl.classList.remove('text-emerald-600'); liveLabelEl.classList.add('text-amber-600');
+        }
+    }
+
+    let ws = null;
+    let reconnectDelay = 1000;
+    let pollFallbackId = null;
+
+    function openWs() {
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${proto}//${location.host}/ws/admin`);
+
+        ws.addEventListener('open', () => {
+            setLive('live');
+            reconnectDelay = 1000;
+            if (pollFallbackId) {
+                clearInterval(pollFallbackId);
+                pollFallbackId = null;
+            }
+            // Light heartbeat so intermediaries don't drop the socket
+            ws._ping = setInterval(() => {
+                try { ws.send('ping'); } catch (_) {}
+            }, 30000);
+        });
+
+        ws.addEventListener('message', (ev) => {
+            let msg;
+            try { msg = JSON.parse(ev.data); } catch (_) { return; }
+            if (!msg || !msg.event) return;
+            const d = msg.data || {};
+
+            if (msg.event === 'driver_location_update') {
+                upsertMarker(d);
+                recomputeStats();
+                markUpdated(d.last_seen);
+                renderDriversList();
+            } else if (msg.event === 'driver_status_update') {
+                const cur = driversState.get(d.id);
+                if (cur && d.lat != null && d.lng != null) {
+                    upsertMarker({ ...cur, ...d });
+                } else if (cur) {
+                    cur.is_online = !!d.is_online;
+                    driversState.set(d.id, cur);
+                    if (markers.has(d.id)) markers.get(d.id).setIcon(driverIcon(cur));
+                }
+                recomputeStats();
+                markUpdated(new Date().toISOString());
+                renderDriversList();
+            }
+        });
+
+        ws.addEventListener('close', () => {
+            if (ws && ws._ping) clearInterval(ws._ping);
+            setLive('reconnecting');
+            // HTTP fallback poll so the page still updates while we retry.
+            if (!pollFallbackId) {
+                pollFallbackId = setInterval(loadInitial, 5000);
+            }
+            const delay = reconnectDelay;
+            reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+            setTimeout(openWs, delay);
+        });
+
+        ws.addEventListener('error', () => {
+            // close handler will run too; nothing to do here
+        });
+    }
+
+    loadInitial().then(openWs);
 </script>
 {% endblock %}
