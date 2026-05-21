@@ -68,7 +68,9 @@ async def list_active_promos(
     q = await db.execute(
         select(PromoCode).where(
             PromoCode.is_active == True,  # noqa: E712
+            (PromoCode.valid_from == None) | (PromoCode.valid_from <= now),  # noqa: E711
             (PromoCode.valid_to == None) | (PromoCode.valid_to >= now),  # noqa: E711
+            (PromoCode.usage_limit == None) | (PromoCode.used_count < PromoCode.usage_limit),  # noqa: E711
         )
         .order_by(PromoCode.id.desc())
     )

@@ -100,6 +100,50 @@ class _PromoCard extends StatelessWidget {
   final String value;
   const _PromoCard({required this.promo, required this.value});
 
+  static const _months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
+  Widget _chip(String text, {Color? bg, Color? fg}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg ?? AppColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: fg ?? AppColors.textSecondary,
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _metaChips(Map<String, dynamic> p) {
+    final chips = <Widget>[];
+    final min = p['min_order_amount'] as num?;
+    if (min != null && min > 0) {
+      chips.add(_chip('Min Rs.${min.toStringAsFixed(0)}'));
+    }
+    final validTo = p['valid_to']?.toString();
+    if (validTo != null && validTo.isNotEmpty) {
+      try {
+        final d = DateTime.parse(validTo).toLocal();
+        chips.add(_chip(
+          'Until ${d.day} ${_months[d.month - 1]}',
+          bg: const Color(0x14F59E0B),
+          fg: AppColors.warning,
+        ));
+      } catch (_) {}
+    }
+    return chips;
+  }
+
   Future<void> _copy(BuildContext context, String code) async {
     await Clipboard.setData(ClipboardData(text: code));
     if (!context.mounted) return;
@@ -202,24 +246,12 @@ class _PromoCard extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  if ((promo['min_order_amount'] as num?) != null &&
-                      (promo['min_order_amount'] as num) > 0) ...[
+                  if (_metaChips(promo).isNotEmpty) ...[
                     const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceMuted,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'Min Rs.${(promo['min_order_amount'] as num).toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: _metaChips(promo),
                     ),
                   ],
                 ],

@@ -1943,6 +1943,138 @@ async def admin_promotions(
     )
 
 
+def _parse_admin_date(s: str):
+    s = (s or "").strip()
+    if not s:
+        return None
+    # Form input type="date" sends YYYY-MM-DD
+    try:
+        return datetime.strptime(s, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid date '{s}', expected YYYY-MM-DD")
+
+
+@router.post("/promotions/new")
+async def admin_promotions_new(
+    code: str = Form(...),
+    description: str = Form(""),
+    discount_type: str = Form("percentage"),
+    discount_value: float = Form(...),
+    min_order_amount: float = Form(0),
+    max_discount: str = Form(""),
+    usage_limit: str = Form(""),
+    valid_from: str = Form(""),
+    valid_to: str = Form(""),
+    is_active: str = Form("on"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from ..models import PromoCode
+    from decimal import Decimal
+
+    norm_code = code.strip().upper()
+    if not norm_code:
+        raise HTTPException(status_code=400, detail="Code is required")
+    if discount_type not in ("percentage", "fixed"):
+        raise HTTPException(status_code=400, detail="discount_type must be 'percentage' or 'fixed'")
+
+    dup = await db.execute(select(PromoCode).where(PromoCode.code == norm_code))
+    if dup.scalars().first():
+        raise HTTPException(status_code=400, detail=f"Promo code '{norm_code}' already exists")
+
+    db.add(PromoCode(
+        code=norm_code,
+        description=description.strip() or None,
+        discount_type=discount_type,
+        discount_value=Decimal(str(discount_value)),
+        min_order_amount=Decimal(str(min_order_amount or 0)),
+        max_discount=Decimal(str(max_discount)) if max_discount.strip() else None,
+        usage_limit=int(usage_limit) if usage_limit.strip().isdigit() else None,
+        used_count=0,
+        valid_from=_parse_admin_date(valid_from),
+        valid_to=_parse_admin_date(valid_to),
+        is_active=(is_active == "on"),
+    ))
+    await db.commit()
+    return RedirectResponse(url="/admin/promotions", status_code=303)
+
+
+@router.post("/promotions/{promo_id}/edit")
+async def admin_promotions_edit(
+    promo_id: int,
+    description: str = Form(""),
+    discount_type: str = Form("percentage"),
+    discount_value: float = Form(...),
+    min_order_amount: float = Form(0),
+    max_discount: str = Form(""),
+    usage_limit: str = Form(""),
+    valid_from: str = Form(""),
+    valid_to: str = Form(""),
+    is_active: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from ..models import PromoCode
+    from decimal import Decimal
+
+    if discount_type not in ("percentage", "fixed"):
+        raise HTTPException(status_code=400, detail="discount_type must be 'percentage' or 'fixed'")
+
+    q = await db.execute(select(PromoCode).where(PromoCode.id == promo_id))
+    p = q.scalars().first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Promo not found")
+
+    p.description = description.strip() or None
+    p.discount_type = discount_type
+    p.discount_value = Decimal(str(discount_value))
+    p.min_order_amount = Decimal(str(min_order_amount or 0))
+    p.max_discount = Decimal(str(max_discount)) if max_discount.strip() else None
+    p.usage_limit = int(usage_limit) if usage_limit.strip().isdigit() else None
+    p.valid_from = _parse_admin_date(valid_from)
+    p.valid_to = _parse_admin_date(valid_to)
+    p.is_active = (is_active == "on")
+    await db.commit()
+    return RedirectResponse(url="/admin/promotions", status_code=303)
+
+
+@router.post("/promotions/{promo_id}/toggle")
+async def admin_promotions_toggle(
+    promo_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from ..models import PromoCode
+
+    q = await db.execute(select(PromoCode).where(PromoCode.id == promo_id))
+    p = q.scalars().first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Promo not found")
+    p.is_active = not bool(p.is_active)
+    await db.commit()
+    return RedirectResponse(url="/admin/promotions", status_code=303)
+
+
+@router.post("/promotions/{promo_id}/delete")
+async def admin_promotions_delete(
+    promo_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from ..models import PromoCode
+
+    q = await db.execute(select(PromoCode).where(PromoCode.id == promo_id))
+    p = q.scalars().first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Promo not found")
+    # `used_count` may already be > 0; we still allow deletion because
+    # bookings reference the code by string, not FK. The audit trail
+    # lives on Booking.promo_code.
+    await db.delete(p)
+    await db.commit()
+    return RedirectResponse(url="/admin/promotions", status_code=303)
+
+
 @router.get("/complaints", response_class=HTMLResponse)
 async def admin_complaints(
     request: Request,
