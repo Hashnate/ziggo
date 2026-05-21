@@ -47,19 +47,23 @@ async def seed_admin(db):
 
 async def seed_fare_settings(db):
     rates = [
-        ("bike",  60,  35,  2, 100, 15, 1.0),
-        ("tuk",   80,  55,  3, 150, 15, 1.0),
-        ("car",   150, 80,  4, 250, 15, 1.0),
-        ("van",   250, 120, 5, 400, 15, 1.0),
-        ("truck", 500, 200, 6, 750, 15, 1.0),
+        ("bike",  "Bike",  1, "Moto bike for short city trips",   60,  35,  2, 100, 15, 1.0),
+        ("tuk",   "Tuk",   3, "Three-wheeler for in-city rides",  80,  55,  3, 150, 15, 1.0),
+        ("car",   "Car",   4, "Sedan for comfortable city travel", 150, 80,  4, 250, 15, 1.0),
+        ("van",   "Van",   8, "Van for groups and longer trips",   250, 120, 5, 400, 15, 1.0),
+        ("truck", "Truck", 2, "Truck for cargo and heavy loads",   500, 200, 6, 750, 15, 1.0),
     ]
-    for st, base, perkm, permin, minf, pct, surge in rates:
+    for st, label, cap, desc, base, perkm, permin, minf, pct, surge in rates:
         q = await db.execute(select(FareSetting).where(FareSetting.service_type == st))
         if q.scalars().first():
             continue
         db.add(
             FareSetting(
                 service_type=st,
+                display_name=label,
+                capacity=cap,
+                description=desc,
+                is_active=True,
                 base_fare=Decimal(str(base)),
                 per_km_rate=Decimal(str(perkm)),
                 per_minute_rate=Decimal(str(permin)),

@@ -65,6 +65,11 @@ class FareSetting(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     service_type = Column(String(20), unique=True, index=True)
+    display_name = Column(String(60))
+    image_url = Column(String(255))
+    capacity = Column(Integer, default=0)
+    description = Column(String(255))
+    is_active = Column(Boolean, nullable=False, default=True)
     base_fare = Column(DECIMAL(10, 2))
     per_km_rate = Column(DECIMAL(10, 2))
     per_minute_rate = Column(DECIMAL(10, 2))

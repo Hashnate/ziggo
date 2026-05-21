@@ -1,79 +1,258 @@
 {% extends "base.html" %}
 
 {% block title %}Categories | Ziggo Admin{% endblock %}
-{% block page_title %}Service Categories{% endblock %}
+{% block page_title %}Vehicle Categories{% endblock %}
 
 {% block content %}
-<div class="mb-6 zi-card p-5 flex items-center gap-4">
-    <div class="w-12 h-12 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-xl">
-        <i class="fas fa-info-circle"></i>
+<div class="space-y-6">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-11 h-11 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-xl">
+                <i class="fas fa-list"></i>
+            </div>
+            <div>
+                <h2 class="text-2xl font-black text-ziggo-ink leading-tight">Vehicle Categories</h2>
+                <p class="text-xs text-ziggo-muted font-bold">Pricing, capacity and availability per ride/parcel type</p>
+            </div>
+        </div>
+        <button onclick="openCreateModal()" class="px-5 py-3 bg-ziggo text-white rounded-2xl font-black shadow-brand hover:bg-ziggo-light transition flex items-center gap-2">
+            <i class="fas fa-plus"></i> Add Category
+        </button>
     </div>
-    <div>
-        <p class="text-sm font-bold text-ziggo-ink">Ziggo runs five vehicle categories</p>
-        <p class="text-xs text-ziggo-muted">Pricing per category is editable on the
-            <a href="/admin/fare-settings" class="text-ziggo font-bold underline">Fare settings</a> page.
-            Flash parcel weight tiers live on the
-            <a href="/admin/flash-pricing" class="text-ziggo font-bold underline">Flash pricing</a> page.
-        </p>
+
+    <!-- Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+        {% for c in categories %}
+        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm overflow-hidden flex flex-col">
+            <!-- Top: image + name + status -->
+            <div class="p-5 pb-3 flex items-center gap-3">
+                <div class="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                    {% if c.image_url %}
+                        <img src="{{ c.image_url }}" alt="{{ c.display_name or c.service_type }}" class="w-full h-full object-cover">
+                    {% else %}
+                        <i class="fas fa-car text-ziggo text-lg"></i>
+                    {% endif %}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-lg font-black text-ziggo-ink truncate">{{ c.display_name or c.service_type|title }}</p>
+                </div>
+                {% if c.is_active %}
+                <span class="px-3 py-1 text-[11px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600 rounded-full">Active</span>
+                {% else %}
+                <span class="px-3 py-1 text-[11px] font-black uppercase tracking-wider bg-gray-100 text-gray-500 rounded-full">Inactive</span>
+                {% endif %}
+            </div>
+
+            <!-- Fare block -->
+            <div class="mx-5 mb-3 bg-ziggo-canvas rounded-2xl px-4 py-3 space-y-2">
+                <div class="flex items-center justify-between text-sm">
+                    <span class="text-ziggo-muted font-bold">Base Fare</span>
+                    <span class="text-ziggo-ink font-black">Rs.{{ "%.2f"|format(c.base_fare or 0) }}</span>
+                </div>
+                <div class="flex items-center justify-between text-sm">
+                    <span class="text-ziggo-muted font-bold">Per KM</span>
+                    <span class="text-ziggo-ink font-black">Rs.{{ "%.2f"|format(c.per_km_rate or 0) }}</span>
+                </div>
+                <div class="flex items-center justify-between text-sm">
+                    <span class="text-ziggo-muted font-bold">Per Minute</span>
+                    <span class="text-ziggo-ink font-black">Rs.{{ "%.2f"|format(c.per_minute_rate or 0) }}</span>
+                </div>
+                <div class="flex items-center justify-between text-sm pt-2 border-t border-dashed border-ziggo-line">
+                    <span class="text-ziggo-ink font-black">Minimum Fare</span>
+                    <span class="text-ziggo-ink font-black">Rs.{{ "%.2f"|format(c.min_fare or 0) }}</span>
+                </div>
+            </div>
+
+            <!-- Capacity -->
+            <div class="px-5 pb-2 flex items-center gap-2 text-sm">
+                <i class="fas fa-user-friends text-ziggo"></i>
+                <span class="text-ziggo-ink font-black">Capacity: {{ c.capacity or 0 }} persons</span>
+            </div>
+
+            <!-- Description -->
+            <div class="px-5 pb-4">
+                <div class="bg-gray-50 border border-ziggo-line rounded-xl px-3 py-2 text-xs text-ziggo-muted">
+                    {{ c.description or '—' }}
+                </div>
+            </div>
+
+            <!-- Footer: Edit / Delete -->
+            <div class="mt-auto px-5 pb-5 grid grid-cols-2 gap-3">
+                <button
+                    onclick='openEditModal({{ {
+                        "id": c.id,
+                        "service_type": c.service_type,
+                        "display_name": c.display_name or "",
+                        "capacity": c.capacity or 0,
+                        "description": c.description or "",
+                        "base_fare": (c.base_fare|float) if c.base_fare is not none else 0,
+                        "per_km_rate": (c.per_km_rate|float) if c.per_km_rate is not none else 0,
+                        "per_minute_rate": (c.per_minute_rate|float) if c.per_minute_rate is not none else 0,
+                        "min_fare": (c.min_fare|float) if c.min_fare is not none else 0,
+                        "platform_fee_percent": (c.platform_fee_percent|float) if c.platform_fee_percent is not none else 15,
+                        "surge_multiplier": (c.surge_multiplier|float) if c.surge_multiplier is not none else 1,
+                        "is_active": c.is_active,
+                    }|tojson }})'
+                    class="px-3 py-2 border border-ziggo-line rounded-xl text-sm font-black text-ziggo-ink hover:bg-gray-50 transition flex items-center justify-center gap-2">
+                    <i class="fas fa-edit"></i> Edit
+                </button>
+                <form method="POST" action="/admin/categories/{{ c.id }}/delete" onsubmit="return confirmDelete({{ driver_counts.get(c.service_type, 0) }}, '{{ c.display_name or c.service_type }}')">
+                    <button type="submit" class="w-full px-3 py-2 border border-rose-200 rounded-xl text-sm font-black text-rose-600 hover:bg-rose-50 transition flex items-center justify-center gap-2">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% else %}
+        <div class="col-span-full bg-white rounded-3xl border border-dashed border-ziggo-line p-12 text-center">
+            <i class="fas fa-car text-4xl text-ziggo-faint mb-3"></i>
+            <p class="text-ziggo-muted font-bold">No vehicle categories yet. Click <span class="text-ziggo">Add Category</span> to create one.</p>
+        </div>
+        {% endfor %}
     </div>
 </div>
 
-<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-    {% for c in categories %}
-    <div class="zi-card overflow-hidden zi-card-hover">
-        <div class="bg-gradient-to-r {{ c.grad }} p-5 text-white flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center text-xl">
-                    <i class="fas {{ c.icon }}"></i>
+<!-- Create / Edit Modal -->
+<div id="categoryModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+        <div class="p-6 border-b border-ziggo-line flex justify-between items-center bg-gray-50/50 flex-shrink-0">
+            <h3 class="text-xl font-black text-ziggo" id="catModalTitle">New category</h3>
+            <button onclick="closeModal()" class="text-ziggo-faint hover:text-ziggo-ink">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        <form id="categoryForm" method="POST" enctype="multipart/form-data" class="p-8 space-y-5 overflow-y-auto">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Service key</label>
+                    <input type="text" name="service_type" id="catKey" required pattern="[a-z0-9_-]+" placeholder="e.g. parcel_bike" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    <p class="text-[10px] text-ziggo-faint font-bold mt-1">lowercase, unique. Cannot change after create.</p>
                 </div>
                 <div>
-                    <p class="text-lg font-black">{{ c.label }}</p>
-                    <p class="text-xs opacity-80 uppercase tracking-wider">{{ c.key }}</p>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Display name</label>
+                    <input type="text" name="display_name" id="catName" required placeholder="e.g. Parcel Bike" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                 </div>
-            </div>
-            <div class="text-right">
-                <p class="text-3xl font-black leading-none">{{ c.drivers }}</p>
-                <p class="text-[10px] uppercase opacity-80 tracking-wider mt-1">drivers</p>
-            </div>
-        </div>
-        <div class="p-5 space-y-3">
-            <div class="grid grid-cols-2 gap-3">
-                <div class="bg-ziggo-canvas rounded-xl p-3">
-                    <p class="text-[10px] text-ziggo-faint uppercase font-bold">Base fare</p>
-                    <p class="text-base font-black text-ziggo-ink">
-                        {% if c.base_fare is not none %}Rs.{{ "{:.0f}".format(c.base_fare) }}{% else %}—{% endif %}
-                    </p>
+                <div class="col-span-2">
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Image</label>
+                    <input type="file" name="image" accept="image/png,image/jpeg,image/webp" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white">
+                    <p class="text-[10px] text-ziggo-faint font-bold mt-1">JPG/PNG/WEBP, max 5 MB. Leave empty to keep current.</p>
                 </div>
-                <div class="bg-ziggo-canvas rounded-xl p-3">
-                    <p class="text-[10px] text-ziggo-faint uppercase font-bold">Per km</p>
-                    <p class="text-base font-black text-ziggo-ink">
-                        {% if c.per_km is not none %}Rs.{{ "{:.0f}".format(c.per_km) }}{% else %}—{% endif %}
-                    </p>
-                </div>
-                <div class="bg-ziggo-canvas rounded-xl p-3">
-                    <p class="text-[10px] text-ziggo-faint uppercase font-bold">Per min</p>
-                    <p class="text-base font-black text-ziggo-ink">
-                        {% if c.per_min is not none %}Rs.{{ "{:.0f}".format(c.per_min) }}{% else %}—{% endif %}
-                    </p>
-                </div>
-                <div class="bg-ziggo-canvas rounded-xl p-3">
-                    <p class="text-[10px] text-ziggo-faint uppercase font-bold">Min fare</p>
-                    <p class="text-base font-black text-ziggo-ink">
-                        {% if c.min_fare is not none %}Rs.{{ "{:.0f}".format(c.min_fare) }}{% else %}—{% endif %}
-                    </p>
-                </div>
-            </div>
-            <div class="flex items-center justify-between pt-2">
                 <div>
-                    <p class="text-[10px] text-ziggo-faint uppercase font-bold">Bookings (all-time)</p>
-                    <p class="text-lg font-black text-ziggo">{{ c.bookings }}</p>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Capacity (persons)</label>
+                    <input type="number" min="0" name="capacity" id="catCapacity" value="0" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                 </div>
-                <a href="/admin/fare-settings" class="px-3 py-2 rounded-xl bg-ziggo text-white text-xs font-bold hover:bg-ziggo-dark transition">
-                    <i class="fas fa-edit mr-1"></i> Edit pricing
-                </a>
+                <div class="flex items-end">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="is_active" id="catActive" checked class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
+                        <span class="text-sm font-black text-ziggo-ink">Active</span>
+                    </label>
+                </div>
+                <div class="col-span-2">
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Description</label>
+                    <textarea name="description" id="catDesc" rows="2" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo"></textarea>
+                </div>
+
+                <div class="col-span-2 pt-2">
+                    <p class="text-xs font-black text-ziggo uppercase tracking-wider">Pricing</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Base fare (Rs)</label>
+                    <input type="number" step="0.01" min="0" name="base_fare" id="catBase" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Per km (Rs)</label>
+                    <input type="number" step="0.01" min="0" name="per_km_rate" id="catPerKm" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Per minute (Rs)</label>
+                    <input type="number" step="0.01" min="0" name="per_minute_rate" id="catPerMin" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Minimum fare (Rs)</label>
+                    <input type="number" step="0.01" min="0" name="min_fare" id="catMin" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Platform fee (%)</label>
+                    <input type="number" step="0.01" min="0" name="platform_fee_percent" id="catFee" value="15" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Surge multiplier</label>
+                    <input type="number" step="0.01" min="0.1" name="surge_multiplier" id="catSurge" value="1.0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
             </div>
-        </div>
+            <div class="pt-2 flex justify-end gap-3">
+                <button type="button" onclick="closeModal()" class="px-6 py-3 border border-ziggo-line rounded-xl font-black text-ziggo-muted hover:bg-gray-50">Cancel</button>
+                <button type="submit" class="px-8 py-3 bg-ziggo text-white rounded-xl font-black hover:bg-ziggo-light shadow-brand">
+                    <span id="catSubmitText">Create category</span>
+                </button>
+            </div>
+        </form>
     </div>
-    {% endfor %}
 </div>
+
+<script>
+function openCreateModal() {
+    document.getElementById('catModalTitle').innerText = 'New category';
+    document.getElementById('catSubmitText').innerText = 'Create category';
+    document.getElementById('categoryForm').action = '/admin/categories/new';
+    document.getElementById('catKey').value = '';
+    document.getElementById('catKey').disabled = false;
+    document.getElementById('catName').value = '';
+    document.getElementById('catCapacity').value = 0;
+    document.getElementById('catDesc').value = '';
+    document.getElementById('catBase').value = 0;
+    document.getElementById('catPerKm').value = 0;
+    document.getElementById('catPerMin').value = 0;
+    document.getElementById('catMin').value = 0;
+    document.getElementById('catFee').value = 15;
+    document.getElementById('catSurge').value = 1.0;
+    document.getElementById('catActive').checked = true;
+    showModal();
+}
+
+function openEditModal(c) {
+    document.getElementById('catModalTitle').innerText = 'Edit — ' + (c.display_name || c.service_type);
+    document.getElementById('catSubmitText').innerText = 'Save changes';
+    document.getElementById('categoryForm').action = '/admin/categories/' + c.id + '/edit';
+    document.getElementById('catKey').value = c.service_type;
+    document.getElementById('catKey').disabled = true;
+    document.getElementById('catName').value = c.display_name || '';
+    document.getElementById('catCapacity').value = c.capacity || 0;
+    document.getElementById('catDesc').value = c.description || '';
+    document.getElementById('catBase').value = c.base_fare;
+    document.getElementById('catPerKm').value = c.per_km_rate;
+    document.getElementById('catPerMin').value = c.per_minute_rate;
+    document.getElementById('catMin').value = c.min_fare;
+    document.getElementById('catFee').value = c.platform_fee_percent;
+    document.getElementById('catSurge').value = c.surge_multiplier;
+    document.getElementById('catActive').checked = !!c.is_active;
+    showModal();
+}
+
+function showModal() {
+    const m = document.getElementById('categoryModal');
+    m.classList.remove('hidden');
+    m.classList.add('flex');
+}
+
+function closeModal() {
+    const m = document.getElementById('categoryModal');
+    m.classList.add('hidden');
+    m.classList.remove('flex');
+}
+
+function confirmDelete(driverCount, name) {
+    if (driverCount > 0) {
+        alert("Can't delete '" + name + "' — " + driverCount + " driver(s) are assigned. Deactivate it instead.");
+        return false;
+    }
+    return confirm("Delete '" + name + "' permanently?");
+}
+
+document.getElementById('categoryModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+});
+</script>
 {% endblock %}

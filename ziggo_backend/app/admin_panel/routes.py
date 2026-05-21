@@ -29,6 +29,8 @@ templates = Jinja2Templates(directory=os.path.join(current_dir, "templates"))
 
 UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "drivers")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+CATEGORY_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "categories")
+os.makedirs(CATEGORY_UPLOAD_DIR, exist_ok=True)
 ALLOWED_PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 MAX_PHOTO_BYTES = 5 * 1024 * 1024  # 5 MB
 
@@ -55,6 +57,25 @@ async def _save_uploaded_photo(photo: UploadFile | None) -> str | None:
     with open(fpath, "wb") as f:
         f.write(data)
     return f"/static/uploads/drivers/{fname}"
+
+
+async def _save_category_image(photo: UploadFile | None) -> str | None:
+    if photo is None or not photo.filename:
+        return None
+    ext = os.path.splitext(photo.filename)[1].lower()
+    if ext not in ALLOWED_PHOTO_EXTS:
+        raise HTTPException(status_code=400, detail="Image must be JPG, PNG, or WEBP")
+    data = await photo.read()
+    if len(data) == 0:
+        return None
+    if len(data) > MAX_PHOTO_BYTES:
+        raise HTTPException(status_code=400, detail="Image must be under 5 MB")
+    import secrets
+    fname = f"{secrets.token_hex(8)}{ext}"
+    fpath = os.path.join(CATEGORY_UPLOAD_DIR, fname)
+    with open(fpath, "wb") as f:
+        f.write(data)
+    return f"/static/uploads/categories/{fname}"
 
 SESSION_COOKIE = "ziggo_admin"
 _serializer = URLSafeSerializer(settings.SECRET_KEY, salt="ziggo-admin")
@@ -670,6 +691,160 @@ async def admin_fare_settings_update(
         f.surge_multiplier = Decimal(str(surge_multiplier))
         await db.commit()
     return RedirectResponse(url="/admin/fare-settings", status_code=303)
+
+
+# ---------- Vehicle categories ----------
+@router.get("/categories", response_class=HTMLResponse)
+async def admin_categories(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from ..models import FareSetting, Driver
+
+    q = await db.execute(select(FareSetting).order_by(FareSetting.id))
+    categories = q.scalars().all()
+    # Per-category driver count, so admin sees impact before deleting
+    counts_q = await db.execute(
+        select(Driver.vehicle_type, func.count(Driver.id)).group_by(Driver.vehicle_type)
+    )
+    driver_counts = {vt: n for vt, n in counts_q.all()}
+    return templates.TemplateResponse(
+        request,
+        "categories.html",
+        {
+            "request": request,
+            "active_page": "categories",
+            "categories": categories,
+            "driver_counts": driver_counts,
+        },
+    )
+
+
+@router.post("/categories/new")
+async def admin_categories_new(
+    service_type: str = Form(...),
+    display_name: str = Form(...),
+    capacity: int = Form(0),
+    description: str = Form(""),
+    base_fare: float = Form(0),
+    per_km_rate: float = Form(0),
+    per_minute_rate: float = Form(0),
+    min_fare: float = Form(0),
+    platform_fee_percent: float = Form(15),
+    surge_multiplier: float = Form(1.0),
+    is_active: str = Form("on"),
+    image: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from ..models import FareSetting
+    from decimal import Decimal
+
+    key = service_type.strip().lower()
+    if not key:
+        raise HTTPException(status_code=400, detail="Service type is required")
+    dup = await db.execute(select(FareSetting).where(FareSetting.service_type == key))
+    if dup.scalars().first():
+        raise HTTPException(status_code=400, detail=f"Category '{key}' already exists")
+
+    image_url = await _save_category_image(image)
+    db.add(
+        FareSetting(
+            service_type=key,
+            display_name=display_name.strip() or key.title(),
+            image_url=image_url,
+            capacity=int(capacity or 0),
+            description=description.strip() or None,
+            is_active=(is_active == "on"),
+            base_fare=Decimal(str(base_fare)),
+            per_km_rate=Decimal(str(per_km_rate)),
+            per_minute_rate=Decimal(str(per_minute_rate)),
+            min_fare=Decimal(str(min_fare)),
+            platform_fee_percent=Decimal(str(platform_fee_percent)),
+            surge_multiplier=Decimal(str(surge_multiplier)),
+        )
+    )
+    await db.commit()
+    return RedirectResponse(url="/admin/categories", status_code=303)
+
+
+@router.post("/categories/{id}/edit")
+async def admin_categories_edit(
+    id: int,
+    display_name: str = Form(...),
+    capacity: int = Form(0),
+    description: str = Form(""),
+    base_fare: float = Form(0),
+    per_km_rate: float = Form(0),
+    per_minute_rate: float = Form(0),
+    min_fare: float = Form(0),
+    platform_fee_percent: float = Form(15),
+    surge_multiplier: float = Form(1.0),
+    is_active: str = Form(""),
+    image: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from ..models import FareSetting
+    from decimal import Decimal
+
+    q = await db.execute(select(FareSetting).where(FareSetting.id == id))
+    f = q.scalars().first()
+    if not f:
+        raise HTTPException(status_code=404, detail="Category not found")
+    f.display_name = display_name.strip() or f.service_type.title()
+    f.capacity = int(capacity or 0)
+    f.description = description.strip() or None
+    f.is_active = (is_active == "on")
+    f.base_fare = Decimal(str(base_fare))
+    f.per_km_rate = Decimal(str(per_km_rate))
+    f.per_minute_rate = Decimal(str(per_minute_rate))
+    f.min_fare = Decimal(str(min_fare))
+    f.platform_fee_percent = Decimal(str(platform_fee_percent))
+    f.surge_multiplier = Decimal(str(surge_multiplier))
+    new_image = await _save_category_image(image)
+    if new_image:
+        f.image_url = new_image
+    await db.commit()
+    return RedirectResponse(url="/admin/categories", status_code=303)
+
+
+@router.post("/categories/{id}/delete")
+async def admin_categories_delete(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from ..models import FareSetting, Driver, Booking
+
+    q = await db.execute(select(FareSetting).where(FareSetting.id == id))
+    f = q.scalars().first()
+    if not f:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    # Guard: refuse delete if drivers or bookings reference this vehicle_type.
+    # The admin can deactivate instead.
+    drv_count = await db.execute(
+        select(func.count(Driver.id)).where(Driver.vehicle_type == f.service_type)
+    )
+    if drv_count.scalar_one() > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete '{f.display_name or f.service_type}': drivers are assigned to this category. Deactivate it instead.",
+        )
+    bk_count = await db.execute(
+        select(func.count(Booking.id)).where(Booking.service_type == f.service_type)
+    )
+    if bk_count.scalar_one() > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete '{f.display_name or f.service_type}': bookings reference this category. Deactivate it instead.",
+        )
+
+    await db.delete(f)
+    await db.commit()
+    return RedirectResponse(url="/admin/categories", status_code=303)
 
 
 # ---------- Flash pricing ----------
