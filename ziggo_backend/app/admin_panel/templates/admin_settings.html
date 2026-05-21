@@ -1,105 +1,213 @@
 {% extends "base.html" %}
 
-{% block title %}Settings | Ziggo Admin{% endblock %}
-{% block page_title %}Settings{% endblock %}
+{% block title %}System Configuration | Ziggo Admin{% endblock %}
+{% block page_title %}System Configuration{% endblock %}
 
 {% block content %}
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-    <div class="zi-card p-6">
-        <h3 class="font-black text-ziggo-ink mb-4">Your admin profile</h3>
-        <div class="space-y-3">
-            <div>
-                <p class="text-[10px] text-ziggo-faint uppercase font-bold">Name</p>
-                <p class="text-sm font-semibold text-ziggo-ink">{{ info.admin_name }}</p>
-            </div>
-            <div>
-                <p class="text-[10px] text-ziggo-faint uppercase font-bold">Phone (login)</p>
-                <p class="text-sm font-semibold text-ziggo-ink">{{ info.admin_phone }}</p>
-            </div>
-            <div>
-                <p class="text-[10px] text-ziggo-faint uppercase font-bold">Email</p>
-                <p class="text-sm text-ziggo-muted">{{ info.admin_email or 'Not set' }}</p>
-            </div>
+<div class="space-y-6">
+
+    <!-- Header -->
+    <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-xl">
+            <i class="fas fa-cog"></i>
+        </div>
+        <div>
+            <h2 class="text-2xl font-black text-ziggo-ink leading-tight">System Configuration</h2>
+            <p class="text-xs text-ziggo-muted font-bold">Core operational settings — applied across the customer & driver apps</p>
         </div>
     </div>
 
-    <div class="zi-card p-6">
-        <h3 class="font-black text-ziggo-ink mb-4">System</h3>
-        <div class="space-y-3">
-            <div>
-                <p class="text-[10px] text-ziggo-faint uppercase font-bold">Project</p>
-                <p class="text-sm font-semibold text-ziggo-ink">{{ info.project_name }}</p>
-            </div>
-            <div>
-                <p class="text-[10px] text-ziggo-faint uppercase font-bold">API prefix</p>
-                <p class="text-sm font-mono text-ziggo">{{ info.api_prefix }}</p>
-            </div>
-            <div>
-                <p class="text-[10px] text-ziggo-faint uppercase font-bold">Dev mode</p>
-                {% if info.dev_mode %}
-                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
-                    <i class="fas fa-flask"></i> Enabled
-                </span>
-                <p class="text-[10px] text-ziggo-muted mt-1">OTPs are returned in the API response. Disable in production.</p>
-                {% else %}
-                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
-                    <i class="fas fa-shield-alt"></i> Production
-                </span>
-                {% endif %}
-            </div>
-        </div>
+    {% if saved %}
+    <div class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-2xl p-4 flex items-center gap-3 font-bold">
+        <i class="fas fa-check-circle"></i>
+        Settings saved successfully.
     </div>
+    {% endif %}
 
-    <div class="zi-card p-6">
-        <h3 class="font-black text-ziggo-ink mb-4">Configuration counts</h3>
-        <div class="space-y-3">
-            <div class="flex items-center justify-between">
-                <span class="text-sm text-ziggo-muted">Fare settings</span>
-                <span class="text-lg font-black text-ziggo">{{ info.fare_count }}</span>
-            </div>
-            <div class="flex items-center justify-between">
-                <span class="text-sm text-ziggo-muted">Flash weight tiers</span>
-                <span class="text-lg font-black text-ziggo">{{ info.flash_count }}</span>
-            </div>
-            <div class="flex items-center justify-between">
-                <span class="text-sm text-ziggo-muted">Promo codes</span>
-                <span class="text-lg font-black text-ziggo">{{ info.promo_count }}</span>
-            </div>
-        </div>
-    </div>
-</div>
+    <form method="POST" action="/admin/settings" enctype="multipart/form-data" class="space-y-6">
 
-<div class="mt-6 zi-card p-6">
-    <h3 class="font-black text-ziggo-ink mb-4">Configuration shortcuts</h3>
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <a href="/admin/fare-settings" class="p-4 rounded-2xl bg-ziggo-canvas hover:bg-blue-50 transition group">
-            <div class="w-10 h-10 rounded-xl bg-blue-100 text-ziggo flex items-center justify-center mb-2 group-hover:scale-105 transition">
-                <i class="fas fa-tags"></i>
-            </div>
-            <p class="text-sm font-bold text-ziggo-ink">Fare settings</p>
-            <p class="text-[10px] text-ziggo-muted">Per-category rates</p>
-        </a>
-        <a href="/admin/flash-pricing" class="p-4 rounded-2xl bg-ziggo-canvas hover:bg-blue-50 transition group">
-            <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center mb-2 group-hover:scale-105 transition">
-                <i class="fas fa-weight-hanging"></i>
-            </div>
-            <p class="text-sm font-bold text-ziggo-ink">Flash pricing</p>
-            <p class="text-[10px] text-ziggo-muted">Parcel weight tiers</p>
-        </a>
-        <a href="/admin/promotions" class="p-4 rounded-2xl bg-ziggo-canvas hover:bg-blue-50 transition group">
-            <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center mb-2 group-hover:scale-105 transition">
-                <i class="fas fa-percent"></i>
-            </div>
-            <p class="text-sm font-bold text-ziggo-ink">Promotions</p>
-            <p class="text-[10px] text-ziggo-muted">Promo & coupon codes</p>
-        </a>
-        <a href="/admin/categories" class="p-4 rounded-2xl bg-ziggo-canvas hover:bg-blue-50 transition group">
-            <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center mb-2 group-hover:scale-105 transition">
-                <i class="fas fa-layer-group"></i>
-            </div>
-            <p class="text-sm font-bold text-ziggo-ink">Categories</p>
-            <p class="text-[10px] text-ziggo-muted">Vehicle types overview</p>
-        </a>
-    </div>
+        <!-- Row 1: General + Pricing -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            <!-- General -->
+            <section class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-6">
+                <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                    <i class="fas fa-globe text-ziggo"></i> General
+                </h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1">Site Name</label>
+                        <input type="text" name="site_name" value="{{ s.site_name or '' }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1">Admin Email</label>
+                        <input type="email" name="admin_email" value="{{ s.admin_email or '' }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1">Contact Phone</label>
+                        <input type="text" name="contact_phone" value="{{ s.contact_phone or '' }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1">Contact Email</label>
+                        <input type="email" name="contact_email" value="{{ s.contact_email or '' }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1">Address</label>
+                        <textarea name="address" rows="3" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">{{ s.address or '' }}</textarea>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Pricing -->
+            <section class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-6">
+                <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                    <i class="fas fa-dollar-sign text-ziggo"></i> Pricing
+                </h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1">Commission Rate (%)</label>
+                        <input type="number" step="0.01" min="0" max="100" name="commission_rate" value="{{ s.commission_rate or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1">Surge Start Hour (0–23)</label>
+                        <input type="number" min="0" max="23" name="surge_start_hour" value="{{ s.surge_start_hour if s.surge_start_hour is not none else 17 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1">Surge End Hour (0–23)</label>
+                        <input type="number" min="0" max="23" name="surge_end_hour" value="{{ s.surge_end_hour if s.surge_end_hour is not none else 20 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1">Surge Multiplier</label>
+                        <input type="number" step="0.01" min="0.1" name="surge_multiplier" value="{{ s.surge_multiplier or 1 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1">Standard Cancellation Fee (Rs.)</label>
+                        <input type="number" step="0.01" min="0" name="cancellation_fee" value="{{ s.cancellation_fee or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1">Unreasonable Penalty – Rider (Rs.)</label>
+                        <input type="number" step="0.01" min="0" name="rider_penalty" value="{{ s.rider_penalty or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Row 2: Security + Notifications -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            <!-- Security -->
+            <section class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-6">
+                <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                    <i class="fas fa-shield-alt text-ziggo"></i> Security
+                </h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1">Min Password Length</label>
+                        <input type="number" min="1" name="min_password_length" value="{{ s.min_password_length or 6 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1">Session Timeout (minutes)</label>
+                        <input type="number" min="1" name="session_timeout_minutes" value="{{ s.session_timeout_minutes or 30 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1">Max Login Attempts</label>
+                        <input type="number" min="1" name="max_login_attempts" value="{{ s.max_login_attempts or 5 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Notifications -->
+            <section class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-6">
+                <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                    <i class="fas fa-bell text-ziggo"></i> Notifications
+                </h3>
+                <div class="space-y-3">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" name="email_notifications_enabled" {% if s.email_notifications_enabled %}checked{% endif %} class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
+                        <span class="text-sm font-bold text-ziggo-ink">Enable Email Notifications</span>
+                    </label>
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" name="sms_notifications_enabled" {% if s.sms_notifications_enabled %}checked{% endif %} class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
+                        <span class="text-sm font-bold text-ziggo-ink">Enable SMS Notifications</span>
+                    </label>
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" name="push_notifications_enabled" {% if s.push_notifications_enabled %}checked{% endif %} class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
+                        <span class="text-sm font-bold text-ziggo-ink">Enable Push Notifications</span>
+                    </label>
+                </div>
+            </section>
+        </div>
+
+        <!-- Row 3: Driver Incentives (full width on screenshot is single column on left; we keep it full) -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <section class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-6">
+                <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                    <i class="fas fa-gift text-ziggo"></i> Driver Incentives
+                </h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1">Min Rides for Daily Bonus</label>
+                        <input type="number" min="0" name="min_rides_daily_bonus" value="{{ s.min_rides_daily_bonus or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1">Daily Bonus Amount (Rs.)</label>
+                        <input type="number" step="0.01" min="0" name="daily_bonus_amount" value="{{ s.daily_bonus_amount or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1">Commission Cycle (Rides)</label>
+                        <input type="number" min="0" name="commission_cycle_rides" value="{{ s.commission_cycle_rides or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1">Commission Per Cycle (Rs.)</label>
+                        <input type="number" step="0.01" min="0" name="commission_per_cycle" value="{{ s.commission_per_cycle or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Logo & Favicon -->
+            <section class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-6">
+                <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                    <i class="fas fa-image text-ziggo"></i> Logo &amp; Favicon
+                </h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-2">Logo</label>
+                        <div class="bg-gray-50 border border-ziggo-line rounded-2xl p-3 flex items-center justify-center h-24 mb-2">
+                            {% if s.logo_url %}
+                                <img src="{{ s.logo_url }}" alt="Logo" class="max-h-full max-w-full object-contain">
+                            {% else %}
+                                <span class="text-xs text-ziggo-faint font-bold">No logo uploaded</span>
+                            {% endif %}
+                        </div>
+                        <input type="file" name="logo" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="w-full text-xs">
+                        <p class="text-[10px] text-ziggo-faint font-bold mt-1">JPG/PNG/WEBP/SVG, max 5 MB.</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-2">Favicon</label>
+                        <div class="bg-gray-50 border border-ziggo-line rounded-2xl p-3 flex items-center justify-center h-24 mb-2">
+                            {% if s.favicon_url %}
+                                <img src="{{ s.favicon_url }}" alt="Favicon" class="max-h-full max-w-full object-contain">
+                            {% else %}
+                                <span class="text-xs text-ziggo-faint font-bold">No favicon uploaded</span>
+                            {% endif %}
+                        </div>
+                        <input type="file" name="favicon" accept="image/png,image/x-icon,image/vnd.microsoft.icon,image/svg+xml" class="w-full text-xs">
+                        <p class="text-[10px] text-ziggo-faint font-bold mt-1">ICO/PNG/SVG, max 5 MB.</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Save -->
+        <div class="flex items-center gap-3 pt-2">
+            <button type="submit" class="px-8 py-4 bg-ziggo text-white rounded-2xl font-black shadow-brand hover:bg-ziggo-light transition flex items-center gap-2">
+                <i class="fas fa-save"></i> Save All Settings
+            </button>
+            <a href="/admin/settings" class="px-6 py-4 border border-ziggo-line rounded-2xl font-black text-ziggo-muted hover:bg-gray-50">Reset</a>
+            {% if s.updated_at %}
+            <span class="text-xs text-ziggo-faint font-bold ml-auto">Last updated {{ s.updated_at.strftime("%Y-%m-%d %H:%M UTC") }}</span>
+            {% endif %}
+        </div>
+    </form>
 </div>
 {% endblock %}

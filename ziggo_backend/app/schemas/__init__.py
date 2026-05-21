@@ -34,6 +34,8 @@ from .misc_schema import (
     PromoCodeResponse,
     ComplaintCreate,
     ComplaintResponse,
+    ComplaintMessageCreate,
+    ComplaintMessageResponse,
     GoldSubscribeRequest,
 )
 from .restaurant_schema import (
@@ -77,6 +79,8 @@ __all__ = [
     "PromoCodeResponse",
     "ComplaintCreate",
     "ComplaintResponse",
+    "ComplaintMessageCreate",
+    "ComplaintMessageResponse",
     "GoldSubscribeRequest",
     "RestaurantRegisterRequest",
     "RestaurantProfileResponse",

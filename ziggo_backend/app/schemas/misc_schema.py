@@ -37,5 +37,20 @@ class ComplaintResponse(BaseModel):
         from_attributes = True
 
 
+class ComplaintMessageCreate(BaseModel):
+    body: str
+
+
+class ComplaintMessageResponse(BaseModel):
+    id: int
+    complaint_id: int
+    sender_role: str  # "customer" / "driver" / "admin"
+    body: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class GoldSubscribeRequest(BaseModel):
     months: int = 1  # 1, 3, 6, 12

@@ -31,6 +31,10 @@ UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "drivers")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 CATEGORY_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "categories")
 os.makedirs(CATEGORY_UPLOAD_DIR, exist_ok=True)
+VEHICLE_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "vehicles")
+os.makedirs(VEHICLE_UPLOAD_DIR, exist_ok=True)
+BRANDING_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "branding")
+os.makedirs(BRANDING_UPLOAD_DIR, exist_ok=True)
 ALLOWED_PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 MAX_PHOTO_BYTES = 5 * 1024 * 1024  # 5 MB
 
@@ -76,6 +80,50 @@ async def _save_category_image(photo: UploadFile | None) -> str | None:
     with open(fpath, "wb") as f:
         f.write(data)
     return f"/static/uploads/categories/{fname}"
+
+
+async def _save_vehicle_photo(photo: UploadFile | None) -> str | None:
+    if photo is None or not photo.filename:
+        return None
+    ext = os.path.splitext(photo.filename)[1].lower()
+    if ext not in ALLOWED_PHOTO_EXTS:
+        raise HTTPException(status_code=400, detail="Photo must be JPG, PNG, or WEBP")
+    data = await photo.read()
+    if len(data) == 0:
+        return None
+    if len(data) > MAX_PHOTO_BYTES:
+        raise HTTPException(status_code=400, detail="Photo must be under 5 MB")
+    import secrets
+    fname = f"{secrets.token_hex(8)}{ext}"
+    fpath = os.path.join(VEHICLE_UPLOAD_DIR, fname)
+    with open(fpath, "wb") as f:
+        f.write(data)
+    return f"/static/uploads/vehicles/{fname}"
+
+
+# Favicons are allowed to be .ico in addition to the usual image types.
+ALLOWED_BRANDING_EXTS = ALLOWED_PHOTO_EXTS | {".ico", ".svg"}
+
+
+async def _save_branding_asset(asset: UploadFile | None, label: str) -> str | None:
+    if asset is None or not asset.filename:
+        return None
+    ext = os.path.splitext(asset.filename)[1].lower()
+    if ext not in ALLOWED_BRANDING_EXTS:
+        raise HTTPException(
+            status_code=400, detail=f"{label} must be JPG, PNG, WEBP, SVG or ICO"
+        )
+    data = await asset.read()
+    if len(data) == 0:
+        return None
+    if len(data) > MAX_PHOTO_BYTES:
+        raise HTTPException(status_code=400, detail=f"{label} must be under 5 MB")
+    import secrets
+    fname = f"{secrets.token_hex(8)}{ext}"
+    fpath = os.path.join(BRANDING_UPLOAD_DIR, fname)
+    with open(fpath, "wb") as f:
+        f.write(data)
+    return f"/static/uploads/branding/{fname}"
 
 SESSION_COOKIE = "ziggo_admin"
 _serializer = URLSafeSerializer(settings.SECRET_KEY, salt="ziggo-admin")
@@ -693,6 +741,109 @@ async def admin_fare_settings_update(
     return RedirectResponse(url="/admin/fare-settings", status_code=303)
 
 
+# ---------- System settings (admin → Settings) ----------
+async def _get_or_create_settings(db: AsyncSession):
+    from ..models import SystemSettings
+
+    q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    s = q.scalars().first()
+    if not s:
+        s = SystemSettings(id=1)
+        db.add(s)
+        await db.commit()
+        await db.refresh(s)
+    return s
+
+
+@router.get("/settings", response_class=HTMLResponse)
+async def admin_settings_get(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    s = await _get_or_create_settings(db)
+    return templates.TemplateResponse(
+        request,
+        "admin_settings.html",
+        {
+            "request": request,
+            "active_page": "settings",
+            "s": s,
+            "saved": request.query_params.get("saved") == "1",
+        },
+    )
+
+
+@router.post("/settings")
+async def admin_settings_save(
+    # General
+    site_name: str = Form(""),
+    admin_email: str = Form(""),
+    contact_phone: str = Form(""),
+    contact_email: str = Form(""),
+    address: str = Form(""),
+    # Pricing
+    commission_rate: float = Form(15),
+    surge_start_hour: int = Form(17),
+    surge_end_hour: int = Form(20),
+    surge_multiplier: float = Form(1.5),
+    cancellation_fee: float = Form(0),
+    rider_penalty: float = Form(0),
+    # Security
+    min_password_length: int = Form(6),
+    session_timeout_minutes: int = Form(30),
+    max_login_attempts: int = Form(5),
+    # Notifications (HTML checkboxes only submit when checked)
+    email_notifications_enabled: str = Form(""),
+    sms_notifications_enabled: str = Form(""),
+    push_notifications_enabled: str = Form(""),
+    # Driver incentives
+    min_rides_daily_bonus: int = Form(15),
+    daily_bonus_amount: float = Form(1000),
+    commission_cycle_rides: int = Form(5),
+    commission_per_cycle: float = Form(500),
+    # Branding
+    logo: UploadFile | None = File(None),
+    favicon: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from decimal import Decimal
+
+    s = await _get_or_create_settings(db)
+    s.site_name = site_name.strip() or "Ziggo"
+    s.admin_email = admin_email.strip()
+    s.contact_phone = contact_phone.strip()
+    s.contact_email = contact_email.strip()
+    s.address = address.strip()
+    s.commission_rate = Decimal(str(commission_rate))
+    s.surge_start_hour = max(0, min(23, int(surge_start_hour)))
+    s.surge_end_hour = max(0, min(23, int(surge_end_hour)))
+    s.surge_multiplier = Decimal(str(surge_multiplier))
+    s.cancellation_fee = Decimal(str(cancellation_fee))
+    s.rider_penalty = Decimal(str(rider_penalty))
+    s.min_password_length = max(1, int(min_password_length))
+    s.session_timeout_minutes = max(1, int(session_timeout_minutes))
+    s.max_login_attempts = max(1, int(max_login_attempts))
+    s.email_notifications_enabled = email_notifications_enabled == "on"
+    s.sms_notifications_enabled = sms_notifications_enabled == "on"
+    s.push_notifications_enabled = push_notifications_enabled == "on"
+    s.min_rides_daily_bonus = max(0, int(min_rides_daily_bonus))
+    s.daily_bonus_amount = Decimal(str(daily_bonus_amount))
+    s.commission_cycle_rides = max(0, int(commission_cycle_rides))
+    s.commission_per_cycle = Decimal(str(commission_per_cycle))
+
+    new_logo = await _save_branding_asset(logo, "Logo")
+    if new_logo:
+        s.logo_url = new_logo
+    new_favicon = await _save_branding_asset(favicon, "Favicon")
+    if new_favicon:
+        s.favicon_url = new_favicon
+
+    await db.commit()
+    return RedirectResponse(url="/admin/settings?saved=1", status_code=303)
+
+
 # ---------- Vehicle categories ----------
 @router.get("/categories", response_class=HTMLResponse)
 async def admin_categories(
@@ -721,6 +872,13 @@ async def admin_categories(
     )
 
 
+def _safe_admin_next(next_url: str, default: str) -> str:
+    """Only honor next= when it points back inside /admin/ — avoids open-redirects."""
+    if next_url and next_url.startswith("/admin/"):
+        return next_url
+    return default
+
+
 @router.post("/categories/new")
 async def admin_categories_new(
     service_type: str = Form(...),
@@ -735,6 +893,7 @@ async def admin_categories_new(
     surge_multiplier: float = Form(1.0),
     is_active: str = Form("on"),
     image: UploadFile | None = File(None),
+    next: str = Form(""),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -766,7 +925,7 @@ async def admin_categories_new(
         )
     )
     await db.commit()
-    return RedirectResponse(url="/admin/categories", status_code=303)
+    return RedirectResponse(url=_safe_admin_next(next, "/admin/categories"), status_code=303)
 
 
 @router.post("/categories/{id}/edit")
@@ -783,6 +942,7 @@ async def admin_categories_edit(
     surge_multiplier: float = Form(1.0),
     is_active: str = Form(""),
     image: UploadFile | None = File(None),
+    next: str = Form(""),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -807,12 +967,13 @@ async def admin_categories_edit(
     if new_image:
         f.image_url = new_image
     await db.commit()
-    return RedirectResponse(url="/admin/categories", status_code=303)
+    return RedirectResponse(url=_safe_admin_next(next, "/admin/categories"), status_code=303)
 
 
 @router.post("/categories/{id}/delete")
 async def admin_categories_delete(
     id: int,
+    next: str = Form(""),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -844,7 +1005,174 @@ async def admin_categories_delete(
 
     await db.delete(f)
     await db.commit()
-    return RedirectResponse(url="/admin/categories", status_code=303)
+    return RedirectResponse(url=_safe_admin_next(next, "/admin/categories"), status_code=303)
+
+
+# ---------- Services (table view of vehicle categories) ----------
+@router.get("/services", response_class=HTMLResponse)
+async def admin_services(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from ..models import FareSetting
+
+    q = await db.execute(select(FareSetting).order_by(FareSetting.id))
+    categories = q.scalars().all()
+    counts_q = await db.execute(
+        select(Driver.vehicle_type, func.count(Driver.id)).group_by(Driver.vehicle_type)
+    )
+    driver_counts = {vt: n for vt, n in counts_q.all()}
+    return templates.TemplateResponse(
+        request,
+        "services.html",
+        {
+            "request": request,
+            "active_page": "services",
+            "categories": categories,
+            "driver_counts": driver_counts,
+        },
+    )
+
+
+@router.post("/services/{id}/toggle")
+async def admin_services_toggle(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from ..models import FareSetting
+
+    q = await db.execute(select(FareSetting).where(FareSetting.id == id))
+    f = q.scalars().first()
+    if not f:
+        raise HTTPException(status_code=404, detail="Service not found")
+    f.is_active = not bool(f.is_active)
+    await db.commit()
+    return RedirectResponse(url="/admin/services", status_code=303)
+
+
+# ---------- Vehicles ----------
+@router.get("/vehicles", response_class=HTMLResponse)
+async def admin_vehicles(
+    request: Request,
+    status: str = "",
+    category: str = "",
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from ..models import FareSetting
+
+    q = select(Driver).options(selectinload(Driver.user)).order_by(Driver.id)
+    if status:
+        try:
+            q = q.where(Driver.status == DriverStatus(status))
+        except ValueError:
+            pass
+    if category:
+        q = q.where(Driver.vehicle_type == category)
+    result = await db.execute(q)
+    vehicles = result.scalars().all()
+
+    # Totals are unfiltered (the stat cards always show overall numbers).
+    totals_q = await db.execute(select(Driver.status, func.count(Driver.id)).group_by(Driver.status))
+    by_status = {s.value: n for s, n in totals_q.all()}
+    total_vehicles = sum(by_status.values())
+    pending = by_status.get(DriverStatus.PENDING.value, 0)
+    verified = by_status.get(DriverStatus.APPROVED.value, 0)
+
+    cats_q = await db.execute(
+        select(FareSetting).where(FareSetting.is_active == True).order_by(FareSetting.id)  # noqa: E712
+    )
+    categories = cats_q.scalars().all()
+
+    return templates.TemplateResponse(
+        request,
+        "vehicles.html",
+        {
+            "request": request,
+            "active_page": "vehicles",
+            "vehicles": vehicles,
+            "categories": categories,
+            "total_vehicles": total_vehicles,
+            "pending_count": pending,
+            "verified_count": verified,
+            "category_count": len(categories),
+            "filter_status": status,
+            "filter_category": category,
+            "statuses": [s.value for s in DriverStatus],
+        },
+    )
+
+
+@router.post("/vehicles/{driver_id}/edit")
+async def admin_vehicles_edit(
+    driver_id: int,
+    vehicle_type: str = Form(...),
+    vehicle_number: str = Form(""),
+    vehicle_model: str = Form(""),
+    vehicle_color: str = Form(""),
+    vehicle_year: str = Form(""),
+    photo: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    q = await db.execute(select(Driver).where(Driver.id == driver_id))
+    d = q.scalars().first()
+    if not d:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+
+    # Plate uniqueness if changed
+    plate = (vehicle_number or "").strip()
+    if plate and plate != (d.vehicle_number or ""):
+        dup = await db.execute(
+            select(Driver).where(Driver.vehicle_number == plate, Driver.id != driver_id)
+        )
+        if dup.scalars().first():
+            raise HTTPException(status_code=400, detail=f"Reg. number '{plate}' is already in use")
+
+    d.vehicle_type = vehicle_type.strip().lower() or d.vehicle_type
+    d.vehicle_number = plate or None
+    d.vehicle_model = vehicle_model.strip() or None
+    d.vehicle_color = vehicle_color.strip() or None
+    d.vehicle_year = int(vehicle_year) if vehicle_year.strip().isdigit() else None
+    new_photo = await _save_vehicle_photo(photo)
+    if new_photo:
+        d.vehicle_photo_url = new_photo
+    await db.commit()
+    return RedirectResponse(url="/admin/vehicles", status_code=303)
+
+
+@router.post("/vehicles/{driver_id}/verify")
+async def admin_vehicles_verify(
+    driver_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    q = await db.execute(select(Driver).where(Driver.id == driver_id))
+    d = q.scalars().first()
+    if d:
+        d.is_approved = True
+        d.status = DriverStatus.APPROVED
+        d.approved_at = datetime.now(timezone.utc)
+        await db.commit()
+    return RedirectResponse(url="/admin/vehicles", status_code=303)
+
+
+@router.post("/vehicles/{driver_id}/revoke")
+async def admin_vehicles_revoke(
+    driver_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    q = await db.execute(select(Driver).where(Driver.id == driver_id))
+    d = q.scalars().first()
+    if d:
+        d.is_approved = False
+        d.is_online = False
+        d.status = DriverStatus.SUSPENDED
+        await db.commit()
+    return RedirectResponse(url="/admin/vehicles", status_code=303)
 
 
 # ---------- Flash pricing ----------
@@ -1630,6 +1958,179 @@ async def admin_complaints(
         request, "complaints.html",
         {"request": request, "active_page": "complaints", "complaints": q.scalars().all()},
     )
+
+
+# ---------- Help & Support Center ----------
+SUPPORT_STATUSES = ["open", "in_progress", "resolved", "closed"]
+
+
+def _normalize_status(raw: str | None) -> str:
+    """Treat legacy 'pending' rows as 'open' for display."""
+    if not raw or raw == "pending":
+        return "open"
+    return raw
+
+
+@router.get("/support", response_class=HTMLResponse)
+async def admin_support(
+    request: Request,
+    q: str = "",
+    status: str = "",
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from ..models import Complaint, ComplaintMessage
+
+    base = (
+        select(Complaint)
+        .options(
+            selectinload(Complaint.user),
+            selectinload(Complaint.messages).selectinload(ComplaintMessage.sender),
+        )
+    )
+    if status in SUPPORT_STATUSES:
+        if status == "open":
+            base = base.where(Complaint.status.in_(["open", "pending", None]))
+        else:
+            base = base.where(Complaint.status == status)
+    if q:
+        like = f"%{q}%"
+        base = base.where(
+            (Complaint.subject.ilike(like))
+            | (User.full_name.ilike(like))
+            | (User.phone_number.ilike(like))
+        ).join(User, User.id == Complaint.user_id)
+
+    base = base.order_by(Complaint.id.desc()).limit(200)
+    result = await db.execute(base)
+    tickets = result.scalars().all()
+
+    # Pre-serialize for the template — Jinja can't do list comps inside dict literals.
+    tickets_payload = []
+    for t in tickets:
+        tickets_payload.append({
+            "id": t.id,
+            "subject": t.subject or "",
+            "category": t.category or "",
+            "description": t.description or "",
+            "status": _normalize_status(t.status),
+            "user_name": (t.user.full_name if t.user else "") or "",
+            "user_phone": (t.user.phone_number if t.user else "") or "",
+            "created_at": t.created_at.strftime("%Y-%m-%d %H:%M") if t.created_at else "",
+            "messages": [
+                {
+                    "id": m.id,
+                    "sender_role": m.sender_role,
+                    "sender_name": (m.sender.full_name if m.sender else "") or "",
+                    "body": m.body,
+                    "created_at": m.created_at.strftime("%Y-%m-%d %H:%M") if m.created_at else "",
+                }
+                for m in (t.messages or [])
+            ],
+        })
+
+    # Unfiltered counts for the stat cards
+    counts_q = await db.execute(
+        select(Complaint.status, func.count(Complaint.id)).group_by(Complaint.status)
+    )
+    raw_counts: dict[str, int] = {}
+    for raw, n in counts_q.all():
+        raw_counts[_normalize_status(raw)] = raw_counts.get(_normalize_status(raw), 0) + n
+    total = sum(raw_counts.values())
+
+    return templates.TemplateResponse(
+        request,
+        "support.html",
+        {
+            "request": request,
+            "active_page": "support",
+            "tickets": tickets,
+            "tickets_payload": tickets_payload,
+            "normalize_status": _normalize_status,
+            "total": total,
+            "open_count": raw_counts.get("open", 0),
+            "in_progress_count": raw_counts.get("in_progress", 0),
+            "resolved_count": raw_counts.get("resolved", 0),
+            "closed_count": raw_counts.get("closed", 0),
+            "filter_q": q,
+            "filter_status": status,
+            "statuses": SUPPORT_STATUSES,
+        },
+    )
+
+
+@router.post("/support/{ticket_id}/status")
+async def admin_support_set_status(
+    ticket_id: int,
+    status: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(current_admin),
+):
+    from ..models import Complaint
+    from ..services.ws_manager import manager
+
+    if status not in SUPPORT_STATUSES:
+        raise HTTPException(status_code=400, detail="Invalid status")
+    res = await db.execute(select(Complaint).where(Complaint.id == ticket_id))
+    t = res.scalars().first()
+    if not t:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    t.status = status
+    if status == "resolved" and not t.resolved_at:
+        t.resolved_at = datetime.now(timezone.utc)
+    if status != "resolved":
+        # Re-opening clears the resolved timestamp so the metric stays honest
+        t.resolved_at = None
+    await db.commit()
+    # Push to the ticket owner so their app can refresh the badge
+    if t.user_id:
+        await manager.send(t.user_id, "support_ticket_update", {
+            "ticket_id": t.id,
+            "status": t.status,
+        })
+    return RedirectResponse(url="/admin/support", status_code=303)
+
+
+@router.post("/support/{ticket_id}/reply")
+async def admin_support_reply(
+    ticket_id: int,
+    body: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(current_admin),
+):
+    from ..models import Complaint, ComplaintMessage
+    from ..services.ws_manager import manager
+
+    text = body.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Reply body is required")
+    res = await db.execute(select(Complaint).where(Complaint.id == ticket_id))
+    t = res.scalars().first()
+    if not t:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    msg = ComplaintMessage(
+        complaint_id=t.id,
+        sender_user_id=admin.id,
+        sender_role="admin",
+        body=text,
+    )
+    db.add(msg)
+    # Admin replying nudges the ticket out of "open" if it was sitting idle
+    if t.status in (None, "", "pending", "open"):
+        t.status = "in_progress"
+    await db.commit()
+    await db.refresh(msg)
+
+    if t.user_id:
+        await manager.send(t.user_id, "support_message", {
+            "ticket_id": t.id,
+            "message_id": msg.id,
+            "sender_role": "admin",
+            "body": msg.body,
+            "created_at": msg.created_at.isoformat() if msg.created_at else None,
+        })
+    return RedirectResponse(url="/admin/support", status_code=303)
 
 
 # ---------------------------------------------------------------------------

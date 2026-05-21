@@ -9,7 +9,7 @@ from .user import (
     OTPCode,
 )
 from .booking import Booking, BookingStatus, Payment, PromoCode
-from .misc import WalletTransaction, Complaint, Notification, FareSetting, FlashWeightTier
+from .misc import WalletTransaction, Complaint, ComplaintMessage, Notification, FareSetting, FlashWeightTier, SystemSettings
 from .food import (
     Restaurant,
     MenuCategory,
@@ -41,9 +41,11 @@ __all__ = [
     "PromoCode",
     "WalletTransaction",
     "Complaint",
+    "ComplaintMessage",
     "Notification",
     "FareSetting",
     "FlashWeightTier",
+    "SystemSettings",
     "Restaurant",
     "MenuCategory",
     "MenuItem",

@@ -11,15 +11,20 @@ from ...database import get_db
 from ...models import (
     PromoCode,
     Complaint,
+    ComplaintMessage,
     Customer,
+    Driver,
     FlashWeightTier,
     User,
+    UserRole,
     WalletTransaction,
 )
 from ...schemas import (
     PromoCodeResponse,
     ComplaintCreate,
     ComplaintResponse,
+    ComplaintMessageCreate,
+    ComplaintMessageResponse,
     GoldSubscribeRequest,
 )
 from ...services.auth_service import get_current_user, require_role
@@ -83,7 +88,7 @@ async def create_complaint(
         category=body.category,
         subject=body.subject,
         description=body.description,
-        status="pending",
+        status="open",
     )
     db.add(c)
     await db.commit()
@@ -102,6 +107,65 @@ async def list_my_complaints(
         .order_by(Complaint.id.desc())
     )
     return q.scalars().all()
+
+
+async def _get_my_complaint(db: AsyncSession, user: User, complaint_id: int) -> Complaint:
+    q = await db.execute(
+        select(Complaint).where(
+            Complaint.id == complaint_id, Complaint.user_id == user.id
+        )
+    )
+    c = q.scalars().first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    return c
+
+
+def _sender_role(user: User) -> str:
+    return "driver" if user.role == UserRole.DRIVER else "customer"
+
+
+@router.get("/complaints/{complaint_id}/messages", response_model=List[ComplaintMessageResponse])
+async def list_complaint_messages(
+    complaint_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    await _get_my_complaint(db, user, complaint_id)
+    q = await db.execute(
+        select(ComplaintMessage)
+        .where(ComplaintMessage.complaint_id == complaint_id)
+        .order_by(ComplaintMessage.id)
+    )
+    return q.scalars().all()
+
+
+@router.post("/complaints/{complaint_id}/messages", response_model=ComplaintMessageResponse, status_code=201)
+async def post_complaint_message(
+    complaint_id: int,
+    body: ComplaintMessageCreate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    c = await _get_my_complaint(db, user, complaint_id)
+    text = body.body.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Message body is required")
+
+    msg = ComplaintMessage(
+        complaint_id=c.id,
+        sender_user_id=user.id,
+        sender_role=_sender_role(user),
+        body=text,
+    )
+    db.add(msg)
+    # If a closed ticket gets a new message from the customer, treat it as a re-open
+    if c.status in ("resolved", "closed"):
+        c.status = "open"
+        c.resolved_at = None
+    await db.commit()
+    await db.refresh(msg)
+    return msg
 
 
 # ---------- Gold subscription ----------

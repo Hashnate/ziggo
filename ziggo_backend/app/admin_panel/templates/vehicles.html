@@ -1,120 +1,264 @@
 {% extends "base.html" %}
 
 {% block title %}Vehicles | Ziggo Admin{% endblock %}
-{% block page_title %}Vehicles{% endblock %}
+{% block page_title %}Vehicle Management{% endblock %}
 
 {% block content %}
-<div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
-    <div class="zi-stat">
-        <div class="flex items-center gap-2">
-            <div class="stat-icon bg-blue-100 text-ziggo text-base"><i class="fas fa-car-side"></i></div>
+<div class="space-y-6">
+
+    <!-- Header -->
+    <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-xl">
+            <i class="fas fa-car"></i>
+        </div>
+        <div>
+            <h2 class="text-2xl font-black text-ziggo-ink leading-tight">Vehicle Management</h2>
+            <p class="text-xs text-ziggo-muted font-bold">Registered vehicles, verification status and per-vehicle details</p>
+        </div>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl">
+                <i class="fas fa-car-side"></i>
+            </div>
             <div>
-                <p class="text-[10px] text-ziggo-faint uppercase font-bold">Total</p>
-                <p class="text-xl font-black text-ziggo-ink">{{ vehicles | length }}</p>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Total Vehicles</p>
+                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">{{ total_vehicles }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl">
+                <i class="far fa-clock"></i>
+            </div>
+            <div>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Pending Verification</p>
+                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">{{ pending_count }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Verified Vehicles</p>
+                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">{{ verified_count }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl">
+                <i class="fas fa-layer-group"></i>
+            </div>
+            <div>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Categories</p>
+                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">{{ category_count }}</p>
             </div>
         </div>
     </div>
-    <div class="zi-stat">
-        <div class="flex items-center gap-2">
-            <div class="stat-icon bg-emerald-100 text-emerald-600 text-base"><i class="fas fa-broadcast-tower"></i></div>
-            <div>
-                <p class="text-[10px] text-ziggo-faint uppercase font-bold">Online</p>
-                <p class="text-xl font-black text-emerald-600">{{ online_count }}</p>
-            </div>
+
+    <!-- Filter row -->
+    <form method="GET" action="/admin/vehicles" class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex flex-wrap items-end gap-4">
+        <div class="flex-1 min-w-[200px]">
+            <label class="block text-[11px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Verification status</label>
+            <select name="status" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white">
+                <option value="">All Status</option>
+                {% for s in statuses %}
+                <option value="{{ s }}" {% if filter_status == s %}selected{% endif %}>{{ s|title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="flex-1 min-w-[200px]">
+            <label class="block text-[11px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Vehicle category</label>
+            <select name="category" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white">
+                <option value="">All Categories</option>
+                {% for c in categories %}
+                <option value="{{ c.service_type }}" {% if filter_category == c.service_type %}selected{% endif %}>{{ c.display_name or c.service_type|title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="px-6 py-3 bg-ziggo text-white rounded-2xl font-black shadow-brand hover:bg-ziggo-light transition flex items-center gap-2">
+            <i class="fas fa-filter"></i> Filter
+        </button>
+        <a href="/admin/vehicles" class="px-6 py-3 border border-ziggo-line rounded-2xl font-black text-ziggo-muted hover:bg-gray-50 transition">Clear Filter</a>
+    </form>
+
+    <!-- Table -->
+    <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-gray-50 text-[11px] uppercase text-ziggo-muted font-black tracking-wider">
+                    <tr>
+                        <th class="px-6 py-4">Photo</th>
+                        <th class="px-6 py-4">Vehicle</th>
+                        <th class="px-6 py-4">Category</th>
+                        <th class="px-6 py-4">Reg No.</th>
+                        <th class="px-6 py-4">Year / Color</th>
+                        <th class="px-6 py-4">Owner</th>
+                        <th class="px-6 py-4">Phone</th>
+                        <th class="px-6 py-4">Status</th>
+                        <th class="px-6 py-4 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-ziggo-line">
+                    {% for v in vehicles %}
+                    <tr class="hover:bg-gray-50/50">
+                        <td class="px-6 py-4">
+                            <div class="w-14 h-14 rounded-xl bg-gray-100 overflow-hidden flex items-center justify-center">
+                                {% if v.vehicle_photo_url %}
+                                <img src="{{ v.vehicle_photo_url }}" alt="" class="w-full h-full object-cover">
+                                {% else %}
+                                <i class="fas fa-car text-ziggo-faint"></i>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 font-black text-ziggo-ink">{{ v.vehicle_model or '—' }}</td>
+                        <td class="px-6 py-4">
+                            <span class="inline-flex items-center gap-2 text-sm text-ziggo font-bold">
+                                <i class="fas
+                                    {% if v.vehicle_type == 'bike' %}fa-motorcycle
+                                    {% elif v.vehicle_type == 'tuk' %}fa-taxi
+                                    {% elif v.vehicle_type == 'car' %}fa-car
+                                    {% elif v.vehicle_type == 'van' %}fa-shuttle-van
+                                    {% elif v.vehicle_type == 'truck' %}fa-truck
+                                    {% else %}fa-car{% endif %}"></i>
+                                <span class="capitalize">{{ v.vehicle_type or '—' }}</span>
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-sm font-bold text-ziggo">{{ v.vehicle_number or '—' }}</td>
+                        <td class="px-6 py-4 text-sm text-ziggo-muted">
+                            {{ v.vehicle_year or '—' }} <span class="text-ziggo-faint">|</span> {{ v.vehicle_color or '—' }}
+                        </td>
+                        <td class="px-6 py-4 text-sm font-bold text-ziggo-ink">{{ v.user.full_name if v.user else '—' }}</td>
+                        <td class="px-6 py-4 text-sm text-ziggo-muted">{{ v.user.phone_number if v.user else '—' }}</td>
+                        <td class="px-6 py-4">
+                            {% set s = v.status.value if v.status else 'pending' %}
+                            <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider
+                                {% if s == 'approved' %}bg-emerald-50 text-emerald-600
+                                {% elif s == 'pending' %}bg-amber-50 text-amber-600
+                                {% elif s == 'suspended' %}bg-rose-50 text-rose-600
+                                {% else %}bg-gray-100 text-gray-500{% endif %}">
+                                {% if s == 'approved' %}Verified{% else %}{{ s|title }}{% endif %}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex items-center justify-end gap-2">
+                                <button
+                                    onclick='openEditModal({{ {
+                                        "id": v.id,
+                                        "vehicle_type": v.vehicle_type or "",
+                                        "vehicle_number": v.vehicle_number or "",
+                                        "vehicle_model": v.vehicle_model or "",
+                                        "vehicle_color": v.vehicle_color or "",
+                                        "vehicle_year": v.vehicle_year or "",
+                                        "owner": (v.user.full_name if v.user else "") or "",
+                                    }|tojson }})'
+                                    class="px-3 py-2 bg-ziggo text-white rounded-lg text-xs font-black hover:bg-ziggo-light transition flex items-center gap-1.5">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                                {% if s == 'approved' %}
+                                <form method="POST" action="/admin/vehicles/{{ v.id }}/revoke" onsubmit="return confirm('Revoke verification for this vehicle? Driver will go offline.');">
+                                    <button type="submit" class="px-3 py-2 bg-rose-600 text-white rounded-lg text-xs font-black hover:bg-rose-700 transition flex items-center gap-1.5">
+                                        <i class="fas fa-ban"></i> Revoke
+                                    </button>
+                                </form>
+                                {% else %}
+                                <form method="POST" action="/admin/vehicles/{{ v.id }}/verify">
+                                    <button type="submit" class="px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-black hover:bg-emerald-700 transition flex items-center gap-1.5">
+                                        <i class="fas fa-check"></i> Verify
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="px-6 py-16 text-center">
+                            <i class="fas fa-car text-4xl text-ziggo-faint mb-3"></i>
+                            <p class="text-ziggo-muted font-bold">No vehicles match the current filters.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
-    {% for type_key, label, color in [('bike','Bike','rose'),('tuk','Tuk','amber'),('car','Car','sky'),('van','Van','indigo')] %}
-    <div class="zi-stat">
-        <div class="flex items-center gap-2">
-            <div class="stat-icon bg-{{ color }}-100 text-{{ color }}-600 text-base">
-                <i class="fas {% if type_key=='bike' %}fa-motorcycle{% elif type_key=='tuk' %}fa-taxi{% elif type_key=='car' %}fa-car{% else %}fa-shuttle-van{% endif %}"></i>
-            </div>
-            <div>
-                <p class="text-[10px] text-ziggo-faint uppercase font-bold">{{ label }}</p>
-                <p class="text-xl font-black text-ziggo-ink">{{ by_type.get(type_key, 0) }}</p>
-            </div>
-        </div>
-    </div>
-    {% endfor %}
 </div>
 
-<div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-    <div class="p-6 border-b border-gray-100 flex items-center justify-between">
-        <h3 class="font-bold text-ziggo">All Vehicles ({{ vehicles | length }})</h3>
-        <input type="text" id="vehSearch" placeholder="Search plate, driver, model…"
-               class="px-3 py-2 rounded-xl border border-gray-200 text-sm w-72 focus:outline-none focus:border-ziggo">
-    </div>
-    <div class="overflow-x-auto">
-        <table class="w-full text-left" id="vehTable">
-            <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
-                <tr>
-                    <th class="px-6 py-3">Plate</th>
-                    <th class="px-6 py-3">Type</th>
-                    <th class="px-6 py-3">Model</th>
-                    <th class="px-6 py-3">Color</th>
-                    <th class="px-6 py-3">Driver</th>
-                    <th class="px-6 py-3">Phone</th>
-                    <th class="px-6 py-3">Status</th>
-                    <th class="px-6 py-3">Online</th>
-                    <th class="px-6 py-3"></th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
-                {% for v in vehicles %}
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-3 font-bold text-ziggo">{{ v.vehicle_number or '—' }}</td>
-                    <td class="px-6 py-3 text-sm capitalize">
-                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-50 text-ziggo text-xs font-bold">
-                            <i class="fas
-                                {% if v.vehicle_type == 'bike' %}fa-motorcycle
-                                {% elif v.vehicle_type == 'tuk' %}fa-taxi
-                                {% elif v.vehicle_type == 'car' %}fa-car
-                                {% elif v.vehicle_type == 'van' %}fa-shuttle-van
-                                {% elif v.vehicle_type == 'truck' %}fa-truck
-                                {% else %}fa-question{% endif %}"></i>
-                            {{ v.vehicle_type or 'unknown' }}
-                        </span>
-                    </td>
-                    <td class="px-6 py-3 text-sm">{{ v.vehicle_model or '—' }}</td>
-                    <td class="px-6 py-3 text-sm">{{ v.vehicle_color or '—' }}</td>
-                    <td class="px-6 py-3 text-sm font-semibold">{{ v.user.full_name if v.user else '—' }}</td>
-                    <td class="px-6 py-3 text-xs text-gray-500">{{ v.user.phone_number if v.user else '' }}</td>
-                    <td class="px-6 py-3">
-                        <span class="px-2 py-1 rounded-full text-xs font-bold
-                            {% if v.status.value == 'approved' %}bg-green-100 text-green-700
-                            {% elif v.status.value == 'pending' %}bg-amber-100 text-amber-700
-                            {% elif v.status.value == 'suspended' %}bg-red-100 text-red-700
-                            {% else %}bg-gray-100 text-gray-600{% endif %}">
-                            {{ v.status.value }}
-                        </span>
-                    </td>
-                    <td class="px-6 py-3">
-                        {% if v.is_online %}
-                        <span class="inline-flex items-center gap-1 text-xs font-bold text-emerald-600">
-                            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Online
-                        </span>
-                        {% else %}
-                        <span class="text-xs text-gray-400">Offline</span>
-                        {% endif %}
-                    </td>
-                    <td class="px-6 py-3 text-right">
-                        <a href="/admin/drivers/{{ v.id }}/edit" class="text-ziggo text-xs font-bold hover:underline">Edit</a>
-                    </td>
-                </tr>
-                {% else %}
-                <tr><td colspan="9" class="px-6 py-10 text-center text-gray-400">No vehicles registered</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<!-- Edit Modal -->
+<div id="vehicleModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+        <div class="p-6 border-b border-ziggo-line flex justify-between items-center bg-gray-50/50 flex-shrink-0">
+            <h3 class="text-xl font-black text-ziggo" id="vehModalTitle">Edit vehicle</h3>
+            <button onclick="closeModal()" class="text-ziggo-faint hover:text-ziggo-ink">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        <form id="vehicleForm" method="POST" enctype="multipart/form-data" class="p-8 space-y-5 overflow-y-auto">
+            <p class="text-xs text-ziggo-muted font-bold">Owner: <span class="text-ziggo-ink" id="vehOwner">—</span></p>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="col-span-2">
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Vehicle photo</label>
+                    <input type="file" name="photo" accept="image/png,image/jpeg,image/webp" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white">
+                    <p class="text-[10px] text-ziggo-faint font-bold mt-1">JPG/PNG/WEBP, max 5 MB. Leave empty to keep current.</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Category</label>
+                    <select name="vehicle_type" id="vehType" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white">
+                        {% for c in categories %}
+                        <option value="{{ c.service_type }}">{{ c.display_name or c.service_type|title }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Reg number</label>
+                    <input type="text" name="vehicle_number" id="vehNumber" placeholder="e.g. AJT-10985" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Model</label>
+                    <input type="text" name="vehicle_model" id="vehModel" placeholder="e.g. Suzuki CT-100" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Color</label>
+                    <input type="text" name="vehicle_color" id="vehColor" placeholder="e.g. Red" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Year</label>
+                    <input type="number" min="1980" max="2099" name="vehicle_year" id="vehYear" placeholder="e.g. 2022" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+            </div>
+            <div class="pt-2 flex justify-end gap-3">
+                <button type="button" onclick="closeModal()" class="px-6 py-3 border border-ziggo-line rounded-xl font-black text-ziggo-muted hover:bg-gray-50">Cancel</button>
+                <button type="submit" class="px-8 py-3 bg-ziggo text-white rounded-xl font-black hover:bg-ziggo-light shadow-brand">Save changes</button>
+            </div>
+        </form>
     </div>
 </div>
 
 <script>
-    document.getElementById('vehSearch').addEventListener('input', (e) => {
-        const q = e.target.value.toLowerCase();
-        document.querySelectorAll('#vehTable tbody tr').forEach(tr => {
-            tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
-        });
-    });
+function openEditModal(v) {
+    document.getElementById('vehModalTitle').innerText = 'Edit vehicle — ' + (v.vehicle_model || v.vehicle_number || '');
+    document.getElementById('vehicleForm').action = '/admin/vehicles/' + v.id + '/edit';
+    document.getElementById('vehOwner').innerText = v.owner || '—';
+    document.getElementById('vehType').value = v.vehicle_type || '';
+    document.getElementById('vehNumber').value = v.vehicle_number || '';
+    document.getElementById('vehModel').value = v.vehicle_model || '';
+    document.getElementById('vehColor').value = v.vehicle_color || '';
+    document.getElementById('vehYear').value = v.vehicle_year || '';
+    const m = document.getElementById('vehicleModal');
+    m.classList.remove('hidden');
+    m.classList.add('flex');
+}
+
+function closeModal() {
+    const m = document.getElementById('vehicleModal');
+    m.classList.add('hidden');
+    m.classList.remove('flex');
+}
+
+document.getElementById('vehicleModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+});
 </script>
 {% endblock %}

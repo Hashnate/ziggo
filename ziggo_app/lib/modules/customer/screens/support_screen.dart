@@ -5,6 +5,7 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/widgets/motion.dart';
+import 'support_chat_screen.dart';
 
 class SupportScreen extends StatefulWidget {
   const SupportScreen({super.key});
@@ -317,63 +318,100 @@ class _SupportScreenState extends State<SupportScreen> {
           else
             ..._myComplaints.map((c) {
               final meta = _statusMeta(c['status']?.toString() ?? 'pending');
-              return Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Material(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.cardBorder),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            c['subject']?.toString() ?? '',
-                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
-                          ),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SupportChatScreen(ticket: c),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: meta.color.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(100),
+                      );
+                      // refresh list when returning — status may have changed
+                      _loadMine();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.cardBorder),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  c['subject']?.toString() ?? '',
+                                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: meta.color.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(100),
+                                ),
+                                child: Text(
+                                  meta.label,
+                                  style: TextStyle(
+                                    color: meta.color,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 10,
+                                    letterSpacing: 0.4,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          child: Text(
-                            meta.label,
-                            style: TextStyle(
-                              color: meta.color,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 10,
-                              letterSpacing: 0.4,
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Text(
+                                (c['category'] ?? '').toString().replaceAll('_', ' ').toUpperCase(),
+                                style: const TextStyle(
+                                  color: AppColors.textTertiary,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1.2,
+                                ),
+                              ),
+                              const Spacer(),
+                              const Icon(Icons.chat_bubble_outline_rounded,
+                                  size: 14, color: AppColors.textTertiary),
+                              const SizedBox(width: 4),
+                              const Text(
+                                'Open chat',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: AppColors.textTertiary,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.6,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            c['description']?.toString() ?? '',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      (c['category'] ?? '').toString().replaceAll('_', ' ').toUpperCase(),
-                      style: const TextStyle(
-                        color: AppColors.textTertiary,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.2,
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      c['description']?.toString() ?? '',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               );
             }),

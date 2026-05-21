@@ -78,6 +78,8 @@ class Driver(Base):
     vehicle_number = Column(String(20), unique=True)
     vehicle_model = Column(String(100))
     vehicle_color = Column(String(50))
+    vehicle_year = Column(Integer)
+    vehicle_photo_url = Column(String(255))
     is_approved = Column(Boolean, default=False)
     is_online = Column(Boolean, default=False)
     current_lat = Column(DECIMAL(10, 7))

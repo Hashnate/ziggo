@@ -1,41 +1,258 @@
 {% extends "base.html" %}
 
-{% block title %}Services | Ziggo Admin{% endblock %}
-{% block page_title %}Services{% endblock %}
+{% block title %}Standard Services | Ziggo Admin{% endblock %}
+{% block page_title %}Standard Services{% endblock %}
 
 {% block content %}
-<div class="mb-6 zi-card p-5 flex items-center gap-4">
-    <div class="w-12 h-12 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-xl">
-        <i class="fas fa-concierge-bell"></i>
+<div class="space-y-6">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between flex-wrap gap-4">
+        <div class="flex items-center gap-3">
+            <div class="w-11 h-11 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-xl">
+                <i class="fas fa-concierge-bell"></i>
+            </div>
+            <div>
+                <h2 class="text-2xl font-black text-ziggo-ink leading-tight">Standard Services</h2>
+                <p class="text-xs text-ziggo-muted font-bold">Configure vehicle categories, standard fare matrices and service availability</p>
+            </div>
+        </div>
+        <button onclick="openCreateModal()" class="px-5 py-3 bg-ziggo text-white rounded-2xl font-black shadow-brand hover:bg-ziggo-light transition flex items-center gap-2">
+            <i class="fas fa-plus"></i> Add Service
+        </button>
     </div>
-    <div>
-        <p class="text-sm font-bold text-ziggo-ink">Ziggo's customer-facing services</p>
-        <p class="text-xs text-ziggo-muted">Each tile drills into the dedicated admin page for that service.</p>
+
+    <!-- Table -->
+    <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-gray-50 text-[11px] uppercase text-ziggo-muted font-black tracking-wider">
+                    <tr>
+                        <th class="px-6 py-4">Icon</th>
+                        <th class="px-6 py-4">Name</th>
+                        <th class="px-6 py-4">Base Fare</th>
+                        <th class="px-6 py-4">Per KM</th>
+                        <th class="px-6 py-4">Per Min</th>
+                        <th class="px-6 py-4">Min Fare</th>
+                        <th class="px-6 py-4">Status</th>
+                        <th class="px-6 py-4 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-ziggo-line">
+                    {% for c in categories %}
+                    <tr class="hover:bg-gray-50/50">
+                        <td class="px-6 py-4">
+                            <div class="w-14 h-14 rounded-xl bg-gray-100 overflow-hidden flex items-center justify-center">
+                                {% if c.image_url %}
+                                <img src="{{ c.image_url }}" alt="" class="w-full h-full object-cover">
+                                {% else %}
+                                <i class="fas
+                                    {% if c.service_type == 'bike' %}fa-motorcycle
+                                    {% elif c.service_type == 'tuk' %}fa-taxi
+                                    {% elif c.service_type == 'car' %}fa-car
+                                    {% elif c.service_type == 'van' %}fa-shuttle-van
+                                    {% elif c.service_type == 'truck' %}fa-truck
+                                    {% else %}fa-car{% endif %} text-ziggo text-xl"></i>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 font-black text-ziggo-ink">{{ c.display_name or c.service_type|title }}</td>
+                        <td class="px-6 py-4 text-ziggo font-black">Rs.{{ "%.2f"|format(c.base_fare or 0) }}</td>
+                        <td class="px-6 py-4 text-ziggo-ink font-bold">Rs.{{ "%.2f"|format(c.per_km_rate or 0) }}</td>
+                        <td class="px-6 py-4 text-ziggo-ink font-bold">Rs.{{ "%.2f"|format(c.per_minute_rate or 0) }}</td>
+                        <td class="px-6 py-4 text-ziggo-ink font-bold">Rs.{{ "%.2f"|format(c.min_fare or 0) }}</td>
+                        <td class="px-6 py-4">
+                            <form method="POST" action="/admin/services/{{ c.id }}/toggle" class="inline">
+                                {% if c.is_active %}
+                                <button type="submit" title="Click to deactivate" class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition">Active</button>
+                                {% else %}
+                                <button type="submit" title="Click to activate" class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-gray-100 text-gray-500 hover:bg-gray-200 transition">Inactive</button>
+                                {% endif %}
+                            </form>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex items-center justify-end gap-2">
+                                <button
+                                    onclick='openEditModal({{ {
+                                        "id": c.id,
+                                        "service_type": c.service_type,
+                                        "display_name": c.display_name or "",
+                                        "capacity": c.capacity or 0,
+                                        "description": c.description or "",
+                                        "base_fare": (c.base_fare|float) if c.base_fare is not none else 0,
+                                        "per_km_rate": (c.per_km_rate|float) if c.per_km_rate is not none else 0,
+                                        "per_minute_rate": (c.per_minute_rate|float) if c.per_minute_rate is not none else 0,
+                                        "min_fare": (c.min_fare|float) if c.min_fare is not none else 0,
+                                        "platform_fee_percent": (c.platform_fee_percent|float) if c.platform_fee_percent is not none else 15,
+                                        "surge_multiplier": (c.surge_multiplier|float) if c.surge_multiplier is not none else 1,
+                                        "is_active": c.is_active,
+                                    }|tojson }})'
+                                    class="px-3 py-2 bg-slate-700 text-white rounded-lg text-xs font-black hover:bg-slate-800 transition flex items-center gap-1.5">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                                <form method="POST" action="/admin/categories/{{ c.id }}/delete" onsubmit="return confirmDelete({{ driver_counts.get(c.service_type, 0) }}, '{{ c.display_name or c.service_type }}')">
+                                    <input type="hidden" name="next" value="/admin/services">
+                                    <button type="submit" class="px-3 py-2 bg-rose-500 text-white rounded-lg text-xs font-black hover:bg-rose-600 transition">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="px-6 py-16 text-center">
+                            <i class="fas fa-concierge-bell text-4xl text-ziggo-faint mb-3"></i>
+                            <p class="text-ziggo-muted font-bold">No services yet. Click <span class="text-ziggo">Add Service</span> to create one.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
-<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-    {% for s in services %}
-    <a href="{{ s.url }}" class="zi-card overflow-hidden zi-card-hover block">
-        <div class="bg-gradient-to-r {{ s.grad }} p-5 text-white">
-            <div class="flex items-center justify-between">
-                <div class="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center text-2xl">
-                    <i class="fas {{ s.icon }}"></i>
+<!-- Create / Edit Modal -->
+<div id="serviceModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+        <div class="p-6 border-b border-ziggo-line flex justify-between items-center bg-gray-50/50 flex-shrink-0">
+            <h3 class="text-xl font-black text-ziggo" id="svcModalTitle">New service</h3>
+            <button onclick="closeModal()" class="text-ziggo-faint hover:text-ziggo-ink">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        <form id="serviceForm" method="POST" enctype="multipart/form-data" class="p-8 space-y-5 overflow-y-auto">
+            <input type="hidden" name="next" value="/admin/services">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Service key</label>
+                    <input type="text" name="service_type" id="svcKey" required pattern="[a-z0-9_-]+" placeholder="e.g. zip" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    <p class="text-[10px] text-ziggo-faint font-bold mt-1">lowercase, unique. Cannot change after create.</p>
                 </div>
-                <div class="text-right">
-                    <p class="text-4xl font-black leading-none">{{ s.count }}</p>
-                    <p class="text-[10px] uppercase opacity-80 tracking-wider mt-1">{{ s.count_label }}</p>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Display name</label>
+                    <input type="text" name="display_name" id="svcName" required placeholder="e.g. Zip" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div class="col-span-2">
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Icon image</label>
+                    <input type="file" name="image" accept="image/png,image/jpeg,image/webp" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white">
+                    <p class="text-[10px] text-ziggo-faint font-bold mt-1">JPG/PNG/WEBP, max 5 MB. Leave empty to keep current.</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Capacity (persons)</label>
+                    <input type="number" min="0" name="capacity" id="svcCapacity" value="0" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div class="flex items-end">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="is_active" id="svcActive" checked class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
+                        <span class="text-sm font-black text-ziggo-ink">Active</span>
+                    </label>
+                </div>
+                <div class="col-span-2">
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Description</label>
+                    <textarea name="description" id="svcDesc" rows="2" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo"></textarea>
+                </div>
+
+                <div class="col-span-2 pt-2">
+                    <p class="text-xs font-black text-ziggo uppercase tracking-wider">Pricing</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Base fare (Rs)</label>
+                    <input type="number" step="0.01" min="0" name="base_fare" id="svcBase" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Per km (Rs)</label>
+                    <input type="number" step="0.01" min="0" name="per_km_rate" id="svcPerKm" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Per minute (Rs)</label>
+                    <input type="number" step="0.01" min="0" name="per_minute_rate" id="svcPerMin" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Minimum fare (Rs)</label>
+                    <input type="number" step="0.01" min="0" name="min_fare" id="svcMin" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Platform fee (%)</label>
+                    <input type="number" step="0.01" min="0" name="platform_fee_percent" id="svcFee" value="15" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Surge multiplier</label>
+                    <input type="number" step="0.01" min="0.1" name="surge_multiplier" id="svcSurge" value="1.0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                 </div>
             </div>
-            <p class="mt-3 text-xl font-black">{{ s.label }}</p>
-        </div>
-        <div class="p-5">
-            <p class="text-xs text-ziggo-muted leading-relaxed">{{ s.desc }}</p>
-            <p class="mt-3 text-xs font-bold text-ziggo">
-                Manage <i class="fas fa-arrow-right ml-1 text-[10px]"></i>
-            </p>
-        </div>
-    </a>
-    {% endfor %}
+            <div class="pt-2 flex justify-end gap-3">
+                <button type="button" onclick="closeModal()" class="px-6 py-3 border border-ziggo-line rounded-xl font-black text-ziggo-muted hover:bg-gray-50">Cancel</button>
+                <button type="submit" class="px-8 py-3 bg-ziggo text-white rounded-xl font-black hover:bg-ziggo-light shadow-brand">
+                    <span id="svcSubmitText">Create service</span>
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
+
+<script>
+function openCreateModal() {
+    document.getElementById('svcModalTitle').innerText = 'New service';
+    document.getElementById('svcSubmitText').innerText = 'Create service';
+    document.getElementById('serviceForm').action = '/admin/categories/new';
+    document.getElementById('svcKey').value = '';
+    document.getElementById('svcKey').disabled = false;
+    document.getElementById('svcName').value = '';
+    document.getElementById('svcCapacity').value = 0;
+    document.getElementById('svcDesc').value = '';
+    document.getElementById('svcBase').value = 0;
+    document.getElementById('svcPerKm').value = 0;
+    document.getElementById('svcPerMin').value = 0;
+    document.getElementById('svcMin').value = 0;
+    document.getElementById('svcFee').value = 15;
+    document.getElementById('svcSurge').value = 1.0;
+    document.getElementById('svcActive').checked = true;
+    showModal();
+}
+
+function openEditModal(c) {
+    document.getElementById('svcModalTitle').innerText = 'Edit — ' + (c.display_name || c.service_type);
+    document.getElementById('svcSubmitText').innerText = 'Save changes';
+    document.getElementById('serviceForm').action = '/admin/categories/' + c.id + '/edit';
+    document.getElementById('svcKey').value = c.service_type;
+    document.getElementById('svcKey').disabled = true;
+    document.getElementById('svcName').value = c.display_name || '';
+    document.getElementById('svcCapacity').value = c.capacity || 0;
+    document.getElementById('svcDesc').value = c.description || '';
+    document.getElementById('svcBase').value = c.base_fare;
+    document.getElementById('svcPerKm').value = c.per_km_rate;
+    document.getElementById('svcPerMin').value = c.per_minute_rate;
+    document.getElementById('svcMin').value = c.min_fare;
+    document.getElementById('svcFee').value = c.platform_fee_percent;
+    document.getElementById('svcSurge').value = c.surge_multiplier;
+    document.getElementById('svcActive').checked = !!c.is_active;
+    showModal();
+}
+
+function showModal() {
+    const m = document.getElementById('serviceModal');
+    m.classList.remove('hidden');
+    m.classList.add('flex');
+}
+
+function closeModal() {
+    const m = document.getElementById('serviceModal');
+    m.classList.add('hidden');
+    m.classList.remove('flex');
+}
+
+function confirmDelete(driverCount, name) {
+    if (driverCount > 0) {
+        alert("Can't delete '" + name + "' — " + driverCount + " driver(s) are assigned. Deactivate it instead.");
+        return false;
+    }
+    return confirm("Delete '" + name + "' permanently?");
+}
+
+document.getElementById('serviceModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+});
+</script>
 {% endblock %}

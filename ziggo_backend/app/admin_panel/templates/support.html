@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+
+{% block title %}Help & Support | Ziggo Admin{% endblock %}
+{% block page_title %}Help & Support Center{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Header -->
+    <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-xl">
+            <i class="fas fa-headset"></i>
+        </div>
+        <div>
+            <h2 class="text-2xl font-black text-ziggo-ink leading-tight">Help &amp; Support Center</h2>
+            <p class="text-xs text-ziggo-muted font-bold">Manage customer support tickets and resolution workflow</p>
+        </div>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl">
+                <i class="fas fa-ticket-alt"></i>
+            </div>
+            <div>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Total Tickets</p>
+                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">{{ total }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl">
+                <i class="far fa-envelope"></i>
+            </div>
+            <div>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Open</p>
+                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">{{ open_count }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl">
+                <i class="fas fa-spinner"></i>
+            </div>
+            <div>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">In Progress</p>
+                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">{{ in_progress_count }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Resolved</p>
+                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">{{ resolved_count }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter row -->
+    <form method="GET" action="/admin/support" class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex flex-wrap items-center gap-4">
+        <div class="flex-1 min-w-[260px] relative">
+            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-ziggo-faint text-sm"></i>
+            <input type="text" name="q" value="{{ filter_q }}" placeholder="Search by name or subject..." class="w-full pl-11 pr-4 py-3 border border-ziggo-line rounded-2xl outline-none focus:border-ziggo">
+        </div>
+        <div class="min-w-[180px]">
+            <select name="status" class="w-full p-3 border border-ziggo-line rounded-2xl outline-none focus:border-ziggo bg-white">
+                <option value="">All Status</option>
+                {% for s in statuses %}
+                <option value="{{ s }}" {% if filter_status == s %}selected{% endif %}>{{ s.replace('_', ' ')|title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="px-6 py-3 bg-ziggo text-white rounded-2xl font-black shadow-brand hover:bg-ziggo-light transition flex items-center gap-2">
+            <i class="fas fa-filter"></i> Filter
+        </button>
+        <a href="/admin/support" class="px-6 py-3 border border-ziggo-line rounded-2xl font-black text-ziggo-muted hover:bg-gray-50 transition">Clear</a>
+    </form>
+
+    <!-- Table -->
+    <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-gray-50 text-[11px] uppercase text-ziggo-muted font-black tracking-wider">
+                    <tr>
+                        <th class="px-6 py-4">#</th>
+                        <th class="px-6 py-4">User</th>
+                        <th class="px-6 py-4">Subject</th>
+                        <th class="px-6 py-4">Status</th>
+                        <th class="px-6 py-4">Date</th>
+                        <th class="px-6 py-4 text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-ziggo-line">
+                    {% for t in tickets %}
+                    {% set st = normalize_status(t.status) %}
+                    {% set tp = tickets_payload[loop.index0] %}
+                    <tr class="hover:bg-gray-50/50">
+                        <td class="px-6 py-4 font-bold text-ziggo-ink">#{{ t.id }}</td>
+                        <td class="px-6 py-4">
+                            {% if t.user %}
+                            <p class="text-sm font-black text-ziggo-ink">{{ t.user.full_name or '—' }}</p>
+                            <p class="text-[11px] text-ziggo-muted">{{ t.user.phone_number or '' }}</p>
+                            {% else %}
+                            <span class="text-ziggo-muted text-sm">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4">
+                            <p class="text-sm font-black text-ziggo-ink">{{ t.subject or '—' }}</p>
+                            {% if t.category %}
+                            <p class="text-[11px] text-ziggo font-bold uppercase tracking-wider">{{ t.category }}</p>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider
+                                {% if st == 'resolved' %}bg-emerald-50 text-emerald-600
+                                {% elif st == 'in_progress' %}bg-amber-50 text-amber-600
+                                {% elif st == 'closed' %}bg-gray-100 text-gray-500
+                                {% else %}bg-blue-50 text-ziggo{% endif %}">
+                                {{ st.replace('_', ' ')|title }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-ziggo-muted">
+                            {{ t.created_at.strftime("%Y-%m-%d %H:%M") if t.created_at else '—' }}
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <button
+                                onclick='openTicket({{ tp|tojson }})'
+                                class="px-3 py-2 bg-ziggo text-white rounded-lg text-xs font-black hover:bg-ziggo-light transition inline-flex items-center gap-1.5">
+                                <i class="fas fa-comments"></i> Open
+                                {% if t.messages|length %}
+                                <span class="bg-white/30 text-white px-1.5 py-0.5 rounded-full text-[10px] font-black">{{ t.messages|length }}</span>
+                                {% endif %}
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-16 text-center">
+                            <i class="fas fa-headset text-4xl text-ziggo-faint mb-3"></i>
+                            <p class="text-ziggo-muted font-bold">No tickets found.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Ticket thread modal -->
+<div id="ticketModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-3xl w-full max-w-3xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+        <div class="p-6 border-b border-ziggo-line flex justify-between items-start bg-gray-50/50 flex-shrink-0">
+            <div class="min-w-0">
+                <h3 class="text-xl font-black text-ziggo" id="tkTitle">Ticket #—</h3>
+                <p class="text-xs text-ziggo-muted font-bold truncate" id="tkMeta">—</p>
+                <div class="mt-2 flex flex-wrap gap-2" id="tkStatusButtons"></div>
+            </div>
+            <button onclick="closeModal()" class="text-ziggo-faint hover:text-ziggo-ink">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+
+        <div class="p-6 space-y-2 border-b border-ziggo-line bg-gray-50/30 flex-shrink-0">
+            <div class="grid grid-cols-3 gap-4 text-xs">
+                <div>
+                    <p class="text-ziggo-muted font-black uppercase tracking-wider">User</p>
+                    <p class="text-ziggo-ink font-bold mt-0.5" id="tkUser">—</p>
+                </div>
+                <div>
+                    <p class="text-ziggo-muted font-black uppercase tracking-wider">Category</p>
+                    <p class="text-ziggo-ink font-bold mt-0.5" id="tkCategory">—</p>
+                </div>
+                <div>
+                    <p class="text-ziggo-muted font-black uppercase tracking-wider">Subject</p>
+                    <p class="text-ziggo-ink font-bold mt-0.5" id="tkSubject">—</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Thread -->
+        <div class="px-6 py-4 space-y-3 overflow-y-auto flex-1 bg-white" id="tkThread">
+            <!-- filled in by JS -->
+        </div>
+
+        <!-- Reply -->
+        <form id="tkReplyForm" method="POST" class="border-t border-ziggo-line bg-gray-50/40 p-4 flex items-end gap-3 flex-shrink-0">
+            <textarea name="body" id="tkReplyBody" required rows="2" placeholder="Type your reply…"
+                class="flex-1 p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm resize-none bg-white"></textarea>
+            <button type="submit" class="px-5 py-3 bg-ziggo text-white rounded-xl font-black shadow-brand hover:bg-ziggo-light transition flex items-center gap-2">
+                <i class="fas fa-paper-plane"></i> Send
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+const STATUSES = [
+    { key: "open",        label: "Open",        cls: "bg-blue-50 text-ziggo hover:bg-blue-100" },
+    { key: "in_progress", label: "In Progress", cls: "bg-amber-50 text-amber-600 hover:bg-amber-100" },
+    { key: "resolved",    label: "Resolved",    cls: "bg-emerald-50 text-emerald-600 hover:bg-emerald-100" },
+    { key: "closed",      label: "Closed",      cls: "bg-gray-100 text-gray-500 hover:bg-gray-200" },
+];
+
+function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({
+        '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+    }[c]));
+}
+
+function renderThread(t) {
+    const wrap = document.getElementById('tkThread');
+    wrap.innerHTML = '';
+
+    // The opening message: the ticket's original description, framed as a
+    // user bubble so the thread reads naturally.
+    const opener = document.createElement('div');
+    opener.className = 'flex justify-start';
+    opener.innerHTML = `
+        <div class="max-w-[80%]">
+            <div class="text-[10px] text-ziggo-muted font-black uppercase tracking-wider mb-1">
+                ${escapeHtml(t.user_name || 'Customer')} · ${escapeHtml(t.created_at)}
+            </div>
+            <div class="bg-gray-100 text-ziggo-ink rounded-2xl rounded-tl-md px-4 py-3 text-sm whitespace-pre-wrap">
+                ${escapeHtml(t.description || '(no description)')}
+            </div>
+        </div>`;
+    wrap.appendChild(opener);
+
+    (t.messages || []).forEach(m => {
+        const isAdmin = m.sender_role === 'admin';
+        const row = document.createElement('div');
+        row.className = 'flex ' + (isAdmin ? 'justify-end' : 'justify-start');
+        const bubbleCls = isAdmin
+            ? 'bg-ziggo text-white rounded-2xl rounded-tr-md'
+            : 'bg-gray-100 text-ziggo-ink rounded-2xl rounded-tl-md';
+        const meta = (m.sender_name || (isAdmin ? 'Admin' : (t.user_name || 'Customer'))) + ' · ' + m.created_at;
+        row.innerHTML = `
+            <div class="max-w-[80%]">
+                <div class="text-[10px] ${isAdmin ? 'text-ziggo' : 'text-ziggo-muted'} font-black uppercase tracking-wider mb-1 ${isAdmin ? 'text-right' : ''}">
+                    ${escapeHtml(meta)}
+                </div>
+                <div class="${bubbleCls} px-4 py-3 text-sm whitespace-pre-wrap">
+                    ${escapeHtml(m.body)}
+                </div>
+            </div>`;
+        wrap.appendChild(row);
+    });
+    wrap.scrollTop = wrap.scrollHeight;
+}
+
+function openTicket(t) {
+    document.getElementById('tkTitle').innerText = 'Ticket #' + t.id;
+    document.getElementById('tkMeta').innerText = t.created_at + ' · ' + t.status.replace('_', ' ').toUpperCase();
+    document.getElementById('tkUser').innerText = (t.user_name || '—') + (t.user_phone ? ' (' + t.user_phone + ')' : '');
+    document.getElementById('tkCategory').innerText = t.category || '—';
+    document.getElementById('tkSubject').innerText = t.subject || '—';
+
+    const statusWrap = document.getElementById('tkStatusButtons');
+    statusWrap.innerHTML = '';
+    STATUSES.forEach(s => {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/admin/support/' + t.id + '/status';
+        form.className = 'inline';
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden'; hidden.name = 'status'; hidden.value = s.key;
+        form.appendChild(hidden);
+        const btn = document.createElement('button');
+        btn.type = 'submit';
+        btn.className = 'px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition ' + s.cls + (t.status === s.key ? ' ring-2 ring-ziggo' : '');
+        btn.innerText = s.label;
+        form.appendChild(btn);
+        statusWrap.appendChild(form);
+    });
+
+    renderThread(t);
+
+    const form = document.getElementById('tkReplyForm');
+    form.action = '/admin/support/' + t.id + '/reply';
+    document.getElementById('tkReplyBody').value = '';
+
+    const m = document.getElementById('ticketModal');
+    m.classList.remove('hidden');
+    m.classList.add('flex');
+    document.getElementById('tkReplyBody').focus();
+}
+
+function closeModal() {
+    const m = document.getElementById('ticketModal');
+    m.classList.add('hidden');
+    m.classList.remove('flex');
+}
+
+document.getElementById('ticketModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+});
+</script>
+{% endblock %}

@@ -39,10 +39,34 @@ class Complaint(Base):
     subject = Column(String(200))
     description = Column(Text)
     attachment_url = Column(String(255))
-    status = Column(String(20), default="pending")
+    status = Column(String(20), default="open")
     assigned_to = Column(Integer, ForeignKey("users.id"))
     resolved_at = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", foreign_keys=[user_id])
+    messages = relationship(
+        "ComplaintMessage",
+        back_populates="complaint",
+        cascade="all, delete-orphan",
+        order_by="ComplaintMessage.id",
+    )
+
+
+class ComplaintMessage(Base):
+    __tablename__ = "complaint_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    complaint_id = Column(Integer, ForeignKey("complaints.id", ondelete="CASCADE"), index=True)
+    sender_user_id = Column(Integer, ForeignKey("users.id"))
+    # "customer" / "driver" / "admin" — keeps role on the message even if the
+    # user's profile role later changes (rare, but cheap to denormalize).
+    sender_role = Column(String(20), nullable=False)
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    complaint = relationship("Complaint", back_populates="messages")
+    sender = relationship("User", foreign_keys=[sender_user_id])
 
 
 class Notification(Base):
@@ -76,6 +100,44 @@ class FareSetting(Base):
     min_fare = Column(DECIMAL(10, 2), default=0)
     platform_fee_percent = Column(DECIMAL(5, 2), default=15)
     surge_multiplier = Column(DECIMAL(3, 2), default=1.00)
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class SystemSettings(Base):
+    __tablename__ = "system_settings"
+
+    id = Column(Integer, primary_key=True, default=1)
+    # General
+    site_name = Column(String(100), default="Ziggo")
+    admin_email = Column(String(120), default="")
+    contact_phone = Column(String(20), default="")
+    contact_email = Column(String(120), default="")
+    address = Column(Text, default="")
+    # Pricing
+    commission_rate = Column(DECIMAL(5, 2), default=15)
+    surge_start_hour = Column(Integer, default=17)
+    surge_end_hour = Column(Integer, default=20)
+    surge_multiplier = Column(DECIMAL(3, 2), default=1.5)
+    cancellation_fee = Column(DECIMAL(10, 2), default=0)
+    rider_penalty = Column(DECIMAL(10, 2), default=0)
+    # Security
+    min_password_length = Column(Integer, default=6)
+    session_timeout_minutes = Column(Integer, default=30)
+    max_login_attempts = Column(Integer, default=5)
+    # Notifications
+    email_notifications_enabled = Column(Boolean, nullable=False, default=True)
+    sms_notifications_enabled = Column(Boolean, nullable=False, default=True)
+    push_notifications_enabled = Column(Boolean, nullable=False, default=True)
+    # Driver incentives
+    min_rides_daily_bonus = Column(Integer, default=15)
+    daily_bonus_amount = Column(DECIMAL(10, 2), default=1000)
+    commission_cycle_rides = Column(Integer, default=5)
+    commission_per_cycle = Column(DECIMAL(10, 2), default=500)
+    # Branding
+    logo_url = Column(String(255))
+    favicon_url = Column(String(255))
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
