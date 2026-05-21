@@ -77,10 +77,10 @@ services:
       # Persist admin panel uploads (driver photos etc.) across container rebuilds
       - ziggo_uploads:/app/app/admin_panel/static/uploads
     ports:
-      # Bind to loopback only — the host nginx (already running) terminates TLS
-      # and reverse-proxies to this port. Change to "0.0.0.0:${ZIGGO_PORT:-8030}"
-      # if you need to reach the container directly for debugging.
-      - "127.0.0.1:${ZIGGO_PORT:-8030}:8000"
+      # Public binding — accepts traffic from outside the server on
+      # ${ZIGGO_PORT}. Switch back to "127.0.0.1:..." once nginx is fronting
+      # this so the backend isn't directly reachable from the internet.
+      - "0.0.0.0:${ZIGGO_PORT:-8030}:8000"
     networks:
       - ziggo_net
 
@@ -90,4 +90,4 @@ networks:
 
 volumes:
   ziggo_pgdata:
-  ziggo_uploads:
+  ziggo_uploads: 
