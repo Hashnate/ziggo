@@ -119,13 +119,6 @@ class BookingProvider extends ChangeNotifier {
     int redeemPoints = 0,
     // BRD: CD-19 — intermediate stops
     List<Map<String, dynamic>> stops = const [],
-    // BRD: PR-03 — basic courier (longer-distance parcel, not Flash)
-    bool isCourier = false,
-    // BRD: PR-05 — receive items / inverse Flash: customer is receiver,
-    // driver collects FROM sender_* at pickup address.
-    bool isPickupRequest = false,
-    String? senderName,
-    String? senderPhone,
   }) async {
     _setBusy(true);
     _lastError = null;
@@ -151,26 +144,6 @@ class BookingProvider extends ChangeNotifier {
             if (parcelWeightKg != null) 'parcel_weight_kg': parcelWeightKg,
             if (receiverName != null && receiverName.isNotEmpty) 'receiver_name': receiverName,
             if (receiverPhone != null && receiverPhone.isNotEmpty) 'receiver_phone': receiverPhone,
-            if (parcelInstructions != null && parcelInstructions.isNotEmpty)
-              'parcel_instructions': parcelInstructions,
-          },
-          // BRD: PR-03 — Basic Courier (long-distance parcel)
-          if (isCourier) ...{
-            'is_courier': true,
-            if (parcelType != null) 'parcel_type': parcelType,
-            if (parcelWeightKg != null) 'parcel_weight_kg': parcelWeightKg,
-            if (receiverName != null && receiverName.isNotEmpty) 'receiver_name': receiverName,
-            if (receiverPhone != null && receiverPhone.isNotEmpty) 'receiver_phone': receiverPhone,
-            if (parcelInstructions != null && parcelInstructions.isNotEmpty)
-              'parcel_instructions': parcelInstructions,
-          },
-          // BRD: PR-05 — Receive items / inverse Flash
-          if (isPickupRequest) ...{
-            'is_pickup_request': true,
-            if (parcelType != null) 'parcel_type': parcelType,
-            if (parcelWeightKg != null) 'parcel_weight_kg': parcelWeightKg,
-            if (senderName != null && senderName.isNotEmpty) 'sender_name': senderName,
-            if (senderPhone != null && senderPhone.isNotEmpty) 'sender_phone': senderPhone,
             if (parcelInstructions != null && parcelInstructions.isNotEmpty)
               'parcel_instructions': parcelInstructions,
           },

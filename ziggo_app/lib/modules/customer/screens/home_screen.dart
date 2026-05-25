@@ -110,16 +110,6 @@ class _HomeScreenState extends State<HomeScreen> {
               onFood: () => _open(const FoodHomeScreen()),
               onFlash: () => _open(const FlashHomeScreen()),
               onMarket: () => _open(const MarketHomeScreen()),
-              // BRD: PR-03 / PR-05 / PR-07 — three new delivery surfaces
-              onCourier: () => _open(
-                const FlashHomeScreen(mode: ParcelFlowMode.courier),
-              ),
-              onReceive: () => _open(
-                const FlashHomeScreen(mode: ParcelFlowMode.receive),
-              ),
-              onTruck: () => _open(
-                const FareEstimateScreen(initialServiceType: 'truck'),
-              ),
             ),
             const SizedBox(height: 24),
             _GoldStrip(onTap: () => _open(const SubscriptionScreen())),
@@ -781,18 +771,11 @@ class _ServicesGrid extends StatelessWidget {
   final VoidCallback onFood;
   final VoidCallback onFlash;
   final VoidCallback onMarket;
-  // BRD: PR-03 / PR-05 / PR-07
-  final VoidCallback onCourier;
-  final VoidCallback onReceive;
-  final VoidCallback onTruck;
   const _ServicesGrid({
     required this.onRide,
     required this.onFood,
     required this.onFlash,
     required this.onMarket,
-    required this.onCourier,
-    required this.onReceive,
-    required this.onTruck,
   });
 
   @override
@@ -838,9 +821,7 @@ class _ServicesGrid extends StatelessWidget {
                 icon: Icons.local_shipping_rounded,
                 imageAsset: 'assets/icons/truck.png',
                 label: 'Trucks',
-                // BRD: PR-07 — Truck delivery (reuses fare-estimate flow
-                // with Truck vehicle pre-selected via initialServiceType).
-                onTap: onTruck,
+                onTap: onRide,
               ),
               GradientServiceTile(
                 icon: Icons.event_rounded,
@@ -870,28 +851,6 @@ class _ServicesGrid extends StatelessWidget {
                 icon: Icons.apps_rounded,
                 imageAsset: 'assets/icons/more.png',
                 label: 'More',
-              ),
-            ],
-          ),
-          const SizedBox(height: 22),
-          // BRD: PR-03 + PR-05 — long-distance courier + receive-items.
-          Row(
-            mainAxisAlignment: MainAxisAlignment.start,
-            children: [
-              GradientServiceTile(
-                icon: Icons.inventory_2_rounded,
-                imageAsset: 'assets/icons/flash.png',
-                label: 'Courier',
-                isNew: true,
-                onTap: onCourier,
-              ),
-              const SizedBox(width: 16),
-              GradientServiceTile(
-                icon: Icons.move_to_inbox_rounded,
-                imageAsset: 'assets/icons/flash.png',
-                label: 'Receive',
-                isNew: true,
-                onTap: onReceive,
               ),
             ],
           ),
