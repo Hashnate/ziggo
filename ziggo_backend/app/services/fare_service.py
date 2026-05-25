@@ -83,6 +83,9 @@ async def calculate_fare(
     # BRD: RW-01 (earn) + RW-02 (redeem) + RS-07 (display)
     customer=None,
     redeem_points: int = 0,
+    # BRD: CD-19 / BE-16 / BR-9 — intermediate stops
+    # Each stop is {"lat": float, "lng": float, "address": str?}.
+    stops: Optional[list] = None,
 ) -> dict:
     # Rental: short-circuit the distance-based math. Fare = hourly * hours,
     # promo discount still applies, platform-fee split still applies.
@@ -134,7 +137,28 @@ async def calculate_fare(
         }
         return await _enrich_with_loyalty(db, rental_dict, customer, redeem_points)
 
-    distance_km = haversine_km(pickup_lat, pickup_lng, drop_lat, drop_lng)
+    # BRD: CD-19 — sum of leg distances when intermediate stops are present.
+    # Stops are an ordered list between pickup and drop; legs cover every
+    # consecutive pair. With 2 stops the route is pickup→stop1→stop2→drop.
+    waypoints = [(pickup_lat, pickup_lng)]
+    clean_stops = []
+    if stops:
+        for st in stops:
+            lat = st.get("lat") if isinstance(st, dict) else None
+            lng = st.get("lng") if isinstance(st, dict) else None
+            if lat is None or lng is None:
+                continue
+            clean_stops.append({
+                "lat": float(lat),
+                "lng": float(lng),
+                "address": (st.get("address") if isinstance(st, dict) else None) or "",
+            })
+            waypoints.append((float(lat), float(lng)))
+    waypoints.append((drop_lat, drop_lng))
+
+    distance_km = 0.0
+    for (a_lat, a_lng), (b_lat, b_lng) in zip(waypoints, waypoints[1:]):
+        distance_km += haversine_km(a_lat, a_lng, b_lat, b_lng)
     duration_min = estimate_duration_min(distance_km)
 
     setting_q = await db.execute(
@@ -156,6 +180,16 @@ async def calculate_fare(
 
     raw = (base + per_km * distance_km + per_min * duration_min) * surge
     fare = max(raw, min_fare)
+
+    # BRD: CD-19 — per-stop fee compensates the driver for the detour.
+    stop_fee_total = 0.0
+    if clean_stops:
+        from ..models import SystemSettings
+        ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+        ss = ss_q.scalars().first()
+        per_stop = float(ss.multi_stop_fee_per_stop) if ss and ss.multi_stop_fee_per_stop is not None else 50.0
+        stop_fee_total = per_stop * len(clean_stops)
+        fare += stop_fee_total
 
     flash_surcharge = 0.0
     if is_flash and parcel_weight_kg is not None:
@@ -199,6 +233,9 @@ async def calculate_fare(
         "promo_code": promo_applied,
         "surge_multiplier": surge,
         "flash_surcharge": round(flash_surcharge, 2),
+        # BRD: CD-19 — surface multi-stop snapshot so the UI can render it
+        "stop_count": len(clean_stops),
+        "stops_fee": round(stop_fee_total, 2),
     }
     return await _enrich_with_loyalty(db, base_dict, customer, redeem_points)
 

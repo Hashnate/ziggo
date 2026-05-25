@@ -127,6 +127,64 @@
             </div>
         </div>
 
+        {% if documents %}
+        <!-- BRD: KYC document review -->
+        <div class="pt-6 border-t border-gray-100">
+            <h4 class="font-black text-ziggo-ink mb-4 flex items-center gap-2">
+                <i class="fas fa-id-card text-ziggo"></i> KYC Documents
+            </h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {% for doc in documents %}
+                <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
+                    <div class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
+                        {% if doc.document_url %}
+                        <a href="{{ doc.document_url }}" target="_blank">
+                            {% if doc.document_url.endswith('.pdf') %}
+                            <i class="fas fa-file-pdf text-2xl text-rose-500"></i>
+                            {% else %}
+                            <img src="{{ doc.document_url }}" alt="{{ doc.label }}" class="w-full h-full object-cover">
+                            {% endif %}
+                        </a>
+                        {% else %}
+                        <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
+                        {% endif %}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-black text-sm text-ziggo-ink">{{ doc.label }}</p>
+                        {% if doc.document_url %}
+                        <p class="text-[11px] text-ziggo-muted truncate">Uploaded {{ doc.uploaded_at.strftime("%Y-%m-%d") if doc.uploaded_at else '' }}</p>
+                        {% if doc.is_verified %}
+                        <span class="px-2 py-0.5 mt-1 inline-block text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700 rounded-full">Verified</span>
+                        {% else %}
+                        <span class="px-2 py-0.5 mt-1 inline-block text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-700 rounded-full">Pending review</span>
+                        {% endif %}
+                        {% else %}
+                        <p class="text-[11px] text-rose-500 font-bold">Not uploaded yet</p>
+                        {% endif %}
+                    </div>
+                    {% if doc.id %}
+                    <div class="flex flex-col gap-1.5">
+                        {% if not doc.is_verified %}
+                        <form method="POST" action="/admin/drivers/{{ driver.id }}/documents/{{ doc.id }}/verify">
+                            <button class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-black hover:bg-emerald-700 whitespace-nowrap">
+                                <i class="fas fa-check mr-1"></i> Verify
+                            </button>
+                        </form>
+                        {% else %}
+                        <form method="POST" action="/admin/drivers/{{ driver.id }}/documents/{{ doc.id }}/reject" onsubmit="return confirm('Mark this document as not verified? The driver will need to re-upload.');">
+                            <button class="px-3 py-1.5 border border-rose-300 text-rose-600 rounded-lg text-xs font-black hover:bg-rose-50 whitespace-nowrap">
+                                <i class="fas fa-times mr-1"></i> Revoke
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
         <div class="pt-6 border-t border-gray-100 flex justify-end gap-3">
             <a href="/admin/drivers" class="px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50">Cancel</a>
             <button type="submit" class="px-8 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light shadow-brand">

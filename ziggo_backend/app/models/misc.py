@@ -144,12 +144,66 @@ class SystemSettings(Base):
     loyalty_max_redeem_order_pct = Column(DECIMAL(5, 2), nullable=False, default=20)
     # Gold membership (BRD: RW-03)
     gold_delivery_discount_pct = Column(DECIMAL(5, 2), nullable=False, default=50)
+    # Multi-stop trips (BRD: CD-19 / BE-16 / BR-9)
+    multi_stop_max_count = Column(Integer, nullable=False, default=2)
+    multi_stop_free_minutes = Column(Integer, nullable=False, default=3)
+    multi_stop_excess_per_minute = Column(DECIMAL(10, 2), nullable=False, default=5)
+    multi_stop_fee_per_stop = Column(DECIMAL(10, 2), nullable=False, default=50)
     # Branding
     logo_url = Column(String(255))
     favicon_url = Column(String(255))
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class Incident(Base):
+    """Driver-reported road event (accident, traffic, closure, checkpoint).
+
+    Used by:
+    - other drivers nearby — to render warning pins on their map (BRD)
+    - admin — to see hotspots in real time
+
+    `kind` whitelist is enforced in the API, not at DB level, so admin can
+    add new types later without a migration.
+    """
+    __tablename__ = "incidents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    reported_by_user_id = Column(Integer, ForeignKey("users.id"))
+    kind = Column(String(30), nullable=False)  # accident | traffic | closure | police | hazard | other
+    lat = Column(DECIMAL(10, 7), nullable=False)
+    lng = Column(DECIMAL(10, 7), nullable=False)
+    note = Column(Text)
+    status = Column(String(20), nullable=False, default="active")  # active | expired | dismissed
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    reporter = relationship("User", foreign_keys=[reported_by_user_id])
+
+
+class EmergencyAlert(Base):
+    """A panic-button alert raised by a customer mid-ride (BRD: CD-17).
+
+    `status` lifecycle: open → acknowledged → resolved | dismissed.
+    Snapshot the rider's location + booking ref so admin sees what mattered
+    even if the rider's phone later goes silent.
+    """
+    __tablename__ = "emergency_alerts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    booking_id = Column(Integer, ForeignKey("bookings.id"), nullable=True, index=True)
+    booking_ref = Column(String(20))
+    lat = Column(DECIMAL(10, 7))
+    lng = Column(DECIMAL(10, 7))
+    note = Column(Text)
+    status = Column(String(20), nullable=False, default="open", index=True)
+    acknowledged_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    acknowledged_at = Column(DateTime(timezone=True))
+    resolved_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", foreign_keys=[user_id])
 
 
 class LoyaltyTransaction(Base):

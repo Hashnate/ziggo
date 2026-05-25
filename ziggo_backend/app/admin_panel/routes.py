@@ -449,6 +449,30 @@ async def admin_drivers_edit_form(
     d = q.scalars().first()
     if not d:
         raise HTTPException(status_code=404, detail="Driver not found")
+
+    # BRD: load uploaded KYC documents so the admin can verify them inline
+    from ..models import DriverDocument
+    dq = await db.execute(
+        select(DriverDocument).where(DriverDocument.driver_id == d.id)
+    )
+    docs_by_kind = {row.document_type: row for row in dq.scalars().all()}
+    docs = []
+    for kind, label in [
+        ("nic", "NIC"),
+        ("license", "Driving License"),
+        ("vehicle_reg", "Vehicle Registration"),
+        ("insurance", "Insurance"),
+    ]:
+        row = docs_by_kind.get(kind)
+        docs.append({
+            "kind": kind,
+            "label": label,
+            "id": row.id if row else None,
+            "document_url": row.document_url if row else None,
+            "is_verified": bool(row.is_verified) if row else False,
+            "uploaded_at": row.uploaded_at if row else None,
+        })
+
     return templates.TemplateResponse(
         request, "driver_edit.html",
         {
@@ -456,6 +480,7 @@ async def admin_drivers_edit_form(
             "active_page": "drivers",
             "driver": d,
             "user": d.user,
+            "documents": docs,
             "error": None,
         },
     )
@@ -496,6 +521,7 @@ async def admin_drivers_edit_submit(
                 "active_page": "drivers",
                 "driver": d,
                 "user": user,
+                "documents": [],
                 "error": msg,
             },
             status_code=status,
@@ -808,6 +834,11 @@ async def admin_settings_save(
     loyalty_min_redeem_points: int = Form(100),
     loyalty_max_redeem_order_pct: float = Form(20),
     gold_delivery_discount_pct: float = Form(50),
+    # Multi-stop trips (BRD: CD-19 / BE-16 / BR-9)
+    multi_stop_max_count: int = Form(2),
+    multi_stop_free_minutes: int = Form(3),
+    multi_stop_excess_per_minute: float = Form(5),
+    multi_stop_fee_per_stop: float = Form(50),
     # Branding
     logo: UploadFile | None = File(None),
     favicon: UploadFile | None = File(None),
@@ -844,6 +875,11 @@ async def admin_settings_save(
     s.loyalty_min_redeem_points = max(1, int(loyalty_min_redeem_points))
     s.loyalty_max_redeem_order_pct = Decimal(str(loyalty_max_redeem_order_pct))
     s.gold_delivery_discount_pct = Decimal(str(gold_delivery_discount_pct))
+    # BRD: CD-19 — multi-stop policy
+    s.multi_stop_max_count = max(0, min(5, int(multi_stop_max_count)))
+    s.multi_stop_free_minutes = max(0, int(multi_stop_free_minutes))
+    s.multi_stop_excess_per_minute = Decimal(str(multi_stop_excess_per_minute))
+    s.multi_stop_fee_per_stop = Decimal(str(multi_stop_fee_per_stop))
 
     new_logo = await _save_branding_asset(logo, "Logo")
     if new_logo:
@@ -2393,6 +2429,169 @@ def _normalize_status(raw: str | None) -> str:
     if not raw or raw == "pending":
         return "open"
     return raw
+
+
+# ---------- BRD: Incident reports (driver-side) ----------
+@router.get("/incidents", response_class=HTMLResponse)
+async def admin_incidents(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from ..models import Incident
+
+    q = await db.execute(
+        select(Incident)
+        .options(selectinload(Incident.reporter))
+        .order_by(Incident.id.desc())
+        .limit(200)
+    )
+    incidents = q.scalars().all()
+    counts_q = await db.execute(
+        select(Incident.kind, func.count(Incident.id))
+        .where(Incident.status == "active")
+        .group_by(Incident.kind)
+    )
+    counts = {k: n for k, n in counts_q.all()}
+    return templates.TemplateResponse(
+        request,
+        "incidents.html",
+        {
+            "request": request,
+            "active_page": "incidents",
+            "incidents": incidents,
+            "counts": counts,
+        },
+    )
+
+
+@router.post("/incidents/{incident_id}/dismiss")
+async def admin_incidents_dismiss(
+    incident_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from ..models import Incident
+    q = await db.execute(select(Incident).where(Incident.id == incident_id))
+    inc = q.scalars().first()
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    inc.status = "dismissed"
+    await db.commit()
+    return RedirectResponse(url="/admin/incidents", status_code=303)
+
+
+# ---------- BRD: Driver document verification ----------
+@router.post("/drivers/{driver_id}/documents/{doc_id}/verify")
+async def admin_driver_doc_verify(
+    driver_id: int,
+    doc_id: int,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(current_admin),
+):
+    from ..models import DriverDocument
+    q = await db.execute(
+        select(DriverDocument).where(
+            DriverDocument.id == doc_id, DriverDocument.driver_id == driver_id
+        )
+    )
+    doc = q.scalars().first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    doc.is_verified = True
+    doc.verified_by = admin.id
+    doc.verified_at = datetime.now(timezone.utc)
+    await db.commit()
+    return RedirectResponse(url=f"/admin/drivers/{driver_id}/edit", status_code=303)
+
+
+@router.post("/drivers/{driver_id}/documents/{doc_id}/reject")
+async def admin_driver_doc_reject(
+    driver_id: int,
+    doc_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from ..models import DriverDocument
+    q = await db.execute(
+        select(DriverDocument).where(
+            DriverDocument.id == doc_id, DriverDocument.driver_id == driver_id
+        )
+    )
+    doc = q.scalars().first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    doc.is_verified = False
+    doc.verified_by = None
+    doc.verified_at = None
+    await db.commit()
+    return RedirectResponse(url=f"/admin/drivers/{driver_id}/edit", status_code=303)
+
+
+# ---------- BRD: CD-17 — Emergency alerts ----------
+@router.get("/emergencies", response_class=HTMLResponse)
+async def admin_emergencies(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from ..models import EmergencyAlert
+
+    q = await db.execute(
+        select(EmergencyAlert)
+        .options(selectinload(EmergencyAlert.user))
+        .order_by(EmergencyAlert.id.desc())
+        .limit(200)
+    )
+    alerts = q.scalars().all()
+    # Tallies for the header cards
+    counts_q = await db.execute(
+        select(EmergencyAlert.status, func.count(EmergencyAlert.id))
+        .group_by(EmergencyAlert.status)
+    )
+    counts = {s: n for s, n in counts_q.all()}
+    return templates.TemplateResponse(
+        request,
+        "emergencies.html",
+        {
+            "request": request,
+            "active_page": "emergencies",
+            "alerts": alerts,
+            "open_count": counts.get("open", 0),
+            "acknowledged_count": counts.get("acknowledged", 0),
+            "resolved_count": counts.get("resolved", 0) + counts.get("dismissed", 0),
+            "total_count": sum(counts.values()),
+        },
+    )
+
+
+@router.post("/emergencies/{alert_id}/{action}")
+async def admin_emergencies_action(
+    alert_id: int,
+    action: str,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(current_admin),
+):
+    from ..models import EmergencyAlert
+    if action not in ("acknowledge", "resolve", "dismiss"):
+        raise HTTPException(status_code=400, detail="Unknown action")
+    q = await db.execute(select(EmergencyAlert).where(EmergencyAlert.id == alert_id))
+    a = q.scalars().first()
+    if not a:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    now = datetime.now(timezone.utc)
+    if action == "acknowledge":
+        a.status = "acknowledged"
+        a.acknowledged_by = admin.id
+        a.acknowledged_at = now
+    elif action == "resolve":
+        a.status = "resolved"
+        a.resolved_at = now
+    else:
+        a.status = "dismissed"
+        a.resolved_at = now
+    await db.commit()
+    return RedirectResponse(url="/admin/emergencies", status_code=303)
 
 
 @router.get("/support", response_class=HTMLResponse)

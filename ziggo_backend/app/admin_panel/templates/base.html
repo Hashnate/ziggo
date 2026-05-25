@@ -282,6 +282,14 @@
                 <i class="fas fa-concierge-bell w-5 text-center"></i>
                 <span class="text-sm">Services</span>
             </a>
+            <a href="/admin/emergencies" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'emergencies' %}active{% endif %}">
+                <i class="fas fa-exclamation-triangle w-5 text-center text-rose-300"></i>
+                <span class="text-sm">Emergencies</span>
+            </a>
+            <a href="/admin/incidents" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'incidents' %}active{% endif %}">
+                <i class="fas fa-triangle-exclamation w-5 text-center text-amber-300"></i>
+                <span class="text-sm">Incidents</span>
+            </a>
             <a href="/admin/support" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'support' %}active{% endif %}">
                 <i class="fas fa-life-ring w-5 text-center"></i>
                 <span class="text-sm">Support</span>

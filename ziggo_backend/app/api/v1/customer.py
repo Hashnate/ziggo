@@ -41,6 +41,47 @@ async def update_profile(
     return user
 
 
+# BRD: CD-32 — Account deletion. We soft-delete: PII is scrubbed but the user
+# row stays so historical bookings/payments still have a foreign key target.
+# Phone number is randomized to free it up for future re-registration.
+@router.delete("/me", status_code=200)
+async def delete_my_account(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    import secrets as _secrets
+
+    # Tombstone the phone number so the row is unique-safe even after the user
+    # signs back up with their real number on a new account. Stays under the
+    # phone_number column's 20-char limit.
+    user.phone_number = f"del-{_secrets.token_hex(6)}"  # 4 + 12 = 16 chars
+    user.full_name = None
+    user.email = None
+    user.profile_photo = None
+    user.is_active = False
+
+    # Clear the customer profile's wallet + invalidate notification tokens.
+    cq = await db.execute(select(Customer).where(Customer.user_id == user.id))
+    customer = cq.scalars().first()
+    if customer:
+        customer.notification_token = None
+        # Wallet balance + loyalty points stay on the row for auditing but are
+        # detached from any usable identity above.
+
+    await db.commit()
+    return {
+        "ok": True,
+        "message": (
+            "Your Ziggo account has been deleted. "
+            "Personal data (name, email, photo, phone, push tokens) has been "
+            "erased. Historical trip + payment records are retained for legal "
+            "and accounting compliance (Sri Lanka Inland Revenue requires 6 "
+            "years of transaction history). Wallet balance, if any, was "
+            "forfeit per the Terms of Service."
+        ),
+    }
+
+
 @router.get("/addresses", response_model=List[SavedAddressResponse])
 async def list_addresses(
     db: AsyncSession = Depends(get_db),
