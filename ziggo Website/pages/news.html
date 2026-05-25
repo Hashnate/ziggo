@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>News | Ziggo</title>
+  <meta name="description" content="The latest from Ziggo &mdash; new cities, new services, milestones and updates." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="../assets/css/premium.css?v=20260522-pm138-safetymeta">
+  <style>
+    .pm-page-hero { position:relative; padding:100px 0 70px; overflow:hidden;
+      background: radial-gradient(ellipse 80% 60% at 20% 20%, rgba(96,165,250,.18), transparent 60%),
+                  radial-gradient(ellipse 60% 50% at 85% 80%, rgba(147,197,253,.15), transparent 60%),
+                  linear-gradient(180deg,#FBFCFE 0%,#F5F8FE 100%); }
+    .pm-page-hero::before { content:''; position:absolute; inset:0;
+      background-image: radial-gradient(circle at 1px 1px, rgba(30,58,138,.06) 1px, transparent 0);
+      background-size:28px 28px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 30%, transparent 80%);
+      -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 30%, transparent 80%); }
+    .pm-page-hero-inner { position:relative; z-index:1; max-width:900px; margin:0 auto; padding:0 24px; text-align:center; }
+    .pm-page-hero h1 { font-family:var(--p-font-display); font-size:clamp(2.25rem,5vw,4rem); letter-spacing:-.045em; line-height:1.02; font-weight:700; color:var(--p-brand-dark); margin:18px 0 18px; }
+    .pm-page-hero .pm-lede { font-size:clamp(1rem,1.15vw,1.125rem); max-width:60ch; margin:0 auto; line-height:1.6; color:#475569; }
+
+    .pm-block { padding: clamp(60px,9vw,100px) 0; }
+
+    .news-grid { max-width:1180px; margin:0 auto; padding:0 24px; display:grid; grid-template-columns:repeat(3,1fr); gap:24px; }
+    .news-item { display:block; background:#fff; border:1px solid var(--p-border); border-radius:22px; overflow:hidden; text-decoration:none; color:inherit; transition:transform .4s var(--p-spring), box-shadow .4s var(--p-ease), border-color .3s var(--p-ease); }
+    .news-item:hover { transform:translateY(-6px); box-shadow:0 24px 50px -16px rgba(11,20,38,.18); border-color:rgba(30,58,138,.2); }
+    .news-thumb { aspect-ratio: 16/9; display:flex; align-items:center; justify-content:center; font-size:3.5rem; color:#fff;
+      background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%); }
+    .news-thumb.green  { background: linear-gradient(135deg, #047857 0%, #10B981 100%); }
+    .news-thumb.amber  { background: linear-gradient(135deg, #A16207 0%, #F59E0B 100%); }
+    .news-thumb.purple { background: linear-gradient(135deg, #5B21B6 0%, #A78BFA 100%); }
+    .news-body { padding:22px 24px 26px; }
+    .news-body .meta { display:flex; gap:8px; align-items:center; font-size:.72rem; text-transform:uppercase; letter-spacing:.08em; font-weight:700; color:var(--p-text-muted); margin-bottom:10px; }
+    .news-body h3 { font-family:var(--p-font-display); font-size:1.15rem; font-weight:700; letter-spacing:-.02em; color:var(--p-brand-dark); margin:0 0 8px; line-height:1.25; }
+    .news-body p { color:var(--p-text-light); font-size:.92rem; line-height:1.5; margin:0; }
+
+    @media (max-width:1080px) { .news-grid { grid-template-columns:repeat(2,1fr); } }
+    @media (max-width:600px)  { .news-grid { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body class="pm">
+
+<nav class="pm-topbar" id="pmTopbar">
+  <div class="pm-topbar-inner">
+    <a href="../index.html" class="pm-nav-logo"><img src="../assets/images/logo/logo-dark.png" alt="Ziggo"></a>
+    <ul class="pm-nav-links">
+      <li class="pm-nav-has-dropdown">
+        <a href="#" class="pm-nav-link">Services <i class="fa-solid fa-chevron-down"></i></a>
+        <div class="pm-nav-dropdown">
+          <a href="services/ride.html" class="color-ride"><span class="ico ico-img"><img src="../assets/images/services/ride.png?v=pm108-realstudio" alt=""></span><div><strong>Ride</strong><small>Tuk, Mini, City, Flex, Lux</small></div></a>
+          <a href="services/food.html" class="color-food"><span class="ico ico-img"><img src="../assets/images/services/food.png?v=20260520123" alt=""></span><div><strong>Food</strong><small>10,000+ restaurants</small></div></a>
+          <a href="services/flash.html" class="color-flash"><span class="ico ico-img"><img src="../assets/images/services/flash.png?v=20260520123" alt=""></span><div><strong>Flash</strong><small>Same-day parcel delivery</small></div></a>
+          <a href="services/truck.html" class="color-truck"><span class="ico ico-img"><img src="../assets/images/services/truck.png?v=20260520123" alt=""></span><div><strong>Truck</strong><small>Moving &amp; cargo, with helpers</small></div></a>
+          <a href="services/mart.html" class="color-mart">
+            <span class="ico ico-img"><img src="../assets/images/services/mart.png?v=pm115-cleanbag" alt=""></span>
+            <div><strong>Mart</strong><small>Groceries in 30 minutes</small></div>
+          </a>
+          <a href="signup.html" class="pm-mega-footer"><div class="text"><strong>Ziggo Pass</strong><small>Unlimited free delivery for Rs. 549/mo</small></div><span class="cta">Try free <i class="fa-solid fa-arrow-right"></i></span></a>
+        </div>
+      </li>
+      <li class="pm-nav-has-dropdown">
+        <a href="#" class="pm-nav-link">Partner <i class="fa-solid fa-chevron-down"></i></a>
+        <div class="pm-nav-dropdown">
+          <a href="drive.html" class="color-drive"><span class="ico ico-img"><img src="../assets/images/services/ride.png?v=pm108-realstudio" alt=""></span><div><strong>Drive with Ziggo</strong><small>Be your own boss</small></div></a>
+          <a href="partner.html" class="color-merchant"><span class="ico ico-img"><img src="../assets/images/services/food.png?v=20260520123" alt=""></span><div><strong>Merchant partner</strong><small>List your restaurant or store</small></div></a>
+          <a href="business.html" class="color-biz"><span class="ico ico-img"><img src="../assets/images/services/truck.png?v=20260520123" alt=""></span><div><strong>For Business</strong><small>Corporate accounts</small></div></a>
+          <a href="drive.html" class="pm-mega-footer"><div class="text"><strong>Earn up to LKR 60K / week</strong><small>50,000 drivers already on Ziggo</small></div><span class="cta">Apply <i class="fa-solid fa-arrow-right"></i></span></a>
+        </div>
+      </li>
+      <li><a href="careers.html" class="pm-nav-link">Careers</a></li>
+      <li><a href="about.html" class="pm-nav-link">About</a></li>
+    </ul>
+    <div class="pm-nav-cta"><a href="signup.html" class="signup">Get the app</a>
+    </div>
+    <button class="pm-nav-toggle" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
+  </div>
+</nav>
+
+<section class="pm-page-hero">
+  <div class="pm-page-hero-inner" data-reveal>
+    <span class="pm-eyebrow"><span class="dot"></span> News &amp; Updates</span>
+    <h1>The latest from Ziggo</h1>
+    <p class="pm-lede">Milestones, expansion, product updates and stories from the road.</p>
+  </div>
+</section>
+
+<section class="pm-block">
+  <div class="news-grid">
+    <a href="#" class="news-item" data-reveal>
+      <div class="news-thumb"><i class="fa-solid fa-rocket"></i></div>
+      <div class="news-body">
+        <div class="meta"><span>Company news</span><span>&middot;</span><span>May 10, 2026</span></div>
+        <h3>Ziggo crosses 2 million active users</h3>
+        <p>A major milestone as Sri Lanka's #1 super app reaches 2M monthly actives across all services.</p>
+      </div>
+    </a>
+    <a href="#" class="news-item" data-reveal data-reveal-delay="100">
+      <div class="news-thumb green"><i class="fa-solid fa-leaf"></i></div>
+      <div class="news-body">
+        <div class="meta"><span>Sustainability</span><span>&middot;</span><span>Apr 22, 2026</span></div>
+        <h3>Going green: 500 EV rides in our fleet</h3>
+        <p>Ziggo introduces 500 electric vehicles in Colombo as part of our pledge to cut emissions 40% by 2028.</p>
+      </div>
+    </a>
+    <a href="#" class="news-item" data-reveal data-reveal-delay="200">
+      <div class="news-thumb amber"><i class="fa-solid fa-location-dot"></i></div>
+      <div class="news-body">
+        <div class="meta"><span>Expansion</span><span>&middot;</span><span>Mar 30, 2026</span></div>
+        <h3>Now live in Anuradhapura &amp; Polonnaruwa</h3>
+        <p>Ziggo Ride and Ziggo Food go live in two more cities, bringing the network to 25+ cities.</p>
+      </div>
+    </a>
+    <a href="#" class="news-item" data-reveal>
+      <div class="news-thumb purple"><i class="fa-solid fa-utensils"></i></div>
+      <div class="news-body">
+        <div class="meta"><span>Product</span><span>&middot;</span><span>Mar 12, 2026</span></div>
+        <h3>Ziggo Food now supports group ordering</h3>
+        <p>Order with your friends or colleagues, split the bill automatically in the app.</p>
+      </div>
+    </a>
+    <a href="#" class="news-item" data-reveal data-reveal-delay="100">
+      <div class="news-thumb green"><i class="fa-solid fa-shield-halved"></i></div>
+      <div class="news-body">
+        <div class="meta"><span>Safety</span><span>&middot;</span><span>Feb 28, 2026</span></div>
+        <h3>New AI-powered safety features for riders</h3>
+        <p>Anomaly detection on routes, automated check-ins for late-night trips, and more.</p>
+      </div>
+    </a>
+    <a href="#" class="news-item" data-reveal data-reveal-delay="200">
+      <div class="news-thumb amber"><i class="fa-solid fa-handshake"></i></div>
+      <div class="news-body">
+        <div class="meta"><span>Partnership</span><span>&middot;</span><span>Feb 14, 2026</span></div>
+        <h3>Ziggo partners with Cargills for Mart expansion</h3>
+        <p>200+ Cargills Food City stores now live on Ziggo Mart for 30-min grocery delivery.</p>
+      </div>
+    </a>
+  </div>
+</section>
+
+<footer class="pm-footer">
+  <div class="pm-footer-top">
+    <div class="pm-footer-brand">
+      <a href="../index.html" class="pm-nav-logo pm-footer-logo"><img src="../assets/images/logo/logo-light.png" alt="Ziggo"></a>
+      <p>Sri Lanka's super app for rides, food, parcels and more &mdash; all in one place.</p>
+      <div class="socials">
+        <a href="#" aria-label="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
+        <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
+        <a href="#" aria-label="X"><i class="fa-brands fa-x-twitter"></i></a>
+        <a href="#" aria-label="LinkedIn"><i class="fa-brands fa-linkedin-in"></i></a>
+        <a href="#" aria-label="YouTube"><i class="fa-brands fa-youtube"></i></a>
+      </div>
+    </div>
+    <div class="pm-footer-col"><h5>Services</h5><ul><li><a href="services/ride.html">Ride</a></li><li><a href="services/food.html">Food</a></li><li><a href="services/flash.html">Flash</a></li><li><a href="services/truck.html">Truck</a></li><li><a href="services/mart.html">Mart</a></li></ul></div>
+    <div class="pm-footer-col"><h5>Partner</h5><ul><li><a href="drive.html">Drive with Ziggo</a></li><li><a href="partner.html">Merchant partner</a></li><li><a href="business.html">For Business</a></li><li><a href="signup.html">Ziggo Pass</a></li></ul></div>
+    <div class="pm-footer-col"><h5>Company</h5><ul><li><a href="about.html">About</a></li><li><a href="news.html">News</a></li><li><a href="careers.html">Careers</a></li><li><a href="contact.html">Contact</a></li></ul></div>
+    <ul><li><a href="help.html">Help Center</a></li><li><a href="help.html#safety">Safety</a></li><li><a href="privacy.html">Privacy</a></li><li><a href="terms.html">Terms</a></li></ul></div>
+  </div>
+  <div class="pm-footer-bottom">
+    <span>&copy; 2026 Ziggo.lk</span>
+    <div><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="contact.html">Contact</a></div>
+  </div>
+</footer>
+
+<div class="pm-fab-stack">
+  <a href="#" class="pm-fab fab-back-to-top" aria-label="Back to top"><i class="fa-solid fa-arrow-up"></i></a>
+  <a href="help.html" class="pm-fab help" aria-label="Help"><i class="fa-solid fa-question"></i></a>
+</div>
+
+<script>
+(function() {
+  window.pmFallback = function(img, fallback) { if (img && img.src !== fallback) img.src = fallback; };
+  const reveals = document.querySelectorAll('[data-reveal]');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { const d = e.target.dataset.revealDelay || 0; setTimeout(() => e.target.classList.add('revealed'), d); observer.unobserve(e.target); } });
+  }, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
+  reveals.forEach(el => observer.observe(el));
+
+  const topbar = document.getElementById('pmTopbar');
+  if (topbar) { const onScroll = () => topbar.classList.toggle('scrolled', window.scrollY > 12); window.addEventListener('scroll', onScroll, { passive: true }); onScroll(); }
+  const backToTop = document.querySelector('.fab-back-to-top');
+  if (backToTop) backToTop.addEventListener('click', (e) => { e.preventDefault(); window.scrollTo({ top:0, behavior:'smooth' }); });
+  const navToggle = document.querySelector('.pm-nav-toggle');
+  const navLinks = document.querySelector('.pm-nav-links');
+  if (navToggle && navLinks) navToggle.addEventListener('click', () => { navLinks.classList.toggle('open'); navToggle.classList.toggle('open'); });
+})();
+</script>
+</body>
+</html>

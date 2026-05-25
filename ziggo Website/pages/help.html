@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Help Center | Ziggo</title>
+  <meta name="description" content="Find answers to common questions, safety information, and ways to contact Ziggo support." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="../assets/css/premium.css?v=20260522-pm138-safetymeta">
+  <style>
+    .pm-page-hero { position:relative; padding:100px 0 70px; overflow:hidden;
+      background: radial-gradient(ellipse 80% 60% at 20% 20%, rgba(96,165,250,.18), transparent 60%),
+                  radial-gradient(ellipse 60% 50% at 85% 80%, rgba(147,197,253,.15), transparent 60%),
+                  linear-gradient(180deg,#FBFCFE 0%,#F5F8FE 100%); }
+    .pm-page-hero::before { content:''; position:absolute; inset:0;
+      background-image: radial-gradient(circle at 1px 1px, rgba(30,58,138,.06) 1px, transparent 0);
+      background-size:28px 28px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 30%, transparent 80%);
+      -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 30%, transparent 80%); }
+    .pm-page-hero-inner { position:relative; z-index:1; max-width:900px; margin:0 auto; padding:0 24px; text-align:center; }
+    .pm-page-hero h1 { font-family:var(--p-font-display); font-size:clamp(2.25rem,5vw,4rem); letter-spacing:-.045em; line-height:1.02; font-weight:700; color:var(--p-brand-dark); margin:18px 0 18px; }
+    .pm-page-hero .pm-lede { font-size:clamp(1rem,1.15vw,1.125rem); max-width:60ch; margin:0 auto; line-height:1.6; color:#475569; }
+
+    .pm-block { padding: clamp(60px,9vw,100px) 0; }
+    .pm-block.alt { background: linear-gradient(180deg,#FBFCFE 0%,#F8FAFE 100%); border-top:1px solid var(--p-border); border-bottom:1px solid var(--p-border); }
+    .pm-block-head { text-align:center; max-width:720px; margin:0 auto 48px; padding:0 24px; }
+    .pm-block-head .pm-eyebrow { margin-bottom:16px; }
+    .pm-block-head h2 { font-family:var(--p-font-display); font-size:clamp(2rem,4vw,3rem); font-weight:700; letter-spacing:-.035em; line-height:1.06; color:var(--p-brand-dark); margin-bottom:12px; }
+
+    .topic-grid { max-width:1180px; margin:0 auto; padding:0 24px; display:grid; grid-template-columns:repeat(4,1fr); gap:18px; }
+    .topic-card { display:block; text-decoration:none; background:#fff; border:1px solid var(--p-border); border-radius:20px; padding:24px; transition:transform .4s var(--p-spring), box-shadow .4s var(--p-ease), border-color .3s var(--p-ease); color:inherit; }
+    .topic-card:hover { transform:translateY(-6px); box-shadow:0 24px 50px -16px rgba(11,20,38,.18); border-color:rgba(30,58,138,.2); }
+    .topic-card .icon { width:48px; height:48px; border-radius:13px; background:linear-gradient(160deg,#F5F9FF 0%,#DBEAFE 100%); color:var(--p-brand); display:flex; align-items:center; justify-content:center; font-size:1.1rem; margin-bottom:14px; box-shadow:inset 0 0 0 1px rgba(30,58,138,.08); }
+    .topic-card h3 { font-family:var(--p-font-display); font-size:1.1rem; font-weight:700; color:var(--p-brand-dark); margin:0 0 6px; letter-spacing:-.02em; }
+    .topic-card p { color:var(--p-text-light); font-size:.9rem; line-height:1.5; margin:0; }
+
+    .faq-wrap { max-width:880px; margin:0 auto; padding:0 24px; }
+    .faq-item { background:#fff; border:1px solid var(--p-border); border-radius:18px; margin-bottom:12px; overflow:hidden; transition:border-color .3s var(--p-ease); }
+    .faq-item:hover { border-color:rgba(30,58,138,.25); }
+    .faq-q { padding:18px 22px; display:flex; align-items:center; justify-content:space-between; gap:16px; cursor:pointer; font-family:var(--p-font-display); font-size:1rem; font-weight:600; color:var(--p-brand-dark); }
+    .faq-q i { color:var(--p-brand); transition:transform .3s var(--p-ease); }
+    .faq-item.open .faq-q i { transform:rotate(45deg); }
+    .faq-a { padding:0 22px; max-height:0; overflow:hidden; transition:max-height .35s var(--p-ease), padding .3s var(--p-ease); }
+    .faq-item.open .faq-a { padding:0 22px 18px; max-height:240px; }
+    .faq-a p { color:var(--p-text-light); font-size:.92rem; line-height:1.55; margin:0; }
+
+    .help-cta-banner { max-width:1180px; margin:0 auto; padding:0 24px; }
+    .help-cta-inner { background:linear-gradient(135deg,#1E3A8A 0%,#2563EB 100%); color:#fff; border-radius:28px; padding:48px; display:grid; grid-template-columns:1fr auto; gap:24px; align-items:center; box-shadow:0 32px 70px -20px rgba(11,20,38,.30); }
+    .help-cta-inner h2 { font-family:var(--p-font-display); font-size:clamp(1.5rem,2.5vw,2.2rem); font-weight:700; letter-spacing:-.03em; color:#fff; margin:0 0 10px; }
+    .help-cta-inner p { color:rgba(255,255,255,.85); margin:0 0 18px; font-size:1.0625rem; }
+    .help-cta-inner .row { display:flex; gap:12px; flex-wrap:wrap; }
+    .help-cta-inner .pm-btn-ghost { background:rgba(255,255,255,.12); color:#fff; border-color:rgba(255,255,255,.3); }
+    .help-cta-inner .pm-btn-ghost:hover { background:rgba(255,255,255,.2); }
+    .help-cta-visual { font-size:5rem; color:rgba(255,255,255,.45); }
+
+    @media (max-width:1080px) { .topic-grid { grid-template-columns:repeat(2,1fr); } .help-cta-inner { grid-template-columns:1fr; padding:36px; } .help-cta-visual { display:none; } }
+    @media (max-width:600px)  { .topic-grid { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body class="pm">
+
+<nav class="pm-topbar" id="pmTopbar">
+  <div class="pm-topbar-inner">
+    <a href="../index.html" class="pm-nav-logo"><img src="../assets/images/logo/logo-dark.png" alt="Ziggo"></a>
+    <ul class="pm-nav-links">
+      <li class="pm-nav-has-dropdown">
+        <a href="#" class="pm-nav-link">Services <i class="fa-solid fa-chevron-down"></i></a>
+        <div class="pm-nav-dropdown">
+          <a href="services/ride.html" class="color-ride"><span class="ico ico-img"><img src="../assets/images/services/ride.png?v=pm108-realstudio" alt=""></span><div><strong>Ride</strong><small>Tuk, Mini, City, Flex, Lux</small></div></a>
+          <a href="services/food.html" class="color-food"><span class="ico ico-img"><img src="../assets/images/services/food.png?v=20260520123" alt=""></span><div><strong>Food</strong><small>10,000+ restaurants</small></div></a>
+          <a href="services/flash.html" class="color-flash"><span class="ico ico-img"><img src="../assets/images/services/flash.png?v=20260520123" alt=""></span><div><strong>Flash</strong><small>Same-day parcel delivery</small></div></a>
+          <a href="services/truck.html" class="color-truck"><span class="ico ico-img"><img src="../assets/images/services/truck.png?v=20260520123" alt=""></span><div><strong>Truck</strong><small>Moving &amp; cargo, with helpers</small></div></a>
+          <a href="services/mart.html" class="color-mart">
+            <span class="ico ico-img"><img src="../assets/images/services/mart.png?v=pm115-cleanbag" alt=""></span>
+            <div><strong>Mart</strong><small>Groceries in 30 minutes</small></div>
+          </a>
+          <a href="signup.html" class="pm-mega-footer"><div class="text"><strong>Ziggo Pass</strong><small>Unlimited free delivery for Rs. 549/mo</small></div><span class="cta">Try free <i class="fa-solid fa-arrow-right"></i></span></a>
+        </div>
+      </li>
+      <li class="pm-nav-has-dropdown">
+        <a href="#" class="pm-nav-link">Partner <i class="fa-solid fa-chevron-down"></i></a>
+        <div class="pm-nav-dropdown">
+          <a href="drive.html" class="color-drive"><span class="ico ico-img"><img src="../assets/images/services/ride.png?v=pm108-realstudio" alt=""></span><div><strong>Drive with Ziggo</strong><small>Be your own boss</small></div></a>
+          <a href="partner.html" class="color-merchant"><span class="ico ico-img"><img src="../assets/images/services/food.png?v=20260520123" alt=""></span><div><strong>Merchant partner</strong><small>List your restaurant or store</small></div></a>
+          <a href="business.html" class="color-biz"><span class="ico ico-img"><img src="../assets/images/services/truck.png?v=20260520123" alt=""></span><div><strong>For Business</strong><small>Corporate accounts</small></div></a>
+          <a href="drive.html" class="pm-mega-footer"><div class="text"><strong>Earn up to LKR 60K / week</strong><small>50,000 drivers already on Ziggo</small></div><span class="cta">Apply <i class="fa-solid fa-arrow-right"></i></span></a>
+        </div>
+      </li>
+      <li><a href="careers.html" class="pm-nav-link">Careers</a></li>
+      <li><a href="about.html" class="pm-nav-link">About</a></li>
+    </ul>
+    <div class="pm-nav-cta"><a href="signup.html" class="signup">Get the app</a>
+    </div>
+    <button class="pm-nav-toggle" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
+  </div>
+</nav>
+
+<section class="pm-page-hero">
+  <div class="pm-page-hero-inner" data-reveal>
+    <span class="pm-eyebrow"><span class="dot"></span> Help Center</span>
+    <h1>How can we help you?</h1>
+    <p class="pm-lede">Browse common topics or get in touch with our team &mdash; we're here 24/7.</p>
+  </div>
+</section>
+
+<section class="pm-block">
+  <div class="pm-block-head" data-reveal>
+    <span class="pm-eyebrow"><span class="dot"></span> Topics</span>
+    <h2>Browse by category</h2>
+  </div>
+  <div class="topic-grid">
+    <a href="#riders" class="topic-card" data-reveal><div class="icon"><i class="fa-solid fa-user"></i></div><h3>For riders</h3><p>Bookings, payments, account, safety, lost items.</p></a>
+    <a href="#drivers" class="topic-card" data-reveal data-reveal-delay="100"><div class="icon"><i class="fa-solid fa-car"></i></div><h3>For drivers</h3><p>Earnings, payouts, app issues, vehicle docs.</p></a>
+    <a href="#partners" class="topic-card" data-reveal data-reveal-delay="200"><div class="icon"><i class="fa-solid fa-store"></i></div><h3>For partners</h3><p>Onboarding, menus, orders, payouts.</p></a>
+    <a href="#safety" class="topic-card" data-reveal data-reveal-delay="300"><div class="icon"><i class="fa-solid fa-shield-halved"></i></div><h3>Safety</h3><p>SOS, verification, trip sharing, incident reports.</p></a>
+  </div>
+</section>
+
+<section class="pm-block alt" id="riders">
+  <div class="pm-block-head" data-reveal>
+    <span class="pm-eyebrow"><span class="dot"></span> FAQs</span>
+    <h2>Common questions</h2>
+  </div>
+  <div class="faq-wrap" data-reveal>
+    <div class="faq-item"><div class="faq-q">How do I book a ride? <i class="fa-solid fa-plus"></i></div><div class="faq-a"><p>Open Ziggo, set your pickup and destination, choose a vehicle type, confirm. A nearby driver will accept and you can watch them arrive in real time.</p></div></div>
+    <div class="faq-item"><div class="faq-q">How do I cancel a booking? <i class="fa-solid fa-plus"></i></div><div class="faq-a"><p>Open the active trip and tap "Cancel". Free if cancelled within 3 minutes of booking, or up to 5 minutes before driver arrival. A small fee may apply after.</p></div></div>
+    <div class="faq-item"><div class="faq-q">What payment methods do you accept? <i class="fa-solid fa-plus"></i></div><div class="faq-a"><p>Cash, credit/debit card, mobile wallets (eZ Cash, Genie, FriMi), and your in-app Ziggo Pay balance.</p></div></div>
+    <div class="faq-item" id="safety"><div class="faq-q">What if I feel unsafe during a trip? <i class="fa-solid fa-plus"></i></div><div class="faq-a"><p>Tap the SOS button in the trip screen. It alerts your emergency contacts and our 24/7 safety team simultaneously, sharing your live location.</p></div></div>
+    <div class="faq-item"><div class="faq-q">How do I report a lost item? <i class="fa-solid fa-plus"></i></div><div class="faq-a"><p>Open the app &rarr; "Your trips" &rarr; select the trip &rarr; "Find lost item". You'll be connected with the driver immediately.</p></div></div>
+    <div class="faq-item"><div class="faq-q">How do refunds work? <i class="fa-solid fa-plus"></i></div><div class="faq-a"><p>Refund requests go via "Help" in the relevant order. Most refunds are processed within 24 hours to your Ziggo Pay wallet or original payment method.</p></div></div>
+  </div>
+</section>
+
+<section class="pm-block">
+  <div class="help-cta-banner" data-reveal>
+    <div class="help-cta-inner">
+      <div>
+        <h2>Still need help? We're here 24/7.</h2>
+        <p>Call us, chat with us in the app, or send a message. We respond within minutes.</p>
+        <div class="row">
+          <a href="tel:+941177700700" class="pm-btn pm-btn-primary pm-btn-lg" style="background:#fff;color:var(--p-brand-dark);"><i class="fa-solid fa-phone"></i> +94 117 770 0700</a>
+          <a href="contact.html" class="pm-btn pm-btn-ghost pm-btn-lg">Send a message</a>
+        </div>
+      </div>
+      <div class="help-cta-visual"><i class="fa-solid fa-headset"></i></div>
+    </div>
+  </div>
+</section>
+
+<footer class="pm-footer">
+  <div class="pm-footer-top">
+    <div class="pm-footer-brand">
+      <a href="../index.html" class="pm-nav-logo pm-footer-logo"><img src="../assets/images/logo/logo-light.png" alt="Ziggo"></a>
+      <p>Sri Lanka's super app for rides, food, parcels and more &mdash; all in one place.</p>
+      <div class="socials">
+        <a href="#" aria-label="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
+        <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
+        <a href="#" aria-label="X"><i class="fa-brands fa-x-twitter"></i></a>
+        <a href="#" aria-label="LinkedIn"><i class="fa-brands fa-linkedin-in"></i></a>
+        <a href="#" aria-label="YouTube"><i class="fa-brands fa-youtube"></i></a>
+      </div>
+    </div>
+    <div class="pm-footer-col"><h5>Services</h5><ul><li><a href="services/ride.html">Ride</a></li><li><a href="services/food.html">Food</a></li><li><a href="services/flash.html">Flash</a></li><li><a href="services/truck.html">Truck</a></li><li><a href="services/mart.html">Mart</a></li></ul></div>
+    <div class="pm-footer-col"><h5>Partner</h5><ul><li><a href="drive.html">Drive with Ziggo</a></li><li><a href="partner.html">Merchant partner</a></li><li><a href="business.html">For Business</a></li><li><a href="signup.html">Ziggo Pass</a></li></ul></div>
+    <div class="pm-footer-col"><h5>Company</h5><ul><li><a href="about.html">About</a></li><li><a href="news.html">News</a></li><li><a href="careers.html">Careers</a></li><li><a href="contact.html">Contact</a></li></ul></div>
+    <div class="pm-footer-col"><h5>Support</h5><ul><li><a href="help.html">Help Center</a></li><li><a href="help.html#safety">Safety</a></li><li><a href="privacy.html">Privacy</a></li><li><a href="terms.html">Terms</a></li></ul></div>
+  </div>
+  <div class="pm-footer-bottom">
+    <span>&copy; 2026 Ziggo.lk</span>
+    <div><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="contact.html">Contact</a></div>
+  </div>
+</footer>
+
+<div class="pm-fab-stack">
+  <a href="#" class="pm-fab fab-back-to-top" aria-label="Back to top"><i class="fa-solid fa-arrow-up"></i></a>
+  <a href="help.html" class="pm-fab help" aria-label="Help"><i class="fa-solid fa-question"></i></a>
+</div>
+
+<script>
+(function() {
+  window.pmFallback = function(img, fallback) { if (img && img.src !== fallback) img.src = fallback; };
+  const reveals = document.querySelectorAll('[data-reveal]');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { const d = e.target.dataset.revealDelay || 0; setTimeout(() => e.target.classList.add('revealed'), d); observer.unobserve(e.target); } });
+  }, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
+  reveals.forEach(el => observer.observe(el));
+
+  const topbar = document.getElementById('pmTopbar');
+  if (topbar) { const onScroll = () => topbar.classList.toggle('scrolled', window.scrollY > 12); window.addEventListener('scroll', onScroll, { passive: true }); onScroll(); }
+  const backToTop = document.querySelector('.fab-back-to-top');
+  if (backToTop) backToTop.addEventListener('click', (e) => { e.preventDefault(); window.scrollTo({ top:0, behavior:'smooth' }); });
+  const navToggle = document.querySelector('.pm-nav-toggle');
+  const navLinks = document.querySelector('.pm-nav-links');
+  if (navToggle && navLinks) navToggle.addEventListener('click', () => { navLinks.classList.toggle('open'); navToggle.classList.toggle('open'); });
+
+  document.querySelectorAll('.faq-item').forEach(item => {
+    item.querySelector('.faq-q').addEventListener('click', () => item.classList.toggle('open'));
+  });
+})();
+</script>
+</body>
+</html>
