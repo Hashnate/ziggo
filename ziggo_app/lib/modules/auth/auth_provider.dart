@@ -97,14 +97,35 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // BRD: CD-34 — profile completeness {percent, completed[], missing[]}
+  Map<String, dynamic>? _completeness;
+  Map<String, dynamic>? get completeness => _completeness;
+
   Future<void> _refreshMe() async {
     try {
       final resp = await ApiClient.instance.dio.get('/auth/me');
       _fullName = resp.data['full_name'] as String?;
       _email = resp.data['email'] as String?;
       _phoneNumber = resp.data['phone_number'] as String?;
+      _completeness = resp.data['profile_completeness'] is Map
+          ? Map<String, dynamic>.from(resp.data['profile_completeness'] as Map)
+          : null;
       notifyListeners();
     } catch (_) {}
+  }
+
+  /// BRD: CD-32 — Delete the current account. Returns the human-readable
+  /// erasure-notice text from the server, which the UI should show before
+  /// signing the user out.
+  Future<String?> deleteAccount() async {
+    try {
+      final r = await ApiClient.instance.dio.delete('/customer/me');
+      final msg = (r.data is Map) ? (r.data['message']?.toString()) : null;
+      await logout();
+      return msg ?? 'Account deleted.';
+    } on DioException catch (e) {
+      return null;
+    }
   }
 
   Future<void> updateProfile({String? fullName, String? email}) async {

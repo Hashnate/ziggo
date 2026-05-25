@@ -146,6 +146,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _walletStrip(balance: wallet.balance, currency: wallet.currency),
           const SizedBox(height: 10),
           _loyaltyStrip(points: promos.points, value: promos.pointsValue),
+          // BRD: CD-34 — profile completeness ring (only shown when there's
+          // still work to do).
+          if (auth.completeness != null &&
+              ((auth.completeness!['percent'] as num?)?.toInt() ?? 100) < 100) ...[
+            const SizedBox(height: 10),
+            _completenessStrip(auth.completeness!),
+          ],
           const SizedBox(height: 22),
           _sectionLabel('ACCOUNT'),
           const SizedBox(height: 10),
@@ -235,6 +242,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 14),
           _logoutButton(),
+          const SizedBox(height: 10),
+          // BRD: CD-32 — account deletion entry point
+          _deleteAccountButton(),
           const SizedBox(height: 24),
           const Center(
             child: Text(
@@ -597,6 +607,156 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
+  }
+
+  /// BRD: CD-34 — strip that nudges the user to finish their profile.
+  Widget _completenessStrip(Map<String, dynamic> c) {
+    final percent = ((c['percent'] as num?)?.toInt() ?? 0).clamp(0, 100);
+    final missing = (c['missing'] as List?)?.cast<String>() ?? const <String>[];
+    final friendly = {
+      'full_name': 'Add your name',
+      'email': 'Add an email',
+      'profile_photo': 'Upload a photo',
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.cardBorder),
+        boxShadow: AppStyles.shadowSm,
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: 48, height: 48,
+                  child: CircularProgressIndicator(
+                    value: percent / 100,
+                    strokeWidth: 5,
+                    backgroundColor: AppColors.surfaceMuted,
+                    valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  ),
+                ),
+                Text('$percent%',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 11,
+                      color: AppColors.textPrimary,
+                    )),
+              ],
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('PROFILE COMPLETENESS',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textTertiary,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.2,
+                    )),
+                const SizedBox(height: 2),
+                Text(
+                  missing.isEmpty
+                      ? 'Your profile looks great.'
+                      : missing.map((k) => friendly[k] ?? k).join(' · '),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// BRD: CD-32 — opens the data-erasure confirmation flow.
+  Widget _deleteAccountButton() {
+    return GestureDetector(
+      onTap: _confirmDeleteAccount,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.cardBorder),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.no_accounts_rounded,
+                color: AppColors.error, size: 16),
+            SizedBox(width: 8),
+            Text('Delete my account',
+                style: TextStyle(
+                  color: AppColors.error,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 13,
+                  letterSpacing: 0.4,
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteAccount() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete your Ziggo account?'),
+        content: const Text(
+          'This will permanently remove your personal data (name, email, '
+          'photo, phone, push tokens). Past trip and payment records are '
+          'retained for Sri Lanka Inland Revenue compliance (6 years). '
+          'Any wallet balance is forfeit per Terms of Service. '
+          '\n\nThis cannot be undone.',
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Delete account'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final msg = await context.read<AuthProvider>().deleteAccount();
+    if (!mounted) return;
+    if (msg != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not delete account — please try again.'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Widget _logoutButton() {

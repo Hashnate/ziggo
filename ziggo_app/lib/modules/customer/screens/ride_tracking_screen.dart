@@ -286,6 +286,45 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 10),
+                  // BRD: CD-17 + CD-31 — Share trip with contacts
+                  GestureDetector(
+                    onTap: _shareTrip,
+                    child: GlassCard(
+                      padding: const EdgeInsets.all(10),
+                      radius: 14,
+                      blur: 18,
+                      tint: Colors.white.withOpacity(0.55),
+                      child: const Icon(Icons.share_location_rounded,
+                          color: AppColors.textPrimary, size: 22),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  // BRD: CD-17 — SOS panic button
+                  GestureDetector(
+                    onTap: _triggerSos,
+                    child: GlassCard(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      radius: 14,
+                      blur: 18,
+                      tint: AppColors.error.withOpacity(0.85),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.emergency_rounded,
+                              color: Colors.white, size: 18),
+                          SizedBox(width: 6),
+                          Text('SOS',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 13,
+                                letterSpacing: 1.2,
+                              )),
+                        ],
+                      ),
+                    ),
+                  ),
                   const Spacer(),
                   GlassCard(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -584,6 +623,146 @@ class _DriverCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // BRD: CD-17 — panic button. Confirms first (false-tap protection), then
+  // POSTs and surfaces a clear acknowledgement so the rider knows help is on
+  // the way. Backend pushes the alert to every admin socket.
+  Future<void> _triggerSos() async {
+    final booking = context.read<BookingProvider>().activeBooking;
+    if (booking == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.emergency_rounded, color: AppColors.error),
+            SizedBox(width: 8),
+            Text('Send SOS?'),
+          ],
+        ),
+        content: const Text(
+          'This alerts Ziggo Safety with your current trip and location. '
+          'If you\'re in immediate danger, call 119 (Sri Lanka Police) right now.',
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Send SOS'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final bookingId = booking['id'] as int;
+    final pickup = LatLng(
+      (booking['pickup_lat'] as num).toDouble(),
+      (booking['pickup_lng'] as num).toDouble(),
+    );
+    final sent = await context.read<BookingProvider>().triggerSos(
+          bookingId,
+          lat: pickup.latitude,
+          lng: pickup.longitude,
+        );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: sent ? AppColors.success : AppColors.error,
+        content: Text(sent
+            ? 'SOS sent — Ziggo Safety has been notified.'
+            : 'Could not send SOS. Please try again or call 119.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  // BRD: CD-31 — share trip URL via SMS or WhatsApp deep link.
+  Future<void> _shareTrip() async {
+    final booking = context.read<BookingProvider>().activeBooking;
+    if (booking == null) return;
+    final bookingId = booking['id'] as int;
+    final res = await context.read<BookingProvider>().getShareLink(bookingId);
+    if (!mounted || res == null) return;
+    final smsBody = res['sms_body']?.toString() ?? '';
+    final waUrl = res['wa_url']?.toString() ?? '';
+    final shareUrl = res['share_url']?.toString() ?? '';
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Share trip with a contact',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+              const SizedBox(height: 4),
+              const Text(
+                'Your contact will see your live trip on a public web page (no login).',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  width: 40, height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF25D366),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.chat, color: Colors.white),
+                ),
+                title: const Text('WhatsApp', style: TextStyle(fontWeight: FontWeight.w900)),
+                subtitle: const Text('Open WhatsApp share sheet'),
+                onTap: () async {
+                  await launchUrl(Uri.parse(waUrl), mode: LaunchMode.externalApplication);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  width: 40, height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.sms, color: Colors.black),
+                ),
+                title: const Text('SMS', style: TextStyle(fontWeight: FontWeight.w900)),
+                subtitle: const Text('Open Messages with the link pre-filled'),
+                onTap: () async {
+                  await launchUrl(Uri.parse('sms:?body=${Uri.encodeComponent(smsBody)}'));
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+              ),
+              const Divider(height: 24),
+              SelectableText(
+                shareUrl,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

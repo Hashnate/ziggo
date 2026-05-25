@@ -265,6 +265,37 @@ class BookingProvider extends ChangeNotifier {
     }
   }
 
+  // ---- BRD: CD-17 — SOS panic button ----------------------------------
+  Future<bool> triggerSos(int bookingId, {double? lat, double? lng, String? note}) async {
+    try {
+      await ApiClient.instance.dio.post(
+        '/bookings/$bookingId/sos',
+        data: {
+          if (lat != null) 'lat': lat,
+          if (lng != null) 'lng': lng,
+          if (note != null && note.isNotEmpty) 'note': note,
+        },
+      );
+      return true;
+    } on DioException catch (e) {
+      _lastError = e.response?.data?['detail']?.toString() ?? e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ---- BRD: CD-17 + CD-31 — trip-share link --------------------------
+  Future<Map<String, dynamic>?> getShareLink(int bookingId) async {
+    try {
+      final r = await ApiClient.instance.dio.post('/bookings/$bookingId/share');
+      return Map<String, dynamic>.from(r.data as Map);
+    } on DioException catch (e) {
+      _lastError = e.response?.data?['detail']?.toString() ?? e.message;
+      notifyListeners();
+      return null;
+    }
+  }
+
   // ---- BRD: CD-19 — driver-side stop transitions -----------------------
   Future<Map<String, dynamic>?> arriveAtStop(int bookingId, int orderIndex) async {
     try {
