@@ -325,33 +325,41 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                       ),
                     ),
                   ),
-                  const Spacer(),
-                  GlassCard(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    radius: 100,
-                    blur: 18,
-                    tint: Colors.white.withOpacity(0.6),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: meta.color,
-                            shape: BoxShape.circle,
+                  const SizedBox(width: 10),
+                  // Status pill — `Flexible` lets it shrink + ellipsize so we
+                  // never overflow on narrow screens once SOS/Share take space.
+                  Flexible(
+                    child: GlassCard(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      radius: 100,
+                      blur: 18,
+                      tint: Colors.white.withOpacity(0.6),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: meta.color,
+                              shape: BoxShape.circle,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          meta.label.toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.2,
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              meta.label.toUpperCase(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -628,13 +636,17 @@ class _DriverCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(22),
       child: Stack(
         children: [
-          // Base gradient
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF0B1437), Color(0xFF1E40AF)],
+          // Base gradient — Positioned.fill so the navy actually covers the
+          // whole card (without this, the unsized Container collapses and the
+          // shimmer overlay hides the driver text against the parent's white).
+          const Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF0B1437), Color(0xFF1E40AF)],
+                ),
               ),
             ),
           ),
@@ -648,12 +660,12 @@ class _DriverCard extends StatelessWidget {
               count: 2,
             ),
           ),
-          // Shimmer sweep
+          // Shimmer sweep — keep it short so it doesn't blanket the text area
           const Positioned(
             top: 0,
             left: 0,
             right: 0,
-            child: ShimmerHighlight(height: 120),
+            child: ShimmerHighlight(height: 40),
           ),
           // Content
           Padding(
@@ -690,7 +702,11 @@ class _DriverCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        d['full_name']?.toString() ?? 'Driver',
+                        (d['full_name']?.toString().trim().isNotEmpty ?? false)
+                            ? d['full_name'].toString()
+                            : 'Driver',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w900,
@@ -734,14 +750,24 @@ class _DriverCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        '${d['vehicle_model'] ?? ''} • ${d['vehicle_number'] ?? ''}',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.72),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      Builder(builder: (_) {
+                        final model = (d['vehicle_model'] ?? '').toString().trim();
+                        final plate = (d['vehicle_number'] ?? '').toString().trim();
+                        final parts = [
+                          if (model.isNotEmpty) model,
+                          if (plate.isNotEmpty) plate,
+                        ];
+                        return Text(
+                          parts.isEmpty ? 'Vehicle details unavailable' : parts.join(' • '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.72),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        );
+                      }),
                     ],
                   ),
                 ),
