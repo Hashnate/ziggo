@@ -1,0 +1,282 @@
+Ziggo
+Business Requirements Document
+Ziggo Platform – On-Demand Mobility & Super-App
+Document Title | Ziggo Platform - Business Requirements Document
+Version | 3.1
+Date | 2026-05-16
+Prepared by | Hashnate
+Status | Updated - Ziggo Feature Catalogue Integrated
+---
+1. Introduction
+1.1 Purpose
+This document outlines the business requirements for the Ziggo platform. It details the features and functionalities of the system, capturing the user roles and behaviour to guide development and ensure the app meets all necessary requirements.
+Version 3.1 realigns the BRD to mirror the PickMe feature set. All features are retained; features that were Ziggo-specific have been simplified to match the equivalent PickMe level of complexity (e.g. basic ride variants, simple rental booking, basic parcel delivery, a single truck option, simple promo codes, and a basic loyalty point system without tiers).
+1.2 Background
+Ziggo is an on-demand mobility platform designed to connect riders and drivers in a seamless experience. Unlike the model with separate apps for customers and drivers, Ziggo will have a single app for both parties, allowing users to switch roles through a button within the app.
+Beyond ride-hailing, Ziggo operates as a multi-service app: parcel delivery (same-day Flash), food and grocery delivery, basic truck logistics, event discovery, in-app payments, and a simple loyalty programme are all delivered through the same client.
+The platform consists of:
+Single Customer-Driver App (Flutter)
+Admin Panel (HTML/CSS/Python)
+Backend System (Python)
+VPS Server
+Google Maps API for location tracking, routing, and ETAs
+Firebase for notifications
+PayHere for payment processing
+2. Business Objectives
+ID | Requirement
+BO-1 | Provide users a fast and reliable way to book rides or become drivers on-demand.
+BO-2 | Enable users to switch between customer and driver roles via a button within the app.
+BO-3 | Match ride requests efficiently and minimise wait times for both drivers and customers.
+BO-4 | Ensure safe and traceable trips with ratings and trip records for both customers and drivers.
+BO-5 | Allow operations to monitor the platform centrally via the Admin Panel.
+BO-6 | Support multiple payment methods (cash, digital wallet, credit/debit cards) through PayHere.
+BO-7 | Integrate Google Maps API for accurate location tracking, routing, and real-time ETA updates.
+BO-8 | Use Firebase for push notifications for ride status updates, promotions, and other relevant alerts.
+BO-9 | Offer multi-service delivery (food, market, parcel Flash, basic truck) from a single app.
+BO-10 | Drive repeat use through a simple loyalty points system and promo codes.
+BO-11 | Support basic business accounts for corporate ride and delivery bookings.
+BO-12 | Surface third-party events to increase engagement.
+---
+3. Stakeholders & User Roles
+ID | Requirement
+SH-1 | User (Customer/Driver): End users who can switch between being a passenger or a driver by tapping the appropriate button in the app.
+SH-2 | Admin/Operations: Staff who manage platform activities such as user accounts, trips, fares, and promotions via the Admin Panel.
+SH-3 | Support Agent: Handles complaints and disputes related to rides, deliveries, and merchant orders.
+SH-4 | Finance: Manages payouts, commissions, and financial reconciliations.
+SH-5 | Merchant / Restaurant Partner: Receives and fulfils food and market orders through Ziggo.
+SH-6 | Courier Partner: Handles parcel fulfilment for deliveries beyond Flash range.
+SH-7 | Event Organiser: Lists events on the Ziggo Events surface.
+SH-8 | Business Account Holder: Corporate user whose employees can book rides and deliveries against a business profile.
+---
+4. Functional Requirements
+4.1 Customer/Driver App (Single App for Both Roles)
+ID | Requirement
+CD-01 | User registration (phone number + OTP, email/password).
+CD-02 | Profile management (name, photo, contact details, saved places).
+CD-03 | Ability to switch between Passenger Mode and Driver Mode using a button in the app.
+CD-04 | Set pickup and drop-off locations via GPS or map pin (integrating Google Maps API).
+CD-05 | Choose vehicle type (for passengers) and view fare estimate.
+CD-06 | View upfront fare estimate and confirm ride booking (for customers).
+CD-07 | Request a ride and match with the nearest available driver (for customers).
+CD-08 | Turn on/off availability (for drivers).
+CD-09 | Accept or reject incoming ride requests (for drivers).
+CD-10 | GPS navigation for pickups and drop-offs using Google Maps API, with turn-by-turn directions, picture-in-picture mini-map, speed display, mute, and incident reporting (for drivers).
+CD-11 | Collect payment (cash, card, or wallet) and confirm payment (for drivers).
+CD-12 | Payment processing via PayHere, supporting cash, card, and wallet for customers and drivers.
+CD-13 | View earnings and trip history (for drivers).
+CD-14 | In-app communication (call) with the other party (passenger or driver).
+CD-15 | Rate and review the other party after the trip.
+CD-16 | View trip history and receipts (for both customers and drivers).
+CD-17 | Emergency SOS button and share trip with contacts.
+CD-18 | Receive push notifications via Firebase for booking status, driver arrival, promotions, and updates.
+CD-19 | Multi-stop trips – add up to two intermediate stops with a configurable waiting allowance per stop (exceeding it triggers standard waiting charges).
+CD-20 | One-way or return-trip selection at booking.
+CD-21 | Instant booking (Now) or scheduled booking (Later) with date and time picker.
+CD-22 | Add note to driver and apply promo code at booking.
+CD-23 | Saved Addresses with Home and Work shortcuts.
+CD-24 | Help & Support flow with last-five activity quick-access and category routing (Account & payment, App issues, Using Ziggo Rides).
+CD-25 | Notifications inbox with system, ride, and promotional alerts.
+CD-26 | Activity history filtered by service category – Rides, Trucks, Food, Rentals, Delivery, Market, Courier, Events – with Ongoing, Completed, Complaint, and Cancelled tabs.
+CD-27 | Camera permission flow for in-app QR scanning (basic Scan & Pay).
+CD-28 | Basic business account: add a corporate profile for business-billed bookings.
+CD-29 | About Us and app version display under the account menu.
+CD-30 | Invite a Friend referral flow from the Earn-with-Ziggo screen.
+CD-31 | ETA sharing – user can share their real-time estimated time of arrival with selected contacts directly from the active trip screen.
+CD-32 | Account deletion – user can permanently delete their Ziggo account from within the app settings, with a confirmation step and data-erasure notice.
+CD-33 | Automated complaint responses – minor and routine support complaints receive instant automated responses, with escalation to a live agent for complex issues.
+CD-34 | Simple profile completeness indicator – shows the user how complete their profile is and prompts them to fill missing fields.
+---
+4.2 Ride Services
+ID | Requirement
+RS-01 | Ride types available at booking: Car, Tuk, Bike (Moto), with vehicle availability shown as ETA (e.g., "In 1 min").
+RS-02 | Flex (premium car) as a separate ride class with its own fare.
+RS-03 | Reserve / scheduled rides (Later) – pickup date and time scheduling.
+RS-04 | Long-distance / intercity rides – basic option for bookings between cities.
+RS-05 | Seniors rides – a ride variant for senior passengers (basic label, no special driver policies).
+RS-06 | Teens rides – a ride variant for teen passengers (basic label, standard safeguards).
+RS-07 | Per-ride loyalty points earning displayed at vehicle selection.
+RS-08 | "Meet your driver here" pickup-point indicator on the map for high-density areas.
+RS-09 | AI-powered drop location suggestions – recommends destinations based on current location, time of day, and usage history.
+---
+4.3 Rental Features
+ID | Requirement
+RT-01 | Hourly rental booking – user can book a vehicle for a set number of hours, with the driver waiting throughout.
+RT-02 | Scheduled pickup – pickup date and time selection (Now or Schedule).
+RT-03 | Vehicle selection for rentals (Car, Van).
+RT-04 | Transparent rental rate displayed before confirmation.
+---
+4.4 Pickup & Drop Features
+ID | Requirement
+PD-01 | One-way trip selection.
+PD-02 | Return-trip selection with waiting handled at the drop location.
+PD-03 | Pickup location selection via map, search, or saved address.
+PD-04 | Drop location selection via map, search, or saved address.
+PD-05 | Pickup date and time scheduling (Now or Schedule).
+PD-06 | Instant booking (Now) – immediate dispatch.
+PD-07 | Scheduled booking – deferred dispatch at the user’s chosen time.
+---
+4.5 Parcel & Delivery
+ID | Requirement
+PR-01 | Parcel delivery as a top-level service with Flash (same-day) and basic Courier sub-types.
+PR-02 | Flash instant delivery – same-day, on-demand parcel pickup and drop.
+PR-03 | Basic courier delivery – standard parcel delivery for longer distances.
+PR-04 | Send items – user dispatches a parcel from their location.
+PR-05 | Receive items – user requests pickup of a parcel addressed to them.
+PR-06 | Pickup and drop address capture with on-package address/contact-detail reminder.
+PR-07 | Basic truck delivery for moving goods – a single truck option with real-time tracking.
+---
+4.6 Delivery Services (Food & Market)
+Ziggo supports the following on-demand delivery verticals through partner merchants:
+ID | Requirement
+DV-01 | Food delivery – Rice & Curry, Burgers, Shawarma, Desserts, Chinese, Indian, Kottu, Pizza.
+DV-02 | Grocery delivery – Groceries, Fresh products, Dairy & poultry.
+DV-03 | Pharmaceutical and health-product delivery.
+DV-04 | Household items delivery.
+DV-05 | Personal care and baby-care delivery.
+DV-06 | Flowers delivery.
+DV-07 | Electronics delivery.
+DV-08 | Pet supplies delivery.
+DV-09 | Retail delivery (general merchandise).
+DV-10 | Search bar across Food and Market verticals with auto-suggested terms.
+DV-11 | Favourite merchants / items via a heart icon on listings.
+DV-12 | "Picked Up For You" personalised recommendation rail.
+DV-13 | Weather-aware delivery banner notifying users of possible delays.
+DV-14 | Menu recommendations – each merchant listing surfaces a curated highlight of that outlet’s popular or promoted items before entering the full menu.
+---
+4.7 Events
+ID | Requirement
+EV-01 | Basic event discovery surface – a curated list of local events surfaced within the app.
+EV-02 | Event categories: Experiences, Charity, Fashion (extendable).
+EV-03 | Search bar for event discovery.
+---
+4.8 Payment Features
+ID | Requirement
+PY-01 | Cash payments at trip/order completion.
+PY-02 | Credit/debit card payments via PayHere.
+PY-03 | In-app digital wallet – add and manage balance through PayHere.
+PY-04 | Add and manage multiple payment methods (cards, wallet) through PayHere.
+PY-05 | Basic business account support – separate billing profile for corporate use.
+PY-06 | Basic QR scan-to-pay – in-app QR code scanning for quick payment at supported points.
+PY-07 | Promo code entry at booking with displayed validity and usage limits.
+PY-08 | Price Trends Widget – shows fare variation across times of the day at the selected pickup location.
+---
+4.9 Rewards & Loyalty
+ID | Requirement
+RW-01 | Simple loyalty points – earn points for every qualifying spend across rides, food, and delivery. No tier system.
+RW-02 | Points redemption – redeem accumulated points as a discount at checkout.
+RW-03 | Basic membership option – a simple membership plan offering standard benefits (e.g. reduced delivery fees).
+RW-04 | Promotions inbox with claimable, category-tagged offers (Rides, Food, Market, etc.).
+RW-05 | Earn-with-Ziggo flow for prospective driver-partners (sign-up and onboarding).
+---
+4.10 Activity Categories
+The Activity history is filterable by the following service categories:
+Rides
+Trucks
+Food
+Rentals
+Delivery
+Market
+Courier
+Events
+4.11 User Account & Support
+ID | Requirement
+AC-01 | Help & Support hub with category routing.
+AC-02 | Activity history with details, receipts, and per-trip Help & Support entry point.
+AC-03 | Saved Addresses (Add Home, Add Work, plus custom labels).
+AC-04 | Account and payment management.
+AC-05 | App-issue support flow.
+AC-06 | Ride-support flow tied to a specific completed/ongoing trip.
+AC-07 | About Us and app version display.
+---
+4.12 Admin Panel
+ID | Requirement
+AD-01 | Secure admin login with role-based access control.
+AD-02 | Dashboard showing active trips, online users, revenue, etc.
+AD-03 | Manage customer/driver accounts (approve, suspend, delete).
+AD-04 | Configure fare rules, promo codes, and discounts.
+AD-05 | View and monitor all trips, including customer and driver actions.
+AD-06 | Manage complaints, disputes, and refunds.
+AD-07 | Reports and analytics for trips, revenue, driver performance.
+AD-08 | Manage commissions and driver payouts.
+AD-09 | Manage merchant partners (restaurants, market vendors).
+AD-10 | Configure delivery categories and merchant onboarding rules.
+AD-11 | Manage event listings.
+AD-12 | Manage basic business accounts (corporate billing).
+AD-13 | Configure loyalty points earning rate and redemption rules.
+---
+4.13 Backend / Core System
+ID | Requirement
+BE-01 | Authentication and authorisation for all user roles (token-based).
+BE-02 | Ride-matching engine – locate nearest available drivers and dispatch.
+BE-03 | Real-time location tracking and updates for drivers and trips using Google Maps API.
+BE-04 | Fare calculation engine – distance, time, vehicle type, surge.
+BE-05 | Payment processing and wallet management through PayHere API; basic QR payment rail.
+BE-06 | Trip lifecycle management (requested → accepted → ongoing → completed/cancelled).
+BE-07 | Notifications service via Firebase for push alerts (booking status, driver arrival, promotions).
+BE-08 | Ratings and reviews storage and aggregation.
+BE-09 | Commission and payout calculation.
+BE-10 | Data storage for users, trips, vehicles, transactions, merchants, events.
+BE-11 | APIs consumed by Customer/Driver App and Admin Panel.
+BE-12 | Logging, audit trail, and error handling.
+BE-13 | Simple loyalty engine – points accrual per transaction and redemption at checkout.
+BE-14 | Merchant order routing – accept, prepare, dispatch lifecycle for food and market orders.
+BE-15 | Basic courier dispatch for deliveries beyond Flash range.
+BE-16 | Multi-stop trip routing and waiting-charge calculation.
+BE-17 | Promotions engine – promo codes, validity windows, usage limits, eligibility rules.
+BE-18 | Basic event catalogue service with category and search.
+BE-19 | Basic business-account engine for corporate billing.
+---
+5. Key Business Rules
+ID | Requirement
+BR-1 | A user can only be in one active role (passenger or driver) at a time.
+BR-2 | Fare calculation includes base fare, distance, time, and surge pricing adjustments.
+BR-3 | Cancellation after a grace period may incur a cancellation fee.
+BR-4 | Users must be document-verified and admin-approved to operate as drivers.
+BR-5 | Platform commission is deducted before the driver’s payout.
+BR-6 | Loyalty points accrue on qualifying spend; refunded/cancelled transactions reverse the accrual.
+BR-7 | Flash parcel delivery is same-day; basic courier handles longer distances.
+BR-8 | Basic truck delivery is for moving goods within the service area; no size-tier categories or goods insurance.
+BR-9 | Multi-stop trips allow a configurable per-stop waiting allowance (default 2 minutes); excess time is billed at standard waiting rates.
+BR-10 | Basic membership benefits apply only while the membership is active.
+BR-11 | Promo codes have defined validity windows and per-user usage limits enforced by the promotions engine.
+---
+6. Non-Functional Requirements
+ID | Requirement
+NFR-1 | Performance: Ride requests dispatched within seconds, real-time tracking updates.
+NFR-2 | Scalability: Handle growing user base and concurrent trips across all service verticals.
+NFR-3 | Availability: High uptime with fail-safe mechanisms.
+NFR-4 | Security: Secure user authentication and payment handling (via PayHere); PCI-compliant card handling.
+NFR-5 | Usability: Simple, intuitive flows for booking, driving, and role-switching.
+NFR-6 | Localisation: Multi-language support (English, Sinhala, Tamil) and LKR currency formatting.
+NFR-7 | Offline tolerance: Activity history and saved addresses cached for read access when the device is offline.
+NFR-8 | Observability: All service flows (rides, deliveries, payments, loyalty) emit structured logs and business-event metrics.
+---
+7. Assumptions & Constraints
+Users must have smartphones with GPS and internet access.
+Google Maps API will be used for routing, location tracking, and ETAs.
+Firebase will handle push notifications for ride status, promotions, and other alerts.
+PayHere is the integrated payment gateway for digital payments.
+Merchant partners (restaurants, market vendors) operate their own order-prep workflow and meet Ziggo’s preparation SLAs.
+Event organisers list and manage their own events; Ziggo provides discovery only.
+Push notification service providers are available.
+8. Glossary
+ID | Requirement
+Trip | A single journey from pickup to drop-off.
+Surge | Dynamic price increase during high demand.
+Dispatch | Assigning a ride request to a driver.
+Wallet | In-app balance used for payment.
+Commission | Platform’s cut from the driver’s fare.
+Loyalty Points | Points earned on qualifying spend, redeemable as a discount at checkout.
+Flash | Same-day, on-demand parcel delivery service.
+Courier | Standard parcel delivery for longer distances.
+Flex | Premium car ride class with higher comfort.
+Scan & Pay | Basic in-app QR code scanning for payment at supported points.
+Multi-stop | A single trip with one or more intermediate stops between pickup and final drop.
+Promo Code | A discount code applied at booking with a defined validity window and usage limit.
+Rental | Hourly vehicle hire with a waiting driver.
+---
+9. Revision History
+Version | Date | Author | Summary of Changes
+1.0 | 2026-05-14 | Hashnate | Initial BRD covering ride-hailing core, admin panel, backend, and business rules.
+2.0 | 2026-05-15 | Hashnate | Integrated the Ziggo feature catalogue. Added ride variants, rentals, parcel & delivery, events, payments, rewards programme, and corresponding backend/admin/business-rule entries.
+---
