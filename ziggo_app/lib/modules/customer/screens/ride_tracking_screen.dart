@@ -26,6 +26,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
   final ZiggoMapController _mapController = ZiggoMapController();
   bool _navigatedToRating = false;
   List<LatLng> _routePoints = const [];
+  List<DirectionStep> _routeSteps = const [];
   String? _routeKey;
 
   // While the booking is in SEARCHING we poll /driver/nearby every 6 s so the
@@ -55,7 +56,10 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
     _routeKey = key;
     MapsService.instance.directions(pickup, drop).then((dir) {
       if (mounted && dir != null && dir.points.isNotEmpty) {
-        setState(() => _routePoints = dir.points);
+        setState(() {
+          _routePoints = dir.points;
+          _routeSteps = dir.steps;
+        });
       }
     });
   }
@@ -366,6 +370,14 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
               ),
             ),
           ),
+          // BRD: Turn-by-turn — first upcoming instruction overlayed below the
+          // top status pill while the ride is in motion.
+          if (_routeSteps.isNotEmpty && (active['status'] == 'started' || active['status'] == 'accepted'))
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 70,
+              left: 12, right: 12,
+              child: _NextStepStrip(step: _routeSteps.first),
+            ),
           _BottomCard(active: active, meta: meta, driver: driver),
         ],
       ),
@@ -910,6 +922,76 @@ class _ActionRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+
+/// BRD: Turn-by-turn — strip with the next instruction + a manoeuvre icon.
+class _NextStepStrip extends StatelessWidget {
+  final DirectionStep step;
+  const _NextStepStrip({required this.step});
+
+  IconData _iconFor(String maneuver) {
+    if (maneuver.contains('right')) return Icons.turn_right_rounded;
+    if (maneuver.contains('left')) return Icons.turn_left_rounded;
+    if (maneuver.contains('uturn')) return Icons.u_turn_left_rounded;
+    if (maneuver.contains('merge')) return Icons.merge_rounded;
+    if (maneuver.contains('roundabout')) return Icons.roundabout_left_rounded;
+    return Icons.arrow_upward_rounded;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final distanceTxt = step.distanceM >= 1000
+        ? '${(step.distanceM / 1000).toStringAsFixed(1)} km'
+        : '${step.distanceM.toStringAsFixed(0)} m';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.88),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: AppStyles.shadowLg,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36, height: 36,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(_iconFor(step.maneuver), color: Colors.black, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  step.instruction,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                  ),
+                ),
+                Text(
+                  'In $distanceTxt',
+                  style: const TextStyle(
+                    color: Colors.white60,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
