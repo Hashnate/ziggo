@@ -555,6 +555,46 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   ),
                 ],
               ),
+              // BRD: CD-19 — intermediate stops between pickup and drop
+              for (final stop in (ride['stops'] as List? ?? const [])) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Container(
+                      width: 14,
+                      height: 14,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '${stop['order_index'] ?? '·'}',
+                        style: const TextStyle(
+                          color: AppColors.warning,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        (stop['address'] ?? '').toString().isEmpty
+                            ? 'Stop ${stop['order_index'] ?? ''}'
+                            : stop['address'].toString(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.warning,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -1428,6 +1468,31 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                       label: 'PICKUP',
                       value: (r['pickup_address'] ?? '').toString(),
                     ),
+                    // BRD: CD-19 — intermediate stops in the expanded card
+                    for (final stop in (r['stops'] as List? ?? const [])) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(left: 13, top: 6, bottom: 6),
+                        child: Column(
+                          children: List.generate(
+                            2,
+                            (_) => Container(
+                              margin: const EdgeInsets.only(bottom: 2),
+                              width: 2,
+                              height: 4,
+                              color: Colors.white24,
+                            ),
+                          ),
+                        ),
+                      ),
+                      _addressRow(
+                        icon: Icons.pin_drop_rounded,
+                        color: AppColors.warning,
+                        label: 'STOP ${stop['order_index'] ?? ''}',
+                        value: (stop['address'] ?? '').toString().isEmpty
+                            ? 'Stop ${stop['order_index'] ?? ''}'
+                            : stop['address'].toString(),
+                      ),
+                    ],
                     Padding(
                       padding: const EdgeInsets.only(left: 13, top: 6, bottom: 6),
                       child: Column(
