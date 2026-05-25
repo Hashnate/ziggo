@@ -802,6 +802,12 @@ async def admin_settings_save(
     daily_bonus_amount: float = Form(1000),
     commission_cycle_rides: int = Form(5),
     commission_per_cycle: float = Form(500),
+    # Loyalty + membership (BRD: AD-13)
+    loyalty_earn_rupees_per_point: float = Form(10),
+    loyalty_value_per_point: float = Form(0.50),
+    loyalty_min_redeem_points: int = Form(100),
+    loyalty_max_redeem_order_pct: float = Form(20),
+    gold_delivery_discount_pct: float = Form(50),
     # Branding
     logo: UploadFile | None = File(None),
     favicon: UploadFile | None = File(None),
@@ -832,6 +838,12 @@ async def admin_settings_save(
     s.daily_bonus_amount = Decimal(str(daily_bonus_amount))
     s.commission_cycle_rides = max(0, int(commission_cycle_rides))
     s.commission_per_cycle = Decimal(str(commission_per_cycle))
+    # BRD: AD-13 — loyalty + Gold settings
+    s.loyalty_earn_rupees_per_point = Decimal(str(loyalty_earn_rupees_per_point))
+    s.loyalty_value_per_point = Decimal(str(loyalty_value_per_point))
+    s.loyalty_min_redeem_points = max(1, int(loyalty_min_redeem_points))
+    s.loyalty_max_redeem_order_pct = Decimal(str(loyalty_max_redeem_order_pct))
+    s.gold_delivery_discount_pct = Decimal(str(gold_delivery_discount_pct))
 
     new_logo = await _save_branding_asset(logo, "Logo")
     if new_logo:
@@ -2138,6 +2150,7 @@ def _parse_admin_date(s: str):
 async def admin_promotions_new(
     code: str = Form(...),
     description: str = Form(""),
+    category: str = Form("all"),
     discount_type: str = Form("percentage"),
     discount_value: float = Form(...),
     min_order_amount: float = Form(0),
@@ -2162,9 +2175,14 @@ async def admin_promotions_new(
     if dup.scalars().first():
         raise HTTPException(status_code=400, detail=f"Promo code '{norm_code}' already exists")
 
+    norm_cat = (category or "all").strip().lower()
+    if norm_cat not in ("all", "rides", "food", "market"):
+        raise HTTPException(status_code=400, detail="category must be all/rides/food/market")
+
     db.add(PromoCode(
         code=norm_code,
         description=description.strip() or None,
+        category=norm_cat,
         discount_type=discount_type,
         discount_value=Decimal(str(discount_value)),
         min_order_amount=Decimal(str(min_order_amount or 0)),
@@ -2183,6 +2201,7 @@ async def admin_promotions_new(
 async def admin_promotions_edit(
     promo_id: int,
     description: str = Form(""),
+    category: str = Form("all"),
     discount_type: str = Form("percentage"),
     discount_value: float = Form(...),
     min_order_amount: float = Form(0),
@@ -2199,6 +2218,9 @@ async def admin_promotions_edit(
 
     if discount_type not in ("percentage", "fixed"):
         raise HTTPException(status_code=400, detail="discount_type must be 'percentage' or 'fixed'")
+    norm_cat = (category or "all").strip().lower()
+    if norm_cat not in ("all", "rides", "food", "market"):
+        raise HTTPException(status_code=400, detail="category must be all/rides/food/market")
 
     q = await db.execute(select(PromoCode).where(PromoCode.id == promo_id))
     p = q.scalars().first()
@@ -2206,6 +2228,7 @@ async def admin_promotions_edit(
         raise HTTPException(status_code=404, detail="Promo not found")
 
     p.description = description.strip() or None
+    p.category = norm_cat
     p.discount_type = discount_type
     p.discount_value = Decimal(str(discount_value))
     p.min_order_amount = Decimal(str(min_order_amount or 0))

@@ -59,6 +59,10 @@ class FoodOrderCreate(BaseModel):
     delivery_lng: float
     payment_method: str = "cash"
     instructions: Optional[str] = None
+    # BRD: RW-02 — loyalty points the customer wants to redeem at checkout
+    redeem_points: int = 0
+    # BRD: optional promo code applied at checkout
+    promo_code: Optional[str] = None
 
 
 class FoodOrderItemResponse(BaseModel):

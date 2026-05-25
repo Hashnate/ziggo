@@ -98,6 +98,9 @@ class FoodProvider extends ChangeNotifier {
     required double lng,
     String paymentMethod = 'cash',
     String? instructions,
+    // BRD: RW-02 / RW-04 — opt-in checkout discounts.
+    int redeemPoints = 0,
+    String? promoCode,
   }) async {
     if (_activeRestaurantId == null || _cart.isEmpty) return null;
     final items = _cart.values
@@ -115,6 +118,8 @@ class FoodProvider extends ChangeNotifier {
         'delivery_lng': lng,
         'payment_method': paymentMethod,
         if (instructions != null && instructions.isNotEmpty) 'instructions': instructions,
+        if (redeemPoints > 0) 'redeem_points': redeemPoints,
+        if (promoCode != null && promoCode.isNotEmpty) 'promo_code': promoCode,
       });
       clearCart();
       return Map<String, dynamic>.from(resp.data);

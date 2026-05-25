@@ -55,6 +55,7 @@ class Customer(Base):
     notification_token = Column(String(255))
     gold_member = Column(Boolean, default=False)
     gold_expires_at = Column(DateTime(timezone=True))
+    loyalty_points = Column(Integer, nullable=False, default=0)
 
     user = relationship("User", back_populates="customer_profile")
     bookings = relationship("Booking", back_populates="customer")

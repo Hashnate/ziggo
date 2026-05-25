@@ -19,6 +19,8 @@ class FareEstimateRequest(BaseModel):
     # hourly_rate * rental_hours.
     is_rental: bool = False
     rental_hours: Optional[int] = Field(default=None, ge=1, le=24)
+    # BRD: RW-02 — optional preview of points redemption on the estimate
+    redeem_points: int = 0
 
 
 class FareEstimateResponse(BaseModel):
@@ -33,6 +35,12 @@ class FareEstimateResponse(BaseModel):
     promo_code: Optional[str] = None
     surge_multiplier: float
     flash_surcharge: float = 0
+    # BRD: RS-07 — show this on the vehicle selection card
+    points_earnable: int = 0
+    # BRD: RW-02 — populated when the customer pre-applies points on estimate
+    redeem_points_used: int = 0
+    redeem_discount: float = 0
+    redeem_reason: Optional[str] = None
 
 
 class BookingCreate(BaseModel):
@@ -57,6 +65,8 @@ class BookingCreate(BaseModel):
     # for rental_hours. drop_* can be the same as pickup_* (no fixed dropoff).
     is_rental: bool = False
     rental_hours: Optional[int] = Field(default=None, ge=1, le=24)
+    # BRD: RW-02 — points the customer wants to redeem at checkout
+    redeem_points: int = 0
 
 
 class DriverMini(BaseModel):

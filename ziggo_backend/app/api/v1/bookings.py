@@ -127,6 +127,12 @@ async def estimate_fare(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    # Customer is only needed when the estimate also previews a points
+    # redemption. Avoid lazy-loading it through the User relationship —
+    # async SQLAlchemy refuses that and we don't need it for plain estimates.
+    customer = None
+    if (req.redeem_points or 0) > 0:
+        customer = await _get_customer(db, user)
     fare = await calculate_fare(
         db,
         req.service_type,
@@ -140,6 +146,8 @@ async def estimate_fare(
         parcel_weight_kg=req.parcel_weight_kg,
         is_rental=req.is_rental,
         rental_hours=req.rental_hours,
+        customer=customer,
+        redeem_points=req.redeem_points or 0,
     )
     # FareEstimateResponse doesn't carry rental_hours/hourly_rate; strip them.
     fare.pop("hourly_rate", None)
@@ -168,6 +176,8 @@ async def create_booking(
         parcel_weight_kg=req.parcel_weight_kg,
         is_rental=req.is_rental,
         rental_hours=req.rental_hours,
+        customer=customer,
+        redeem_points=req.redeem_points or 0,
     )
 
     # If wallet payment, ensure balance
@@ -208,6 +218,8 @@ async def create_booking(
         duration_min=fare["duration_min"],
         fare_amount=to_decimal(fare["fare_amount"]),
         discount_amount=to_decimal(fare["discount_amount"]),
+        redeem_points=int(fare.get("redeem_points_used", 0) or 0),
+        redeem_discount=to_decimal(fare.get("redeem_discount", 0) or 0),
         final_amount=to_decimal(fare["final_amount"]),
         platform_fee=to_decimal(fare["platform_fee"]),
         driver_earnings=to_decimal(fare["driver_earnings"]),
@@ -225,6 +237,19 @@ async def create_booking(
     )
     db.add(booking)
     await db.flush()
+
+    # BRD: RW-02 — deduct redeemed points now (at booking time) so they can't be
+    # double-spent on another booking before this one completes. If the ride is
+    # cancelled later we refund via update_booking_status.
+    if booking.redeem_points and booking.redeem_points > 0:
+        from ...services.loyalty_service import redeem_points as _redeem
+        await _redeem(
+            db, customer,
+            points=int(booking.redeem_points),
+            source_kind="booking",
+            source_id=booking.id,
+            description=f"Redeemed on {booking.booking_ref}",
+        )
 
     # Broadcast to every nearby driver of the right vehicle type. The booking
     # stays SEARCHING until the first one taps "Accept" — at that point the
@@ -577,10 +602,43 @@ async def update_booking_status(
                 drv.today_earnings = (drv.today_earnings or Decimal(0)) + (b.driver_earnings or Decimal(0))
                 drv.today_rides = (drv.today_rides or 0) + 1
 
+        # BRD: RW-01 — award loyalty points on completion (based on the cash
+        # paid, i.e. final_amount AFTER any redemption discount).
+        from ...services.loyalty_service import award_points as _award
+        cq = await db.execute(select(Customer).where(Customer.id == b.customer_id))
+        cust_for_points = cq.scalars().first()
+        if cust_for_points and b.final_amount:
+            await _award(
+                db, cust_for_points,
+                spend_amount=b.final_amount,
+                source_kind="booking",
+                source_id=b.id,
+                description=f"Earned on {b.booking_ref}",
+            )
+
     elif new_status == BookingStatus.CANCELLED:
         b.cancelled_at = now
         b.cancellation_reason = body.reason
         b.cancelled_by = user.role.value
+        # BRD: RW-02 — refund any redeemed points if the trip never happened.
+        if b.redeem_points and b.redeem_points > 0:
+            cq = await db.execute(select(Customer).where(Customer.id == b.customer_id))
+            cust_refund = cq.scalars().first()
+            if cust_refund:
+                cust_refund.loyalty_points = int(cust_refund.loyalty_points or 0) + int(b.redeem_points)
+                from ...models import LoyaltyTransaction
+                db.add(LoyaltyTransaction(
+                    customer_id=cust_refund.id,
+                    points=int(b.redeem_points),
+                    kind="adjust",
+                    source_kind="booking",
+                    source_id=b.id,
+                    description=f"Refund — {b.booking_ref} cancelled",
+                    balance_after=cust_refund.loyalty_points,
+                ))
+                # Zero out the snapshot so a re-cancellation doesn't double-refund.
+                b.redeem_points = 0
+                b.redeem_discount = Decimal("0.00")
 
     await db.commit()
     await db.refresh(b)

@@ -13,8 +13,10 @@ from ...models import (
     Complaint,
     ComplaintMessage,
     Customer,
+    CustomerPromoClaim,
     Driver,
     FlashWeightTier,
+    LoyaltyTransaction,
     User,
     UserRole,
     WalletTransaction,
@@ -26,8 +28,11 @@ from ...schemas import (
     ComplaintMessageCreate,
     ComplaintMessageResponse,
     GoldSubscribeRequest,
+    LoyaltyBalanceResponse,
+    LoyaltyTransactionResponse,
 )
 from ...services.auth_service import get_current_user, require_role
+from ...services import loyalty_service as L
 
 router = APIRouter()
 
@@ -58,21 +63,155 @@ async def list_flash_tiers(
     ]
 
 
-# ---------- Promos ----------
+# ---------- Promos (BRD: RW-04 promotions inbox) ----------
+async def _customer_for(db: AsyncSession, user: User) -> Customer:
+    cq = await db.execute(select(Customer).where(Customer.user_id == user.id))
+    c = cq.scalars().first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Customer profile not found")
+    return c
+
+
+async def _customer_or_none(db: AsyncSession, user: User) -> "Customer | None":
+    cq = await db.execute(select(Customer).where(Customer.user_id == user.id))
+    return cq.scalars().first()
+
+
 @router.get("/promos", response_model=List[PromoCodeResponse])
 async def list_active_promos(
+    category: str | None = None,           # BRD: RW-04 — filter the inbox by category
+    only_claimed: bool = False,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ):
+    """Promotions inbox.
+
+    Shows every redeemable promo (active, in-date, under-limit). When the
+    caller is a customer, each row carries a `claimed_at` so the app can
+    badge saved ones. `category` filters by surface (rides/food/market/all)
+    and `only_claimed=true` restricts to promos the customer has saved.
+    """
     now = datetime.now(timezone.utc)
-    q = await db.execute(
-        select(PromoCode).where(
-            PromoCode.is_active == True,  # noqa: E712
-            (PromoCode.valid_from == None) | (PromoCode.valid_from <= now),  # noqa: E711
-            (PromoCode.valid_to == None) | (PromoCode.valid_to >= now),  # noqa: E711
-            (PromoCode.usage_limit == None) | (PromoCode.used_count < PromoCode.usage_limit),  # noqa: E711
+    where_clauses = [
+        PromoCode.is_active == True,  # noqa: E712
+        (PromoCode.valid_from == None) | (PromoCode.valid_from <= now),  # noqa: E711
+        (PromoCode.valid_to == None) | (PromoCode.valid_to >= now),  # noqa: E711
+        (PromoCode.usage_limit == None) | (PromoCode.used_count < PromoCode.usage_limit),  # noqa: E711
+    ]
+    if category and category != "all":
+        where_clauses.append(PromoCode.category.in_(["all", category]))
+
+    q = await db.execute(select(PromoCode).where(*where_clauses).order_by(PromoCode.id.desc()))
+    promos = q.scalars().all()
+
+    # Attach claimed_at for the requesting customer (if any).
+    claimed_map: dict[int, datetime] = {}
+    if user.role == UserRole.CUSTOMER:
+        customer = await _customer_or_none(db, user)
+        if customer:
+            cq = await db.execute(
+                select(CustomerPromoClaim).where(CustomerPromoClaim.customer_id == customer.id)
+            )
+            for cp in cq.scalars().all():
+                claimed_map[cp.promo_code_id] = cp.claimed_at
+
+    out = []
+    for p in promos:
+        if only_claimed and p.id not in claimed_map:
+            continue
+        out.append(PromoCodeResponse(
+            id=p.id, code=p.code, description=p.description,
+            category=p.category or "all",
+            discount_type=p.discount_type, discount_value=float(p.discount_value or 0),
+            min_order_amount=float(p.min_order_amount) if p.min_order_amount is not None else None,
+            max_discount=float(p.max_discount) if p.max_discount is not None else None,
+            valid_to=p.valid_to,
+            claimed_at=claimed_map.get(p.id),
+        ))
+    return out
+
+
+@router.post("/promos/{promo_id}/claim", status_code=201)
+async def claim_promo(
+    promo_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    """Save a promo to the customer's inbox (BRD: RW-04)."""
+    customer = await _customer_for(db, user)
+    pq = await db.execute(select(PromoCode).where(PromoCode.id == promo_id))
+    p = pq.scalars().first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Promo not found")
+    # Already claimed? Idempotent — just return the existing claim time.
+    existing_q = await db.execute(
+        select(CustomerPromoClaim).where(
+            CustomerPromoClaim.customer_id == customer.id,
+            CustomerPromoClaim.promo_code_id == promo_id,
         )
-        .order_by(PromoCode.id.desc())
+    )
+    existing = existing_q.scalars().first()
+    if existing:
+        return {"ok": True, "claimed_at": existing.claimed_at, "already_claimed": True}
+    claim = CustomerPromoClaim(customer_id=customer.id, promo_code_id=promo_id)
+    db.add(claim)
+    await db.commit()
+    await db.refresh(claim)
+    return {"ok": True, "claimed_at": claim.claimed_at, "already_claimed": False}
+
+
+@router.delete("/promos/{promo_id}/claim", status_code=204)
+async def unclaim_promo(
+    promo_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    customer = await _customer_for(db, user)
+    q = await db.execute(
+        select(CustomerPromoClaim).where(
+            CustomerPromoClaim.customer_id == customer.id,
+            CustomerPromoClaim.promo_code_id == promo_id,
+        )
+    )
+    claim = q.scalars().first()
+    if claim:
+        await db.delete(claim)
+        await db.commit()
+    return None
+
+
+# ---------- Loyalty (BRD: RW-01 balance + history) ----------
+@router.get("/loyalty/balance", response_model=LoyaltyBalanceResponse)
+async def loyalty_balance(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    customer = await _customer_for(db, user)
+    points = int(customer.loyalty_points or 0)
+    value = await L.value_of(db, points)
+    settings = await L._settings(db)
+    return LoyaltyBalanceResponse(
+        points=points,
+        value=float(value),
+        earn_rupees_per_point=float(settings.loyalty_earn_rupees_per_point or 0),
+        value_per_point=float(settings.loyalty_value_per_point or 0),
+        min_redeem_points=int(settings.loyalty_min_redeem_points or 0),
+        max_redeem_order_pct=float(settings.loyalty_max_redeem_order_pct or 0),
+    )
+
+
+@router.get("/loyalty/history", response_model=List[LoyaltyTransactionResponse])
+async def loyalty_history(
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    customer = await _customer_for(db, user)
+    q = await db.execute(
+        select(LoyaltyTransaction)
+        .where(LoyaltyTransaction.customer_id == customer.id)
+        .order_by(LoyaltyTransaction.id.desc())
+        .limit(max(1, min(200, limit)))
     )
     return q.scalars().all()
 

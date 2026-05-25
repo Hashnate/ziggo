@@ -721,6 +721,27 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
                     color: selected ? Colors.white : AppColors.textPrimary,
                   ),
                 ),
+                // BRD: RS-07 — per-ride loyalty points display.
+                if (est != null && (est['points_earnable'] ?? 0) is num && (est['points_earnable'] as num) > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: selected ? Colors.white.withOpacity(0.18) : const Color(0x14F59E0B),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '+${est['points_earnable']} pts',
+                        style: TextStyle(
+                          color: selected ? Colors.white : AppColors.warning,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 10,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ),
+                  ),
                 if (selected)
                   const Padding(
                     padding: EdgeInsets.only(top: 2),

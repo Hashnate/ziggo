@@ -6,6 +6,7 @@ import '../../../app/app_styles.dart';
 import '../../../core/widgets/motion.dart';
 import '../../auth/auth_provider.dart';
 import '../wallet_provider.dart';
+import '../promos_provider.dart';
 import 'promotions_screen.dart';
 import 'ride_history_screen.dart';
 import 'saved_addresses_screen.dart';
@@ -119,6 +120,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final wallet = context.watch<WalletProvider>();
+    final promos = context.watch<PromosProvider>();
     final name = auth.fullName ?? '';
     final initial = name.isNotEmpty
         ? name[0].toUpperCase()
@@ -142,6 +144,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _heroCard(name: name, phone: auth.phoneNumber ?? '', initial: initial, role: auth.role ?? 'customer'),
           const SizedBox(height: 16),
           _walletStrip(balance: wallet.balance, currency: wallet.currency),
+          const SizedBox(height: 10),
+          _loyaltyStrip(points: promos.points, value: promos.pointsValue),
           const SizedBox(height: 22),
           _sectionLabel('ACCOUNT'),
           const SizedBox(height: 10),
@@ -343,6 +347,84 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// BRD: RW-01 — loyalty points balance strip below the wallet card.
+  Widget _loyaltyStrip({required int points, required double value}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.cardBorder),
+        boxShadow: AppStyles.shadowSm,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44, height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0x14F59E0B),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.stars_rounded, color: AppColors.warning, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('LOYALTY POINTS',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textTertiary,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.2,
+                    )),
+                const SizedBox(height: 2),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('$points',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.textPrimary,
+                        )),
+                    const SizedBox(width: 4),
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 3),
+                      child: Text('pts',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textTertiary,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.8,
+                          )),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceMuted,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text('≈ Rs.${value.toStringAsFixed(0)}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textSecondary,
+                  letterSpacing: 0.5,
+                )),
           ),
         ],
       ),

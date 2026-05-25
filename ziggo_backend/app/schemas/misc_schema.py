@@ -7,11 +7,38 @@ class PromoCodeResponse(BaseModel):
     id: int
     code: str
     description: Optional[str] = None
+    # BRD: RW-04 — category-tagged so the customer inbox can filter
+    category: str = "all"  # all | rides | food | market
     discount_type: str
     discount_value: float
     min_order_amount: Optional[float] = None
     max_discount: Optional[float] = None
     valid_to: Optional[datetime] = None
+    # BRD: RW-04 — populated when the customer has claimed this promo
+    claimed_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class LoyaltyBalanceResponse(BaseModel):
+    points: int
+    value: float                # current rupee value of the balance
+    earn_rupees_per_point: float
+    value_per_point: float
+    min_redeem_points: int
+    max_redeem_order_pct: float
+
+
+class LoyaltyTransactionResponse(BaseModel):
+    id: int
+    points: int                 # signed: + earn, − redeem, ± adjust
+    kind: str                   # earn | redeem | adjust
+    source_kind: Optional[str] = None
+    source_id: Optional[int] = None
+    description: Optional[str] = None
+    balance_after: int
+    created_at: datetime
 
     class Config:
         from_attributes = True

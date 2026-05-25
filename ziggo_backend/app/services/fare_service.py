@@ -80,6 +80,9 @@ async def calculate_fare(
     parcel_weight_kg: Optional[float] = None,
     is_rental: bool = False,
     rental_hours: Optional[int] = None,
+    # BRD: RW-01 (earn) + RW-02 (redeem) + RS-07 (display)
+    customer=None,
+    redeem_points: int = 0,
 ) -> dict:
     # Rental: short-circuit the distance-based math. Fare = hourly * hours,
     # promo discount still applies, platform-fee split still applies.
@@ -115,7 +118,7 @@ async def calculate_fare(
         platform_fee = final * (platform_pct / 100.0)
         driver_earnings = final - platform_fee
 
-        return {
+        rental_dict = {
             "distance_km": 0.0,
             "duration_min": hours * 60,
             "fare_amount": round(fare, 2),
@@ -129,6 +132,7 @@ async def calculate_fare(
             "hourly_rate": hourly,
             "rental_hours": hours,
         }
+        return await _enrich_with_loyalty(db, rental_dict, customer, redeem_points)
 
     distance_km = haversine_km(pickup_lat, pickup_lng, drop_lat, drop_lng)
     duration_min = estimate_duration_min(distance_km)
@@ -184,7 +188,7 @@ async def calculate_fare(
     platform_fee = final * (platform_pct / 100.0)
     driver_earnings = final - platform_fee
 
-    return {
+    base_dict = {
         "distance_km": round(distance_km, 2),
         "duration_min": duration_min,
         "fare_amount": round(fare, 2),
@@ -196,7 +200,61 @@ async def calculate_fare(
         "surge_multiplier": surge,
         "flash_surcharge": round(flash_surcharge, 2),
     }
+    return await _enrich_with_loyalty(db, base_dict, customer, redeem_points)
 
 
 def to_decimal(x: float) -> Decimal:
     return Decimal(str(round(x, 2)))
+
+
+async def _enrich_with_loyalty(
+    db: AsyncSession,
+    fare: dict,
+    customer,
+    redeem_points: int,
+) -> dict:
+    """Add points-earnable + apply redemption to a fare dict.
+
+    Always populates `points_earnable` (computed from `final_amount` before
+    redemption — what you'd earn from the cash side of the transaction).
+    If `customer` + `redeem_points > 0`, also clamps the redemption via
+    `loyalty_service.quote_redemption` and reduces `final_amount` /
+    `platform_fee` / `driver_earnings` accordingly.
+    """
+    from . import loyalty_service as L
+
+    # `final_amount` here is post-promo, pre-redemption.
+    pre_redemption_final = float(fare.get("final_amount", 0))
+    earnable = await L.points_earnable_for(db, pre_redemption_final)
+
+    actual_points = 0
+    redeem_discount = 0.0
+    redeem_reason = None
+
+    if customer is not None and (redeem_points or 0) > 0:
+        pts, val, reason = await L.quote_redemption(
+            db, customer, int(redeem_points), Decimal(str(pre_redemption_final))
+        )
+        actual_points = pts
+        redeem_discount = float(val)
+        redeem_reason = reason
+
+        if actual_points > 0:
+            new_final = max(0.0, pre_redemption_final - redeem_discount)
+            # Platform fee + driver earnings recompute against the new final.
+            # We preserve the ratio implied by the original numbers so a
+            # missing FareSetting doesn't change the split here.
+            if pre_redemption_final > 0:
+                platform_ratio = float(fare.get("platform_fee", 0)) / pre_redemption_final
+            else:
+                platform_ratio = 0.0
+            new_platform = round(new_final * platform_ratio, 2)
+            fare["final_amount"] = round(new_final, 2)
+            fare["platform_fee"] = new_platform
+            fare["driver_earnings"] = round(new_final - new_platform, 2)
+
+    fare["points_earnable"] = earnable
+    fare["redeem_points_used"] = actual_points
+    fare["redeem_discount"] = round(redeem_discount, 2)
+    fare["redeem_reason"] = redeem_reason
+    return fare

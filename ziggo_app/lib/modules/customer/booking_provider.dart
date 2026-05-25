@@ -52,6 +52,8 @@ class BookingProvider extends ChangeNotifier {
     double? parcelWeightKg,
     bool isRental = false,
     int? rentalHours,
+    // BRD: RW-02 — preview redemption
+    int redeemPoints = 0,
   }) async {
     try {
       final resp = await ApiClient.instance.dio.post(
@@ -68,6 +70,7 @@ class BookingProvider extends ChangeNotifier {
           if (isRental) 'is_rental': true,
           if (rentalHours != null) 'rental_hours': rentalHours,
           if (promoCode != null && promoCode.isNotEmpty) 'promo_code': promoCode,
+          if (redeemPoints > 0) 'redeem_points': redeemPoints,
         },
       );
       if (resp.data is! Map) return null;
@@ -109,6 +112,8 @@ class BookingProvider extends ChangeNotifier {
     // Rental fields — only set when the booking is a vehicle-hire
     bool isRental = false,
     int? rentalHours,
+    // BRD: RW-02 — redeem points at checkout
+    int redeemPoints = 0,
   }) async {
     _setBusy(true);
     _lastError = null;
@@ -126,6 +131,7 @@ class BookingProvider extends ChangeNotifier {
           'payment_method': paymentMethod,
           'trip_type': tripType,
           if (promoCode != null && promoCode.isNotEmpty) 'promo_code': promoCode,
+          if (redeemPoints > 0) 'redeem_points': redeemPoints,
           if (isFlash) ...{
             'is_flash': true,
             if (parcelType != null) 'parcel_type': parcelType,

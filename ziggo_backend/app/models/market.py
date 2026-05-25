@@ -86,6 +86,11 @@ class MarketOrder(Base):
     )
     total_amount = Column(DECIMAL(10, 2))
     delivery_fee = Column(DECIMAL(10, 2))
+    # BRD: RW-02 — loyalty redemption snapshot
+    redeem_points = Column(Integer, nullable=False, default=0)
+    redeem_discount = Column(DECIMAL(10, 2), nullable=False, default=0)
+    # BRD: RW-03 — gold delivery discount applied
+    gold_discount = Column(DECIMAL(10, 2), nullable=False, default=0)
     final_amount = Column(DECIMAL(10, 2))
 
     delivery_address = Column(Text)

@@ -42,23 +42,32 @@ class _PromotionsScreenState extends State<PromotionsScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: () => p.refresh(),
-        child: p.loading && p.items.isEmpty
-            ? const Center(child: CircularProgressIndicator())
-            : p.items.isEmpty
-                ? _empty()
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: p.items.length,
-                    itemBuilder: (_, i) {
-                      return EntranceSlide(
-                        delay: Duration(milliseconds: 55 * i),
-                        child: _PromoCard(
-                          promo: p.items[i],
-                          value: _displayValue(p.items[i]),
-                        ),
-                      );
-                    },
-                  ),
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // BRD: RW-01 — loyalty balance card on top of the inbox.
+            _LoyaltyCard(loyalty: p.loyalty),
+            const SizedBox(height: 14),
+            // BRD: RW-04 — category filter chips + claimed-only toggle.
+            _CategoryChips(provider: p),
+            const SizedBox(height: 12),
+            if (p.loading && p.items.isEmpty)
+              const Padding(padding: EdgeInsets.symmetric(vertical: 80),
+                child: Center(child: CircularProgressIndicator()))
+            else if (p.items.isEmpty)
+              _empty()
+            else
+              ...p.items.asMap().entries.map((e) => EntranceSlide(
+                    delay: Duration(milliseconds: 55 * e.key),
+                    child: _PromoCard(
+                      promo: e.value,
+                      value: _displayValue(e.value),
+                      onClaim: () => p.claim(e.value['id'] as int),
+                      onUnclaim: () => p.unclaim(e.value['id'] as int),
+                    ),
+                  )),
+          ],
+        ),
       ),
     );
   }
@@ -98,7 +107,14 @@ class _PromotionsScreenState extends State<PromotionsScreen> {
 class _PromoCard extends StatelessWidget {
   final Map<String, dynamic> promo;
   final String value;
-  const _PromoCard({required this.promo, required this.value});
+  final VoidCallback onClaim;
+  final VoidCallback onUnclaim;
+  const _PromoCard({
+    required this.promo,
+    required this.value,
+    required this.onClaim,
+    required this.onUnclaim,
+  });
 
   static const _months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -229,13 +245,41 @@ class _PromoCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    code,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 18,
-                      letterSpacing: 1.2,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          code,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ),
+                      if (promo['claimed_at'] != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0x1410B981),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.check_rounded, size: 11, color: AppColors.success),
+                              SizedBox(width: 3),
+                              Text('SAVED',
+                                  style: TextStyle(
+                                    color: AppColors.success,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.6,
+                                  )),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -254,6 +298,37 @@ class _PromoCard extends StatelessWidget {
                       children: _metaChips(promo),
                     ),
                   ],
+                  const SizedBox(height: 8),
+                  // BRD: RW-04 — Save/Saved toggle
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: promo['claimed_at'] != null ? onUnclaim : onClaim,
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            side: BorderSide(
+                              color: promo['claimed_at'] != null ? AppColors.success : AppColors.cardBorder,
+                            ),
+                          ),
+                          icon: Icon(
+                            promo['claimed_at'] != null ? Icons.bookmark_remove_rounded : Icons.bookmark_add_rounded,
+                            size: 14,
+                            color: promo['claimed_at'] != null ? AppColors.success : AppColors.textSecondary,
+                          ),
+                          label: Text(
+                            promo['claimed_at'] != null ? 'Saved' : 'Save',
+                            style: TextStyle(
+                              color: promo['claimed_at'] != null ? AppColors.success : AppColors.textPrimary,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -276,6 +351,117 @@ class _PromoCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+
+/// BRD: RW-01 — loyalty balance card on top of the promo inbox.
+class _LoyaltyCard extends StatelessWidget {
+  final Map<String, dynamic> loyalty;
+  const _LoyaltyCard({required this.loyalty});
+
+  @override
+  Widget build(BuildContext context) {
+    final pts = (loyalty['points'] as num?)?.toInt() ?? 0;
+    final value = (loyalty['value'] as num?)?.toDouble() ?? 0;
+    final min = (loyalty['min_redeem_points'] as num?)?.toInt() ?? 100;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: AppColors.blackGradient,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 52, height: 52,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(Icons.stars_rounded, color: Colors.black, size: 26),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Your points',
+                    style: TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.3)),
+                const SizedBox(height: 2),
+                Text('$pts pts',
+                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
+                Text('≈ Rs.${value.toStringAsFixed(0)} · Redeem from $min pts',
+                    style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+/// BRD: RW-04 — category-tagged inbox + saved-only toggle.
+class _CategoryChips extends StatelessWidget {
+  final PromosProvider provider;
+  const _CategoryChips({required this.provider});
+
+  static const _cats = [
+    ('all', 'All'),
+    ('rides', 'Rides'),
+    ('food', 'Food'),
+    ('market', 'Market'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _cats.map((c) {
+                final selected = provider.category == c.$1;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: ChoiceChip(
+                    label: Text(c.$2),
+                    selected: selected,
+                    onSelected: (_) => provider.category = c.$1,
+                    labelStyle: TextStyle(
+                      color: selected ? Colors.white : AppColors.textPrimary,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 12,
+                    ),
+                    selectedColor: Colors.black,
+                    backgroundColor: Colors.white,
+                    side: BorderSide(color: selected ? Colors.black : AppColors.cardBorder),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        FilterChip(
+          label: const Text('Saved'),
+          selected: provider.onlyClaimed,
+          onSelected: (v) => provider.onlyClaimed = v,
+          labelStyle: TextStyle(
+            color: provider.onlyClaimed ? Colors.white : AppColors.textPrimary,
+            fontWeight: FontWeight.w900,
+            fontSize: 12,
+          ),
+          selectedColor: AppColors.success,
+          backgroundColor: Colors.white,
+          side: BorderSide(color: provider.onlyClaimed ? AppColors.success : AppColors.cardBorder),
+        ),
+      ],
     );
   }
 }

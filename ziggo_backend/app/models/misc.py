@@ -10,6 +10,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from decimal import Decimal
 
 from ..database import Base
 
@@ -135,12 +136,56 @@ class SystemSettings(Base):
     daily_bonus_amount = Column(DECIMAL(10, 2), default=1000)
     commission_cycle_rides = Column(Integer, default=5)
     commission_per_cycle = Column(DECIMAL(10, 2), default=500)
+    # Loyalty (BRD: RW-01, RW-02, AD-13)
+    # Default: 1 point per Rs.10 spent (rate=10), each point worth Rs.0.50 (value=0.50)
+    loyalty_earn_rupees_per_point = Column(DECIMAL(10, 2), nullable=False, default=10)
+    loyalty_value_per_point = Column(DECIMAL(10, 4), nullable=False, default=Decimal("0.50"))
+    loyalty_min_redeem_points = Column(Integer, nullable=False, default=100)
+    loyalty_max_redeem_order_pct = Column(DECIMAL(5, 2), nullable=False, default=20)
+    # Gold membership (BRD: RW-03)
+    gold_delivery_discount_pct = Column(DECIMAL(5, 2), nullable=False, default=50)
     # Branding
     logo_url = Column(String(255))
     favicon_url = Column(String(255))
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class LoyaltyTransaction(Base):
+    """Audit ledger for loyalty points (BRD: RW-01).
+
+    `points` is signed: positive on earn, negative on redeem. The matching
+    `customer.loyalty_points` balance is kept hot for fast reads.
+    `source_kind` + `source_id` link back to the booking/order that caused
+    the entry so the admin can trace any anomaly.
+    """
+    __tablename__ = "loyalty_transactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    customer_id = Column(Integer, ForeignKey("customers.id", ondelete="CASCADE"), index=True)
+    points = Column(Integer, nullable=False)
+    kind = Column(String(20), nullable=False)  # earn | redeem | adjust
+    source_kind = Column(String(20))           # booking | food_order | market_order | manual
+    source_id = Column(Integer)
+    description = Column(Text)
+    balance_after = Column(Integer, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class CustomerPromoClaim(Base):
+    """Tracks which promos a customer has 'saved' to their inbox (BRD: RW-04).
+
+    Claiming is purely a UX affordance — the promo can still be applied at
+    checkout without claiming. Claimed promos float to the top of the inbox
+    and get a 'Saved' badge.
+    """
+    __tablename__ = "customer_promo_claims"
+
+    id = Column(Integer, primary_key=True, index=True)
+    customer_id = Column(Integer, ForeignKey("customers.id", ondelete="CASCADE"), index=True)
+    promo_code_id = Column(Integer, ForeignKey("promo_codes.id", ondelete="CASCADE"), index=True)
+    claimed_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class FlashWeightTier(Base):

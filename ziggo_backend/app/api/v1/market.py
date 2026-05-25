@@ -147,8 +147,40 @@ async def create_market_order(
         total += line_total
         lines.append((product, line.quantity))
 
-    delivery_fee = Decimal(str(vendor.delivery_fee or 0)) if (vendor.delivery_fee or 0) > 0 else Decimal("150")
-    final = total + delivery_fee
+    base_delivery_fee = Decimal(str(vendor.delivery_fee or 0)) if (vendor.delivery_fee or 0) > 0 else Decimal("150")
+
+    # BRD: RW-03 — Gold delivery discount.
+    from ...services import loyalty_service as L
+    discounted_delivery_fee = await L.gold_delivery_fee(db, customer, base_delivery_fee)
+    gold_discount = (base_delivery_fee - discounted_delivery_fee).quantize(Decimal("0.01"))
+    delivery_fee = discounted_delivery_fee
+
+    # Optional market promo.
+    promo_discount = Decimal("0")
+    promo_code_applied = None
+    if body.promo_code:
+        from ...models import PromoCode
+        p_q = await db.execute(select(PromoCode).where(PromoCode.code == body.promo_code.upper()))
+        p = p_q.scalars().first()
+        if p and p.is_active and p.category in ("all", "market") and (
+            p.usage_limit is None or p.used_count < p.usage_limit
+        ):
+            if p.discount_type == "percentage":
+                promo_discount = (total * Decimal(str(p.discount_value)) / Decimal("100")).quantize(Decimal("0.01"))
+                if p.max_discount:
+                    promo_discount = min(promo_discount, Decimal(str(p.max_discount)))
+            else:
+                promo_discount = Decimal(str(p.discount_value))
+            promo_code_applied = p.code
+
+    subtotal_before_points = max(Decimal("0.00"), total + delivery_fee - promo_discount)
+
+    # BRD: RW-02 — quote redemption.
+    redeem_pts, redeem_value, _redeem_reason = await L.quote_redemption(
+        db, customer, int(body.redeem_points or 0), subtotal_before_points
+    )
+
+    final = max(Decimal("0.00"), subtotal_before_points - redeem_value)
 
     if body.payment_method == "wallet" and (customer.wallet_balance or Decimal(0)) < final:
         raise HTTPException(status_code=400, detail="Insufficient wallet balance")
@@ -161,6 +193,9 @@ async def create_market_order(
         status=MarketOrderStatus.PENDING,
         total_amount=total,
         delivery_fee=delivery_fee,
+        redeem_points=redeem_pts,
+        redeem_discount=redeem_value,
+        gold_discount=gold_discount,
         final_amount=final,
         delivery_address=body.delivery_address,
         delivery_lat=Decimal(str(body.delivery_lat)),
@@ -171,6 +206,23 @@ async def create_market_order(
     )
     db.add(order)
     await db.flush()
+
+    # BRD: RW-02 — deduct redeemed points.
+    if order.redeem_points and order.redeem_points > 0:
+        await L.redeem_points(
+            db, customer,
+            points=int(order.redeem_points),
+            source_kind="market_order",
+            source_id=order.id,
+            description=f"Redeemed on {order.order_ref}",
+        )
+
+    if promo_code_applied:
+        from ...models import PromoCode
+        bump_q = await db.execute(select(PromoCode).where(PromoCode.code == promo_code_applied))
+        bp = bump_q.scalars().first()
+        if bp:
+            bp.used_count = (bp.used_count or 0) + 1
 
     for product, qty in lines:
         db.add(
@@ -436,6 +488,36 @@ async def update_market_order_status(
     elif new_status == MarketOrderStatus.DELIVERED:
         order.delivered_at = now
         order.payment_status = "paid"
+        # BRD: RW-01 — award loyalty points on delivery.
+        from ...services.loyalty_service import award_points as _award
+        cq = await db.execute(select(Customer).where(Customer.id == order.customer_id))
+        c_for_pts = cq.scalars().first()
+        if c_for_pts and order.final_amount:
+            await _award(
+                db, c_for_pts,
+                spend_amount=order.final_amount,
+                source_kind="market_order",
+                source_id=order.id,
+                description=f"Earned on {order.order_ref}",
+            )
+    elif new_status == MarketOrderStatus.CANCELLED and order.redeem_points and order.redeem_points > 0:
+        # BRD: RW-02 — refund redeemed points on cancellation.
+        cq = await db.execute(select(Customer).where(Customer.id == order.customer_id))
+        cust_refund = cq.scalars().first()
+        if cust_refund:
+            cust_refund.loyalty_points = int(cust_refund.loyalty_points or 0) + int(order.redeem_points)
+            from ...models import LoyaltyTransaction
+            db.add(LoyaltyTransaction(
+                customer_id=cust_refund.id,
+                points=int(order.redeem_points),
+                kind="adjust",
+                source_kind="market_order",
+                source_id=order.id,
+                description=f"Refund — {order.order_ref} cancelled",
+                balance_after=cust_refund.loyalty_points,
+            ))
+            order.redeem_points = 0
+            order.redeem_discount = Decimal("0.00")
 
     await db.commit()
     await db.refresh(order)

@@ -58,6 +58,10 @@ class Booking(Base):
     payment_status = Column(String(20), default="pending")
     promo_code = Column(String(50))
     discount_amount = Column(DECIMAL(10, 2), default=0)
+    # BRD: RW-02 — loyalty redemption snapshot per booking, separate from
+    # `discount_amount` so admin can split promo vs points in finance reports.
+    redeem_points = Column(Integer, nullable=False, default=0)
+    redeem_discount = Column(DECIMAL(10, 2), nullable=False, default=0)
     final_amount = Column(DECIMAL(10, 2))
     platform_fee = Column(DECIMAL(10, 2))
     driver_earnings = Column(DECIMAL(10, 2))
@@ -119,6 +123,8 @@ class PromoCode(Base):
     id = Column(Integer, primary_key=True, index=True)
     code = Column(String(50), unique=True, index=True)
     description = Column(Text)
+    # Surface where the promo applies. "all" = any checkout.
+    category = Column(String(20), nullable=False, default="all")  # all | rides | food | market
     discount_type = Column(String(20))  # percentage, fixed
     discount_value = Column(DECIMAL(10, 2))
     min_order_amount = Column(DECIMAL(10, 2), default=0)
