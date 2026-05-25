@@ -16,6 +16,7 @@ import '../../auth/auth_provider.dart';
 import '../../customer/screens/support_screen.dart';
 import '../driver_provider.dart';
 import 'driver_history_screen.dart';
+import 'driver_documents_screen.dart';
 import 'driver_registration_screen.dart';
 
 class DriverHomeScreen extends StatefulWidget {
@@ -29,6 +30,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ZiggoMapController _mapController = ZiggoMapController();
   bool _bootstrapped = false;
+  // BRD: speed display + mute toggle
+  double _speedKmh = 0;          // updated by the geolocator stream
+  bool _muted = false;           // local-only — wired into TTS when we add it
+  StreamSubscription<Position>? _speedSub;
 
   @override
   void initState() {
@@ -46,6 +51,122 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     if (auth.token != null) {
       await driver.bootstrap(auth.token!);
       _centerOnDriver();
+    }
+    // BRD: live speed read-out — subscribe once, convert m/s → km/h.
+    _speedSub ??= Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high, distanceFilter: 5,
+      ),
+    ).listen((p) {
+      final kmh = (p.speed.isNaN || p.speed < 0) ? 0.0 : p.speed * 3.6;
+      if (!mounted) return;
+      // Don't notify-spam — only setState when it changes by >=1 km/h
+      if ((kmh - _speedKmh).abs() >= 1) setState(() => _speedKmh = kmh);
+    });
+  }
+
+  @override
+  void dispose() {
+    _speedSub?.cancel();
+    super.dispose();
+  }
+
+  /// BRD: Incident reporting — driver taps a chip from a bottom sheet,
+  /// we POST current location + selected kind to the backend.
+  Future<void> _reportIncident() async {
+    final kinds = const [
+      ('accident', 'Accident', Icons.car_crash_rounded, Color(0xFFEF4444)),
+      ('traffic', 'Heavy traffic', Icons.traffic_rounded, Color(0xFFF59E0B)),
+      ('closure', 'Road closed', Icons.do_not_disturb_on_rounded, Color(0xFFEF4444)),
+      ('police', 'Police checkpoint', Icons.shield_rounded, Color(0xFF3B82F6)),
+      ('hazard', 'Hazard / debris', Icons.warning_amber_rounded, Color(0xFFF59E0B)),
+      ('other', 'Other', Icons.report_rounded, Color(0xFF6B7280)),
+    ];
+    final chosen = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Report incident',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
+              const SizedBox(height: 4),
+              const Text(
+                'Other drivers near you will see your warning for the next hour.',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8, runSpacing: 8,
+                children: [
+                  for (final (kind, label, icon, color) in kinds)
+                    GestureDetector(
+                      onTap: () => Navigator.pop(ctx, kind),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: color.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(icon, color: color, size: 18),
+                            const SizedBox(width: 8),
+                            Text(label,
+                                style: TextStyle(
+                                  color: color,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 12,
+                                )),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (chosen == null) return;
+    try {
+      final pos = await Geolocator.getCurrentPosition();
+      await ApiClient.instance.dio.post('/incidents', data: {
+        'kind': chosen,
+        'lat': pos.latitude,
+        'lng': pos.longitude,
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.success,
+          content: Text('Thanks — drivers near you have been warned.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.error,
+          content: Text('Could not send incident. Check your connection.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -207,6 +328,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             MaterialPageRoute(builder: (_) => const DriverHistoryScreen()),
           );
         },
+        onDocuments: () {
+          Navigator.pop(context);
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const DriverDocumentsScreen()),
+          );
+        },
       ),
       body: Stack(
         children: [
@@ -324,6 +452,19 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             alignment: Alignment.bottomCenter,
             child: _buildBottomCard(driver, ride, food, market),
           ),
+          // BRD: speed display + mute toggle + incident-report quick action.
+          // Only shown when the driver is online — same gating as the map.
+          if (driver.isOnline)
+            Positioned(
+              right: 12,
+              top: MediaQuery.of(context).padding.top + 12,
+              child: _DriverHUD(
+                speedKmh: _speedKmh,
+                muted: _muted,
+                onToggleMute: () => setState(() => _muted = !_muted),
+                onReportIncident: _reportIncident,
+              ),
+            ),
         ],
       ),
     );
@@ -1680,7 +1821,8 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
 
 class _Drawer extends StatelessWidget {
   final VoidCallback onHistory;
-  const _Drawer({required this.onHistory});
+  final VoidCallback onDocuments;
+  const _Drawer({required this.onHistory, required this.onDocuments});
 
   @override
   Widget build(BuildContext context) {
@@ -1901,6 +2043,14 @@ class _Drawer extends StatelessWidget {
                     label: 'My Rides',
                     subtitle: 'History & earnings',
                     onTap: onHistory,
+                  ),
+                  // BRD: Driver document upload UI
+                  _menuItem(
+                    icon: Icons.badge_rounded,
+                    color: AppColors.warning,
+                    label: 'KYC Documents',
+                    subtitle: 'NIC, license, vehicle reg, insurance',
+                    onTap: onDocuments,
                   ),
                   _menuItem(
                     icon: Icons.payments_rounded,
@@ -2545,6 +2695,95 @@ class _PendingApprovalScreen extends StatelessWidget {
           child: Text(
             v,
             style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+
+/// BRD: vertical HUD on the driver map — speed read-out, mute toggle, and
+/// the SOS/incident quick-report. Floats over the map top-right.
+class _DriverHUD extends StatelessWidget {
+  final double speedKmh;
+  final bool muted;
+  final VoidCallback onToggleMute;
+  final VoidCallback onReportIncident;
+  const _DriverHUD({
+    required this.speedKmh,
+    required this.muted,
+    required this.onToggleMute,
+    required this.onReportIncident,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        // Speed pill
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: AppStyles.shadowSm,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                speedKmh.toStringAsFixed(0),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 18,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Text('km/h',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 10,
+                    letterSpacing: 0.6,
+                  )),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Mute toggle
+        GestureDetector(
+          onTap: onToggleMute,
+          child: Container(
+            width: 44, height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: muted ? AppColors.textTertiary : Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: AppStyles.shadowSm,
+            ),
+            child: Icon(
+              muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+              color: muted ? Colors.white : AppColors.textPrimary,
+              size: 20,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Incident report
+        GestureDetector(
+          onTap: onReportIncident,
+          child: Container(
+            width: 44, height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.warning,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: AppStyles.shadowSm,
+            ),
+            child: const Icon(Icons.report_rounded, color: Colors.white, size: 22),
           ),
         ),
       ],

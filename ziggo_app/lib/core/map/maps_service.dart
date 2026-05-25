@@ -23,15 +23,37 @@ class PlacePrediction {
 }
 
 /// Result of a Directions API call.
+/// One step in a turn-by-turn route (BRD: Turn-by-turn navigation).
+class DirectionStep {
+  final String instruction;   // HTML-stripped human text ("Turn right onto X")
+  final String maneuver;      // Google's maneuver key ("turn-right", "merge"…)
+  final double distanceM;     // meters for this leg
+  final int durationS;        // seconds for this leg
+  final LatLng startLocation;
+  final LatLng endLocation;
+
+  const DirectionStep({
+    required this.instruction,
+    required this.maneuver,
+    required this.distanceM,
+    required this.durationS,
+    required this.startLocation,
+    required this.endLocation,
+  });
+}
+
 class DirectionsResult {
   final List<LatLng> points;
   final double distanceKm;
   final int durationMin;
+  // BRD: Turn-by-turn navigation
+  final List<DirectionStep> steps;
 
   const DirectionsResult({
     required this.points,
     required this.distanceKm,
     required this.durationMin,
+    this.steps = const [],
   });
 }
 
@@ -194,10 +216,41 @@ class MapsService {
       if (legs.isEmpty) return null;
       final leg = legs.first;
       final encoded = route['overview_polyline']?['points'] as String?;
+
+      // BRD: Turn-by-turn — parse Google's per-step instructions. The
+      // `html_instructions` field has light HTML (<b>, <div>) which we strip.
+      final rawSteps = (leg['steps'] as List?) ?? const [];
+      final steps = <DirectionStep>[];
+      for (final s in rawSteps) {
+        if (s is! Map) continue;
+        final txt = (s['html_instructions'] ?? '').toString().replaceAll(
+              RegExp(r'<[^>]+>'),
+              ' ',
+            ).replaceAll(RegExp(r'\s+'), ' ').trim();
+        final start = s['start_location'] as Map?;
+        final end = s['end_location'] as Map?;
+        if (start == null || end == null) continue;
+        steps.add(DirectionStep(
+          instruction: txt,
+          maneuver: (s['maneuver'] ?? '').toString(),
+          distanceM: ((s['distance']?['value'] as num?) ?? 0).toDouble(),
+          durationS: ((s['duration']?['value'] as num?) ?? 0).toInt(),
+          startLocation: LatLng(
+            (start['lat'] as num).toDouble(),
+            (start['lng'] as num).toDouble(),
+          ),
+          endLocation: LatLng(
+            (end['lat'] as num).toDouble(),
+            (end['lng'] as num).toDouble(),
+          ),
+        ));
+      }
+
       return DirectionsResult(
         points: encoded == null ? const [] : _decodePolyline(encoded),
         distanceKm: ((leg['distance']?['value'] as num?) ?? 0) / 1000.0,
         durationMin: (((leg['duration']?['value'] as num?) ?? 0) / 60).round(),
+        steps: steps,
       );
     } catch (_) {
       return null;
