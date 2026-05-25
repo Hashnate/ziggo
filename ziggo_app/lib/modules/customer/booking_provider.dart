@@ -54,6 +54,8 @@ class BookingProvider extends ChangeNotifier {
     int? rentalHours,
     // BRD: RW-02 — preview redemption
     int redeemPoints = 0,
+    // BRD: CD-19 — intermediate stops, each {lat,lng,address}
+    List<Map<String, dynamic>> stops = const [],
   }) async {
     try {
       final resp = await ApiClient.instance.dio.post(
@@ -71,6 +73,7 @@ class BookingProvider extends ChangeNotifier {
           if (rentalHours != null) 'rental_hours': rentalHours,
           if (promoCode != null && promoCode.isNotEmpty) 'promo_code': promoCode,
           if (redeemPoints > 0) 'redeem_points': redeemPoints,
+          if (stops.isNotEmpty) 'stops': stops,
         },
       );
       if (resp.data is! Map) return null;
@@ -114,6 +117,8 @@ class BookingProvider extends ChangeNotifier {
     int? rentalHours,
     // BRD: RW-02 — redeem points at checkout
     int redeemPoints = 0,
+    // BRD: CD-19 — intermediate stops
+    List<Map<String, dynamic>> stops = const [],
   }) async {
     _setBusy(true);
     _lastError = null;
@@ -132,6 +137,7 @@ class BookingProvider extends ChangeNotifier {
           'trip_type': tripType,
           if (promoCode != null && promoCode.isNotEmpty) 'promo_code': promoCode,
           if (redeemPoints > 0) 'redeem_points': redeemPoints,
+          if (stops.isNotEmpty) 'stops': stops,
           if (isFlash) ...{
             'is_flash': true,
             if (parcelType != null) 'parcel_type': parcelType,
@@ -256,6 +262,33 @@ class BookingProvider extends ChangeNotifier {
       return List<Map<String, dynamic>>.from(resp.data as List);
     } catch (_) {
       return [];
+    }
+  }
+
+  // ---- BRD: CD-19 — driver-side stop transitions -----------------------
+  Future<Map<String, dynamic>?> arriveAtStop(int bookingId, int orderIndex) async {
+    try {
+      final r = await ApiClient.instance.dio.post(
+        '/bookings/$bookingId/stops/$orderIndex/arrive',
+      );
+      return Map<String, dynamic>.from(r.data as Map);
+    } on DioException catch (e) {
+      _lastError = e.response?.data?['detail']?.toString() ?? e.message;
+      notifyListeners();
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> departFromStop(int bookingId, int orderIndex) async {
+    try {
+      final r = await ApiClient.instance.dio.post(
+        '/bookings/$bookingId/stops/$orderIndex/depart',
+      );
+      return Map<String, dynamic>.from(r.data as Map);
+    } on DioException catch (e) {
+      _lastError = e.response?.data?['detail']?.toString() ?? e.message;
+      notifyListeners();
+      return null;
     }
   }
 

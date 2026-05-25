@@ -28,6 +28,9 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
 
   Place? _pickup;
   Place? _drop;
+  // BRD: CD-19 — up to 2 intermediate stops between pickup and drop.
+  final List<Place> _stops = [];
+  static const int _maxStops = 2;
   String? _serviceType;
   String _payment = 'cash';
   String _promo = '';
@@ -163,6 +166,11 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
       _routePoints = const [];
     });
     final booking = context.read<BookingProvider>();
+    final stopsPayload = _stops.map((s) => {
+          'lat': s.location.latitude,
+          'lng': s.location.longitude,
+          'address': s.fullAddress,
+        }).toList();
     for (final st in const ['bike', 'tuk', 'car', 'van', 'truck']) {
       final res = await booking.estimateFare(
         serviceType: st,
@@ -170,6 +178,7 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
         drop: _drop!.location,
         promoCode: _promo.isEmpty ? null : _promo,
         tripType: _tripType,
+        stops: stopsPayload,
       );
       if (res != null) _estimates[st] = res;
     }
@@ -232,6 +241,13 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
         paymentMethod: _payment,
         promoCode: _promo.isEmpty ? null : _promo,
         tripType: _tripType,
+        stops: _stops
+            .map((s) => {
+                  'lat': s.location.latitude,
+                  'lng': s.location.longitude,
+                  'address': s.fullAddress,
+                })
+            .toList(),
       );
     } catch (e) {
       caughtError = e.toString();
@@ -300,6 +316,9 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
                         pinMarker(point: _pickup!.location, icon: Icons.my_location_rounded, color: AppColors.flash),
                       if (_drop != null)
                         pinMarker(point: _drop!.location, icon: Icons.location_on_rounded, color: AppColors.error),
+                      // BRD: CD-19 — show every intermediate stop on the map
+                      for (final s in _stops)
+                        pinMarker(point: s.location, icon: Icons.pin_drop_rounded, color: AppColors.warning),
                     ],
                     polylines: (_pickup != null && _drop != null)
                         ? [
@@ -382,24 +401,14 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
                       value: _pickup?.fullAddress ?? 'Set pickup',
                       color: AppColors.flash,
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 28),
-                      child: Row(
-                        children: [
-                          for (int i = 0; i < 4; i++) ...[
-                            Container(
-                              width: 3,
-                              height: 3,
-                              decoration: BoxDecoration(
-                                color: AppColors.divider,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                          ],
-                        ],
-                      ),
-                    ),
+                    // BRD: CD-19 — render any intermediate stops + the +Add button
+                    for (int i = 0; i < _stops.length; i++) ...[
+                      _stopDots(),
+                      _stopRow(index: i),
+                    ],
+                    _stopDots(),
+                    if (_stops.length < _maxStops)
+                      _addStopButton(),
                     _routeRow(
                       isPickup: false,
                       icon: Icons.location_on_rounded,
@@ -534,6 +543,132 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
         ],
       ],
     );
+  }
+
+  // BRD: CD-19 — small connector dots between pickup / each stop / drop.
+  Widget _stopDots() {
+    return Padding(
+      padding: const EdgeInsets.only(left: 28),
+      child: Row(
+        children: [
+          for (int i = 0; i < 4; i++) ...[
+            Container(
+              width: 3, height: 3,
+              decoration: const BoxDecoration(
+                color: AppColors.divider, shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 4),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // BRD: CD-19 — a row showing one intermediate stop with a remove button.
+  Widget _stopRow({required int index}) {
+    final s = _stops[index];
+    return InkWell(
+      onTap: () => _pickStop(replaceIndex: index),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Container(
+              width: 28, height: 28,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.warning.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text('${index + 1}',
+                  style: const TextStyle(
+                    color: AppColors.warning,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                  )),
+            ),
+            const SizedBox(width: 12),
+            const Text('STOP',
+                style: TextStyle(
+                  color: AppColors.textTertiary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.4,
+                )),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                s.fullAddress,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close_rounded, size: 18),
+              color: AppColors.textTertiary,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onPressed: () {
+                setState(() => _stops.removeAt(index));
+                if (_pickup != null && _drop != null) _recalculate();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // BRD: CD-19 — "+ Add stop" affordance between pickup and drop.
+  Widget _addStopButton() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+      child: InkWell(
+        onTap: () => _pickStop(),
+        borderRadius: BorderRadius.circular(10),
+        child: Row(
+          children: [
+            const SizedBox(width: 16),
+            const Icon(Icons.add_location_alt_rounded,
+                size: 18, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Text(
+              _stops.isEmpty ? 'Add stop' : 'Add another stop',
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w900,
+                fontSize: 12,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickStop({int? replaceIndex}) async {
+    final picked = await showPlaceSearch(
+      context,
+      title: replaceIndex != null
+          ? 'Edit stop ${replaceIndex + 1}'
+          : 'Add stop ${_stops.length + 1}',
+      near: _pickup?.location ?? kColomboCenter,
+      allowCurrentLocation: false,
+    );
+    if (picked == null) return;
+    setState(() {
+      if (replaceIndex != null) {
+        _stops[replaceIndex] = picked;
+      } else {
+        _stops.add(picked);
+      }
+    });
+    if (_pickup != null && _drop != null) await _recalculate();
   }
 
   Widget _routeRow({
