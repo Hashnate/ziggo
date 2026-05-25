@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"c:\\\\Users\\\\Muzakkir\\\\Desktop\\\\Internship\\\\Hashnate\\\\Task 4\\\\ziggo Website\" && mkdir -p pages/services assets/css assets/js assets/images/logo assets/images/hero assets/images/services assets/images/icons assets/images/testimonials components && find . -type d)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\Muzakkir\\Desktop\\Internship\\Hashnate\\Task 4\\ziggo Website\\pages\\services"
+    ]
+  }
+}

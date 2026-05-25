@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign up | Ziggo</title>
+  <meta name="description" content="Create your free Ziggo account. Join Sri Lanka's #1 super app in 30 seconds." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="../assets/css/premium.css?v=20260522-pm138-safetymeta">
+  <style>
+    .auth-bg {
+      min-height: 100vh;
+      padding: 130px 0 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 20%, rgba(96,165,250,.18), transparent 60%),
+        radial-gradient(ellipse 60% 50% at 85% 80%, rgba(147,197,253,.15), transparent 60%),
+        linear-gradient(180deg,#FBFCFE 0%,#F5F8FE 100%);
+    }
+    .auth-bg::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle at 1px 1px, rgba(30,58,138,.06) 1px, transparent 0);
+      background-size: 28px 28px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 30%, transparent 80%);
+      -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 30%, transparent 80%);
+    }
+    .auth-wrap { position: relative; z-index: 1; max-width: 480px; width: 100%; margin: 0 auto; padding: 0 24px; }
+    .auth-card {
+      background: #fff;
+      border: 1px solid rgba(11,20,38,0.06);
+      border-radius: 24px;
+      padding: 44px 40px;
+      box-shadow:
+        0 1px 2px rgba(11,20,38,0.04),
+        0 32px 70px -20px rgba(11,20,38,0.18);
+      position: relative;
+      overflow: hidden;
+    }
+    .auth-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 50%, #60A5FA 100%);
+    }
+    .auth-card .eyebrow-row { text-align: center; margin-bottom: 16px; }
+    .auth-card h2 {
+      font-family: var(--p-font-display);
+      font-size: 1.9rem;
+      font-weight: 700;
+      letter-spacing: -.03em;
+      color: var(--p-brand-dark);
+      margin: 0 0 8px;
+      text-align: center;
+    }
+    .auth-card .subtitle {
+      color: var(--p-text-light);
+      font-size: .95rem;
+      margin: 0 0 28px;
+      text-align: center;
+    }
+
+    /* Inputs with icon */
+    .auth-form .form-row { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+    .auth-form label { font-size: .78rem; color: #475569; font-weight: 600; letter-spacing: .02em; }
+    .auth-input { position: relative; display: flex; align-items: center; }
+    .auth-input i {
+      position: absolute;
+      left: 16px;
+      color: #94A3B8;
+      font-size: 0.92rem;
+      pointer-events: none;
+    }
+    .auth-input input {
+      width: 100%;
+      padding: 14px 14px 14px 46px;
+      background: #F8FAFC;
+      border: 1.5px solid transparent;
+      border-radius: 12px;
+      font-size: .95rem;
+      font-family: var(--p-font-body);
+      color: var(--p-text);
+      transition: all .2s var(--p-ease);
+    }
+    .auth-input input:focus {
+      outline: none;
+      border-color: #3B82F6;
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(59,130,246,0.12);
+    }
+    .auth-input:focus-within i { color: #3B82F6; }
+    .auth-input .toggle-pwd {
+      position: absolute;
+      right: 14px;
+      background: transparent;
+      border: 0;
+      color: #94A3B8;
+      cursor: pointer;
+      font-size: 0.9rem;
+      padding: 4px;
+    }
+    .auth-input .toggle-pwd:hover { color: #3B82F6; }
+
+    .terms-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: .87rem;
+      color: #475569;
+      margin: 4px 0 22px;
+    }
+    .terms-row input { margin-top: 3px; width: 16px; height: 16px; accent-color: #1E3A8A; }
+    .terms-row a { color: var(--p-brand); font-weight: 600; }
+
+    .auth-form button[type="submit"] {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%);
+      color: #fff;
+      border: 0;
+      border-radius: 12px;
+      font-family: var(--p-font-display);
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: -.01em;
+      cursor: pointer;
+      box-shadow: 0 12px 24px -10px rgba(30,58,138,0.5);
+      transition: transform .2s var(--p-ease), box-shadow .25s var(--p-ease);
+    }
+    .auth-form button[type="submit"]:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 18px 32px -12px rgba(30,58,138,0.6);
+    }
+    .auth-form button[type="submit"] i { margin-left: 8px; }
+
+    /* Social divider + buttons */
+    .auth-divider {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin: 26px 0 20px;
+      color: #94A3B8;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .auth-divider::before, .auth-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #E2E8F0;
+    }
+    .auth-socials {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .auth-social {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 12px;
+      background: #fff;
+      border: 1.5px solid #E2E8F0;
+      border-radius: 12px;
+      font-family: var(--p-font-body);
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: #0B1426;
+      cursor: pointer;
+      transition: all .2s var(--p-ease);
+    }
+    .auth-social:hover { border-color: #94A3B8; background: #F8FAFC; }
+    .auth-social.apple i { color: #0B1426; }
+    .auth-social svg { flex-shrink: 0; }
+
+    .auth-foot {
+      text-align: center;
+      margin-top: 26px;
+      font-size: .92rem;
+      color: var(--p-text-light);
+    }
+    .auth-foot a { color: var(--p-brand); font-weight: 600; text-decoration: none; }
+    .auth-foot a:hover { text-decoration: underline; }
+
+    @media (max-width: 600px) {
+      .auth-card { padding: 32px 24px; }
+      .auth-card h2 { font-size: 1.55rem; }
+      .auth-socials { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body class="pm">
+
+<nav class="pm-topbar" id="pmTopbar">
+  <div class="pm-topbar-inner">
+    <a href="../index.html" class="pm-nav-logo"><img src="../assets/images/logo/logo-dark.png" alt="Ziggo"></a>
+    <ul class="pm-nav-links">
+      <li class="pm-nav-has-dropdown">
+        <a href="#" class="pm-nav-link">Services <i class="fa-solid fa-chevron-down"></i></a>
+        <div class="pm-nav-dropdown">
+          <a href="services/ride.html" class="color-ride"><span class="ico ico-img"><img src="../assets/images/services/ride.png?v=pm108-realstudio" alt=""></span><div><strong>Ride</strong><small>Tuk, Mini, City, Flex, Lux</small></div></a>
+          <a href="services/food.html" class="color-food"><span class="ico ico-img"><img src="../assets/images/services/food.png?v=20260520123" alt=""></span><div><strong>Food</strong><small>10,000+ restaurants</small></div></a>
+          <a href="services/flash.html" class="color-flash"><span class="ico ico-img"><img src="../assets/images/services/flash.png?v=20260520123" alt=""></span><div><strong>Flash</strong><small>Same-day parcel delivery</small></div></a>
+          <a href="services/truck.html" class="color-truck"><span class="ico ico-img"><img src="../assets/images/services/truck.png?v=20260520123" alt=""></span><div><strong>Truck</strong><small>Moving &amp; cargo, with helpers</small></div></a>
+          <a href="services/mart.html" class="color-mart">
+            <span class="ico ico-img"><img src="../assets/images/services/mart.png?v=pm115-cleanbag" alt=""></span>
+            <div><strong>Mart</strong><small>Groceries in 30 minutes</small></div>
+          </a>
+          <a href="signup.html" class="pm-mega-footer"><div class="text"><strong>Ziggo Pass</strong><small>Unlimited free delivery for Rs. 549/mo</small></div><span class="cta">Try free <i class="fa-solid fa-arrow-right"></i></span></a>
+        </div>
+      </li>
+      <li class="pm-nav-has-dropdown">
+        <a href="#" class="pm-nav-link">Partner <i class="fa-solid fa-chevron-down"></i></a>
+        <div class="pm-nav-dropdown">
+          <a href="drive.html" class="color-drive"><span class="ico ico-img"><img src="../assets/images/services/ride.png?v=pm108-realstudio" alt=""></span><div><strong>Drive with Ziggo</strong><small>Be your own boss</small></div></a>
+          <a href="partner.html" class="color-merchant"><span class="ico ico-img"><img src="../assets/images/services/food.png?v=20260520123" alt=""></span><div><strong>Merchant partner</strong><small>List your restaurant or store</small></div></a>
+          <a href="business.html" class="color-biz"><span class="ico ico-img"><img src="../assets/images/services/truck.png?v=20260520123" alt=""></span><div><strong>For Business</strong><small>Corporate accounts</small></div></a>
+          <a href="drive.html" class="pm-mega-footer"><div class="text"><strong>Earn up to LKR 60K / week</strong><small>50,000 drivers already on Ziggo</small></div><span class="cta">Apply <i class="fa-solid fa-arrow-right"></i></span></a>
+        </div>
+      </li>
+      <li><a href="careers.html" class="pm-nav-link">Careers</a></li>
+      <li><a href="about.html" class="pm-nav-link">About</a></li>
+    </ul>
+    <div class="pm-nav-cta"><a href="signup.html" class="signup">Get the app</a>
+    </div>
+    <button class="pm-nav-toggle" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
+  </div>
+</nav>
+
+<section class="auth-bg">
+  <div class="auth-wrap">
+    <div class="auth-card" data-reveal>
+      <div class="eyebrow-row"><span class="pm-eyebrow"><span class="dot"></span> Get started</span></div>
+      <h2>Create your account</h2>
+      <p class="subtitle">Join Sri Lanka's #1 super app &mdash; free, in 30 seconds.</p>
+
+      <form class="auth-form" onsubmit="event.preventDefault(); this.querySelector('button[type=submit]').innerHTML='Account created'; this.querySelector('button[type=submit]').disabled=true;">
+        <div class="form-row">
+          <label>Full name</label>
+          <div class="auth-input"><i class="fa-solid fa-user"></i><input type="text" required placeholder="Your name" /></div>
+        </div>
+        <div class="form-row">
+          <label>Mobile number</label>
+          <div class="auth-input"><i class="fa-solid fa-mobile-screen"></i><input type="tel" required placeholder="+94 7X XXX XXXX" /></div>
+        </div>
+        <div class="form-row">
+          <label>Email (optional)</label>
+          <div class="auth-input"><i class="fa-solid fa-envelope"></i><input type="email" placeholder="you@email.com" /></div>
+        </div>
+        <div class="form-row">
+          <label>Password</label>
+          <div class="auth-input">
+            <i class="fa-solid fa-lock"></i>
+            <input type="password" required placeholder="Min 8 characters" minlength="8" />
+            <button type="button" class="toggle-pwd" aria-label="Show password"><i class="fa-solid fa-eye"></i></button>
+          </div>
+        </div>
+        <div class="terms-row">
+          <input type="checkbox" required />
+          <span>I agree to the <a href="terms.html">Terms of Service</a> and <a href="privacy.html">Privacy Policy</a></span>
+        </div>
+        <button type="submit">Create account <i class="fa-solid fa-arrow-right"></i></button>
+
+        <div class="auth-divider">or continue with</div>
+        <div class="auth-socials">
+          <button type="button" class="auth-social google">
+            <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.6-.4-3.5z"/>
+              <path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
+              <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2c-2 1.5-4.5 2.5-7.2 2.5-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/>
+              <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.1 5.7l6.2 5.2C39 35.1 44 30 44 24c0-1.3-.1-2.6-.4-3.5z"/>
+            </svg> Google
+          </button>
+          <button type="button" class="auth-social apple"><i class="fa-brands fa-apple"></i> Apple</button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+</section>
+
+<footer class="pm-footer">
+  <div class="pm-footer-top">
+    <div class="pm-footer-brand">
+      <a href="../index.html" class="pm-nav-logo pm-footer-logo"><img src="../assets/images/logo/logo-light.png" alt="Ziggo"></a>
+      <p>Sri Lanka's super app for rides, food, parcels and more &mdash; all in one place.</p>
+      <div class="socials">
+        <a href="#" aria-label="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
+        <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
+        <a href="#" aria-label="X"><i class="fa-brands fa-x-twitter"></i></a>
+        <a href="#" aria-label="LinkedIn"><i class="fa-brands fa-linkedin-in"></i></a>
+        <a href="#" aria-label="YouTube"><i class="fa-brands fa-youtube"></i></a>
+      </div>
+    </div>
+    <div class="pm-footer-col"><h5>Services</h5><ul><li><a href="services/ride.html">Ride</a></li><li><a href="services/food.html">Food</a></li><li><a href="services/flash.html">Flash</a></li><li><a href="services/truck.html">Truck</a></li><li><a href="services/mart.html">Mart</a></li></ul></div>
+    <div class="pm-footer-col"><h5>Partner</h5><ul><li><a href="drive.html">Drive with Ziggo</a></li><li><a href="partner.html">Merchant partner</a></li><li><a href="business.html">For Business</a></li><li><a href="signup.html">Ziggo Pass</a></li></ul></div>
+    <div class="pm-footer-col"><h5>Company</h5><ul><li><a href="about.html">About</a></li><li><a href="news.html">News</a></li><li><a href="careers.html">Careers</a></li><li><a href="contact.html">Contact</a></li></ul></div>
+    <div class="pm-footer-col"><h5>Support</h5><ul><li><a href="help.html">Help Center</a></li><li><a href="help.html#safety">Safety</a></li><li><a href="privacy.html">Privacy</a></li><li><a href="terms.html">Terms</a></li></ul></div>
+  </div>
+  <div class="pm-footer-bottom">
+    <span>&copy; 2026 Ziggo.lk</span>
+    <div><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="contact.html">Contact</a></div>
+  </div>
+</footer>
+
+<div class="pm-fab-stack">
+  <a href="#" class="pm-fab fab-back-to-top" aria-label="Back to top"><i class="fa-solid fa-arrow-up"></i></a>
+  <a href="help.html" class="pm-fab help" aria-label="Help"><i class="fa-solid fa-question"></i></a>
+</div>
+
+<script>
+(function() {
+  window.pmFallback = function(img, fallback) { if (img && img.src !== fallback) img.src = fallback; };
+  const reveals = document.querySelectorAll('[data-reveal]');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { const d = e.target.dataset.revealDelay || 0; setTimeout(() => e.target.classList.add('revealed'), d); observer.unobserve(e.target); } });
+  }, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
+  reveals.forEach(el => observer.observe(el));
+
+  const topbar = document.getElementById('pmTopbar');
+  if (topbar) { const onScroll = () => topbar.classList.toggle('scrolled', window.scrollY > 12); window.addEventListener('scroll', onScroll, { passive: true }); onScroll(); }
+  const backToTop = document.querySelector('.fab-back-to-top');
+  if (backToTop) backToTop.addEventListener('click', (e) => { e.preventDefault(); window.scrollTo({ top:0, behavior:'smooth' }); });
+  const navToggle = document.querySelector('.pm-nav-toggle');
+  const navLinks = document.querySelector('.pm-nav-links');
+  if (navToggle && navLinks) navToggle.addEventListener('click', () => { navLinks.classList.toggle('open'); navToggle.classList.toggle('open'); });
+
+  // Show / hide password
+  document.querySelectorAll('.toggle-pwd').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const input = btn.parentElement.querySelector('input');
+      const icon = btn.querySelector('i');
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+      } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>
