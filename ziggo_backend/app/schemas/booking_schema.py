@@ -1,8 +1,15 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 from ..models.booking import BookingStatus
+
+
+class StopRequest(BaseModel):
+    """An intermediate waypoint (BRD: CD-19)."""
+    lat: float
+    lng: float
+    address: Optional[str] = None
 
 
 class FareEstimateRequest(BaseModel):
@@ -21,6 +28,8 @@ class FareEstimateRequest(BaseModel):
     rental_hours: Optional[int] = Field(default=None, ge=1, le=24)
     # BRD: RW-02 — optional preview of points redemption on the estimate
     redeem_points: int = 0
+    # BRD: CD-19 — up to N intermediate stops (server clamps to admin limit)
+    stops: List[StopRequest] = Field(default_factory=list)
 
 
 class FareEstimateResponse(BaseModel):
@@ -41,6 +50,9 @@ class FareEstimateResponse(BaseModel):
     redeem_points_used: int = 0
     redeem_discount: float = 0
     redeem_reason: Optional[str] = None
+    # BRD: CD-19 — multi-stop snapshot
+    stop_count: int = 0
+    stops_fee: float = 0
 
 
 class BookingCreate(BaseModel):
@@ -67,6 +79,8 @@ class BookingCreate(BaseModel):
     rental_hours: Optional[int] = Field(default=None, ge=1, le=24)
     # BRD: RW-02 — points the customer wants to redeem at checkout
     redeem_points: int = 0
+    # BRD: CD-19 — up to N intermediate stops (server clamps to admin limit)
+    stops: List[StopRequest] = Field(default_factory=list)
 
 
 class DriverMini(BaseModel):

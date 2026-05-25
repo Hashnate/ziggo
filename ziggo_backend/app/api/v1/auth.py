@@ -85,4 +85,17 @@ async def verify_otp(request: OTPVerify, db: AsyncSession = Depends(get_db)):
 
 @router.get("/me", response_model=UserResponse)
 async def get_me(user: User = Depends(get_current_user)):
-    return user
+    # BRD: CD-34 — attach profile completeness so the mobile widget can render.
+    from ...services.auth_service import compute_profile_completeness
+    return UserResponse(
+        id=user.id,
+        phone_number=user.phone_number,
+        full_name=user.full_name,
+        email=user.email,
+        role=user.role,
+        is_active=user.is_active,
+        profile_photo=user.profile_photo,
+        rating=float(user.rating) if user.rating is not None else None,
+        total_rides=user.total_rides,
+        profile_completeness=compute_profile_completeness(user),
+    )

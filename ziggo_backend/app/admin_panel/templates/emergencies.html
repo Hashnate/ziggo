@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Emergencies | Ziggo Admin{% endblock %}
+{% block page_title %}Emergencies{% endblock %}
+{% block top_title %}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Header -->
+    <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center text-xl">
+            <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <div>
+            <h2 class="text-2xl font-black text-ziggo-ink leading-tight">SOS &amp; Emergency Alerts</h2>
+            <p class="text-xs text-ziggo-muted font-bold">Mid-ride panic-button triggers from riders and drivers (BRD: CD-17)</p>
+        </div>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center text-xl">
+                <i class="fas fa-bell"></i>
+            </div>
+            <div>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Open</p>
+                <p class="text-3xl font-black text-rose-600 leading-none mt-1">{{ open_count }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center text-xl">
+                <i class="fas fa-eye"></i>
+            </div>
+            <div>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Acknowledged</p>
+                <p class="text-3xl font-black text-amber-600 leading-none mt-1">{{ acknowledged_count }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl">
+                <i class="fas fa-check-double"></i>
+            </div>
+            <div>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Closed</p>
+                <p class="text-3xl font-black text-emerald-600 leading-none mt-1">{{ resolved_count }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-xl">
+                <i class="fas fa-history"></i>
+            </div>
+            <div>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">All-time</p>
+                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">{{ total_count }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alerts table -->
+    <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-gray-50 text-[11px] uppercase text-ziggo-muted font-black tracking-wider">
+                    <tr>
+                        <th class="px-6 py-4">#</th>
+                        <th class="px-6 py-4">When</th>
+                        <th class="px-6 py-4">User</th>
+                        <th class="px-6 py-4">Booking</th>
+                        <th class="px-6 py-4">Location</th>
+                        <th class="px-6 py-4">Note</th>
+                        <th class="px-6 py-4">Status</th>
+                        <th class="px-6 py-4 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-ziggo-line">
+                    {% for a in alerts %}
+                    <tr class="hover:bg-gray-50/50 {% if a.status == 'open' %}bg-rose-50/40{% endif %}">
+                        <td class="px-6 py-4 font-bold text-ziggo-ink">#{{ a.id }}</td>
+                        <td class="px-6 py-4 text-sm text-ziggo-muted">{{ a.created_at.strftime("%Y-%m-%d %H:%M") if a.created_at else '—' }}</td>
+                        <td class="px-6 py-4">
+                            {% if a.user %}
+                            <p class="text-sm font-black text-ziggo-ink">{{ a.user.full_name or '—' }}</p>
+                            <p class="text-[11px] text-ziggo-muted">{{ a.user.phone_number or '' }}</p>
+                            {% else %}
+                            <span class="text-ziggo-muted text-sm">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-sm font-bold text-ziggo">{{ a.booking_ref or '—' }}</td>
+                        <td class="px-6 py-4 text-sm">
+                            {% if a.lat and a.lng %}
+                            <a href="https://www.google.com/maps?q={{ a.lat }},{{ a.lng }}" target="_blank"
+                               class="text-ziggo font-black hover:underline">
+                                <i class="fas fa-map-marker-alt mr-1"></i> Open in Maps
+                            </a>
+                            <p class="text-[11px] text-ziggo-faint mt-0.5">{{ "%.5f"|format(a.lat) }}, {{ "%.5f"|format(a.lng) }}</p>
+                            {% else %}
+                            <span class="text-ziggo-faint">No location</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-sm text-ziggo-muted">{{ a.note or '—' }}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider
+                                {% if a.status == 'open' %}bg-rose-50 text-rose-600
+                                {% elif a.status == 'acknowledged' %}bg-amber-50 text-amber-600
+                                {% elif a.status == 'resolved' %}bg-emerald-50 text-emerald-600
+                                {% else %}bg-gray-100 text-gray-500{% endif %}">
+                                {{ a.status }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex items-center justify-end gap-2">
+                                {% if a.status == 'open' %}
+                                <form method="POST" action="/admin/emergencies/{{ a.id }}/acknowledge">
+                                    <button type="submit" class="px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-black hover:bg-amber-600">
+                                        Acknowledge
+                                    </button>
+                                </form>
+                                {% endif %}
+                                {% if a.status in ('open', 'acknowledged') %}
+                                <form method="POST" action="/admin/emergencies/{{ a.id }}/resolve">
+                                    <button type="submit" class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-black hover:bg-emerald-700">
+                                        Resolve
+                                    </button>
+                                </form>
+                                <form method="POST" action="/admin/emergencies/{{ a.id }}/dismiss" onsubmit="return confirm('Dismiss this alert as a false alarm?');">
+                                    <button type="submit" class="px-3 py-1.5 border border-ziggo-line rounded-lg text-xs font-black text-ziggo-muted hover:bg-gray-50">
+                                        Dismiss
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="px-6 py-16 text-center">
+                            <i class="fas fa-shield-alt text-4xl text-ziggo-faint mb-3"></i>
+                            <p class="text-ziggo-muted font-bold">No SOS alerts.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

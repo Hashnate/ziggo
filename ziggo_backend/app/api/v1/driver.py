@@ -1,12 +1,14 @@
+import os
+import secrets
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from ...database import get_db
-from ...models import Driver, DriverStatus, User
+from ...models import Driver, DriverDocument, DriverStatus, User
 from ...schemas import (
     DriverLocationUpdate,
     DriverOnlineToggle,
@@ -227,3 +229,123 @@ async def toggle_online(
         "lng": float(d.current_lng) if d.current_lng is not None else None,
     })
     return {"is_online": d.is_online}
+
+
+# ---------- BRD: Driver KYC document upload UI ----------
+# Where uploads land. Lives under the admin-panel static volume so the
+# admin can view the same files in the browser without extra plumbing.
+_DOC_UPLOAD_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+    "admin_panel", "static", "uploads", "driver_docs",
+)
+os.makedirs(_DOC_UPLOAD_DIR, exist_ok=True)
+_VALID_DOC_TYPES = {"nic", "license", "vehicle_reg", "insurance"}
+_ALLOWED_DOC_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".pdf"}
+_MAX_DOC_BYTES = 8 * 1024 * 1024  # 8 MB — PDFs of scanned IDs can be chunky
+
+
+async def _save_driver_doc(asset: UploadFile, doc_type: str) -> str:
+    ext = os.path.splitext(asset.filename or "")[1].lower()
+    if ext not in _ALLOWED_DOC_EXTS:
+        raise HTTPException(status_code=400, detail="Document must be JPG, PNG, WEBP, or PDF")
+    data = await asset.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file")
+    if len(data) > _MAX_DOC_BYTES:
+        raise HTTPException(status_code=400, detail="File must be under 8 MB")
+    fname = f"{doc_type}_{secrets.token_hex(8)}{ext}"
+    fpath = os.path.join(_DOC_UPLOAD_DIR, fname)
+    with open(fpath, "wb") as f:
+        f.write(data)
+    return f"/static/uploads/driver_docs/{fname}"
+
+
+@router.post("/documents")
+async def upload_driver_document(
+    document_type: str = Form(...),
+    document: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("driver")),
+):
+    """Driver uploads (or replaces) a KYC document.
+
+    Replacing an existing doc of the same type wipes its `is_verified` flag —
+    admin needs to verify again. The old file isn't deleted from disk (keeps
+    an audit trail in case the driver disputes a rejection).
+    """
+    doc_type = document_type.strip().lower()
+    if doc_type not in _VALID_DOC_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"document_type must be one of {sorted(_VALID_DOC_TYPES)}",
+        )
+
+    dq = await db.execute(select(Driver).where(Driver.user_id == user.id))
+    d = dq.scalars().first()
+    if not d:
+        raise HTTPException(status_code=404, detail="Driver profile not found")
+
+    url = await _save_driver_doc(document, doc_type)
+
+    # Upsert by (driver_id, document_type)
+    exq = await db.execute(
+        select(DriverDocument).where(
+            DriverDocument.driver_id == d.id,
+            DriverDocument.document_type == doc_type,
+        )
+    )
+    existing = exq.scalars().first()
+    if existing:
+        existing.document_url = url
+        existing.is_verified = False
+        existing.verified_by = None
+        existing.verified_at = None
+        existing.uploaded_at = datetime.now(timezone.utc)
+        doc = existing
+    else:
+        doc = DriverDocument(
+            driver_id=d.id,
+            document_type=doc_type,
+            document_url=url,
+            is_verified=False,
+        )
+        db.add(doc)
+    await db.commit()
+    await db.refresh(doc)
+    return {
+        "id": doc.id,
+        "document_type": doc.document_type,
+        "document_url": doc.document_url,
+        "is_verified": doc.is_verified,
+        "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
+    }
+
+
+@router.get("/documents")
+async def list_my_documents(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("driver")),
+):
+    """List this driver's documents — each of the 4 expected types is
+    returned, even if not yet uploaded, so the UI can render placeholders."""
+    dq = await db.execute(select(Driver).where(Driver.user_id == user.id))
+    d = dq.scalars().first()
+    if not d:
+        raise HTTPException(status_code=404, detail="Driver profile not found")
+
+    q = await db.execute(
+        select(DriverDocument).where(DriverDocument.driver_id == d.id)
+    )
+    by_type = {row.document_type: row for row in q.scalars().all()}
+    out = []
+    for kind in ("nic", "license", "vehicle_reg", "insurance"):
+        row = by_type.get(kind)
+        out.append({
+            "document_type": kind,
+            "id": row.id if row else None,
+            "document_url": row.document_url if row else None,
+            "is_verified": bool(row.is_verified) if row else False,
+            "uploaded_at": row.uploaded_at.isoformat() if (row and row.uploaded_at) else None,
+            "verified_at": row.verified_at.isoformat() if (row and row.verified_at) else None,
+        })
+    return out
