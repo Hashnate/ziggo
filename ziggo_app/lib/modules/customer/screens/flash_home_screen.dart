@@ -11,8 +11,16 @@ import '../../../core/map/ziggo_map.dart';
 import '../booking_provider.dart';
 import 'flash_tracking_screen.dart';
 
+/// Which parcel-booking flavour this screen is being used for.
+///
+/// BRD: PR-03 (Basic Courier) and PR-05 (Receive Items / inverse Flash)
+/// reuse the same UI as Flash with small wording + payload differences.
+enum ParcelFlowMode { flash, courier, receive }
+
 class FlashHomeScreen extends StatefulWidget {
-  const FlashHomeScreen({super.key});
+  const FlashHomeScreen({super.key, this.mode = ParcelFlowMode.flash});
+
+  final ParcelFlowMode mode;
 
   @override
   State<FlashHomeScreen> createState() => _FlashHomeScreenState();
@@ -112,12 +120,16 @@ class _FlashHomeScreenState extends State<FlashHomeScreen> {
 
   Future<void> _recalc() async {
     if (_pickup == null || _drop == null) return;
+    // Courier and receive use the same per-km math as Flash but skip the
+    // weight-tier surcharge (courier is long-distance, receive is a one-off
+    // collection — neither is weight-graded today).
+    final isFlashMode = widget.mode == ParcelFlowMode.flash;
     final res = await context.read<BookingProvider>().estimateFare(
           serviceType: _serviceType,
           pickup: _pickup!.location,
           drop: _drop!.location,
-          isFlash: true,
-          parcelWeightKg: _selectedWeightKg,
+          isFlash: isFlashMode,
+          parcelWeightKg: isFlashMode ? _selectedWeightKg : null,
         );
     if (mounted) setState(() => _estimate = res);
   }
@@ -196,6 +208,12 @@ class _FlashHomeScreenState extends State<FlashHomeScreen> {
       _busy = true;
       _error = null;
     });
+    // BRD: PR-03 (courier) / PR-05 (receive) — same form, different flag.
+    final isCourier = widget.mode == ParcelFlowMode.courier;
+    final isReceive = widget.mode == ParcelFlowMode.receive;
+    final isFlashMode = widget.mode == ParcelFlowMode.flash;
+    final partyName = _receiverNameCtrl.text.trim();
+    final partyPhone = _normalizedReceiverPhone;
     final created = await context.read<BookingProvider>().createBooking(
           serviceType: _serviceType,
           pickup: _pickup!.location,
@@ -203,11 +221,17 @@ class _FlashHomeScreenState extends State<FlashHomeScreen> {
           drop: _drop!.location,
           dropAddress: _drop!.fullAddress,
           paymentMethod: _payment,
-          isFlash: true,
+          isFlash: isFlashMode,
+          isCourier: isCourier,
+          isPickupRequest: isReceive,
           parcelType: _parcelType,
           parcelWeightKg: _selectedWeightKg,
-          receiverName: _receiverNameCtrl.text.trim(),
-          receiverPhone: _normalizedReceiverPhone,
+          // For send/courier the form captures the receiver; for receive the
+          // same form fields refer to the sender.
+          receiverName: isReceive ? null : partyName,
+          receiverPhone: isReceive ? null : partyPhone,
+          senderName: isReceive ? partyName : null,
+          senderPhone: isReceive ? partyPhone : null,
           parcelInstructions:
               _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
         );
@@ -763,6 +787,11 @@ class _FlashHomeScreenState extends State<FlashHomeScreen> {
   }
 
   Widget _buildReceiverForm() {
+    // BRD: PR-05 — in receive (inverse Flash) mode the same controllers
+    // capture the SENDER details instead of the receiver.
+    final isReceive = widget.mode == ParcelFlowMode.receive;
+    final nameLabel = isReceive ? 'Sender Name' : 'Receiver Name';
+    final phoneLabel = isReceive ? 'Sender Phone' : 'Receiver Phone';
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
       padding: const EdgeInsets.all(20),
@@ -773,12 +802,12 @@ class _FlashHomeScreenState extends State<FlashHomeScreen> {
       ),
       child: Column(
         children: [
-          _textField(_receiverNameCtrl, 'Receiver Name', Icons.person_rounded,
+          _textField(_receiverNameCtrl, nameLabel, Icons.person_rounded,
               hint: 'e.g. Faris Ahmed'),
           const SizedBox(height: 16),
           _textField(
             _receiverPhoneCtrl,
-            'Receiver Phone',
+            phoneLabel,
             Icons.phone_rounded,
             keyboard: TextInputType.number,
             hint: '0712345678',

@@ -497,15 +497,25 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (ride['is_flash'] == true) ...[
-                    const Icon(Icons.inventory_2_rounded,
-                        color: AppColors.textPrimary, size: 12),
+                  // BRD: PR-03 / PR-05 — show different icon + label per kind.
+                  if (ride['is_flash'] == true || ride['is_courier'] == true || ride['is_pickup_request'] == true) ...[
+                    Icon(
+                      ride['is_pickup_request'] == true
+                          ? Icons.move_to_inbox_rounded
+                          : Icons.inventory_2_rounded,
+                      color: AppColors.textPrimary,
+                      size: 12,
+                    ),
                     const SizedBox(width: 4),
                   ],
                   Text(
-                    ride['is_flash'] == true
-                        ? 'PARCEL • ${(status ?? '').toUpperCase()}'
-                        : (status ?? '').toUpperCase(),
+                    () {
+                      final s = (status ?? '').toUpperCase();
+                      if (ride['is_pickup_request'] == true) return 'PICKUP • $s';
+                      if (ride['is_courier'] == true) return 'COURIER • $s';
+                      if (ride['is_flash'] == true) return 'PARCEL • $s';
+                      return s;
+                    }(),
                     style: const TextStyle(
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.w900,
@@ -526,7 +536,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             ),
           ],
         ),
-        if (ride['is_flash'] == true) ...[
+        // BRD: PR-03 / PR-05 — show the parcel/sender banner for any parcel job.
+        if (ride['is_flash'] == true ||
+            ride['is_courier'] == true ||
+            ride['is_pickup_request'] == true) ...[
           const SizedBox(height: 10),
           _parcelInfoBanner(ride),
         ],
@@ -696,7 +709,16 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final weight = ride['parcel_weight_kg'];
     final receiverName = (ride['receiver_name'] ?? '').toString();
     final receiverPhone = (ride['receiver_phone'] ?? '').toString();
+    final senderName = (ride['sender_name'] ?? '').toString();
+    final senderPhone = (ride['sender_phone'] ?? '').toString();
     final instructions = (ride['parcel_instructions'] ?? '').toString();
+    // BRD: PR-05 — on a pickup-request, the *sender* is the party the
+    // driver needs to call (the customer is the receiver). For send/courier
+    // the receiver is who the driver hands the parcel to.
+    final isPickup = ride['is_pickup_request'] == true;
+    final partyLabel = isPickup ? 'From' : 'To';
+    final partyName = isPickup ? senderName : receiverName;
+    final partyPhone = isPickup ? senderPhone : receiverPhone;
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -731,12 +753,12 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     letterSpacing: 0.4,
                   ),
                 ),
-                if (receiverName.isNotEmpty || receiverPhone.isNotEmpty)
+                if (partyName.isNotEmpty || partyPhone.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
-                      'To: $receiverName'
-                      '${receiverPhone.isNotEmpty ? ' • $receiverPhone' : ''}',
+                      '$partyLabel: $partyName'
+                      '${partyPhone.isNotEmpty ? ' • $partyPhone' : ''}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -763,10 +785,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               ],
             ),
           ),
-          if (receiverPhone.isNotEmpty)
+          if (partyPhone.isNotEmpty)
             GestureDetector(
               onTap: () async {
-                final uri = Uri.parse('tel:$receiverPhone');
+                final uri = Uri.parse('tel:$partyPhone');
                 if (await canLaunchUrl(uri)) await launchUrl(uri);
               },
               child: Container(

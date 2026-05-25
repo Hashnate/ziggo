@@ -17,7 +17,11 @@ import 'customer_shell.dart';
 import 'ride_tracking_screen.dart';
 
 class FareEstimateScreen extends StatefulWidget {
-  const FareEstimateScreen({super.key});
+  const FareEstimateScreen({super.key, this.initialServiceType});
+
+  /// Pre-select a vehicle type when the screen opens (BRD: PR-07 — the
+  /// Truck tile on Home routes here with initialServiceType='truck').
+  final String? initialServiceType;
 
   @override
   State<FareEstimateScreen> createState() => _FareEstimateScreenState();
@@ -48,6 +52,10 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
   void initState() {
     super.initState();
     _pickup = kColomboPlaces[0];
+    // BRD: PR-07 — pre-select the service tile when entering from Truck/etc.
+    if (widget.initialServiceType != null && widget.initialServiceType!.isNotEmpty) {
+      _serviceType = widget.initialServiceType;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _useCurrentLocationForPickup();
       _startNearbyDriverPolling();
