@@ -43,6 +43,18 @@ class WSManager:
         # Visible in uvicorn logs — tells you the user was/wasn't reachable.
         print(f"[ws] → user_id={user_id} event={event} sockets={len(targets)} delivered={delivered}")
 
+        # Piggyback an FCM push so the user still gets notified when the WS
+        # was unreachable (app killed, phone asleep, carrier NAT closed the
+        # TCP). Fire-and-forget — never blocks the WS path. Safe no-op when
+        # Firebase isn't configured.
+        try:
+            from . import fcm_service
+            asyncio.create_task(
+                fcm_service.fire_and_forget_to_user_id(user_id, event, payload)
+            )
+        except Exception:
+            pass
+
     async def broadcast(self, user_ids, event: str, payload: dict) -> None:
         for uid in user_ids:
             await self.send(uid, event, payload)

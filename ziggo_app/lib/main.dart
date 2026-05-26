@@ -42,10 +42,16 @@ Future<void> main() async {
     const Duration(seconds: 4),
     onTimeout: () {},
   );
+
+  // Firebase Cloud Messaging — safe no-op if google-services.json is missing.
+  // registerWithBackend() is called from AuthProvider after a successful login
+  // (we don't know the user yet here).
+
   // Initialise Firebase / FCM. Safe no-op when google-services.json /
   // GoogleService-Info.plist aren't present yet — the rest of the app boots
   // unaffected. registerWithBackend() is called from AuthProvider after a
   // successful login (we don't know the user yet here).
+
   await FcmService.instance.init();
   runApp(const ZiggoApp());
 }

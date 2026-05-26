@@ -6,6 +6,13 @@
 !.env.example
 ziggo_app/android/local.properties
 ziggo_app/ios/Flutter/Secrets.xcconfig
+# Firebase Admin SDK service account — full project access, treat like a password
+ziggo_backend/firebase.json
+ziggo_backend/firebase-*.json
+ziggo_backend/*-firebase-adminsdk-*.json
+# Firebase client config files — regeneratable from console, safer to keep out of git
+ziggo_app/android/app/google-services.json
+ziggo_app/ios/Runner/GoogleService-Info.plist
 
 # Python
 __pycache__/
@@ -44,3 +51,4 @@ ziggo_backend/app/admin_panel/static/uploads/
 # OS junk
 .DS_Store
 Thumbs.db
+ziggo_backend/firebase.json
