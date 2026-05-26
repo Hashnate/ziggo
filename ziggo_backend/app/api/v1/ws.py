@@ -44,8 +44,16 @@ async def ws_endpoint(websocket: WebSocket, token: str = Query(...)):
     await manager.connect(user_id, websocket)
     try:
         while True:
-            # Receive pings or client-side messages; we don't act on them.
-            await websocket.receive_text()
+            raw = await websocket.receive_text()
+            # Heartbeat: client sends `{"event":"ping"}` every 25 s. Reply with
+            # `{"event":"pong"}` so the client can detect half-open sockets
+            # (carrier-NAT killed the TCP, OS suspended the app, etc.).
+            # Older clients that don't send pings keep working unchanged.
+            if raw and '"ping"' in raw:
+                try:
+                    await websocket.send_text('{"event":"pong","data":{}}')
+                except Exception:
+                    break
     except WebSocketDisconnect:
         await manager.disconnect(user_id, websocket)
     except Exception:

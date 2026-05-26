@@ -34,14 +34,30 @@ class WSManager:
             targets = list(self._connections.get(user_id, ()))
         msg = json.dumps({"event": event, "data": payload}, default=str)
         delivered = 0
+        dead = []
         for ws in targets:
             try:
                 await ws.send_text(msg)
                 delivered += 1
             except Exception:
-                pass
+                # Socket is half-open / closed without us noticing. Collect it
+                # for cleanup so the next send doesn't try this dead socket
+                # again — this was the root cause of "driver doesn't get the
+                # ride request" until a hot-restart.
+                dead.append(ws)
+        if dead:
+            async with self._lock:
+                bucket = self._connections.get(user_id)
+                if bucket is not None:
+                    for ws in dead:
+                        bucket.discard(ws)
+                    if not bucket:
+                        self._connections.pop(user_id, None)
         # Visible in uvicorn logs — tells you the user was/wasn't reachable.
-        print(f"[ws] → user_id={user_id} event={event} sockets={len(targets)} delivered={delivered}")
+        print(
+            f"[ws] → user_id={user_id} event={event} sockets={len(targets)} "
+            f"delivered={delivered} reaped={len(dead)}"
+        )
 
         # Piggyback an FCM push so the user still gets notified when the WS
         # was unreachable (app killed, phone asleep, carrier NAT closed the
@@ -80,13 +96,25 @@ class WSManager:
             targets = list(self._topics.get(topic, ()))
         msg = json.dumps({"event": event, "data": payload}, default=str)
         delivered = 0
+        dead = []
         for ws in targets:
             try:
                 await ws.send_text(msg)
                 delivered += 1
             except Exception:
-                pass
-        print(f"[ws] topic={topic} event={event} sockets={len(targets)} delivered={delivered}")
+                dead.append(ws)
+        if dead:
+            async with self._lock:
+                bucket = self._topics.get(topic)
+                if bucket is not None:
+                    for ws in dead:
+                        bucket.discard(ws)
+                    if not bucket:
+                        self._topics.pop(topic, None)
+        print(
+            f"[ws] topic={topic} event={event} sockets={len(targets)} "
+            f"delivered={delivered} reaped={len(dead)}"
+        )
 
 
 manager = WSManager()
