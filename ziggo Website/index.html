@@ -819,6 +819,21 @@
   <a href="pages/help.html" class="pm-fab help" aria-label="Help"><i class="fa-solid fa-question"></i></a>
 </div>
 
+<<<<<<< HEAD
+=======
+<!-- Sticky bottom CTA (appears after scroll) -->
+<div class="pm-sticky-cta" id="pmStickyCta">
+  <div class="pm-sticky-cta-text">
+    <span class="ico"><i class="fa-solid fa-mobile-screen-button"></i></span>
+    <div><strong>Get Ziggo on your phone.</strong> <small>&middot; iOS &amp; Android &middot; Free</small></div>
+  </div>
+  <div class="actions">
+    <a href="pages/signup.html" class="pm-btn pm-btn-primary">Get the app</a>
+    <button class="close" aria-label="Dismiss" id="pmStickyCtaClose"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+</div>
+
+>>>>>>> d23beae8dc0ff42c611bf416f321bef0132c9fd9
 <!-- Inline interactivity (self-contained, lightweight) -->
 <script>
 // Image fallback chain — must be global (called from inline onerror)
@@ -1047,6 +1062,23 @@ window.pmFallback = function(el) {
     startTimer();
   }
 
+<<<<<<< HEAD
+=======
+  // Sticky bottom CTA — appears after ~one viewport of scroll, dismissable
+  const sticky = document.getElementById('pmStickyCta');
+  const stickyClose = document.getElementById('pmStickyCtaClose');
+  if (sticky && !sessionStorage.getItem('pm_sticky_dismissed')) {
+    const reveal = () => {
+      if (window.scrollY > window.innerHeight * 0.85) sticky.classList.add('show');
+    };
+    window.addEventListener('scroll', reveal, { passive: true });
+    reveal();
+    if (stickyClose) stickyClose.addEventListener('click', () => {
+      sticky.classList.remove('show');
+      sessionStorage.setItem('pm_sticky_dismissed', '1');
+    });
+  }
+>>>>>>> d23beae8dc0ff42c611bf416f321bef0132c9fd9
 })();
 </script>
 </body>

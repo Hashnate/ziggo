@@ -38,16 +38,26 @@ Future<void> main() async {
   // On web, inject the Google Maps JS SDK now that we have the key. No-op on
   // mobile/desktop where the SDK comes from native config.
   injectGoogleMapsJs(dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '');
+<<<<<<< HEAD
   await ApiClient.init().timeout(const Duration(seconds: 4), onTimeout: () {});
+=======
+  await ApiClient.init().timeout(
+    const Duration(seconds: 4),
+    onTimeout: () {},
+  );
+>>>>>>> d23beae8dc0ff42c611bf416f321bef0132c9fd9
 
   // Firebase Cloud Messaging — safe no-op if google-services.json is missing.
   // registerWithBackend() is called from AuthProvider after a successful login
   // (we don't know the user yet here).
 
+<<<<<<< HEAD
   // Firebase Cloud Messaging — safe no-op if google-services.json is missing.
   // registerWithBackend() is called from AuthProvider after a successful login
   // (we don't know the user yet here).
 
+=======
+>>>>>>> d23beae8dc0ff42c611bf416f321bef0132c9fd9
   // Initialise Firebase / FCM. Safe no-op when google-services.json /
   // GoogleService-Info.plist aren't present yet — the rest of the app boots
   // unaffected. registerWithBackend() is called from AuthProvider after a
