@@ -67,7 +67,19 @@ services:
       DEV_MODE: ${DEV_MODE:-false}
       PROJECT_NAME: ${PROJECT_NAME:-Ziggo}
       API_V1_STR: ${API_V1_STR:-/api/v1}
-      # Optional third-party (uncomment in .env if/when you wire them):
+      # 3rd-party API keys. All optional — empty values disable each
+      # integration and the app falls back to its stub behaviour.
+      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-}
+      NOTIFY_LK_USER_ID: ${NOTIFY_LK_USER_ID:-}
+      NOTIFY_LK_API_KEY: ${NOTIFY_LK_API_KEY:-}
+      NOTIFY_LK_SENDER_ID: ${NOTIFY_LK_SENDER_ID:-}
+      PAYHERE_MERCHANT_ID: ${PAYHERE_MERCHANT_ID:-}
+      PAYHERE_MERCHANT_SECRET: ${PAYHERE_MERCHANT_SECRET:-}
+      PAYHERE_APP_ID: ${PAYHERE_APP_ID:-}
+      PAYHERE_APP_SECRET: ${PAYHERE_APP_SECRET:-}
+      PAYHERE_MODE: ${PAYHERE_MODE:-sandbox}
+      PAYHERE_NOTIFY_URL: ${PAYHERE_NOTIFY_URL:-}
+      # Legacy stubs (kept for backwards compatibility; safe to delete):
       # TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
       # TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
       # TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:-}

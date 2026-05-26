@@ -5,6 +5,9 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    // Firebase config processor — reads google-services.json. The file is
+    // gitignored; each developer / each environment supplies their own.
+    id("com.google.gms.google-services")
 }
 
 // Read MAPS_API_KEY from android/local.properties (gitignored) so the key

@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -81,6 +81,25 @@ async def verify_otp(request: OTPVerify, db: AsyncSession = Depends(get_db)):
         expires_delta=expires,
     )
     return Token(access_token=token, user_id=user.id, role=user.role)
+
+
+@router.put("/fcm-token")
+async def update_fcm_token(
+    payload: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Save the device's FCM token on the user row.
+
+    The Flutter app calls this after `FirebaseMessaging.getToken()` succeeds
+    AND any time the token rotates. An empty/null token clears it (useful on
+    logout so the device stops receiving pushes for a different user).
+    Body: {"token": "<fcm-registration-token>" | null}
+    """
+    token = (payload.get("token") or "").strip() or None
+    user.notification_token = token
+    await db.commit()
+    return {"ok": True, "saved": bool(token)}
 
 
 @router.get("/me", response_model=UserResponse)

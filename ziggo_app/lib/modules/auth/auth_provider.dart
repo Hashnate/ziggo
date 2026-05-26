@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_client.dart';
+import '../../core/notifications/fcm_service.dart';
 import '../../core/storage/token_storage.dart';
 
 enum AuthStatus { unauthenticated, authenticating, authenticated, error }
@@ -88,6 +91,13 @@ class AuthProvider extends ChangeNotifier {
       _status = AuthStatus.authenticated;
       notifyListeners();
       await _refreshMe();
+
+      // Push the FCM token to the backend now that the JWT is set so realtime
+      // events also arrive via Firebase when the WebSocket is unavailable
+      // (app backgrounded, phone asleep). Fire-and-forget — no-op if
+      // Firebase isn't configured on this build.
+      unawaited(FcmService.instance.registerWithBackend());
+
       return true;
     } on DioException catch (e) {
       _lastError = e.response?.data?['detail']?.toString() ?? e.message;
@@ -140,6 +150,13 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    // Unregister the FCM token BEFORE clearing the JWT so the PUT goes out
+    // with the auth header still attached. Best-effort — failure here must
+    // not block logout.
+    try {
+      await FcmService.instance.clearOnBackend();
+    } catch (_) {}
+
     _status = AuthStatus.unauthenticated;
     _token = null;
     _role = null;

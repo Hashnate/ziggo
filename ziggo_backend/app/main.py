@@ -11,11 +11,12 @@ from fastapi.responses import RedirectResponse
 
 from .config import settings
 from .database import engine
-from .api.v1 import auth, customer, driver, admin, bookings, ws, event, food, market, market_vendor, misc, restaurant, trip_share
+from .api.v1 import auth, customer, driver, admin, bookings, ws, event, food, market, market_vendor, misc, payments, restaurant, trip_share
 from .admin_panel import routes as admin_panel_routes
 from .admin_panel.routes import _AdminRedirect
 from .services.schema_sync import ensure_schema
 from .services.auto_cancel import auto_cancel_loop
+from .services import fcm_service
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -29,6 +30,12 @@ _background_tasks: set[asyncio.Task] = set()
 @app.on_event("startup")
 async def _run_schema_sync() -> None:
     await ensure_schema(engine)
+
+
+@app.on_event("startup")
+async def _init_fcm() -> None:
+    """Initialise Firebase Admin SDK. Safe no-op when credentials aren't set."""
+    fcm_service.init()
 
 
 @app.on_event("startup")
@@ -75,6 +82,7 @@ app.include_router(market_vendor.router, prefix=f"{settings.API_V1_STR}/market/v
 app.include_router(event.router, prefix=f"{settings.API_V1_STR}/events", tags=["events"])
 app.include_router(admin.router, prefix=f"{settings.API_V1_STR}/admin", tags=["admin"])
 app.include_router(misc.router, prefix=settings.API_V1_STR, tags=["misc"])
+app.include_router(payments.router, prefix=f"{settings.API_V1_STR}/payments", tags=["payments"])
 app.include_router(trip_share.router, prefix=settings.API_V1_STR, tags=["trip_share"])
 app.include_router(ws.router, tags=["ws"])
 
