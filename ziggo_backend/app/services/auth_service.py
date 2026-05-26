@@ -47,8 +47,17 @@ async def create_and_send_otp(db: AsyncSession, phone_number: str) -> str:
     db.add(OTPCode(phone_number=phone_number, code=code, expires_at=expires))
     await db.commit()
 
-    # In dev: print to console. In prod: call Twilio.
     print(f"[OTP] {phone_number} -> {code} (expires in {OTP_TTL_MINUTES} min)")
+
+    # Fire-and-forget real-SMS via Notify.lk. No-op when env vars are empty,
+    # so DEV_MODE / local-dev behaviour is unchanged. Errors are swallowed —
+    # the code is still in the DB and the dev path still works.
+    from . import notify_lk_service
+    try:
+        await notify_lk_service.send_otp(phone_number, code)
+    except Exception as e:
+        print(f"[OTP] notify.lk delivery skipped: {type(e).__name__}: {e}")
+
     return code
 
 

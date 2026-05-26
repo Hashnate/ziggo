@@ -6,6 +6,7 @@ import 'app/app_theme.dart';
 import 'core/map/maps_web_loader_stub.dart'
     if (dart.library.html) 'core/map/maps_web_loader.dart';
 import 'core/network/api_client.dart';
+import 'core/notifications/fcm_service.dart';
 import 'modules/auth/auth_provider.dart';
 import 'modules/auth/screens/role_selection_screen.dart';
 import 'modules/common/screens/splash_screen.dart';
@@ -41,6 +42,9 @@ Future<void> main() async {
     const Duration(seconds: 4),
     onTimeout: () {},
   );
+  // Initialise Firebase (FCM). Safe no-op if google-services.json /
+  // GoogleService-Info.plist are missing — caught inside FcmService.init().
+  await FcmService.instance.init();
   runApp(const ZiggoApp());
 }
 

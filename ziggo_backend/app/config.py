@@ -22,6 +22,22 @@ class Settings(BaseSettings):
     STRIPE_WEBHOOK_SECRET: Optional[str] = None
     GOOGLE_MAPS_API_KEY: Optional[str] = None
 
+    # Notify.lk — Sri Lankan SMS gateway. When any of these are empty the
+    # service no-ops and OTP just lands in the uvicorn console (DEV_MODE flow).
+    NOTIFY_LK_USER_ID: Optional[str] = None
+    NOTIFY_LK_API_KEY: Optional[str] = None
+    NOTIFY_LK_SENDER_ID: Optional[str] = None
+
+    # PayHere — Sri Lankan payment gateway. When MERCHANT_ID is empty the
+    # /payments/payhere/* endpoints return 503 and wallet top-ups fall back
+    # to the existing mock direct-credit flow.
+    PAYHERE_MERCHANT_ID: Optional[str] = None
+    PAYHERE_MERCHANT_SECRET: Optional[str] = None
+    PAYHERE_APP_ID: Optional[str] = None
+    PAYHERE_APP_SECRET: Optional[str] = None
+    PAYHERE_MODE: Optional[str] = "sandbox"  # "sandbox" or "live"
+    PAYHERE_NOTIFY_URL: Optional[str] = None
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
 

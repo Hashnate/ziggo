@@ -46,6 +46,7 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("market_orders", "picked_up_at", "DATETIME"),
     ("bookings", "is_rental", "BOOLEAN NOT NULL DEFAULT FALSE"),
     ("bookings", "rental_hours", "INTEGER"),
+    ("users", "notification_token", "VARCHAR(255)"),
 )
 
 

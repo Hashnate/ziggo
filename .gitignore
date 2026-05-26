@@ -10,6 +10,14 @@ ziggo_app/android/app/google-services.json
 ziggo_app/ios/Runner/GoogleService-Info.plist
 ziggo_backend/firebase.json
 
+# Firebase — credential files contain private keys / project secrets and
+# must never enter git history. Each dev / each deploy holds their own.
+ziggo_backend/firebase.json
+ziggo_backend/firebase-*.json
+ziggo_backend/*-firebase-adminsdk-*.json
+ziggo_app/android/app/google-services.json
+ziggo_app/ios/Runner/GoogleService-Info.plist
+
 # Python
 __pycache__/
 *.pyc
