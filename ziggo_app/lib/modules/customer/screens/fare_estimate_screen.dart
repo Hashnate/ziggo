@@ -976,8 +976,6 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
         _payOption('cash', Icons.payments_rounded, 'Cash'),
         const SizedBox(width: 10),
         _payOption('wallet', Icons.account_balance_wallet_rounded, 'Wallet'),
-        const SizedBox(width: 10),
-        _payOption('card', Icons.credit_card_rounded, 'Card'),
       ],
     );
   }
