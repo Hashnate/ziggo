@@ -11,7 +11,7 @@ from fastapi.responses import RedirectResponse
 
 from .config import settings
 from .database import engine
-from .api.v1 import auth, customer, driver, admin, bookings, ws, event, food, market, market_vendor, misc, restaurant
+from .api.v1 import auth, customer, driver, admin, bookings, ws, event, food, market, market_vendor, misc, restaurant, trip_share
 from .admin_panel import routes as admin_panel_routes
 from .admin_panel.routes import _AdminRedirect
 from .services.schema_sync import ensure_schema
@@ -82,6 +82,7 @@ app.include_router(market_vendor.router, prefix=f"{settings.API_V1_STR}/market/v
 app.include_router(event.router, prefix=f"{settings.API_V1_STR}/events", tags=["events"])
 app.include_router(admin.router, prefix=f"{settings.API_V1_STR}/admin", tags=["admin"])
 app.include_router(misc.router, prefix=settings.API_V1_STR, tags=["misc"])
+app.include_router(trip_share.router, prefix=settings.API_V1_STR, tags=["trip_share"])
 app.include_router(ws.router, tags=["ws"])
 
 # Admin panel static + templates

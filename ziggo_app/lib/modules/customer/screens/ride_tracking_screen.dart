@@ -672,13 +672,9 @@ class _DriverCard extends StatelessWidget {
               count: 2,
             ),
           ),
-          // Shimmer sweep — keep it short so it doesn't blanket the text area
-          const Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: ShimmerHighlight(height: 40),
-          ),
+          // (The old ShimmerHighlight here painted an opaque white band on
+          // top of the card content via srcATop on a white Container — it
+          // hid the driver's name. Removed; orbs alone give enough motion.)
           // Content
           Padding(
             padding: const EdgeInsets.all(14),

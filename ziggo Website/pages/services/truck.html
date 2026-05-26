@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Truck | Ziggo</title>
+  <meta name="description" content="Ziggo Truck for moving house and shifting cargo. Lorry, mover, and helper services across Sri Lanka." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="../../assets/css/premium.css?v=20260522-pm138-safetymeta">
+  <style>
+    .svc-hero { position:relative; padding:100px 0 80px; overflow:hidden;
+      background: radial-gradient(ellipse 80% 60% at 20% 20%, rgba(14,165,233,.18), transparent 60%),
+                  radial-gradient(ellipse 60% 50% at 85% 80%, rgba(56,189,248,.15), transparent 60%),
+                  linear-gradient(180deg,#F7FCFF 0%,#EAF6FE 100%); }
+    .svc-hero::before { content:''; position:absolute; inset:0;
+      background-image: radial-gradient(circle at 1px 1px, rgba(3,105,161,.06) 1px, transparent 0);
+      background-size:28px 28px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 30%, transparent 80%);
+      -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 30%, transparent 80%); }
+    .svc-hero-grid { position:relative; z-index:1; max-width:1240px; margin:0 auto; padding:0 24px; display:grid; grid-template-columns:1.15fr 1fr; gap:60px; align-items:center; }
+    .svc-hero h1 { font-family:var(--p-font-display); font-size:clamp(2.5rem,5.5vw,4.5rem); letter-spacing:-.045em; line-height:.98; font-weight:700; color:var(--p-brand-dark); margin:22px 0 22px; }
+    .svc-hero .pm-lede { font-size:clamp(1rem,1.15vw,1.125rem); max-width:52ch; margin-bottom:32px; line-height:1.6; color:#475569; }
+    .svc-hero-cta-row { display:flex; gap:12px; flex-wrap:wrap; }
+    .svc-hero-card { position:relative; z-index:1; background:rgba(255,255,255,.96); backdrop-filter:blur(20px); border:1px solid var(--p-border); border-radius:28px; padding:32px; box-shadow:0 32px 70px -20px rgba(11,20,38,.18), 0 4px 16px rgba(11,20,38,.06); }
+    .svc-hero-card h3 { font-family:var(--p-font-display); font-size:1.35rem; font-weight:700; color:var(--p-brand-dark); letter-spacing:-.02em; margin:16px 0 22px; }
+    .svc-hero-card .big { font-family:var(--p-font-display); font-size:clamp(2rem,4vw,3rem); font-weight:800; color:#0369A1; letter-spacing:-.04em; line-height:1; }
+    .svc-hero-card .period { font-size:.95rem; color:var(--p-text-light); margin-top:6px; }
+    .svc-hero-card .row { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+    .svc-hero-card .row strong { font-family:var(--p-font-display); font-size:1.2rem; font-weight:800; color:var(--p-brand-dark); letter-spacing:-.03em; display:block; }
+    .svc-hero-card .row small { font-size:.68rem; text-transform:uppercase; letter-spacing:.08em; color:var(--p-text-muted); font-weight:600; }
+
+    .pm-block { padding: clamp(70px,9vw,110px) 0; }
+    .pm-block.alt { background: linear-gradient(180deg,#FBFCFE 0%,#F8FAFE 100%); border-top:1px solid var(--p-border); border-bottom:1px solid var(--p-border); }
+    .pm-block-head { text-align:center; max-width:720px; margin:0 auto 56px; padding:0 24px; }
+    .pm-block-head .pm-eyebrow { margin-bottom:18px; }
+    .pm-block-head h2 { font-family:var(--p-font-display); font-size:clamp(2rem,4vw,3rem); font-weight:700; letter-spacing:-.035em; line-height:1.06; color:var(--p-brand-dark); margin-bottom:14px; }
+    .pm-block-head p { color:var(--p-text-light); font-size:1.05rem; line-height:1.55; }
+
+    .truck-grid { max-width:1180px; margin:0 auto; padding:0 24px; display:grid; grid-template-columns:repeat(4,1fr); gap:18px; }
+    .truck-card { background:#fff; border:1px solid var(--p-border); border-radius:22px; padding:26px 24px; transition:transform .4s var(--p-spring), box-shadow .4s var(--p-ease); }
+    .truck-card:hover { transform:translateY(-6px); box-shadow:0 24px 50px -16px rgba(11,20,38,.18); }
+    .truck-card .icon { width:50px; height:50px; border-radius:14px; background:linear-gradient(160deg,#F0F9FF 0%,#BAE6FD 100%); color:#0369A1; display:flex; align-items:center; justify-content:center; font-size:1.2rem; margin-bottom:16px; box-shadow:inset 0 0 0 1px rgba(3,105,161,.12); }
+    .truck-card h3 { font-family:var(--p-font-display); font-size:1.1rem; font-weight:700; color:var(--p-brand-dark); margin:0 0 6px; letter-spacing:-.02em; }
+    .truck-card .price { font-family:var(--p-font-display); font-size:1.4rem; font-weight:800; color:#0369A1; letter-spacing:-.03em; margin-bottom:8px; }
+    .truck-card .desc { font-size:.86rem; color:var(--p-text-light); line-height:1.45; margin:0; }
+
+    .feat-grid { max-width:1180px; margin:0 auto; padding:0 24px; display:grid; grid-template-columns:repeat(3,1fr); gap:18px; }
+    .feat-card { background:#fff; border:1px solid var(--p-border); border-radius:20px; padding:22px; transition:transform .4s var(--p-spring), box-shadow .4s var(--p-ease); }
+    .feat-card:hover { transform:translateY(-6px); box-shadow:0 24px 50px -16px rgba(11,20,38,.18); }
+    .feat-card .icon { width:46px; height:46px; border-radius:13px; background:linear-gradient(160deg,#F0F9FF 0%,#BAE6FD 100%); color:#0369A1; display:flex; align-items:center; justify-content:center; font-size:1.05rem; margin-bottom:14px; box-shadow:inset 0 0 0 1px rgba(3,105,161,.12); }
+    .feat-card h4 { font-family:var(--p-font-display); font-size:1.05rem; font-weight:700; letter-spacing:-.02em; color:var(--p-brand-dark); margin:0 0 6px; }
+    .feat-card p { color:var(--p-text-light); font-size:.88rem; line-height:1.5; margin:0; }
+
+    .cta-banner { max-width:1180px; margin:0 auto; padding:0 24px; }
+    .cta-inner { background:linear-gradient(135deg,#075985 0%,#0EA5E9 100%); color:#fff; border-radius:28px; padding:48px; display:grid; grid-template-columns:1fr auto; gap:24px; align-items:center; box-shadow:0 32px 70px -20px rgba(11,20,38,.30); }
+    .cta-inner h2 { font-family:var(--p-font-display); font-size:clamp(1.5rem,2.5vw,2.2rem); font-weight:700; letter-spacing:-.03em; color:#fff; margin:0 0 10px; }
+    .cta-inner p { color:rgba(255,255,255,.85); margin:0 0 18px; font-size:1.0625rem; }
+    .app-badge { display:inline-flex; align-items:center; gap:10px; padding:10px 18px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); border-radius:14px; color:#fff; text-decoration:none; }
+    .app-badge:hover { background:rgba(255,255,255,.22); }
+    .app-badge i { font-size:1.6rem; }
+    .app-badge .label small { display:block; font-size:.65rem; letter-spacing:.06em; opacity:.85; }
+    .app-badge .label strong { font-size:1rem; font-family:var(--p-font-display); }
+    .cta-actions { display:flex; gap:12px; flex-wrap:wrap; }
+    .cta-visual { font-size:5rem; color:rgba(255,255,255,.45); }
+
+    @media (max-width:1080px) {
+      .svc-hero-grid { grid-template-columns:1fr; gap:40px; }
+      .truck-grid { grid-template-columns:repeat(2,1fr); }
+      .feat-grid { grid-template-columns:repeat(2,1fr); }
+      .cta-inner { grid-template-columns:1fr; padding:36px; } .cta-visual { display:none; }
+    }
+    @media (max-width:600px) { .truck-grid, .feat-grid { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body class="pm">
+
+<nav class="pm-topbar" id="pmTopbar">
+  <div class="pm-topbar-inner">
+    <a href="../../index.html" class="pm-nav-logo"><img src="../../assets/images/logo/logo-dark.png" alt="Ziggo"></a>
+    <ul class="pm-nav-links">
+      <li class="pm-nav-has-dropdown">
+        <a href="#" class="pm-nav-link">Services <i class="fa-solid fa-chevron-down"></i></a>
+        <div class="pm-nav-dropdown">
+          <a href="ride.html" class="color-ride"><span class="ico ico-img"><img src="../../assets/images/services/ride.png?v=pm108-realstudio" alt=""></span><div><strong>Ride</strong><small>Tuk, Mini, City, Flex, Lux</small></div></a>
+          <a href="food.html" class="color-food"><span class="ico ico-img"><img src="../../assets/images/services/food.png?v=20260520123" alt=""></span><div><strong>Food</strong><small>10,000+ restaurants</small></div></a>
+          <a href="flash.html" class="color-flash"><span class="ico ico-img"><img src="../../assets/images/services/flash.png?v=20260520123" alt=""></span><div><strong>Flash</strong><small>Same-day parcel delivery</small></div></a>
+          <a href="truck.html" class="color-truck"><span class="ico ico-img"><img src="../../assets/images/services/truck.png?v=20260520123" alt=""></span><div><strong>Truck</strong><small>Moving &amp; cargo, with helpers</small></div></a>
+          <a href="mart.html" class="color-mart">
+            <span class="ico ico-img"><img src="../../assets/images/services/mart.png?v=pm115-cleanbag" alt=""></span>
+            <div><strong>Mart</strong><small>Groceries in 30 minutes</small></div>
+          </a>
+          <a href="../signup.html" class="pm-mega-footer"><div class="text"><strong>Ziggo Pass</strong><small>Unlimited free delivery for Rs. 549/mo</small></div><span class="cta">Try free <i class="fa-solid fa-arrow-right"></i></span></a>
+        </div>
+      </li>
+      <li class="pm-nav-has-dropdown">
+        <a href="#" class="pm-nav-link">Partner <i class="fa-solid fa-chevron-down"></i></a>
+        <div class="pm-nav-dropdown">
+          <a href="../drive.html" class="color-drive"><span class="ico ico-img"><img src="../../assets/images/services/ride.png?v=pm108-realstudio" alt=""></span><div><strong>Drive with Ziggo</strong><small>Be your own boss</small></div></a>
+          <a href="../partner.html" class="color-merchant"><span class="ico ico-img"><img src="../../assets/images/services/food.png?v=20260520123" alt=""></span><div><strong>Merchant partner</strong><small>List your restaurant or store</small></div></a>
+          <a href="../business.html" class="color-biz"><span class="ico ico-img"><img src="../../assets/images/services/truck.png?v=20260520123" alt=""></span><div><strong>For Business</strong><small>Corporate accounts</small></div></a>
+          <a href="../drive.html" class="pm-mega-footer"><div class="text"><strong>Earn up to LKR 60K / week</strong><small>50,000 drivers already on Ziggo</small></div><span class="cta">Apply <i class="fa-solid fa-arrow-right"></i></span></a>
+        </div>
+      </li>
+      <li><a href="../careers.html" class="pm-nav-link">Careers</a></li>
+      <li><a href="../about.html" class="pm-nav-link">About</a></li>
+    </ul>
+    <div class="pm-nav-cta"><a href="../signup.html" class="signup">Get the app</a>
+    </div>
+    <button class="pm-nav-toggle" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
+  </div>
+</nav>
+
+<section class="svc-hero">
+  <div class="svc-hero-grid">
+    <div data-reveal>
+      <span class="pm-eyebrow"><span class="dot"></span> Ziggo Truck</span>
+      <h1>Moving day, sorted.</h1>
+      <p class="pm-lede">Lorries, movers and helpers for moving house, shifting cargo, or anything that won't fit in a tuk.</p>
+      <div class="svc-hero-cta-row">
+        <a href="#download" class="pm-btn pm-btn-primary pm-btn-lg">Book a truck <i class="fa-solid fa-arrow-right"></i></a>
+        <a href="#types" class="pm-btn pm-btn-ghost pm-btn-lg">See vehicle types</a>
+      </div>
+    </div>
+    <div class="svc-hero-card" data-reveal data-reveal-delay="100">
+      <span class="pm-eyebrow"><span class="dot"></span> On the road</span>
+      <h3>Full house moves, parcel runs</h3>
+      <div class="big">LKR 1,500</div>
+      <div class="period">from &middot; insurance included up to LKR 100K</div>
+      <hr style="border:0;border-top:1px solid var(--p-border);margin:22px 0;">
+      <div class="row">
+        <div><strong>4</strong><small>truck types</small></div>
+        <div><strong>+3</strong><small>helpers max</small></div>
+        <div><strong>7 days</strong><small>schedule ahead</small></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="pm-block" id="types">
+  <div class="pm-block-head" data-reveal>
+    <span class="pm-eyebrow"><span class="dot"></span> Truck types</span>
+    <h2>The right truck for every load</h2>
+    <p>Choose the size that fits your job &mdash; we'll send the closest driver.</p>
+  </div>
+  <div class="truck-grid">
+    <div class="truck-card" data-reveal><div class="icon"><i class="fa-solid fa-truck-pickup"></i></div><h3>Pickup</h3><div class="price">From LKR 1,500</div><p class="desc">Up to 500kg. Small loads, single rooms, appliances.</p></div>
+    <div class="truck-card" data-reveal data-reveal-delay="100"><div class="icon"><i class="fa-solid fa-van-shuttle"></i></div><h3>Mini Lorry</h3><div class="price">From LKR 2,500</div><p class="desc">Up to 1.5 tons. 1BR move, small business cargo.</p></div>
+    <div class="truck-card" data-reveal data-reveal-delay="200"><div class="icon"><i class="fa-solid fa-truck"></i></div><h3>Lorry</h3><div class="price">From LKR 4,500</div><p class="desc">Up to 3 tons. 2&ndash;3BR move, larger business loads.</p></div>
+    <div class="truck-card" data-reveal data-reveal-delay="300"><div class="icon"><i class="fa-solid fa-truck-moving"></i></div><h3>Mover</h3><div class="price">From LKR 7,500</div><p class="desc">Up to 5 tons + 2 helpers included. Full house moves.</p></div>
+  </div>
+</section>
+
+<section class="pm-block alt">
+  <div class="pm-block-head" data-reveal>
+    <span class="pm-eyebrow"><span class="dot"></span> Why Ziggo Truck</span>
+    <h2>Built for hassle-free moves</h2>
+  </div>
+  <div class="feat-grid">
+    <div class="feat-card" data-reveal><div class="icon"><i class="fa-solid fa-people-carry-box"></i></div><h4>Helpers on demand</h4><p>Add 1, 2 or 3 helpers at booking to load and unload.</p></div>
+    <div class="feat-card" data-reveal data-reveal-delay="100"><div class="icon"><i class="fa-solid fa-tag"></i></div><h4>Fixed pricing</h4><p>See the cost upfront based on distance, size and helpers.</p></div>
+    <div class="feat-card" data-reveal data-reveal-delay="200"><div class="icon"><i class="fa-solid fa-calendar-check"></i></div><h4>Book in advance</h4><p>Schedule moves up to 7 days ahead so the truck is ready.</p></div>
+    <div class="feat-card" data-reveal data-reveal-delay="300"><div class="icon"><i class="fa-solid fa-shield-halved"></i></div><h4>Insurance included</h4><p>Goods are covered up to LKR 100,000 against damage in transit.</p></div>
+    <div class="feat-card" data-reveal data-reveal-delay="400"><div class="icon"><i class="fa-solid fa-route"></i></div><h4>Multiple stops</h4><p>Pick up from one place, drop at several &mdash; one booking.</p></div>
+    <div class="feat-card" data-reveal data-reveal-delay="500"><div class="icon"><i class="fa-solid fa-id-card"></i></div><h4>Verified drivers</h4><p>Every driver is licensed, insured, and ID-verified.</p></div>
+  </div>
+</section>
+
+<section class="pm-block" id="download">
+  <div class="cta-banner" data-reveal>
+    <div class="cta-inner">
+      <div>
+        <h2>Need to move? Book a truck.</h2>
+        <p>Same-day or scheduled. Helpers included. Fair price.</p>
+        <div class="cta-actions">
+          <a href="#" class="app-badge"><i class="fa-brands fa-google-play"></i><span class="label"><small>Get it on</small><strong>Google Play</strong></span></a>
+          <a href="#" class="app-badge"><i class="fa-brands fa-apple"></i><span class="label"><small>Download on</small><strong>App Store</strong></span></a>
+        </div>
+      </div>
+      <div class="cta-visual"><i class="fa-solid fa-truck"></i></div>
+    </div>
+  </div>
+</section>
+
+<footer class="pm-footer">
+  <div class="pm-footer-top">
+    <div class="pm-footer-brand">
+      <a href="../../index.html" class="pm-nav-logo pm-footer-logo"><img src="../../assets/images/logo/logo-light.png" alt="Ziggo"></a>
+      <p>Sri Lanka's super app for rides, food, parcels and more &mdash; all in one place.</p>
+      <div class="socials">
+        <a href="#" aria-label="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
+        <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
+        <a href="#" aria-label="X"><i class="fa-brands fa-x-twitter"></i></a>
+        <a href="#" aria-label="LinkedIn"><i class="fa-brands fa-linkedin-in"></i></a>
+        <a href="#" aria-label="YouTube"><i class="fa-brands fa-youtube"></i></a>
+      </div>
+    </div>
+    <div class="pm-footer-col"><h5>Services</h5><ul><li><a href="ride.html">Ride</a></li><li><a href="food.html">Food</a></li><li><a href="flash.html">Flash</a></li><li><a href="truck.html">Truck</a></li><li><a href="mart.html">Mart</a></li></ul></div>
+    <div class="pm-footer-col"><h5>Partner</h5><ul><li><a href="../drive.html">Drive with Ziggo</a></li><li><a href="../partner.html">Merchant partner</a></li><li><a href="../business.html">For Business</a></li><li><a href="../signup.html">Ziggo Pass</a></li></ul></div>
+    <div class="pm-footer-col"><h5>Company</h5><ul><li><a href="../about.html">About</a></li><li><a href="../news.html">News</a></li><li><a href="../careers.html">Careers</a></li><li><a href="../contact.html">Contact</a></li></ul></div>
+    <div class="pm-footer-col"><h5>Support</h5><ul><li><a href="../help.html">Help Center</a></li><li><a href="../help.html#safety">Safety</a></li><li><a href="../privacy.html">Privacy</a></li><li><a href="../terms.html">Terms</a></li></ul></div>
+  </div>
+  <div class="pm-footer-bottom">
+    <span>&copy; 2026 Ziggo.lk</span>
+    <div><a href="../privacy.html">Privacy</a><a href="../terms.html">Terms</a><a href="../contact.html">Contact</a></div>
+  </div>
+</footer>
+
+<div class="pm-fab-stack">
+  <a href="#" class="pm-fab fab-back-to-top" aria-label="Back to top"><i class="fa-solid fa-arrow-up"></i></a>
+  <a href="../help.html" class="pm-fab help" aria-label="Help"><i class="fa-solid fa-question"></i></a>
+</div>
+
+<script>
+(function() {
+  window.pmFallback = function(img, fallback) { if (img && img.src !== fallback) img.src = fallback; };
+  const reveals = document.querySelectorAll('[data-reveal]');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { const d = e.target.dataset.revealDelay || 0; setTimeout(() => e.target.classList.add('revealed'), d); observer.unobserve(e.target); } });
+  }, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
+  reveals.forEach(el => observer.observe(el));
+
+  const topbar = document.getElementById('pmTopbar');
+  if (topbar) { const onScroll = () => topbar.classList.toggle('scrolled', window.scrollY > 12); window.addEventListener('scroll', onScroll, { passive: true }); onScroll(); }
+  const backToTop = document.querySelector('.fab-back-to-top');
+  if (backToTop) backToTop.addEventListener('click', (e) => { e.preventDefault(); window.scrollTo({ top:0, behavior:'smooth' }); });
+  const navToggle = document.querySelector('.pm-nav-toggle');
+  const navLinks = document.querySelector('.pm-nav-links');
+  if (navToggle && navLinks) navToggle.addEventListener('click', () => { navLinks.classList.toggle('open'); navToggle.classList.toggle('open'); });
+})();
+</script>
+</body>
+</html>

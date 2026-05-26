@@ -287,236 +287,249 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
     final est = _serviceType == null ? null : _estimates[_serviceType!];
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Column(
+      // Fullscreen map at the back, draggable bottom sheet for content.
+      // User pulls the sheet down to see more map, up to see more content.
+      body: Stack(
         children: [
-          // Map with floating back + locations card
-          SizedBox(
-            height: 300,
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: ZiggoMap(
-                    controller: _mapController,
-                    center: _pickup?.location ?? kColomboCenter,
-                    zoom: 13,
-                    showMyLocation: true,
-                    markers: [
-                      for (final d in _nearbyDrivers)
-                        pinMarker(
-                          point: LatLng(
-                            (d['lat'] as num).toDouble(),
-                            (d['lng'] as num).toDouble(),
-                          ),
-                          icon: _vehicleIcon(d['vehicle_type'] as String?),
-                          color: _vehicleColor(d['vehicle_type'] as String?),
-                          size: 30,
-                          assetPath: _vehicleAsset(d['vehicle_type'] as String?),
-                        ),
-                      if (_pickup != null)
-                        pinMarker(point: _pickup!.location, icon: Icons.my_location_rounded, color: AppColors.flash),
-                      if (_drop != null)
-                        pinMarker(point: _drop!.location, icon: Icons.location_on_rounded, color: AppColors.error),
-                      // BRD: CD-19 — show every intermediate stop on the map
-                      for (final s in _stops)
-                        pinMarker(point: s.location, icon: Icons.pin_drop_rounded, color: AppColors.warning),
-                    ],
-                    polylines: (_pickup != null && _drop != null)
-                        ? [
-                            ZiggoPolyline(
-                              points: _routePoints.isNotEmpty
-                                  ? _routePoints
-                                  : [_pickup!.location, _drop!.location],
-                              strokeWidth: 4,
-                              color: Colors.black,
-                            ),
-                          ]
-                        : const [],
+          // 1) Fullscreen map
+          Positioned.fill(
+            child: ZiggoMap(
+              controller: _mapController,
+              center: _pickup?.location ?? kColomboCenter,
+              zoom: 13,
+              showMyLocation: true,
+              markers: [
+                for (final d in _nearbyDrivers)
+                  pinMarker(
+                    point: LatLng(
+                      (d['lat'] as num).toDouble(),
+                      (d['lng'] as num).toDouble(),
+                    ),
+                    icon: _vehicleIcon(d['vehicle_type'] as String?),
+                    color: _vehicleColor(d['vehicle_type'] as String?),
+                    size: 30,
+                    assetPath: _vehicleAsset(d['vehicle_type'] as String?),
                   ),
-                ),
-                // Soft gradient fade so the locations card pops
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: IgnorePointer(
-                    child: Container(
-                      height: 80,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            AppColors.background.withOpacity(0),
-                            AppColors.background,
-                          ],
-                        ),
+                if (_pickup != null)
+                  pinMarker(point: _pickup!.location, icon: Icons.my_location_rounded, color: AppColors.flash),
+                if (_drop != null)
+                  pinMarker(point: _drop!.location, icon: Icons.location_on_rounded, color: AppColors.error),
+                // BRD: CD-19 — show every intermediate stop on the map
+                for (final s in _stops)
+                  pinMarker(point: s.location, icon: Icons.pin_drop_rounded, color: AppColors.warning),
+              ],
+              polylines: (_pickup != null && _drop != null)
+                  ? [
+                      ZiggoPolyline(
+                        points: _routePoints.isNotEmpty
+                            ? _routePoints
+                            : [_pickup!.location, _drop!.location],
+                        strokeWidth: 4,
+                        color: Colors.black,
                       ),
-                    ),
-                  ),
-                ),
-                SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        GestureDetector(
-                          onTap: _handleBack,
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(14),
-                              boxShadow: AppStyles.shadowSm,
-                            ),
-                            child: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
-                          ),
-                        ),
-                        const Spacer(),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+                    ]
+                  : const [],
             ),
           ),
-          // Locations card (overlapping map slightly)
-          Transform.translate(
-            offset: const Offset(0, -28),
+          // 2) Floating back button (top-left)
+          SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(22),
-                  boxShadow: AppStyles.shadowMd,
-                ),
-                child: Column(
-                  children: [
-                    _routeRow(
-                      isPickup: true,
-                      icon: Icons.my_location_rounded,
-                      label: 'PICKUP',
-                      value: _pickup?.fullAddress ?? 'Set pickup',
-                      color: AppColors.flash,
-                    ),
-                    // BRD: CD-19 — render any intermediate stops + the +Add button
-                    for (int i = 0; i < _stops.length; i++) ...[
-                      _stopDots(),
-                      _stopRow(index: i),
-                    ],
-                    _stopDots(),
-                    if (_stops.length < _maxStops)
-                      _addStopButton(),
-                    _routeRow(
-                      isPickup: false,
-                      icon: Icons.location_on_rounded,
-                      label: 'DROP-OFF',
-                      value: _drop?.fullAddress ?? 'Set drop',
-                      color: AppColors.error,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              children: [
-                _sectionHeader('TRIP TYPE'),
-                const SizedBox(height: 8),
-                _tripTypeToggle(),
-                const SizedBox(height: 18),
-                _sectionHeader('CHOOSE A RIDE', subtitle: 'Tap to select'),
-                const SizedBox(height: 12),
-                for (final st in const ['bike', 'tuk', 'car', 'van', 'truck']) _vehicleTile(st),
-                const SizedBox(height: 18),
-                _sectionHeader('PROMO CODE'),
-                const SizedBox(height: 8),
-                _promoField(),
-                const SizedBox(height: 18),
-                _sectionHeader('PAYMENT'),
-                const SizedBox(height: 8),
-                _paymentRow(),
-              ],
-            ),
-          ),
-          // Bottom action bar
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
-                  blurRadius: 24,
-                  offset: const Offset(0, -8),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              top: false,
+              padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Total fare',
-                          style: TextStyle(
-                            color: AppColors.textTertiary,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 10,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                        Text(
-                          est == null ? '--' : 'Rs.${(est['final_amount'] as num).toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 26,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        if (est != null && (est['distance_km'] as num) > 0)
-                          Row(
-                            children: [
-                              const Icon(Icons.timer_rounded, size: 12, color: AppColors.textSecondary),
-                              const SizedBox(width: 3),
-                              Text(
-                                '${(est['distance_km'] as num).toStringAsFixed(1)} km • ${est['duration_min']} min',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.textSecondary,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                      ],
+                  GestureDetector(
+                    onTap: _handleBack,
+                    child: Container(
+                      width: 44, height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: AppStyles.shadowSm,
+                      ),
+                      child: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
                     ),
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: PrimaryButton(
-                      label: 'BOOK NOW',
-                      icon: Icons.bolt_rounded,
-                      gold: true,
-                      busy: _loadingEstimates,
-                      onPressed: est == null ? null : _confirmBooking,
-                    ),
-                  ),
+                  const Spacer(),
                 ],
               ),
             ),
+          ),
+          // 3) Draggable bottom sheet with all the booking content
+          DraggableScrollableSheet(
+            initialChildSize: 0.55,
+            minChildSize: 0.30,
+            maxChildSize: 0.92,
+            snap: true,
+            snapSizes: const [0.30, 0.55, 0.92],
+            builder: (context, scrollCtrl) {
+              return Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 24,
+                      offset: const Offset(0, -6),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    // Drag handle
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10, bottom: 4),
+                      child: Container(
+                        width: 42, height: 4,
+                        decoration: BoxDecoration(
+                          color: AppColors.divider,
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                      ),
+                    ),
+                    // Scrollable content area
+                    Expanded(
+                      child: ListView(
+                        controller: scrollCtrl,
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                        children: [
+                          _locationsCard(),
+                          const SizedBox(height: 18),
+                          _sectionHeader('TRIP TYPE'),
+                          const SizedBox(height: 8),
+                          _tripTypeToggle(),
+                          const SizedBox(height: 18),
+                          _sectionHeader('CHOOSE A RIDE', subtitle: 'Tap to select'),
+                          const SizedBox(height: 12),
+                          for (final st in const ['bike', 'tuk', 'car', 'van', 'truck']) _vehicleTile(st),
+                          const SizedBox(height: 18),
+                          _sectionHeader('PROMO CODE'),
+                          const SizedBox(height: 8),
+                          _promoField(),
+                          const SizedBox(height: 18),
+                          _sectionHeader('PAYMENT'),
+                          const SizedBox(height: 8),
+                          _paymentRow(),
+                        ],
+                      ),
+                    ),
+                    // Bottom action bar pinned inside the sheet
+                    _bottomActionBar(est),
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),
     );
   }
+
+  /// Locations card (pickup → stops → drop). Moved out of build() for clarity.
+  Widget _locationsCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Column(
+        children: [
+          _routeRow(
+            isPickup: true,
+            icon: Icons.my_location_rounded,
+            label: 'PICKUP',
+            value: _pickup?.fullAddress ?? 'Set pickup',
+            color: AppColors.flash,
+          ),
+          // BRD: CD-19 — render any intermediate stops + the +Add button
+          for (int i = 0; i < _stops.length; i++) ...[
+            _stopDots(),
+            _stopRow(index: i),
+          ],
+          _stopDots(),
+          if (_stops.length < _maxStops) _addStopButton(),
+          _routeRow(
+            isPickup: false,
+            icon: Icons.location_on_rounded,
+            label: 'DROP-OFF',
+            value: _drop?.fullAddress ?? 'Set drop',
+            color: AppColors.error,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The "Total fare + Book Now" bar at the bottom of the draggable sheet.
+  Widget _bottomActionBar(Map<String, dynamic>? est) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.divider)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Total fare',
+                    style: TextStyle(
+                      color: AppColors.textTertiary,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 10,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  Text(
+                    est == null ? '--' : 'Rs.${(est['final_amount'] as num).toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 26,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  if (est != null && (est['distance_km'] as num) > 0)
+                    Row(
+                      children: [
+                        const Icon(Icons.timer_rounded, size: 12, color: AppColors.textSecondary),
+                        const SizedBox(width: 3),
+                        Text(
+                          '${(est['distance_km'] as num).toStringAsFixed(1)} km • ${est['duration_min']} min',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: PrimaryButton(
+                label: 'BOOK NOW',
+                icon: Icons.bolt_rounded,
+                gold: true,
+                busy: _loadingEstimates,
+                onPressed: est == null ? null : _confirmBooking,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Stale stub kept so the old gradient-fade code can be removed in one chunk.
 
   Widget _sectionHeader(String text, {String? subtitle}) {
     return Row(
@@ -963,6 +976,8 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
         _payOption('cash', Icons.payments_rounded, 'Cash'),
         const SizedBox(width: 10),
         _payOption('wallet', Icons.account_balance_wallet_rounded, 'Wallet'),
+        const SizedBox(width: 10),
+        _payOption('card', Icons.credit_card_rounded, 'Card'),
       ],
     );
   }

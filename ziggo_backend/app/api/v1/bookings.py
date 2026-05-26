@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import List, Optional
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
@@ -148,6 +148,7 @@ async def estimate_fare(
         rental_hours=req.rental_hours,
         customer=customer,
         redeem_points=req.redeem_points or 0,
+        stops=[s.model_dump() for s in (req.stops or [])],
     )
     # FareEstimateResponse doesn't carry rental_hours/hourly_rate; strip them.
     fare.pop("hourly_rate", None)
@@ -162,6 +163,26 @@ async def create_booking(
     user: User = Depends(get_current_user),
 ):
     customer = await _get_customer(db, user)
+
+    # BRD: CD-19 — clamp to admin-configured max stops before pricing.
+    from ...models import SystemSettings
+    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    ss = ss_q.scalars().first()
+    max_stops = int(ss.multi_stop_max_count) if ss and ss.multi_stop_max_count is not None else 2
+    incoming_stops = list(req.stops or [])
+    if len(incoming_stops) > max_stops:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Up to {max_stops} intermediate stop(s) allowed; got {len(incoming_stops)}",
+        )
+    # Flash and rental trips don't make sense with multi-stop. The dispatcher
+    # doesn't know how to handle a courier with intermediate addresses, and a
+    # rental is by-the-hour so distance doesn't drive the fare.
+    if incoming_stops and (req.is_flash or req.is_rental):
+        raise HTTPException(
+            status_code=400,
+            detail="Intermediate stops are not supported on flash or rental bookings",
+        )
 
     fare = await calculate_fare(
         db,
@@ -178,6 +199,7 @@ async def create_booking(
         rental_hours=req.rental_hours,
         customer=customer,
         redeem_points=req.redeem_points or 0,
+        stops=[s.model_dump() for s in incoming_stops],
     )
 
     # If wallet payment, ensure balance
@@ -237,6 +259,24 @@ async def create_booking(
     )
     db.add(booking)
     await db.flush()
+
+    # BRD: CD-19 — snapshot intermediate stops + the waiting policy in effect
+    # at booking time (so future admin tuning doesn't retroactively re-bill).
+    if incoming_stops:
+        from ...models import BookingStop
+        free_secs = int((ss.multi_stop_free_minutes if ss else 3) or 3) * 60
+        excess_rate = ss.multi_stop_excess_per_minute if (ss and ss.multi_stop_excess_per_minute is not None) else Decimal("5")
+        for idx, stop in enumerate(incoming_stops, start=1):
+            db.add(BookingStop(
+                booking_id=booking.id,
+                order_index=idx,
+                lat=Decimal(str(stop.lat)),
+                lng=Decimal(str(stop.lng)),
+                address=stop.address,
+                free_wait_seconds=free_secs,
+                excess_rate_per_minute=Decimal(str(excess_rate)),
+            ))
+        booking.stop_count = len(incoming_stops)
 
     # BRD: RW-02 — deduct redeemed points now (at booking time) so they can't be
     # double-spent on another booking before this one completes. If the ride is
@@ -309,6 +349,17 @@ async def create_booking(
         "parcel_instructions": booking.parcel_instructions,
         "is_rental": bool(booking.is_rental),
         "rental_hours": booking.rental_hours,
+        # BRD: CD-19 — intermediate stops so the driver popup can render them
+        "stop_count": booking.stop_count or 0,
+        "stops": [
+            {
+                "order_index": idx,
+                "lat": float(s.lat),
+                "lng": float(s.lng),
+                "address": s.address or "",
+            }
+            for idx, s in enumerate(incoming_stops or [], start=1)
+        ],
     }
 
     for driver in nearby:
@@ -546,6 +597,123 @@ VALID_TRANSITIONS = {
 }
 
 
+# ---------- Intermediate-stop driver actions (BRD: CD-19 / BE-16 / BR-9) ----------
+async def _load_booking_for_driver(db: AsyncSession, user: User, booking_id: int) -> Booking:
+    """Look up a booking and verify the caller is its assigned driver."""
+    d = await _get_driver(db, user)
+    q = await db.execute(
+        select(Booking)
+        .options(selectinload(Booking.stops))
+        .where(Booking.id == booking_id)
+    )
+    b = q.scalars().first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    if b.driver_id != d.id:
+        raise HTTPException(status_code=403, detail="Not your booking")
+    return b
+
+
+@router.post("/{booking_id}/stops/{order_index}/arrive")
+async def driver_arrived_at_stop(
+    booking_id: int,
+    order_index: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Driver taps "Arrived at stop". Starts the per-stop free-wait timer."""
+    b = await _load_booking_for_driver(db, user, booking_id)
+    if b.status != BookingStatus.STARTED:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Can only arrive at a stop after the trip starts (status={b.status.value})",
+        )
+    stop = next((s for s in (b.stops or []) if s.order_index == order_index), None)
+    if not stop:
+        raise HTTPException(status_code=404, detail=f"Stop {order_index} not found on this booking")
+    if stop.arrived_at:
+        # Idempotent: the driver might double-tap; just echo the existing timestamp.
+        return {
+            "ok": True, "already_arrived": True,
+            "arrived_at": stop.arrived_at.isoformat(),
+            "free_wait_seconds": stop.free_wait_seconds,
+        }
+    now = datetime.now(timezone.utc)
+    stop.arrived_at = now
+    await db.commit()
+    # Notify the customer so their app can start the visible countdown
+    if b.customer_id:
+        cust_q = await db.execute(select(Customer).where(Customer.id == b.customer_id))
+        c = cust_q.scalars().first()
+        if c:
+            await manager.send(c.user_id, "stop_arrived", {
+                "booking_id": b.id,
+                "order_index": order_index,
+                "arrived_at": now.isoformat(),
+                "free_wait_seconds": stop.free_wait_seconds,
+            })
+    return {
+        "ok": True, "arrived_at": now.isoformat(),
+        "free_wait_seconds": stop.free_wait_seconds,
+    }
+
+
+@router.post("/{booking_id}/stops/{order_index}/depart")
+async def driver_departed_from_stop(
+    booking_id: int,
+    order_index: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Driver taps "Depart". Locks in this stop's excess wait charge."""
+    b = await _load_booking_for_driver(db, user, booking_id)
+    stop = next((s for s in (b.stops or []) if s.order_index == order_index), None)
+    if not stop:
+        raise HTTPException(status_code=404, detail=f"Stop {order_index} not found on this booking")
+    if not stop.arrived_at:
+        raise HTTPException(status_code=400, detail="Mark 'arrived' before 'depart'")
+    if stop.departed_at:
+        return {
+            "ok": True, "already_departed": True,
+            "departed_at": stop.departed_at.isoformat(),
+            "excess_seconds": stop.excess_seconds,
+            "wait_charge": float(stop.wait_charge or 0),
+        }
+
+    now = datetime.now(timezone.utc)
+    waited_sec = max(0, int((now - stop.arrived_at).total_seconds()))
+    free_sec = int(stop.free_wait_seconds or 0)
+    excess_sec = max(0, waited_sec - free_sec)
+    # Bill per started minute — same convention parking meters use.
+    excess_minutes = (excess_sec + 59) // 60
+    rate = Decimal(str(stop.excess_rate_per_minute or 0))
+    charge = (Decimal(excess_minutes) * rate).quantize(Decimal("0.01"))
+
+    stop.departed_at = now
+    stop.excess_seconds = excess_sec
+    stop.wait_charge = charge
+    await db.commit()
+
+    if b.customer_id:
+        cust_q = await db.execute(select(Customer).where(Customer.id == b.customer_id))
+        c = cust_q.scalars().first()
+        if c:
+            await manager.send(c.user_id, "stop_departed", {
+                "booking_id": b.id,
+                "order_index": order_index,
+                "waited_seconds": waited_sec,
+                "excess_seconds": excess_sec,
+                "wait_charge": float(charge),
+            })
+    return {
+        "ok": True,
+        "departed_at": now.isoformat(),
+        "waited_seconds": waited_sec,
+        "excess_seconds": excess_sec,
+        "wait_charge": float(charge),
+    }
+
+
 @router.patch("/{booking_id}/status", response_model=BookingResponse)
 async def update_booking_status(
     booking_id: int,
@@ -575,6 +743,35 @@ async def update_booking_status(
     elif new_status == BookingStatus.COMPLETED:
         b.completed_at = now
         b.payment_status = "paid"
+
+        # BRD: CD-19 / BR-9 — sum excess waiting charges across all stops and
+        # add them to the customer's final bill. Done BEFORE the wallet debit
+        # so the wallet path withdraws the full inclusive amount.
+        from ...models import BookingStop
+        sq = await db.execute(
+            select(BookingStop).where(BookingStop.booking_id == b.id)
+        )
+        stops_now = sq.scalars().all()
+        total_wait = Decimal("0")
+        for s in stops_now:
+            # If the driver never tapped 'depart' but tapped 'arrive', settle
+            # the timer now so we don't lose the wait charge.
+            if s.arrived_at and not s.departed_at:
+                waited_sec = max(0, int((now - s.arrived_at).total_seconds()))
+                free_sec = int(s.free_wait_seconds or 0)
+                excess_sec = max(0, waited_sec - free_sec)
+                excess_minutes = (excess_sec + 59) // 60
+                rate = Decimal(str(s.excess_rate_per_minute or 0))
+                s.departed_at = now
+                s.excess_seconds = excess_sec
+                s.wait_charge = (Decimal(excess_minutes) * rate).quantize(Decimal("0.01"))
+            total_wait += Decimal(str(s.wait_charge or 0))
+        if total_wait > 0:
+            b.waiting_charge = total_wait.quantize(Decimal("0.01"))
+            b.final_amount = (Decimal(str(b.final_amount or 0)) + b.waiting_charge).quantize(Decimal("0.01"))
+            # Driver keeps the waiting charge (split-free) since it's
+            # compensation for their time, not platform value.
+            b.driver_earnings = (Decimal(str(b.driver_earnings or 0)) + b.waiting_charge).quantize(Decimal("0.01"))
 
         # Wallet debit if applicable
         if b.payment_method == "wallet":
@@ -673,6 +870,118 @@ async def update_booking_status(
     await db.commit()
 
     return await _booking_to_response(db, b)
+
+
+# ---------- BRD: CD-17 SOS alert ----------
+@router.post("/{booking_id}/sos", status_code=201)
+async def trigger_sos(
+    booking_id: int,
+    body: dict = Body(default={}),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Customer taps the panic button mid-ride.
+
+    Stamps the alert with the booking's last-known driver location (if any)
+    so admin sees where the rider was at the moment they pressed it. Also
+    broadcasts to every connected admin socket so the alert pings the live
+    admin dashboard immediately.
+    """
+    from ...models import EmergencyAlert
+    from ...services.ws_manager import manager as _mgr
+
+    q = await db.execute(select(Booking).where(Booking.id == booking_id))
+    b = q.scalars().first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    # Anyone party to the booking can trigger — rider or driver.
+    cust_q = await db.execute(select(Customer).where(Customer.id == b.customer_id))
+    cust = cust_q.scalars().first()
+    is_party = (cust and cust.user_id == user.id) or (
+        b.driver_id and (await db.execute(
+            select(Driver).where(Driver.id == b.driver_id)
+        )).scalars().first().user_id == user.id
+    )
+    if not is_party:
+        raise HTTPException(status_code=403, detail="Not your booking")
+
+    # Take the most reliable lat/lng we have right now.
+    lat = body.get("lat") or (float(b.pickup_lat) if b.pickup_lat is not None else None)
+    lng = body.get("lng") or (float(b.pickup_lng) if b.pickup_lng is not None else None)
+
+    alert = EmergencyAlert(
+        user_id=user.id,
+        booking_id=b.id,
+        booking_ref=b.booking_ref,
+        lat=Decimal(str(lat)) if lat is not None else None,
+        lng=Decimal(str(lng)) if lng is not None else None,
+        note=(body.get("note") or "")[:500] or None,
+        status="open",
+    )
+    db.add(alert)
+    await db.commit()
+    await db.refresh(alert)
+
+    payload = {
+        "alert_id": alert.id,
+        "booking_id": b.id,
+        "booking_ref": b.booking_ref,
+        "user_id": user.id,
+        "user_name": user.full_name or "",
+        "user_phone": user.phone_number or "",
+        "lat": float(alert.lat) if alert.lat is not None else None,
+        "lng": float(alert.lng) if alert.lng is not None else None,
+        "note": alert.note or "",
+        "created_at": alert.created_at.isoformat() if alert.created_at else None,
+    }
+    await _mgr.publish("admin_live", "sos_alert", payload)
+    return {"ok": True, "alert_id": alert.id, "status": alert.status}
+
+
+# ---------- BRD: CD-17 + CD-31 Trip sharing ----------
+@router.post("/{booking_id}/share")
+async def create_trip_share_link(
+    booking_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Returns a signed share URL + a ready-to-send SMS/WhatsApp body.
+
+    The URL hits the public `GET /api/v1/trip/share/{token}` viewer below — no
+    auth — so the rider can deep-link family / friends without exposing the JWT.
+    """
+    import secrets as _secrets
+
+    q = await db.execute(select(Booking).where(Booking.id == booking_id))
+    b = q.scalars().first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    cust_q = await db.execute(select(Customer).where(Customer.id == b.customer_id))
+    cust = cust_q.scalars().first()
+    if not (cust and cust.user_id == user.id):
+        raise HTTPException(status_code=403, detail="Only the rider can share a trip")
+
+    if not b.share_token:
+        b.share_token = _secrets.token_urlsafe(16)
+        await db.commit()
+
+    # Use the same host the request came in on; works for both nginx-front and
+    # direct-port deployments.
+    base = str(request.base_url).rstrip("/")
+    share_url = f"{base}/api/v1/trip/share/{b.share_token}"
+    eta_min = b.duration_min or 0
+    sms_body = (
+        f"I'm on a Ziggo ride. Track me live: {share_url}\n"
+        f"Pickup: {b.pickup_address}\nDrop: {b.drop_address}\n"
+        f"ETA: ~{eta_min} min."
+    )
+    return {
+        "share_token": b.share_token,
+        "share_url": share_url,
+        "sms_body": sms_body,
+        "wa_url": f"https://wa.me/?text={share_url}",
+    }
 
 
 @router.post("/{booking_id}/rate", response_model=BookingResponse)

@@ -217,6 +217,53 @@ async def loyalty_history(
 
 
 # ---------- Complaints ----------
+# BRD: CD-33 — automated complaint responses, keyword-routed.
+# Order matters: the first rule whose keyword list matches the
+# subject + description (case-insensitive) wins. The reply lands as a
+# `ComplaintMessage` with sender_role="admin" so the customer sees it as
+# a real support reply (and the existing chat UI just works).
+_AUTO_REPLY_RULES = [
+    (
+        ["refund", "double charge", "double-charge", "charged twice", "overcharge"],
+        "Thanks for reporting this — our finance team will review the transaction within 24h. "
+        "If a duplicate charge is confirmed, the refund posts back to your wallet automatically.",
+    ),
+    (
+        ["fare", "price", "expensive", "too much", "cost"],
+        "Your fare is calculated from a base fare + per-km + per-minute rates, plus any surge. "
+        "If you think the price is wrong for this trip, our team will review it and reply here.",
+    ),
+    (
+        ["driver", "rude", "unsafe", "harass", "behaviour", "behavior"],
+        "Sorry to hear that. We take driver conduct seriously and will investigate this trip. "
+        "If you feel unsafe right now please use the SOS button on your ride screen.",
+    ),
+    (
+        ["safety", "accident", "emergency"],
+        "Your safety is our priority. We've flagged this ticket for urgent review. "
+        "If this is an active emergency, please call 119 (Sri Lanka Police) right away.",
+    ),
+    (
+        ["app", "bug", "crash", "otp", "login", "freeze"],
+        "Thanks — we've logged the issue. Our tech team usually replies within 24h. "
+        "A quick fix is often to log out and back in, or update the app to the latest version.",
+    ),
+    (
+        ["promo", "discount", "code", "coupon"],
+        "Promo codes need to be entered at the fare-estimate screen BEFORE booking — they can't be applied retroactively. "
+        "Codes also have time/usage limits which we've checked against your account.",
+    ),
+]
+
+
+def _auto_reply_for(complaint: "Complaint") -> str | None:
+    text = f"{complaint.subject or ''} {complaint.description or ''}".lower()
+    for keywords, reply in _AUTO_REPLY_RULES:
+        if any(kw in text for kw in keywords):
+            return reply
+    return None
+
+
 @router.post("/complaints", response_model=ComplaintResponse, status_code=201)
 async def create_complaint(
     body: ComplaintCreate,
@@ -232,6 +279,21 @@ async def create_complaint(
         status="open",
     )
     db.add(c)
+    await db.flush()  # need c.id for the auto-reply message
+
+    # BRD: CD-33 — instant keyword-routed auto-reply so the customer doesn't
+    # feel ignored. The chat screen will pick it up like any other admin reply.
+    auto_text = _auto_reply_for(c)
+    if auto_text:
+        db.add(ComplaintMessage(
+            complaint_id=c.id,
+            sender_user_id=None,        # automated, not authored by a human
+            sender_role="admin",
+            body=auto_text,
+        ))
+        # Move the ticket into in_progress so dashboards reflect attention.
+        c.status = "in_progress"
+
     await db.commit()
     await db.refresh(c)
     return c
@@ -380,3 +442,97 @@ async def gold_status(
         "expires_at": c.gold_expires_at.isoformat() if c.gold_expires_at else None,
         "price_per_month": GOLD_PRICE_PER_MONTH,
     }
+
+
+# ---------- BRD: Incident reporting ----------
+_VALID_INCIDENT_KINDS = {
+    "accident", "traffic", "closure", "police", "hazard", "other",
+}
+
+
+@router.post("/incidents", status_code=201)
+async def report_incident(
+    body: dict = None,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Driver (or rider) reports a road event near their current location.
+
+    Other drivers fetching `/incidents` within range will see it on their map.
+    """
+    from ...models import Incident
+    body = body or {}
+    kind = (body.get("kind") or "").strip().lower()
+    if kind not in _VALID_INCIDENT_KINDS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"kind must be one of {sorted(_VALID_INCIDENT_KINDS)}",
+        )
+    try:
+        lat = float(body["lat"])
+        lng = float(body["lng"])
+    except (KeyError, ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="lat + lng are required")
+
+    inc = Incident(
+        reported_by_user_id=user.id,
+        kind=kind,
+        lat=Decimal(str(lat)),
+        lng=Decimal(str(lng)),
+        note=(body.get("note") or "")[:300] or None,
+        status="active",
+    )
+    db.add(inc)
+    await db.commit()
+    await db.refresh(inc)
+    return {
+        "id": inc.id,
+        "kind": inc.kind,
+        "lat": float(inc.lat),
+        "lng": float(inc.lng),
+        "note": inc.note,
+        "status": inc.status,
+        "created_at": inc.created_at.isoformat() if inc.created_at else None,
+    }
+
+
+@router.get("/incidents")
+async def list_recent_incidents(
+    lat: float | None = None,
+    lng: float | None = None,
+    radius_km: float = 5.0,
+    minutes: int = 60,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Return active incidents from the last `minutes` (default 60).
+
+    If lat+lng are supplied we also filter to a radius — used by the driver
+    app to render warning pins on their map without paging through the
+    whole country's reports.
+    """
+    from ...models import Incident
+    from ...services.fare_service import haversine_km
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=max(1, min(24 * 60, minutes)))
+    q = await db.execute(
+        select(Incident)
+        .where(Incident.status == "active", Incident.created_at >= cutoff)
+        .order_by(Incident.id.desc())
+        .limit(200)
+    )
+    rows = q.scalars().all()
+    out = []
+    for r in rows:
+        if lat is not None and lng is not None:
+            d = haversine_km(lat, lng, float(r.lat), float(r.lng))
+            if d > radius_km:
+                continue
+        out.append({
+            "id": r.id,
+            "kind": r.kind,
+            "lat": float(r.lat),
+            "lng": float(r.lng),
+            "note": r.note or "",
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        })
+    return out

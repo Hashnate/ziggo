@@ -96,9 +96,54 @@ class Booking(Base):
     is_rental = Column(Boolean, default=False, index=True)
     rental_hours = Column(Integer)
 
+    # BRD: CD-19 / BE-16 / BR-9 — total waiting surcharge across all stops
+    # (computed when COMPLETED transition fires). Stored on the booking itself
+    # so reporting can split it from base fare + promo + redemption.
+    waiting_charge = Column(DECIMAL(10, 2), nullable=False, default=0)
+    stop_count = Column(Integer, nullable=False, default=0)
+    # BRD: CD-17 / CD-31 — opaque token that lets emergency contacts view the
+    # trip in real time via a public, no-auth URL. Generated on demand.
+    share_token = Column(String(40), unique=True, index=True)
+
     customer = relationship("Customer", back_populates="bookings")
     driver = relationship("Driver", back_populates="bookings")
     payments = relationship("Payment", back_populates="booking", cascade="all, delete-orphan")
+    stops = relationship(
+        "BookingStop",
+        back_populates="booking",
+        cascade="all, delete-orphan",
+        order_by="BookingStop.order_index",
+    )
+
+
+class BookingStop(Base):
+    """An intermediate waypoint on a multi-stop booking (BRD: CD-19 / BE-16 / BR-9).
+
+    Each stop is appended in order between pickup and drop. `arrived_at` is
+    set when the driver taps "Arrived at stop"; `departed_at` is set when
+    they tap "Depart". `free_wait_seconds` snapshots the policy in effect at
+    booking time so changes to admin settings don't retroactively re-bill an
+    in-flight trip.
+    """
+    __tablename__ = "booking_stops"
+
+    id = Column(Integer, primary_key=True, index=True)
+    booking_id = Column(Integer, ForeignKey("bookings.id", ondelete="CASCADE"), index=True)
+    order_index = Column(Integer, nullable=False)        # 1-based
+    lat = Column(DECIMAL(10, 7))
+    lng = Column(DECIMAL(10, 7))
+    address = Column(Text)
+
+    arrived_at = Column(DateTime(timezone=True))
+    departed_at = Column(DateTime(timezone=True))
+    # Policy snapshot at booking time
+    free_wait_seconds = Column(Integer, nullable=False, default=180)
+    excess_rate_per_minute = Column(DECIMAL(10, 2), nullable=False, default=5)
+    # Computed surcharge for this stop (set at the depart-from-stop moment)
+    excess_seconds = Column(Integer, nullable=False, default=0)
+    wait_charge = Column(DECIMAL(10, 2), nullable=False, default=0)
+
+    booking = relationship("Booking", back_populates="stops")
 
 
 class Payment(Base):

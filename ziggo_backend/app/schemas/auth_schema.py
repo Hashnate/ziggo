@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from typing import List, Optional
 from ..models.user import UserRole
 
 
@@ -31,6 +31,13 @@ class UserUpdate(BaseModel):
     profile_photo: Optional[str] = None
 
 
+class ProfileCompleteness(BaseModel):
+    """BRD: CD-34 — fed to the mobile completeness ring widget."""
+    percent: int                  # 0..100
+    completed: List[str]          # field keys the user has filled
+    missing: List[str]            # field keys still needed
+
+
 class UserResponse(UserBase):
     id: int
     role: UserRole
@@ -38,6 +45,8 @@ class UserResponse(UserBase):
     profile_photo: Optional[str] = None
     rating: Optional[float] = None
     total_rides: Optional[int] = None
+    # BRD: CD-34 — populated server-side from the user record
+    profile_completeness: Optional[ProfileCompleteness] = None
 
     class Config:
         from_attributes = True

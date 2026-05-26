@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/network/ws_client.dart';
+import '../../core/payments/payhere_service.dart';
 
 /// Drives the full ride lifecycle: estimate → create → track → rate.
 class BookingProvider extends ChangeNotifier {
@@ -18,6 +19,19 @@ class BookingProvider extends ChangeNotifier {
 
   bool _busy = false;
   bool get busy => _busy;
+
+  // Tracks which booking IDs we've already auto-launched PayHere for, so a
+  // duplicate `booking_update` WS event doesn't open the sheet twice.
+  final Set<int> _paymentLaunched = <int>{};
+
+  /// Notifies the UI when an auto-charge attempt finishes. null = paid OK,
+  /// non-null = a user-facing error message to display.
+  PayHereResult? _lastAutoCharge;
+  PayHereResult? get lastAutoCharge => _lastAutoCharge;
+  void clearAutoCharge() {
+    _lastAutoCharge = null;
+    notifyListeners();
+  }
 
   void _setBusy(bool v) {
     _busy = v;
@@ -37,9 +51,34 @@ class BookingProvider extends ChangeNotifier {
           notifyListeners();
         }
         // Lazy refresh
+        loadActive().then((_) => _maybeAutoChargeCard(bid));
+      } else if (event == 'booking_paid') {
+        // Webhook tells us the card charge cleared — sync the local state.
         loadActive();
       }
     });
+  }
+
+  /// When a card-pay booking transitions to COMPLETED, auto-open PayHere with
+  /// the final amount. Runs once per booking ID so a duplicate WS event can't
+  /// re-launch the sheet.
+  Future<void> _maybeAutoChargeCard(dynamic bookingIdRaw) async {
+    final b = _activeBooking;
+    if (b == null) return;
+    final bid = b['id'];
+    if (bid is! int || (bookingIdRaw != null && bookingIdRaw != bid)) return;
+    final status = (b['status'] ?? '').toString();
+    final method = (b['payment_method'] ?? '').toString();
+    final payStatus = (b['payment_status'] ?? '').toString();
+    if (status != 'completed' || method != 'card' || payStatus == 'paid') return;
+    if (_paymentLaunched.contains(bid)) return;
+    _paymentLaunched.add(bid);
+    final res = await PayHereService.instance.payBooking(bid);
+    _lastAutoCharge = res;
+    notifyListeners();
+    if (res.paid) {
+      await loadActive();
+    }
   }
 
   Future<Map<String, dynamic>?> estimateFare({
