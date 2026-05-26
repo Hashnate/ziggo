@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../core/network/api_client.dart';
+import '../../core/payments/payhere_service.dart';
 
 class WalletProvider extends ChangeNotifier {
   double _balance = 0;
@@ -36,5 +37,26 @@ class WalletProvider extends ChangeNotifier {
     } on DioException {
       return false;
     }
+  }
+
+  /// Top up via PayHere (real card / wallet payment). Returns null on success
+  /// (and refreshes the balance), or a user-facing error message on failure.
+  ///
+  /// Auto-falls back to the mock [topUp] endpoint when the server responds
+  /// with HTTP 503 "PayHere not configured" — that way the demo flow keeps
+  /// working until you paste merchant credentials into the server `.env`.
+  Future<String?> topUpViaPayHere(double amount) async {
+    final res = await PayHereService.instance.topUp(amount);
+    if (res.paid) {
+      await refresh();
+      return null;
+    }
+    final err = res.error ?? 'Top-up failed';
+    if (err.contains('not configured')) {
+      // Dev fallback so the app stays usable before merchant onboarding.
+      final ok = await topUp(amount, description: 'Wallet top-up (dev mock)');
+      return ok ? null : 'Top-up failed';
+    }
+    return err;
   }
 }
