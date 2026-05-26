@@ -2,6 +2,10 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        // PayHere Android SDK (com.github.PayHereDevs:payhere-android-sdk) is
+        // published on JitPack, not Maven Central. Required by the
+        // payhere_mobilesdk_flutter plugin.
+        maven { url = uri("https://jitpack.io") }
     }
 }
 
