@@ -6,6 +6,9 @@
 !.env.example
 ziggo_app/android/local.properties
 ziggo_app/ios/Flutter/Secrets.xcconfig
+ziggo_app/android/app/google-services.json
+ziggo_app/ios/Runner/GoogleService-Info.plist
+ziggo_backend/firebase.json
 
 # Python
 __pycache__/
