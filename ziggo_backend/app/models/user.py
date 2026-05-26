@@ -35,6 +35,10 @@ class User(Base):
     rating = Column(DECIMAL(3, 2), default=0)
     total_rides = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)
+    # FCM registration token (BRD: CD-18, BE-07). Stored at user level (not
+    # customer/driver level) so the same user works across roles + devices.
+    # `ensure_schema` auto-adds this column on startup; no manual migration.
+    notification_token = Column(String(255))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

@@ -16,6 +16,7 @@ from .admin_panel import routes as admin_panel_routes
 from .admin_panel.routes import _AdminRedirect
 from .services.schema_sync import ensure_schema
 from .services.auto_cancel import auto_cancel_loop
+from .services import fcm_service
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -29,6 +30,12 @@ _background_tasks: set[asyncio.Task] = set()
 @app.on_event("startup")
 async def _run_schema_sync() -> None:
     await ensure_schema(engine)
+
+
+@app.on_event("startup")
+async def _init_fcm() -> None:
+    """Initialise Firebase Cloud Messaging. Safe no-op when not configured."""
+    fcm_service.init()
 
 
 @app.on_event("startup")
