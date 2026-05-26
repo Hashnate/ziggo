@@ -5,6 +5,9 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    // Firebase: requires google-services.json to exist at android/app/.
+    // Project ID: ziggo-4eb54 / package: com.example.ziggo_app.
+    id("com.google.gms.google-services")
 }
 
 // Read MAPS_API_KEY from android/local.properties (gitignored) so the key
