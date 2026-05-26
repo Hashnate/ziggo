@@ -27,11 +27,16 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Future<void> _topUp(BuildContext context, double amount) async {
-    final ok = await context.read<WalletProvider>().topUp(amount, description: 'Wallet top-up');
+    // Goes through PayHere when the server has merchant credentials,
+    // automatically falls back to the dev mock when it doesn't.
+    final error = await context.read<WalletProvider>().topUpViaPayHere(amount);
     if (!mounted) return;
+    final ok = error == null;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok ? 'Added Rs.${amount.toStringAsFixed(0)} to wallet' : 'Top-up failed'),
+        content: Text(ok
+            ? 'Added Rs.${amount.toStringAsFixed(0)} to wallet'
+            : error),
         backgroundColor: ok ? AppColors.success : AppColors.error,
         behavior: SnackBarBehavior.floating,
       ),

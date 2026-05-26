@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/payments/payhere_service.dart';
 import '../../../core/widgets/motion.dart';
 import '../wallet_provider.dart';
 
@@ -40,19 +41,48 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   Future<void> _subscribe() async {
     setState(() => _busy = true);
     try {
-      final resp = await ApiClient.instance.dio.post('/gold/subscribe', data: {'months': _months});
+      // Prefer PayHere card payment. Falls back to the wallet-deduct endpoint
+      // when the server hasn't been configured with PayHere yet (HTTP 503).
+      final res = await PayHereService.instance
+          .payGoldSubscription(_months);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Activated Ziggo Gold until ${resp.data['expires_at'].toString().substring(0, 10)}'),
-        ),
-      );
-      await _loadStatus();
-      await context.read<WalletProvider>().refresh();
+
+      if (res.paid) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ziggo Gold activated')),
+        );
+        await _loadStatus();
+        return;
+      }
+
+      final err = res.error ?? 'Subscription failed';
+      if (err.contains('not configured')) {
+        // Dev fallback: pay from wallet via the legacy endpoint.
+        final resp = await ApiClient.instance.dio
+            .post('/gold/subscribe', data: {'months': _months});
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Activated Ziggo Gold until '
+              '${resp.data['expires_at'].toString().substring(0, 10)}',
+            ),
+          ),
+        );
+        await _loadStatus();
+        if (!mounted) return;
+        await context.read<WalletProvider>().refresh();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+      }
     } on DioException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.response?.data?['detail']?.toString() ?? 'Subscription failed')),
+        SnackBar(
+          content: Text(
+            e.response?.data?['detail']?.toString() ?? 'Subscription failed',
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => _busy = false);
