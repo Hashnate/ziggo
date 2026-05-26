@@ -67,6 +67,7 @@ services:
       DEV_MODE: ${DEV_MODE:-false}
       PROJECT_NAME: ${PROJECT_NAME:-Ziggo}
       API_V1_STR: ${API_V1_STR:-/api/v1}
+      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-firebase.json}
       # Optional third-party (uncomment in .env if/when you wire them):
       # TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
       # TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}

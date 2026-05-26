@@ -13,6 +13,9 @@ import '../network/api_client.dart';
 /// it alive in release builds (it's invoked from a fresh isolate).
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // The background isolate has no UI; the system tray notification is
+  // rendered by FCM itself when the payload contains a `notification` block
+  // (server always sends one). Logging only — for diagnostics.
   if (kDebugMode) {
     debugPrint(
       '[fcm-bg] ${message.messageId} '
@@ -23,8 +26,9 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 /// Singleton wrapper around Firebase Messaging that is safe to call even when
-/// Firebase isn't configured yet — `init()` catches the error and falls back
-/// to a no-op so the rest of the app still boots.
+/// Firebase isn't configured yet (no `google-services.json` / `GoogleService-
+/// Info.plist`) — `init()` catches the error and falls back to a no-op so the
+/// rest of the app still boots.
 ///
 /// Lifecycle:
 ///   1. `main()` calls `FcmService.instance.init()` once before `runApp`.
@@ -48,10 +52,15 @@ class FcmService {
   final FlutterLocalNotificationsPlugin _local =
       FlutterLocalNotificationsPlugin();
 
+  /// Initialise Firebase + ask for notification permission + set up the
+  /// foreground / background message listeners + start watching for token
+  /// rotations. Safe to call multiple times.
   Future<void> init() async {
     if (_initialised) return;
 
     try {
+      // initializeApp() throws PlatformException when there's no native config.
+      // We catch and continue — the app must keep working without push.
       await Firebase.initializeApp();
     } catch (e) {
       _initError = 'Firebase.initializeApp failed: $e';
@@ -70,12 +79,19 @@ class FcmService {
         debugPrint('[fcm] notification permission denied — tokens still work');
       }
 
+      // Show data-only messages while the app is in the foreground via the
+      // local-notifications plugin (FCM only auto-shows banners when app is
+      // backgrounded).
       await _setupLocalChannel();
 
+      // Background handler (top-level function above).
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
+      // Foreground listener — show as a local notification.
       _foregroundSub = FirebaseMessaging.onMessage.listen(_onForegroundMessage);
 
+      // Cache + watch token. The token may change without user action
+      // (cache reset, app reinstall, etc.) — we re-register every time.
       _cachedToken = await messaging.getToken();
       debugPrint('[fcm] token=${_cachedToken?.substring(0, 20)}...');
       _tokenSub = messaging.onTokenRefresh.listen((newToken) {
@@ -130,6 +146,7 @@ class FcmService {
   }
 
   /// Send the cached token to the backend so push messages route correctly.
+  /// Safe no-op when Firebase isn't initialised or token isn't ready yet.
   Future<bool> registerWithBackend() async {
     if (!_initialised || _cachedToken == null) return false;
     try {
@@ -144,6 +161,8 @@ class FcmService {
     }
   }
 
+  /// On logout — tell the backend to forget our token so we don't keep
+  /// receiving pushes for someone else who logs in on this device.
   Future<void> clearOnBackend() async {
     try {
       await ApiClient.instance.dio.put('/auth/fcm-token', data: {'token': ''});

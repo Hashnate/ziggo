@@ -51,3 +51,4 @@ ziggo_backend/app/admin_panel/static/uploads/
 # OS junk
 .DS_Store
 Thumbs.db
+ziggo_backend/firebase.json

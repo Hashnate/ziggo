@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>About | Ziggo</title>
+  <meta name="description" content="Ziggo is on a mission to make daily life easier for Sri Lankans. Learn about our story, values, and leadership." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="../assets/css/premium.css?v=20260522-pm138-safetymeta">
+  <style>
+    .pm-page-hero {
+      position: relative;
+      padding: 100px 0 70px;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 20%, rgba(96, 165, 250, 0.18), transparent 60%),
+        radial-gradient(ellipse 60% 50% at 85% 80%, rgba(147, 197, 253, 0.15), transparent 60%),
+        linear-gradient(180deg, #FBFCFE 0%, #F5F8FE 100%);
+    }
+    .pm-page-hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle at 1px 1px, rgba(30, 58, 138, 0.06) 1px, transparent 0);
+      background-size: 28px 28px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 30%, transparent 80%);
+      -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 30%, transparent 80%);
+      pointer-events: none;
+    }
+    .pm-page-hero-inner {
+      position: relative;
+      z-index: 1;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 24px;
+      text-align: center;
+    }
+    .pm-page-hero h1 {
+      font-family: var(--p-font-display);
+      font-size: clamp(2.25rem, 5vw, 4rem);
+      letter-spacing: -0.045em;
+      line-height: 1.02;
+      font-weight: 700;
+      color: var(--p-brand-dark);
+      margin: 18px 0 18px;
+    }
+    .pm-page-hero .pm-lede {
+      font-size: clamp(1rem, 1.15vw, 1.125rem);
+      max-width: 60ch;
+      margin: 0 auto 28px;
+      line-height: 1.6;
+      color: #475569;
+    }
+
+    .pm-block {
+      padding: clamp(60px, 9vw, 100px) 0;
+      position: relative;
+    }
+    .pm-block.alt {
+      background: linear-gradient(180deg, #FBFCFE 0%, #F8FAFE 100%);
+      border-top: 1px solid var(--p-border);
+      border-bottom: 1px solid var(--p-border);
+    }
+    .pm-block-head {
+      text-align: center;
+      max-width: 720px;
+      margin: 0 auto 48px;
+      padding: 0 24px;
+    }
+    .pm-block-head .pm-eyebrow { margin-bottom: 16px; }
+    .pm-block-head h2 {
+      font-family: var(--p-font-display);
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 700;
+      letter-spacing: -0.035em;
+      line-height: 1.06;
+      color: var(--p-brand-dark);
+      margin-bottom: 12px;
+    }
+    .pm-block-head p { color: var(--p-text-light); font-size: 1.05rem; line-height: 1.55; }
+
+    .about-two-col {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: 1.05fr 1fr;
+      gap: 60px;
+      align-items: center;
+    }
+    .about-two-col h2 {
+      font-family: var(--p-font-display);
+      font-size: clamp(1.75rem, 3vw, 2.5rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--p-brand-dark);
+      margin: 14px 0 14px;
+    }
+    .about-two-col p { color: var(--p-text-light); font-size: 1.05rem; line-height: 1.6; margin-bottom: 14px; }
+    .about-visual {
+      aspect-ratio: 4/3;
+      border-radius: 24px;
+      overflow: hidden;
+      border: 1px solid var(--p-border);
+      box-shadow: 0 30px 60px -20px rgba(11, 20, 38, 0.18);
+      position: relative;
+    }
+    .about-visual img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .about-visual::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, transparent 40%, rgba(11,20,38,0.55) 100%);
+      pointer-events: none;
+    }
+    .about-visual .caption {
+      position: absolute;
+      left: 22px;
+      bottom: 18px;
+      color: #fff;
+      z-index: 1;
+      font-family: var(--p-font-display);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .about-visual .caption strong {
+      display: block;
+      font-size: 1.2rem;
+      margin-bottom: 2px;
+    }
+    .about-visual .caption small {
+      font-size: 0.82rem;
+      opacity: 0.9;
+      font-weight: 400;
+    }
+
+    .values-grid {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 18px;
+    }
+    .value-card {
+      background: #fff;
+      border: 1px solid var(--p-border);
+      border-radius: 20px;
+      padding: 24px;
+      transition: transform 0.4s var(--p-spring), box-shadow 0.4s var(--p-ease);
+    }
+    .value-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 24px 50px -16px rgba(11, 20, 38, 0.18);
+    }
+    .value-card .icon {
+      width: 46px; height: 46px;
+      border-radius: 13px;
+      background: linear-gradient(160deg, #F5F9FF 0%, #DBEAFE 100%);
+      color: var(--p-brand);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.05rem; margin-bottom: 14px;
+      box-shadow: inset 0 0 0 1px rgba(30, 58, 138, 0.08);
+    }
+    .value-card h4 {
+      font-family: var(--p-font-display);
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--p-brand-dark);
+      margin: 0 0 6px;
+    }
+    .value-card p { color: var(--p-text-light); font-size: 0.86rem; line-height: 1.5; margin: 0; }
+
+    .stats-strip {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+      text-align: center;
+    }
+    .stat-block strong {
+      font-family: var(--p-font-display);
+      font-size: clamp(2rem, 3.5vw, 2.75rem);
+      font-weight: 800;
+      color: var(--p-brand-dark);
+      letter-spacing: -0.04em;
+      display: block;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+    .stat-block span {
+      font-size: 0.82rem;
+      color: var(--p-text-light);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+    }
+
+    .team-grid {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 22px;
+    }
+    .team-card {
+      background: #fff;
+      border: 1px solid var(--p-border);
+      border-radius: 22px;
+      padding: 28px 24px;
+      text-align: center;
+      box-shadow: 0 14px 32px -16px rgba(11, 20, 38, 0.10);
+    }
+    .team-card .avatar {
+      width: 100px; height: 100px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%);
+      color: #fff;
+      font-family: var(--p-font-display);
+      font-weight: 700;
+      font-size: 2rem;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 16px;
+    }
+    .team-card h3 {
+      font-family: var(--p-font-display);
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--p-brand-dark);
+      margin: 0 0 4px;
+      letter-spacing: -0.02em;
+    }
+    .team-card .role { color: var(--p-brand); font-weight: 600; font-size: 0.88rem; margin-bottom: 10px; }
+    .team-card p { color: var(--p-text-light); font-size: 0.9rem; line-height: 1.5; margin: 0; }
+
+    @media (max-width: 1080px) {
+      .about-two-col { grid-template-columns: 1fr; gap: 36px; }
+      .values-grid { grid-template-columns: repeat(2, 1fr); }
+      .stats-strip { grid-template-columns: repeat(2, 1fr); }
+      .team-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body class="pm">
+
+<!-- ========== NAV ========== -->
+<nav class="pm-topbar" id="pmTopbar">
+  <div class="pm-topbar-inner">
+    <a href="../index.html" class="pm-nav-logo">
+      <img src="../assets/images/logo/logo-dark.png" alt="Ziggo">
+    </a>
+    <ul class="pm-nav-links">
+      <li class="pm-nav-has-dropdown">
+        <a href="#" class="pm-nav-link">Services <i class="fa-solid fa-chevron-down"></i></a>
+        <div class="pm-nav-dropdown">
+          <a href="services/ride.html" class="color-ride">
+            <span class="ico ico-img"><img src="../assets/images/services/ride.png?v=pm108-realstudio" alt=""></span>
+            <div><strong>Ride</strong><small>Tuk, Mini, City, Flex, Lux</small></div>
+          </a>
+          <a href="services/food.html" class="color-food">
+            <span class="ico ico-img"><img src="../assets/images/services/food.png?v=20260520123" alt=""></span>
+            <div><strong>Food</strong><small>10,000+ restaurants</small></div>
+          </a>
+          <a href="services/flash.html" class="color-flash">
+            <span class="ico ico-img"><img src="../assets/images/services/flash.png?v=20260520123" alt=""></span>
+            <div><strong>Flash</strong><small>Same-day parcel delivery</small></div>
+          </a>
+          <a href="services/truck.html" class="color-truck">
+            <span class="ico ico-img"><img src="../assets/images/services/truck.png?v=20260520123" alt=""></span>
+            <div><strong>Truck</strong><small>Moving &amp; cargo, with helpers</small></div>
+          </a>
+          <a href="services/mart.html" class="color-mart">
+            <span class="ico ico-img"><img src="../assets/images/services/mart.png?v=pm115-cleanbag" alt=""></span>
+            <div><strong>Mart</strong><small>Groceries in 30 minutes</small></div>
+          </a>
+          <a href="signup.html" class="pm-mega-footer">
+            <div class="text"><strong>Ziggo Pass</strong><small>Unlimited free delivery for Rs. 549/mo</small></div>
+            <span class="cta">Try free <i class="fa-solid fa-arrow-right"></i></span>
+          </a>
+        </div>
+      </li>
+      <li class="pm-nav-has-dropdown">
+        <a href="#" class="pm-nav-link">Partner <i class="fa-solid fa-chevron-down"></i></a>
+        <div class="pm-nav-dropdown">
+          <a href="drive.html" class="color-drive">
+            <span class="ico ico-img"><img src="../assets/images/services/ride.png?v=pm108-realstudio" alt=""></span>
+            <div><strong>Drive with Ziggo</strong><small>Be your own boss</small></div>
+          </a>
+          <a href="partner.html" class="color-merchant">
+            <span class="ico ico-img"><img src="../assets/images/services/food.png?v=20260520123" alt=""></span>
+            <div><strong>Merchant partner</strong><small>List your restaurant or store</small></div>
+          </a>
+          <a href="business.html" class="color-biz">
+            <span class="ico ico-img"><img src="../assets/images/services/truck.png?v=20260520123" alt=""></span>
+            <div><strong>For Business</strong><small>Corporate accounts</small></div>
+          </a>
+          <a href="drive.html" class="pm-mega-footer">
+            <div class="text"><strong>Earn up to LKR 60K / week</strong><small>50,000 drivers already on Ziggo</small></div>
+            <span class="cta">Apply <i class="fa-solid fa-arrow-right"></i></span>
+          </a>
+        </div>
+      </li>
+      <li><a href="careers.html" class="pm-nav-link">Careers</a></li>
+      <li><a href="about.html" class="pm-nav-link">About</a></li>
+    </ul>
+    <div class="pm-nav-cta"><a href="signup.html" class="signup">Get the app</a>
+    </div>
+    <button class="pm-nav-toggle" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
+  </div>
+</nav>
+
+<!-- ========== HERO ========== -->
+<section class="pm-page-hero">
+  <div class="pm-page-hero-inner" data-reveal>
+    <span class="pm-eyebrow"><span class="dot"></span> About Ziggo</span>
+    <h1>We're building Sri Lanka's super app.</h1>
+    <p class="pm-lede">From a single tuk ride in 2022 to 2 million users across the island &mdash; we're just getting started.</p>
+  </div>
+</section>
+
+<!-- ========== STORY ========== -->
+<section class="pm-block">
+  <div class="about-two-col">
+    <div data-reveal>
+      <span class="pm-eyebrow"><span class="dot"></span> Our story</span>
+      <h2>Built in Sri Lanka, for Sri Lankans.</h2>
+      <p>Ziggo started with a simple idea: getting a ride in Colombo shouldn't be hard. From there we asked &mdash; what if one app could solve more daily problems? Food. Parcels. Groceries. Trucks.</p>
+      <p>Today, 2 million people use Ziggo every day. 50,000 drivers and 10,000 merchants earn through our platform. And we're just getting started.</p>
+    </div>
+    <div class="about-visual" data-reveal data-reveal-delay="200">
+      <img src="../assets/images/news/news-1.jpg" alt="Colombo skyline">
+      <div class="caption">
+        <strong>Colombo, Sri Lanka</strong>
+        <small>Where Ziggo was born</small>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== VALUES ========== -->
+<section class="pm-block alt">
+  <div class="pm-block-head" data-reveal>
+    <span class="pm-eyebrow"><span class="dot"></span> Our values</span>
+    <h2>What we stand for</h2>
+  </div>
+  <div class="values-grid">
+    <div class="value-card" data-reveal>
+      <div class="icon"><i class="fa-solid fa-bullseye"></i></div>
+      <h4>Customer first</h4>
+      <p>Every decision starts with: is this better for our users?</p>
+    </div>
+    <div class="value-card" data-reveal data-reveal-delay="100">
+      <div class="icon"><i class="fa-solid fa-handshake"></i></div>
+      <h4>Fair partnership</h4>
+      <p>Drivers and merchants deserve a fair deal &mdash; not exploitation.</p>
+    </div>
+    <div class="value-card" data-reveal data-reveal-delay="200">
+      <div class="icon"><i class="fa-solid fa-shield-halved"></i></div>
+      <h4>Safety always</h4>
+      <p>Every trip, every order, every interaction &mdash; safety is non-negotiable.</p>
+    </div>
+    <div class="value-card" data-reveal data-reveal-delay="300">
+      <div class="icon"><i class="fa-solid fa-leaf"></i></div>
+      <h4>Build for tomorrow</h4>
+      <p>EVs, sustainable packaging, fair labour &mdash; the long view wins.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ========== LEADERSHIP ========== -->
+<section class="pm-block alt">
+  <div class="pm-block-head" data-reveal>
+    <span class="pm-eyebrow"><span class="dot"></span> Leadership</span>
+    <h2>The team behind Ziggo</h2>
+  </div>
+  <div class="team-grid">
+    <div class="team-card" data-reveal>
+      <div class="avatar">AF</div>
+      <h3>Ashan Fernando</h3>
+      <p class="role">Founder &amp; CEO</p>
+      <p>Former tech leader at Dialog. Started Ziggo to make daily life easier in Sri Lanka.</p>
+    </div>
+    <div class="team-card" data-reveal data-reveal-delay="100">
+      <div class="avatar">SR</div>
+      <h3>Sashini Rajapakse</h3>
+      <p class="role">Co-Founder &amp; COO</p>
+      <p>Built logistics ops at Daraz before joining Ziggo to scale our delivery network.</p>
+    </div>
+    <div class="team-card" data-reveal data-reveal-delay="200">
+      <div class="avatar">DK</div>
+      <h3>Dinesh Kumarasinghe</h3>
+      <p class="role">CTO</p>
+      <p>Led engineering at PayHere. Now building the tech that powers Ziggo.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ========== FOOTER ========== -->
+<footer class="pm-footer">
+  <div class="pm-footer-top">
+    <div class="pm-footer-brand">
+      <a href="../index.html" class="pm-nav-logo pm-footer-logo">
+        <img src="../assets/images/logo/logo-light.png" alt="Ziggo">
+      </a>
+      <p>Sri Lanka's super app for rides, food, parcels and more &mdash; all in one place.</p>
+      <div class="socials">
+        <a href="#" aria-label="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
+        <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
+        <a href="#" aria-label="X"><i class="fa-brands fa-x-twitter"></i></a>
+        <a href="#" aria-label="LinkedIn"><i class="fa-brands fa-linkedin-in"></i></a>
+        <a href="#" aria-label="YouTube"><i class="fa-brands fa-youtube"></i></a>
+      </div>
+    </div>
+    <div class="pm-footer-col">
+      <h5>Services</h5>
+      <ul>
+        <li><a href="services/ride.html">Ride</a></li>
+        <li><a href="services/food.html">Food</a></li>
+        <li><a href="services/flash.html">Flash</a></li>
+        <li><a href="services/truck.html">Truck</a></li>
+        <li><a href="services/mart.html">Mart</a></li>
+      </ul>
+    </div>
+    <div class="pm-footer-col">
+      <h5>Partner</h5>
+      <ul>
+        <li><a href="drive.html">Drive with Ziggo</a></li>
+        <li><a href="partner.html">Merchant partner</a></li>
+        <li><a href="business.html">For Business</a></li>
+        <li><a href="signup.html">Ziggo Pass</a></li>
+      </ul>
+    </div>
+    <div class="pm-footer-col">
+      <h5>Company</h5>
+      <ul>
+        <li><a href="about.html">About</a></li>
+        <li><a href="news.html">News</a></li>
+        <li><a href="careers.html">Careers</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+    </div>
+    <div class="pm-footer-col">
+      <h5>Support</h5>
+      <ul>
+        <li><a href="help.html">Help Center</a></li>
+        <li><a href="help.html#safety">Safety</a></li>
+        <li><a href="privacy.html">Privacy</a></li>
+        <li><a href="terms.html">Terms</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="pm-footer-bottom">
+    <span>&copy; 2026 Ziggo.lk</span>
+    <div>
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+      <a href="contact.html">Contact</a>
+    </div>
+  </div>
+</footer>
+
+<!-- Floating action buttons -->
+<div class="pm-fab-stack">
+  <a href="#" class="pm-fab fab-back-to-top" aria-label="Back to top"><i class="fa-solid fa-arrow-up"></i></a>
+  <a href="help.html" class="pm-fab help" aria-label="Help"><i class="fa-solid fa-question"></i></a>
+</div>
+
+<script>
+(function() {
+  // pmFallback helper
+  window.pmFallback = function(img, fallback) {
+    if (img && img.src !== fallback) img.src = fallback;
+  };
+  // Scroll reveal
+  const reveals = document.querySelectorAll('[data-reveal]');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        const delay = e.target.dataset.revealDelay || 0;
+        setTimeout(() => e.target.classList.add('revealed'), delay);
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
+  reveals.forEach(el => observer.observe(el));
+
+  // Top bar scroll shadow
+  const topbar = document.getElementById('pmTopbar');
+  if (topbar) {
+    const onScroll = () => {
+      if (window.scrollY > 12) topbar.classList.add('scrolled');
+      else topbar.classList.remove('scrolled');
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  }
+
+  // Back to top
+  const backToTop = document.querySelector('.fab-back-to-top');
+  if (backToTop) {
+    backToTop.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+
+  // Mobile menu toggle
+  const navToggle = document.querySelector('.pm-nav-toggle');
+  const navLinks = document.querySelector('.pm-nav-links');
+  if (navToggle && navLinks) {
+    navToggle.addEventListener('click', () => {
+      navLinks.classList.toggle('open');
+      navToggle.classList.toggle('open');
+    });
+  }
+})();
+</script>
+</body>
+</html>

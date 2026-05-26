@@ -28,6 +28,10 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Required by flutter_local_notifications 17+. Lets the build use
+        // modern Java 8+ APIs (java.time, etc.) even on older Android
+        // versions by shimming them via desugaring.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -59,4 +63,10 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Pairs with `isCoreLibraryDesugaringEnabled = true` above. Required by
+    // flutter_local_notifications 17+. Bump the version when AGP complains.
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

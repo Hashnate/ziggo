@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Drive | Ziggo</title>
+  <meta name="description" content="Be your own boss. Earn up to LKR 60,000+/week driving with Ziggo. Weekly payouts, lowest commission, flexible hours." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="../assets/css/premium.css?v=20260522-pm138-safetymeta">
+  <style>
+    /* Page-specific tweaks (light premium theme) */
+    .drive-hero {
+      position: relative;
+      padding: 100px 0 80px;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 20%, rgba(96, 165, 250, 0.18), transparent 60%),
+        radial-gradient(ellipse 60% 50% at 85% 80%, rgba(147, 197, 253, 0.15), transparent 60%),
+        linear-gradient(180deg, #FBFCFE 0%, #F5F8FE 100%);
+    }
+    .drive-hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle at 1px 1px, rgba(30, 58, 138, 0.06) 1px, transparent 0);
+      background-size: 28px 28px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 30%, transparent 80%);
+      -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 30%, transparent 80%);
+      pointer-events: none;
+    }
+    .drive-hero-grid {
+      position: relative;
+      z-index: 1;
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: 1.15fr 1fr;
+      gap: 60px;
+      align-items: center;
+    }
+    .drive-hero h1 {
+      font-size: clamp(2.5rem, 5.5vw, 4.5rem);
+      letter-spacing: -0.045em;
+      line-height: 0.98;
+      font-weight: 700;
+      color: var(--p-brand-dark);
+      margin: 22px 0 22px;
+    }
+    .drive-hero h1 em {
+      font-style: italic;
+      font-weight: 600;
+      background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 60%, #60A5FA 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .drive-hero .pm-lede {
+      font-size: clamp(1rem, 1.15vw, 1.125rem);
+      max-width: 52ch;
+      margin-bottom: 32px;
+      line-height: 1.6;
+      color: #475569;
+    }
+    .drive-hero-cta-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 32px;
+    }
+    .drive-hero-quick {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 22px;
+      margin-top: 8px;
+    }
+    .drive-hero-quick .item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.86rem;
+      color: var(--p-text-light);
+      font-weight: 500;
+    }
+    .drive-hero-quick .item i {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      background: rgba(30, 58, 138, 0.08);
+      color: var(--p-brand);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.78rem;
+    }
+
+    /* Hero earnings card */
+    .drive-hero-card {
+      position: relative;
+      z-index: 1;
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--p-border);
+      border-radius: 28px;
+      padding: 32px;
+      box-shadow:
+        0 32px 70px -20px rgba(11, 20, 38, 0.18),
+        0 4px 16px rgba(11, 20, 38, 0.06);
+    }
+    .drive-hero-card .pm-eyebrow { margin-bottom: 16px; }
+    .drive-hero-card h3 {
+      font-family: var(--p-font-display);
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--p-brand-dark);
+      letter-spacing: -0.02em;
+      margin-bottom: 22px;
+    }
+    .drive-hero-card .calc-amount {
+      font-family: var(--p-font-display);
+      font-size: clamp(2.5rem, 5vw, 3.5rem);
+      font-weight: 800;
+      background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.04em;
+      line-height: 1;
+    }
+    .drive-hero-card .calc-period {
+      font-size: 0.95rem;
+      color: var(--p-text-light);
+      margin-top: 6px;
+    }
+
+    /* Section primitives */
+    .drive-section {
+      padding: clamp(70px, 9vw, 110px) 0;
+      position: relative;
+    }
+    .drive-section.alt {
+      background: linear-gradient(180deg, #FBFCFE 0%, #F8FAFE 100%);
+      border-top: 1px solid var(--p-border);
+      border-bottom: 1px solid var(--p-border);
+    }
+    .drive-section-head {
+      text-align: center;
+      max-width: 720px;
+      margin: 0 auto 56px;
+      padding: 0 24px;
+    }
+    .drive-section-head .pm-eyebrow { margin-bottom: 18px; }
+    .drive-section-head h2 {
+      font-family: var(--p-font-display);
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 700;
+      letter-spacing: -0.035em;
+      line-height: 1.06;
+      color: var(--p-brand-dark);
+      margin-bottom: 14px;
+    }
+    .drive-section-head h2 em {
+      font-style: italic;
+      font-weight: 600;
+      background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 60%, #60A5FA 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .drive-section-head p {
+      color: var(--p-text-light);
+      font-size: 1.05rem;
+      line-height: 1.55;
+    }
+
+    /* Earnings cards */
+    .earn-grid {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 18px;
+    }
+    .earn-card {
+      background: #fff;
+      border: 1px solid var(--p-border);
+      border-radius: 22px;
+      padding: 26px 24px 28px;
+      transition: transform 0.4s var(--p-spring), box-shadow 0.4s var(--p-ease), border-color 0.3s var(--p-ease);
+      position: relative;
+      overflow: hidden;
+    }
+    .earn-card::before {
+      content: '';
+      position: absolute;
+      top: -40px;
+      right: -40px;
+      width: 160px;
+      height: 160px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(59,130,246,0.14), transparent 70%);
+      filter: blur(28px);
+      opacity: 0;
+      transition: opacity 0.5s var(--p-ease);
+    }
+    .earn-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 24px 50px -16px rgba(11, 20, 38, 0.18);
+      border-color: rgba(30, 58, 138, 0.18);
+    }
+    .earn-card:hover::before { opacity: 1; }
+    .earn-card .icon {
+      width: 50px;
+      height: 50px;
+      border-radius: 14px;
+      background: linear-gradient(160deg, #F5F9FF 0%, #DBEAFE 100%);
+      color: var(--p-brand);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      margin-bottom: 18px;
+      box-shadow: inset 0 0 0 1px rgba(30, 58, 138, 0.08);
+    }
+    .earn-card h3 {
+      font-family: var(--p-font-display);
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--p-brand-dark);
+      margin-bottom: 8px;
+    }
+    .earn-card .earn-amount {
+      font-family: var(--p-font-display);
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--p-brand);
+      letter-spacing: -0.03em;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .earn-card .earn-period {
+      font-size: 0.78rem;
+      color: var(--p-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+      margin-bottom: 14px;
+    }
+    .earn-card .desc {
+      font-size: 0.86rem;
+      color: var(--p-text-light);
+      line-height: 1.45;
+      margin: 0;
+    }
+    .earn-note {
+      text-align: center;
+      margin-top: 28px;
+      font-size: 0.82rem;
+      color: var(--p-text-muted);
+      max-width: 720px;
+      margin-left: auto;
+      margin-right: auto;
+      padding: 0 24px;
+    }
+
+    /* Benefits grid */
+    .benefit-grid {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+    .benefit-card {
+      position: relative;
+      background: #fff;
+      border: 1px solid var(--p-border);
+      border-radius: 20px;
+      padding: 22px 24px 26px;
+      min-height: 180px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      isolation: isolate;
+      overflow: hidden;
+      transition: transform 0.4s var(--p-spring), box-shadow 0.4s var(--p-ease), border-color 0.3s var(--p-ease);
+    }
+    .benefit-card::after {
+      content: '';
+      position: absolute;
+      top: -40px; right: -40px;
+      width: 160px; height: 160px;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--accent-color, rgba(30,58,138,0.18)) 0%, transparent 70%);
+      opacity: 0;
+      filter: blur(30px);
+      transition: opacity 0.5s var(--p-ease), transform 0.6s var(--p-spring);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .benefit-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 24px 50px -16px rgba(11,20,38,0.18);
+      border-color: var(--accent-color-solid, rgba(30,58,138,0.25));
+    }
+    .benefit-card:hover::after { opacity: 1; transform: scale(1.15); }
+    .benefit-card .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--tag-bg, rgba(30, 58, 138, 0.08));
+      color: var(--tag-color, var(--p-brand));
+      border: 1px solid var(--tag-border, rgba(30, 58, 138, 0.18));
+      font-family: var(--p-font-body);
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      width: fit-content;
+      margin-bottom: 6px;
+    }
+    .benefit-card .tag i { font-size: 0.7rem; }
+    .benefit-card .icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 13px;
+      background: linear-gradient(160deg, #F5F9FF 0%, #DBEAFE 100%);
+      color: var(--p-brand);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.05rem;
+      margin-bottom: 14px;
+      box-shadow: inset 0 0 0 1px rgba(30, 58, 138, 0.08);
+    }
+    .benefit-card h4 {
+      font-family: var(--p-font-display);
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--p-brand-dark);
+      margin: 0;
+      line-height: 1.15;
+    }
+    .benefit-card p {
+      font-size: 0.86rem;
+      color: var(--p-text-light);
+      line-height: 1.5;
+      margin: 0;
+      max-width: 32ch;
+    }
+
+    /* Per-card accent themes */
+    .benefit-card.accent-payout {
+      --accent-color: rgba(52, 211, 153, 0.32);
+      --accent-color-solid: rgba(52, 211, 153, 0.45);
+      --tag-bg: linear-gradient(135deg, rgba(110,231,183,0.22), rgba(52,211,153,0.13));
+      --tag-color: #047857;
+      --tag-border: rgba(52,211,153,0.28);
+    }
+    .benefit-card.accent-bonus {
+      --accent-color: rgba(251, 191, 36, 0.32);
+      --accent-color-solid: rgba(251, 191, 36, 0.50);
+      --tag-bg: linear-gradient(135deg, rgba(253,224,71,0.22), rgba(251,191,36,0.15));
+      --tag-color: #A16207;
+      --tag-border: rgba(251,191,36,0.30);
+    }
+    .benefit-card.accent-hours {
+      --accent-color: rgba(59, 130, 246, 0.32);
+      --accent-color-solid: rgba(59, 130, 246, 0.45);
+      --tag-bg: linear-gradient(135deg, rgba(96,165,250,0.22), rgba(59,130,246,0.13));
+      --tag-color: #1E40AF;
+      --tag-border: rgba(59,130,246,0.28);
+    }
+    .benefit-card.accent-safety {
+      --accent-color: rgba(167, 139, 250, 0.32);
+      --accent-color-solid: rgba(167, 139, 250, 0.45);
+      --tag-bg: linear-gradient(135deg, rgba(196,181,253,0.22), rgba(167,139,250,0.13));
+      --tag-color: #5B21B6;
+      --tag-border: rgba(167,139,250,0.28);
+    }
+    .benefit-card.accent-support {
+      --accent-color: rgba(14, 165, 233, 0.32);
+      --accent-color-solid: rgba(14, 165, 233, 0.45);
+      --tag-bg: linear-gradient(135deg, rgba(56,189,248,0.22), rgba(14,165,233,0.13));
+      --tag-color: #0369A1;
+      --tag-border: rgba(14,165,233,0.28);
+    }
+    .benefit-card.accent-commission {
+      --accent-color: rgba(251, 146, 60, 0.32);
+      --accent-color-solid: rgba(251, 146, 60, 0.45);
+      --tag-bg: linear-gradient(135deg, rgba(253,186,116,0.22), rgba(251,146,60,0.13));
+      --tag-color: #C2410C;
+      --tag-border: rgba(251,146,60,0.28);
+    }
+
+    /* Requirements two-col */
+    .req-grid {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    .req-card {
+      background: #fff;
+      border: 1px solid var(--p-border);
+      border-radius: 24px;
+      padding: 36px;
+      box-shadow: 0 14px 32px -16px rgba(11, 20, 38, 0.10);
+    }
+    .req-card h3 {
+      font-family: var(--p-font-display);
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      color: var(--p-brand-dark);
+      margin-bottom: 22px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .req-card h3 .icon-pill {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: linear-gradient(160deg, #F5F9FF 0%, #DBEAFE 100%);
+      color: var(--p-brand);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+    }
+    .req-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .req-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      font-size: 0.95rem;
+      color: var(--p-text);
+      font-weight: 500;
+    }
+    .req-list li i {
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(16, 185, 129, 0.12);
+      color: #059669;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      margin-top: 2px;
+    }
+
+    /* Application form */
+    .apply-wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      align-items: center;
+    }
+    .apply-side h2 {
+      font-family: var(--p-font-display);
+      font-size: clamp(1.75rem, 3vw, 2.5rem);
+      font-weight: 700;
+      letter-spacing: -0.035em;
+      color: var(--p-brand-dark);
+      line-height: 1.06;
+      margin-bottom: 14px;
+    }
+    .apply-side h2 em {
+      font-style: italic;
+      font-weight: 600;
+      background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 60%, #60A5FA 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .apply-side p {
+      color: var(--p-text-light);
+      font-size: 1.0625rem;
+      line-height: 1.55;
+      margin-bottom: 22px;
+    }
+    .apply-side ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .apply-side ul li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--p-text);
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+    .apply-side ul li i {
+      color: #059669;
+      width: 18px;
+      text-align: center;
+    }
+    .apply-form {
+      background: #fff;
+      border: 1px solid var(--p-border);
+      border-radius: 28px;
+      padding: 36px;
+      box-shadow:
+        0 32px 70px -20px rgba(11, 20, 38, 0.18),
+        0 4px 16px rgba(11, 20, 38, 0.06);
+    }
+    .apply-form h3 {
+      font-family: var(--p-font-display);
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      color: var(--p-brand-dark);
+      margin-bottom: 6px;
+    }
+    .apply-form .subtitle {
+      color: var(--p-text-light);
+      font-size: 0.92rem;
+      margin: 0 0 22px;
+    }
+    .apply-form .form-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .apply-form label {
+      font-size: 0.78rem;
+      color: var(--p-text-light);
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .apply-form input,
+    .apply-form select {
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--p-bg-soft);
+      border: 1px solid transparent;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      font-family: var(--p-font-body);
+      color: var(--p-text);
+      transition: border-color 0.2s var(--p-ease), background 0.2s var(--p-ease);
+    }
+    .apply-form input:focus,
+    .apply-form select:focus {
+      outline: none;
+      border-color: var(--p-brand);
+      background: #fff;
+    }
+    .apply-form button {
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    @media (max-width: 1080px) {
+      .drive-hero-grid { grid-template-columns: 1fr; gap: 40px; }
+      .earn-grid { grid-template-columns: repeat(2, 1fr); }
+      .benefit-grid { grid-template-columns: 1fr; }
+      .req-grid { grid-template-columns: 1fr; }
+      .apply-wrap { grid-template-columns: 1fr; gap: 32px; }
+    }
+    @media (max-width: 600px) {
+      .earn-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body class="pm">
+
+<!-- ========== NAV ========== -->
+<nav class="pm-topbar" id="pmTopbar">
+  <div class="pm-topbar-inner">
+    <a href="../index.html" class="pm-nav-logo">
+      <img src="../assets/images/logo/logo-dark.png" alt="Ziggo">
+    </a>
+    <ul class="pm-nav-links">
+      <li class="pm-nav-has-dropdown">
+        <a href="#" class="pm-nav-link">Services <i class="fa-solid fa-chevron-down"></i></a>
+        <div class="pm-nav-dropdown">
+          <a href="services/ride.html" class="color-ride">
+            <span class="ico ico-img"><img src="../assets/images/services/ride.png?v=pm108-realstudio" alt=""></span>
+            <div><strong>Ride</strong><small>Tuk, Mini, City, Flex, Lux</small></div>
+          </a>
+          <a href="services/food.html" class="color-food">
+            <span class="ico ico-img"><img src="../assets/images/services/food.png?v=20260520123" alt=""></span>
+            <div><strong>Food</strong><small>10,000+ restaurants</small></div>
+          </a>
+          <a href="services/flash.html" class="color-flash">
+            <span class="ico ico-img"><img src="../assets/images/services/flash.png?v=20260520123" alt=""></span>
+            <div><strong>Flash</strong><small>Same-day parcel delivery</small></div>
+          </a>
+          <a href="services/truck.html" class="color-truck">
+            <span class="ico ico-img"><img src="../assets/images/services/truck.png?v=20260520123" alt=""></span>
+            <div><strong>Truck</strong><small>Moving &amp; cargo, with helpers</small></div>
+          </a>
+          <a href="services/mart.html" class="color-mart">
+            <span class="ico ico-img"><img src="../assets/images/services/mart.png?v=pm115-cleanbag" alt=""></span>
+            <div><strong>Mart</strong><small>Groceries in 30 minutes</small></div>
+          </a>
+          <a href="signup.html" class="pm-mega-footer">
+            <div class="text"><strong>Ziggo Pass</strong><small>Unlimited free delivery for Rs. 549/mo</small></div>
+            <span class="cta">Try free <i class="fa-solid fa-arrow-right"></i></span>
+          </a>
+        </div>
+      </li>
+      <li class="pm-nav-has-dropdown">
+        <a href="#" class="pm-nav-link">Partner <i class="fa-solid fa-chevron-down"></i></a>
+        <div class="pm-nav-dropdown">
+          <a href="drive.html" class="color-drive">
+            <span class="ico ico-img"><img src="../assets/images/services/ride.png?v=pm108-realstudio" alt=""></span>
+            <div><strong>Drive with Ziggo</strong><small>Be your own boss</small></div>
+          </a>
+          <a href="partner.html" class="color-merchant">
+            <span class="ico ico-img"><img src="../assets/images/services/food.png?v=20260520123" alt=""></span>
+            <div><strong>Merchant partner</strong><small>List your restaurant or store</small></div>
+          </a>
+          <a href="business.html" class="color-biz">
+            <span class="ico ico-img"><img src="../assets/images/services/truck.png?v=20260520123" alt=""></span>
+            <div><strong>For Business</strong><small>Corporate accounts</small></div>
+          </a>
+          <a href="drive.html" class="pm-mega-footer">
+            <div class="text"><strong>Earn up to LKR 60K / week</strong><small>50,000 drivers already on Ziggo</small></div>
+            <span class="cta">Apply <i class="fa-solid fa-arrow-right"></i></span>
+          </a>
+        </div>
+      </li>
+      
+      <li><a href="careers.html" class="pm-nav-link">Careers</a></li>
+      <li><a href="about.html" class="pm-nav-link">About</a></li>
+    </ul>
+    <div class="pm-nav-cta"><a href="signup.html" class="signup">Get the app</a>
+    </div>
+    <button class="pm-nav-toggle" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
+  </div>
+</nav>
+
+<!-- ========== HERO ========== -->
+<section class="drive-hero">
+  <div class="drive-hero-grid">
+    <div data-reveal>
+      <span class="pm-eyebrow"><span class="dot"></span> Drive with Ziggo</span>
+      <h1>Drive your future.<br><em>Be your own boss.</em></h1>
+      <p class="pm-lede">Choose your hours. Industry's lowest commission. Weekly payouts on the dot. Join 50,000+ Sri Lankans already earning on the country's #1 super app.</p>
+      <div class="drive-hero-cta-row">
+        <a href="#signup" class="pm-btn pm-btn-primary pm-btn-lg">Sign up to drive <i class="fa-solid fa-arrow-right"></i></a>
+        <a href="#earnings" class="pm-btn pm-btn-ghost pm-btn-lg">See what you'd earn</a>
+      </div>
+      <div class="drive-hero-quick">
+        <div class="item"><i class="fa-solid fa-wallet"></i> Weekly payouts</div>
+        <div class="item"><i class="fa-solid fa-percent"></i> Lowest commission</div>
+        <div class="item"><i class="fa-solid fa-clock"></i> Flexible hours</div>
+      </div>
+    </div>
+    <div class="drive-hero-card" data-reveal data-reveal-delay="100">
+      <span class="pm-eyebrow"><span class="dot"></span> Top driver earnings</span>
+      <h3>Mini driver, 40 hours / week</h3>
+      <div class="calc-amount">LKR 32,000</div>
+      <div class="calc-period">per week &middot; ~ LKR 128,000 / month</div>
+      <hr style="border:0;border-top:1px solid var(--p-border);margin:22px 0;">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+        <div>
+          <div style="font-family:var(--p-font-display);font-size:1.35rem;font-weight:800;color:var(--p-brand-dark);letter-spacing:-0.03em;">50K+</div>
+          <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--p-text-muted);font-weight:600;">drivers</div>
+        </div>
+        <div>
+          <div style="font-family:var(--p-font-display);font-size:1.35rem;font-weight:800;color:var(--p-brand-dark);letter-spacing:-0.03em;">8K</div>
+          <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--p-text-muted);font-weight:600;">weekly bonus</div>
+        </div>
+        <div>
+          <div style="font-family:var(--p-font-display);font-size:1.35rem;font-weight:800;color:var(--p-brand-dark);letter-spacing:-0.03em;">24/7</div>
+          <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--p-text-muted);font-weight:600;">support</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== EARNINGS BY VEHICLE ========== -->
+<section class="drive-section" id="earnings">
+  <div class="drive-section-head" data-reveal>
+    <span class="pm-eyebrow"><span class="dot"></span> Earnings</span>
+    <h2>Real drivers. <em>Real numbers.</em></h2>
+    <p>What our top drivers earn each week. The more you drive, the more you make.</p>
+  </div>
+  <div class="earn-grid">
+    <div class="earn-card" data-reveal>
+      <div class="icon"><i class="fa-solid fa-taxi"></i></div>
+      <h3>Tuk driver</h3>
+      <div class="earn-amount">LKR 18,000</div>
+      <div class="earn-period">per week</div>
+      <p class="desc">~30 hours, peak-hour focus.</p>
+    </div>
+    <div class="earn-card" data-reveal data-reveal-delay="100">
+      <div class="icon"><i class="fa-solid fa-car-side"></i></div>
+      <h3>Mini driver</h3>
+      <div class="earn-amount">LKR 32,000</div>
+      <div class="earn-period">per week</div>
+      <p class="desc">~40 hours, mixed hours.</p>
+    </div>
+    <div class="earn-card" data-reveal data-reveal-delay="200">
+      <div class="icon"><i class="fa-solid fa-car"></i></div>
+      <h3>City / Flex</h3>
+      <div class="earn-amount">LKR 45,000</div>
+      <div class="earn-period">per week</div>
+      <p class="desc">~45 hours, airport + city.</p>
+    </div>
+    <div class="earn-card" data-reveal data-reveal-delay="300">
+      <div class="icon"><i class="fa-solid fa-car-burst"></i></div>
+      <h3>Lux driver</h3>
+      <div class="earn-amount">LKR 60,000+</div>
+      <div class="earn-period">per week</div>
+      <p class="desc">~40 hours, executive bookings.</p>
+    </div>
+  </div>
+  <p class="earn-note">* Estimates based on top 20% of drivers in 2026. Your actual earnings depend on hours, vehicle type, city and bookings.</p>
+</section>
+
+<!-- ========== BENEFITS ========== -->
+<section class="drive-section alt">
+  <div class="drive-section-head" data-reveal>
+    <span class="pm-eyebrow"><span class="dot"></span> Why drive with us</span>
+    <h2>The best deal for drivers<br><em>in Sri Lanka.</em></h2>
+  </div>
+  <div class="benefit-grid">
+    <div class="benefit-card accent-payout" data-reveal>
+      <span class="tag"><i class="fa-solid fa-wallet"></i> Payouts</span>
+      <h4>Weekly payouts</h4>
+      <p>Money in your bank every Monday, like clockwork.</p>
+    </div>
+    <div class="benefit-card accent-bonus" data-reveal data-reveal-delay="100">
+      <span class="tag"><i class="fa-solid fa-trophy"></i> Bonus</span>
+      <h4>Bonus quests</h4>
+      <p>Hit weekly targets and earn up to LKR&nbsp;8,000 extra per week.</p>
+    </div>
+    <div class="benefit-card accent-hours" data-reveal data-reveal-delay="200">
+      <span class="tag"><i class="fa-solid fa-calendar"></i> Hours</span>
+      <h4>Flexible hours</h4>
+      <p>Online when you want. No targets, no minimums, no pressure.</p>
+    </div>
+    <div class="benefit-card accent-safety" data-reveal data-reveal-delay="300">
+      <span class="tag"><i class="fa-solid fa-shield-halved"></i> Safety</span>
+      <h4>Insurance &amp; safety</h4>
+      <p>Driver insurance plus an in-app SOS button on every trip.</p>
+    </div>
+    <div class="benefit-card accent-support" data-reveal data-reveal-delay="400">
+      <span class="tag"><i class="fa-solid fa-headset"></i> Support</span>
+      <h4>24/7 support</h4>
+      <p>Real humans to help with payments, trips, or anything else.</p>
+    </div>
+    <div class="benefit-card accent-commission" data-reveal data-reveal-delay="500">
+      <span class="tag"><i class="fa-solid fa-percent"></i> Commission</span>
+      <h4>Lowest commission</h4>
+      <p>Industry-leading rate &mdash; you keep more of every fare.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ========== REQUIREMENTS ========== -->
+<section class="drive-section">
+  <div class="drive-section-head" data-reveal>
+    <span class="pm-eyebrow"><span class="dot"></span> Requirements</span>
+    <h2>What you need to <em>get started.</em></h2>
+  </div>
+  <div class="req-grid">
+    <div class="req-card" data-reveal>
+      <h3><span class="icon-pill"><i class="fa-solid fa-id-card"></i></span> Driver</h3>
+      <ul class="req-list">
+        <li><i class="fa-solid fa-check"></i> Age 21 or above</li>
+        <li><i class="fa-solid fa-check"></i> Valid Sri Lankan driving licence (1+ year old)</li>
+        <li><i class="fa-solid fa-check"></i> NIC and proof of address</li>
+        <li><i class="fa-solid fa-check"></i> Smartphone with mobile data</li>
+        <li><i class="fa-solid fa-check"></i> Clean police record</li>
+      </ul>
+    </div>
+    <div class="req-card" data-reveal data-reveal-delay="100">
+      <h3><span class="icon-pill"><i class="fa-solid fa-car-side"></i></span> Vehicle</h3>
+      <ul class="req-list">
+        <li><i class="fa-solid fa-check"></i> Registered in your name (or owner consent letter)</li>
+        <li><i class="fa-solid fa-check"></i> Vehicle insurance and revenue licence</li>
+        <li><i class="fa-solid fa-check"></i> Passes Ziggo's vehicle inspection</li>
+        <li><i class="fa-solid fa-check"></i> Manufactured 2010 or later (for cars)</li>
+        <li><i class="fa-solid fa-check"></i> AC working (Mini and above)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ========== APPLY ========== -->
+<section class="drive-section alt" id="signup">
+  <div class="apply-wrap">
+    <div class="apply-side" data-reveal>
+      <span class="pm-eyebrow"><span class="dot"></span> Apply now</span>
+      <h2>Three minutes is all it <em>takes.</em></h2>
+      <p>Tell us a bit about you and your vehicle. We'll come back within 48 hours with the next steps.</p>
+      <ul>
+        <li><i class="fa-solid fa-circle-check"></i> Free to apply &middot; no signup fee</li>
+        <li><i class="fa-solid fa-circle-check"></i> Get verified in 2&ndash;3 days</li>
+        <li><i class="fa-solid fa-circle-check"></i> Start earning the same week</li>
+      </ul>
+    </div>
+    <form class="apply-form" data-reveal data-reveal-delay="100" onsubmit="event.preventDefault(); this.querySelector('button').textContent='Application submitted ✓'; this.querySelector('button').disabled=true;">
+      <h3>Apply to drive</h3>
+      <p class="subtitle">We'll reach out within 48 hours.</p>
+      <div class="form-row"><label>Full name</label><input type="text" required placeholder="Your name"></div>
+      <div class="form-row"><label>Mobile number</label><input type="tel" required placeholder="+94 7X XXX XXXX"></div>
+      <div class="form-row"><label>City</label>
+        <select required>
+          <option value="">Select your city</option>
+          <option>Colombo</option><option>Kandy</option><option>Galle</option>
+          <option>Negombo</option><option>Jaffna</option><option>Anuradhapura</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div class="form-row"><label>Vehicle type</label>
+        <select required>
+          <option value="">Select vehicle</option>
+          <option>Tuk</option><option>Mini</option><option>City</option>
+          <option>Flex</option><option>Lux</option><option>Truck</option>
+        </select>
+      </div>
+      <div class="form-row"><label>NIC number</label><input type="text" required placeholder="200012345678 or 90123456V"></div>
+      <button type="submit" class="pm-btn pm-btn-primary pm-btn-lg">Submit application <i class="fa-solid fa-arrow-right"></i></button>
+    </form>
+  </div>
+</section>
+
+<!-- ========== FOOTER ========== -->
+<footer class="pm-footer">
+  <div class="pm-footer-top">
+    <div class="pm-footer-brand">
+      <a href="../index.html" class="pm-nav-logo pm-footer-logo">
+        <img src="../assets/images/logo/logo-light.png" alt="Ziggo">
+      </a>
+      <p>Sri Lanka's super app for rides, food, parcels and more &mdash; all in one place.</p>
+      <div class="socials">
+        <a href="#" aria-label="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
+        <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
+        <a href="#" aria-label="X"><i class="fa-brands fa-x-twitter"></i></a>
+        <a href="#" aria-label="LinkedIn"><i class="fa-brands fa-linkedin-in"></i></a>
+        <a href="#" aria-label="YouTube"><i class="fa-brands fa-youtube"></i></a>
+      </div>
+    </div>
+    <div class="pm-footer-col">
+      <h5>Services</h5>
+      <ul>
+        <li><a href="services/ride.html">Ride</a></li>
+        <li><a href="services/food.html">Food</a></li>
+        <li><a href="services/flash.html">Flash</a></li>
+        <li><a href="services/truck.html">Truck</a></li>
+        <li><a href="services/mart.html">Mart</a></li>
+      </ul>
+    </div>
+    <div class="pm-footer-col">
+      <h5>Partner</h5>
+      <ul>
+        <li><a href="drive.html">Drive with Ziggo</a></li>
+        <li><a href="partner.html">Merchant partner</a></li>
+        <li><a href="business.html">For Business</a></li>
+        <li><a href="signup.html">Ziggo Pass</a></li>
+      </ul>
+    </div>
+    <div class="pm-footer-col">
+      <h5>Company</h5>
+      <ul>
+        <li><a href="about.html">About</a></li>
+        <li><a href="news.html">News</a></li>
+        <li><a href="careers.html">Careers</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+    </div>
+    <div class="pm-footer-col">
+      <h5>Support</h5>
+      <ul>
+        <li><a href="help.html">Help Center</a></li>
+        <li><a href="help.html#safety">Safety</a></li>
+        <li><a href="privacy.html">Privacy</a></li>
+        <li><a href="terms.html">Terms</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="pm-footer-bottom">
+    <span>&copy; 2026 Ziggo.lk</span>
+    <div>
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+      <a href="contact.html">Contact</a>
+    </div>
+  </div>
+</footer>
+
+<!-- Floating action buttons -->
+<div class="pm-fab-stack">
+  <a href="#" class="pm-fab fab-back-to-top" aria-label="Back to top"><i class="fa-solid fa-arrow-up"></i></a>
+  
+  <a href="help.html" class="pm-fab help" aria-label="Help"><i class="fa-solid fa-question"></i></a>
+</div>
+
+<script>
+(function() {
+  // Scroll reveal
+  const reveals = document.querySelectorAll('[data-reveal]');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        const delay = e.target.dataset.revealDelay || 0;
+        setTimeout(() => e.target.classList.add('revealed'), delay);
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
+  reveals.forEach(el => observer.observe(el));
+
+  // Top bar scroll shadow
+  const topbar = document.getElementById('pmTopbar');
+  if (topbar) {
+    const onScroll = () => {
+      if (window.scrollY > 12) topbar.classList.add('scrolled');
+      else topbar.classList.remove('scrolled');
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  }
+
+  // Back to top
+  const backToTop = document.querySelector('.fab-back-to-top');
+  if (backToTop) {
+    backToTop.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+})();
+</script>
+</body>
+</html>

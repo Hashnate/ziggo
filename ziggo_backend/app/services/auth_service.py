@@ -104,3 +104,27 @@ def require_role(*roles: str):
         return user
 
     return _checker
+
+
+# BRD: CD-34 — what counts toward "your profile is N% complete"
+# Each entry is (field_key, accessor on User). The list is the source of
+# truth — change weights by adding/removing entries.
+_PROFILE_FIELDS = [
+    ("full_name", lambda u: bool((u.full_name or "").strip())),
+    ("email", lambda u: bool((u.email or "").strip())),
+    ("profile_photo", lambda u: bool((u.profile_photo or "").strip())),
+]
+
+
+def compute_profile_completeness(user) -> dict:
+    """Return a dict matching ProfileCompleteness schema for any User."""
+    completed = []
+    missing = []
+    for key, has in _PROFILE_FIELDS:
+        if has(user):
+            completed.append(key)
+        else:
+            missing.append(key)
+    total = len(_PROFILE_FIELDS)
+    percent = round(100 * len(completed) / total) if total else 0
+    return {"percent": percent, "completed": completed, "missing": missing}

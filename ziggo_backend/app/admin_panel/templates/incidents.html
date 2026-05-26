@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Incidents | Ziggo Admin{% endblock %}
+{% block page_title %}Incidents{% endblock %}
+{% block top_title %}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center text-xl">
+            <i class="fas fa-triangle-exclamation"></i>
+        </div>
+        <div>
+            <h2 class="text-2xl font-black text-ziggo-ink leading-tight">Driver-Reported Incidents</h2>
+            <p class="text-xs text-ziggo-muted font-bold">Accidents, traffic, road closures &amp; police checkpoints (BRD)</p>
+        </div>
+    </div>
+
+    <!-- Active counts by kind -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {% for k, icon in [
+            ('accident', 'fa-car-burst'),
+            ('traffic', 'fa-stop'),
+            ('closure', 'fa-road-barrier'),
+            ('police', 'fa-shield-halved'),
+            ('hazard', 'fa-triangle-exclamation'),
+            ('other', 'fa-circle-question'),
+        ] %}
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-4 flex items-center gap-3">
+            <i class="fas {{ icon }} text-amber-500"></i>
+            <div>
+                <p class="text-[10px] text-ziggo-muted uppercase font-black tracking-wider">{{ k }}</p>
+                <p class="text-xl font-black text-ziggo-ink leading-none">{{ counts.get(k, 0) }}</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-gray-50 text-[11px] uppercase text-ziggo-muted font-black tracking-wider">
+                    <tr>
+                        <th class="px-6 py-4">#</th>
+                        <th class="px-6 py-4">When</th>
+                        <th class="px-6 py-4">Kind</th>
+                        <th class="px-6 py-4">Reported by</th>
+                        <th class="px-6 py-4">Location</th>
+                        <th class="px-6 py-4">Note</th>
+                        <th class="px-6 py-4">Status</th>
+                        <th class="px-6 py-4 text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-ziggo-line">
+                    {% for i in incidents %}
+                    <tr class="hover:bg-gray-50/50">
+                        <td class="px-6 py-4 font-bold text-ziggo-ink">#{{ i.id }}</td>
+                        <td class="px-6 py-4 text-sm text-ziggo-muted">{{ i.created_at.strftime("%Y-%m-%d %H:%M") if i.created_at else '—' }}</td>
+                        <td class="px-6 py-4 text-sm font-black uppercase tracking-wider text-amber-600">{{ i.kind }}</td>
+                        <td class="px-6 py-4 text-sm">
+                            {% if i.reporter %}
+                            <p class="font-black text-ziggo-ink">{{ i.reporter.full_name or '—' }}</p>
+                            <p class="text-[11px] text-ziggo-muted">{{ i.reporter.phone_number or '' }}</p>
+                            {% else %}
+                            <span class="text-ziggo-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-sm">
+                            <a href="https://www.google.com/maps?q={{ i.lat }},{{ i.lng }}" target="_blank"
+                               class="text-ziggo font-black hover:underline">
+                                <i class="fas fa-map-marker-alt mr-1"></i> Open in Maps
+                            </a>
+                            <p class="text-[11px] text-ziggo-faint mt-0.5">{{ "%.5f"|format(i.lat) }}, {{ "%.5f"|format(i.lng) }}</p>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-ziggo-muted">{{ i.note or '—' }}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider
+                                {% if i.status == 'active' %}bg-amber-50 text-amber-600
+                                {% else %}bg-gray-100 text-gray-500{% endif %}">
+                                {{ i.status }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            {% if i.status == 'active' %}
+                            <form method="POST" action="/admin/incidents/{{ i.id }}/dismiss">
+                                <button class="px-3 py-1.5 border border-ziggo-line rounded-lg text-xs font-black text-ziggo-muted hover:bg-gray-50">
+                                    Dismiss
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="px-6 py-16 text-center">
+                            <i class="fas fa-triangle-exclamation text-4xl text-ziggo-faint mb-3"></i>
+                            <p class="text-ziggo-muted font-bold">No incidents reported.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

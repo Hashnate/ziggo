@@ -197,6 +197,36 @@
             </section>
         </div>
 
+        <!-- Multi-stop policy (BRD: CD-19 / BE-16 / BR-9) -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <section class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-6">
+                <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                    <i class="fas fa-map-pin text-ziggo"></i> Trip Stops &amp; Waiting
+                </h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1">Max intermediate stops</label>
+                        <input type="number" min="0" max="5" name="multi_stop_max_count" value="{{ s.multi_stop_max_count or 2 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        <p class="text-[10px] text-ziggo-faint font-bold mt-1">How many stops a rider can add between pickup &amp; drop.</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1">Free wait per stop (minutes)</label>
+                        <input type="number" min="0" name="multi_stop_free_minutes" value="{{ s.multi_stop_free_minutes or 3 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1">Excess wait charge (Rs./minute)</label>
+                        <input type="number" step="0.01" min="0" name="multi_stop_excess_per_minute" value="{{ s.multi_stop_excess_per_minute or 5 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        <p class="text-[10px] text-ziggo-faint font-bold mt-1">Billed per started minute beyond the free window. Goes to the driver.</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1">Fee per stop (Rs.)</label>
+                        <input type="number" step="0.01" min="0" name="multi_stop_fee_per_stop" value="{{ s.multi_stop_fee_per_stop or 50 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        <p class="text-[10px] text-ziggo-faint font-bold mt-1">Fixed surcharge per added stop, on top of the per-km fare.</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <!-- Logo & Favicon -->
             <section class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-6">

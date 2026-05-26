@@ -830,6 +830,8 @@ class _FlashHomeScreenState extends State<FlashHomeScreen> {
           _payTile('cash', 'Cash', Icons.payments_rounded),
           const SizedBox(width: 12),
           _payTile('wallet', 'Wallet', Icons.account_balance_wallet_rounded),
+          const SizedBox(width: 12),
+          _payTile('card', 'Card', Icons.credit_card_rounded),
         ],
       ),
     );

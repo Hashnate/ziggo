@@ -5,6 +5,7 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/map/place_search_sheet.dart';
 import '../../../core/map/places.dart';
+import '../../../core/payments/payhere_service.dart';
 import '../../../core/widgets/motion.dart';
 import '../addresses_provider.dart';
 import '../food_provider.dart';
@@ -81,8 +82,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       instructions: _instructionsCtrl.text.trim(),
     );
     if (!mounted) return;
-    setState(() => _busy = false);
     if (order == null) {
+      setState(() => _busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(food.error ?? 'Could not place order'),
@@ -92,6 +93,28 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
       return;
     }
+
+    // Card payment → open PayHere sheet now. Cash/Wallet flow through unchanged.
+    if (_payment == 'card') {
+      final orderId = order['id'] as int? ?? 0;
+      if (orderId > 0) {
+        final res = await PayHereService.instance.payFoodOrder(orderId);
+        if (!mounted) return;
+        if (!res.paid) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(res.error ?? 'Card payment did not complete'),
+              backgroundColor: AppColors.warning,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          // Continue to tracking anyway — payment can settle from the webhook
+          // and the tracking screen will reflect payment_status when refreshed.
+        }
+      }
+    }
+
+    setState(() => _busy = false);
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => FoodTrackingScreen(orderRef: order['order_ref'] as String)),
@@ -313,6 +336,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 _payOption('cash', Icons.payments_rounded, 'Cash'),
                 const SizedBox(width: 10),
                 _payOption('wallet', Icons.account_balance_wallet_rounded, 'Wallet'),
+                const SizedBox(width: 10),
+                _payOption('card', Icons.credit_card_rounded, 'Card'),
               ],
             ),
           ),

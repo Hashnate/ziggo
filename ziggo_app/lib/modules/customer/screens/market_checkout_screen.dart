@@ -5,6 +5,7 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/map/place_search_sheet.dart';
 import '../../../core/map/places.dart';
+import '../../../core/payments/payhere_service.dart';
 import '../../../core/widgets/motion.dart';
 import '../addresses_provider.dart';
 import '../market_provider.dart';
@@ -72,8 +73,8 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
       instructions: _instructionsCtrl.text.trim(),
     );
     if (!mounted) return;
-    setState(() => _busy = false);
     if (order == null) {
+      setState(() => _busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(context.read<MarketProvider>().error ?? 'Order failed'),
@@ -83,6 +84,26 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
       );
       return;
     }
+
+    // Card payment → open PayHere sheet now. Cash/Wallet flow through unchanged.
+    if (_payment == 'card') {
+      final orderId = order['id'] as int? ?? 0;
+      if (orderId > 0) {
+        final res = await PayHereService.instance.payMarketOrder(orderId);
+        if (!mounted) return;
+        if (!res.paid) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(res.error ?? 'Card payment did not complete'),
+              backgroundColor: AppColors.warning,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    }
+
+    setState(() => _busy = false);
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -278,6 +299,8 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
                 _payOption('cash', Icons.payments_rounded, 'Cash'),
                 const SizedBox(width: 10),
                 _payOption('wallet', Icons.account_balance_wallet_rounded, 'Wallet'),
+                const SizedBox(width: 10),
+                _payOption('card', Icons.credit_card_rounded, 'Card'),
               ],
             ),
           ),
