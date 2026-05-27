@@ -45,6 +45,13 @@ dependencies:
   firebase_core: ^3.6.0
   firebase_messaging: ^15.1.3
 
+  # Show notifications + play sound when an FCM push arrives while the app
+  # is in the FOREGROUND. Android doesn't auto-show foreground pushes, and
+  # the firebase_messaging plugin alone has no API to display one — this
+  # plugin fills that gap. It also lets us pre-create the high-importance
+  # ride-alert channel that pins our custom sound.
+  flutter_local_notifications: ^17.2.3
+
   # PayHere hosted checkout — opened in an in-app WebView. Returns to the
   # app via PayHere's `return_url` (a deep link we control).
   webview_flutter: ^4.10.0

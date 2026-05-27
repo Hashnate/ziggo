@@ -1,14 +1,23 @@
 // Firebase Cloud Messaging — Flutter side.
 //
-// Initialised once at app boot from main.dart. Auth provider calls
-// registerWithBackend() right after a successful OTP-verify, and
-// clearOnBackend() before clearing the JWT on logout.
+// Init flow (once at boot from main.dart):
+//   1. Firebase.initializeApp()         — reads google-services.json
+//   2. Create the Android notification channel "ziggo_ride_alerts" with the
+//      custom sound ride_alert.mp3 (pinned: Android won't change a channel's
+//      sound after creation, so bump the channel id if you ever swap files)
+//   3. Wire onMessage (foreground), onBackgroundMessage, onTokenRefresh
+//   4. Cache the FCM device token; AuthProvider pushes it to the backend
+//      right after OTP-verify
 //
-// EVERYTHING is wrapped in try/catch so that:
-//   - missing google-services.json (Android) or GoogleService-Info.plist (iOS)
-//   - revoked permissions
-//   - Firebase project being mis-configured
-// degrade to a no-op — the rest of the app keeps working.
+// Foreground handling: Android does NOT auto-show notifications when the
+// app is in the foreground — the message arrives via onMessage and we have
+// to display it ourselves with flutter_local_notifications, otherwise the
+// user only sees the in-app UI update (silent). That was the cause of "test
+// push made a sound but real ride didn't" — the app was open during rides.
+//
+// EVERYTHING is wrapped in try/catch so missing config / revoked perms /
+// mis-configured Firebase degrade to a no-op — the app keeps working, just
+// without push.
 
 import 'dart:async';
 import 'dart:io';
@@ -17,16 +26,26 @@ import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../network/api_client.dart';
 
+// Must match the channel_id the backend sends in FCM payloads
+// (see fcm_service.py `channel_id="ziggo_ride_alerts"`). Bumping this id
+// here forces Android to create a fresh channel (use this trick if you ever
+// swap the sound file — Android won't update an existing channel's sound).
+const String _rideAlertChannelId = 'ziggo_ride_alerts';
+const String _rideAlertChannelName = 'Ride alerts';
+const String _rideAlertChannelDesc =
+    'New ride requests and ride status updates. Plays ride_alert.mp3.';
+
 /// Required for background message handling on Android — Firebase invokes a
-/// top-level function in an isolated Dart isolate. We don't process the
-/// message ourselves (the OS shows the system notification); this handler
-/// exists so Firebase doesn't complain about a missing registration.
+/// top-level function in an isolated Dart isolate. The OS shows the system
+/// notification automatically using the payload, so we don't need to do
+/// anything here. Must be top-level + @pragma so it survives tree-shaking.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // No-op — the system notification UI handles display.
+  // No-op — OS displays the notification from the payload.
 }
 
 class FcmService {
@@ -38,6 +57,8 @@ class FcmService {
   String? _cachedToken;
   StreamSubscription<RemoteMessage>? _foregroundSub;
   StreamSubscription<String>? _tokenSub;
+
+  final FlutterLocalNotificationsPlugin _local = FlutterLocalNotificationsPlugin();
 
   bool get firebaseAvailable => _firebaseAvailable;
   String? get cachedToken => _cachedToken;
@@ -51,8 +72,6 @@ class FcmService {
       await Firebase.initializeApp();
       _firebaseAvailable = true;
     } catch (e) {
-      // No google-services.json / no GoogleService-Info.plist → init throws.
-      // We swallow and the rest of FcmService becomes a no-op.
       if (kDebugMode) {
         debugPrint('[fcm] Firebase.initializeApp failed: $e — push disabled');
       }
@@ -60,31 +79,77 @@ class FcmService {
     }
 
     try {
-      final messaging = FirebaseMessaging.instance;
+      // 1. flutter_local_notifications init (Android + iOS)
+      const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const iosInit = DarwinInitializationSettings(
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
+      );
+      await _local.initialize(
+        const InitializationSettings(android: androidInit, iOS: iosInit),
+      );
 
-      // iOS needs an explicit permission grant. Android auto-grants below v33.
+      // 2. Register the Android channel with the custom sound. This is what
+      //    makes the ride_alert.mp3 actually play — on Android 8+ the
+      //    channel's sound is what plays, NOT the FCM payload's sound.
+      //    Idempotent — calling create on an existing channel is a no-op.
+      if (Platform.isAndroid) {
+        await _local
+            .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>()
+            ?.createNotificationChannel(
+              const AndroidNotificationChannel(
+                _rideAlertChannelId,
+                _rideAlertChannelName,
+                description: _rideAlertChannelDesc,
+                importance: Importance.max,
+                playSound: true,
+                sound: RawResourceAndroidNotificationSound('ride_alert'),
+                enableVibration: true,
+              ),
+            );
+      }
+
+      // 3. Permissions
+      final messaging = FirebaseMessaging.instance;
       if (Platform.isIOS) {
+        await messaging.requestPermission(alert: true, badge: true, sound: true);
+      } else if (Platform.isAndroid) {
+        // Android 13+ requires runtime POST_NOTIFICATIONS permission. The
+        // firebase_messaging method handles all versions transparently.
         await messaging.requestPermission(alert: true, badge: true, sound: true);
       }
 
+      // 4. Foreground display behaviour
+      //    iOS: tell the OS to show the banner + play sound when the app is
+      //    in the foreground (otherwise iOS suppresses everything by default).
+      await messaging.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      // 5. Wire handlers
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
       _foregroundSub = FirebaseMessaging.onMessage.listen(_onForegroundMessage);
 
-      // Cache token now and observe rotations so the backend always has the
-      // freshest one.
+      // 6. Cache token + listen for rotations
       _cachedToken = await messaging.getToken();
       _tokenSub = messaging.onTokenRefresh.listen((t) {
         _cachedToken = t;
-        // If the user is logged in, push the rotated token straight away.
         unawaited(_sendToBackend(t));
       });
+
+      if (kDebugMode) {
+        debugPrint('[fcm] init complete, channel=$_rideAlertChannelId, token=${_cachedToken?.substring(0, 20)}...');
+      }
     } catch (e) {
       if (kDebugMode) debugPrint('[fcm] init step failed: $e');
     }
   }
 
-  /// Push the FCM token to the backend. Called by AuthProvider right after
-  /// a successful login. Silently no-ops if Firebase isn't initialised yet.
+  /// Push the FCM token to the backend. Called after a successful login.
   Future<bool> registerWithBackend() async {
     if (!_firebaseAvailable) return false;
     try {
@@ -99,7 +164,7 @@ class FcmService {
 
   /// Clear the FCM token on the backend so the device stops getting pushes
   /// addressed to the previous user. Called from AuthProvider.logout()
-  /// BEFORE the JWT is wiped, so the auth header is still attached.
+  /// BEFORE the JWT is wiped so the auth header is still attached.
   Future<void> clearOnBackend() async {
     if (!_firebaseAvailable) return;
     try {
@@ -125,16 +190,48 @@ class FcmService {
     }
   }
 
-  void _onForegroundMessage(RemoteMessage message) {
-    // We don't show a local notification when the app is in the foreground —
-    // the WebSocket has already delivered the event live and the UI has
-    // already updated. The OS-level notification only shows when the app is
-    // backgrounded / killed (handled by the OS itself, no code needed).
+  /// Foreground message handler — Android doesn't auto-show notifications
+  /// while the app is open, so we render one ourselves with the same channel
+  /// (and therefore the same sound) the OS would have used in background.
+  Future<void> _onForegroundMessage(RemoteMessage message) async {
+    final notif = message.notification;
+    if (notif == null) return; // pure data-only payload — let the WS update the UI
+
     if (kDebugMode) {
-      debugPrint(
-        '[fcm] foreground message: ${message.notification?.title} — '
-        '${message.notification?.body}',
+      debugPrint('[fcm] foreground: ${notif.title} — ${notif.body}');
+    }
+
+    // Show via flutter_local_notifications. The Android channel was already
+    // created in init() with the custom sound, so just referencing the
+    // channel id here is enough to make ride_alert.mp3 play.
+    try {
+      await _local.show(
+        // Unique notification id — use the FCM message hash so duplicates
+        // dedupe naturally if the OS retries.
+        message.messageId.hashCode,
+        notif.title,
+        notif.body,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            _rideAlertChannelId,
+            _rideAlertChannelName,
+            channelDescription: _rideAlertChannelDesc,
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: true,
+            sound: const RawResourceAndroidNotificationSound('ride_alert'),
+            enableVibration: true,
+            // Tap → opens the app (since we don't set a payload route)
+          ),
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        ),
       );
+    } catch (e) {
+      if (kDebugMode) debugPrint('[fcm] failed to show foreground notification: $e');
     }
   }
 
