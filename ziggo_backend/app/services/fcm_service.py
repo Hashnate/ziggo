@@ -108,22 +108,37 @@ async def send_to_user(
     body: str,
     data: Optional[dict] = None,
 ) -> bool:
-    """Look up the user's stored FCM token and push. Returns True on success."""
+    """Look up the user's stored FCM token and push. Returns True on success.
+
+    Every outcome is logged so a "the driver didn't get notified" report can
+    be diagnosed straight from container logs. Tag: `[fcm]`.
+    """
     if not _initialized:
+        print(f"[fcm] skip user_id={user_id}: SDK not initialised")
         return False
     q = await db.execute(select(User).where(User.id == user_id))
     user = q.scalars().first()
-    token = (user.notification_token or "").strip() if user else ""
+    if user is None:
+        print(f"[fcm] skip user_id={user_id}: user not found")
+        return False
+    token = (user.notification_token or "").strip()
     if not token:
+        print(f"[fcm] skip user_id={user_id} ({user.phone_number}): NO TOKEN registered — driver must log into the FCM-enabled app build")
         return False
     ok, err = await _send_to_token(token, title, body, data)
-    if not ok and err and any(c in err for c in _DEAD_TOKEN_CODES):
+    if ok:
+        print(f"[fcm] ok user_id={user_id} ({user.phone_number}) title={title!r}")
+        return True
+    # not ok
+    if err and any(c in err for c in _DEAD_TOKEN_CODES):
         await db.execute(
             update(User).where(User.id == user_id).values(notification_token=None)
         )
         await db.commit()
-        print(f"[fcm] cleared dead token for user_id={user_id} ({err})")
-    return ok
+        print(f"[fcm] cleared DEAD token user_id={user_id} ({user.phone_number}): {err}")
+    else:
+        print(f"[fcm] FAIL user_id={user_id} ({user.phone_number}): {err}")
+    return False
 
 
 async def send_to_users(
@@ -144,23 +159,38 @@ async def send_to_users(
 
 def fire_and_forget(user_id: int, event: str, payload: dict) -> None:
     """Sync entry-point used by ws_manager.send() to piggyback FCM on every
-    WS event. Owns its own DB session so it doesn't borrow the request one."""
+    WS event. Owns its own DB session so it doesn't borrow the request one.
+
+    Logs every dispatch decision so logs alone are enough to debug
+    "the driver didn't get notified" reports.
+    """
     if not _initialized:
+        print(f"[fcm] piggyback skip event={event} user_id={user_id}: SDK not initialised")
         return
 
     title, body = _format(event, payload)
     if not title:
-        return  # event doesn't warrant a notification
+        # Event has no notification mapping (e.g. driver_location_update) —
+        # this is intentional, don't spam the log.
+        return
+
+    print(f"[fcm] piggyback dispatch event={event} user_id={user_id}")
 
     async def _run() -> None:
-        async with AsyncSessionLocal() as db:
-            await send_to_user(db, user_id, title, body, {"event": event, **{k: v for k, v in payload.items() if isinstance(v, (str, int, float, bool))}})
+        try:
+            async with AsyncSessionLocal() as db:
+                await send_to_user(
+                    db, user_id, title, body,
+                    {"event": event, **{k: v for k, v in payload.items() if isinstance(v, (str, int, float, bool))}},
+                )
+        except Exception as e:
+            # Don't let a piggyback failure crash the WS handler.
+            print(f"[fcm] piggyback EXCEPTION event={event} user_id={user_id}: {type(e).__name__}: {e}")
 
     try:
         asyncio.create_task(_run())
-    except RuntimeError:
-        # No running loop — nothing we can do from a fully-sync context.
-        pass
+    except RuntimeError as e:
+        print(f"[fcm] piggyback skip event={event} user_id={user_id}: no running loop ({e})")
 
 
 # Map WS events → user-visible notification text. Add new entries as new
