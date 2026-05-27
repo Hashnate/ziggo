@@ -233,10 +233,12 @@ async def toggle_online(
 
 # ---------- BRD: Driver KYC document upload UI ----------
 # Where uploads land. Lives under the admin-panel static volume so the
-# admin can view the same files in the browser without extra plumbing.
+# admin can view the same files in the browser without extra plumbing. The
+# admin_panel is now a top-level package alongside `app/`.
 _DOC_UPLOAD_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-    "admin_panel", "static", "uploads", "driver_docs",
+    # /app/app/api/v1/driver.py → up 4 dirs = /app
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
+    "ziggo_admin_panel", "static", "uploads", "driver_docs",
 )
 os.makedirs(_DOC_UPLOAD_DIR, exist_ok=True)
 _VALID_DOC_TYPES = {"nic", "license", "vehicle_reg", "insurance"}

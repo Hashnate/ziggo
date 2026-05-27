@@ -50,8 +50,10 @@ services:
 
   ziggo_backend:
     build:
-      context: ./ziggo_backend
-      dockerfile: Dockerfile
+      # Build context is the repo root so the image can include both
+      # ziggo_backend/ (the API) and ziggo_admin_panel/ (the web UI sibling).
+      context: .
+      dockerfile: ziggo_backend/Dockerfile
     container_name: ziggo_backend
     restart: unless-stopped
     depends_on:
@@ -86,8 +88,10 @@ services:
       # STRIPE_API_KEY: ${STRIPE_API_KEY:-}
       # GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
     volumes:
-      # Persist admin panel uploads (driver photos etc.) across container rebuilds
-      - ziggo_uploads:/app/app/admin_panel/static/uploads
+      # Persist admin panel uploads (driver photos etc.) across container
+      # rebuilds. The named volume's contents survive the path change so
+      # existing uploads keep working after the admin_panel move.
+      - ziggo_uploads:/app/ziggo_admin_panel/static/uploads
     ports:
       # Public binding — accepts traffic from outside the server on
       # ${ZIGGO_PORT}. Switch back to "127.0.0.1:..." once nginx is fronting

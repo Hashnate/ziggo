@@ -44,14 +44,15 @@ from ...services.ws_manager import manager
 router = APIRouter()
 
 # ---------------------------------------------------------------------------
-# Image upload — files land under admin_panel/static/uploads/{kind}/ and are
-# served by the existing /static mount in main.py, so URLs are stable across
-# the customer + merchant apps.
+# Image upload — files land under ziggo_admin_panel/static/uploads/{kind}/
+# (peer of the backend `app/` package) and are served by the /static mount in
+# main.py, so URLs are stable across the customer + merchant apps.
 # ---------------------------------------------------------------------------
-_BACKEND_ROOT = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# /app/app/api/v1/restaurant.py → parents[3] = /app
+_REPO_ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
-_UPLOAD_BASE = os.path.join(_BACKEND_ROOT, "admin_panel", "static", "uploads")
+_UPLOAD_BASE = os.path.join(_REPO_ROOT, "ziggo_admin_panel", "static", "uploads")
 _ALLOWED_IMG_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 _MAX_IMG_BYTES = 5 * 1024 * 1024
 

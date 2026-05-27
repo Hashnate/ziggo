@@ -45,12 +45,14 @@ router = APIRouter()
 
 
 # ---------------------------------------------------------------------------
-# Image upload (shared with restaurant uploads dir layout)
+# Image upload (shared with restaurant uploads dir layout — now under
+# top-level ziggo_admin_panel/, peer of the backend `app/` package).
 # ---------------------------------------------------------------------------
-_BACKEND_ROOT = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# /app/app/api/v1/market_vendor.py → parents[3] = /app
+_REPO_ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
-_UPLOAD_BASE = os.path.join(_BACKEND_ROOT, "admin_panel", "static", "uploads")
+_UPLOAD_BASE = os.path.join(_REPO_ROOT, "ziggo_admin_panel", "static", "uploads")
 _ALLOWED_IMG_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 _MAX_IMG_BYTES = 5 * 1024 * 1024
 

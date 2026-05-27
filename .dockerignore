@@ -1,0 +1,47 @@
+# Build context is the repo root (see docker-compose.yml). The backend
+# image only needs ziggo_backend/ + ziggo_admin_panel/ — everything else is
+# excluded to keep the build context small.
+
+# Sibling projects the backend doesn't need
+ziggo_app/
+ziggo Website/
+
+# Per-project ignores
+**/.git
+**/.gitignore
+**/.idea/
+**/.vscode/
+**/.claude/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/.pytest_cache/
+**/.mypy_cache/
+**/.venv/
+**/venv/
+
+# Secrets — never ship into the image; mount via env at runtime instead
+**/.env
+**/.env.*
+!**/.env.production.example
+ziggo_backend/firebase.json
+ziggo_backend/firebase-*.json
+ziggo_backend/*-firebase-adminsdk-*.json
+
+# Sqlite (dev fallback DB)
+ziggo_backend/ziggo.db
+ziggo_backend/ziggo.db-shm
+ziggo_backend/ziggo.db-wal
+**/*.sqlite
+**/*.sqlite3
+
+# Upload dir contents — the runtime volume supplies these
+ziggo_admin_panel/static/uploads/
+
+# Docs / misc
+**/*.md
+**/*.docx
+
+# OS junk
+**/.DS_Store
+**/Thumbs.db

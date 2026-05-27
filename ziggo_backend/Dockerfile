@@ -21,16 +21,27 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY requirements.txt ./
+# Build context is the REPO ROOT (set in docker-compose) so this Dockerfile
+# can see both ziggo_backend/ and ziggo_admin_panel/. Inside the image they
+# land at /app/app (backend package) and /app/ziggo_admin_panel (admin web
+# UI package). /app is implicitly on sys.path when uvicorn runs from there,
+# so both `app.X` and `ziggo_admin_panel.X` are importable.
+
+COPY ziggo_backend/requirements.txt ./
 RUN pip install -r requirements.txt \
  && apt-get purge -y build-essential libpq-dev \
  && apt-get autoremove -y \
  && rm -rf /var/lib/apt/lists/*
 
-COPY . .
+COPY ziggo_backend/ ./
+COPY ziggo_admin_panel/ /app/ziggo_admin_panel/
 
-# Ensure upload dir exists (mounted as a volume in compose so it survives rebuilds)
-RUN mkdir -p /app/app/admin_panel/static/uploads/drivers
+# Ensure upload dirs exist (mounted as a volume in compose so they survive rebuilds)
+RUN mkdir -p /app/ziggo_admin_panel/static/uploads/drivers \
+             /app/ziggo_admin_panel/static/uploads/driver_docs \
+             /app/ziggo_admin_panel/static/uploads/categories \
+             /app/ziggo_admin_panel/static/uploads/vehicles \
+             /app/ziggo_admin_panel/static/uploads/branding
 
 EXPOSE 8000
 

@@ -10,9 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 from sqlalchemy.orm import selectinload
 
-from ..config import settings
-from ..database import get_db
-from ..models import (
+from app.config import settings
+from app.database import get_db
+from app.models import (
     User,
     UserRole,
     Customer,
@@ -207,7 +207,7 @@ async def admin_dashboard(
     _: User = Depends(current_admin),
 ):
     from datetime import timedelta
-    from ..models import FareSetting
+    from app.models import FareSetting
 
     customers = (await db.execute(select(func.count(Customer.id)))).scalar()
     drivers = (await db.execute(select(func.count(Driver.id)))).scalar()
@@ -353,7 +353,7 @@ async def admin_drivers_new_submit(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import UserRole
+    from app.models import UserRole
 
     form = {
         "phone_number": phone_number,
@@ -451,7 +451,7 @@ async def admin_drivers_edit_form(
         raise HTTPException(status_code=404, detail="Driver not found")
 
     # BRD: load uploaded KYC documents so the admin can verify them inline
-    from ..models import DriverDocument
+    from app.models import DriverDocument
     dq = await db.execute(
         select(DriverDocument).where(DriverDocument.driver_id == d.id)
     )
@@ -730,7 +730,7 @@ async def admin_fare_settings(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import FareSetting
+    from app.models import FareSetting
 
     q = await db.execute(select(FareSetting).order_by(FareSetting.id))
     return templates.TemplateResponse(
@@ -751,7 +751,7 @@ async def admin_fare_settings_update(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import FareSetting
+    from app.models import FareSetting
     from decimal import Decimal
 
     q = await db.execute(select(FareSetting).where(FareSetting.id == id))
@@ -769,7 +769,7 @@ async def admin_fare_settings_update(
 
 # ---------- System settings (admin → Settings) ----------
 async def _get_or_create_settings(db: AsyncSession):
-    from ..models import SystemSettings
+    from app.models import SystemSettings
 
     q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
     s = q.scalars().first()
@@ -899,7 +899,7 @@ async def admin_categories(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import FareSetting, Driver
+    from app.models import FareSetting, Driver
 
     q = await db.execute(select(FareSetting).order_by(FareSetting.id))
     categories = q.scalars().all()
@@ -945,7 +945,7 @@ async def admin_categories_new(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import FareSetting
+    from app.models import FareSetting
     from decimal import Decimal
 
     key = service_type.strip().lower()
@@ -994,7 +994,7 @@ async def admin_categories_edit(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import FareSetting
+    from app.models import FareSetting
     from decimal import Decimal
 
     q = await db.execute(select(FareSetting).where(FareSetting.id == id))
@@ -1025,7 +1025,7 @@ async def admin_categories_delete(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import FareSetting, Driver, Booking
+    from app.models import FareSetting, Driver, Booking
 
     q = await db.execute(select(FareSetting).where(FareSetting.id == id))
     f = q.scalars().first()
@@ -1063,7 +1063,7 @@ async def admin_services(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import FareSetting
+    from app.models import FareSetting
 
     q = await db.execute(select(FareSetting).order_by(FareSetting.id))
     categories = q.scalars().all()
@@ -1089,7 +1089,7 @@ async def admin_services_toggle(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import FareSetting
+    from app.models import FareSetting
 
     q = await db.execute(select(FareSetting).where(FareSetting.id == id))
     f = q.scalars().first()
@@ -1109,7 +1109,7 @@ async def admin_vehicles(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import FareSetting
+    from app.models import FareSetting
 
     q = select(Driver).options(selectinload(Driver.user)).order_by(Driver.id)
     if status:
@@ -1230,7 +1230,7 @@ async def admin_flash_pricing(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import FlashWeightTier
+    from app.models import FlashWeightTier
 
     q = await db.execute(
         select(FlashWeightTier).order_by(FlashWeightTier.display_order, FlashWeightTier.id)
@@ -1258,7 +1258,7 @@ async def admin_flash_pricing_new(
     _: User = Depends(current_admin),
 ):
     from decimal import Decimal
-    from ..models import FlashWeightTier
+    from app.models import FlashWeightTier
 
     max_val = None
     if max_weight_kg.strip():
@@ -1297,7 +1297,7 @@ async def admin_flash_pricing_update(
     _: User = Depends(current_admin),
 ):
     from decimal import Decimal
-    from ..models import FlashWeightTier
+    from app.models import FlashWeightTier
 
     q = await db.execute(select(FlashWeightTier).where(FlashWeightTier.id == id))
     t = q.scalars().first()
@@ -1328,7 +1328,7 @@ async def admin_flash_pricing_toggle(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import FlashWeightTier
+    from app.models import FlashWeightTier
 
     q = await db.execute(select(FlashWeightTier).where(FlashWeightTier.id == tier_id))
     t = q.scalars().first()
@@ -1344,7 +1344,7 @@ async def admin_flash_pricing_delete(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import FlashWeightTier
+    from app.models import FlashWeightTier
 
     q = await db.execute(select(FlashWeightTier).where(FlashWeightTier.id == tier_id))
     t = q.scalars().first()
@@ -1360,7 +1360,7 @@ async def admin_restaurants(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import Restaurant
+    from app.models import Restaurant
 
     # Order pending (is_active=False) first so owner self-registrations rise
     # to the top of the admin's attention. Within each group, newest first.
@@ -1405,8 +1405,8 @@ async def admin_restaurant_approve(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import Notification, Restaurant
-    from ..services.ws_manager import manager
+    from app.models import Notification, Restaurant
+    from app.services.ws_manager import manager
 
     q = await db.execute(select(Restaurant).where(Restaurant.id == restaurant_id))
     r = q.scalars().first()
@@ -1439,8 +1439,8 @@ async def admin_restaurant_suspend(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import Notification, Restaurant
-    from ..services.ws_manager import manager
+    from app.models import Notification, Restaurant
+    from app.services.ws_manager import manager
 
     q = await db.execute(select(Restaurant).where(Restaurant.id == restaurant_id))
     r = q.scalars().first()
@@ -1503,7 +1503,7 @@ async def admin_restaurant_new_submit(
     user, we reuse them (and bump customers up to restaurant_owner).
     Otherwise we create a fresh user with role=restaurant_owner."""
     from decimal import Decimal
-    from ..models import Restaurant, UserRole
+    from app.models import Restaurant, UserRole
 
     form_echo = {
         "owner_phone": owner_phone,
@@ -1563,7 +1563,7 @@ async def admin_restaurant_new_submit(
         # Promote when safe — plain customer OR a market_owner without a
         # market vendor (i.e. they never got onboarded for market). Avoid
         # touching drivers/admins or anyone with an active market vendor.
-        from ..models import MarketVendor as _MV
+        from app.models import MarketVendor as _MV
 
         has_market = (
             await db.execute(
@@ -1609,7 +1609,7 @@ async def admin_restaurant_detail(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import Restaurant, MenuCategory, MenuItem
+    from app.models import Restaurant, MenuCategory, MenuItem
 
     rq = await db.execute(
         select(Restaurant)
@@ -1644,7 +1644,7 @@ async def admin_restaurant_add_category(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import MenuCategory
+    from app.models import MenuCategory
 
     db.add(
         MenuCategory(
@@ -1672,7 +1672,7 @@ async def admin_restaurant_add_item(
     _: User = Depends(current_admin),
 ):
     from decimal import Decimal
-    from ..models import MenuItem
+    from app.models import MenuItem
 
     db.add(
         MenuItem(
@@ -1698,7 +1698,7 @@ async def admin_market(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import MarketVendor
+    from app.models import MarketVendor
 
     q = await db.execute(select(MarketVendor).order_by(MarketVendor.id.desc()))
     return templates.TemplateResponse(
@@ -1742,7 +1742,7 @@ async def admin_market_new_submit(
     by phone, links them via owner_id, and promotes them to market_owner
     when safe (no conflicting restaurant tied to them)."""
     from decimal import Decimal
-    from ..models import MarketVendor, Restaurant, UserRole
+    from app.models import MarketVendor, Restaurant, UserRole
 
     form_echo = {
         "owner_phone": owner_phone,
@@ -1846,7 +1846,7 @@ async def admin_market_detail(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import MarketVendor, Product
+    from app.models import MarketVendor, Product
 
     vq = await db.execute(
         select(MarketVendor)
@@ -1888,7 +1888,7 @@ async def admin_market_add_product(
     _: User = Depends(current_admin),
 ):
     from decimal import Decimal
-    from ..models import Product
+    from app.models import Product
 
     db.add(
         Product(
@@ -1914,8 +1914,8 @@ async def admin_market_suspend(
 ):
     """Suspend a market vendor — sets is_active=False and forces is_open=False
     so customers stop seeing them immediately. Owner is notified by WS."""
-    from ..models import MarketVendor, Notification
-    from ..services.ws_manager import manager
+    from app.models import MarketVendor, Notification
+    from app.services.ws_manager import manager
 
     q = await db.execute(select(MarketVendor).where(MarketVendor.id == vendor_id))
     v = q.scalars().first()
@@ -1949,8 +1949,8 @@ async def admin_market_activate(
     _: User = Depends(current_admin),
 ):
     """Un-suspend a market vendor — sets is_active=True and notifies the owner."""
-    from ..models import MarketVendor, Notification
-    from ..services.ws_manager import manager
+    from app.models import MarketVendor, Notification
+    from app.services.ws_manager import manager
 
     q = await db.execute(select(MarketVendor).where(MarketVendor.id == vendor_id))
     v = q.scalars().first()
@@ -2162,7 +2162,7 @@ async def admin_promotions(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import PromoCode
+    from app.models import PromoCode
 
     q = await db.execute(select(PromoCode).order_by(PromoCode.id.desc()))
     return templates.TemplateResponse(
@@ -2198,7 +2198,7 @@ async def admin_promotions_new(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import PromoCode
+    from app.models import PromoCode
     from decimal import Decimal
 
     norm_code = code.strip().upper()
@@ -2249,7 +2249,7 @@ async def admin_promotions_edit(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import PromoCode
+    from app.models import PromoCode
     from decimal import Decimal
 
     if discount_type not in ("percentage", "fixed"):
@@ -2283,7 +2283,7 @@ async def admin_promotions_toggle(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import PromoCode
+    from app.models import PromoCode
 
     q = await db.execute(select(PromoCode).where(PromoCode.id == promo_id))
     p = q.scalars().first()
@@ -2300,7 +2300,7 @@ async def admin_promotions_delete(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import PromoCode
+    from app.models import PromoCode
 
     q = await db.execute(select(PromoCode).where(PromoCode.id == promo_id))
     p = q.scalars().first()
@@ -2320,7 +2320,7 @@ async def admin_complaints(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import Complaint
+    from app.models import Complaint
 
     q = await db.execute(
         select(Complaint).order_by(Complaint.id.desc()).limit(200)
@@ -2438,7 +2438,7 @@ async def admin_incidents(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import Incident
+    from app.models import Incident
 
     q = await db.execute(
         select(Incident)
@@ -2471,7 +2471,7 @@ async def admin_incidents_dismiss(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import Incident
+    from app.models import Incident
     q = await db.execute(select(Incident).where(Incident.id == incident_id))
     inc = q.scalars().first()
     if not inc:
@@ -2489,7 +2489,7 @@ async def admin_driver_doc_verify(
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(current_admin),
 ):
-    from ..models import DriverDocument
+    from app.models import DriverDocument
     q = await db.execute(
         select(DriverDocument).where(
             DriverDocument.id == doc_id, DriverDocument.driver_id == driver_id
@@ -2512,7 +2512,7 @@ async def admin_driver_doc_reject(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import DriverDocument
+    from app.models import DriverDocument
     q = await db.execute(
         select(DriverDocument).where(
             DriverDocument.id == doc_id, DriverDocument.driver_id == driver_id
@@ -2535,7 +2535,7 @@ async def admin_emergencies(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import EmergencyAlert
+    from app.models import EmergencyAlert
 
     q = await db.execute(
         select(EmergencyAlert)
@@ -2572,7 +2572,7 @@ async def admin_emergencies_action(
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(current_admin),
 ):
-    from ..models import EmergencyAlert
+    from app.models import EmergencyAlert
     if action not in ("acknowledge", "resolve", "dismiss"):
         raise HTTPException(status_code=400, detail="Unknown action")
     q = await db.execute(select(EmergencyAlert).where(EmergencyAlert.id == alert_id))
@@ -2602,7 +2602,7 @@ async def admin_support(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import Complaint, ComplaintMessage
+    from app.models import Complaint, ComplaintMessage
 
     base = (
         select(Complaint)
@@ -2689,8 +2689,8 @@ async def admin_support_set_status(
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(current_admin),
 ):
-    from ..models import Complaint
-    from ..services.ws_manager import manager
+    from app.models import Complaint
+    from app.services.ws_manager import manager
 
     if status not in SUPPORT_STATUSES:
         raise HTTPException(status_code=400, detail="Invalid status")
@@ -2721,8 +2721,8 @@ async def admin_support_reply(
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(current_admin),
 ):
-    from ..models import Complaint, ComplaintMessage
-    from ..services.ws_manager import manager
+    from app.models import Complaint, ComplaintMessage
+    from app.services.ws_manager import manager
 
     text = body.strip()
     if not text:
@@ -2762,7 +2762,7 @@ async def admin_support_reply(
 # thin shims that fetch and template-render.
 # ---------------------------------------------------------------------------
 
-from ..services import finance_service as fin  # noqa: E402
+from app.services import finance_service as fin  # noqa: E402
 
 
 @router.get("/finance", response_class=HTMLResponse)
@@ -2904,7 +2904,7 @@ async def admin_events(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import Event
+    from app.models import Event
     from sqlalchemy.orm import selectinload as _sel
 
     q = await db.execute(
@@ -2949,7 +2949,7 @@ async def admin_events_new_submit(
     _: User = Depends(current_admin),
 ):
     from decimal import Decimal as _D
-    from ..models import Event as _E, EventTicketTier as _T
+    from app.models import Event as _E, EventTicketTier as _T
 
     def _parse_dt(s: str):
         # HTML datetime-local sends "2026-05-20T18:30" (no tz). Treat as UTC.
@@ -3014,7 +3014,7 @@ async def admin_events_toggle_publish(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import Event as _E
+    from app.models import Event as _E
 
     q = await db.execute(select(_E).where(_E.id == event_id))
     ev = q.scalars().first()
@@ -3031,7 +3031,7 @@ async def admin_events_delete(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from ..models import Event as _E
+    from app.models import Event as _E
 
     q = await db.execute(select(_E).where(_E.id == event_id))
     ev = q.scalars().first()

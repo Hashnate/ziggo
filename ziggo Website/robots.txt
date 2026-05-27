@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /components/
+
+Sitemap: https://ziggo.lk/sitemap.xml

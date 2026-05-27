@@ -12,8 +12,8 @@ from fastapi.responses import RedirectResponse
 from .config import settings
 from .database import engine
 from .api.v1 import auth, customer, driver, admin, bookings, ws, event, food, market, market_vendor, misc, payments, restaurant, trip_share
-from .admin_panel import routes as admin_panel_routes
-from .admin_panel.routes import _AdminRedirect
+from ziggo_admin_panel import routes as admin_panel_routes
+from ziggo_admin_panel.routes import _AdminRedirect
 from .services.schema_sync import ensure_schema
 from .services.auto_cancel import auto_cancel_loop
 from .services import fcm_service
@@ -86,9 +86,13 @@ app.include_router(payments.router, prefix=f"{settings.API_V1_STR}/payments", ta
 app.include_router(trip_share.router, prefix=settings.API_V1_STR, tags=["trip_share"])
 app.include_router(ws.router, tags=["ws"])
 
-# Admin panel static + templates
+# Admin panel static + templates. The admin_panel package now lives as a
+# top-level sibling of `app/` (under /app/ziggo_admin_panel/). main.py is
+# at /app/app/main.py — go up one to /app then into ziggo_admin_panel.
 current_dir = os.path.dirname(os.path.abspath(__file__))
-static_dir = os.path.join(current_dir, "admin_panel", "static")
+static_dir = os.path.abspath(
+    os.path.join(current_dir, "..", "ziggo_admin_panel", "static")
+)
 if os.path.isdir(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
