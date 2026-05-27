@@ -80,19 +80,62 @@ def is_enabled() -> bool:
     return _initialized
 
 
+# Event types whose notification should be HIGH priority and play a sound —
+# things the user genuinely needs to act on (ride requests, ride state). For
+# anything else we still send a notification but at default priority so it
+# doesn't wake the phone unnecessarily.
+_URGENT_EVENTS = {
+    "new_ride_request",
+    "booking_update",
+    "no_drivers_available",
+    "food_order_update",
+    "market_order_update",
+}
+
+
 async def _send_to_token(
     token: str,
     title: str,
     body: str,
     data: Optional[dict] = None,
 ) -> tuple[bool, Optional[str]]:
-    """Returns (ok, error_string). firebase-admin is sync — run in a thread."""
+    """Returns (ok, error_string). firebase-admin is sync — run in a thread.
+
+    Plays the system default notification sound on both platforms. For Android
+    we mark urgent events as HIGH priority so the notification breaks through
+    Do-Not-Disturb / heads-up display rather than being silently appended to
+    the tray.
+    """
     if not _initialized:
         return False, "not initialised"
+
+    urgent = (data or {}).get("event") in _URGENT_EVENTS
+
     msg = messaging.Message(
         token=token,
         notification=messaging.Notification(title=title, body=body),
         data={k: str(v) for k, v in (data or {}).items()},
+        android=messaging.AndroidConfig(
+            priority="high" if urgent else "normal",
+            notification=messaging.AndroidNotification(
+                sound="default",
+                # Channel ID — Flutter's firebase_messaging plugin auto-creates
+                # one with this exact id at first install; routing pushes here
+                # lets us tune its importance from the app side without a
+                # backend change. Safe to send before the channel exists; the
+                # OS falls back to the default channel.
+                channel_id="ziggo_ride_alerts" if urgent else None,
+            ),
+        ),
+        apns=messaging.APNSConfig(
+            headers={"apns-priority": "10" if urgent else "5"},
+            payload=messaging.APNSPayload(
+                aps=messaging.Aps(
+                    sound="default",
+                    content_available=True,
+                ),
+            ),
+        ),
     )
     try:
         await asyncio.to_thread(messaging.send, msg)
