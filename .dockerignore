@@ -24,7 +24,11 @@ ziggo Website/
 **/.env
 **/.env.*
 !**/.env.production.example
-ziggo_backend/firebase.json
+# NOTE: ziggo_backend/firebase.json IS intentionally NOT ignored — it gets
+# COPYed into the image at build time so the FCM service can find it at
+# /app/firebase.json. The .gitignore (not this file) is what keeps the
+# secret out of source control.
+ziggo_backend/firebase.json.example
 ziggo_backend/firebase-*.json
 ziggo_backend/*-firebase-adminsdk-*.json
 
