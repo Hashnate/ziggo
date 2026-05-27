@@ -118,12 +118,15 @@ async def _send_to_token(
         android=messaging.AndroidConfig(
             priority="high" if urgent else "normal",
             notification=messaging.AndroidNotification(
-                sound="default",
-                # Channel ID — Flutter's firebase_messaging plugin auto-creates
-                # one with this exact id at first install; routing pushes here
-                # lets us tune its importance from the app side without a
-                # backend change. Safe to send before the channel exists; the
-                # OS falls back to the default channel.
+                # Urgent events play the bundled ride_alert.mp3 (lives at
+                # ziggo_app/android/app/src/main/res/raw/ride_alert.mp3 in the
+                # APK). Non-urgent ones use the OS default tone. Note:
+                # Android references res/raw assets WITHOUT extension.
+                sound="ride_alert" if urgent else "default",
+                # Channel id — Firebase auto-creates this channel on first
+                # delivery, using the sound from the payload as the channel's
+                # default. Once created, the channel's sound is fixed; to
+                # change later, bump the id (e.g. ziggo_ride_alerts_v2).
                 channel_id="ziggo_ride_alerts" if urgent else None,
             ),
         ),
@@ -131,6 +134,8 @@ async def _send_to_token(
             headers={"apns-priority": "10" if urgent else "5"},
             payload=messaging.APNSPayload(
                 aps=messaging.Aps(
+                    # iOS uses default sound until an .caf/.wav of ride_alert
+                    # is added to the Xcode project (Android-only for now).
                     sound="default",
                     content_available=True,
                 ),
