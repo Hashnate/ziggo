@@ -10,7 +10,7 @@
   --p-bg:           #FFFFFF;
   --p-bg-soft:      #F8FAFC;
   --p-bg-cream:     #FAFAF7;
-  --p-bg-dark:      #050811;
+  --p-bg-dark:      #131C3D;
   --p-bg-dark-2:    #0A0F1F;
   --p-card:         #FFFFFF;
   --p-text:         #0B1426;
@@ -394,8 +394,8 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
   height: 36px;
   width: auto;
   display: block;
-  /* Invert the dark-navy wordmark to white on the dark glass nav */
-  filter: brightness(0) invert(1);
+  /* Disable invert since logo-light has the white-and-orange coloring pre-baked */
+  filter: none;
   transition: transform 0.3s var(--p-spring), filter 0.3s var(--p-ease);
 }
 .pm-nav-logo:hover img {
@@ -403,7 +403,7 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
 }
 .pm-footer-logo img {
   height: 140px;
-  filter: brightness(0) invert(1);
+  filter: none;
 }
 .pm-nav-links {
   display: flex;
@@ -1243,6 +1243,13 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
   0%   { transform: scale(0.5); opacity: 0.8; }
   100% { transform: scale(1.7); opacity: 0; }
 }
+.pm-phone-drive {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
 .pm-phone-route {
   position: absolute;
   top: 30%; left: 25%;
@@ -1358,6 +1365,119 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
   align-items: center;
   gap: 3px;
 }
+
+/* Driver-arriving sheet (booking flow demo) */
+.pm-phone-sheet .trip-eta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--p-brand-dark);
+  letter-spacing: -0.01em;
+  margin-bottom: 10px;
+}
+.pm-phone-sheet .trip-eta strong { color: var(--p-brand); }
+.pm-phone-sheet .trip-eta .dot-live {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10B981;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55);
+  animation: pmPulseDot 1.6s ease-out infinite;
+}
+@keyframes pmPulseDot {
+  0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55); }
+  100% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+}
+.pm-phone-sheet .driver-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px;
+  border-radius: 14px;
+  background: var(--p-bg-soft);
+  border: 1px solid var(--p-border);
+}
+.pm-phone-sheet .avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #3B82F6, #1E3A8A);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--p-font-display);
+  font-weight: 800;
+  font-size: 0.82rem;
+  box-shadow: 0 4px 10px -2px rgba(30, 58, 138, 0.4);
+}
+.pm-phone-sheet .d-meta { flex: 1; min-width: 0; }
+.pm-phone-sheet .d-meta strong {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--p-brand-dark);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pm-phone-sheet .d-meta small {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.62rem;
+  color: var(--p-text-light);
+  margin-top: 2px;
+}
+.pm-phone-sheet .rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  background: #FEF3C7;
+  color: #B45309;
+  font-weight: 800;
+  font-size: 0.62rem;
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+.pm-phone-sheet .rating i { font-size: 0.55rem; color: #F59E0B; }
+.pm-phone-sheet .driver-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.pm-phone-sheet .act {
+  border: 0;
+  cursor: pointer;
+  border-radius: 12px;
+  padding: 10px;
+  font-family: var(--p-font-body);
+  font-weight: 700;
+  font-size: 0.72rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: transform 0.25s var(--p-spring), box-shadow 0.25s var(--p-ease);
+}
+.pm-phone-sheet .act.call {
+  flex: 1;
+  background: var(--p-grad-brand);
+  color: #fff;
+  box-shadow: 0 6px 14px -4px rgba(30, 58, 138, 0.45);
+}
+.pm-phone-sheet .act.msg {
+  width: 40px;
+  background: #fff;
+  border: 1px solid var(--p-border);
+  color: var(--p-brand);
+}
+.pm-phone-sheet .act:hover { transform: translateY(-2px); }
 
 /* Premium floating cards beside the phone */
 .pm-floating-card {
@@ -2028,12 +2148,12 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
 
 /* ---------- Phone-mockup 4-step flow ---------- */
 .pm-flow {
-  max-width: var(--p-container);
+  max-width: 1200px;
   margin: 0 auto;
   padding: 0 24px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 60px;
+  grid-template-columns: 1fr auto;
+  gap: 56px;
   align-items: center;
 }
 .pm-flow-steps { display: flex; flex-direction: column; gap: 16px; }
@@ -2078,6 +2198,10 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
   display: flex;
   justify-content: center;
   align-items: center;
+}
+.pm-flow-phone .pm-phone {
+  top: auto;
+  left: auto;
 }
 
 /* ---------- Marquee ---------- */
@@ -3193,7 +3317,7 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
 
 /* ---------- Footer ---------- */
 .pm-footer {
-  background: var(--p-bg-dark);
+  background: #0F1730;
   color: var(--p-text-onDarkMuted);
   padding: 80px 0 32px;
   position: relative;
@@ -3203,7 +3327,7 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at 30% 0%, rgba(30,58,138,0.4), transparent 60%);
+  background: none;
   pointer-events: none;
 }
 .pm-footer-top {
