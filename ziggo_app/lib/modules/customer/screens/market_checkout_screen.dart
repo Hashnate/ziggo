@@ -8,6 +8,7 @@ import '../../../core/map/places.dart';
 import '../../../core/widgets/motion.dart';
 import '../addresses_provider.dart';
 import '../market_provider.dart';
+import '../promos_provider.dart';
 import 'market_tracking_screen.dart';
 
 class MarketCheckoutScreen extends StatefulWidget {
@@ -22,6 +23,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
   Place? _picked;
   Map<String, dynamic>? _saved;
   bool _busy = false;
+  bool _usePoints = false;
   final _instructionsCtrl = TextEditingController();
 
   @override
@@ -35,6 +37,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AddressesProvider>().refresh();
+      context.read<PromosProvider>().refresh();
     });
   }
 
@@ -70,6 +73,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
       lng: lng,
       paymentMethod: _payment,
       instructions: _instructionsCtrl.text.trim(),
+      redeemPoints: _usePoints ? context.read<PromosProvider>().points : 0,
     );
     if (!mounted) return;
     setState(() => _busy = false);
@@ -91,12 +95,19 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
     );
   }
 
-  @override
   Widget build(BuildContext context) {
     final p = context.watch<MarketProvider>();
     final addr = context.watch<AddressesProvider>();
+    final promos = context.watch<PromosProvider>();
     const deliveryFee = 150.0;
-    final total = p.cartTotal + deliveryFee;
+    
+    double total = p.cartTotal + deliveryFee;
+    double discount = 0.0;
+    if (_usePoints) {
+      discount = promos.pointsValue;
+      if (discount > total) discount = total;
+      total -= discount;
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -281,12 +292,53 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
               ],
             ),
           ),
+          if (promos.points > 0 && promos.points >= ((promos.loyalty['min_redeem_points'] as num?)?.toInt() ?? 100))
+            _section(
+              'LOYALTY POINTS',
+              Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: const Icon(Icons.stars_rounded, color: AppColors.primary, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Use ${promos.points} Points',
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                        ),
+                        Text(
+                          '-Rs.${promos.pointsValue.toStringAsFixed(0)} discount',
+                          style: const TextStyle(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: _usePoints,
+                    onChanged: (v) => setState(() => _usePoints = v),
+                    activeColor: AppColors.primary,
+                  ),
+                ],
+              ),
+            ),
           _section(
             'BILL SUMMARY',
             Column(
               children: [
                 _row('Items', 'Rs.${p.cartTotal.toStringAsFixed(0)}'),
                 _row('Delivery', 'Rs.${deliveryFee.toStringAsFixed(0)}'),
+                if (_usePoints && discount > 0)
+                  _row('Points Discount', '-Rs.${discount.toStringAsFixed(0)}', color: AppColors.success),
                 const Divider(height: 16),
                 _row('Total', 'Rs.${total.toStringAsFixed(0)}', bold: true),
               ],
@@ -377,7 +429,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
     );
   }
 
-  Widget _row(String k, String v, {bool bold = false}) {
+  Widget _row(String k, String v, {bool bold = false, Color? color}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -385,7 +437,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
           Text(
             k,
             style: TextStyle(
-              color: bold ? AppColors.textPrimary : AppColors.textSecondary,
+              color: color ?? (bold ? AppColors.textPrimary : AppColors.textSecondary),
               fontWeight: bold ? FontWeight.w900 : FontWeight.w700,
             ),
           ),
@@ -395,7 +447,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
             style: TextStyle(
               fontSize: bold ? 20 : 14,
               fontWeight: FontWeight.w900,
-              color: bold ? AppColors.market : AppColors.textPrimary,
+              color: color ?? (bold ? AppColors.market : AppColors.textPrimary),
             ),
           ),
         ],

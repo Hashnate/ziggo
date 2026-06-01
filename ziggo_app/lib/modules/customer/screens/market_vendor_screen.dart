@@ -75,7 +75,7 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
                         colors: [Color(0xFF22C55E), Color(0xFF16A34A)],
                       ),
                     ),
-                    padding: const EdgeInsets.fromLTRB(24, 60, 24, 40),
+                    padding: const EdgeInsets.fromLTRB(24, 60, 24, 56),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       crossAxisAlignment: CrossAxisAlignment.start,

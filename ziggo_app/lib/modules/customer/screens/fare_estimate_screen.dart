@@ -13,6 +13,7 @@ import '../../../core/map/places.dart';
 import '../../../core/map/ziggo_map.dart';
 import '../../../core/network/api_client.dart';
 import '../booking_provider.dart';
+import '../promos_provider.dart';
 import 'customer_shell.dart';
 import 'ride_tracking_screen.dart';
 
@@ -39,6 +40,7 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
 
   final Map<String, Map<String, dynamic>> _estimates = {};
   bool _loadingEstimates = false;
+  bool _usePoints = false;
   List<LatLng> _routePoints = const [];
 
   List<Map<String, dynamic>> _nearbyDrivers = const [];
@@ -49,6 +51,8 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
     super.initState();
     _pickup = kColomboPlaces[0];
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<PromosProvider>().refresh();
+      _usePoints = false;
       _useCurrentLocationForPickup();
       _startNearbyDriverPolling();
     });
@@ -145,7 +149,7 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
     final here = await MapsService.instance.currentLocationAsPlace();
     if (!mounted || here == null) return;
     setState(() => _pickup = here);
-    _mapController.moveTo(here.location, zoom: 15);
+    _mapController.moveTo(here.location, zoom: 17.5);
     _fetchNearbyDrivers();
     await _recalculate();
   }
@@ -220,7 +224,7 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
       if (_pickup != null && _drop != null) {
         await _recalculate();
       } else {
-        _mapController.moveTo(result.location, zoom: 15);
+        _mapController.moveTo(result.location, zoom: 17.5);
       }
     }
   }
@@ -240,6 +244,7 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
         dropAddress: _drop!.fullAddress,
         paymentMethod: _payment,
         promoCode: _promo.isEmpty ? null : _promo,
+        redeemPoints: _usePoints ? context.read<PromosProvider>().points : 0,
         tripType: _tripType,
         stops: _stops
             .map((s) => {
@@ -284,7 +289,19 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final promos = context.watch<PromosProvider>();
     final est = _serviceType == null ? null : _estimates[_serviceType!];
+    
+    double finalTotal = 0;
+    double discount = 0;
+    if (est != null) {
+      finalTotal = (est['final_amount'] as num).toDouble();
+      if (_usePoints) {
+        discount = promos.pointsValue;
+        if (discount > finalTotal) discount = finalTotal;
+        finalTotal -= discount;
+      }
+    }
     return Scaffold(
       backgroundColor: AppColors.background,
       // Fullscreen map at the back, draggable bottom sheet for content.
@@ -311,9 +328,9 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
                     assetPath: _vehicleAsset(d['vehicle_type'] as String?),
                   ),
                 if (_pickup != null)
-                  pinMarker(point: _pickup!.location, icon: Icons.my_location_rounded, color: AppColors.flash),
+                  pinMarker(point: _pickup!.location, icon: Icons.my_location_rounded, color: AppColors.flash, label: 'Meet your driver here'),
                 if (_drop != null)
-                  pinMarker(point: _drop!.location, icon: Icons.location_on_rounded, color: AppColors.error),
+                  pinMarker(point: _drop!.location, icon: Icons.location_on_rounded, color: AppColors.error, label: 'Drop off here'),
                 // BRD: CD-19 — show every intermediate stop on the map
                 for (final s in _stops)
                   pinMarker(point: s.location, icon: Icons.pin_drop_rounded, color: AppColors.warning),
@@ -410,11 +427,17 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
                           _sectionHeader('PAYMENT'),
                           const SizedBox(height: 8),
                           _paymentRow(),
+                          if (promos.points > 0 && promos.points >= ((promos.loyalty['min_redeem_points'] as num?)?.toInt() ?? 100)) ...[
+                            const SizedBox(height: 18),
+                            _sectionHeader('LOYALTY POINTS'),
+                            const SizedBox(height: 8),
+                            _loyaltyRow(promos),
+                          ],
                         ],
                       ),
                     ),
                     // Bottom action bar pinned inside the sheet
-                    _bottomActionBar(est),
+                    _bottomActionBar(est, finalTotal, discount),
                   ],
                 ),
               );
@@ -463,7 +486,7 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
   }
 
   /// The "Total fare + Book Now" bar at the bottom of the draggable sheet.
-  Widget _bottomActionBar(Map<String, dynamic>? est) {
+  Widget _bottomActionBar(Map<String, dynamic>? est, double finalTotal, double discount) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
       decoration: const BoxDecoration(
@@ -488,13 +511,22 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
                     ),
                   ),
                   Text(
-                    est == null ? '--' : 'Rs.${(est['final_amount'] as num).toStringAsFixed(0)}',
+                    est == null ? '--' : 'Rs.${finalTotal.toStringAsFixed(0)}',
                     style: const TextStyle(
                       fontWeight: FontWeight.w900,
                       fontSize: 26,
                       letterSpacing: -0.5,
                     ),
                   ),
+                  if (_usePoints && discount > 0)
+                    Text(
+                      'Includes Rs.${discount.toStringAsFixed(0)} discount',
+                      style: const TextStyle(
+                        color: AppColors.success,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
+                      ),
+                    ),
                   if (est != null && (est['distance_km'] as num) > 0)
                     Row(
                       children: [
@@ -573,6 +605,52 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
             ),
             const SizedBox(width: 4),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _loyaltyRow(PromosProvider promos) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.stars_rounded, color: AppColors.primary, size: 16),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Use ${promos.points} Points',
+                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                ),
+                Text(
+                  '-Rs.${promos.pointsValue.toStringAsFixed(0)} discount',
+                  style: const TextStyle(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: _usePoints,
+            onChanged: (v) => setState(() => _usePoints = v),
+            activeColor: AppColors.primary,
+          ),
         ],
       ),
     );

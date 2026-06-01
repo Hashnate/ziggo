@@ -261,10 +261,10 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
 
   Widget _categoryStrip(List<String> cats) {
     return SizedBox(
-      height: 44,
+      height: 60,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
         itemBuilder: (_, i) {
           final c = cats[i];
           final selected = _category == c;

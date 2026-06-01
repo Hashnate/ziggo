@@ -1,3 +1,6 @@
+import 'dart:ui' as ui;
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart' as gmaps;
@@ -15,12 +18,16 @@ class ZiggoMarker {
   // Optional rasterised image (PNG asset) shown instead of the default colored
   // pin. Used for nearby-driver vehicle markers on the customer map.
   final String? assetPath;
+  // Optional label to render a custom bubble marker instead of a default pin
+  final String? label;
+  
   const ZiggoMarker({
     required this.point,
     required this.icon,
     required this.color,
     this.size = 36,
     this.assetPath,
+    this.label,
   });
 }
 
@@ -30,6 +37,7 @@ ZiggoMarker pinMarker({
   required Color color,
   double size = 36,
   String? assetPath,
+  String? label,
 }) {
   return ZiggoMarker(
     point: point,
@@ -37,6 +45,119 @@ ZiggoMarker pinMarker({
     color: color,
     size: size,
     assetPath: assetPath,
+    label: label,
+  );
+}
+
+class CustomMarkerData {
+  final gmaps.BitmapDescriptor bitmap;
+  final Offset anchor;
+  CustomMarkerData(this.bitmap, this.anchor);
+}
+
+Future<CustomMarkerData> _createCustomMarkerBitmap(String label, Color color) async {
+  final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
+  final Canvas canvas = Canvas(pictureRecorder);
+  
+  // 1. Measure the text first to determine canvas dimensions
+  final TextPainter textPainter = TextPainter(
+    textDirection: TextDirection.ltr,
+  );
+  textPainter.text = TextSpan(
+    text: label,
+    style: const TextStyle(
+      fontSize: 16, // Reduced from 28
+      color: Colors.white,
+      fontWeight: FontWeight.w900,
+    ),
+  );
+  textPainter.layout();
+  
+  final double textWidth = textPainter.width;
+  final double textHeight = textPainter.height;
+  
+  // 2. Calculate dynamic dimensions
+  final double bubbleWidth = textWidth + 30; // Reduced from 60
+  final double bubbleHeight = textHeight + 16; // Reduced from 24
+  
+  final double width = (bubbleWidth > 70 ? bubbleWidth : 70) + 20; // Reduced from 140/40
+  final double height = bubbleHeight + 60; // Reduced from 110
+  
+  final double centerX = width / 2;
+  final double centerY = height - 30; // Pin center is 30px from the bottom (reduced from 50)
+  
+  // 3. Draw Background translucent circle
+  final Paint circlePaint = Paint()
+    ..color = color.withOpacity(0.15)
+    ..style = PaintingStyle.fill;
+  canvas.drawCircle(Offset(centerX, centerY), 28, circlePaint); // Radius reduced from 50
+  
+  // 4. Draw Center dot outer white border
+  final Paint dotOuterPaint = Paint()
+    ..color = Colors.white
+    ..style = PaintingStyle.fill;
+  canvas.drawCircle(Offset(centerX, centerY), 9, dotOuterPaint); // Radius reduced from 16
+  
+  // 5. Draw Center dot inner fill
+  final Paint dotInnerPaint = Paint()
+    ..color = Colors.black
+    ..style = PaintingStyle.fill;
+  canvas.drawCircle(Offset(centerX, centerY), 5.5, dotInnerPaint); // Radius reduced from 10
+  
+  // 6. Define bubble rect and tail path
+  final double bubbleY = 8; // Reduced from 15
+  final double bubbleX = (width - bubbleWidth) / 2;
+  
+  final RRect bubbleRect = RRect.fromRectAndRadius(
+    Rect.fromLTWH(bubbleX, bubbleY, bubbleWidth, bubbleHeight),
+    Radius.circular(bubbleHeight / 2),
+  );
+  
+  final ui.Path tailPath = ui.Path();
+  final double tailTop = bubbleY + bubbleHeight;
+  tailPath.moveTo(centerX - 7, tailTop); // Reduced from 12
+  tailPath.lineTo(centerX + 7, tailTop);
+  tailPath.lineTo(centerX, tailTop + 10); // Reduced from 16
+  tailPath.close();
+
+  // Combine into a single shape
+  final ui.Path bubblePath = ui.Path()..addRRect(bubbleRect);
+  final ui.Path combinedPath = ui.Path.combine(ui.PathOperation.union, bubblePath, tailPath);
+
+  // 7. Draw the white border stroke
+  final Paint borderPaint = Paint()
+    ..color = Colors.white
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 3.0 // Reduced from 5.0
+    ..strokeJoin = StrokeJoin.round;
+  canvas.drawPath(combinedPath, borderPaint);
+
+  // 8. Draw the colored fill
+  final Paint bubblePaint = Paint()
+    ..color = color
+    ..style = PaintingStyle.fill;
+  canvas.drawPath(combinedPath, bubblePaint);
+  
+  // 9. Draw text
+  textPainter.paint(
+    canvas,
+    Offset(
+      centerX - textWidth / 2,
+      bubbleY + (bubbleHeight - textHeight) / 2,
+    ),
+  );
+  
+  // 10. Render to image
+  final ui.Image img = await pictureRecorder.endRecording().toImage(
+    width.toInt(),
+    height.toInt(),
+  );
+  final ByteData? byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+  final Uint8List uint8List = byteData!.buffer.asUint8List();
+  
+  return CustomMarkerData(
+    gmaps.BitmapDescriptor.fromBytes(uint8List),
+    Offset(0.5, centerY / height),
   );
 }
 
@@ -125,12 +246,32 @@ class _ZiggoMapState extends State<ZiggoMap> {
   // Process-wide cache so flipping screens or polling drivers every 6 s
   // doesn't re-decode the same PNG over and over.
   static final Map<String, gmaps.BitmapDescriptor> _iconCache = {};
+  static final Map<String, gmaps.BitmapDescriptor> _customLabelCache = {};
+  static final Map<String, Offset> _customLabelAnchors = {};
   final Set<String> _loadingAssets = {};
+  final Set<String> _loadingLabels = {};
 
   @override
   void initState() {
     super.initState();
     if (widget.showMyLocation) _ensureLocationPermission();
+  }
+
+  Future<void> _ensureLabelIcon(String label, Color color) async {
+    final key = '$label-${color.value}';
+    if (_customLabelCache.containsKey(key) || _loadingLabels.contains(key)) {
+      return;
+    }
+    _loadingLabels.add(key);
+    try {
+      final data = await _createCustomMarkerBitmap(label, color);
+      _customLabelCache[key] = data.bitmap;
+      _customLabelAnchors[key] = data.anchor;
+      if (mounted) setState(() {});
+    } catch (_) {
+    } finally {
+      _loadingLabels.remove(key);
+    }
   }
 
   Future<void> _ensureIcon(String assetPath) async {
@@ -178,7 +319,18 @@ class _ZiggoMapState extends State<ZiggoMap> {
       final m = widget.markers[i];
       gmaps.BitmapDescriptor icon;
       Offset anchor = const Offset(0.5, 1.0);
-      if (m.assetPath != null) {
+      
+      if (m.label != null) {
+        final key = '${m.label}-${m.color.value}';
+        final cached = _customLabelCache[key];
+        if (cached != null) {
+          icon = cached;
+          anchor = _customLabelAnchors[key] ?? const Offset(0.5, 0.70);
+        } else {
+          _ensureLabelIcon(m.label!, m.color);
+          icon = gmaps.BitmapDescriptor.defaultMarkerWithHue(_hueFor(m.color));
+        }
+      } else if (m.assetPath != null) {
         final cached = _iconCache[m.assetPath!];
         if (cached != null) {
           icon = cached;
@@ -192,6 +344,7 @@ class _ZiggoMapState extends State<ZiggoMap> {
       } else {
         icon = gmaps.BitmapDescriptor.defaultMarkerWithHue(_hueFor(m.color));
       }
+      
       gMarkers.add(
         gmaps.Marker(
           markerId: gmaps.MarkerId('m$i'),

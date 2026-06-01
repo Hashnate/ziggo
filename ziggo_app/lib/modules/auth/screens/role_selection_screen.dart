@@ -148,10 +148,21 @@ class RoleSelectionScreen extends StatelessWidget {
                     delay: const Duration(milliseconds: 460),
                     child: _RoleCard(
                       title: 'RUN A RESTAURANT',
-                      subtitle: 'Restaurants, market stalls — manage both here',
+                      subtitle: 'Manage your restaurant orders and menus',
                       icon: Icons.restaurant_rounded,
                       featured: false,
                       onTap: () => _navigateToLogin(context, 'restaurant_owner'),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  EntranceSlide(
+                    delay: const Duration(milliseconds: 500),
+                    child: _RoleCard(
+                      title: 'MANAGE MARKET PLACE',
+                      subtitle: 'Supermarkets, stalls, and grocery stores',
+                      icon: Icons.storefront_rounded,
+                      featured: false,
+                      onTap: () => _navigateToLogin(context, 'market_owner'),
                     ),
                   ),
                   const SizedBox(height: 28),
