@@ -60,6 +60,11 @@ async def root():
     return RedirectResponse(url="/admin/login")
 
 
+@app.get("/admin")
+async def admin_root():
+    return RedirectResponse(url="/admin/login")
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": settings.PROJECT_NAME}
