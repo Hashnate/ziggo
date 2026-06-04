@@ -152,6 +152,9 @@ async def list_restaurants(db: AsyncSession = Depends(get_db)):
     enriched = []
     for r in rows:
         within = _is_within_hours(r.opening_time, r.closing_time)
+        is_open_now = bool(r.is_open) and within
+        if not is_open_now:
+            continue
         enriched.append(
             {
                 "id": r.id,
@@ -167,7 +170,7 @@ async def list_restaurants(db: AsyncSession = Depends(get_db)):
                 "eta_minutes": r.eta_minutes,
                 "is_active": bool(r.is_active),
                 "is_open": bool(r.is_open),
-                "is_open_now": bool(r.is_open) and within,
+                "is_open_now": is_open_now,
             }
         )
     # Open restaurants first, then closed.

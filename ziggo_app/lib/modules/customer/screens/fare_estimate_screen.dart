@@ -133,15 +133,15 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
   String _vehicleAsset(String? type) {
     switch (type) {
       case 'bike':
-        return 'assets/icons/bike.png';
+        return 'assets/icons/top_bike.png';
       case 'tuk':
-        return 'assets/icons/tuk.png';
+        return 'assets/icons/top_tuk.png';
       case 'truck':
-        return 'assets/icons/truck.png';
+        return 'assets/icons/top_truck.png';
       case 'van':
       case 'car':
       default:
-        return 'assets/icons/car.png';
+        return 'assets/icons/top_car.png';
     }
   }
 
@@ -328,9 +328,26 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
                     assetPath: _vehicleAsset(d['vehicle_type'] as String?),
                   ),
                 if (_pickup != null)
-                  pinMarker(point: _pickup!.location, icon: Icons.my_location_rounded, color: AppColors.flash, label: 'Meet your driver here'),
+                  _drop == null
+                      ? pinMarker(
+                          point: _pickup!.location,
+                          icon: Icons.my_location_rounded,
+                          color: AppColors.flash,
+                          label: 'Meet your driver here',
+                        )
+                      : pinMarker(
+                          point: _pickup!.location,
+                          icon: Icons.my_location_rounded,
+                          color: AppColors.info,
+                          label: 'Pickup | ${_pickup!.name}',
+                        ),
                 if (_drop != null)
-                  pinMarker(point: _drop!.location, icon: Icons.location_on_rounded, color: AppColors.error, label: 'Drop off here'),
+                  pinMarker(
+                    point: _drop!.location,
+                    icon: Icons.location_on_rounded,
+                    color: AppColors.warning,
+                    label: 'Drop | ${_drop!.name}',
+                  ),
                 // BRD: CD-19 — show every intermediate stop on the map
                 for (final s in _stops)
                   pinMarker(point: s.location, icon: Icons.pin_drop_rounded, color: AppColors.warning),

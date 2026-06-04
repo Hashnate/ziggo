@@ -61,6 +61,9 @@ async def list_vendors(db: AsyncSession = Depends(get_db)):
     enriched = []
     for v in rows:
         within = _is_within_hours(v.opening_time, v.closing_time)
+        is_open_now = (bool(v.is_open) if v.is_open is not None else True) and within
+        if not is_open_now:
+            continue
         enriched.append(
             {
                 "id": v.id,
@@ -76,7 +79,7 @@ async def list_vendors(db: AsyncSession = Depends(get_db)):
                 "closing_time": v.closing_time,
                 "is_active": bool(v.is_active),
                 "is_open": bool(v.is_open) if v.is_open is not None else True,
-                "is_open_now": (bool(v.is_open) if v.is_open is not None else True) and within,
+                "is_open_now": is_open_now,
             }
         )
     enriched.sort(key=lambda x: (not x["is_open_now"], x["id"]))

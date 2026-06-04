@@ -3,8 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
+import 'package:provider/provider.dart';
+
 import '../../app/app_colors.dart';
 import '../../app/app_styles.dart';
+import '../../modules/customer/addresses_provider.dart';
 import 'maps_service.dart';
 import 'places.dart';
 
@@ -52,6 +55,14 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
   bool _loading = false;
   bool _resolving = false;
   Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AddressesProvider>().refresh();
+    });
+  }
 
   @override
   void dispose() {
@@ -191,15 +202,93 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
       );
     }
     if (_controller.text.trim().length < 2) {
+      final addrProvider = context.watch<AddressesProvider>();
+      final saved = addrProvider.items;
       return Column(
         children: [
           if (widget.allowCurrentLocation) _currentLocationTile(),
-          const Expanded(
-            child: _Hint(
-              icon: Icons.travel_explore_rounded,
-              text: 'Start typing to search anywhere in Sri Lanka',
+          if (saved.isNotEmpty) ...[
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 12, 20, 6),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'SAVED PLACES',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textTertiary,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
             ),
-          ),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                itemCount: saved.length,
+                itemBuilder: (_, i) {
+                  final a = saved[i];
+                  final label = a['label']?.toString() ?? 'Saved Place';
+                  IconData icon = Icons.place_rounded;
+                  Color color = AppColors.market;
+                  final l = label.toLowerCase();
+                  if (l.contains('home')) {
+                    icon = Icons.home_rounded;
+                    color = AppColors.primary;
+                  } else if (l.contains('work') || l.contains('office')) {
+                    icon = Icons.work_rounded;
+                    color = AppColors.flash;
+                  } else if (l.contains('gym')) {
+                    icon = Icons.fitness_center_rounded;
+                    color = AppColors.bike;
+                  }
+                  
+                  return ListTile(
+                    onTap: _resolving ? null : () {
+                      final lat = (a['lat'] as num).toDouble();
+                      final lng = (a['lng'] as num).toDouble();
+                      final address = a['address'].toString();
+                      Navigator.pop(context, Place(label, address, LatLng(lat, lng)));
+                    },
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+                    ),
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        gradient: AppColors.serviceGradient(color),
+                        borderRadius: BorderRadius.circular(AppStyles.radiusXs),
+                      ),
+                      child: Icon(icon, color: Colors.white, size: 20),
+                    ),
+                    title: Text(
+                      label,
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                    ),
+                    subtitle: Text(
+                      a['address']?.toString() ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ] else
+            const Expanded(
+              child: _Hint(
+                icon: Icons.travel_explore_rounded,
+                text: 'Start typing to search anywhere in Sri Lanka',
+              ),
+            ),
         ],
       );
     }

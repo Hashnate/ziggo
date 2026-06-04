@@ -9,6 +9,7 @@ import '../../../core/widgets/motion.dart';
 import '../../../core/widgets/pulse_dot.dart';
 import '../../auth/auth_provider.dart';
 import '../booking_provider.dart';
+import '../notifications_provider.dart';
 import '../wallet_provider.dart';
 import 'fare_estimate_screen.dart';
 import 'event_home_screen.dart';
@@ -42,6 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<WalletProvider>().refresh();
       context.read<BookingProvider>().loadActive();
+      context.read<NotificationsProvider>().refresh();
     });
   }
 
@@ -146,6 +148,7 @@ class _Header extends StatelessWidget {
     final initial = (auth.fullName?.isNotEmpty ?? false)
         ? auth.fullName![0].toUpperCase()
         : 'Z';
+    final hasUnread = context.watch<NotificationsProvider>().unreadCount > 0;
 
     return Row(
       children: [
@@ -171,7 +174,7 @@ class _Header extends StatelessWidget {
         _IconBubble(
           icon: Icons.notifications_none_rounded,
           onTap: onNotifications,
-          badge: true,
+          badge: hasUnread,
         ),
         const SizedBox(width: 10),
         GestureDetector(

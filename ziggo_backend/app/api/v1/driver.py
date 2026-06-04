@@ -235,11 +235,20 @@ async def toggle_online(
 # Where uploads land. Lives under the admin-panel static volume so the
 # admin can view the same files in the browser without extra plumbing. The
 # admin_panel is now a top-level package alongside `app/`.
-_DOC_UPLOAD_DIR = os.path.join(
-    # /app/app/api/v1/driver.py → up 4 dirs = /app
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
-    "ziggo_admin_panel", "static", "uploads", "driver_docs",
-)
+def _find_admin_panel_dir() -> str:
+    curr = os.path.abspath(__file__)
+    for _ in range(10):
+        curr = os.path.dirname(curr)
+        candidate = os.path.join(curr, "ziggo_admin_panel")
+        if os.path.isdir(candidate):
+            return candidate
+    return os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
+        "ziggo_admin_panel"
+    )
+
+_ADMIN_PANEL_DIR = _find_admin_panel_dir()
+_DOC_UPLOAD_DIR = os.path.join(_ADMIN_PANEL_DIR, "static", "uploads", "driver_docs")
 os.makedirs(_DOC_UPLOAD_DIR, exist_ok=True)
 _VALID_DOC_TYPES = {"nic", "license", "vehicle_reg", "insurance"}
 _ALLOWED_DOC_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".pdf"}
@@ -351,3 +360,39 @@ async def list_my_documents(
             "verified_at": row.verified_at.isoformat() if (row and row.verified_at) else None,
         })
     return out
+
+
+_PROFILE_PHOTO_DIR = os.path.join(_ADMIN_PANEL_DIR, "static", "uploads", "drivers")
+os.makedirs(_PROFILE_PHOTO_DIR, exist_ok=True)
+
+
+async def _save_profile_photo(asset: UploadFile) -> str:
+    ext = os.path.splitext(asset.filename or "")[1].lower()
+    if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
+        raise HTTPException(status_code=400, detail="Photo must be JPG, PNG, or WEBP")
+    data = await asset.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file")
+    if len(data) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Photo must be under 5 MB")
+    import secrets
+    fname = f"profile_{secrets.token_hex(8)}{ext}"
+    fpath = os.path.join(_PROFILE_PHOTO_DIR, fname)
+    with open(fpath, "wb") as f:
+        f.write(data)
+    return f"/static/uploads/drivers/{fname}"
+
+
+@router.post("/profile-photo")
+async def upload_profile_photo(
+    photo: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("driver")),
+):
+    """Driver uploads their profile photo."""
+    url = await _save_profile_photo(photo)
+    user.profile_photo = url
+    await db.commit()
+    await db.refresh(user)
+    return {"ok": True, "profile_photo": url}
+

@@ -423,6 +423,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     }
 
     final ev = _event!;
+    debugPrint('EventDetailScreen: event data is $ev');
     final name = ev['name']?.toString() ?? '';
     final description = ev['description']?.toString();
     final venue = ev['venue']?.toString();
@@ -433,78 +434,89 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     final endsAtRaw = ev['ends_at']?.toString();
     final startsAt = startsAtRaw == null ? null : DateTime.tryParse(startsAtRaw)?.toLocal();
     final endsAt = endsAtRaw == null ? null : DateTime.tryParse(endsAtRaw)?.toLocal();
-    final tiers = (ev['tiers'] as List? ?? []).cast<Map<String, dynamic>>();
+    final List<Map<String, dynamic>> tiers = [];
+    try {
+      if (ev['tiers'] != null) {
+        for (final t in ev['tiers'] as List) {
+          tiers.add(Map<String, dynamic>.from(t as Map));
+        }
+      }
+    } catch (e, stack) {
+      debugPrint('EventDetailScreen: Error parsing tiers: $e\n$stack');
+    }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            backgroundColor: Colors.black,
-            foregroundColor: Colors.white,
-            expandedHeight: 240,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              background: image != null && image.isNotEmpty
-                  ? Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Image.network(image, fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                Container(color: Colors.black)),
-                        const DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [Colors.transparent, Colors.black87],
-                            ),
-                          ),
-                        ),
-                      ],
+    Widget bodyWidget;
+    try {
+      bodyWidget = SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: image != null && image.isNotEmpty
+                  ? Image.network(
+                      image,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _imageFallback(),
                     )
-                  : Container(
-                      color: AppColors.primary.withOpacity(0.15),
-                      alignment: Alignment.center,
-                      child: const Icon(Icons.music_note_rounded,
-                          color: Colors.white, size: 64),
-                    ),
+                  : _imageFallback(),
             ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 22, 20, 140),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.textPrimary,
-                    letterSpacing: -0.4,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 22, 20, 140),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -0.4,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 14),
-                if (startsAt != null) _iconRow(Icons.calendar_today_rounded,
-                    DateFormat('E, d MMM y · h:mm a').format(startsAt)),
-                if (endsAt != null) ...[
-                  const SizedBox(height: 6),
-                  _iconRow(Icons.schedule_rounded,
-                      'Ends ${DateFormat('h:mm a').format(endsAt)}'),
-                ],
-                if (venue != null) ...[
-                  const SizedBox(height: 6),
-                  _iconRow(Icons.place_rounded,
-                      '$venue${city != null ? " · $city" : ""}'),
-                ],
-                if (organizer != null) ...[
-                  const SizedBox(height: 6),
-                  _iconRow(Icons.person_outline_rounded, 'By $organizer'),
-                ],
-                if (description != null && description.isNotEmpty) ...[
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
+                  if (startsAt != null) _iconRow(Icons.calendar_today_rounded,
+                      DateFormat('E, d MMM y · h:mm a').format(startsAt)),
+                  if (endsAt != null) ...[
+                    const SizedBox(height: 6),
+                    _iconRow(Icons.schedule_rounded,
+                        'Ends ${DateFormat('h:mm a').format(endsAt)}'),
+                  ],
+                  if (venue != null) ...[
+                    const SizedBox(height: 6),
+                    _iconRow(Icons.place_rounded,
+                        '$venue${city != null ? " · $city" : ""}'),
+                  ],
+                  if (organizer != null) ...[
+                    const SizedBox(height: 6),
+                    _iconRow(Icons.person_outline_rounded, 'By $organizer'),
+                  ],
+                  if (description != null && description.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    const Text(
+                      'ABOUT',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textTertiary,
+                        letterSpacing: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      description,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        height: 1.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
                   const Text(
-                    'ABOUT',
+                    'TICKETS',
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w900,
@@ -512,41 +524,71 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       letterSpacing: 1.4,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    description,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      height: 1.5,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
+                  const SizedBox(height: 10),
+                  for (final t in tiers) _TierRow(tier: t, onBuy: _showComingSoon),
+                  if (tiers.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 14),
+                      child: Text('No tickets configured yet.',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w700,
+                          )),
                     ),
-                  ),
                 ],
-                const SizedBox(height: 24),
-                const Text(
-                  'TICKETS',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.textTertiary,
-                    letterSpacing: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                for (final t in tiers) _TierRow(tier: t, onBuy: _showComingSoon),
-                if (tiers.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 14),
-                    child: Text('No tickets configured yet.',
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.w700,
-                        )),
-                  ),
-              ]),
+              ),
             ),
+          ],
+        ),
+      );
+    } catch (e, stack) {
+      debugPrint('EventDetailScreen: Error in SingleChildScrollView build: $e\n$stack');
+      bodyWidget = Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text('Error rendering content: $e'),
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF8FAFC),
+        elevation: 0,
+        title: Text(
+          name,
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w900,
+            fontSize: 16,
           ),
+        ),
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 140),
+        children: [
+          Container(
+            height: 200,
+            color: Colors.grey[300],
+            child: const Center(child: Text("IMAGE PLACEHOLDER")),
+          ),
+          const SizedBox(height: 24),
+          Text(name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          Text('Venue: $venue'),
+          Text('Organizer: $organizer'),
+          const SizedBox(height: 20),
+          const Text('TICKETS', style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          for (final t in tiers)
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(16),
+              color: Colors.white,
+              child: Text('${t['name'] ?? ''} - Rs.${t['price'] ?? 0}'),
+            ),
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -682,6 +724,15 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       ],
     );
   }
+
+  Widget _imageFallback() {
+    return Container(
+      color: AppColors.primary.withOpacity(0.08),
+      alignment: Alignment.center,
+      child: const Icon(Icons.music_note_rounded,
+          color: AppColors.primary, size: 48),
+    );
+  }
 }
 
 class _TierRow extends StatelessWidget {
@@ -692,7 +743,7 @@ class _TierRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = tier['name']?.toString() ?? '';
-    final price = (tier['price'] as num?)?.toDouble() ?? 0;
+    final price = double.tryParse(tier['price']?.toString() ?? '') ?? 0.0;
     final desc = tier['description']?.toString();
     return Container(
       margin: const EdgeInsets.only(bottom: 10),

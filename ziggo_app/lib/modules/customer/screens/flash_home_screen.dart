@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
@@ -36,6 +37,7 @@ class _FlashHomeScreenState extends State<FlashHomeScreen> {
   Map<String, dynamic>? _estimate;
   bool _busy = false;
   String? _error;
+  List<LatLng> _routePoints = const [];
 
   @override
   void initState() {
@@ -112,6 +114,9 @@ class _FlashHomeScreenState extends State<FlashHomeScreen> {
 
   Future<void> _recalc() async {
     if (_pickup == null || _drop == null) return;
+    setState(() {
+      _routePoints = const [];
+    });
     final res = await context.read<BookingProvider>().estimateFare(
           serviceType: _serviceType,
           pickup: _pickup!.location,
@@ -119,7 +124,15 @@ class _FlashHomeScreenState extends State<FlashHomeScreen> {
           isFlash: true,
           parcelWeightKg: _selectedWeightKg,
         );
-    if (mounted) setState(() => _estimate = res);
+    final dir = await MapsService.instance.directions(_pickup!.location, _drop!.location);
+    if (mounted) {
+      setState(() {
+        _estimate = res;
+        if (dir != null && dir.points.isNotEmpty) {
+          _routePoints = dir.points;
+        }
+      });
+    }
   }
 
   Future<void> _selectPlace(bool isPickup) async {
@@ -250,7 +263,7 @@ class _FlashHomeScreenState extends State<FlashHomeScreen> {
               polylines: (_pickup != null && _drop != null)
                   ? [
                       ZiggoPolyline(
-                        points: [_pickup!.location, _drop!.location],
+                        points: _routePoints.isNotEmpty ? _routePoints : [_pickup!.location, _drop!.location],
                         strokeWidth: 5,
                         color: AppColors.primary.withOpacity(0.8),
                       ),

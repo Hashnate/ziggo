@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart' as gmaps;
 import 'package:latlong2/latlong.dart';
@@ -20,6 +21,7 @@ class ZiggoMarker {
   final String? assetPath;
   // Optional label to render a custom bubble marker instead of a default pin
   final String? label;
+  final double rotation;
   
   const ZiggoMarker({
     required this.point,
@@ -28,6 +30,7 @@ class ZiggoMarker {
     this.size = 36,
     this.assetPath,
     this.label,
+    this.rotation = 0.0,
   });
 }
 
@@ -38,6 +41,7 @@ ZiggoMarker pinMarker({
   double size = 36,
   String? assetPath,
   String? label,
+  double rotation = 0.0,
 }) {
   return ZiggoMarker(
     point: point,
@@ -46,6 +50,7 @@ ZiggoMarker pinMarker({
     size: size,
     assetPath: assetPath,
     label: label,
+    rotation: rotation,
   );
 }
 
@@ -59,6 +64,155 @@ Future<CustomMarkerData> _createCustomMarkerBitmap(String label, Color color) as
   final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
   final Canvas canvas = Canvas(pictureRecorder);
   
+  String pillText = '';
+  String mainText = label;
+  bool isSplit = false;
+  if (label.contains('|')) {
+    final parts = label.split('|');
+    pillText = parts[0].trim();
+    mainText = parts[1].trim();
+    isSplit = true;
+  }
+
+  if (isSplit) {
+    final TextPainter pillPainter = TextPainter(textDirection: TextDirection.ltr);
+    pillPainter.text = TextSpan(
+      text: pillText,
+      style: const TextStyle(
+        fontSize: 12,
+        color: Colors.white,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+    pillPainter.layout();
+
+    String displayMainText = mainText;
+    if (displayMainText.length > 22) {
+      displayMainText = '${displayMainText.substring(0, 20)}...';
+    }
+
+    final TextPainter mainPainter = TextPainter(textDirection: TextDirection.ltr);
+    mainPainter.text = TextSpan(
+      text: displayMainText,
+      style: const TextStyle(
+        fontSize: 12,
+        color: Colors.black87,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+    mainPainter.layout();
+
+    final double pillTextWidth = pillPainter.width;
+    final double pillTextHeight = pillPainter.height;
+    final double mainTextWidth = mainPainter.width;
+    final double mainTextHeight = mainPainter.height;
+
+    final double pillPaddingX = 10.0;
+    final double pillPaddingY = 5.0;
+    final double pillWidth = pillTextWidth + (pillPaddingX * 2);
+    final double pillHeight = pillTextHeight + (pillPaddingY * 2);
+
+    final double bubblePaddingX = 8.0;
+    final double bubblePaddingY = 6.0;
+    final double gap = 8.0;
+    
+    final double bubbleWidth = bubblePaddingX + pillWidth + gap + mainTextWidth + bubblePaddingX;
+    final double bubbleHeight = pillHeight + (bubblePaddingY * 2);
+
+    final double width = bubbleWidth + 24;
+    final double height = bubbleHeight + 60;
+
+    final double centerX = width / 2;
+    final double centerY = height - 20;
+
+    // Draw background outer glow
+    final Paint circlePaint = Paint()
+      ..color = color.withOpacity(0.15)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(centerX, centerY), 20, circlePaint);
+
+    // Draw center dot outer white border
+    final Paint dotOuterPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(centerX, centerY), 7.5, dotOuterPaint);
+
+    // Draw center dot inner fill
+    final Paint dotInnerPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(centerX, centerY), 4.5, dotInnerPaint);
+
+    // Draw bubble shadow
+    final double bubbleY = 8.0;
+    final double bubbleX = (width - bubbleWidth) / 2;
+    final RRect bubbleRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(bubbleX, bubbleY, bubbleWidth, bubbleHeight),
+      Radius.circular(bubbleHeight / 2),
+    );
+
+    final Paint shadowPaint = Paint()
+      ..color = Colors.black.withOpacity(0.12)
+      ..style = PaintingStyle.fill;
+    canvas.drawRRect(bubbleRect.shift(const Offset(0, 2)), shadowPaint);
+
+    // Draw bubble white background
+    final Paint bgPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawRRect(bubbleRect, bgPaint);
+
+    // Draw bubble outline border
+    final Paint borderPaint = Paint()
+      ..color = Colors.grey.withOpacity(0.2)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+    canvas.drawRRect(bubbleRect, borderPaint);
+
+    // Draw colored pill background
+    final double pillX = bubbleX + bubblePaddingX;
+    final double pillY = bubbleY + bubblePaddingY;
+    final RRect pillRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(pillX, pillY, pillWidth, pillHeight),
+      Radius.circular(pillHeight / 2),
+    );
+    final Paint pillBgPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    canvas.drawRRect(pillRect, pillBgPaint);
+
+    // Draw pill text
+    pillPainter.paint(
+      canvas,
+      Offset(
+        pillX + pillPaddingX,
+        pillY + pillPaddingY,
+      ),
+    );
+
+    // Draw main text
+    mainPainter.paint(
+      canvas,
+      Offset(
+        pillX + pillWidth + gap,
+        bubbleY + (bubbleHeight - mainTextHeight) / 2,
+      ),
+    );
+
+    final ui.Image img = await pictureRecorder.endRecording().toImage(
+      width.toInt(),
+      height.toInt(),
+    );
+    final ByteData? byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+    final Uint8List uint8List = byteData!.buffer.asUint8List();
+
+    return CustomMarkerData(
+      gmaps.BitmapDescriptor.fromBytes(uint8List),
+      Offset(0.5, centerY / height),
+    );
+  }
+
+  // Fallback / legacy format (no '|' delimiter)
   // 1. Measure the text first to determine canvas dimensions
   final TextPainter textPainter = TextPainter(
     textDirection: TextDirection.ltr,
@@ -66,7 +220,7 @@ Future<CustomMarkerData> _createCustomMarkerBitmap(String label, Color color) as
   textPainter.text = TextSpan(
     text: label,
     style: const TextStyle(
-      fontSize: 16, // Reduced from 28
+      fontSize: 16,
       color: Colors.white,
       fontWeight: FontWeight.w900,
     ),
@@ -77,35 +231,35 @@ Future<CustomMarkerData> _createCustomMarkerBitmap(String label, Color color) as
   final double textHeight = textPainter.height;
   
   // 2. Calculate dynamic dimensions
-  final double bubbleWidth = textWidth + 30; // Reduced from 60
-  final double bubbleHeight = textHeight + 16; // Reduced from 24
+  final double bubbleWidth = textWidth + 30;
+  final double bubbleHeight = textHeight + 16;
   
-  final double width = (bubbleWidth > 70 ? bubbleWidth : 70) + 20; // Reduced from 140/40
-  final double height = bubbleHeight + 60; // Reduced from 110
+  final double width = (bubbleWidth > 70 ? bubbleWidth : 70) + 20;
+  final double height = bubbleHeight + 60;
   
   final double centerX = width / 2;
-  final double centerY = height - 30; // Pin center is 30px from the bottom (reduced from 50)
+  final double centerY = height - 30;
   
   // 3. Draw Background translucent circle
   final Paint circlePaint = Paint()
     ..color = color.withOpacity(0.15)
     ..style = PaintingStyle.fill;
-  canvas.drawCircle(Offset(centerX, centerY), 28, circlePaint); // Radius reduced from 50
+  canvas.drawCircle(Offset(centerX, centerY), 28, circlePaint);
   
   // 4. Draw Center dot outer white border
   final Paint dotOuterPaint = Paint()
     ..color = Colors.white
     ..style = PaintingStyle.fill;
-  canvas.drawCircle(Offset(centerX, centerY), 9, dotOuterPaint); // Radius reduced from 16
+  canvas.drawCircle(Offset(centerX, centerY), 9, dotOuterPaint);
   
   // 5. Draw Center dot inner fill
   final Paint dotInnerPaint = Paint()
     ..color = Colors.black
     ..style = PaintingStyle.fill;
-  canvas.drawCircle(Offset(centerX, centerY), 5.5, dotInnerPaint); // Radius reduced from 10
+  canvas.drawCircle(Offset(centerX, centerY), 5.5, dotInnerPaint);
   
   // 6. Define bubble rect and tail path
-  final double bubbleY = 8; // Reduced from 15
+  final double bubbleY = 8;
   final double bubbleX = (width - bubbleWidth) / 2;
   
   final RRect bubbleRect = RRect.fromRectAndRadius(
@@ -115,9 +269,9 @@ Future<CustomMarkerData> _createCustomMarkerBitmap(String label, Color color) as
   
   final ui.Path tailPath = ui.Path();
   final double tailTop = bubbleY + bubbleHeight;
-  tailPath.moveTo(centerX - 7, tailTop); // Reduced from 12
+  tailPath.moveTo(centerX - 7, tailTop);
   tailPath.lineTo(centerX + 7, tailTop);
-  tailPath.lineTo(centerX, tailTop + 10); // Reduced from 16
+  tailPath.lineTo(centerX, tailTop + 10);
   tailPath.close();
 
   // Combine into a single shape
@@ -128,7 +282,7 @@ Future<CustomMarkerData> _createCustomMarkerBitmap(String label, Color color) as
   final Paint borderPaint = Paint()
     ..color = Colors.white
     ..style = PaintingStyle.stroke
-    ..strokeWidth = 3.0 // Reduced from 5.0
+    ..strokeWidth = 3.0
     ..strokeJoin = StrokeJoin.round;
   canvas.drawPath(combinedPath, borderPaint);
 
@@ -274,23 +428,33 @@ class _ZiggoMapState extends State<ZiggoMap> {
     }
   }
 
-  Future<void> _ensureIcon(String assetPath) async {
-    if (_iconCache.containsKey(assetPath) || _loadingAssets.contains(assetPath)) {
+  Future<Uint8List> _getBytesFromAsset(String path, int width) async {
+    final ByteData data = await rootBundle.load(path);
+    final ui.Codec codec = await ui.instantiateImageCodec(
+      data.buffer.asUint8List(),
+      targetWidth: width,
+    );
+    final ui.FrameInfo fi = await codec.getNextFrame();
+    final ByteData? byteData = await fi.image.toByteData(format: ui.ImageByteFormat.png);
+    return byteData!.buffer.asUint8List();
+  }
+
+  Future<void> _ensureIcon(String assetPath, int width) async {
+    final key = '$assetPath-$width';
+    if (_iconCache.containsKey(key) || _loadingAssets.contains(key)) {
       return;
     }
-    _loadingAssets.add(assetPath);
+    _loadingAssets.add(key);
     try {
-      final desc = await gmaps.BitmapDescriptor.asset(
-        const ImageConfiguration(size: Size(40, 40), devicePixelRatio: 2.5),
-        assetPath,
-      );
-      _iconCache[assetPath] = desc;
+      final Uint8List markerIcon = await _getBytesFromAsset(assetPath, width);
+      final desc = gmaps.BitmapDescriptor.fromBytes(markerIcon);
+      _iconCache[key] = desc;
       if (mounted) setState(() {});
     } catch (_) {
       // Asset missing or decode failed — leave the slot empty so the marker
       // falls back to the default colored pin.
     } finally {
-      _loadingAssets.remove(assetPath);
+      _loadingAssets.remove(key);
     }
   }
 
@@ -331,14 +495,16 @@ class _ZiggoMapState extends State<ZiggoMap> {
           icon = gmaps.BitmapDescriptor.defaultMarkerWithHue(_hueFor(m.color));
         }
       } else if (m.assetPath != null) {
-        final cached = _iconCache[m.assetPath!];
+        final targetWidth = (m.size * 1.5).round();
+        final key = '${m.assetPath!}-$targetWidth';
+        final cached = _iconCache[key];
         if (cached != null) {
           icon = cached;
           // PNG vehicle pin is centred on the location, not stem-anchored.
           anchor = const Offset(0.5, 0.5);
         } else {
           // Kick off the load; rebuild will pick it up when ready.
-          _ensureIcon(m.assetPath!);
+          _ensureIcon(m.assetPath!, targetWidth);
           icon = gmaps.BitmapDescriptor.defaultMarkerWithHue(_hueFor(m.color));
         }
       } else {
@@ -351,6 +517,7 @@ class _ZiggoMapState extends State<ZiggoMap> {
           position: _g(m.point),
           icon: icon,
           anchor: anchor,
+          rotation: m.rotation,
         ),
       );
     }

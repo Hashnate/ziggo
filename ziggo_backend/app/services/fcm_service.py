@@ -89,6 +89,7 @@ _URGENT_EVENTS = {
     "booking_update",
     "no_drivers_available",
     "food_order_update",
+    "order_update",
     "market_order_update",
 }
 
@@ -262,9 +263,9 @@ def _format(event: str, payload: dict) -> tuple[str, str]:
             return ("Ride cancelled", "Your ride has been cancelled.")
     if event == "no_drivers_available":
         return ("No drivers found", "We couldn't find a driver nearby. Please try again.")
-    if event == "food_order_update":
-        status = payload.get("status", "")
-        return ("Order update", f"Your food order is now {status}.")
+    if event in ("food_order_update", "order_update"):
+      status = payload.get("status", "")
+      return ("Order update", f"Your food order is now {status}.")
     if event == "market_order_update":
         status = payload.get("status", "")
         return ("Order update", f"Your market order is now {status}.")

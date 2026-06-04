@@ -32,6 +32,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   bool _bootstrapped = false;
   // BRD: speed display + mute toggle
   double _speedKmh = 0;          // updated by the geolocator stream
+  double _heading = 0.0;         // updated by the geolocator stream to orient location arrow
   bool _muted = false;           // local-only — wired into TTS when we add it
   StreamSubscription<Position>? _speedSub;
 
@@ -60,8 +61,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     ).listen((p) {
       final kmh = (p.speed.isNaN || p.speed < 0) ? 0.0 : p.speed * 3.6;
       if (!mounted) return;
-      // Don't notify-spam — only setState when it changes by >=1 km/h
-      if ((kmh - _speedKmh).abs() >= 1) setState(() => _speedKmh = kmh);
+      setState(() {
+        if ((kmh - _speedKmh).abs() >= 1) {
+          _speedKmh = kmh;
+        }
+        if (p.heading >= 0 && p.heading <= 360) {
+          _heading = p.heading;
+        }
+      });
     });
   }
 
@@ -347,7 +354,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 zoom: 14,
                 showMyLocation: true,
                 markers: [
-                  pinMarker(point: loc, icon: Icons.directions_car_rounded, color: Colors.black),
+                  pinMarker(
+                    point: loc,
+                    icon: Icons.navigation_rounded,
+                    color: Colors.black,
+                    assetPath: 'assets/icons/heading_indicator.png',
+                    rotation: _heading,
+                    size: 32,
+                  ),
                   if (ride != null) ...[
                     pinMarker(
                       point: LatLng(
