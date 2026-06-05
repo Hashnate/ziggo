@@ -529,11 +529,11 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
                                       ),
                                     ),
                                     if (i == cur)
-                                      const Padding(
-                                        padding: EdgeInsets.only(top: 2),
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 2),
                                         child: Text(
-                                          'In progress...',
-                                          style: TextStyle(
+                                          s.status == 'delivered' ? 'Completed' : 'In progress...',
+                                          style: const TextStyle(
                                             fontSize: 11,
                                             color: AppColors.market,
                                             fontWeight: FontWeight.w900,
@@ -551,6 +551,17 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
                     }),
                   ),
                 ),
+                if (status == 'delivered') ...[
+                  const SizedBox(height: 24),
+                  PrimaryButton(
+                    label: 'DONE',
+                    icon: Icons.check_circle_rounded,
+                    gold: true,
+                    onPressed: () {
+                      Navigator.popUntil(context, (r) => r.isFirst);
+                    },
+                  ),
+                ],
               ]),
             ),
     );

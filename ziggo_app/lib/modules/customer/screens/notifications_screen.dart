@@ -17,8 +17,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<NotificationsProvider>().refresh();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final p = context.read<NotificationsProvider>();
+      await p.refresh();
+      await p.markAllAsRead();
     });
   }
 
@@ -26,6 +28,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     switch (type) {
       case 'ride_update':
         return (icon: Icons.directions_car_rounded, color: AppColors.flash);
+      case 'order_update':
+        return (icon: Icons.restaurant_rounded, color: AppColors.primary);
+      case 'market_order_update':
+        return (icon: Icons.shopping_basket_rounded, color: AppColors.market);
       case 'promo':
         return (icon: Icons.local_offer_rounded, color: AppColors.success);
       case 'payment':

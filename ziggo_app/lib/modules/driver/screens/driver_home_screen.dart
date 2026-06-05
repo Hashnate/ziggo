@@ -32,6 +32,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   bool _bootstrapped = false;
   // BRD: speed display + mute toggle
   double _speedKmh = 0;          // updated by the geolocator stream
+  double _heading = 0.0;         // updated by the geolocator stream to orient location arrow
   bool _muted = false;           // local-only — wired into TTS when we add it
   StreamSubscription<Position>? _speedSub;
 
@@ -60,8 +61,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     ).listen((p) {
       final kmh = (p.speed.isNaN || p.speed < 0) ? 0.0 : p.speed * 3.6;
       if (!mounted) return;
-      // Don't notify-spam — only setState when it changes by >=1 km/h
-      if ((kmh - _speedKmh).abs() >= 1) setState(() => _speedKmh = kmh);
+      setState(() {
+        if ((kmh - _speedKmh).abs() >= 1) {
+          _speedKmh = kmh;
+        }
+        if (p.heading >= 0 && p.heading <= 360) {
+          _heading = p.heading;
+        }
+      });
     });
   }
 
@@ -313,7 +320,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final pending = driver.pendingRequest;
     final loc = driver.currentLocation ?? kColomboCenter;
 
-    if (pending != null && ride == null && food == null) {
+    if (pending != null && ride == null && food == null && market == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _showRideRequest(pending));
     }
 
@@ -347,7 +354,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 zoom: 14,
                 showMyLocation: true,
                 markers: [
-                  pinMarker(point: loc, icon: Icons.directions_car_rounded, color: Colors.black),
+                  pinMarker(
+                    point: loc,
+                    icon: Icons.navigation_rounded,
+                    color: Colors.black,
+                    assetPath: 'assets/icons/heading_indicator.png',
+                    rotation: _heading,
+                    size: 32,
+                  ),
                   if (ride != null) ...[
                     pinMarker(
                       point: LatLng(
@@ -793,7 +807,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             Expanded(
               flex: 2,
               child: GestureDetector(
-                onTap: () => driver.updateRideStatus(nextStatus),
+                onTap: () {
+                  if (nextStatus == 'completed') {
+                    _handleCompleteTrip(driver, ride);
+                  } else {
+                    driver.updateRideStatus(nextStatus);
+                  }
+                },
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   alignment: Alignment.center,
@@ -830,6 +850,81 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         ),
       ],
     );
+  }
+
+  Future<void> _handleCompleteTrip(DriverProvider driver, Map<String, dynamic> ride) async {
+    final paymentMethod = (ride['payment_method'] ?? 'cash').toString().toLowerCase();
+    final amount = (ride['final_amount'] as num?)?.toDouble() ?? 0.0;
+
+    if (paymentMethod == 'cash') {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Collect Cash', textAlign: TextAlign.center),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.payments_rounded, color: AppColors.success, size: 48),
+              const SizedBox(height: 16),
+              const Text('Please collect', style: TextStyle(color: AppColors.textSecondary)),
+              Text('Rs.${amount.toStringAsFixed(0)}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900)),
+              const Text('from the customer.', style: TextStyle(color: AppColors.textSecondary)),
+            ],
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.success,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Confirm Payment'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    } else if (paymentMethod == 'wallet' || paymentMethod == 'card') {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Digital Payment', textAlign: TextAlign.center),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary, size: 48),
+              const SizedBox(height: 16),
+              const Text('Payment of', style: TextStyle(color: AppColors.textSecondary)),
+              Text('Rs.${amount.toStringAsFixed(0)}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: AppColors.primary)),
+              const Text('was successfully deducted from customer.', style: TextStyle(color: AppColors.textSecondary), textAlign: TextAlign.center),
+            ],
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Complete Trip'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+    
+    driver.updateRideStatus('completed');
   }
 
   Widget _parcelInfoBanner(Map<String, dynamic> ride) {
@@ -1241,8 +1336,9 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
   // The provider's accept/decline routes by `is_food` flag and uses the right
   // path, so we just need an int that won't crash the call site.
   int get _requestId =>
-      (widget.request['booking_id'] ?? widget.request['food_order_id'] ?? 0)
-          as int;
+      (widget.request['booking_id'] ?? 
+       widget.request['food_order_id'] ?? 
+       widget.request['market_order_id'] ?? 0) as int;
 
   bool get _isFood => widget.request['is_food'] == true;
 

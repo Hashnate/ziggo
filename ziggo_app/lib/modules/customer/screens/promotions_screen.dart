@@ -73,33 +73,29 @@ class _PromotionsScreenState extends State<PromotionsScreen> {
   }
 
   Widget _empty() {
-    return ListView(
-      children: [
-        const SizedBox(height: 140),
-        Center(
-          child: Column(
-            children: [
-              Container(
-                width: 96,
-                height: 96,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceMuted,
-                  borderRadius: BorderRadius.circular(28),
-                ),
-                child: const Icon(Icons.local_offer_outlined,
-                    size: 44, color: AppColors.textTertiary),
-              ),
-              const SizedBox(height: 18),
-              const Text('No active promotions',
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-              const SizedBox(height: 4),
-              const Text('Check back soon for great deals',
-                  style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-            ],
+    return Center(
+      child: Column(
+        children: [
+          const SizedBox(height: 140),
+          Container(
+            width: 96,
+            height: 96,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceMuted,
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: const Icon(Icons.local_offer_outlined,
+                size: 44, color: AppColors.textTertiary),
           ),
-        ),
-      ],
+          const SizedBox(height: 18),
+          const Text('No active promotions',
+              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+          const SizedBox(height: 4),
+          const Text('Check back soon for great deals',
+              style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+        ],
+      ),
     );
   }
 }
@@ -188,9 +184,10 @@ class _PromoCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: AppStyles.shadowSm,
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
           Container(
             width: 100,
             padding: const EdgeInsets.all(16),
@@ -351,6 +348,7 @@ class _PromoCard extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }

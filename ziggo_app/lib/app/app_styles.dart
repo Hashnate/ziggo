@@ -156,6 +156,7 @@ class GradientServiceTile extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
   final bool isNew;
+  final String? badgeText;
 
   /// Optional 3D illustration asset (e.g. 'assets/icons/food.png'). When set,
   /// the tile renders the illustration free-floating instead of the flat icon
@@ -168,6 +169,7 @@ class GradientServiceTile extends StatelessWidget {
     required this.label,
     this.onTap,
     this.isNew = false,
+    this.badgeText,
     this.imageAsset,
   });
 
@@ -213,7 +215,7 @@ class GradientServiceTile extends StatelessWidget {
             clipBehavior: Clip.none,
             children: [
               _glyph(),
-              if (isNew)
+              if (isNew || badgeText != null)
                 Positioned(
                   right: -4,
                   top: -4,
@@ -223,8 +225,8 @@ class GradientServiceTile extends StatelessWidget {
                       color: AppColors.error,
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Text('NEW',
-                        style: TextStyle(
+                    child: Text(badgeText ?? 'NEW',
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 9,
                           fontWeight: FontWeight.w900,

@@ -106,15 +106,15 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
   String _vehicleAsset(String? type) {
     switch (type) {
       case 'bike':
-        return 'assets/icons/bike.png';
+        return 'assets/icons/top_bike.png';
       case 'tuk':
-        return 'assets/icons/tuk.png';
+        return 'assets/icons/top_tuk.png';
       case 'truck':
-        return 'assets/icons/truck.png';
+        return 'assets/icons/top_truck.png';
       case 'van':
       case 'car':
       default:
-        return 'assets/icons/car.png';
+        return 'assets/icons/top_car.png';
     }
   }
 
@@ -249,8 +249,18 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                     size: 30,
                     assetPath: _vehicleAsset(d['vehicle_type'] as String?),
                   ),
-                pinMarker(point: pickup, icon: Icons.my_location_rounded, color: AppColors.flash),
-                pinMarker(point: drop, icon: Icons.location_on_rounded, color: AppColors.error),
+                pinMarker(
+                  point: pickup,
+                  icon: Icons.my_location_rounded,
+                  color: AppColors.info,
+                  label: 'Pickup | ${active['pickup_address'] ?? 'Your Location'}',
+                ),
+                pinMarker(
+                  point: drop,
+                  icon: Icons.location_on_rounded,
+                  color: AppColors.warning,
+                  label: 'Drop | ${active['drop_address'] ?? 'Destination'}',
+                ),
                 if (driverLatLng != null)
                   pinMarker(
                     point: driverLatLng,

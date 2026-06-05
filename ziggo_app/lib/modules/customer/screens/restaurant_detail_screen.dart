@@ -83,7 +83,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                     decoration: const BoxDecoration(
                       gradient: AppColors.primaryGradient,
                     ),
-                    padding: const EdgeInsets.fromLTRB(24, 60, 24, 84),
+                    padding: const EdgeInsets.fromLTRB(24, 60, 24, 60),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -109,18 +109,16 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                   ),
                 ),
               ),
-              // Info chips card — overlaps the bottom of the hero cleanly
+              // Info chips card
               SliverToBoxAdapter(
-                child: Transform.translate(
-                  offset: const Offset(0, -36),
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 16),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(22),
-                      boxShadow: AppStyles.shadowMd,
-                    ),
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    boxShadow: AppStyles.shadowMd,
+                  ),
                     child: Row(
                       children: [
                         Expanded(
@@ -160,7 +158,6 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                       ],
                     ),
                   ),
-                ),
               ),
               SliverList(
                 delegate: SliverChildListDelegate([

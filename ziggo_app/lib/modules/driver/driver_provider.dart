@@ -49,9 +49,19 @@ class DriverProvider extends ChangeNotifier {
     final event = msg['event'];
     final data = msg['data'] as Map<String, dynamic>?;
     if (data == null) return;
-    if (event == 'new_ride_request' || event == 'new_ride') {
-      // Rich payload — rides, parcels (is_flash) and food orders (is_food)
-      // all flow through this single channel.
+    
+    // Aggressive catch-all: If it looks like a request, show it!
+    final isRequestEvent = event == 'new_ride_request' || 
+                           event == 'new_ride' || 
+                           event == 'new_market_order' || 
+                           event == 'new_market_request' || 
+                           event.toString().contains('request') ||
+                           event.toString().contains('broadcast') ||
+                           (data.containsKey('pickup_lat') && data.containsKey('fare'));
+
+    if (isRequestEvent) {
+      // Rich payload — rides, parcels (is_flash), food orders (is_food),
+      // and market orders (is_market) all flow through this listener.
       _pendingRequest = data;
       notifyListeners();
     } else if (event == 'booking_update') {
@@ -60,7 +70,7 @@ class DriverProvider extends ChangeNotifier {
       loadActiveFoodOrder();
     } else if (event == 'market_order_update') {
       loadActiveMarketOrder();
-    } else if (event == 'ride_taken') {
+    } else if (event == 'ride_taken' || event == 'order_taken' || event == 'market_order_taken') {
       // Another driver claimed it. Match by booking_id, food_order_id, OR
       // market_order_id depending on what was pending.
       final pending = _pendingRequest;

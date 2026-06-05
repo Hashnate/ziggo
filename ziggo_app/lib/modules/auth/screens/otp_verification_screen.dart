@@ -181,52 +181,71 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
               const SizedBox(height: 36),
               EntranceSlide(
                 delay: const Duration(milliseconds: 120),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: List.generate(_len, (i) {
-                  final has = _controllers[i].text.isNotEmpty;
-                  return Container(
-                    width: 46,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: has ? AppColors.primary : AppColors.cardBorder,
-                        width: has ? 2 : 1,
-                      ),
-                      boxShadow: has ? AppStyles.shadowSm : null,
-                    ),
-                    child: TextField(
-                      controller: _controllers[i],
-                      focusNode: _focusNodes[i],
-                      keyboardType: TextInputType.number,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.textPrimary,
-                      ),
-                      maxLength: 1,
-                      decoration: const InputDecoration(
-                        counterText: '',
-                        filled: false,
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                      onChanged: (v) {
-                        if (v.isNotEmpty && i < _len - 1) {
-                          _focusNodes[i + 1].requestFocus();
-                        } else if (v.isEmpty && i > 0) {
-                          _focusNodes[i - 1].requestFocus();
-                        }
-                        setState(() {});
-                      },
-                    ),
-                  );
-                }),
+                child: AutofillGroup(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: List.generate(_len, (i) {
+                      final has = _controllers[i].text.isNotEmpty;
+                      return Container(
+                        width: 46,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: has ? AppColors.primary : AppColors.cardBorder,
+                            width: has ? 2 : 1,
+                          ),
+                          boxShadow: has ? AppStyles.shadowSm : null,
+                        ),
+                        child: TextField(
+                          controller: _controllers[i],
+                          focusNode: _focusNodes[i],
+                          keyboardType: TextInputType.number,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.textPrimary,
+                          ),
+                          autofillHints: const [AutofillHints.oneTimeCode],
+                          decoration: const InputDecoration(
+                            counterText: '',
+                            filled: false,
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          onChanged: (v) {
+                            if (v.length >= _len) {
+                              final digits = v.replaceAll(RegExp(r'\D'), '');
+                              if (digits.length >= _len) {
+                                for (int j = 0; j < _len; j++) {
+                                  _controllers[j].text = digits[j];
+                                }
+                                _focusNodes[_len - 1].requestFocus();
+                                setState(() {});
+                                return;
+                              }
+                            }
+                            
+                            if (v.length > 1) {
+                              _controllers[i].text = v.substring(v.length - 1);
+                              if (i < _len - 1) {
+                                _focusNodes[i + 1].requestFocus();
+                              }
+                            } else if (v.isNotEmpty && i < _len - 1) {
+                              _focusNodes[i + 1].requestFocus();
+                            } else if (v.isEmpty && i > 0) {
+                              _focusNodes[i - 1].requestFocus();
+                            }
+                            setState(() {});
+                          },
+                        ),
+                      );
+                    }),
+                  ),
                 ),
               ),
               if (_error != null) ...[

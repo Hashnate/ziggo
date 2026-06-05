@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
+import '../../../core/map/maps_service.dart';
 import '../../../core/map/ziggo_map.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/widgets/glass_card.dart';
@@ -33,6 +34,7 @@ class _FlashTrackingScreenState extends State<FlashTrackingScreen> {
   Timer? _nearbyTimer;
   List<Map<String, dynamic>> _nearbyDrivers = const [];
   bool _navigatedToRating = false;
+  List<LatLng> _routePoints = const [];
 
   @override
   void initState() {
@@ -40,6 +42,13 @@ class _FlashTrackingScreenState extends State<FlashTrackingScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<BookingProvider>().loadActive();
     });
+  }
+
+  Future<void> _fetchRoute(LatLng pickup, LatLng drop) async {
+    final dir = await MapsService.instance.directions(pickup, drop);
+    if (mounted && dir != null && dir.points.isNotEmpty) {
+      setState(() => _routePoints = dir.points);
+    }
   }
 
   @override
@@ -90,15 +99,15 @@ class _FlashTrackingScreenState extends State<FlashTrackingScreen> {
   String _vehicleAsset(String? type) {
     switch (type) {
       case 'bike':
-        return 'assets/icons/bike.png';
+        return 'assets/icons/top_bike.png';
       case 'tuk':
-        return 'assets/icons/tuk.png';
+        return 'assets/icons/top_tuk.png';
       case 'truck':
-        return 'assets/icons/truck.png';
+        return 'assets/icons/top_truck.png';
       case 'van':
       case 'car':
       default:
-        return 'assets/icons/car.png';
+        return 'assets/icons/top_car.png';
     }
   }
 
@@ -237,6 +246,10 @@ class _FlashTrackingScreenState extends State<FlashTrackingScreen> {
       });
     }
 
+    if (_routePoints.isEmpty) {
+      _fetchRoute(pickup, drop);
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Stack(
@@ -261,8 +274,18 @@ class _FlashTrackingScreenState extends State<FlashTrackingScreen> {
                     size: 30,
                     assetPath: _vehicleAsset(d['vehicle_type'] as String?),
                   ),
-                pinMarker(point: pickup, icon: Icons.inventory_2_rounded, color: AppColors.flash),
-                pinMarker(point: drop, icon: Icons.location_on_rounded, color: AppColors.error),
+                pinMarker(
+                  point: pickup,
+                  icon: Icons.inventory_2_rounded,
+                  color: AppColors.success,
+                  label: 'Sender | ${active['pickup_address'] ?? 'Pickup Location'}',
+                ),
+                pinMarker(
+                  point: drop,
+                  icon: Icons.location_on_rounded,
+                  color: AppColors.error,
+                  label: 'Receiver | ${active['drop_address'] ?? 'Delivery Location'}',
+                ),
                 if (driverLatLng != null)
                   pinMarker(
                     point: driverLatLng,
@@ -272,7 +295,11 @@ class _FlashTrackingScreenState extends State<FlashTrackingScreen> {
                   ),
               ],
               polylines: [
-                ZiggoPolyline(points: [pickup, drop], strokeWidth: 4, color: AppColors.primary),
+                ZiggoPolyline(
+                  points: _routePoints.isNotEmpty ? _routePoints : [pickup, drop],
+                  strokeWidth: 4,
+                  color: AppColors.primary,
+                ),
               ],
             ),
           ),
