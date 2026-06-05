@@ -105,6 +105,11 @@ class Booking(Base):
     # trip in real time via a public, no-auth URL. Generated on demand.
     share_token = Column(String(40), unique=True, index=True)
 
+    # BRD: PY-05 — corporate billing. When True the fare is debited from the
+    # linked CorporateAccount.balance instead of the customer's personal wallet.
+    is_corporate = Column(Boolean, default=False, index=True)
+    corporate_id = Column(Integer, ForeignKey("corporate_accounts.id"), nullable=True)
+
     customer = relationship("Customer", back_populates="bookings")
     driver = relationship("Driver", back_populates="bookings")
     payments = relationship("Payment", back_populates="booking", cascade="all, delete-orphan")

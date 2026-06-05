@@ -55,6 +55,7 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
     _pickup = kColomboPlaces[0];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<PromosProvider>().refresh();
+      context.read<PaymentMethodsProvider>().fetchCorporateProfile();
       _usePoints = false;
       _useCurrentLocationForPickup();
       _startNearbyDriverPolling();
@@ -1139,6 +1140,21 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
                 ),
                 const Divider(height: 1),
 
+                // Corporate Option
+                if (cardsProvider.corporateProfile != null) ...[
+                  ListTile(
+                    leading: const Icon(Icons.business_rounded, color: AppColors.primary),
+                    title: Text('Corporate: ${cardsProvider.corporateProfile!['company_name']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text('Status: ${(cardsProvider.corporateProfile!['status'] ?? 'active').toUpperCase()}'),
+                    trailing: _payment == 'corporate' ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
+                    onTap: () {
+                      setState(() => _payment = 'corporate');
+                      Navigator.pop(ctx);
+                    },
+                  ),
+                  const Divider(height: 1),
+                ],
+
                 // Saved Cards
                 if (cardsProvider.cards.isNotEmpty) ...[
                   Padding(
@@ -1204,7 +1220,9 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
                   ? Icons.payments_rounded
                   : _payment == 'wallet'
                       ? Icons.account_balance_wallet_rounded
-                      : Icons.credit_card_rounded,
+                      : _payment == 'corporate'
+                          ? Icons.business_rounded
+                          : Icons.credit_card_rounded,
               color: AppColors.primary,
               size: 20,
             ),
@@ -1215,7 +1233,9 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
                     ? 'Cash'
                     : _payment == 'wallet'
                         ? 'Ziggo Wallet (Rs.${context.read<WalletProvider>().balance.toStringAsFixed(0)})'
-                        : _getSelectedCardLabel(),
+                        : _payment == 'corporate'
+                            ? 'Corporate Profile (${context.read<PaymentMethodsProvider>().corporateProfile?['company_name'] ?? 'Business'})'
+                            : _getSelectedCardLabel(),
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
             ),

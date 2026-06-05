@@ -23,6 +23,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<PaymentMethodsProvider>().fetchCards();
+      context.read<PaymentMethodsProvider>().fetchCorporateProfile();
       context.read<WalletProvider>().refresh();
     });
   }
@@ -292,6 +293,54 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
+
+                  if (p.corporateProfile != null) ...[
+                    const Text(
+                      'CORPORATE BILLING',
+                      style: TextStyle(fontSize: 11, color: AppColors.textTertiary, fontWeight: FontWeight.w900, letterSpacing: 1.4),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.cardBorder),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: AppColors.accent.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.business_rounded, color: AppColors.accent, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  p.corporateProfile!['company_name']?.toString() ?? 'Business Profile',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Status: ${(p.corporateProfile!['status']?.toString() ?? 'active').toUpperCase()}',
+                                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
 
                   // List of Saved Cards
                   Row(
