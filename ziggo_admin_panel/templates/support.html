@@ -177,12 +177,39 @@
         <form id="tkReplyForm" method="POST" class="border-t border-ziggo-line bg-gray-50/40 p-4 flex items-end gap-3 flex-shrink-0">
             <textarea name="body" id="tkReplyBody" required rows="2" placeholder="Type your reply…"
                 class="flex-1 p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm resize-none bg-white"></textarea>
-            <button type="submit" class="px-5 py-3 bg-ziggo text-white rounded-xl font-black shadow-brand hover:bg-ziggo-light transition flex items-center gap-2">
+            <button type="button" id="tkSendBtn" class="px-5 py-3 bg-ziggo text-white rounded-xl font-black shadow-brand hover:bg-ziggo-light transition flex items-center gap-2">
                 <i class="fas fa-paper-plane"></i> Send
             </button>
         </form>
     </div>
 </div>
+
+<style>
+/* Dedicated Chat Bubble styles to override any generic button/div CSS in base.html */
+.zi-chat-bubble {
+    padding: 10px 16px !important;
+    border-radius: 20px !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+    font-weight: 500 !important;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06) !important;
+    width: max-content !important;
+    max-width: 100% !important;
+    word-break: break-word !important;
+    white-space: pre-wrap !important;
+    margin-top: 2px !important;
+}
+.zi-chat-bubble.admin {
+    background: #1E3A8A !important;
+    color: #ffffff !important;
+    border-top-right-radius: 4px !important;
+}
+.zi-chat-bubble.user {
+    background: #F1F5F9 !important;
+    color: #0F172A !important;
+    border-top-left-radius: 4px !important;
+}
+</style>
 
 <script>
 const STATUSES = [
@@ -198,6 +225,28 @@ function escapeHtml(s) {
     }[c]));
 }
 
+let currentTicket = null;
+let pollTimer = null;
+let lastSig = '';
+function msgSig(msgs) { return (msgs || []).map(m => m.id).join('-'); }
+
+// Poll the server for new messages while a ticket is open (real-time feel)
+function pollMessages() {
+    if (!currentTicket) return;
+    fetch('/admin/support/' + currentTicket.id + '/messages', { credentials: 'same-origin' })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => {
+            if (!d || !currentTicket) return;
+            const sig = msgSig(d.messages);
+            if (sig !== lastSig) {
+                currentTicket.messages = d.messages;
+                lastSig = sig;
+                renderThread(currentTicket);
+            }
+        })
+        .catch(() => {});
+}
+
 function renderThread(t) {
     const wrap = document.getElementById('tkThread');
     wrap.innerHTML = '';
@@ -205,34 +254,28 @@ function renderThread(t) {
     // The opening message: the ticket's original description, framed as a
     // user bubble so the thread reads naturally.
     const opener = document.createElement('div');
-    opener.className = 'flex justify-start';
+    opener.className = 'flex justify-start mb-3';
     opener.innerHTML = `
-        <div class="max-w-[80%]">
-            <div class="text-[10px] text-ziggo-muted font-black uppercase tracking-wider mb-1">
+        <div class="flex flex-col items-start max-w-[85%] sm:max-w-[75%]">
+            <div class="text-[10px] text-ziggo-muted font-black uppercase tracking-wider mb-1 px-1">
                 ${escapeHtml(t.user_name || 'Customer')} · ${escapeHtml(t.created_at)}
             </div>
-            <div class="bg-gray-100 text-ziggo-ink rounded-2xl rounded-tl-md px-4 py-3 text-sm whitespace-pre-wrap">
-                ${escapeHtml(t.description || '(no description)')}
-            </div>
+            <div class="zi-chat-bubble user">${escapeHtml(t.description || '(no description)')}</div>
         </div>`;
     wrap.appendChild(opener);
 
     (t.messages || []).forEach(m => {
         const isAdmin = m.sender_role === 'admin';
         const row = document.createElement('div');
-        row.className = 'flex ' + (isAdmin ? 'justify-end' : 'justify-start');
-        const bubbleCls = isAdmin
-            ? 'bg-ziggo text-white rounded-2xl rounded-tr-md'
-            : 'bg-gray-100 text-ziggo-ink rounded-2xl rounded-tl-md';
+        row.className = 'flex mb-3 ' + (isAdmin ? 'justify-end' : 'justify-start');
+        const bubbleCls = isAdmin ? 'zi-chat-bubble admin' : 'zi-chat-bubble user';
         const meta = (m.sender_name || (isAdmin ? 'Admin' : (t.user_name || 'Customer'))) + ' · ' + m.created_at;
         row.innerHTML = `
-            <div class="max-w-[80%]">
-                <div class="text-[10px] ${isAdmin ? 'text-ziggo' : 'text-ziggo-muted'} font-black uppercase tracking-wider mb-1 ${isAdmin ? 'text-right' : ''}">
+            <div class="flex flex-col ${isAdmin ? 'items-end' : 'items-start'} max-w-[85%] sm:max-w-[75%]">
+                <div class="text-[10px] ${isAdmin ? 'text-ziggo' : 'text-ziggo-muted'} font-black uppercase tracking-wider mb-1 px-1 ${isAdmin ? 'text-right' : ''}">
                     ${escapeHtml(meta)}
                 </div>
-                <div class="${bubbleCls} px-4 py-3 text-sm whitespace-pre-wrap">
-                    ${escapeHtml(m.body)}
-                </div>
+                <div class="${bubbleCls}">${escapeHtml(m.body)}</div>
             </div>`;
         wrap.appendChild(row);
     });
@@ -264,7 +307,13 @@ function openTicket(t) {
         statusWrap.appendChild(form);
     });
 
+    currentTicket = t;
+    lastSig = msgSig(t.messages);
     renderThread(t);
+
+    // start live polling for incoming messages
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(pollMessages, 3000);
 
     const form = document.getElementById('tkReplyForm');
     form.action = '/admin/support/' + t.id + '/reply';
@@ -280,10 +329,148 @@ function closeModal() {
     const m = document.getElementById('ticketModal');
     m.classList.add('hidden');
     m.classList.remove('flex');
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    currentTicket = null;
 }
 
-document.getElementById('ticketModal').addEventListener('click', function(e) {
-    if (e.target === this) closeModal();
-});
+function appendAdminMessage(body) {
+    const wrap = document.getElementById('tkThread');
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const ts = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes());
+    const row = document.createElement('div');
+    row.className = 'flex justify-end mb-3';
+    row.innerHTML = `
+        <div class="flex flex-col items-end max-w-[85%] sm:max-w-[75%]">
+            <div class="text-[10px] text-ziggo font-black uppercase tracking-wider mb-1 px-1 text-right">Admin · ${ts}</div>
+            <div class="zi-chat-bubble admin">${escapeHtml(body)}</div>
+        </div>`;
+    wrap.appendChild(row);
+    wrap.scrollTop = wrap.scrollHeight;
+}
+
+// Send reply without leaving the modal; show it immediately (no page reload)
+function sendReply() {
+    const form = document.getElementById('tkReplyForm');
+    const ta = document.getElementById('tkReplyBody');
+    const body = (ta.value || '').trim();
+    if (!body) { ta.focus(); return; }
+    const btn = document.getElementById('tkSendBtn');
+    if (btn) btn.disabled = true;
+    appendAdminMessage(body);   // show instantly
+    ta.value = '';
+    fetch(form.action, {
+        method: 'POST',
+        body: new URLSearchParams({ body: body }),
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
+        },
+        credentials: 'same-origin'
+    }).then(function (r) { return r.ok ? r.json().catch(function () {}) : null; })
+      .then(function () { setTimeout(pollMessages, 250); })
+      .catch(function () {})
+      .finally(function () { if (btn) btn.disabled = false; ta.focus(); });
+}
+document.getElementById('tkSendBtn').addEventListener('click', sendReply);
+// Safety: stop any native form submit (full page reload) and route through sendReply
+document.getElementById('tkReplyForm').addEventListener('submit', function (e) { e.preventDefault(); sendReply(); });
+
+// ── Live indicator dot in modal header ──────────────────────────────────────
+const liveIndicator = document.createElement('span');
+liveIndicator.id = 'liveIndicator';
+liveIndicator.title = 'Connecting…';
+liveIndicator.style.cssText =
+    'display:inline-block;width:8px;height:8px;border-radius:50%;' +
+    'background:#9ca3af;margin-left:8px;vertical-align:middle;' +
+    'transition:background .4s;';
+document.getElementById('tkTitle').after(liveIndicator);
+
+function setLiveStatus(on) {
+    liveIndicator.style.background = on ? '#22c55e' : '#9ca3af';
+    liveIndicator.title = on ? 'Live – real-time updates active' : 'Offline – using polling';
+}
+
+// ── Toast notification for off-screen messages ──────────────────────────────
+function showToast(msg) {
+    const t = document.createElement('div');
+    t.style.cssText =
+        'position:fixed;bottom:24px;right:24px;z-index:9999;' +
+        'background:#1e293b;color:#fff;border-radius:12px;' +
+        'padding:12px 18px;font-size:13px;font-weight:700;' +
+        'box-shadow:0 8px 32px rgba(0,0,0,.25);' +
+        'animation:slideUp .3s ease;max-width:300px;line-height:1.4;';
+    t.innerHTML =
+        '<i class="fas fa-comment-dots" style="color:#6366f1;margin-right:8px"></i>' + escapeHtml(msg);
+    document.body.appendChild(t);
+    setTimeout(function () {
+        t.style.transition = 'opacity .4s';
+        t.style.opacity = '0';
+        setTimeout(function () { t.remove(); }, 400);
+    }, 4000);
+}
+// Add keyframe for the toast slide-up animation once
+if (!document.getElementById('toastKf')) {
+    const s = document.createElement('style');
+    s.id = 'toastKf';
+    s.textContent = '@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}';
+    document.head.appendChild(s);
+}
+
+// ── True real-time: WebSocket push ──────────────────────────────────────────
+// Falls back to the 3 s polling above if the socket drops.
+let tkSocket = null;
+let pingInterval = null;
+
+function connectSupportWS() {
+    try {
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        tkSocket = new WebSocket(proto + '//' + location.host + '/ws/admin');
+
+        tkSocket.onopen = function () {
+            setLiveStatus(true);
+            // Send a ping every 25 s to keep the connection alive through proxies.
+            if (pingInterval) clearInterval(pingInterval);
+            pingInterval = setInterval(function () {
+                if (tkSocket && tkSocket.readyState === WebSocket.OPEN) {
+                    try { tkSocket.send('ping'); } catch (e) {}
+                }
+            }, 25000);
+        };
+
+        tkSocket.onmessage = function (ev) {
+            let m;
+            try { m = JSON.parse(ev.data); } catch (e) { return; }
+            if (!m || m.event !== 'support_message' || !m.data) return;
+
+            const tid = String(m.data.ticket_id);
+            if (currentTicket && String(currentTicket.id) === tid) {
+                // The ticket is open in the modal — refresh the thread.
+                pollMessages();
+            } else {
+                // A different ticket got a new message — show a toast so the
+                // admin knows without having to refresh the page.
+                const senderLabel = m.data.sender_role === 'admin' ? 'Admin' : 'User';
+                showToast('New message on Ticket #' + tid + ': "' + (m.data.body || '').slice(0, 60) + '"');
+            }
+        };
+
+        tkSocket.onclose = function () {
+            setLiveStatus(false);
+            tkSocket = null;
+            if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
+            setTimeout(connectSupportWS, 5000);
+        };
+
+        tkSocket.onerror = function () {
+            setLiveStatus(false);
+            try { tkSocket.close(); } catch (e) {}
+        };
+    } catch (e) {
+        setLiveStatus(false);
+    }
+}
+connectSupportWS();
 </script>
 {% endblock %}
+

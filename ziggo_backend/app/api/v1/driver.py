@@ -262,19 +262,20 @@ _ADMIN_PANEL_DIR = _find_admin_panel_dir()
 _DOC_UPLOAD_DIR = os.path.join(_ADMIN_PANEL_DIR, "static", "uploads", "driver_docs")
 os.makedirs(_DOC_UPLOAD_DIR, exist_ok=True)
 _VALID_DOC_TYPES = {"nic", "license", "vehicle_reg", "insurance"}
-_ALLOWED_DOC_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".pdf"}
-_MAX_DOC_BYTES = 8 * 1024 * 1024  # 8 MB — PDFs of scanned IDs can be chunky
+_ALLOWED_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".pdf"}
+_MAX_DOC_BYTES = 25 * 1024 * 1024  # 25 MB
 
-
-async def _save_driver_doc(asset: UploadFile, doc_type: str) -> str:
-    ext = os.path.splitext(asset.filename or "")[1].lower()
-    if ext not in _ALLOWED_DOC_EXTS:
-        raise HTTPException(status_code=400, detail="Document must be JPG, PNG, WEBP, or PDF")
-    data = await asset.read()
-    if not data:
+async def _save_doc(file: UploadFile, doc_type: str) -> str:
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename")
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in _ALLOWED_EXTS:
+        raise HTTPException(status_code=400, detail="Must be JPG, PNG, WEBP, or PDF")
+    data = await file.read()
+    if len(data) == 0:
         raise HTTPException(status_code=400, detail="Empty file")
     if len(data) > _MAX_DOC_BYTES:
-        raise HTTPException(status_code=400, detail="File must be under 8 MB")
+        raise HTTPException(status_code=400, detail="File must be under 25 MB")
     fname = f"{doc_type}_{secrets.token_hex(8)}{ext}"
     fpath = os.path.join(_DOC_UPLOAD_DIR, fname)
     with open(fpath, "wb") as f:

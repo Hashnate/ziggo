@@ -55,12 +55,12 @@ async def _save_uploaded_photo(photo: UploadFile | None) -> str | None:
         return None
     ext = os.path.splitext(photo.filename)[1].lower()
     if ext not in ALLOWED_PHOTO_EXTS:
-        raise HTTPException(status_code=400, detail="Photo must be JPG, PNG, or WEBP")
+        raise HTTPException(status_code=400, detail="Image must be JPG, PNG, or WEBP")
     data = await photo.read()
     if len(data) == 0:
         return None
     if len(data) > MAX_PHOTO_BYTES:
-        raise HTTPException(status_code=400, detail="Photo must be under 5 MB")
+        raise HTTPException(status_code=400, detail="Image must be under 5 MB")
     import secrets
     fname = f"{secrets.token_hex(8)}{ext}"
     fpath = os.path.join(UPLOAD_DIR, fname)
@@ -79,7 +79,7 @@ async def _save_uploaded_doc(doc: UploadFile | None, doc_type: str) -> str | Non
     if len(data) == 0:
         return None
     if len(data) > MAX_DOC_BYTES:
-        raise HTTPException(status_code=400, detail="Document must be under 8 MB")
+        raise HTTPException(status_code=400, detail="Document must be under 25 MB")
     import secrets
     fname = f"{doc_type}_{secrets.token_hex(8)}{ext}"
     fpath = os.path.join(DOC_UPLOAD_DIR, fname)
@@ -4076,6 +4076,38 @@ async def admin_support(
     )
 
 
+@router.get("/support/{ticket_id}/messages")
+async def admin_support_messages(
+    ticket_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    """Read-only JSON feed of a ticket's messages, for live polling in the UI."""
+    from app.models import Complaint, ComplaintMessage
+
+    res = await db.execute(
+        select(Complaint)
+        .options(selectinload(Complaint.messages).selectinload(ComplaintMessage.sender))
+        .where(Complaint.id == ticket_id)
+    )
+    t = res.scalars().first()
+    if not t:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    return {
+        "status": _normalize_status(t.status),
+        "messages": [
+            {
+                "id": m.id,
+                "sender_role": m.sender_role,
+                "sender_name": (m.sender.full_name if m.sender else "") or "",
+                "body": m.body,
+                "created_at": m.created_at.strftime("%Y-%m-%d %H:%M") if m.created_at else "",
+            }
+            for m in (t.messages or [])
+        ],
+    }
+
+
 @router.post("/support/{ticket_id}/status")
 async def admin_support_set_status(
     ticket_id: int,
@@ -4111,6 +4143,7 @@ async def admin_support_set_status(
 @router.post("/support/{ticket_id}/reply")
 async def admin_support_reply(
     ticket_id: int,
+    request: Request,
     body: str = Form(...),
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(current_admin),
@@ -4139,14 +4172,27 @@ async def admin_support_reply(
     await db.commit()
     await db.refresh(msg)
 
+    payload = {
+        "ticket_id": t.id,
+        "message_id": msg.id,
+        "sender_role": "admin",
+        "body": msg.body,
+        "created_at": msg.created_at.isoformat() if msg.created_at else None,
+    }
     if t.user_id:
-        await manager.send(t.user_id, "support_message", {
-            "ticket_id": t.id,
-            "message_id": msg.id,
-            "sender_role": "admin",
-            "body": msg.body,
-            "created_at": msg.created_at.isoformat() if msg.created_at else None,
-        })
+        await manager.send(t.user_id, "support_message", payload)
+    # Broadcast to any admin viewing the support panel (instant multi-admin sync).
+    try:
+        await manager.publish("admin_live", "support_message", payload)
+    except Exception:
+        pass
+
+    # Return JSON when the request came from the modal's fetch() so we avoid
+    # an unnecessary redirect → full-page HTML roundtrip.
+    accept = request.headers.get("accept", "")
+    if "application/json" in accept:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"ok": True, "message_id": msg.id, "created_at": payload["created_at"]})
     return RedirectResponse(url="/admin/support", status_code=303)
 
 

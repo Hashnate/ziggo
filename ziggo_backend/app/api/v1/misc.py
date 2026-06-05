@@ -368,6 +368,20 @@ async def post_complaint_message(
         c.resolved_at = None
     await db.commit()
     await db.refresh(msg)
+
+    # Push to any admin viewing the support panel so the reply shows instantly.
+    try:
+        from app.services.ws_manager import manager
+        await manager.publish("admin_live", "support_message", {
+            "ticket_id": c.id,
+            "message_id": msg.id,
+            "sender_role": msg.sender_role,
+            "body": msg.body,
+            "created_at": msg.created_at.isoformat() if msg.created_at else None,
+        })
+    except Exception:
+        pass
+
     return msg
 
 

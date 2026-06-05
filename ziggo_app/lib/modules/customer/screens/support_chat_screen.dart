@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/network/ws_client.dart';
+import '../../../core/storage/token_storage.dart';
 
 class SupportChatScreen extends StatefulWidget {
   const SupportChatScreen({super.key, required this.ticket});
@@ -24,6 +28,13 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
   String? _error;
   String _status = 'open';
 
+  // ── Real-time support ──────────────────────────────────────────────────────
+  final WsClient _ws = WsClient();
+  StreamSubscription<Map<String, dynamic>>? _wsSub;
+  Timer? _pollTimer;
+  // Track the last message ID so we only scroll on genuinely new messages.
+  int _lastMsgId = 0;
+
   int get _ticketId => widget.ticket['id'] as int;
 
   @override
@@ -31,21 +42,78 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
     super.initState();
     _status = (widget.ticket['status']?.toString() ?? 'open');
     _load();
+    _connectRealtime();
   }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
+    _wsSub?.cancel();
+    _ws.dispose();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
+  // ── Real-time helpers ──────────────────────────────────────────────────────
+
+  /// Connect the user WebSocket (same connection used for ride updates) and
+  /// listen for `support_message` events targeting this ticket.
+  Future<void> _connectRealtime() async {
+    final token = await TokenStorage.getToken();
+    if (token != null && token.isNotEmpty) {
+      _ws.connect(token);
+      _wsSub = _ws.events.listen((msg) {
+        final event = msg['event'];
+        final data = msg['data'] as Map<String, dynamic>?;
+        if (event == 'support_message' &&
+            data != null &&
+            data['ticket_id']?.toString() == _ticketId.toString()) {
+          // New message pushed from the server — reload the thread.
+          _reload();
+        }
+      });
+    }
+
+    // Fallback: poll every 3 seconds so messages arrive even if WS is dead.
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _reload());
+  }
+
+  /// Silently refresh messages in the background (no loading spinner).
+  Future<void> _reload() async {
+    try {
+      final resp =
+          await ApiClient.instance.dio.get('/complaints/$_ticketId/messages');
+      if (!mounted) return;
+      final newMessages =
+          List<Map<String, dynamic>>.from(resp.data as List);
+      // Determine the latest message id from the new list.
+      final newLastId = newMessages.isNotEmpty
+          ? (newMessages.last['id'] as int? ?? 0)
+          : 0;
+      final hasNew = newLastId > _lastMsgId;
+      if (hasNew) {
+        setState(() {
+          _messages = newMessages;
+          _lastMsgId = newLastId;
+        });
+        _scrollToBottom();
+      }
+    } catch (_) {
+      // Silent — don't disrupt the UI if polling fails.
+    }
+  }
+
+  // ── Initial load (shows spinner) ──────────────────────────────────────────
+
   Future<void> _load() async {
     try {
       final resp = await ApiClient.instance.dio.get('/complaints/$_ticketId/messages');
       if (!mounted) return;
+      final msgs = List<Map<String, dynamic>>.from(resp.data as List);
       setState(() {
-        _messages = List<Map<String, dynamic>>.from(resp.data as List);
+        _messages = msgs;
+        _lastMsgId = msgs.isNotEmpty ? (msgs.last['id'] as int? ?? 0) : 0;
         _loading = false;
         _error = null;
       });
@@ -70,8 +138,10 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
       );
       if (!mounted) return;
       _messageController.clear();
+      final newMsg = Map<String, dynamic>.from(resp.data as Map);
       setState(() {
-        _messages = [..._messages, Map<String, dynamic>.from(resp.data as Map)];
+        _messages = [..._messages, newMsg];
+        _lastMsgId = newMsg['id'] as int? ?? _lastMsgId;
         _sending = false;
       });
       _scrollToBottom();
@@ -159,11 +229,9 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                 ],
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.refresh, color: Colors.black),
-              onPressed: _load,
-              tooltip: 'Refresh',
-            ),
+            // Pulse indicator shows live connection status
+            _LiveDot(connected: _ws.isConnected),
+            const SizedBox(width: 4),
           ],
         ),
       ),
@@ -358,5 +426,65 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
     } catch (_) {
       return iso;
     }
+  }
+}
+
+// ── Small animated dot to show live/offline status ────────────────────────────
+
+class _LiveDot extends StatefulWidget {
+  const _LiveDot({required this.connected});
+  final bool connected;
+
+  @override
+  State<_LiveDot> createState() => _LiveDotState();
+}
+
+class _LiveDotState extends State<_LiveDot> with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _anim = Tween<double>(begin: 0.4, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.connected) {
+      return const SizedBox(
+        width: 8,
+        height: 8,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.grey,
+            shape: BoxShape.circle,
+          ),
+        ),
+      );
+    }
+    return FadeTransition(
+      opacity: _anim,
+      child: Container(
+        width: 8,
+        height: 8,
+        decoration: const BoxDecoration(
+          color: Color(0xFF22C55E), // green-500
+          shape: BoxShape.circle,
+        ),
+      ),
+    );
   }
 }
