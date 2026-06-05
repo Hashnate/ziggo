@@ -41,6 +41,8 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AddressesProvider>().refresh();
       context.read<PromosProvider>().refresh();
+      context.read<PaymentMethodsProvider>().fetchCards();
+      context.read<PaymentMethodsProvider>().fetchCorporateProfile();
     });
   }
 
@@ -299,7 +301,9 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
                           ? Icons.payments_rounded
                           : _payment == 'wallet'
                               ? Icons.account_balance_wallet_rounded
-                              : Icons.credit_card_rounded,
+                              : _payment == 'corporate'
+                                  ? Icons.business_rounded
+                                  : Icons.credit_card_rounded,
                       color: AppColors.primary,
                       size: 20,
                     ),
@@ -310,7 +314,9 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
                             ? 'Cash'
                             : _payment == 'wallet'
                                 ? 'Ziggo Wallet (Rs.${context.read<WalletProvider>().balance.toStringAsFixed(0)})'
-                                : _getSelectedCardLabel(),
+                                : _payment == 'corporate'
+                                    ? 'Corporate (${context.read<PaymentMethodsProvider>().corporateProfile?['company_name'] ?? 'Business'})'
+                                    : _getSelectedCardLabel(),
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                     ),
@@ -494,6 +500,21 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
                   },
                 ),
                 const Divider(height: 1),
+
+                // Corporate Option
+                if (cardsProvider.corporateProfile != null) ...[
+                  ListTile(
+                    leading: const Icon(Icons.business_rounded, color: AppColors.primary),
+                    title: Text('Corporate: ${cardsProvider.corporateProfile!['company_name']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text('Status: ${(cardsProvider.corporateProfile!['status'] ?? 'active').toUpperCase()}'),
+                    trailing: _payment == 'corporate' ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
+                    onTap: () {
+                      setState(() => _payment = 'corporate');
+                      Navigator.pop(ctx);
+                    },
+                  ),
+                  const Divider(height: 1),
+                ],
 
                 // Saved Cards
                 if (cardsProvider.cards.isNotEmpty) ...[

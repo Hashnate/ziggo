@@ -4399,6 +4399,45 @@ async def admin_finance(
     )
 
 
+@router.get("/withdrawals", response_class=HTMLResponse)
+async def admin_withdrawals(
+    request: Request,
+    page: int = 1,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    data = await fin.get_withdrawals_data(db, page=page, page_size=20)
+    return templates.TemplateResponse(
+        request, "withdrawals.html",
+        {
+            "request": request,
+            "active_page": "withdrawals",
+            "total_pending": data["total_pending"],
+            "rows": data["rows"],
+            "history": data["history"],
+            "total_pages": data["total_pages"],
+            "start_idx": data["start_idx"],
+            "end_idx": data["end_idx"],
+            "total_drivers": data["total_drivers"],
+            "page": data["page"],
+            "page_range": data["page_range"],
+        },
+    )
+
+
+@router.post("/withdrawals/{driver_id}/pay")
+async def admin_withdrawals_pay(
+    driver_id: int,
+    amount: float = Form(...),
+    note: str = Form("Manual payout"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from decimal import Decimal
+    await fin.execute_driver_payout(db, driver_id, Decimal(str(amount)), note)
+    return RedirectResponse(url="/admin/withdrawals", status_code=303)
+
+
 @router.get("/finance/drivers", response_class=HTMLResponse)
 async def admin_finance_drivers(
     request: Request,

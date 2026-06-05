@@ -48,7 +48,7 @@ def _is_complete(d: Driver) -> bool:
     )
 
 
-def _to_response(user: User, d: Driver) -> DriverProfileResponse:
+def _to_response(user: User, d: Driver, paid_payouts: float = 0.0, pending_payout: float = 0.0) -> DriverProfileResponse:
     return DriverProfileResponse(
         id=d.id,
         full_name=user.full_name,
@@ -73,6 +73,8 @@ def _to_response(user: User, d: Driver) -> DriverProfileResponse:
         relative_contact=d.relative_contact,
         relative_relationship=d.relative_relationship,
         billing_proof_url=d.billing_proof_url,
+        paid_payouts=paid_payouts,
+        pending_payout=pending_payout,
     )
 
 
@@ -123,7 +125,9 @@ async def get_my_driver_profile(
     user: User = Depends(require_role("driver")),
 ):
     d = await _get_driver(db, user)
-    return _to_response(user, d)
+    from ...services.finance_service import get_driver_payout_stats
+    stats = await get_driver_payout_stats(db, d.id)
+    return _to_response(user, d, paid_payouts=stats["paid"], pending_payout=stats["pending"])
 
 
 @router.post("/register", response_model=DriverProfileResponse)

@@ -64,6 +64,8 @@ class DriverProfileResponse(BaseModel):
     relative_contact: Optional[str] = None
     relative_relationship: Optional[str] = None
     billing_proof_url: Optional[str] = None
+    paid_payouts: Optional[float] = 0.0
+    pending_payout: Optional[float] = 0.0
 
     class Config:
         from_attributes = True
