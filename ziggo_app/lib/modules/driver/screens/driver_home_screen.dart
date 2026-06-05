@@ -1935,6 +1935,8 @@ class _Drawer extends StatelessWidget {
     final todayEarnings = (profile['today_earnings'] as num?)?.toDouble() ?? 0;
     final totalEarnings = (profile['total_earnings'] as num?)?.toDouble() ?? 0;
     final todayRides = (profile['today_rides'] as num?)?.toInt() ?? 0;
+    final paidPayouts = (profile['paid_payouts'] as num?)?.toDouble() ?? 0;
+    final pendingPayout = (profile['pending_payout'] as num?)?.toDouble() ?? 0;
     final rating = (profile['rating'] as num?)?.toDouble() ?? 0;
     final isOnline = driver.isOnline;
     final vehicleType = (profile['vehicle_type'] ?? '').toString().toUpperCase();
@@ -2159,6 +2161,8 @@ class _Drawer extends StatelessWidget {
                       todayEarnings: todayEarnings,
                       totalEarnings: totalEarnings,
                       todayRides: todayRides,
+                      paidPayouts: paidPayouts,
+                      pendingPayout: pendingPayout,
                     ),
                   ),
                   _menuItem(
@@ -2332,6 +2336,8 @@ class _Drawer extends StatelessWidget {
     required double todayEarnings,
     required double totalEarnings,
     required int todayRides,
+    required double paidPayouts,
+    required double pendingPayout,
   }) {
     showModalBottomSheet<void>(
       context: context,
@@ -2412,6 +2418,28 @@ class _Drawer extends StatelessWidget {
                     value: todayRides.toString(),
                     icon: Icons.directions_car_rounded,
                     color: AppColors.info,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _earnTile(
+                    label: 'Paid out',
+                    value: 'Rs.${paidPayouts.toStringAsFixed(0)}',
+                    icon: Icons.payments_rounded,
+                    color: AppColors.error,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _earnTile(
+                    label: 'Pending payout',
+                    value: 'Rs.${pendingPayout.toStringAsFixed(0)}',
+                    icon: Icons.hourglass_empty_rounded,
+                    color: AppColors.warning,
                   ),
                 ),
               ],
