@@ -40,6 +40,10 @@ def _is_complete(d: Driver) -> bool:
             d.vehicle_number,
             d.license_number,
             d.nic_number,
+            d.relative_name,
+            d.relative_contact,
+            d.relative_relationship,
+            d.billing_proof_url,
         ]
     )
 
@@ -65,6 +69,10 @@ def _to_response(user: User, d: Driver) -> DriverProfileResponse:
         today_rides=d.today_rides or 0,
         total_earnings=float(d.total_earnings or 0),
         acceptance_rate=float(d.acceptance_rate or 100),
+        relative_name=d.relative_name,
+        relative_contact=d.relative_contact,
+        relative_relationship=d.relative_relationship,
+        billing_proof_url=d.billing_proof_url,
     )
 
 
@@ -163,6 +171,9 @@ async def register_driver(
     d.vehicle_number = body.vehicle_number
     d.vehicle_model = body.vehicle_model
     d.vehicle_color = body.vehicle_color
+    d.relative_name = body.relative_name
+    d.relative_contact = body.relative_contact
+    d.relative_relationship = body.relative_relationship
     # Stay in PENDING; admin will approve.
     if d.status == DriverStatus.PENDING:
         pass
@@ -395,4 +406,19 @@ async def upload_profile_photo(
     await db.commit()
     await db.refresh(user)
     return {"ok": True, "profile_photo": url}
+
+
+@router.post("/billing-proof")
+async def upload_billing_proof(
+    photo: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("driver")),
+):
+    """Driver uploads their billing proof."""
+    d = await _get_driver(db, user)
+    url = await _save_profile_photo(photo)
+    d.billing_proof_url = url
+    await db.commit()
+    await db.refresh(d)
+    return {"ok": True, "billing_proof_url": url}
 
