@@ -38,11 +38,17 @@ os.makedirs(BRANDING_UPLOAD_DIR, exist_ok=True)
 ALLOWED_PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 MAX_PHOTO_BYTES = 5 * 1024 * 1024  # 5 MB
 
+DOC_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "driver_docs")
+os.makedirs(DOC_UPLOAD_DIR, exist_ok=True)
+ALLOWED_DOC_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".pdf"}
+MAX_DOC_BYTES = 8 * 1024 * 1024  # 8 MB
+
 
 async def _save_uploaded_photo(photo: UploadFile | None) -> str | None:
     """Save an uploaded driver photo and return its public URL path.
 
     Returns None if no file was uploaded. Raises HTTPException for invalid type
+
     or oversize files so the admin sees a clear error.
     """
     if photo is None or not photo.filename:
@@ -61,6 +67,26 @@ async def _save_uploaded_photo(photo: UploadFile | None) -> str | None:
     with open(fpath, "wb") as f:
         f.write(data)
     return f"/static/uploads/drivers/{fname}"
+
+
+async def _save_uploaded_doc(doc: UploadFile | None, doc_type: str) -> str | None:
+    if doc is None or not doc.filename:
+        return None
+    ext = os.path.splitext(doc.filename)[1].lower()
+    if ext not in ALLOWED_DOC_EXTS:
+        raise HTTPException(status_code=400, detail="Document must be JPG, PNG, WEBP, or PDF")
+    data = await doc.read()
+    if len(data) == 0:
+        return None
+    if len(data) > MAX_DOC_BYTES:
+        raise HTTPException(status_code=400, detail="Document must be under 8 MB")
+    import secrets
+    fname = f"{doc_type}_{secrets.token_hex(8)}{ext}"
+    fpath = os.path.join(DOC_UPLOAD_DIR, fname)
+    with open(fpath, "wb") as f:
+        f.write(data)
+    return f"/static/uploads/driver_docs/{fname}"
+
 
 
 async def _save_category_image(photo: UploadFile | None) -> str | None:
@@ -484,6 +510,10 @@ async def admin_drivers_new_submit(
     relative_relationship: str = Form(""),
     profile_photo: UploadFile | None = File(None),
     billing_proof: UploadFile | None = File(None),
+    doc_nic: UploadFile | None = File(None),
+    doc_license: UploadFile | None = File(None),
+    doc_vehicle_reg: UploadFile | None = File(None),
+    doc_insurance: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -575,7 +605,24 @@ async def admin_drivers_new_submit(
         billing_proof_url=billing_proof_url or None,
     )
     db.add(driver)
+    await db.flush()
+
+    from app.models import DriverDocument
+    for kind in ("nic", "license", "vehicle_reg", "insurance"):
+        file_input = locals().get(f"doc_{kind}")
+        if file_input:
+            url = await _save_uploaded_doc(file_input, kind)
+            if url:
+                doc = DriverDocument(
+                    driver_id=driver.id,
+                    document_type=kind,
+                    document_url=url,
+                    is_verified=False,
+                )
+                db.add(doc)
+
     await db.commit()
+
     return RedirectResponse(url="/admin/drivers", status_code=303)
 
 
@@ -651,6 +698,10 @@ async def admin_drivers_edit_submit(
     relative_relationship: str = Form(""),
     billing_proof: UploadFile | None = File(None),
     remove_billing: str = Form(""),
+    doc_nic: UploadFile | None = File(None),
+    doc_license: UploadFile | None = File(None),
+    doc_vehicle_reg: UploadFile | None = File(None),
+    doc_insurance: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -738,6 +789,34 @@ async def admin_drivers_edit_submit(
         d.is_approved = False
         d.is_online = False
         d.status = DriverStatus.SUSPENDED
+
+    from app.models import DriverDocument
+    for kind in ("nic", "license", "vehicle_reg", "insurance"):
+        file_input = locals().get(f"doc_{kind}")
+        if file_input:
+            url = await _save_uploaded_doc(file_input, kind)
+            if url:
+                exq = await db.execute(
+                    select(DriverDocument).where(
+                        DriverDocument.driver_id == d.id,
+                        DriverDocument.document_type == kind,
+                    )
+                )
+                existing = exq.scalars().first()
+                if existing:
+                    existing.document_url = url
+                    existing.is_verified = False
+                    existing.verified_by = None
+                    existing.verified_at = None
+                    existing.uploaded_at = datetime.now(timezone.utc)
+                else:
+                    doc = DriverDocument(
+                        driver_id=d.id,
+                        document_type=kind,
+                        document_url=url,
+                        is_verified=False,
+                    )
+                    db.add(doc)
 
     await db.commit()
     return RedirectResponse(url="/admin/drivers", status_code=303)

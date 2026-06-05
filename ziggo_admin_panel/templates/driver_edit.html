@@ -187,7 +187,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {% for doc in documents %}
                 <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
-                    <div class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
+                    <div id="{{ doc.kind }}IconWrapper" class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
                         {% if doc.document_url %}
                         <a href="{{ doc.document_url }}" target="_blank">
                             {% if doc.document_url.endswith('.pdf') %}
@@ -203,33 +203,38 @@
                     <div class="flex-1 min-w-0">
                         <p class="font-black text-sm text-ziggo-ink">{{ doc.label }}</p>
                         {% if doc.document_url %}
-                        <p class="text-[11px] text-ziggo-muted truncate">Uploaded {{ doc.uploaded_at.strftime("%Y-%m-%d") if doc.uploaded_at else '' }}</p>
+                        <p class="text-[11px] text-ziggo-muted truncate" id="{{ doc.kind }}Status">Uploaded {{ doc.uploaded_at.strftime("%Y-%m-%d") if doc.uploaded_at else '' }}</p>
                         {% if doc.is_verified %}
-                        <span class="px-2 py-0.5 mt-1 inline-block text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700 rounded-full">Verified</span>
+                        <span class="px-2 py-0.5 mt-1 inline-block text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700 rounded-full" id="{{ doc.kind }}VerifyBadge">Verified</span>
                         {% else %}
-                        <span class="px-2 py-0.5 mt-1 inline-block text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-700 rounded-full">Pending review</span>
+                        <span class="px-2 py-0.5 mt-1 inline-block text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-700 rounded-full" id="{{ doc.kind }}VerifyBadge">Pending review</span>
                         {% endif %}
                         {% else %}
-                        <p class="text-[11px] text-rose-500 font-bold">Not uploaded yet</p>
-                        {% endif %}
-                    </div>
-                    {% if doc.id %}
-                    <div class="flex flex-col gap-1.5">
-                        {% if not doc.is_verified %}
-                        <form method="POST" action="/admin/drivers/{{ driver.id }}/documents/{{ doc.id }}/verify">
-                            <button class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-black hover:bg-emerald-700 whitespace-nowrap">
-                                <i class="fas fa-check mr-1"></i> Verify
-                            </button>
-                        </form>
-                        {% else %}
-                        <form method="POST" action="/admin/drivers/{{ driver.id }}/documents/{{ doc.id }}/reject" onsubmit="return confirm('Mark this document as not verified? The driver will need to re-upload.');">
-                            <button class="px-3 py-1.5 border border-rose-300 text-rose-600 rounded-lg text-xs font-black hover:bg-rose-50 whitespace-nowrap">
-                                <i class="fas fa-times mr-1"></i> Revoke
-                            </button>
-                        </form>
+                        <p class="text-[11px] text-rose-500 font-bold" id="{{ doc.kind }}Status">Not uploaded yet</p>
                         {% endif %}
                     </div>
-                    {% endif %}
+                    <div class="flex flex-col gap-1.5 items-end">
+                        <label for="doc_{{ doc.kind }}" class="cursor-pointer px-3 py-1.5 bg-ziggo-soft text-ziggo rounded-lg text-xs font-black hover:bg-ziggo-soft/70 transition whitespace-nowrap">
+                            <i class="fas fa-upload mr-1"></i> {% if doc.document_url %}Replace{% else %}Upload{% endif %}
+                        </label>
+                        <input id="doc_{{ doc.kind }}" name="doc_{{ doc.kind }}" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden" onchange="previewDoc(this, '{{ doc.kind }}')">
+
+                        {% if doc.id %}
+                            {% if not doc.is_verified %}
+                            <form method="POST" action="/admin/drivers/{{ driver.id }}/documents/{{ doc.id }}/verify">
+                                <button class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-black hover:bg-emerald-700 whitespace-nowrap w-full text-center">
+                                    <i class="fas fa-check mr-1"></i> Verify
+                                </button>
+                            </form>
+                            {% else %}
+                            <form method="POST" action="/admin/drivers/{{ driver.id }}/documents/{{ doc.id }}/reject" onsubmit="return confirm('Mark this document as not verified? The driver will need to re-upload.');">
+                                <button class="px-3 py-1.5 border border-rose-300 text-rose-600 rounded-lg text-xs font-black hover:bg-rose-50 whitespace-nowrap w-full text-center">
+                                    <i class="fas fa-times mr-1"></i> Revoke
+                                </button>
+                            </form>
+                            {% endif %}
+                        {% endif %}
+                    </div>
                 </div>
                 {% endfor %}
             </div>
@@ -280,6 +285,35 @@ function previewBilling(input) {
     };
     reader.readAsDataURL(file);
     label.textContent = 'Change file';
+}
+
+function previewDoc(input, kind) {
+    const wrapper = document.getElementById(kind + 'IconWrapper');
+    const status = document.getElementById(kind + 'Status');
+    const badge = document.getElementById(kind + 'VerifyBadge');
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    if (file.size > 8 * 1024 * 1024) {
+        alert('Document must be under 8 MB');
+        input.value = '';
+        return;
+    }
+    status.textContent = 'Ready to upload';
+    status.className = 'text-[11px] text-amber-500 font-bold';
+    if (badge) {
+        badge.style.display = 'none';
+    }
+    
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'pdf') {
+        wrapper.innerHTML = '<i class="fas fa-file-pdf text-2xl text-rose-500"></i>';
+    } else {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            wrapper.innerHTML = '<img src="' + e.target.result + '" class="w-full h-full object-cover">';
+        };
+        reader.readAsDataURL(file);
+    }
 }
 </script>
 {% endblock %}

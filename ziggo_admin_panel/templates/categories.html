@@ -75,6 +75,7 @@
                                         "id": c.id,
                                         "service_type": c.service_type,
                                         "display_name": c.display_name or "",
+                                        "image_url": c.image_url or "",
                                         "capacity": c.capacity or 0,
                                         "description": c.description or "",
                                         "base_fare": (c.base_fare|float) if c.base_fare is not none else 0,
@@ -132,8 +133,28 @@
                 </div>
                 <div class="col-span-2">
                     <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Image</label>
-                    <input type="file" name="image" accept="image/png,image/jpeg,image/webp" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white">
+                    <input type="file" name="image" accept="image/png,image/jpeg,image/webp" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white" onchange="previewCatImage(this)">
                     <p class="text-[10px] text-ziggo-faint font-bold mt-1">JPG/PNG/WEBP, max 5 MB. Leave empty to keep current.</p>
+                </div>
+                <div class="col-span-2">
+                    <div class="flex gap-6">
+                        <div id="catPrevImageCol" style="display: none;">
+                            <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Current Image</label>
+                            <div id="catPrevImage" class="w-24 h-24 rounded-2xl bg-ziggo-soft/50 border border-ziggo-line flex items-center justify-center overflow-hidden">
+                                <i class="fas fa-image text-ziggo-faint text-3xl"></i>
+                            </div>
+                        </div>
+                        <div id="catNewImageCol" style="display: none;">
+                            <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">New Image Preview</label>
+                            <div id="catNewImage" class="w-24 h-24 rounded-2xl bg-ziggo-soft/50 border-2 border-dashed border-ziggo-line flex items-center justify-center overflow-hidden">
+                                <i class="fas fa-image text-ziggo-faint text-3xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-span-2">
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Description</label>
+                    <textarea name="description" id="catDesc" rows="2" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo"></textarea>
                 </div>
                 <div>
                     <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Capacity (persons)</label>
@@ -144,10 +165,6 @@
                         <input type="checkbox" name="is_active" id="catActive" checked class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
                         <span class="text-sm font-black text-ziggo-ink">Active</span>
                     </label>
-                </div>
-                <div class="col-span-2">
-                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Description</label>
-                    <textarea name="description" id="catDesc" rows="2" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo"></textarea>
                 </div>
 
                 <div class="col-span-2 pt-2">
@@ -205,6 +222,13 @@ function openCreateModal() {
     document.getElementById('catFee').value = 15;
     document.getElementById('catSurge').value = 1.0;
     document.getElementById('catActive').checked = true;
+    
+    // Reset image input and preview
+    document.getElementById('categoryForm').querySelector('input[type="file"]').value = '';
+    document.getElementById('catPrevImageCol').style.display = 'none';
+    document.getElementById('catNewImageCol').style.display = 'none';
+    document.getElementById('catNewImage').innerHTML = '<i class="fas fa-image text-ziggo-faint text-3xl"></i>';
+    
     showModal();
 }
 
@@ -224,6 +248,22 @@ function openEditModal(c) {
     document.getElementById('catFee').value = c.platform_fee_percent;
     document.getElementById('catSurge').value = c.surge_multiplier;
     document.getElementById('catActive').checked = !!c.is_active;
+    
+    // Reset image input and set existing preview
+    document.getElementById('categoryForm').querySelector('input[type="file"]').value = '';
+    document.getElementById('catNewImageCol').style.display = 'none';
+    document.getElementById('catNewImage').innerHTML = '<i class="fas fa-image text-ziggo-faint text-3xl"></i>';
+    
+    const prevCol = document.getElementById('catPrevImageCol');
+    const prevImg = document.getElementById('catPrevImage');
+    if (c.image_url) {
+        prevImg.innerHTML = '<img src="' + c.image_url + '" class="w-full h-full object-cover">';
+        prevCol.style.display = 'block';
+    } else {
+        prevImg.innerHTML = '<i class="fas fa-image text-ziggo-faint text-3xl"></i>';
+        prevCol.style.display = 'none';
+    }
+    
     showModal();
 }
 
@@ -237,6 +277,28 @@ function closeModal() {
     const m = document.getElementById('categoryModal');
     m.classList.add('hidden');
     m.classList.remove('flex');
+}
+
+function previewCatImage(input) {
+    const previewCol = document.getElementById('catNewImageCol');
+    const previewImg = document.getElementById('catNewImage');
+    if (!input.files || !input.files[0]) {
+        previewCol.style.display = 'none';
+        return;
+    }
+    const file = input.files[0];
+    if (file.size > 5 * 1024 * 1024) {
+        alert('Image must be under 5 MB');
+        input.value = '';
+        previewCol.style.display = 'none';
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        previewImg.innerHTML = '<img src="' + e.target.result + '" class="w-full h-full object-cover">';
+        previewCol.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
 }
 
 function confirmDelete(driverCount, name) {

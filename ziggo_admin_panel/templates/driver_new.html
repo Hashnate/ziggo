@@ -154,50 +154,66 @@
             </h4>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
-                    <div class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
+                    <div id="nicIconWrapper" class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
                         <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
                     </div>
                     <div class="flex-1 min-w-0">
                         <p class="font-black text-sm text-ziggo-ink">NIC</p>
-                        <p class="text-[11px] text-rose-500 font-bold">Not uploaded yet</p>
+                        <p class="text-[11px] text-rose-500 font-bold" id="nicStatus">Not uploaded yet</p>
+                    </div>
+                    <div>
+                        <label for="doc_nic" class="cursor-pointer px-3 py-1.5 bg-ziggo-soft text-ziggo rounded-lg text-xs font-black hover:bg-ziggo-soft/70 transition whitespace-nowrap">
+                            <i class="fas fa-upload mr-1"></i> Upload
+                        </label>
+                        <input id="doc_nic" name="doc_nic" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden" onchange="previewDoc(this, 'nic')">
                     </div>
                 </div>
                 <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
-                    <div class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
+                    <div id="licenseIconWrapper" class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
                         <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
                     </div>
                     <div class="flex-1 min-w-0">
                         <p class="font-black text-sm text-ziggo-ink">Driving License</p>
-                        <p class="text-[11px] text-rose-500 font-bold">Not uploaded yet</p>
+                        <p class="text-[11px] text-rose-500 font-bold" id="licenseStatus">Not uploaded yet</p>
+                    </div>
+                    <div>
+                        <label for="doc_license" class="cursor-pointer px-3 py-1.5 bg-ziggo-soft text-ziggo rounded-lg text-xs font-black hover:bg-ziggo-soft/70 transition whitespace-nowrap">
+                            <i class="fas fa-upload mr-1"></i> Upload
+                        </label>
+                        <input id="doc_license" name="doc_license" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden" onchange="previewDoc(this, 'license')">
                     </div>
                 </div>
                 <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
-                    <div class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
+                    <div id="vehicle_regIconWrapper" class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
                         <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
                     </div>
                     <div class="flex-1 min-w-0">
                         <p class="font-black text-sm text-ziggo-ink">Vehicle Registration</p>
-                        <p class="text-[11px] text-rose-500 font-bold">Not uploaded yet</p>
+                        <p class="text-[11px] text-rose-500 font-bold" id="vehicle_regStatus">Not uploaded yet</p>
+                    </div>
+                    <div>
+                        <label for="doc_vehicle_reg" class="cursor-pointer px-3 py-1.5 bg-ziggo-soft text-ziggo rounded-lg text-xs font-black hover:bg-ziggo-soft/70 transition whitespace-nowrap">
+                            <i class="fas fa-upload mr-1"></i> Upload
+                        </label>
+                        <input id="doc_vehicle_reg" name="doc_vehicle_reg" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden" onchange="previewDoc(this, 'vehicle_reg')">
                     </div>
                 </div>
                 <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
-                    <div class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
+                    <div id="insuranceIconWrapper" class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
                         <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
                     </div>
                     <div class="flex-1 min-w-0">
                         <p class="font-black text-sm text-ziggo-ink">Insurance</p>
-                        <p class="text-[11px] text-rose-500 font-bold">Not uploaded yet</p>
+                        <p class="text-[11px] text-rose-500 font-bold" id="insuranceStatus">Not uploaded yet</p>
+                    </div>
+                    <div>
+                        <label for="doc_insurance" class="cursor-pointer px-3 py-1.5 bg-ziggo-soft text-ziggo rounded-lg text-xs font-black hover:bg-ziggo-soft/70 transition whitespace-nowrap">
+                            <i class="fas fa-upload mr-1"></i> Upload
+                        </label>
+                        <input id="doc_insurance" name="doc_insurance" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden" onchange="previewDoc(this, 'insurance')">
                     </div>
                 </div>
-                <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
-                    <div id="billingKycIconWrapper" class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
-                        <i class="fas fa-file-circle-xmark text-gray-300 text-xl" id="billingKycIcon"></i>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="font-black text-sm text-ziggo-ink">Billing Proof</p>
-                        <p class="text-[11px] text-rose-500 font-bold" id="billingKycStatus">Not uploaded yet</p>
-                    </div>
-                </div>
+
             </div>
         </div>
 
@@ -232,9 +248,6 @@ function previewPhoto(input) {
 function previewBilling(input) {
     const preview = document.getElementById('billingPreview');
     const label = document.getElementById('billingLabel');
-    const kycIcon = document.getElementById('billingKycIcon');
-    const kycIconWrapper = document.getElementById('billingKycIconWrapper');
-    const kycStatus = document.getElementById('billingKycStatus');
     
     if (!input.files || !input.files[0]) return;
     const file = input.files[0];
@@ -246,12 +259,34 @@ function previewBilling(input) {
     const reader = new FileReader();
     reader.onload = function (e) {
         preview.innerHTML = '<img src="' + e.target.result + '" class="w-full h-full object-cover">';
-        kycIconWrapper.innerHTML = '<img src="' + e.target.result + '" class="w-full h-full object-cover">';
     };
     reader.readAsDataURL(file);
     label.textContent = 'Change file';
-    kycStatus.textContent = 'Ready to upload';
-    kycStatus.className = 'text-[11px] text-amber-500 font-bold';
+}
+
+function previewDoc(input, kind) {
+    const wrapper = document.getElementById(kind + 'IconWrapper');
+    const status = document.getElementById(kind + 'Status');
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    if (file.size > 8 * 1024 * 1024) {
+        alert('Document must be under 8 MB');
+        input.value = '';
+        return;
+    }
+    status.textContent = 'Ready to upload';
+    status.className = 'text-[11px] text-amber-500 font-bold';
+    
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'pdf') {
+        wrapper.innerHTML = '<i class="fas fa-file-pdf text-2xl text-rose-500"></i>';
+    } else {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            wrapper.innerHTML = '<img src="' + e.target.result + '" class="w-full h-full object-cover">';
+        };
+        reader.readAsDataURL(file);
+    }
 }
 </script>
 {% endblock %}
