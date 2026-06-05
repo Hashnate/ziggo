@@ -256,9 +256,19 @@ class _FlashHomeScreenState extends State<FlashHomeScreen> {
               showMyLocation: true,
               markers: [
                 if (_pickup != null)
-                  pinMarker(point: _pickup!.location, icon: Icons.inventory_2_rounded, color: AppColors.primary),
+                  pinMarker(
+                    point: _pickup!.location,
+                    icon: Icons.inventory_2_rounded,
+                    color: AppColors.success,
+                    label: 'Sender | ${_pickup!.name.isNotEmpty ? _pickup!.name : _pickup!.fullAddress}',
+                  ),
                 if (_drop != null)
-                  pinMarker(point: _drop!.location, icon: Icons.location_on_rounded, color: AppColors.error),
+                  pinMarker(
+                    point: _drop!.location,
+                    icon: Icons.location_on_rounded,
+                    color: AppColors.error,
+                    label: 'Receiver | ${_drop!.name.isNotEmpty ? _drop!.name : _drop!.fullAddress}',
+                  ),
               ],
               polylines: (_pickup != null && _drop != null)
                   ? [

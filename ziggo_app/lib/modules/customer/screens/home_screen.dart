@@ -805,7 +805,8 @@ class _ServicesGrid extends StatelessWidget {
               GradientServiceTile(
                 icon: Icons.flash_on_rounded,
                 imageAsset: 'assets/icons/flash.png',
-                label: 'Flash',
+                label: 'Delivery',
+                badgeText: 'FLASH',
                 onTap: onFlash,
               ),
               GradientServiceTile(

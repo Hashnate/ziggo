@@ -274,8 +274,18 @@ class _FlashTrackingScreenState extends State<FlashTrackingScreen> {
                     size: 30,
                     assetPath: _vehicleAsset(d['vehicle_type'] as String?),
                   ),
-                pinMarker(point: pickup, icon: Icons.inventory_2_rounded, color: AppColors.flash),
-                pinMarker(point: drop, icon: Icons.location_on_rounded, color: AppColors.error),
+                pinMarker(
+                  point: pickup,
+                  icon: Icons.inventory_2_rounded,
+                  color: AppColors.success,
+                  label: 'Sender | ${active['pickup_address'] ?? 'Pickup Location'}',
+                ),
+                pinMarker(
+                  point: drop,
+                  icon: Icons.location_on_rounded,
+                  color: AppColors.error,
+                  label: 'Receiver | ${active['drop_address'] ?? 'Delivery Location'}',
+                ),
                 if (driverLatLng != null)
                   pinMarker(
                     point: driverLatLng,
