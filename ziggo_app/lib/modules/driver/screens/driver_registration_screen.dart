@@ -27,6 +27,9 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
   final _vehicleNumber = TextEditingController();
   final _vehicleModel = TextEditingController();
   final _vehicleColor = TextEditingController();
+  final _relativeName = TextEditingController();
+  final _relativeContact = TextEditingController();
+  final _relativeRelationship = TextEditingController();
 
   String _vehicleType = 'car';
   bool _busy = false;
@@ -37,6 +40,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
   File? _licenseDoc;
   File? _vehicleRegDoc;
   File? _insuranceDoc;
+  File? _billingProofDoc;
 
   static const _typeLabels = {
     'nic': 'NIC (front)',
@@ -87,6 +91,9 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
     _vehicleNumber.dispose();
     _vehicleModel.dispose();
     _vehicleColor.dispose();
+    _relativeName.dispose();
+    _relativeContact.dispose();
+    _relativeRelationship.dispose();
     super.dispose();
   }
 
@@ -96,6 +103,10 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (_profilePhoto == null) {
       setState(() => _error = 'Please select a Profile Photo');
+      return;
+    }
+    if (_billingProofDoc == null) {
+      setState(() => _error = 'Please upload your Billing Proof');
       return;
     }
     if (_nicDoc == null || _licenseDoc == null || _vehicleRegDoc == null || _insuranceDoc == null) {
@@ -118,6 +129,9 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
           vehicleNumber: _vehicleNumber.text.trim(),
           vehicleModel: _vehicleModel.text.trim(),
           vehicleColor: _vehicleColor.text.trim(),
+          relativeName: _relativeName.text.trim(),
+          relativeContact: _relativeContact.text.trim(),
+          relativeRelationship: _relativeRelationship.text.trim(),
         );
 
     if (err != null) {
@@ -139,7 +153,14 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
       });
       await ApiClient.instance.dio.post('/driver/profile-photo', data: photoForm);
 
-      // 2. Upload KYC Documents
+      // 2. Upload Billing Proof
+      if (mounted) setState(() => _uploadStatus = 'Uploading billing proof...');
+      final billingForm = FormData.fromMap({
+        'photo': await MultipartFile.fromFile(_billingProofDoc!.path),
+      });
+      await ApiClient.instance.dio.post('/driver/billing-proof', data: billingForm);
+
+      // 3. Upload KYC Documents
       final docs = {
         'nic': _nicDoc,
         'license': _licenseDoc,
@@ -339,6 +360,23 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                       ),
                     ),
                     const SizedBox(height: 22),
+                    _sectionHeader('EMERGENCY CONTACT (CLOSE RELATIVE)'),
+                    const SizedBox(height: 10),
+                    _card(
+                      Column(
+                        children: [
+                          _field(_relativeName, 'Close Relative Name', Icons.person_outline_rounded,
+                              hint: 'John Doe'),
+                          const SizedBox(height: 10),
+                          _field(_relativeContact, 'Contact Number', Icons.phone_android_rounded,
+                              hint: '0771234567', keyboard: TextInputType.phone),
+                          const SizedBox(height: 10),
+                          _field(_relativeRelationship, 'Relationship', Icons.family_restroom_rounded,
+                              hint: 'Father, Spouse, etc.'),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 22),
                     _sectionHeader('VEHICLE DETAILS'),
                     const SizedBox(height: 10),
                     _card(
@@ -370,6 +408,8 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                           _docUploadRow('vehicle_reg', 'Vehicle Registration Book', _vehicleRegDoc, (file) => setState(() => _vehicleRegDoc = file)),
                           const Divider(height: 20),
                           _docUploadRow('insurance', 'Insurance Document', _insuranceDoc, (file) => setState(() => _insuranceDoc = file)),
+                          const Divider(height: 20),
+                          _docUploadRow('billing_proof', 'Billing Proof (Utility bill / Bank statement)', _billingProofDoc, (file) => setState(() => _billingProofDoc = file)),
                         ],
                       ),
                     ),

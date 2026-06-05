@@ -192,6 +192,9 @@ class DriverProvider extends ChangeNotifier {
     required String vehicleNumber,
     required String vehicleModel,
     required String vehicleColor,
+    required String relativeName,
+    required String relativeContact,
+    required String relativeRelationship,
   }) async {
     try {
       final resp = await ApiClient.instance.dio.post('/driver/register', data: {
@@ -203,6 +206,9 @@ class DriverProvider extends ChangeNotifier {
         'vehicle_number': vehicleNumber,
         'vehicle_model': vehicleModel,
         'vehicle_color': vehicleColor,
+        'relative_name': relativeName,
+        'relative_contact': relativeContact,
+        'relative_relationship': relativeRelationship,
       });
       _profile = Map<String, dynamic>.from(resp.data);
       notifyListeners();

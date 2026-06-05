@@ -21,6 +21,9 @@ class DriverRegisterRequest(BaseModel):
     vehicle_number: str
     vehicle_model: str
     vehicle_color: str
+    relative_name: Optional[str] = None
+    relative_contact: Optional[str] = None
+    relative_relationship: Optional[str] = None
 
 
 class AdminDriverCreateRequest(BaseModel):
@@ -57,6 +60,10 @@ class DriverProfileResponse(BaseModel):
     today_rides: Optional[int] = None
     total_earnings: Optional[float] = None
     acceptance_rate: Optional[float] = None
+    relative_name: Optional[str] = None
+    relative_contact: Optional[str] = None
+    relative_relationship: Optional[str] = None
+    billing_proof_url: Optional[str] = None
 
     class Config:
         from_attributes = True
