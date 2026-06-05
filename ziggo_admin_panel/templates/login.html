@@ -6,7 +6,7 @@
     <title>Ziggo Admin · Sign in</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
@@ -25,7 +25,7 @@
                             line: '#EEF1F6'
                         }
                     },
-                    fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'] },
+                    fontFamily: { sans: ['Sora', 'sans-serif'] },
                     boxShadow: {
                         'soft': '0 24px 60px -20px rgba(15, 23, 42, 0.14), 0 4px 10px -3px rgba(15, 23, 42, 0.04)',
                         'brand': '0 16px 40px -12px rgba(30, 64, 175, 0.45)'
@@ -35,7 +35,7 @@
         }
     </script>
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; color: #0F172A; }
+        body { font-family: 'Sora', sans-serif; color: #0F172A; }
         .ambient-orb {
             position: absolute;
             border-radius: 9999px;
@@ -48,6 +48,7 @@
             background: #F5F7FB;
             border: 1.5px solid transparent;
         }
+        input.brand-field:hover { background: #EEF2F9; }
         input.brand-field:focus {
             outline: none;
             background: #fff;
@@ -103,8 +104,12 @@
                         <div class="relative">
                             <i class="fas fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-ziggo-faint text-sm"></i>
                             <input type="password" name="password" id="password"
-                                   class="brand-field w-full pl-11 pr-4 py-4 rounded-2xl text-sm font-semibold"
+                                   class="brand-field w-full pl-11 pr-11 py-4 rounded-2xl text-sm font-semibold"
                                    placeholder="••••••••" required value="admin123">
+                            <button type="button" id="togglePw" tabindex="-1" aria-label="Show password"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg text-ziggo-faint hover:text-ziggo hover:bg-ziggo-soft/60 transition">
+                                <i class="fas fa-eye text-sm"></i>
+                            </button>
                         </div>
                     </div>
 
@@ -128,5 +133,20 @@
             </p>
         </div>
     </div>
+
+    <script>
+        (function () {
+            var btn = document.getElementById('togglePw');
+            var pw = document.getElementById('password');
+            if (btn && pw) {
+                btn.addEventListener('click', function () {
+                    var show = pw.type === 'password';
+                    pw.type = show ? 'text' : 'password';
+                    btn.querySelector('i').className = (show ? 'fas fa-eye-slash' : 'fas fa-eye') + ' text-sm';
+                    btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+                });
+            }
+        })();
+    </script>
 </body>
 </html>

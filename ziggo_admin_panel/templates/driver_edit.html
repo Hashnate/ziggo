@@ -55,6 +55,33 @@
         </div>
 
         <div>
+            <h3 class="text-lg font-black text-ziggo mb-4">Billing Proof</h3>
+            <div class="flex items-center gap-5">
+                <div id="billingPreview" class="w-24 h-24 rounded-2xl bg-ziggo-soft/50 border-2 border-dashed border-ziggo-line flex items-center justify-center overflow-hidden">
+                    {% if driver.billing_proof_url %}
+                    <img src="{{ driver.billing_proof_url }}" class="w-full h-full object-cover">
+                    {% else %}
+                    <i class="fas fa-file-invoice text-ziggo-faint text-3xl"></i>
+                    {% endif %}
+                </div>
+                <div class="flex-1">
+                    <label for="billing_proof" class="inline-flex items-center gap-2 cursor-pointer px-4 py-2.5 bg-ziggo-soft text-ziggo rounded-xl font-bold text-sm hover:bg-ziggo-soft/70 transition">
+                        <i class="fas fa-upload"></i>
+                        <span id="billingLabel">{% if driver.billing_proof_url %}Replace billing proof{% else %}Choose billing proof{% endif %}</span>
+                    </label>
+                    <input id="billing_proof" name="billing_proof" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="previewBilling(this)">
+                    {% if driver.billing_proof_url %}
+                    <label class="ml-3 inline-flex items-center gap-2 cursor-pointer text-sm font-bold text-red-500">
+                        <input name="remove_billing" type="checkbox" value="1" class="w-4 h-4 text-red-500 border-gray-300 rounded">
+                        Remove existing billing proof
+                    </label>
+                    {% endif %}
+                    <p class="text-xs text-ziggo-faint font-bold mt-2">JPG, PNG or WEBP. Max 5 MB. Upload utility bill, bank statement, etc.</p>
+                </div>
+            </div>
+        </div>
+
+        <div>
             <h3 class="text-lg font-black text-ziggo mb-4">Personal Details</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -123,6 +150,30 @@
                                class="w-5 h-5 text-ziggo border-gray-300 rounded">
                         <span class="ml-2 text-sm font-bold text-gray-700">Approved (can go online & accept rides)</span>
                     </label>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h3 class="text-lg font-black text-ziggo mb-4">Emergency Contact (Close Relative)</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Close Relative Name</label>
+                    <input name="relative_name" value="{{ driver.relative_name or '' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo"
+                           placeholder="John Doe">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Contact Number</label>
+                    <input name="relative_contact" value="{{ driver.relative_contact or '' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo"
+                           placeholder="0771234567">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Relationship</label>
+                    <input name="relative_relationship" value="{{ driver.relative_relationship or '' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo"
+                           placeholder="Father, Spouse, etc.">
                 </div>
             </div>
         </div>
@@ -211,6 +262,24 @@ function previewPhoto(input) {
     };
     reader.readAsDataURL(file);
     label.textContent = 'Change photo';
+}
+
+function previewBilling(input) {
+    const preview = document.getElementById('billingPreview');
+    const label = document.getElementById('billingLabel');
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    if (file.size > 5 * 1024 * 1024) {
+        alert('Billing Proof must be under 5 MB');
+        input.value = '';
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        preview.innerHTML = '<img src="' + e.target.result + '" class="w-full h-full object-cover">';
+    };
+    reader.readAsDataURL(file);
+    label.textContent = 'Change file';
 }
 </script>
 {% endblock %}

@@ -203,11 +203,15 @@ async def admin_logout():
 @router.get("/dashboard", response_class=HTMLResponse)
 async def admin_dashboard(
     request: Request,
+    days: int = 7,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
     from datetime import timedelta
     from app.models import FareSetting
+
+    if days not in (7, 30):
+        days = 7
 
     customers = (await db.execute(select(func.count(Customer.id)))).scalar()
     drivers = (await db.execute(select(func.count(Driver.id)))).scalar()
@@ -246,13 +250,16 @@ async def admin_dashboard(
         )
     ).scalar()
 
-    # Revenue for the last 7 days
+    # Revenue for the last N days
     labels = []
     data = []
-    for i in range(6, -1, -1):
+    for i in range(days - 1, -1, -1):
         day_start = today_start - timedelta(days=i)
         day_end = day_start + timedelta(days=1)
-        labels.append(day_start.strftime("%a"))
+        if days == 30:
+            labels.append(day_start.strftime("%b %d"))
+        else:
+            labels.append(day_start.strftime("%a"))
         day_rev = (
             await db.execute(
                 select(func.coalesce(func.sum(Booking.final_amount), 0)).where(
@@ -269,6 +276,7 @@ async def admin_dashboard(
         {
             "request": request,
             "active_page": "dashboard",
+            "days": days,
             "stats": {
                 "total_customers": customers,
                 "total_drivers": drivers,
@@ -304,10 +312,13 @@ async def admin_drivers(
     where_clauses = []
     
     # Status filter
-    if status == "active":
-        where_clauses.append(User.is_active == True)
-    elif status == "inactive":
-        where_clauses.append(User.is_active == False)
+    if status == "online":
+        where_clauses.append(Driver.is_online == True)
+    elif status == "offline":
+        where_clauses.append(Driver.is_online == False)
+        where_clauses.append(Driver.is_approved == True)
+    elif status == "pending":
+        where_clauses.append(Driver.status == DriverStatus.PENDING)
         
     # Search filter
     if search:
@@ -635,6 +646,11 @@ async def admin_drivers_edit_submit(
     is_approved: str = Form(""),
     remove_photo: str = Form(""),
     profile_photo: UploadFile | None = File(None),
+    relative_name: str = Form(""),
+    relative_contact: str = Form(""),
+    relative_relationship: str = Form(""),
+    billing_proof: UploadFile | None = File(None),
+    remove_billing: str = Form(""),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -702,6 +718,16 @@ async def admin_drivers_edit_submit(
     d.vehicle_number = vehicle_number
     d.vehicle_model = vehicle_model
     d.vehicle_color = vehicle_color
+    d.relative_name = relative_name or None
+    d.relative_contact = relative_contact or None
+    d.relative_relationship = relative_relationship or None
+
+    # Billing proof handling
+    new_billing_url = await _save_uploaded_photo(billing_proof)
+    if new_billing_url:
+        d.billing_proof_url = new_billing_url
+    elif remove_billing:
+        d.billing_proof_url = None
 
     approved_now = bool(is_approved)
     if approved_now and not d.is_approved:
@@ -3745,6 +3771,7 @@ async def admin_notif_feed(
             "icon": "fa-life-ring", "url": "/admin/support", "count": open_tickets,
         })
 
+    items.sort(key=lambda x: x["count"], reverse=True)
     return {"total": sum(i["count"] for i in items), "items": items}
 
 

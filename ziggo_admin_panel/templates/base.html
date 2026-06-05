@@ -226,13 +226,20 @@
             transition: all 180ms ease;
         }
         .zi-notif.open .zi-notif-panel { opacity: 1; visibility: visible; transform: none; }
-        .zi-notif-head { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #94A3B8; padding: 8px 10px 6px; }
+        .zi-notif-head { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #94A3B8; padding: 8px 10px 6px; display: flex; align-items: center; justify-content: space-between; }
         .zi-notif-item { display: flex; align-items: center; gap: 11px; padding: 10px; border-radius: 12px; color: #0F172A; text-decoration: none; transition: background .15s; }
         .zi-notif-item:hover { background: #F8FAFC; }
         .zi-notif-item .ic { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: #EFF6FF; color: #1E3A8A; flex: 0 0 auto; font-size: 14px; }
+        .zi-notif-item .tx { flex: 1; min-width: 0; }
         .zi-notif-item .tx strong { display: block; font-size: 13px; font-weight: 600; line-height: 1.2; }
         .zi-notif-item .tx small { font-size: 11px; color: #64748B; }
+        .zi-notif-item .zi-cnt { flex: 0 0 auto; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 99px; background: #EF4444; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
         .zi-notif-empty { padding: 22px 12px; text-align: center; font-size: 12px; color: #94A3B8; font-weight: 500; }
+        /* Numeric badge on bell icon */
+        .zi-badge { position: absolute; top: -4px; right: -6px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 99px; background: #EF4444; color: #fff; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; pointer-events: none; }
+        /* Bell shake when new notification arrives */
+        @keyframes zi-shake { 0%,100%{transform:rotate(0)} 20%{transform:rotate(-12deg)} 40%{transform:rotate(12deg)} 60%{transform:rotate(-8deg)} 80%{transform:rotate(6deg)} }
+        .zi-bell-shake { animation: zi-shake 0.7s ease; }
 
         /* ===== Buttons ===== */
         .zi-btn-primary,
@@ -459,10 +466,14 @@
                 <div class="zi-notif" id="ziNotif">
                     <button type="button" class="zi-bell flex items-center justify-center" id="ziBellBtn" aria-label="Notifications">
                         <i class="far fa-bell"></i>
-                        <span class="dot"></span>
+                        <span class="dot" id="ziDot"></span>
+                        <span class="zi-badge" id="ziBadge" style="display:none"></span>
                     </button>
                     <div class="zi-notif-panel" id="ziNotifPanel">
-                        <div class="zi-notif-head">Notifications</div>
+                        <div class="zi-notif-head">
+                            <span>Notifications</span>
+                            <a href="/admin/notifications" style="font-size:11px;font-weight:700;color:#6366f1;text-decoration:none">View all</a>
+                        </div>
                         <div id="ziNotifList">
                             <div class="zi-notif-empty">Loading…</div>
                         </div>
@@ -490,22 +501,29 @@
         var btn = document.getElementById('ziBellBtn');
         var list = document.getElementById('ziNotifList');
         var dot = document.querySelector('#ziBellBtn .dot');
+        var _badge = document.getElementById('ziBadge');
+        var _dot   = document.getElementById('ziDot');
+
         if (wrap && btn) {
           btn.addEventListener('click', function (e) {
             e.stopPropagation();
             wrap.classList.toggle('open');
-            // Opening = reading the notifications -> clear the red dot
+            // Opening = reading notifications → clear red dot AND numeric badge
             if (wrap.classList.contains('open')) {
               localStorage.setItem('ziNotifSeen', String(window._ziNotifTotal || 0));
-              if (dot) dot.style.display = 'none';
+              if (_dot)   _dot.style.display   = 'none';
+              if (_badge) _badge.style.display = 'none';
             }
           });
           document.addEventListener('click', function (e) { if (!wrap.contains(e.target)) wrap.classList.remove('open'); });
           document.addEventListener('keydown', function (e) { if (e.key === 'Escape') wrap.classList.remove('open'); });
         }
-
+        
         // Live notification feed from the backend
         function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]); }); }
+        var _prevTotal = -1;
+
+
         function loadNotif() {
           fetch('/admin/notif-feed', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
             .then(function (r) { return r.ok ? r.json() : null; })
@@ -513,26 +531,76 @@
               if (!d || typeof d.total === 'undefined') return;
               var total = d.total;
               window._ziNotifTotal = total;
-              // Red dot only when there are NEW unread items not yet acknowledged.
-              var seen = parseInt(localStorage.getItem('ziNotifSeen') || '0', 10);
-              if (isNaN(seen)) seen = 0;
-              if (total < seen) { seen = total; localStorage.setItem('ziNotifSeen', String(seen)); }
-              if (dot) dot.style.display = (total > seen) ? '' : 'none';
-              if (!list) return;
-              if (!d.items || !d.items.length) {
-                list.innerHTML = '<div class="zi-notif-empty">You’re all caught up ✅</div>';
+
+              var panelOpen = wrap && wrap.classList.contains('open');
+              var onNotifPage = window.location.pathname === '/admin/notifications';
+
+              // Auto-dismiss if panel is open or user is on the notifications page
+              if (panelOpen || onNotifPage) {
+                localStorage.setItem('ziNotifSeen', String(total));
+                if (_dot)   _dot.style.display   = 'none';
+                if (_badge) _badge.style.display = 'none';
+                _prevTotal = total;
+                // Still render list items
+                if (list) { renderList(d); }
                 return;
               }
-              list.innerHTML = d.items.map(function (i) {
-                return '<a href="' + esc(i.url) + '" class="zi-notif-item">'
-                  + '<span class="ic"><i class="fas ' + esc(i.icon) + '"></i></span>'
-                  + '<span class="tx"><strong>' + esc(i.title) + '</strong><small>' + esc(i.subtitle) + '</small></span></a>';
-              }).join('');
+
+              var seen = parseInt(localStorage.getItem('ziNotifSeen') || '-1', 10);
+              if (isNaN(seen) || seen < 0) {
+                // First visit ever — silently set baseline, show nothing
+                localStorage.setItem('ziNotifSeen', String(total));
+                if (_dot)   _dot.style.display   = 'none';
+                if (_badge) _badge.style.display = 'none';
+                _prevTotal = total;
+                if (list) { renderList(d); }
+                return;
+              }
+
+              // Only alert when count has GROWN beyond what was last dismissed
+              var hasNew = total > seen;
+
+              if (_badge) {
+                if (hasNew) {
+                  _badge.textContent = total > 99 ? '99+' : String(total - seen);
+                  _badge.style.display = '';
+                } else {
+                  _badge.style.display = 'none';
+                }
+              }
+              if (_dot) _dot.style.display = hasNew ? '' : 'none';
+
+              // Bell shake only when new items just arrived this poll cycle
+              if (_prevTotal >= 0 && total > _prevTotal) {
+                var bellBtn = document.getElementById('ziBellBtn');
+                if (bellBtn) {
+                  bellBtn.classList.add('zi-bell-shake');
+                  setTimeout(function(){ bellBtn.classList.remove('zi-bell-shake'); }, 700);
+                }
+              }
+              _prevTotal = total;
+              if (list) { renderList(d); }
             })
             .catch(function () {});
         }
+
+        function renderList(d) {
+              if (!d.items || !d.items.length) {
+                list.innerHTML = '<div class="zi-notif-empty">You\'re all caught up ✅</div>';
+                return;
+              }
+              var sorted = d.items.slice().sort(function(a, b){ return (b.count || 0) - (a.count || 0); });
+              list.innerHTML = sorted.map(function (i) {
+                return '<a href="' + esc(i.url) + '" class="zi-notif-item">'
+                  + '<span class="ic"><i class="fas ' + esc(i.icon) + '"></i></span>'
+                  + '<span class="tx"><strong>' + esc(i.title) + '</strong><small>' + esc(i.subtitle) + '</small></span>'
+                  + '<span class="zi-cnt">' + esc(i.count) + '</span></a>';
+              }).join('');
+        }
+
+
         loadNotif();
-        setInterval(loadNotif, 45000);
+        setInterval(loadNotif, 10000);
 
         // Load custom branding assets
         function loadBranding() {

@@ -90,14 +90,14 @@
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
     <!-- Revenue Chart -->
     <div class="lg:col-span-2 zi-card p-5">
-        <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center justify-between mb-5">
             <div>
-                <h3 class="text-lg font-black text-ziggo-ink">Revenue performance</h3>
-                <p class="text-xs text-ziggo-faint mt-1 font-bold">Daily revenue across all services</p>
+                <h3 class="text-lg font-bold text-ziggo-ink tracking-tight">Revenue performance</h3>
+                <p class="text-xs text-ziggo-faint mt-1 font-semibold">Daily revenue across all services</p>
             </div>
-            <select class="bg-ziggo-canvas/80 text-sm rounded-xl px-3 py-2 outline-none font-bold">
-                <option>Last 7 days</option>
-                <option>Last 30 days</option>
+            <select onchange="window.location.href='?days=' + this.value" class="bg-white border border-ziggo-line text-sm rounded-xl px-3.5 py-2 outline-none font-semibold text-ziggo-ink hover:border-ziggo focus:border-ziggo transition cursor-pointer">
+                <option value="7" {% if days == 7 %}selected{% endif %}>Last 7 days</option>
+                <option value="30" {% if days == 30 %}selected{% endif %}>Last 30 days</option>
             </select>
         </div>
         <div class="h-60">
@@ -206,13 +206,14 @@
 {% endblock %}
 
 {% block scripts %}
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     const ctx = document.getElementById('revenueChart').getContext('2d');
-    const grad = ctx.createLinearGradient(0, 0, 0, 320);
-    grad.addColorStop(0, 'rgba(59, 130, 246, 0.28)');
-    grad.addColorStop(1, 'rgba(59, 130, 246, 0.02)');
-    new Chart(ctx, {
+    const grad = ctx.createLinearGradient(0, 0, 0, 300);
+    grad.addColorStop(0, 'rgba(37, 99, 235, 0.22)');
+    grad.addColorStop(1, 'rgba(37, 99, 235, 0.00)');
+    const drawChart = () => new Chart(ctx, {
         type: 'line',
         data: {
             labels: {{ stats.revenue_chart_labels | tojson }},
@@ -223,12 +224,14 @@
                 backgroundColor: grad,
                 fill: true,
                 tension: 0.4,
-                borderWidth: 3,
-                pointBackgroundColor: '#FBBF24',
-                pointBorderColor: '#fff',
+                borderWidth: 2.5,
+                pointBackgroundColor: '#fff',
+                pointBorderColor: '#1E40AF',
                 pointBorderWidth: 2,
-                pointRadius: 5,
-                pointHoverRadius: 7
+                pointRadius: 3,
+                pointHoverRadius: 6,
+                pointHoverBackgroundColor: '#1E40AF',
+                pointHoverBorderColor: '#fff'
             }]
         },
         options: {
@@ -240,22 +243,24 @@
                     backgroundColor: '#0F172A',
                     padding: 12,
                     cornerRadius: 12,
-                    titleFont: { family: 'Plus Jakarta Sans', weight: '900' },
-                    bodyFont: { family: 'Plus Jakarta Sans', weight: '700' },
+                    titleFont: { family: 'Sora', weight: '700' },
+                    bodyFont: { family: 'Sora', weight: '500' },
                 }
             },
             scales: {
                 y: {
                     beginAtZero: true,
-                    grid: { color: 'rgba(15, 23, 42, 0.05)' },
-                    ticks: { font: { family: 'Plus Jakarta Sans', weight: '700' }, color: '#94A3B8' }
+                    grid: { color: 'rgba(15, 23, 42, 0.04)', drawBorder: false },
+                    ticks: { font: { family: 'Sora', weight: '500', size: 11 }, color: '#94A3B8' }
                 },
                 x: {
-                    grid: { display: false },
-                    ticks: { font: { family: 'Plus Jakarta Sans', weight: '700' }, color: '#94A3B8' }
+                    grid: { display: false, drawBorder: false },
+                    ticks: { font: { family: 'Sora', weight: '500', size: 11 }, color: '#94A3B8', maxRotation: 0, autoSkip: true, maxTicksLimit: 12 }
                 }
             }
         }
     });
+    // Render after the Sora font is ready so the axis labels use it
+    if (document.fonts && document.fonts.ready) { document.fonts.ready.then(drawChart); } else { drawChart(); }
 </script>
 {% endblock %}
