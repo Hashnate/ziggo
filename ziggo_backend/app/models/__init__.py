@@ -10,6 +10,7 @@ from .user import (
     CustomerCard,
 )
 from .booking import Booking, BookingStatus, BookingStop, Payment, PromoCode
+from .corporate import CorporateAccount, CorporateMember
 from .misc import (
     WalletTransaction,
     Complaint,
@@ -78,4 +79,6 @@ __all__ = [
     "MarketOrderStatus",
     "Event",
     "EventTicketTier",
+    "CorporateAccount",
+    "CorporateMember",
 ]

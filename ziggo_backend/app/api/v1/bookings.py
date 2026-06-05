@@ -206,8 +206,27 @@ async def create_booking(
     )
 
     # If wallet payment, ensure balance
+    corporate_acct = None
     if req.payment_method == "wallet" and float(customer.wallet_balance or 0) < fare["final_amount"]:
         raise HTTPException(status_code=400, detail="Insufficient wallet balance")
+    elif req.payment_method == "corporate":
+        # BRD: PY-05 — corporate billing: verify membership and balance
+        from ...models import CorporateMember, CorporateAccount
+        mq = await db.execute(
+            select(CorporateMember).where(
+                CorporateMember.user_id == user.id,
+                CorporateMember.status == "active",
+            )
+        )
+        membership = mq.scalars().first()
+        if not membership:
+            raise HTTPException(status_code=403, detail="Not linked to an active corporate account")
+        aq = await db.execute(
+            select(CorporateAccount).where(CorporateAccount.id == membership.corporate_id)
+        )
+        corporate_acct = aq.scalars().first()
+        if not corporate_acct or float(corporate_acct.balance or 0) < fare["final_amount"]:
+            raise HTTPException(status_code=400, detail="Insufficient corporate balance")
     elif req.payment_method and req.payment_method.startswith("card_"):
         try:
             card_id = int(req.payment_method.split("_")[1])
@@ -272,6 +291,8 @@ async def create_booking(
         parcel_instructions=req.parcel_instructions,
         is_rental=req.is_rental,
         rental_hours=req.rental_hours,
+        is_corporate=req.payment_method == "corporate",
+        corporate_id=corporate_acct.id if corporate_acct else None,
     )
     db.add(booking)
     await db.flush()
@@ -849,6 +870,18 @@ async def update_booking_status(
                             status="paid",
                         )
                         db.add(pay_rec)
+
+        # BRD: PY-05 — corporate billing debit
+        elif b.payment_method == "corporate" and b.corporate_id:
+            from ...models import CorporateAccount
+            cq = await db.execute(
+                select(CorporateAccount).where(CorporateAccount.id == b.corporate_id)
+            )
+            corp = cq.scalars().first()
+            if corp:
+                corp.balance = Decimal(str(corp.balance or 0)) - (b.final_amount or Decimal(0))
+                b.payment_status = "paid"
+                print(f"[corporate] debited Rs.{b.final_amount} from {corp.company_name} (balance: {corp.balance})")
 
         # Driver earnings
         if b.driver_id:

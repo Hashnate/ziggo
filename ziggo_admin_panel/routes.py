@@ -4721,4 +4721,116 @@ async def admin_messages_send(
     return RedirectResponse(url="/admin/messages", status_code=303)
 
 
+# ---------- Corporate Billing (BRD: PY-05 / AD-12) ----------
 
+@router.get("/corporate", response_class=HTMLResponse)
+async def admin_corporate(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import CorporateAccount, CorporateMember
+    q = await db.execute(select(CorporateAccount).order_by(CorporateAccount.id.desc()))
+    accounts = q.scalars().all()
+    enriched = []
+    for a in accounts:
+        mq = await db.execute(
+            select(func.count()).select_from(CorporateMember).where(CorporateMember.corporate_id == a.id)
+        )
+        count = mq.scalar() or 0
+        enriched.append({"account": a, "member_count": count})
+    return templates.TemplateResponse(
+        request, "corporate.html",
+        {"request": request, "active_page": "corporate", "accounts": enriched, "error": None, "success": None},
+    )
+
+
+@router.post("/corporate/create")
+async def admin_corporate_create(
+    request: Request,
+    company_name: str = Form(...),
+    billing_email: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import CorporateAccount
+    from decimal import Decimal
+    acct = CorporateAccount(
+        company_name=company_name.strip(),
+        billing_email=billing_email.strip() or None,
+        balance=Decimal("0"),
+    )
+    db.add(acct)
+    await db.commit()
+    return RedirectResponse(url="/admin/corporate", status_code=303)
+
+
+@router.post("/corporate/{account_id}/members/add")
+async def admin_corporate_add_member(
+    account_id: int,
+    request: Request,
+    phone_number: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import CorporateAccount, CorporateMember
+    aq = await db.execute(select(CorporateAccount).where(CorporateAccount.id == account_id))
+    acct = aq.scalars().first()
+    if not acct:
+        raise HTTPException(status_code=404, detail="Corporate account not found")
+    uq = await db.execute(select(User).where(User.phone_number == phone_number.strip()))
+    target = uq.scalars().first()
+    if not target:
+        raise HTTPException(status_code=404, detail="No user found with this phone number")
+    eq = await db.execute(select(CorporateMember).where(CorporateMember.user_id == target.id))
+    if eq.scalars().first():
+        raise HTTPException(status_code=409, detail="User already linked to a corporate account")
+    member = CorporateMember(corporate_id=account_id, user_id=target.id, status="active")
+    db.add(member)
+    await db.commit()
+    return RedirectResponse(url="/admin/corporate", status_code=303)
+
+
+@router.post("/corporate/{account_id}/topup")
+async def admin_corporate_topup(
+    account_id: int,
+    request: Request,
+    amount: float = Form(...),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import CorporateAccount
+    from decimal import Decimal
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+    aq = await db.execute(select(CorporateAccount).where(CorporateAccount.id == account_id))
+    acct = aq.scalars().first()
+    if not acct:
+        raise HTTPException(status_code=404, detail="Corporate account not found")
+    acct.balance = Decimal(str(acct.balance or 0)) + Decimal(str(amount))
+    await db.commit()
+    return RedirectResponse(url="/admin/corporate", status_code=303)
+
+
+@router.get("/corporate/{account_id}/members")
+async def admin_corporate_members_json(
+    account_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import CorporateMember
+    q = await db.execute(
+        select(CorporateMember)
+        .options(selectinload(CorporateMember.user))
+        .where(CorporateMember.corporate_id == account_id)
+    )
+    members = q.scalars().all()
+    return [
+        {
+            "id": m.id,
+            "phone_number": m.user.phone_number if m.user else "",
+            "full_name": m.user.full_name if m.user else "",
+            "status": m.status,
+        }
+        for m in members
+    ]

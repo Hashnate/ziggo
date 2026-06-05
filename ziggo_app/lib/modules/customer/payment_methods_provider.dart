@@ -8,10 +8,12 @@ import '../../core/payments/payhere_service.dart';
 import 'screens/payhere_checkout_screen.dart';
 
 class PaymentMethodsProvider extends ChangeNotifier {
+  Map<String, dynamic>? _corporateProfile;
   List<Map<String, dynamic>> _cards = [];
   bool _isLoading = false;
 
   List<Map<String, dynamic>> get cards => _cards;
+  Map<String, dynamic>? get corporateProfile => _corporateProfile;
   bool get isLoading => _isLoading;
 
   Future<void> fetchCards() async {
@@ -24,6 +26,19 @@ class PaymentMethodsProvider extends ChangeNotifier {
       // swallow
     } finally {
       _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> fetchCorporateProfile() async {
+    try {
+      final r = await ApiClient.instance.dio.get('/corporate/profile');
+      _corporateProfile = Map<String, dynamic>.from(r.data as Map);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        _corporateProfile = null;
+      }
+    } finally {
       notifyListeners();
     }
   }
