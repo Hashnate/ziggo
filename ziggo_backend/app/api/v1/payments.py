@@ -16,11 +16,11 @@ from decimal import Decimal
 import secrets
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...database import get_db
-from ...models import Customer, User, WalletTransaction
+from ...models import Customer, User, WalletTransaction, CustomerCard
 from ...schemas import WalletTransactionResponse
 from ...services import payhere_service
 from ...services.auth_service import require_role
@@ -116,6 +116,74 @@ async def payhere_notify(
     if status_code != payhere_service.STATUS_SUCCESS:
         return {"ok": True, "status": label}
 
+    if order_id.startswith("PA"):
+        cust_user_id = None
+        try:
+            cust_user_id = int(custom1) if custom1 else None
+        except ValueError:
+            cust_user_id = None
+        if not cust_user_id:
+            email = str(form.get("email", ""))
+            if email:
+                uq = await db.execute(select(User).where(User.email == email))
+                u = uq.scalars().first()
+                if u:
+                    cust_user_id = u.id
+        if not cust_user_id:
+            print(f"[payhere] preapprove couldn't resolve user for order {order_id}")
+            return {"ok": True, "status": "unmatched"}
+
+        cq = await db.execute(select(Customer).where(Customer.user_id == cust_user_id))
+        cust = cq.scalars().first()
+        if cust is None:
+            print(f"[payhere] preapprove no customer profile for user {cust_user_id}")
+            return {"ok": True, "status": "no_customer"}
+
+        customer_token = str(form.get("customer_token", ""))
+        card_no = str(form.get("card_no", ""))
+        card_expiry = str(form.get("card_expiry", ""))
+        card_type = str(form.get("method", "CARD"))
+        card_holder_name = str(form.get("card_holder_name", ""))
+
+        if not customer_token:
+            print(f"[payhere] preapprove missing customer_token for order {order_id}")
+            return {"ok": True, "status": "missing_token"}
+
+        existing_card = await db.execute(
+            select(CustomerCard).where(CustomerCard.customer_token == customer_token)
+        )
+        if existing_card.scalars().first() is not None:
+            return {"ok": True, "status": "already_added"}
+
+        has_cards = await db.execute(
+            select(CustomerCard).where(CustomerCard.customer_id == cust.id)
+        )
+        is_first = has_cards.scalars().first() is None
+
+        card = CustomerCard(
+            customer_id=cust.id,
+            card_no=card_no,
+            card_expiry=card_expiry,
+            card_holder_name=card_holder_name or None,
+            card_type=card_type,
+            customer_token=customer_token,
+            is_default=is_first,
+        )
+        db.add(card)
+        await db.commit()
+
+        await manager.send(
+            cust_user_id,
+            "card_added",
+            {
+                "id": card.id,
+                "card_no": card_no,
+                "card_type": card_type,
+                "is_default": card.is_default,
+            },
+        )
+        return {"ok": True, "status": "card_added"}
+
     # Idempotency — if we already credited this order, skip.
     existing = await db.execute(
         select(WalletTransaction).where(WalletTransaction.reference_id == order_id)
@@ -206,3 +274,147 @@ async def payhere_config():
 def settings_mode() -> str:
     from ...config import settings
     return (settings.PAYHERE_MODE or "sandbox").lower()
+
+
+@router.post("/payhere/preapprove")
+async def payhere_preapprove(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    """Start a card pre-approval session. Body: {return_url?, cancel_url?}.
+    Returns fields to be posted to PayHere pre-approve URL.
+    """
+    _ensure_enabled()
+    order_id = "PA" + secrets.token_hex(6).upper()  # PA = pre-approval
+    full_name = (user.full_name or "Customer").strip()
+    first, _, last = full_name.partition(" ")
+    payload = payhere_service.build_preapprove_payload(
+        order_id=order_id,
+        first_name=first or "Customer",
+        last_name=last or "-",
+        email=user.email or f"{user.phone_number}@ziggo.local",
+        phone=user.phone_number,
+        return_url=body.get("return_url") or "",
+        cancel_url=body.get("cancel_url") or "",
+    )
+    return {"order_id": order_id, **payload}
+
+
+@router.get("/methods")
+async def list_payment_methods(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    """List all saved cards for the customer."""
+    cq = await db.execute(select(Customer).where(Customer.user_id == user.id))
+    customer = cq.scalars().first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    q = await db.execute(
+        select(CustomerCard)
+        .where(CustomerCard.customer_id == customer.id)
+        .order_by(CustomerCard.is_default.desc(), CustomerCard.id.desc())
+    )
+    cards = q.scalars().all()
+    return [
+        {
+            "id": c.id,
+            "card_no": c.card_no,
+            "card_expiry": c.card_expiry,
+            "card_holder_name": c.card_holder_name,
+            "card_type": c.card_type,
+            "is_default": c.is_default,
+            "created_at": c.created_at,
+        }
+        for c in cards
+    ]
+
+
+@router.delete("/methods/{card_id}", status_code=204)
+async def delete_payment_method(
+    card_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    """Delete a saved card."""
+    cq = await db.execute(select(Customer).where(Customer.user_id == user.id))
+    customer = cq.scalars().first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    q = await db.execute(
+        select(CustomerCard).where(CustomerCard.id == card_id, CustomerCard.customer_id == customer.id)
+    )
+    card = q.scalars().first()
+    if not card:
+        raise HTTPException(status_code=404, detail="Card not found")
+
+    await db.delete(card)
+    await db.commit()
+    return None
+
+
+@router.post("/methods/{card_id}/default")
+async def set_default_payment_method(
+    card_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    """Set a card as default."""
+    cq = await db.execute(select(Customer).where(Customer.user_id == user.id))
+    customer = cq.scalars().first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    # Verify card exists and belongs to customer
+    q = await db.execute(
+        select(CustomerCard).where(CustomerCard.id == card_id, CustomerCard.customer_id == customer.id)
+    )
+    card = q.scalars().first()
+    if not card:
+        raise HTTPException(status_code=404, detail="Card not found")
+
+    # Set all other cards for this customer to is_default = False
+    await db.execute(
+        update(CustomerCard)
+        .where(CustomerCard.customer_id == customer.id)
+        .values(is_default=False)
+    )
+    card.is_default = True
+    await db.commit()
+    return {"ok": True}
+
+
+@router.post("/methods/mock")
+async def add_mock_card(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    """Add a mock card for testing when PayHere is not configured."""
+    cq = await db.execute(select(Customer).where(Customer.user_id == user.id))
+    customer = cq.scalars().first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    import secrets
+    card_no = f"411111XXXXXX{secrets.token_hex(2).upper()}"
+    card = CustomerCard(
+        customer_id=customer.id,
+        card_no=card_no,
+        card_expiry="1228",
+        card_holder_name=user.full_name or "Valued Customer",
+        card_type="VISA",
+        customer_token=f"mock_token_{secrets.token_hex(8)}",
+        is_default=True,
+    )
+    # Set all other cards to is_default = False
+    await db.execute(
+        update(CustomerCard)
+        .where(CustomerCard.customer_id == customer.id)
+        .values(is_default=False)
+    )
+    db.add(card)
+    await db.commit()
+    return {"ok": True, "card_id": card.id}

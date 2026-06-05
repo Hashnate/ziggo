@@ -891,7 +891,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         ),
       );
       if (confirmed != true) return;
-    } else if (paymentMethod == 'wallet' || paymentMethod == 'card') {
+    } else if (paymentMethod == 'wallet' || paymentMethod == 'card' || paymentMethod.startsWith('card')) {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -1385,7 +1385,8 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
     final duration = (r['duration_min'] as num?)?.toInt() ?? 0;
     final fare = (r['fare'] as num?)?.toDouble() ?? 0;
     final earnings = (r['driver_earnings'] as num?)?.toDouble() ?? fare;
-    final payment = (r['payment_method'] ?? 'cash').toString().toUpperCase();
+    final paymentMethodRaw = (r['payment_method'] ?? 'cash').toString().toUpperCase();
+    final payment = paymentMethodRaw.startsWith('CARD') ? 'CARD' : paymentMethodRaw;
     final customer = (r['customer_name'] ?? 'Customer').toString();
     final initial =
         customer.isNotEmpty ? customer[0].toUpperCase() : 'C';

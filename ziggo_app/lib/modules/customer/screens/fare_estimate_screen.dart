@@ -14,8 +14,11 @@ import '../../../core/map/ziggo_map.dart';
 import '../../../core/network/api_client.dart';
 import '../booking_provider.dart';
 import '../promos_provider.dart';
+import '../wallet_provider.dart';
+import '../payment_methods_provider.dart';
 import 'customer_shell.dart';
 import 'ride_tracking_screen.dart';
+import 'payment_methods_screen.dart';
 
 class FareEstimateScreen extends StatefulWidget {
   const FareEstimateScreen({super.key});
@@ -1065,49 +1068,166 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
     );
   }
 
-  Widget _paymentRow() {
-    return Row(
-      children: [
-        _payOption('cash', Icons.payments_rounded, 'Cash'),
-        const SizedBox(width: 10),
-        _payOption('wallet', Icons.account_balance_wallet_rounded, 'Wallet'),
-      ],
+  String _getSelectedCardLabel() {
+    final cards = context.read<PaymentMethodsProvider>().cards;
+    try {
+      final id = int.parse(_payment.split('_')[1]);
+      final card = cards.firstWhere((c) => c['id'] == id);
+      final no = card['card_no'].toString();
+      return "${card['card_type']} •••• ${no.substring(no.length - 4)}";
+    } catch (_) {
+      return "Card";
+    }
+  }
+
+  void _showPaymentPicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) {
+        final cardsProvider = ctx.watch<PaymentMethodsProvider>();
+        final walletProvider = ctx.watch<WalletProvider>();
+        
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: AppColors.divider,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Choose Payment Method',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                ),
+                const SizedBox(height: 16),
+                
+                // Cash Option
+                ListTile(
+                  leading: const Icon(Icons.payments_rounded, color: AppColors.primary),
+                  title: const Text('Cash', style: TextStyle(fontWeight: FontWeight.bold)),
+                  trailing: _payment == 'cash' ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
+                  onTap: () {
+                    setState(() => _payment = 'cash');
+                    Navigator.pop(ctx);
+                  },
+                ),
+                const Divider(height: 1),
+                
+                // Wallet Option
+                ListTile(
+                  leading: const Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary),
+                  title: const Text('Ziggo Wallet', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text('Balance: Rs.${walletProvider.balance.toStringAsFixed(2)}'),
+                  trailing: _payment == 'wallet' ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
+                  onTap: () {
+                    setState(() => _payment = 'wallet');
+                    Navigator.pop(ctx);
+                  },
+                ),
+                const Divider(height: 1),
+
+                // Saved Cards
+                if (cardsProvider.cards.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(left: 16, top: 12, bottom: 4),
+                    child: Text(
+                      'SAVED CARDS',
+                      style: TextStyle(fontSize: 10, color: AppColors.textTertiary, fontWeight: FontWeight.bold, letterSpacing: 1.1),
+                    ),
+                  ),
+                  ...cardsProvider.cards.map((c) {
+                    final String cardNo = c['card_no'] ?? '';
+                    final String value = 'card_${c['id']}';
+                    return ListTile(
+                      leading: const Icon(Icons.credit_card_rounded, color: AppColors.primary),
+                      title: Text('${c['card_type']} ending in ${cardNo.substring(cardNo.length - 4)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      trailing: _payment == value ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
+                      onTap: () {
+                        setState(() => _payment = value);
+                        Navigator.pop(ctx);
+                      },
+                    );
+                  }),
+                  const Divider(height: 1),
+                ],
+
+                // Add card shortcut
+                ListTile(
+                  leading: const Icon(Icons.add_rounded, color: AppColors.accent),
+                  title: const Text('Add new card', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.accent)),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const PaymentMethodsScreen()),
+                    );
+                    if (context.mounted) {
+                      context.read<PaymentMethodsProvider>().fetchCards();
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _payOption(String value, IconData icon, String label) {
-    final selected = _payment == value;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _payment = value),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
-          decoration: BoxDecoration(
-            color: selected ? Colors.black : Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected ? Colors.black : AppColors.cardBorder,
-              width: selected ? 1.5 : 1,
+  Widget _paymentRow() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: InkWell(
+        onTap: () => _showPaymentPicker(context),
+        child: Row(
+          children: [
+            Icon(
+              _payment == 'cash'
+                  ? Icons.payments_rounded
+                  : _payment == 'wallet'
+                      ? Icons.account_balance_wallet_rounded
+                      : Icons.credit_card_rounded,
+              color: AppColors.primary,
+              size: 20,
             ),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: selected ? AppColors.primary : AppColors.textPrimary, size: 18),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  color: selected ? Colors.white : AppColors.textPrimary,
-                ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                _payment == 'cash'
+                    ? 'Cash'
+                    : _payment == 'wallet'
+                        ? 'Ziggo Wallet (Rs.${context.read<WalletProvider>().balance.toStringAsFixed(0)})'
+                        : _getSelectedCardLabel(),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
-              if (selected) ...[
-                const Spacer(),
-                const Icon(Icons.check_rounded, color: AppColors.primary, size: 16),
-              ],
-            ],
-          ),
+            ),
+            const Text(
+              'CHANGE',
+              style: TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w900,
+                fontSize: 12,
+              ),
+            ),
+          ],
         ),
       ),
     );

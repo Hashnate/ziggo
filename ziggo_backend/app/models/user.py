@@ -63,6 +63,23 @@ class Customer(Base):
 
     user = relationship("User", back_populates="customer_profile")
     bookings = relationship("Booking", back_populates="customer")
+    cards = relationship("CustomerCard", back_populates="customer", cascade="all, delete-orphan")
+
+
+class CustomerCard(Base):
+    __tablename__ = "customer_cards"
+
+    id = Column(Integer, primary_key=True, index=True)
+    customer_id = Column(Integer, ForeignKey("customers.id", ondelete="CASCADE"), index=True)
+    card_no = Column(String(30), nullable=False)  # masked card number
+    card_expiry = Column(String(10), nullable=False)  # MMYY
+    card_holder_name = Column(String(100), nullable=True)
+    card_type = Column(String(20), nullable=False)  # VISA, MASTER, etc.
+    customer_token = Column(String(255), nullable=False)
+    is_default = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    customer = relationship("Customer", back_populates="cards")
 
 
 class DriverStatus(str, enum.Enum):

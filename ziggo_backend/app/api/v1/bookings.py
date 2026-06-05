@@ -19,6 +19,8 @@ from ...models import (
     PromoCode,
     WalletTransaction,
     Notification,
+    CustomerCard,
+    Payment,
 )
 from ...schemas import (
     FareEstimateRequest,
@@ -32,6 +34,7 @@ from ...services.auth_service import get_current_user
 from ...services.fare_service import calculate_fare, to_decimal
 from ...services.matching_service import find_all_nearby_drivers, find_nearest_driver
 from ...services.ws_manager import manager
+from ...services import payhere_service
 
 router = APIRouter()
 
@@ -205,6 +208,19 @@ async def create_booking(
     # If wallet payment, ensure balance
     if req.payment_method == "wallet" and float(customer.wallet_balance or 0) < fare["final_amount"]:
         raise HTTPException(status_code=400, detail="Insufficient wallet balance")
+    elif req.payment_method and req.payment_method.startswith("card_"):
+        try:
+            card_id = int(req.payment_method.split("_")[1])
+        except (ValueError, IndexError):
+            card_id = None
+        if not card_id:
+            raise HTTPException(status_code=400, detail="Invalid card selection")
+        card_q = await db.execute(
+            select(CustomerCard).where(CustomerCard.id == card_id, CustomerCard.customer_id == customer.id)
+        )
+        card = card_q.scalars().first()
+        if not card:
+            raise HTTPException(status_code=400, detail="Card not found")
 
     # Flash deliveries must have a receiver phone — that's how the driver reaches them
     if req.is_flash and not (req.receiver_phone or "").strip():
@@ -789,6 +805,50 @@ async def update_booking_status(
                         balance_after=customer.wallet_balance,
                     )
                 )
+        elif b.payment_method and b.payment_method.startswith("card_"):
+            try:
+                card_id = int(b.payment_method.split("_")[1])
+            except (ValueError, IndexError):
+                card_id = None
+
+            if card_id:
+                card_q = await db.execute(select(CustomerCard).where(CustomerCard.id == card_id))
+                card = card_q.scalars().first()
+                if card:
+                    charge_res = await payhere_service.charge_tokenized_card(
+                        customer_token=card.customer_token,
+                        amount=b.final_amount,
+                        order_id=b.booking_ref,
+                        items=f"Ride payment {b.booking_ref}",
+                    )
+                    if not charge_res.get("success"):
+                        b.status = BookingStatus.PAYMENT_PENDING
+                        b.payment_status = "failed"
+                        print(f"[payhere] automated charge failed for booking {b.booking_ref}: {charge_res.get('message')}")
+                        from ...models import Payment
+                        pay_rec = Payment(
+                            booking_id=b.id,
+                            customer_id=b.customer_id,
+                            amount=b.final_amount,
+                            payment_method=f"{card.card_type} ({card.card_no[-4:]})",
+                            transaction_id=None,
+                            payment_gateway_response=charge_res.get("message"),
+                            status="failed",
+                        )
+                        db.add(pay_rec)
+                    else:
+                        b.payment_status = "paid"
+                        from ...models import Payment
+                        pay_rec = Payment(
+                            booking_id=b.id,
+                            customer_id=b.customer_id,
+                            amount=b.final_amount,
+                            payment_method=f"{card.card_type} ({card.card_no[-4:]})",
+                            transaction_id=charge_res.get("transaction_id"),
+                            payment_gateway_response=charge_res.get("message"),
+                            status="paid",
+                        )
+                        db.add(pay_rec)
 
         # Driver earnings
         if b.driver_id:
