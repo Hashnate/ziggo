@@ -76,7 +76,8 @@
             </div>
 
             <!-- Card -->
-            <div class="bg-white rounded-2xl shadow-soft p-7">
+            <div class="bg-white rounded-3xl border border-ziggo-line/70 shadow-soft p-8 relative overflow-hidden">
+                <div class="absolute top-0 inset-x-0 h-1" style="background:linear-gradient(90deg,#1E40AF,#3B82F6,#1E40AF);"></div>
 
                 {% if error %}
                 <div class="mb-5 p-3 rounded-2xl bg-red-50 border border-red-100 text-red-700 text-sm font-semibold flex items-center gap-2">
@@ -92,7 +93,7 @@
                         <div class="relative">
                             <i class="fas fa-phone absolute left-4 top-1/2 -translate-y-1/2 text-ziggo-faint text-sm"></i>
                             <input type="tel" name="phone_number" id="phone_number"
-                                   class="brand-field w-full pl-11 pr-4 py-3.5 rounded-2xl text-sm font-semibold"
+                                   class="brand-field w-full pl-11 pr-4 py-4 rounded-2xl text-sm font-semibold"
                                    required value="0700000000" maxlength="10" minlength="10" pattern="\d{10}">
                         </div>
                     </div>
@@ -102,7 +103,7 @@
                         <div class="relative">
                             <i class="fas fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-ziggo-faint text-sm"></i>
                             <input type="password" name="password" id="password"
-                                   class="brand-field w-full pl-11 pr-4 py-3.5 rounded-2xl text-sm font-semibold"
+                                   class="brand-field w-full pl-11 pr-4 py-4 rounded-2xl text-sm font-semibold"
                                    placeholder="••••••••" required value="admin123">
                         </div>
                     </div>
@@ -115,9 +116,9 @@
                     </div>
 
                     <button type="submit"
-                            class="w-full py-3.5 rounded-2xl text-sm font-black tracking-wide text-white shadow-brand transition active:scale-[0.98]"
+                            class="group w-full py-4 rounded-2xl text-sm font-black tracking-wide text-white shadow-brand transition-all duration-200 active:scale-[0.98] hover:brightness-110 hover:shadow-[0_20px_44px_-12px_rgba(30,64,175,0.55)]"
                             style="background: linear-gradient(135deg, #1E40AF 0%, #3B82F6 100%);">
-                        SIGN IN <i class="fas fa-arrow-right ml-1"></i>
+                        SIGN IN <i class="fas fa-arrow-right ml-1 transition-transform group-hover:translate-x-1"></i>
                     </button>
                 </form>
             </div>
@@ -127,9 +128,5 @@
             </p>
         </div>
     </div>
-
-    <script>
-        // No forgot password modal scripts needed anymore
-    </script>
 </body>
 </html>
