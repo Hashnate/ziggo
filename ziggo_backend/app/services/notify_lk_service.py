@@ -15,7 +15,7 @@ import httpx
 from ..config import settings
 
 
-_ENDPOINT = "https://app.notify.lk/api/v1/send-sms"
+_ENDPOINT = "https://app.notify.lk/api/v1/send"
 
 
 def _enabled() -> bool:

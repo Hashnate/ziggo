@@ -3,116 +3,132 @@
 {% block title %}Promotion Management | Ziggo Admin{% endblock %}
 {% block page_title %}Promotion Management{% endblock %}
 
-{% block top_title %}{% endblock %}
 {% block content %}
 <div class="space-y-6">
 
-    <!-- Header -->
-    <div class="flex items-center justify-between flex-wrap gap-4">
-        <div class="flex items-center gap-3">
-            <div class="w-11 h-11 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-xl">
-                <i class="fas fa-tag"></i>
-            </div>
-            <div>
-                <h2 class="text-2xl font-black text-ziggo-ink leading-tight">Promotion Management</h2>
-                <p class="text-xs text-ziggo-muted font-bold">Create and manage discount offers for riders</p>
-            </div>
-        </div>
-        <button onclick="openCreateModal()" class="px-5 py-3 bg-ziggo text-white rounded-2xl font-black shadow-brand hover:bg-ziggo-light transition flex items-center gap-2">
-            <i class="fas fa-plus"></i> Add New Promotion
+    <!-- Header Controls -->
+    <div class="flex justify-end">
+        <button onclick="openCreateModal()" class="px-3.5 py-2 text-sm bg-ziggo text-white rounded-xl font-bold shadow-brand hover:bg-ziggo-light transition flex items-center gap-2">
+            <i class="fas fa-plus text-xs"></i> Add New Promotion
         </button>
     </div>
 
-    <!-- Cards grid -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-        {% for p in promos %}
-        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm overflow-hidden flex flex-col">
-            <!-- Title -->
-            <div class="px-5 pt-5 pb-3 flex items-center justify-between gap-3">
-                <div class="min-w-0">
-                    <p class="text-lg font-black text-ziggo truncate">{{ p.code }}</p>
-                    <p class="text-[10px] font-black uppercase tracking-wider mt-0.5
-                        {% if p.category == 'rides' %}text-blue-500
-                        {% elif p.category == 'food' %}text-amber-500
-                        {% elif p.category == 'market' %}text-emerald-500
-                        {% else %}text-ziggo-faint{% endif %}">
-                        {{ (p.category or 'all')|upper }}
-                    </p>
-                </div>
-                {% if p.is_active %}
-                <span class="px-3 py-1 text-[11px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600 rounded-full flex-shrink-0">Active</span>
+    <!-- Table -->
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-gray-50 text-[11px] uppercase text-ziggo-muted font-black tracking-wider">
+                    <tr>
+                        <th class="px-6 py-4">Code</th>
+                        <th class="px-6 py-4">Category</th>
+                        <th class="px-6 py-4">Discount</th>
+                        <th class="px-6 py-4">Valid Until</th>
+                        <th class="px-6 py-4">Usage</th>
+                        <th class="px-6 py-4">Status</th>
+                        <th class="px-6 py-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-ziggo-line">
+                    {% for p in promos %}
+                    <tr class="hover:bg-gray-50/50">
+                        <td class="px-6 py-4 font-bold text-ziggo">{{ p.code }}</td>
+                        <td class="px-6 py-4 text-xs font-black uppercase tracking-wider text-ziggo-faint">{{ (p.category or 'all')|upper }}</td>
+                        <td class="px-6 py-4 text-sm font-bold text-ziggo-ink">
+                            {% if p.discount_type == 'percentage' %}{{ "%.2f"|format(p.discount_value or 0) }}%{% else %}Rs.{{ "%.2f"|format(p.discount_value or 0) }}{% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-sm text-ziggo-muted">{{ p.valid_to.strftime("%d %b %Y") if p.valid_to else '—' }}</td>
+                        <td class="px-6 py-4 text-sm text-ziggo-ink">{{ p.used_count or 0 }} / {{ p.usage_limit if p.usage_limit else '∞' }}</td>
+                        <td class="px-6 py-4">
+                            {% if p.is_active %}
+                            <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600">Active</span>
+                            {% else %}
+                            <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-gray-100 text-gray-500">Paused</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-2">
+                                <button title="Edit"
+                                    onclick='openEditModal({{ {
+                                        "id": p.id,
+                                        "code": p.code,
+                                        "description": p.description or "",
+                                        "category": p.category or "all",
+                                        "discount_type": p.discount_type,
+                                        "discount_value": (p.discount_value|float) if p.discount_value is not none else 0,
+                                        "min_order_amount": (p.min_order_amount|float) if p.min_order_amount is not none else 0,
+                                        "max_discount": (p.max_discount|float) if p.max_discount is not none else "",
+                                        "usage_limit": p.usage_limit if p.usage_limit is not none else "",
+                                        "valid_from": p.valid_from.strftime("%Y-%m-%d") if p.valid_from else "",
+                                        "valid_to": p.valid_to.strftime("%Y-%m-%d") if p.valid_to else "",
+                                        "is_active": p.is_active,
+                                    }|tojson }})'
+                                    class="px-3 py-1.5 bg-blue-50 text-ziggo border border-blue-100 rounded-lg text-xs font-bold hover:bg-blue-100 transition flex items-center gap-1.5">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                                <form method="POST" action="/admin/promotions/{{ p.id }}/toggle">
+                                    <button title="{{ 'Pause' if p.is_active else 'Resume' }}" type="submit"
+                                            class="px-2.5 py-1.5 bg-gray-50 text-ziggo-muted border border-ziggo-line rounded-lg text-xs font-bold hover:bg-gray-100 transition flex items-center">
+                                        <i class="fas {{ 'fa-pause' if p.is_active else 'fa-play' }}"></i>
+                                    </button>
+                                </form>
+                                <form method="POST" action="/admin/promotions/{{ p.id }}/delete" onsubmit="return confirm('Delete promo {{ p.code }}? Bookings that already used it keep the discount.');">
+                                    <button title="Delete" type="submit"
+                                            class="px-2.5 py-1.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-lg text-xs font-bold hover:bg-rose-100 transition flex items-center">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="px-6 py-16 text-center">
+                            <i class="fas fa-tag text-4xl text-ziggo-faint mb-3"></i>
+                            <p class="text-ziggo-muted font-bold">No promotions yet. Click <span class="text-ziggo">Add New Promotion</span> to create one.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination controls -->
+        {% if total_pages > 1 %}
+        <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
+            <p class="text-sm text-gray-500">
+                Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
+                <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
+                <span class="font-bold text-ziggo">{{ total_promos }}</span> promotions
+            </p>
+            <div class="flex items-center gap-1.5">
+                {% if page > 1 %}
+                    <a href="/admin/promotions?page={{ page - 1 }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
                 {% else %}
-                <span class="px-3 py-1 text-[11px] font-black uppercase tracking-wider bg-gray-100 text-gray-500 rounded-full flex-shrink-0">Paused</span>
+                    <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Previous</span>
+                {% endif %}
+
+                {% for p in page_range %}
+                    {% if p == page %}
+                        <span class="px-3 py-1.5 rounded-lg bg-ziggo text-white text-xs font-black">{{ p }}</span>
+                    {% else %}
+                        <a href="/admin/promotions?page={{ p }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page < total_pages %}
+                    <a href="/admin/promotions?page={{ page + 1 }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
+                {% else %}
+                    <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Next</span>
                 {% endif %}
             </div>
-
-            <!-- Body -->
-            <div class="mx-5 mb-3 border-t border-dashed border-ziggo-line pt-3 space-y-1.5 text-sm">
-                <div class="flex items-center justify-between">
-                    <span class="text-ziggo-muted">Discount:</span>
-                    <span class="font-black text-ziggo-ink">
-                        {% if p.discount_type == 'percentage' %}{{ "%.2f"|format(p.discount_value or 0) }}%{% else %}Rs.{{ "%.2f"|format(p.discount_value or 0) }}{% endif %}
-                    </span>
-                </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-ziggo-muted">Valid Until:</span>
-                    <span class="font-black text-ziggo-ink">{{ p.valid_to.strftime("%d %b %Y") if p.valid_to else '—' }}</span>
-                </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-ziggo-muted">Usage:</span>
-                    <span class="font-black text-ziggo-ink">{{ p.used_count or 0 }} / {{ p.usage_limit if p.usage_limit else '∞' }}</span>
-                </div>
-                {% if p.description %}
-                <p class="text-[11px] text-ziggo-muted pt-1 line-clamp-2">{{ p.description }}</p>
-                {% endif %}
-            </div>
-
-            <!-- Footer actions -->
-            <div class="mt-auto px-5 pb-5 pt-3 border-t border-ziggo-line flex items-center gap-2">
-                <button title="Edit"
-                    onclick='openEditModal({{ {
-                        "id": p.id,
-                        "code": p.code,
-                        "description": p.description or "",
-                        "category": p.category or "all",
-                        "discount_type": p.discount_type,
-                        "discount_value": (p.discount_value|float) if p.discount_value is not none else 0,
-                        "min_order_amount": (p.min_order_amount|float) if p.min_order_amount is not none else 0,
-                        "max_discount": (p.max_discount|float) if p.max_discount is not none else "",
-                        "usage_limit": p.usage_limit if p.usage_limit is not none else "",
-                        "valid_from": p.valid_from.strftime("%Y-%m-%d") if p.valid_from else "",
-                        "valid_to": p.valid_to.strftime("%Y-%m-%d") if p.valid_to else "",
-                        "is_active": p.is_active,
-                    }|tojson }})'
-                    class="w-9 h-9 rounded-lg text-ziggo hover:bg-blue-50 transition flex items-center justify-center">
-                    <i class="far fa-edit"></i>
-                </button>
-                <form method="POST" action="/admin/promotions/{{ p.id }}/toggle">
-                    <button title="{{ 'Pause' if p.is_active else 'Resume' }}" type="submit"
-                            class="w-9 h-9 rounded-lg text-ziggo-muted hover:bg-gray-100 transition flex items-center justify-center">
-                        <i class="fas {{ 'fa-pause' if p.is_active else 'fa-play' }}"></i>
-                    </button>
-                </form>
-                <form method="POST" action="/admin/promotions/{{ p.id }}/delete" onsubmit="return confirm('Delete promo {{ p.code }}? Bookings that already used it keep the discount.');" class="ml-auto">
-                    <button title="Delete" type="submit"
-                            class="px-3 py-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition font-black flex items-center gap-1.5 text-sm">
-                        <i class="fas fa-trash"></i> Delete
-                    </button>
-                </form>
-            </div>
         </div>
-        {% else %}
-        <div class="col-span-full bg-white rounded-3xl border border-dashed border-ziggo-line p-12 text-center">
-            <i class="fas fa-tag text-4xl text-ziggo-faint mb-3"></i>
-            <p class="text-ziggo-muted font-bold">No promotions yet. Click <span class="text-ziggo">Add New Promotion</span> to create one.</p>
-        </div>
-        {% endfor %}
+        {% endif %}
     </div>
 </div>
 
 <!-- Create / Edit Modal -->
 <div id="promoModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+    <div class="bg-white rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
         <div class="p-6 border-b border-ziggo-line flex justify-between items-center bg-gray-50/50 flex-shrink-0">
             <h3 class="text-xl font-black text-ziggo" id="pmModalTitle">New promotion</h3>
             <button onclick="closeModal()" class="text-ziggo-faint hover:text-ziggo-ink">

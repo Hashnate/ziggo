@@ -4,7 +4,7 @@
 {% block page_title %}Edit Driver — {{ user.full_name or user.phone_number }}{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+<div class="max-w-3xl mx-auto bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
     <form method="post" action="/admin/drivers/{{ driver.id }}/edit" enctype="multipart/form-data" class="p-8 space-y-6">
         {% if error %}
         <div class="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl font-bold text-sm">

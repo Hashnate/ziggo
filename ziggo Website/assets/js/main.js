@@ -126,7 +126,7 @@ function initSmoothScroll() {
 
 /* ---------- Highlight active nav link by URL ---------- */
 function setActiveNav() {
-  const path = window.location.pathname.split('/').pop() || 'index.html';
+  const path = window.location.pathname.split('/').pop() || '';
   document.querySelectorAll('.nav-link').forEach(link => {
     const href = link.getAttribute('href');
     if (!href) return;

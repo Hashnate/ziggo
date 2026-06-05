@@ -3,10 +3,7 @@
 {% block title %}Live Tracking | Ziggo Admin{% endblock %}
 {% block page_title %}Live Tracking{% endblock %}
 
-{% block top_title %}{% endblock %}
 {% block head %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
     .pulse-dot {
         width: 10px; height: 10px; border-radius: 50%;
@@ -51,54 +48,46 @@
     /* Hide leaflet attribution corner so the map looks more like the reference */
     .leaflet-control-attribution { font-size: 9px !important; opacity: 0.7; }
     #liveMap:fullscreen { background: white; }
+    .leaflet-top.leaflet-left {
+        margin-top: 50px;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="space-y-6">
 
-    <!-- Header -->
-    <div class="flex items-center justify-between flex-wrap gap-4">
-        <div class="flex items-center gap-3">
-            <div class="w-11 h-11 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-xl">
-                <i class="fas fa-broadcast-tower"></i>
-            </div>
-            <div>
-                <h2 class="text-2xl font-black text-ziggo-ink leading-tight">Live Tracking</h2>
-                <p class="text-xs text-ziggo-muted font-bold">Monitoring all active drivers in real-time</p>
-            </div>
-        </div>
-        <div class="flex items-center gap-3">
-            <span class="pulse-dot"></span>
-            <span class="text-xs font-black text-emerald-600 uppercase tracking-wider">Live Feed Active</span>
-            <span class="text-xs text-ziggo-muted font-bold">
-                · <span id="liveOnlineLabel">{{ online_drivers }}</span> Online ·
-                Updated <span id="liveUpdated">--:--:--</span>
-            </span>
-        </div>
+    <!-- Header Controls -->
+    <div class="flex justify-end items-center gap-3">
+        <span class="pulse-dot"></span>
+        <span class="text-xs font-black text-emerald-600 uppercase tracking-wider">Live Feed Active</span>
+        <span class="text-xs text-ziggo-muted font-bold">
+            · <span id="liveOnlineLabel">{{ online_drivers }}</span> Online ·
+            Updated <span id="liveUpdated">--:--:--</span>
+        </span>
     </div>
 
     <!-- Stat cards -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
-            <span class="text-4xl font-black text-ziggo-ink leading-none" id="statOnline">{{ online_drivers }}</span>
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-3.5 flex items-center gap-3">
+            <span class="text-2xl font-black text-ziggo-ink leading-none" id="statOnline">{{ online_drivers }}</span>
             <span class="pulse-dot"></span>
             <span class="text-xs font-black text-ziggo-muted uppercase tracking-wider">Drivers Online</span>
         </div>
-        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
-            <span class="text-4xl font-black text-ziggo-ink leading-none" id="statOffline">{{ offline_drivers }}</span>
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-3.5 flex items-center gap-3">
+            <span class="text-2xl font-black text-ziggo-ink leading-none" id="statOffline">{{ offline_drivers }}</span>
             <span class="w-2.5 h-2.5 rounded-full bg-gray-300"></span>
             <span class="text-xs font-black text-ziggo-muted uppercase tracking-wider">Drivers Offline</span>
         </div>
-        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
-            <span class="text-4xl font-black text-ziggo-ink leading-none" id="statTotal">{{ total_drivers }}</span>
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-3.5 flex items-center gap-3">
+            <span class="text-2xl font-black text-ziggo-ink leading-none" id="statTotal">{{ total_drivers }}</span>
             <i class="fas fa-car text-ziggo"></i>
             <span class="text-xs font-black text-ziggo-muted uppercase tracking-wider">Total Drivers</span>
         </div>
     </div>
 
     <!-- Map -->
-    <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
         <div id="mapWrap" class="relative">
             <div id="liveMap" style="height: 600px; min-height: 480px;"></div>
 
@@ -121,7 +110,7 @@
     </div>
 
     <!-- All drivers list -->
-    <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
         <div class="px-6 py-4 border-b border-ziggo-line flex items-center justify-between flex-wrap gap-3">
             <div class="flex items-center gap-3">
                 <div class="w-9 h-9 rounded-xl bg-blue-100 text-ziggo flex items-center justify-center">
@@ -155,70 +144,103 @@
 </div>
 
 <script>
-    const map = L.map('liveMap', { zoomControl: true }).setView([6.9271, 79.8612], 13);
+    var map;
+    var markers = new Map();
+    var infoWindow;
+    var HTMLMarker;
 
-    const tileMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap'
-    });
-    const tileSat = L.tileLayer(
-        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        { maxZoom: 19, attribution: 'Imagery © Esri' }
-    );
-    tileMap.addTo(map);
+    function initMap() {
+        HTMLMarker = class extends google.maps.OverlayView {
+            constructor(latlng, html, onClick) {
+                super();
+                this.latlng = latlng;
+                this.html = html;
+                this.onClick = onClick;
+                this.div = null;
+            }
+            onAdd() {
+                this.div = document.createElement('div');
+                this.div.style.position = 'absolute';
+                this.div.style.cursor = 'pointer';
+                this.div.style.zIndex = '99999';
+                this.div.innerHTML = this.html;
+                if (this.onClick) {
+                    this.div.addEventListener('click', this.onClick);
+                }
+                const panes = this.getPanes();
+                panes.overlayMouseTarget.appendChild(this.div);
+            }
+            draw() {
+                const projection = this.getProjection();
+                if (!projection) return;
+                const position = projection.fromLatLngToDivPixel(this.latlng);
+                if (position) {
+                    this.div.style.left = (position.x - 20) + 'px';
+                    this.div.style.top = (position.y - 20) + 'px';
+                }
+            }
+            onRemove() {
+                if (this.div) {
+                    this.div.parentNode.removeChild(this.div);
+                    this.div = null;
+                }
+            }
+            setPosition(latlng) {
+                this.latlng = latlng;
+                this.draw();
+            }
+            setHtml(html) {
+                this.html = html;
+                if (this.div) this.div.innerHTML = html;
+            }
+        };
 
-    const layerMapBtn = document.getElementById('layerMap');
-    const layerSatBtn = document.getElementById('layerSat');
-    layerMapBtn.addEventListener('click', () => {
-        if (map.hasLayer(tileSat)) map.removeLayer(tileSat);
-        if (!map.hasLayer(tileMap)) tileMap.addTo(map);
-        layerMapBtn.classList.add('active'); layerSatBtn.classList.remove('active');
-    });
-    layerSatBtn.addEventListener('click', () => {
-        if (map.hasLayer(tileMap)) map.removeLayer(tileMap);
-        if (!map.hasLayer(tileSat)) tileSat.addTo(map);
-        layerSatBtn.classList.add('active'); layerMapBtn.classList.remove('active');
-    });
+        map = new google.maps.Map(document.getElementById('liveMap'), {
+            center: {lat: 6.9271, lng: 79.8612},
+            zoom: 13,
+            mapTypeControl: false,
+            streetViewControl: false
+        });
 
-    document.getElementById('fitAllBtn').addEventListener('click', () => {
-        const points = Array.from(markers.values()).map(m => m.getLatLng());
-        if (points.length === 0) return;
-        const bounds = L.latLngBounds(points);
-        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
-    });
+        infoWindow = new google.maps.InfoWindow();
 
-    document.getElementById('fullscreenBtn').addEventListener('click', () => {
-        const el = document.getElementById('liveMap');
-        if (!document.fullscreenElement) {
-            el.requestFullscreen?.();
-        } else {
-            document.exitFullscreen?.();
-        }
-        setTimeout(() => map.invalidateSize(), 250);
-    });
+        const layerMapBtn = document.getElementById('layerMap');
+        const layerSatBtn = document.getElementById('layerSat');
+        layerMapBtn.addEventListener('click', () => {
+            map.setMapTypeId(google.maps.MapTypeId.ROADMAP);
+            layerMapBtn.classList.add('active'); layerSatBtn.classList.remove('active');
+        });
+        layerSatBtn.addEventListener('click', () => {
+            map.setMapTypeId(google.maps.MapTypeId.SATELLITE);
+            layerSatBtn.classList.add('active'); layerMapBtn.classList.remove('active');
+        });
 
-    const markers = new Map();
+        document.getElementById('fitAllBtn').addEventListener('click', () => {
+            const bounds = new google.maps.LatLngBounds();
+            let count = 0;
+            for (const m of markers.values()) {
+                bounds.extend(m.latlng);
+                count++;
+            }
+            if (count > 0) {
+                map.fitBounds(bounds);
+            }
+        });
+
+        document.getElementById('fullscreenBtn').addEventListener('click', () => {
+            const el = document.getElementById('liveMap');
+            if (!document.fullscreenElement) {
+                el.requestFullscreen?.();
+            } else {
+                document.exitFullscreen?.();
+            }
+        });
+
+        loadInitial().then(openWs);
+    }
 
     function vehicleEmoji(t) {
         return ({ bike: '🏍️', tuk: '🛺', car: '🚗', van: '🚐', truck: '🚚' })[t] || '🚗';
-    }
-
-    function driverIcon(d) {
-        const dim = d.is_online ? '' : 'filter: grayscale(0.6); opacity: 0.55;';
-        const bg = d.is_online
-            ? 'linear-gradient(135deg, #1E40AF, #3B82F6)'
-            : 'linear-gradient(135deg, #64748b, #94a3b8)';
-        return L.divIcon({
-            className: 'live-driver',
-            iconSize: [40, 40],
-            iconAnchor: [20, 20],
-            html: `<div style="
-                width: 40px; height: 40px; border-radius: 14px;
-                background: ${bg};
-                color: white; display: flex; align-items: center; justify-content: center;
-                font-size: 18px; box-shadow: 0 6px 16px -4px rgba(30,64,175,0.6);
-                border: 2px solid white; ${dim}">${vehicleEmoji(d.vehicle_type)}</div>`
-        });
     }
 
     function formatTime(iso) {
@@ -233,8 +255,6 @@
         }
     }
 
-    // Drivers cached locally — keyed by id — so we can re-derive totals
-    // after every push event without hitting the server.
     const driversState = new Map();
 
     function popupHtml(d) {
@@ -250,30 +270,43 @@
 
     function upsertMarker(d) {
         driversState.set(d.id, d);
-        // Drivers without a GPS fix yet are kept in state (for the list) but
-        // not plotted on the map.
         if (d.lat == null || d.lng == null) {
             if (markers.has(d.id)) {
-                map.removeLayer(markers.get(d.id));
+                markers.get(d.id).setMap(null);
                 markers.delete(d.id);
             }
             return;
         }
-        const ll = [d.lat, d.lng];
+        const gLatLng = new google.maps.LatLng(d.lat, d.lng);
+        const bg = d.is_online
+            ? 'linear-gradient(135deg, #1E40AF, #3B82F6)'
+            : 'linear-gradient(135deg, #64748b, #94a3b8)';
+        const dim = d.is_online ? '' : 'filter: grayscale(0.6); opacity: 0.55;';
+        const htmlContent = `<div style="
+            width: 40px; height: 40px; border-radius: 14px;
+            background: ${bg};
+            color: white; display: flex; align-items: center; justify-content: center;
+            font-size: 18px; box-shadow: 0 6px 16px -4px rgba(30,64,175,0.6);
+            border: 2px solid white; ${dim}">${vehicleEmoji(d.vehicle_type)}</div>`;
+
         if (markers.has(d.id)) {
             const m = markers.get(d.id);
-            m.setLatLng(ll);
-            m.setIcon(driverIcon(d));
-            if (m.getPopup()) m.setPopupContent(popupHtml(d));
+            m.setPosition(gLatLng);
+            m.setHtml(htmlContent);
+            if (infoWindow.getMap() && infoWindow.getPosition().equals(gLatLng)) {
+                infoWindow.setContent(popupHtml(d));
+            }
         } else {
-            const m = L.marker(ll, { icon: driverIcon(d) })
-                .bindPopup(popupHtml(d))
-                .addTo(map);
+            const m = new HTMLMarker(gLatLng, htmlContent, () => {
+                infoWindow.setContent(popupHtml(d));
+                infoWindow.setPosition(gLatLng);
+                infoWindow.open(map);
+            });
+            m.setMap(map);
             markers.set(d.id, m);
         }
     }
 
-    // ---- Drivers list (below the map) -------------------------------------
     let listFilter = 'all';
     let listSearch = '';
 
@@ -362,9 +395,12 @@
     function focusDriver(id) {
         const d = driversState.get(id);
         if (!d || d.lat == null || d.lng == null) return;
-        map.setView([d.lat, d.lng], 16, { animate: true });
-        const m = markers.get(id);
-        if (m) m.openPopup();
+        const gLatLng = new google.maps.LatLng(d.lat, d.lng);
+        map.panTo(gLatLng);
+        map.setZoom(16);
+        infoWindow.setContent(popupHtml(d));
+        infoWindow.setPosition(gLatLng);
+        infoWindow.open(map);
         document.getElementById('liveMap').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
@@ -382,7 +418,6 @@
         });
     });
 
-    // Re-render relative timestamps every 10s so "5m ago" stays honest.
     setInterval(renderDriversList, 10000);
 
     function recomputeStats() {
@@ -413,12 +448,11 @@
             });
             for (const [id, m] of markers.entries()) {
                 if (!seen.has(id)) {
-                    map.removeLayer(m);
+                    m.setMap(null);
                     markers.delete(id);
                 }
             }
 
-            // Server-truth totals (includes drivers with no GPS yet, who aren't on the map)
             document.getElementById('statOnline').textContent = j.totals.online;
             document.getElementById('statOffline').textContent = j.totals.offline;
             document.getElementById('statTotal').textContent = j.totals.total;
@@ -427,8 +461,11 @@
 
             const gpsDrivers = j.drivers.filter(d => d.lat != null && d.lng != null);
             if (!window._fittedOnce && gpsDrivers.length > 0) {
-                const bounds = L.latLngBounds(gpsDrivers.map(d => [d.lat, d.lng]));
-                map.fitBounds(bounds, { padding: [60, 60], maxZoom: 14 });
+                const bounds = new google.maps.LatLngBounds();
+                gpsDrivers.forEach(d => {
+                    bounds.extend(new google.maps.LatLng(d.lat, d.lng));
+                });
+                map.fitBounds(bounds);
                 window._fittedOnce = true;
             }
             renderDriversList();
@@ -437,12 +474,10 @@
         }
     }
 
-    // ---- WebSocket subscription -------------------------------------------
-    const liveStatusEl = document.querySelector('.pulse-dot');  // header dot
+    const liveStatusEl = document.querySelector('.pulse-dot');
     const liveLabelEl = document.querySelector('.text-emerald-600.uppercase');
 
     function setLive(state) {
-        // state: 'live' | 'reconnecting' | 'offline'
         if (state === 'live') {
             liveStatusEl.style.background = '#10B981';
             liveStatusEl.style.animation = 'pulseRing 1.5s ease-out infinite';
@@ -476,7 +511,6 @@
                 clearInterval(pollFallbackId);
                 pollFallbackId = null;
             }
-            // Light heartbeat so intermediaries don't drop the socket
             ws._ping = setInterval(() => {
                 try { ws.send('ping'); } catch (_) {}
             }, 30000);
@@ -500,7 +534,19 @@
                 } else if (cur) {
                     cur.is_online = !!d.is_online;
                     driversState.set(d.id, cur);
-                    if (markers.has(d.id)) markers.get(d.id).setIcon(driverIcon(cur));
+                    if (markers.has(d.id)) {
+                        const bg = cur.is_online
+                            ? 'linear-gradient(135deg, #1E40AF, #3B82F6)'
+                            : 'linear-gradient(135deg, #64748b, #94a3b8)';
+                        const dim = cur.is_online ? '' : 'filter: grayscale(0.6); opacity: 0.55;';
+                        const htmlContent = `<div style="
+                            width: 40px; height: 40px; border-radius: 14px;
+                            background: ${bg};
+                            color: white; display: flex; align-items: center; justify-content: center;
+                            font-size: 18px; box-shadow: 0 6px 16px -4px rgba(30,64,175,0.6);
+                            border: 2px solid white; ${dim}">${vehicleEmoji(cur.vehicle_type)}</div>`;
+                        markers.get(d.id).setHtml(htmlContent);
+                    }
                 }
                 recomputeStats();
                 markUpdated(new Date().toISOString());
@@ -511,7 +557,6 @@
         ws.addEventListener('close', () => {
             if (ws && ws._ping) clearInterval(ws._ping);
             setLive('reconnecting');
-            // HTTP fallback poll so the page still updates while we retry.
             if (!pollFallbackId) {
                 pollFallbackId = setInterval(loadInitial, 5000);
             }
@@ -520,11 +565,8 @@
             setTimeout(openWs, delay);
         });
 
-        ws.addEventListener('error', () => {
-            // close handler will run too; nothing to do here
-        });
+        ws.addEventListener('error', () => {});
     }
-
-    loadInitial().then(openWs);
 </script>
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap" async defer></script>
 {% endblock %}

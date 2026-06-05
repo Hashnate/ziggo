@@ -8,28 +8,29 @@
     <link rel="apple-touch-icon" href="/static/img/logo.jpeg">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
                         ziggo: {
-                            DEFAULT: '#1E40AF',
-                            dark: '#172554',
-                            darker: '#0B1437',
+                            DEFAULT: '#1E3A8A',
+                            dark: '#131C3D',
+                            darker: '#0B1226',
                             light: '#3B82F6',
                             soft: '#DBEAFE',
                             accent: '#FBBF24',
                             ink: '#0F172A',
                             muted: '#64748B',
                             faint: '#94A3B8',
-                            canvas: '#F5F7FB',
+                            canvas: '#F8FAFC',
                             line: '#EEF1F6'
                         }
                     },
                     fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
+                        sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+                        display: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
                     },
                     borderRadius: {
                         'xl2': '18px',
@@ -38,290 +39,406 @@
                         '4xl': '36px'
                     },
                     boxShadow: {
-                        'soft-sm': '0 4px 16px -6px rgba(15, 23, 42, 0.08)',
-                        'soft':    '0 12px 36px -10px rgba(15, 23, 42, 0.10), 0 2px 6px -2px rgba(15, 23, 42, 0.04)',
-                        'soft-lg': '0 24px 60px -20px rgba(15, 23, 42, 0.14), 0 4px 10px -3px rgba(15, 23, 42, 0.04)',
-                        'brand':   '0 16px 40px -12px rgba(30, 64, 175, 0.45)',
-                        'gold':    '0 12px 28px -10px rgba(251, 191, 36, 0.55)'
+                        'soft-sm': '0 2px 8px rgba(15, 23, 42, 0.04)',
+                        'soft':    '0 10px 30px -10px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.02)',
+                        'soft-lg': '0 20px 50px -12px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.04)',
+                        'brand':   '0 16px 40px -12px rgba(30, 64, 175, 0.35)',
+                        'gold':    '0 12px 28px -10px rgba(251, 191, 36, 0.35)'
                     }
                 }
             }
         }
     </script>
     <style>
+        /* Force Plus Jakarta Sans globally across all text elements (excluding FontAwesome icons) */
+        html, body, input, select, textarea, button, a, p, span, h1, h2, h3, h4, h5, h6, label, div:not(.fa):not(.fas):not(.far):not(.fab):not(.fal):not(.fad) {
+            font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+            letter-spacing: -0.011em;
+        }
+        h1, h2, h3, h4, h5, h6 { letter-spacing: -0.02em; }
+
+        /* Professional weight scale: only the necessary things stay bold
+           (numbers + headings). Labels/secondary text drop to medium. */
+        .font-black { font-weight: 700 !important; }
+        .font-extrabold { font-weight: 700 !important; }
+        .font-bold { font-weight: 700 !important; }
+        .font-semibold { font-weight: 500 !important; }
+        .font-medium { font-weight: 500 !important; }
+
+        .fa, .fas, .far, .fab, .fal, .fad, [class^="fa-"], [class*=" fa-"] {
+            font-family: 'Font Awesome 6 Free', 'Font Awesome 6 Brands', 'Font Awesome 5 Free', 'Font Awesome 5 Brands', sans-serif !important;
+        }
+
         body {
-            font-family: 'Inter', sans-serif;
             color: #0F172A;
             -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            background-color: #F8FAFC;
         }
 
-        /* ===== Page canvas — subtle radial wash so the surface isn't flat ===== */
+        /* Force metrics numbers to a clean, consistent dark slate color instead of random rainbow colors */
+        .text-3xl.font-black,
+        .text-2xl.font-black,
+        .text-3xl.font-bold,
+        .text-2xl.font-bold,
+        p.text-3xl, p.text-2xl {
+            color: #0F172A !important;
+        }
+
+        /* ===== Page canvas ===== */
         .zi-canvas {
-            background:
-              radial-gradient(circle at 0% 0%, rgba(59,130,246,0.06) 0%, transparent 40%),
-              radial-gradient(circle at 100% 0%, rgba(251,191,36,0.06) 0%, transparent 35%),
-              #F5F7FB;
+            background-color: #F8FAFC;
         }
 
-        /* ===== Reusable card utility ===== */
-        .zi-card {
-            background: #fff;
-            border-radius: 24px;
-            box-shadow: 0 12px 36px -10px rgba(15,23,42,0.10), 0 2px 6px -2px rgba(15,23,42,0.04);
-            border: 1px solid rgba(238,241,246,0.6);
-            transition: box-shadow 220ms ease, transform 220ms ease;
+        /* ===== Reusable card utility & override for standard tailwind cards ===== */
+        .zi-card, .bg-white.shadow-sm, .bg-white.rounded-2xl {
+            background: #ffffff !important;
+            border-radius: 14px !important;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03) !important;
+            border: 1px solid #E7EBF1 !important;
+            transition: border-color 160ms ease, box-shadow 160ms ease;
         }
         .zi-card-hover:hover {
-            box-shadow: 0 24px 60px -20px rgba(15,23,42,0.16), 0 4px 12px -2px rgba(15,23,42,0.06);
-            transform: translateY(-2px);
+            box-shadow: 0 4px 16px -6px rgba(15, 23, 42, 0.10) !important;
+            border-color: #D5DCE6 !important;
+        }
+
+        /* Compress actions/filter wrapper bars across all pages automatically */
+        div[class*="p-8"].border-b.flex,
+        div[class*="p-8"].border-b.bg-gray-50,
+        .p-8.border-b.bg-gray-50\/30,
+        .p-8.border-b.bg-gray-50\/50,
+        .p-8.border-b.flex,
+        form[class*="p-8"].space-y-6,
+        form[class*="p-8"].space-y-5 {
+            padding: 16px 24px !important;
         }
 
         /* ===== Stat card ===== */
         .zi-stat {
             background: #fff;
-            border-radius: 24px;
-            padding: 22px;
-            box-shadow: 0 12px 36px -10px rgba(15,23,42,0.08), 0 2px 6px -2px rgba(15,23,42,0.04);
+            border-radius: 14px;
+            padding: 16px 18px;
+            border: 1px solid #E7EBF1;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
             position: relative;
             overflow: hidden;
-            transition: transform 220ms ease, box-shadow 220ms ease;
+            display: flex;
+            flex-direction: column;
+            transition: border-color 160ms ease, box-shadow 160ms ease;
         }
         .zi-stat:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 24px 60px -20px rgba(15,23,42,0.14);
+            box-shadow: 0 4px 16px -6px rgba(15, 23, 42, 0.10);
+            border-color: #D5DCE6;
         }
         .zi-stat .stat-icon {
-            width: 48px; height: 48px;
-            border-radius: 16px;
+            width: 38px; height: 38px;
+            border-radius: 10px;
             display: flex; align-items: center; justify-content: center;
-            font-size: 20px;
-        }
-
-        /* ===== Soft auto-style for existing templates ===== */
-        /* Templates that use `bg-white ... border border-gray-100 shadow-sm` get the
-           refreshed soft-shadow + transparent border treatment automatically. */
-        .bg-white.shadow-sm {
-            box-shadow: 0 12px 36px -10px rgba(15, 23, 42, 0.08), 0 2px 6px -2px rgba(15, 23, 42, 0.04) !important;
-        }
-        .bg-white.shadow-sm.border-gray-100 {
-            border-color: rgba(238,241,246,0.5) !important;
+            font-size: 15px;
+            background: #F4F7FB;
+            border: 1px solid #E7EBF1;
+            margin-bottom: 10px;
         }
 
         /* ===== Sidebar ===== */
         .zi-sidebar {
-            background:
-              radial-gradient(circle at 50% 0%, rgba(59,130,246,0.18) 0%, transparent 55%),
-              linear-gradient(180deg, #0B1437 0%, #172554 60%, #0F1B3F 100%);
+            background: #ffffff;
+            border-right: 1px solid #EEF1F6;
         }
         .sidebar-item {
             position: relative;
-            color: rgba(255,255,255,0.72);
-            font-weight: 600;
-            border-radius: 14px;
-            transition: background 180ms ease, color 180ms ease, transform 180ms ease;
+            color: #64748B;
+            font-weight: 500;
+            font-size: 13.5px;
+            border-radius: 10px;
+            padding: 7px 12px !important;
+            margin: 1px 0;
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            transition: all 165ms ease;
         }
+        .sidebar-item i { display: inline-flex; justify-content: center; width: 18px; font-size: 14px; color: #94A3B8; transition: all 165ms ease; flex: 0 0 auto; }
         .sidebar-item:hover {
-            background: rgba(255,255,255,0.07);
-            color: #fff;
+            background: #F5F7FB;
+            color: #1E3A8A;
         }
+        .sidebar-item:hover i { color: #1E3A8A; }
         .sidebar-item.active {
-            background: linear-gradient(135deg, rgba(30,64,175,0.95) 0%, rgba(59,130,246,0.95) 100%);
-            color: #fff;
-            box-shadow: 0 14px 30px -12px rgba(59,130,246,0.55), inset 0 0 0 1px rgba(255,255,255,0.08);
+            background: #D6E4FB;
+            color: #1E3A8A;
+            font-weight: 600;
         }
+        .sidebar-item.active i { color: #1E3A8A; }
         .sidebar-item.active::before {
             content: '';
             position: absolute;
-            left: -10px; top: 12px; bottom: 12px;
-            width: 4px; border-radius: 4px;
-            background: #FBBF24;
-            box-shadow: 0 0 18px rgba(251,191,36,0.55);
+            left: -10px; top: 50%; transform: translateY(-50%);
+            width: 3px; height: 18px;
+            background: #1E3A8A;
+            border-radius: 0 3px 3px 0;
         }
+        .zi-nav-group {
+            font-size: 10px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.13em; color: #B6BECC;
+            padding: 0 12px; margin: 14px 0 5px;
+        }
+        .zi-nav-group:first-child { margin-top: 2px; }
         .sidebar-item i { transition: transform 200ms ease; }
         .sidebar-item:hover i,
-        .sidebar-item.active i { transform: scale(1.1); }
-
-        /* ===== Logo glow ===== */
-        .zi-logo {
-            background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%);
-            box-shadow: 0 16px 32px -12px rgba(251,191,36,0.65), inset 0 1px 0 rgba(255,255,255,0.35);
-        }
+        .sidebar-item.active i { transform: scale(1.05); }
 
         /* ===== Top bar ===== */
         .zi-topbar {
-            background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.88) 100%);
-            backdrop-filter: saturate(160%) blur(12px);
-            -webkit-backdrop-filter: saturate(160%) blur(12px);
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            position: relative;
+            z-index: 200;
         }
         .zi-bell {
             position: relative;
-            width: 42px; height: 42px;
-            border-radius: 14px;
-            background: #F5F7FB;
-            color: #475569;
-            transition: background 180ms ease, color 180ms ease;
+            width: 40px; height: 40px;
+            border-radius: 12px;
+            background: #F8FAFC;
+            border: 1px solid #EEF1F6;
+            color: #64748B;
+            transition: all 180ms ease;
         }
-        .zi-bell:hover { background: #E0E7FF; color: #1E40AF; }
+        .zi-bell:hover { background: #EFF6FF; color: #1E3A8A; border-color: #DBEAFE; }
         .zi-bell .dot {
             position: absolute;
-            top: 9px; right: 11px;
+            top: 10px; right: 12px;
             width: 8px; height: 8px;
             background: #EF4444;
             border-radius: 50%;
-            box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(239,68,68,0.25);
-            animation: bellPulse 1.6s ease-out infinite;
+            box-shadow: 0 0 0 2px #fff;
         }
-        @keyframes bellPulse {
-            0%   { box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(239,68,68,0.30); }
-            70%  { box-shadow: 0 0 0 2px #fff, 0 0 0 10px rgba(239,68,68,0); }
-            100% { box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(239,68,68,0); }
+
+        /* ===== Notification popup ===== */
+        .zi-notif { position: relative; }
+        .zi-notif-panel {
+            position: absolute; right: 0; top: calc(100% + 10px); width: 320px;
+            background: #fff; border: 1px solid #EEF1F6; border-radius: 16px;
+            box-shadow: 0 20px 40px -12px rgba(16,24,40,0.12); padding: 8px; z-index: 1000;
+            opacity: 0; visibility: hidden; transform: translateY(-6px);
+            transition: all 180ms ease;
         }
+        .zi-notif.open .zi-notif-panel { opacity: 1; visibility: visible; transform: none; }
+        .zi-notif-head { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #94A3B8; padding: 8px 10px 6px; }
+        .zi-notif-item { display: flex; align-items: center; gap: 11px; padding: 10px; border-radius: 12px; color: #0F172A; text-decoration: none; transition: background .15s; }
+        .zi-notif-item:hover { background: #F8FAFC; }
+        .zi-notif-item .ic { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: #EFF6FF; color: #1E3A8A; flex: 0 0 auto; font-size: 14px; }
+        .zi-notif-item .tx strong { display: block; font-size: 13px; font-weight: 600; line-height: 1.2; }
+        .zi-notif-item .tx small { font-size: 11px; color: #64748B; }
+        .zi-notif-empty { padding: 22px 12px; text-align: center; font-size: 12px; color: #94A3B8; font-weight: 500; }
 
         /* ===== Buttons ===== */
-        .zi-btn-primary {
-            background: linear-gradient(135deg, #1E40AF 0%, #3B82F6 100%);
-            color: #fff; font-weight: 800;
-            padding: 12px 22px; border-radius: 16px;
-            box-shadow: 0 12px 28px -10px rgba(30,64,175,0.55);
-            transition: transform 180ms ease, box-shadow 180ms ease;
+        .zi-btn-primary,
+        .bg-ziggo:not(.sidebar-item):not(.zi-logo),
+        button[class*="px-6"][class*="py-3"]:not(.sidebar-item),
+        a[class*="px-6"][class*="py-3"]:not(.sidebar-item) {
+            background: #1E3A8A !important;
+            color: #ffffff !important;
+            font-weight: 600 !important;
+            padding: 8px 16px !important;
+            border-radius: 10px !important;
+            box-shadow: none !important;
+            transition: background 150ms ease !important;
+            border: none !important;
         }
-        .zi-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 18px 36px -10px rgba(30,64,175,0.7); }
+        .zi-btn-primary:hover,
+        .bg-ziggo:not(.sidebar-item):not(.zi-logo):hover,
+        button[class*="px-6"][class*="py-3"]:not(.sidebar-item):hover,
+        a[class*="px-6"][class*="py-3"]:not(.sidebar-item):hover {
+            background: #18306e !important;
+        }
+        
+        .bg-white.border-gray-200,
+        .bg-white.border-gray-100,
+        a[class*="bg-white"][class*="border-gray-200"] {
+            border-radius: 10px !important;
+            border-color: #E2E8F0 !important;
+            padding: 8px 16px !important;
+            font-weight: 600 !important;
+            transition: all 150ms ease !important;
+        }
 
-        /* ===== Chips ===== */
+        /* ===== Chips / Badges ===== */
         .zi-chip {
             display: inline-flex; align-items: center; gap: 4px;
-            padding: 4px 10px; border-radius: 100px;
-            font-size: 10px; font-weight: 900;
-            letter-spacing: 0.06em; text-transform: uppercase;
+            padding: 2px 8px; border-radius: 100px;
+            font-size: 10px; font-weight: 600;
         }
 
         /* ===== Scrollbar ===== */
-        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-thumb {
-            background: linear-gradient(180deg, #CBD5E1 0%, #94A3B8 100%);
+            background: #E2E8F0;
             border-radius: 10px;
-            border: 2px solid #F5F7FB;
         }
         ::-webkit-scrollbar-track { background: transparent; }
+
+        /* ===== Premium Form Elements ===== */
+        input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),
+        select, textarea {
+            border: 1px solid #E2E8F0 !important;
+            border-radius: 12px !important;
+            padding: 8px 12px !important;
+            background: #fff !important;
+            transition: all 160ms ease !important;
+        }
+        input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):focus,
+        select:focus, textarea:focus {
+            outline: none !important;
+            border-color: #3B82F6 !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12) !important;
+        }
+
+        /* ===== Tables ===== */
+        table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+        }
+        thead th, table thead th {
+            font-size: 11px !important;
+            letter-spacing: 0.05em !important;
+            text-transform: uppercase !important;
+            color: #64748B !important;
+            font-weight: 600 !important;
+            background: #F8FAFC !important;
+            padding: 10px 10px !important;
+            border-bottom: 1px solid #EEF1F6 !important;
+        }
+        tbody td, table tbody td {
+            padding: 10px 10px !important;
+            border-bottom: 1px solid #F1F5F9 !important;
+            color: #334155 !important;
+            font-size: 13px !important;
+            white-space: nowrap !important;
+        }
+        tbody tr, table tbody tr {
+            transition: all 140ms ease !important;
+        }
+        tbody tr:hover, table tbody tr:hover {
+            background: #F8FAFC !important;
+        }
+        
+        @keyframes ziFadeUp { from { opacity: 0; } to { opacity: 1; } }
+        .zi-card, .zi-stat, .bg-white.shadow-sm, .bg-white.rounded-2xl { animation: ziFadeUp 220ms ease both; }
+        @media (prefers-reduced-motion: reduce) {
+            .zi-card, .zi-stat, .bg-white.shadow-sm, .bg-white.rounded-2xl { animation: none; }
+        }
+
+        /* Ensure modal backdrops/overlays sit on top of the z-200 top-bar */
+        .fixed.inset-0.z-50 {
+            z-index: 1000 !important;
+        }
     </style>
     {% block head %}{% endblock %}
 </head>
 <body class="zi-canvas flex h-screen overflow-hidden text-ziggo-ink">
 
     <!-- Sidebar -->
-    <aside class="w-72 zi-sidebar text-white flex flex-col transition-all duration-300">
-        <div class="p-6 flex items-center gap-3">
-            <div class="w-12 h-12 rounded-2xl overflow-hidden flex items-center justify-center bg-white/95 p-1"
-                 style="box-shadow: 0 16px 32px -12px rgba(251,191,36,0.45), inset 0 0 0 1px rgba(255,255,255,0.4);">
-                <img src="/static/img/logo.jpeg" alt="Ziggo" class="w-full h-full object-cover rounded-xl">
-            </div>
+    <aside class="w-56 zi-sidebar text-ziggo-ink flex flex-col transition-all duration-300">
+        <div class="px-5 py-4 flex items-center gap-3 border-b border-ziggo-line">
+            <img id="sidebarLogo" src="/static/img/logo.jpeg" alt="Ziggo"
+                 class="w-10 h-10 rounded-xl object-cover flex-shrink-0"
+                 style="box-shadow: 0 8px 20px -8px rgba(30,58,138,0.45);">
             <div class="flex flex-col leading-tight">
-                <img src="/static/img/ziggo.png" alt="Ziggo" class="h-5"
-                     onerror="this.outerHTML='<span class=\'text-base font-black tracking-wide\'>ZIGGO</span>';">
-                <span class="text-[10px] uppercase tracking-[0.22em] text-ziggo-soft/70 font-semibold mt-0.5">Admin Suite</span>
+                <span class="font-display text-[18px] font-extrabold tracking-tight text-ziggo-ink leading-none">Ziggo</span>
+                <span class="text-[9px] uppercase tracking-[0.22em] text-ziggo-faint font-semibold mt-1">Admin Suite</span>
             </div>
         </div>
 
-        <nav class="flex-1 mt-2 px-4 space-y-1 overflow-y-auto">
-            <a href="/admin/dashboard" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'dashboard' %}active{% endif %}">
-                <i class="fas fa-th-large w-5 text-center"></i>
-                <span class="text-sm">Dashboard</span>
+        <nav class="flex-1 mt-1 px-3 overflow-y-auto">
+            <p class="zi-nav-group">Overview</p>
+            <a href="/admin/dashboard" class="sidebar-item {% if active_page == 'dashboard' %}active{% endif %}">
+                <i class="fas fa-th-large"></i><span>Dashboard</span>
             </a>
-            <a href="/admin/bookings" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'bookings' %}active{% endif %}">
-                <i class="fas fa-car w-5 text-center"></i>
-                <span class="text-sm">Bookings</span>
-            </a>
-            
 
-            
-            <a href="/admin/drivers" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'drivers' %}active{% endif %}">
-                <i class="fas fa-id-card w-5 text-center"></i>
-                <span class="text-sm">Drivers</span>
+            <p class="zi-nav-group">Operations</p>
+            <a href="/admin/bookings" class="sidebar-item {% if active_page == 'bookings' %}active{% endif %}">
+                <i class="fas fa-car"></i><span>Bookings</span>
             </a>
-            <a href="/admin/vehicles" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'vehicles' %}active{% endif %}">
-                <i class="fas fa-car-side w-5 text-center"></i>
-                <span class="text-sm">Vehicles</span>
+            <a href="/admin/drivers" class="sidebar-item {% if active_page == 'drivers' %}active{% endif %}">
+                <i class="fas fa-id-card"></i><span>Drivers</span>
             </a>
-            <a href="/admin/categories" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'categories' %}active{% endif %}">
-                <i class="fas fa-layer-group w-5 text-center"></i>
-                <span class="text-sm">Categories</span>
+            <a href="/admin/vehicles" class="sidebar-item {% if active_page == 'vehicles' %}active{% endif %}">
+                <i class="fas fa-car-side"></i><span>Vehicles</span>
             </a>
-            <a href="/admin/restaurants" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'restaurants' %}active{% endif %}">
-                <i class="fas fa-utensils w-5 text-center"></i>
-                <span class="text-sm">Restaurants</span>
+            <a href="/admin/live-tracking" class="sidebar-item {% if active_page == 'live-tracking' %}active{% endif %}">
+                <i class="fas fa-location-arrow"></i><span>Live Tracking</span>
             </a>
-            <a href="/admin/market" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'market' %}active{% endif %}">
-                <i class="fas fa-store w-5 text-center"></i>
-                <span class="text-sm">Market</span>
+
+            <p class="zi-nav-group">Catalog</p>
+            <a href="/admin/categories" class="sidebar-item {% if active_page == 'categories' %}active{% endif %}">
+                <i class="fas fa-layer-group"></i><span>Categories</span>
             </a>
-            <a href="/admin/live-tracking" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'live-tracking' %}active{% endif %}">
-                <i class="fas fa-location-arrow w-5 text-center"></i>
-                <span class="text-sm">Live Tracking</span>
+            <a href="/admin/restaurants" class="sidebar-item {% if active_page == 'restaurants' %}active{% endif %}">
+                <i class="fas fa-utensils"></i><span>Restaurants</span>
             </a>
-            <a href="/admin/promotions" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'promotions' %}active{% endif %}">
-                <i class="fas fa-percent w-5 text-center"></i>
-                <span class="text-sm">Promotions</span>
+            <a href="/admin/market" class="sidebar-item {% if active_page == 'market' %}active{% endif %}">
+                <i class="fas fa-store"></i><span>Market</span>
             </a>
-            <a href="/admin/reports" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'reports' %}active{% endif %}">
-                <i class="fas fa-chart-bar w-5 text-center"></i>
-                <span class="text-sm">Reports</span>
+            <a href="/admin/services" class="sidebar-item {% if active_page == 'services' %}active{% endif %}">
+                <i class="fas fa-concierge-bell"></i><span>Services</span>
             </a>
-            <a href="/admin/withdrawals" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'withdrawals' %}active{% endif %}">
-                <i class="fas fa-money-bill-wave w-5 text-center"></i>
-                <span class="text-sm">Withdrawals</span>
+            <a href="/admin/promotions" class="sidebar-item {% if active_page == 'promotions' %}active{% endif %}">
+                <i class="fas fa-percent"></i><span>Promotions</span>
             </a>
-            <a href="/admin/payments" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'payments' %}active{% endif %}">
-                <i class="fas fa-credit-card w-5 text-center"></i>
-                <span class="text-sm">Payments</span>
+
+            <p class="zi-nav-group">Finance</p>
+            <a href="/admin/reports" class="sidebar-item {% if active_page == 'reports' %}active{% endif %}">
+                <i class="fas fa-chart-bar"></i><span>Reports</span>
             </a>
-            <a href="/admin/topups" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'topups' %}active{% endif %}">
-                <i class="fas fa-wallet w-5 text-center"></i>
-                <span class="text-sm">Top-ups</span>
+            <a href="/admin/withdrawals" class="sidebar-item {% if active_page == 'withdrawals' %}active{% endif %}">
+                <i class="fas fa-money-bill-wave"></i><span>Withdrawals</span>
             </a>
-            <a href="/admin/services" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'services' %}active{% endif %}">
-                <i class="fas fa-concierge-bell w-5 text-center"></i>
-                <span class="text-sm">Services</span>
+            <a href="/admin/payments" class="sidebar-item {% if active_page == 'payments' %}active{% endif %}">
+                <i class="fas fa-credit-card"></i><span>Payments</span>
             </a>
-            <a href="/admin/emergencies" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'emergencies' %}active{% endif %}">
-                <i class="fas fa-exclamation-triangle w-5 text-center text-rose-300"></i>
-                <span class="text-sm">Emergencies</span>
+            <a href="/admin/topups" class="sidebar-item {% if active_page == 'topups' %}active{% endif %}">
+                <i class="fas fa-wallet"></i><span>Top-ups</span>
             </a>
-            <a href="/admin/incidents" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'incidents' %}active{% endif %}">
-                <i class="fas fa-triangle-exclamation w-5 text-center text-amber-300"></i>
-                <span class="text-sm">Incidents</span>
+
+            <p class="zi-nav-group">Support &amp; Safety</p>
+            <a href="/admin/emergencies" class="sidebar-item {% if active_page == 'emergencies' %}active{% endif %}">
+                <i class="fas fa-exclamation-triangle"></i><span>Emergencies</span>
             </a>
-            <a href="/admin/support" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'support' %}active{% endif %}">
-                <i class="fas fa-life-ring w-5 text-center"></i>
-                <span class="text-sm">Support</span>
+            <a href="/admin/incidents" class="sidebar-item {% if active_page == 'incidents' %}active{% endif %}">
+                <i class="fas fa-triangle-exclamation"></i><span>Incidents</span>
             </a>
-            <a href="/admin/messages" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'messages' %}active{% endif %}">
-                <i class="fas fa-envelope w-5 text-center"></i>
-                <span class="text-sm">Messages</span>
+            <a href="/admin/support" class="sidebar-item {% if active_page == 'support' %}active{% endif %}">
+                <i class="fas fa-life-ring"></i><span>Support</span>
             </a>
-            <a href="/admin/notifications" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'notifications' %}active{% endif %}">
-                <i class="fas fa-bell w-5 text-center"></i>
-                <span class="text-sm">Notifications</span>
+            <a href="/admin/messages" class="sidebar-item {% if active_page == 'messages' %}active{% endif %}">
+                <i class="fas fa-envelope"></i><span>Messages</span>
             </a>
-            <a href="/admin/settings" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all {% if active_page == 'settings' %}active{% endif %}">
-                <i class="fas fa-cog w-5 text-center"></i>
-                <span class="text-sm">Settings</span>
+            <a href="/admin/inbox" class="sidebar-item {% if active_page == 'inbox' %}active{% endif %}">
+                <i class="fas fa-inbox"></i><span>Inbox</span>
             </a>
-            <a href="/admin/logout" class="sidebar-item flex items-center gap-3 px-4 py-3 transition-all text-red-300 hover:text-red-200">
-                <i class="fas fa-sign-out-alt w-5 text-center"></i>
-                <span class="text-sm">Logout</span>
+
+            <p class="zi-nav-group">System</p>
+            <a href="/admin/notifications" class="sidebar-item {% if active_page == 'notifications' %}active{% endif %}">
+                <i class="fas fa-bell"></i><span>Notifications</span>
+            </a>
+            <a href="/admin/settings" class="sidebar-item {% if active_page == 'settings' %}active{% endif %}">
+                <i class="fas fa-cog"></i><span>Settings</span>
             </a>
         </nav>
 
-        <div class="p-4">
-            <div class="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/5 backdrop-blur-sm">
-                <div class="w-10 h-10 rounded-xl flex items-center justify-center text-ziggo-dark text-sm font-black zi-logo">
+        <div class="p-3">
+            <div class="flex items-center gap-2.5 p-2.5 rounded-xl bg-ziggo-canvas border border-ziggo-line">
+                <div class="w-9 h-9 rounded-lg flex items-center justify-center bg-ziggo text-white text-sm font-bold zi-logo">
                     A
                 </div>
                 <div class="flex-1 min-w-0">
-                    <p class="text-sm font-bold truncate">Ziggo Admin</p>
-                    <p class="text-[11px] text-ziggo-soft/60 truncate">admin@ziggo.com</p>
+                    <p class="text-sm font-bold truncate text-ziggo-ink">Ziggo Admin</p>
+                    <p class="text-[11px] text-ziggo-muted truncate">admin@ziggo.com</p>
                 </div>
-                <a href="/admin/logout" class="text-ziggo-soft/60 hover:text-white p-2 rounded-lg hover:bg-white/10 transition" title="Logout">
+                <a href="/admin/logout" class="text-ziggo-muted hover:text-ziggo p-2 rounded-lg hover:bg-ziggo-soft/40 transition" title="Logout">
                     <i class="fas fa-sign-out-alt"></i>
                 </a>
             </div>
@@ -331,38 +448,114 @@
     <!-- Main Content -->
     <main class="flex-1 flex flex-col overflow-hidden">
         <!-- Header -->
-        <header class="zi-topbar px-8 py-4 flex items-center justify-between border-b border-ziggo-line/60">
+        <header class="zi-topbar px-7 py-3.5 flex items-center justify-between border-b border-ziggo-line/60">
             <div class="flex items-center gap-4">
                 <button class="text-ziggo-muted md:hidden"><i class="fas fa-bars text-xl"></i></button>
                 {% block top_title %}
-                <h1 class="text-2xl font-black tracking-tight text-ziggo-ink leading-none">{% block page_title %}Dashboard{% endblock %}</h1>
+                <h1 class="text-[20px] font-bold tracking-tight text-ziggo-ink leading-none">{% block page_title %}Dashboard{% endblock %}</h1>
                 {% endblock %}
             </div>
             <div class="flex items-center gap-3">
-                <button class="zi-bell flex items-center justify-center">
-                    <i class="far fa-bell"></i>
-                    <span class="dot"></span>
-                </button>
-                <div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-ziggo-canvas/80">
-                    <span class="text-xs font-bold text-ziggo-ink">EN</span>
-                    <i class="fas fa-chevron-down text-[10px] text-ziggo-faint"></i>
+                <div class="zi-notif" id="ziNotif">
+                    <button type="button" class="zi-bell flex items-center justify-center" id="ziBellBtn" aria-label="Notifications">
+                        <i class="far fa-bell"></i>
+                        <span class="dot"></span>
+                    </button>
+                    <div class="zi-notif-panel" id="ziNotifPanel">
+                        <div class="zi-notif-head">Notifications</div>
+                        <div id="ziNotifList">
+                            <div class="zi-notif-empty">Loading…</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl border border-ziggo-line">
-                    <div class="w-7 h-7 rounded-lg flex items-center justify-center text-ziggo-dark text-xs font-black zi-logo">A</div>
-                    <div class="leading-tight pr-1">
-                        <p class="text-[12px] font-black text-ziggo-ink">Ziggo Admin</p>
+                <div class="hidden sm:flex items-center gap-2.5 pl-3 pr-1 py-1 rounded-xl border border-ziggo-line">
+                    <div class="leading-tight text-right">
+                        <p class="text-[12px] font-bold text-ziggo-ink">Ziggo Admin</p>
                         <p class="text-[10px] text-ziggo-faint">Super admin</p>
                     </div>
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-ziggo text-white text-xs font-bold zi-logo">A</div>
                 </div>
             </div>
         </header>
 
         <!-- Page Content -->
-        <div class="flex-1 overflow-y-auto p-8">
+        <div class="flex-1 overflow-y-auto px-5 py-4">
             {% block content %}{% endblock %}
         </div>
     </main>
 
+    <script>
+      (function () {
+        var wrap = document.getElementById('ziNotif');
+        var btn = document.getElementById('ziBellBtn');
+        var list = document.getElementById('ziNotifList');
+        var dot = document.querySelector('#ziBellBtn .dot');
+        if (wrap && btn) {
+          btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            wrap.classList.toggle('open');
+            // Opening = reading the notifications -> clear the red dot
+            if (wrap.classList.contains('open')) {
+              localStorage.setItem('ziNotifSeen', String(window._ziNotifTotal || 0));
+              if (dot) dot.style.display = 'none';
+            }
+          });
+          document.addEventListener('click', function (e) { if (!wrap.contains(e.target)) wrap.classList.remove('open'); });
+          document.addEventListener('keydown', function (e) { if (e.key === 'Escape') wrap.classList.remove('open'); });
+        }
+
+        // Live notification feed from the backend
+        function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]); }); }
+        function loadNotif() {
+          fetch('/admin/notif-feed', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (d) {
+              if (!d || typeof d.total === 'undefined') return;
+              var total = d.total;
+              window._ziNotifTotal = total;
+              // Red dot only when there are NEW unread items not yet acknowledged.
+              var seen = parseInt(localStorage.getItem('ziNotifSeen') || '0', 10);
+              if (isNaN(seen)) seen = 0;
+              if (total < seen) { seen = total; localStorage.setItem('ziNotifSeen', String(seen)); }
+              if (dot) dot.style.display = (total > seen) ? '' : 'none';
+              if (!list) return;
+              if (!d.items || !d.items.length) {
+                list.innerHTML = '<div class="zi-notif-empty">You’re all caught up ✅</div>';
+                return;
+              }
+              list.innerHTML = d.items.map(function (i) {
+                return '<a href="' + esc(i.url) + '" class="zi-notif-item">'
+                  + '<span class="ic"><i class="fas ' + esc(i.icon) + '"></i></span>'
+                  + '<span class="tx"><strong>' + esc(i.title) + '</strong><small>' + esc(i.subtitle) + '</small></span></a>';
+              }).join('');
+            })
+            .catch(function () {});
+        }
+        loadNotif();
+        setInterval(loadNotif, 45000);
+
+        // Load custom branding assets
+        function loadBranding() {
+          fetch('/admin/branding-assets')
+            .then(function(r) { return r.ok ? r.json() : null; })
+            .then(function(d) {
+              if (!d) return;
+              if (d.logo_url) {
+                var sidebarLogo = document.getElementById('sidebarLogo');
+                if (sidebarLogo) sidebarLogo.src = d.logo_url;
+              }
+              if (d.favicon_url) {
+                var fav = document.querySelector('link[rel="icon"]');
+                if (fav) fav.href = d.favicon_url;
+                var appleFav = document.querySelector('link[rel="apple-touch-icon"]');
+                if (appleFav) appleFav.href = d.favicon_url;
+              }
+            })
+            .catch(function() {});
+        }
+        loadBranding();
+      })();
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

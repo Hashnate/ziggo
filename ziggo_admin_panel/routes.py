@@ -289,15 +289,66 @@ async def admin_dashboard(
 @router.get("/drivers", response_class=HTMLResponse)
 async def admin_drivers(
     request: Request,
+    page: int = 1,
+    status: str = "all",
+    search: str = "",
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
+    from sqlalchemy import or_
+
+    limit = 50
+    offset = (page - 1) * limit
+
+    # Build filter conditions
+    where_clauses = []
+    
+    # Status filter
+    if status == "active":
+        where_clauses.append(User.is_active == True)
+    elif status == "inactive":
+        where_clauses.append(User.is_active == False)
+        
+    # Search filter
+    if search:
+        search_term = f"%{search.strip()}%"
+        where_clauses.append(
+            or_(
+                User.full_name.ilike(search_term),
+                User.phone_number.ilike(search_term),
+                User.email.ilike(search_term),
+                Driver.vehicle_number.ilike(search_term),
+                Driver.vehicle_model.ilike(search_term),
+            )
+        )
+
+    # Base query for drivers
+    stmt = (
+        select(Driver)
+        .join(User, Driver.user_id == User.id)
+    )
+    if where_clauses:
+        stmt = stmt.where(*where_clauses)
+
+    # Total count of all drivers in system (for stats bar)
+    total_all = (await db.execute(select(func.count(Driver.id)))).scalar() or 0
+
+    # Total count under current filters (for list pagination)
+    count_stmt = select(func.count(Driver.id)).join(User, Driver.user_id == User.id)
+    if where_clauses:
+        count_stmt = count_stmt.where(*where_clauses)
+    total = (await db.execute(count_stmt)).scalar() or 0
+    total_pages = (total + limit - 1) // limit
+
+    # Query matching records
     q = await db.execute(
-        select(Driver).options(selectinload(Driver.user)).order_by(Driver.id.desc())
+        stmt.options(selectinload(Driver.user))
+        .order_by(Driver.id.desc())
+        .offset(offset)
+        .limit(limit)
     )
     drivers = q.scalars().all()
 
-    total = (await db.execute(select(func.count(Driver.id)))).scalar() or 0
     online = (
         await db.execute(select(func.count(Driver.id)).where(Driver.is_online == True))  # noqa: E712
     ).scalar() or 0
@@ -312,16 +363,84 @@ async def admin_drivers(
     avg_rating = float(avg_rating_q.scalar() or 0)
 
     stats = {
-        "total": total,
+        "total": total_all,
         "online": online,
-        "online_pct": int(round((online / total * 100) if total else 0)),
+        "online_pct": int(round((online / total_all * 100) if total_all else 0)),
         "pending": pending,
         "avg_rating": avg_rating,
     }
 
+    start_idx = (page - 1) * limit + 1 if total > 0 else 0
+    end_idx = min(page * limit, total)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
+
     return templates.TemplateResponse(
         request, "drivers.html",
-        {"request": request, "active_page": "drivers", "drivers": drivers, "stats": stats},
+        {
+            "request": request,
+            "active_page": "drivers",
+            "drivers": drivers,
+            "stats": stats,
+            "page": page,
+            "total_pages": total_pages,
+            "total_drivers": total,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
+            "status": status,
+            "search": search,
+        },
+    )
+
+
+
+@router.get("/drivers/export")
+async def admin_drivers_export(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    """Download the driver list as CSV. Read-only export over the existing
+    Driver/User tables — changes nothing else in the app."""
+    import csv
+    import io
+    from fastapi.responses import Response
+
+    q = await db.execute(
+        select(Driver).options(selectinload(Driver.user)).order_by(Driver.id.desc())
+    )
+    drivers = q.scalars().all()
+
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow([
+        "ID", "Name", "Phone", "NIC", "License", "Vehicle Type", "Vehicle No",
+        "Model", "Color", "Year", "Status", "Online", "Rating", "Total Rides",
+        "Total Earnings",
+    ])
+    for d in drivers:
+        u = d.user
+        w.writerow([
+            d.id,
+            (u.full_name if u else "") or "",
+            (u.phone_number if u else "") or "",
+            d.nic_number or "",
+            d.license_number or "",
+            d.vehicle_type or "",
+            d.vehicle_number or "",
+            d.vehicle_model or "",
+            d.vehicle_color or "",
+            d.vehicle_year or "",
+            d.status.value if d.status else "",
+            "Yes" if d.is_online else "No",
+            (u.rating if u else "") or "",
+            (u.total_rides if u else "") or "",
+            d.total_earnings if d.total_earnings is not None else 0,
+        ])
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=ziggo-drivers.csv"},
     )
 
 
@@ -348,8 +467,12 @@ async def admin_drivers_new_submit(
     vehicle_number: str = Form(...),
     vehicle_model: str = Form(...),
     vehicle_color: str = Form(...),
-    auto_approve: str = Form("on"),
+    is_approved: str = Form(""),
+    relative_name: str = Form(""),
+    relative_contact: str = Form(""),
+    relative_relationship: str = Form(""),
     profile_photo: UploadFile | None = File(None),
+    billing_proof: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -365,8 +488,12 @@ async def admin_drivers_new_submit(
         "vehicle_number": vehicle_number,
         "vehicle_model": vehicle_model,
         "vehicle_color": vehicle_color,
-        "auto_approve": auto_approve,
+        "is_approved": is_approved,
+        "relative_name": relative_name,
+        "relative_contact": relative_contact,
+        "relative_relationship": relative_relationship,
     }
+
 
     if vehicle_type not in {"bike", "tuk", "car", "van", "truck"}:
         return templates.TemplateResponse(
@@ -401,6 +528,7 @@ async def admin_drivers_new_submit(
     from decimal import Decimal
 
     photo_url = await _save_uploaded_photo(profile_photo)
+    billing_proof_url = await _save_uploaded_photo(billing_proof)
 
     user = User(
         phone_number=phone_number,
@@ -413,7 +541,7 @@ async def admin_drivers_new_submit(
     db.add(user)
     await db.flush()
 
-    approved = bool(auto_approve)
+    approved = (is_approved == "1" or is_approved == "on")
     driver = Driver(
         user_id=user.id,
         nic_number=nic_number,
@@ -430,10 +558,15 @@ async def admin_drivers_new_submit(
         total_earnings=Decimal("0"),
         today_earnings=Decimal("0"),
         today_rides=0,
+        relative_name=relative_name or None,
+        relative_contact=relative_contact or None,
+        relative_relationship=relative_relationship or None,
+        billing_proof_url=billing_proof_url or None,
     )
     db.add(driver)
     await db.commit()
     return RedirectResponse(url="/admin/drivers", status_code=303)
+
 
 
 @router.get("/drivers/{driver_id}/edit", response_class=HTMLResponse)
@@ -616,52 +749,583 @@ async def suspend_driver_form(
     return RedirectResponse(url="/admin/drivers", status_code=303)
 
 
-@router.get("/customers", response_class=HTMLResponse)
-async def admin_customers(
-    request: Request,
+@router.post("/drivers/{driver_id}/deactivate")
+async def deactivate_driver_form(
+    driver_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
     q = await db.execute(
-        select(Customer).options(selectinload(Customer.user)).order_by(Customer.id.desc())
+        select(Driver)
+        .options(selectinload(Driver.user))
+        .where(Driver.id == driver_id)
+    )
+    d = q.scalars().first()
+    if d:
+        d.is_approved = False
+        d.is_online = False
+        d.status = DriverStatus.SUSPENDED
+        if d.user:
+            d.user.is_active = False
+        await db.commit()
+    return RedirectResponse(url="/admin/drivers", status_code=303)
+
+
+@router.post("/drivers/{driver_id}/activate")
+async def activate_driver_form(
+    driver_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    q = await db.execute(
+        select(Driver)
+        .options(selectinload(Driver.user))
+        .where(Driver.id == driver_id)
+    )
+    d = q.scalars().first()
+    if d:
+        if d.user:
+            d.user.is_active = True
+        await db.commit()
+    return RedirectResponse(url="/admin/drivers", status_code=303)
+
+
+@router.get("/customers", response_class=HTMLResponse)
+async def admin_customers(
+    request: Request,
+    page: int = 1,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    limit = 50
+    offset = (page - 1) * limit
+
+    total = (await db.execute(select(func.count(Customer.id)))).scalar() or 0
+    total_pages = (total + limit - 1) // limit
+
+    q = await db.execute(
+        select(Customer)
+        .options(selectinload(Customer.user))
+        .order_by(Customer.id.desc())
+        .offset(offset)
+        .limit(limit)
     )
     customers = q.scalars().all()
+
+    start_idx = (page - 1) * limit + 1 if total > 0 else 0
+    end_idx = min(page * limit, total)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
+
     return templates.TemplateResponse(
         request, "customers.html",
-        {"request": request, "active_page": "customers", "customers": customers},
+        {
+            "request": request,
+            "active_page": "customers",
+            "customers": customers,
+            "page": page,
+            "total_pages": total_pages,
+            "total_customers": total,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
+        },
     )
+
 
 
 @router.get("/bookings", response_class=HTMLResponse)
 async def admin_bookings(
     request: Request,
+    page: int = 1,
+    start: str = "",
+    end: str = "",
+    status: str = "all",
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
+    from sqlalchemy import and_
+
+    limit = 50
+    offset = (page - 1) * limit
+
+    # Build query base
+    base_where = [Booking.is_flash == False]
+
+    # Parse dates
+    start_dt = None
+    end_dt = None
+    if start:
+        try:
+            start_dt = datetime.strptime(start.strip(), "%Y-%m-%d").replace(tzinfo=timezone.utc, hour=0, minute=0, second=0, microsecond=0)
+            base_where.append(Booking.booked_at >= start_dt)
+        except ValueError:
+            pass
+    if end:
+        try:
+            end_dt = datetime.strptime(end.strip(), "%Y-%m-%d").replace(tzinfo=timezone.utc, hour=23, minute=59, second=59, microsecond=0)
+            base_where.append(Booking.booked_at <= end_dt)
+        except ValueError:
+            pass
+
+    # Active bookings (not paginated, needed for live map tracking)
+    active_statuses = [
+        BookingStatus.SEARCHING,
+        BookingStatus.ACCEPTED,
+        BookingStatus.ARRIVED,
+        BookingStatus.STARTED,
+    ]
+    active_q = await db.execute(
+        select(Booking)
+        .options(
+            selectinload(Booking.customer).selectinload(Customer.user),
+            selectinload(Booking.driver).selectinload(Driver.user),
+        )
+        .where(Booking.is_flash == False, Booking.status.in_(active_statuses))
+        .order_by(desc(Booking.id))
+    )
+    active_bookings = active_q.scalars().all()
+
+    # KPI summary stats (calculated based on date filters)
+    stats_q = await db.execute(
+        select(
+            func.count(Booking.id),
+            func.count(Booking.id).filter(Booking.status == BookingStatus.COMPLETED),
+            func.count(Booking.id).filter(Booking.status == BookingStatus.CANCELLED),
+            func.coalesce(func.sum(Booking.final_amount).filter(Booking.status == BookingStatus.COMPLETED), 0),
+        )
+        .where(and_(*base_where))
+    )
+    stat_total, stat_completed, stat_cancelled, stat_revenue = stats_q.one()
+
+    # Table query conditions (base + optional status filter)
+    table_where = list(base_where)
+    if status and status != "all":
+        table_where.append(Booking.status == status)
+
+    # Total count of filtered bookings
+    total_q = await db.execute(
+        select(func.count(Booking.id)).where(and_(*table_where))
+    )
+    total_bookings = total_q.scalar() or 0
+    total_pages = (total_bookings + limit - 1) // limit
+
+    # Paginated bookings for the table
     q = await db.execute(
         select(Booking)
         .options(
             selectinload(Booking.customer).selectinload(Customer.user),
             selectinload(Booking.driver).selectinload(Driver.user),
         )
-        .where(Booking.is_flash == False)  # noqa: E712  -- rides only
+        .where(and_(*table_where))
         .order_by(desc(Booking.id))
-        .limit(200)
+        .offset(offset)
+        .limit(limit)
     )
     bookings = q.scalars().all()
+
+    start_idx = (page - 1) * limit + 1 if total_bookings > 0 else 0
+    end_idx = min(page * limit, total_bookings)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
+
     return templates.TemplateResponse(
         request, "bookings.html",
-        {"request": request, "active_page": "bookings", "bookings": bookings},
+        {
+            "request": request,
+            "active_page": "bookings",
+            "bookings": bookings,
+            "active_bookings": active_bookings,
+            "page": page,
+            "total_pages": total_pages,
+            "total_bookings": total_bookings,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
+            "start_date": start,
+            "end_date": end,
+            "status": status,
+            "stat_total": stat_total,
+            "stat_completed": stat_completed,
+            "stat_cancelled": stat_cancelled,
+            "stat_revenue": float(stat_revenue),
+            "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY or "",
+        },
     )
+
+
+
+@router.get("/notifications", response_class=HTMLResponse)
+async def admin_notifications(
+    request: Request,
+    page: int = 1,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import Notification
+    limit = 50
+    offset = (page - 1) * limit
+
+    # Total count of notifications
+    total_q = await db.execute(select(func.count(Notification.id)))
+    total_notifications = total_q.scalar() or 0
+    total_pages = (total_notifications + limit - 1) // limit
+
+    # Paginated notifications
+    q = await db.execute(
+        select(Notification)
+        .options(selectinload(Notification.user))
+        .order_by(desc(Notification.created_at))
+        .offset(offset)
+        .limit(limit)
+    )
+    notifications = q.scalars().all()
+
+    # Unread count (global)
+    unread_q = await db.execute(
+        select(func.count(Notification.id)).where(Notification.is_read == False)
+    )
+    unread_count = unread_q.scalar() or 0
+
+    # Group counts by type (global)
+    type_q = await db.execute(
+        select(Notification.type, func.count(Notification.id)).group_by(Notification.type)
+    )
+    by_type = {row[0] or "other": row[1] for row in type_q.all()}
+
+    start_idx = (page - 1) * limit + 1 if total_notifications > 0 else 0
+    end_idx = min(page * limit, total_notifications)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
+
+    return templates.TemplateResponse(
+        request, "notifications.html",
+        {
+            "request": request,
+            "active_page": "notifications",
+            "notifications": notifications,
+            "unread_count": unread_count,
+            "by_type": by_type,
+            "page": page,
+            "total_pages": total_pages,
+            "total_notifications": total_notifications,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
+        },
+    )
+
+
+@router.get("/withdrawals", response_class=HTMLResponse)
+async def admin_withdrawals(
+    request: Request,
+    page: int = 1,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import Driver, WalletTransaction
+    from decimal import Decimal
+
+    limit = 50
+    offset = (page - 1) * limit
+
+    total = (await db.execute(select(func.count(Driver.id)))).scalar() or 0
+    total_pages = (total + limit - 1) // limit
+
+    q = await db.execute(
+        select(Driver)
+        .options(selectinload(Driver.user))
+        .offset(offset)
+        .limit(limit)
+    )
+    drivers = q.scalars().all()
+
+    payouts_q = await db.execute(
+        select(WalletTransaction.user_id, func.sum(WalletTransaction.amount))
+        .where(
+            WalletTransaction.type == "debit",
+            WalletTransaction.reference_id == "PAYOUT"
+        )
+        .group_by(WalletTransaction.user_id)
+    )
+    payout_map = {row[0]: row[1] for row in payouts_q.all()}
+
+    # Calculate global total pending
+    total_earnings_q = await db.execute(select(func.sum(Driver.total_earnings)))
+    sum_earned = total_earnings_q.scalar() or Decimal("0")
+    payout_sum_q = await db.execute(
+        select(func.sum(WalletTransaction.amount))
+        .where(
+            WalletTransaction.type == "debit",
+            WalletTransaction.reference_id == "PAYOUT"
+        )
+    )
+    sum_paid = payout_sum_q.scalar() or Decimal("0")
+    total_pending = max(Decimal("0"), sum_earned - sum_paid)
+
+    rows = []
+    for d in drivers:
+        if not d.user:
+            continue
+        earned = d.total_earnings or Decimal("0")
+        paid = payout_map.get(d.user_id, Decimal("0"))
+        pending = max(Decimal("0"), earned - paid)
+        rows.append({
+            "driver_id": d.id,
+            "name": d.user.full_name or "Driver #" + str(d.id),
+            "phone": d.user.phone_number or "—",
+            "vehicle_type": d.vehicle_type or "—",
+            "earned": earned,
+            "paid": paid,
+            "pending": pending,
+        })
+
+    history_q = await db.execute(
+        select(WalletTransaction)
+        .options(selectinload(WalletTransaction.user))
+        .where(
+            WalletTransaction.type == "debit",
+            WalletTransaction.reference_id == "PAYOUT"
+        )
+        .order_by(WalletTransaction.created_at.desc())
+        .limit(100)
+    )
+    history = history_q.scalars().all()
+
+    start_idx = (page - 1) * limit + 1 if total > 0 else 0
+    end_idx = min(page * limit, total)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
+
+    return templates.TemplateResponse(
+        request, "withdrawals.html",
+        {
+            "request": request,
+            "active_page": "withdrawals",
+            "total_pending": total_pending,
+            "rows": rows,
+            "history": history,
+            "page": page,
+            "total_pages": total_pages,
+            "total_drivers": total,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
+        },
+    )
+
+
+
+@router.post("/withdrawals/{driver_id}/pay")
+async def admin_withdrawals_pay(
+    driver_id: int,
+    amount: float = Form(...),
+    note: str = Form("Manual payout"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import Driver, WalletTransaction
+    from decimal import Decimal
+
+    q = await db.execute(select(Driver).where(Driver.id == driver_id))
+    d = q.scalars().first()
+    if not d:
+        raise HTTPException(status_code=404, detail="Driver not found")
+
+    db.add(
+        WalletTransaction(
+            user_id=d.user_id,
+            amount=Decimal(str(amount)),
+            type="debit",
+            description=note,
+            reference_id="PAYOUT",
+            balance_after=Decimal("0"),
+        )
+    )
+    await db.commit()
+    return RedirectResponse(url="/admin/withdrawals", status_code=303)
+
+
+@router.get("/payments", response_class=HTMLResponse)
+async def admin_payments(
+    request: Request,
+    page: int = 1,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import Payment, Booking, Customer
+    from decimal import Decimal
+
+    limit = 50
+    offset = (page - 1) * limit
+
+    total = (await db.execute(select(func.count(Payment.id)))).scalar() or 0
+    total_pages = (total + limit - 1) // limit
+
+    q = await db.execute(
+        select(Payment)
+        .options(
+            selectinload(Payment.booking)
+            .selectinload(Booking.customer)
+            .selectinload(Customer.user)
+        )
+        .order_by(Payment.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    payments = q.scalars().all()
+
+    total_q = await db.execute(
+        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.status == "completed")
+    )
+    total_val = total_q.scalar() or Decimal("0")
+
+    cash_q = await db.execute(
+        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.status == "completed", Payment.payment_method == "cash")
+    )
+    cash_val = cash_q.scalar() or Decimal("0")
+
+    card_q = await db.execute(
+        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.status == "completed", Payment.payment_method == "card")
+    )
+    card_val = card_q.scalar() or Decimal("0")
+
+    wallet_q = await db.execute(
+        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.status == "completed", Payment.payment_method == "wallet")
+    )
+    wallet_val = wallet_q.scalar() or Decimal("0")
+
+    totals = {
+        "total": float(total_val),
+        "cash": float(cash_val),
+        "card": float(card_val),
+        "wallet": float(wallet_val),
+    }
+
+    start_idx = (page - 1) * limit + 1 if total > 0 else 0
+    end_idx = min(page * limit, total)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
+
+    return templates.TemplateResponse(
+        request, "payments.html",
+        {
+            "request": request,
+            "active_page": "payments",
+            "payments": payments,
+            "totals": totals,
+            "page": page,
+            "total_pages": total_pages,
+            "total_payments": total,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
+        },
+    )
+
+
+
+@router.get("/topups", response_class=HTMLResponse)
+async def admin_topups(
+    request: Request,
+    page: int = 1,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import WalletTransaction
+    from decimal import Decimal
+
+    limit = 50
+    offset = (page - 1) * limit
+
+    total = (await db.execute(select(func.count(WalletTransaction.id)).where(WalletTransaction.type == "credit"))).scalar() or 0
+    total_pages = (total + limit - 1) // limit
+
+    q = await db.execute(
+        select(WalletTransaction)
+        .options(selectinload(WalletTransaction.user))
+        .where(WalletTransaction.type == "credit")
+        .order_by(WalletTransaction.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    topups = q.scalars().all()
+
+    total_q = await db.execute(
+        select(func.coalesce(func.sum(WalletTransaction.amount), 0)).where(WalletTransaction.type == "credit")
+    )
+    total_val = total_q.scalar() or Decimal("0")
+
+    start_idx = (page - 1) * limit + 1 if total > 0 else 0
+    end_idx = min(page * limit, total)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
+
+    return templates.TemplateResponse(
+        request, "topups.html",
+        {
+            "request": request,
+            "active_page": "topups",
+            "topups": topups,
+            "total": float(total_val),
+            "count": total,
+            "page": page,
+            "total_pages": total_pages,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
+        },
+    )
+
+
+
+@router.post("/topups/manual")
+async def admin_topups_manual(
+    user_phone: str = Form(...),
+    amount: float = Form(...),
+    note: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import User, WalletTransaction, Customer
+    from decimal import Decimal
+
+    user_q = await db.execute(select(User).where(User.phone_number == user_phone))
+    u = user_q.scalars().first()
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    cust_q = await db.execute(select(Customer).where(Customer.user_id == u.id))
+    c = cust_q.scalars().first()
+    new_balance = Decimal("0")
+    if c:
+        c.wallet_balance = (c.wallet_balance or Decimal("0")) + Decimal(str(amount))
+        new_balance = c.wallet_balance
+
+    db.add(
+        WalletTransaction(
+            user_id=u.id,
+            amount=Decimal(str(amount)),
+            type="credit",
+            description=note or "Manual top-up",
+            reference_id="MANUAL",
+            balance_after=new_balance,
+        )
+    )
+    await db.commit()
+    return RedirectResponse(url="/admin/topups", status_code=303)
 
 
 @router.get("/flash", response_class=HTMLResponse)
 async def admin_flash(
     request: Request,
+    page: int = 1,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
     from datetime import timedelta  # noqa: F401 (kept for parity with dashboard)
+
+    limit = 50
+    offset = (page - 1) * limit
+
+    total = (
+        await db.execute(select(func.count(Booking.id)).where(Booking.is_flash == True))  # noqa: E712
+    ).scalar() or 0
+    total_pages = (total + limit - 1) // limit
 
     q = await db.execute(
         select(Booking)
@@ -671,23 +1335,27 @@ async def admin_flash(
         )
         .where(Booking.is_flash == True)  # noqa: E712
         .order_by(desc(Booking.id))
-        .limit(200)
+        .offset(offset)
+        .limit(limit)
     )
     orders = q.scalars().all()
 
     today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    total = (
-        await db.execute(select(func.count(Booking.id)).where(Booking.is_flash == True))  # noqa: E712
-    ).scalar() or 0
-    active_count = sum(
-        1 for o in orders
-        if o.status in (
-            BookingStatus.SEARCHING,
-            BookingStatus.ACCEPTED,
-            BookingStatus.ARRIVED,
-            BookingStatus.STARTED,
+    
+    # Active orders (not paginated, needed for live dashboard stats)
+    active_q = await db.execute(
+        select(func.count(Booking.id)).where(
+            Booking.is_flash == True,  # noqa: E712
+            Booking.status.in_([
+                BookingStatus.SEARCHING,
+                BookingStatus.ACCEPTED,
+                BookingStatus.ARRIVED,
+                BookingStatus.STARTED,
+            ])
         )
     )
+    active_count = active_q.scalar() or 0
+
     delivered_today = (
         await db.execute(
             select(func.count(Booking.id)).where(
@@ -713,6 +1381,10 @@ async def admin_flash(
         "revenue": float(revenue),
     }
 
+    start_idx = (page - 1) * limit + 1 if total > 0 else 0
+    end_idx = min(page * limit, total)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
+
     return templates.TemplateResponse(
         request, "flash.html",
         {
@@ -720,8 +1392,14 @@ async def admin_flash(
             "active_page": "flash",
             "orders": orders,
             "stats": stats,
+            "page": page,
+            "total_pages": total_pages,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
         },
     )
+
 
 
 @router.get("/fare-settings", response_class=HTMLResponse)
@@ -779,6 +1457,15 @@ async def _get_or_create_settings(db: AsyncSession):
         await db.commit()
         await db.refresh(s)
     return s
+
+
+@router.get("/branding-assets")
+async def admin_branding_assets(db: AsyncSession = Depends(get_db)):
+    s = await _get_or_create_settings(db)
+    return {
+        "logo_url": s.logo_url or "/static/img/logo.jpeg",
+        "favicon_url": s.favicon_url or "/static/img/logo.jpeg",
+    }
 
 
 @router.get("/settings", response_class=HTMLResponse)
@@ -1104,6 +1791,7 @@ async def admin_services_toggle(
 @router.get("/vehicles", response_class=HTMLResponse)
 async def admin_vehicles(
     request: Request,
+    page: int = 1,
     status: str = "",
     category: str = "",
     db: AsyncSession = Depends(get_db),
@@ -1111,14 +1799,26 @@ async def admin_vehicles(
 ):
     from app.models import FareSetting
 
+    limit = 50
+    offset = (page - 1) * limit
+
     q = select(Driver).options(selectinload(Driver.user)).order_by(Driver.id)
+    count_q = select(func.count(Driver.id))
+
     if status:
         try:
             q = q.where(Driver.status == DriverStatus(status))
+            count_q = count_q.where(Driver.status == DriverStatus(status))
         except ValueError:
             pass
     if category:
         q = q.where(Driver.vehicle_type == category)
+        count_q = count_q.where(Driver.vehicle_type == category)
+
+    total_filtered = (await db.execute(count_q)).scalar() or 0
+    total_pages = (total_filtered + limit - 1) // limit
+
+    q = q.offset(offset).limit(limit)
     result = await db.execute(q)
     vehicles = result.scalars().all()
 
@@ -1133,6 +1833,10 @@ async def admin_vehicles(
         select(FareSetting).where(FareSetting.is_active == True).order_by(FareSetting.id)  # noqa: E712
     )
     categories = cats_q.scalars().all()
+
+    start_idx = (page - 1) * limit + 1 if total_filtered > 0 else 0
+    end_idx = min(page * limit, total_filtered)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
 
     return templates.TemplateResponse(
         request,
@@ -1149,8 +1853,15 @@ async def admin_vehicles(
             "filter_status": status,
             "filter_category": category,
             "statuses": [s.value for s in DriverStatus],
+            "page": page,
+            "total_pages": total_pages,
+            "total_filtered": total_filtered,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
         },
     )
+
 
 
 @router.post("/vehicles/{driver_id}/edit")
@@ -1357,15 +2068,25 @@ async def admin_flash_pricing_delete(
 @router.get("/restaurants", response_class=HTMLResponse)
 async def admin_restaurants(
     request: Request,
+    page: int = 1,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
     from app.models import Restaurant
 
+    limit = 50
+    offset = (page - 1) * limit
+
+    total = (await db.execute(select(func.count(Restaurant.id)))).scalar() or 0
+    total_pages = (total + limit - 1) // limit
+
     # Order pending (is_active=False) first so owner self-registrations rise
     # to the top of the admin's attention. Within each group, newest first.
     q = await db.execute(
-        select(Restaurant).order_by(Restaurant.is_active.asc(), Restaurant.id.desc())
+        select(Restaurant)
+        .order_by(Restaurant.is_active.asc(), Restaurant.id.desc())
+        .offset(offset)
+        .limit(limit)
     )
     restaurants = q.scalars().all()
 
@@ -1393,10 +2114,26 @@ async def admin_restaurants(
         }
         for r in restaurants
     ]
+
+    start_idx = (page - 1) * limit + 1 if total > 0 else 0
+    end_idx = min(page * limit, total)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
+
     return templates.TemplateResponse(
         request, "restaurants.html",
-        {"request": request, "active_page": "restaurants", "restaurants": rows},
+        {
+            "request": request,
+            "active_page": "restaurants",
+            "restaurants": rows,
+            "page": page,
+            "total_pages": total_pages,
+            "total_restaurants": total,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
+        },
     )
+
 
 
 @router.post("/restaurants/{restaurant_id}/approve")
@@ -1695,16 +2432,45 @@ async def admin_restaurant_add_item(
 @router.get("/market", response_class=HTMLResponse)
 async def admin_market(
     request: Request,
+    page: int = 1,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
     from app.models import MarketVendor
 
-    q = await db.execute(select(MarketVendor).order_by(MarketVendor.id.desc()))
+    limit = 50
+    offset = (page - 1) * limit
+
+    total = (await db.execute(select(func.count(MarketVendor.id)))).scalar() or 0
+    total_pages = (total + limit - 1) // limit
+
+    q = await db.execute(
+        select(MarketVendor)
+        .order_by(MarketVendor.id.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    vendors = q.scalars().all()
+
+    start_idx = (page - 1) * limit + 1 if total > 0 else 0
+    end_idx = min(page * limit, total)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
+
     return templates.TemplateResponse(
         request, "market.html",
-        {"request": request, "active_page": "market", "vendors": q.scalars().all()},
+        {
+            "request": request,
+            "active_page": "market",
+            "vendors": vendors,
+            "page": page,
+            "total_pages": total_pages,
+            "total_vendors": total,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
+        },
     )
+
 
 
 @router.get("/market/new", response_class=HTMLResponse)
@@ -1986,117 +2752,397 @@ def _parse_iso_date_or(default_dt, raw: str):
         return default_dt
 
 
-async def _reports_aggregate(db: AsyncSession, start_dt: datetime, end_dt_exclusive: datetime) -> dict:
+async def _reports_aggregate(db: AsyncSession, start_dt: datetime, end_dt_exclusive: datetime, type: str = "summary") -> dict:
     """Aggregate bookings between [start_dt, end_dt_exclusive) bucketed by day."""
     from decimal import Decimal as D
     from sqlalchemy import cast, Date, distinct
 
     bucket = cast(Booking.booked_at, Date).label("day")
 
-    # Per-day per-status rollup
-    q = await db.execute(
-        select(
-            bucket,
-            Booking.status,
-            func.count(Booking.id),
-            func.coalesce(func.sum(Booking.final_amount), 0),
-            func.coalesce(func.sum(Booking.platform_fee), 0),
-            func.count(distinct(Booking.customer_id)),
-            func.count(distinct(Booking.driver_id)),
+    if type == "earnings":
+        # Per-day earnings rollup for COMPLETED bookings
+        q = await db.execute(
+            select(
+                bucket,
+                func.count(Booking.id),
+                func.coalesce(func.sum(Booking.final_amount), 0),
+                func.coalesce(func.sum(Booking.platform_fee), 0),
+                func.coalesce(func.sum(Booking.driver_earnings), 0),
+                func.coalesce(func.sum(Booking.waiting_charge), 0),
+                func.coalesce(func.sum(Booking.discount_amount), 0),
+                func.coalesce(func.sum(Booking.redeem_discount), 0),
+            )
+            .where(
+                Booking.booked_at >= start_dt,
+                Booking.booked_at < end_dt_exclusive,
+                Booking.status == BookingStatus.COMPLETED
+            )
+            .group_by(bucket)
+            .order_by(bucket)
         )
-        .where(Booking.booked_at >= start_dt, Booking.booked_at < end_dt_exclusive)
-        .group_by(bucket, Booking.status)
-        .order_by(bucket)
-    )
-    rows_by_day: dict[str, dict] = {}
-    overall = {"rides": 0, "completed": 0, "cancelled": 0, "revenue": D("0"), "platform": D("0")}
-    drivers_set: set[int] = set()
+        
+        rows_by_day = {}
+        cur = start_dt.date()
+        end_d = (end_dt_exclusive - timedelta(seconds=1)).date()
+        while cur <= end_d:
+            rows_by_day[cur.isoformat()] = {
+                "date": cur.isoformat(),
+                "gross": 0.0,
+                "driver_earnings": 0.0,
+                "commission": 0.0,
+                "waiting_charge": 0.0,
+                "discount": 0.0,
+            }
+            cur = cur + timedelta(days=1)
 
-    # Walk every day in range so the chart and table have zero-filled rows.
-    cur = start_dt.date()
-    end_d = (end_dt_exclusive - timedelta(seconds=1)).date()
-    while cur <= end_d:
-        rows_by_day[cur.isoformat()] = {
-            "date": cur.isoformat(),
+        overall = {
+            "gross": 0.0,
+            "driver_earnings": 0.0,
+            "commission": 0.0,
+            "waiting_charge": 0.0,
+            "promo_discount": 0.0,
+            "redeem_discount": 0.0,
+        }
+        for day, count, gross, commission, driver_earn, wait_chg, promo, redeem in q.all():
+            key = day.isoformat()
+            r = rows_by_day.setdefault(key, {
+                "date": key, "gross": 0.0, "driver_earnings": 0.0, "commission": 0.0, "waiting_charge": 0.0, "discount": 0.0
+            })
+            r["gross"] = float(gross)
+            r["driver_earnings"] = float(driver_earn)
+            r["commission"] = float(commission)
+            r["waiting_charge"] = float(wait_chg)
+            r["discount"] = float(promo + redeem)
+            
+            overall["gross"] += float(gross)
+            overall["driver_earnings"] += float(driver_earn)
+            overall["commission"] += float(commission)
+            overall["waiting_charge"] += float(wait_chg)
+            overall["promo_discount"] += float(promo)
+            overall["redeem_discount"] += float(redeem)
+
+        rows_sorted = sorted(rows_by_day.values(), key=lambda r: r["date"], reverse=True)
+        trend = [
+            {"date": r["date"], "gross": r["gross"], "commission": r["commission"]}
+            for r in rows_sorted
+        ]
+        trend.reverse()
+
+        return {
+            "totals": {
+                "admin_net": overall["commission"],
+                "gross_bookings": overall["gross"],
+                "driver_earnings": overall["driver_earnings"],
+                "waiting_charge": overall["waiting_charge"],
+                "promo_discount": overall["promo_discount"],
+                "redeem_discount": overall["redeem_discount"],
+                "total_discount": overall["promo_discount"] + overall["redeem_discount"],
+            },
+            "trend": trend,
+            "rows": rows_sorted,
+        }
+
+    elif type == "drivers":
+        # Per-day driver performance rollup
+        rows_by_day = {}
+        cur = start_dt.date()
+        end_d = (end_dt_exclusive - timedelta(seconds=1)).date()
+        while cur <= end_d:
+            rows_by_day[cur.isoformat()] = {
+                "date": cur.isoformat(),
+                "active_drivers": set(),
+                "rides": 0,
+                "completed": 0,
+                "cancelled": 0,
+                "rating_sum": 0.0,
+                "rating_count": 0,
+            }
+            cur = cur + timedelta(days=1)
+
+        overall = {
             "rides": 0,
             "completed": 0,
             "cancelled": 0,
-            "revenue": D("0"),
-            "drivers": set(),
-            "riders": set(),
+            "active_drivers": set(),
+            "rating_sum": 0.0,
+            "rating_count": 0,
         }
-        cur = cur + timedelta(days=1)
 
-    for day, status, n, revenue, platform, customers, drivers in q.all():
-        key = day.isoformat()
-        r = rows_by_day.setdefault(key, {
-            "date": key, "rides": 0, "completed": 0, "cancelled": 0,
-            "revenue": D("0"), "drivers": set(), "riders": set(),
-        })
-        r["rides"] += n
-        overall["rides"] += n
-        if status == BookingStatus.COMPLETED:
-            r["completed"] += n
-            r["revenue"] += revenue
-            overall["completed"] += n
-            overall["revenue"] += revenue
-            overall["platform"] += platform
-        elif status == BookingStatus.CANCELLED:
-            r["cancelled"] += n
-            overall["cancelled"] += n
-
-    # Distinct riders/drivers per day need a second pass (the group_by-status
-    # query above can't aggregate distinct customer_id correctly because the
-    # status dimension splits the same customer's bookings across rows).
-    # The per-day "drivers" column counts everyone who took a trip that day
-    # (any status). The top-level "Active drivers" KPI only counts drivers
-    # who actually completed a ride — that's the meaningful business metric.
-    qd = await db.execute(
-        select(bucket, Booking.status, Booking.customer_id, Booking.driver_id)
-        .where(Booking.booked_at >= start_dt, Booking.booked_at < end_dt_exclusive)
-    )
-    for day, status, cid, did in qd.all():
-        key = day.isoformat()
-        if key not in rows_by_day:
-            continue
-        if cid is not None:
-            rows_by_day[key]["riders"].add(cid)
-        if did is not None:
-            rows_by_day[key]["drivers"].add(did)
+        qb = await db.execute(
+            select(
+                bucket,
+                Booking.status,
+                Booking.driver_id,
+                Booking.driver_rating
+            )
+            .where(Booking.booked_at >= start_dt, Booking.booked_at < end_dt_exclusive)
+        )
+        for day, status, driver_id, driver_rating in qb.all():
+            key = day.isoformat()
+            if key not in rows_by_day:
+                continue
+            r = rows_by_day[key]
+            r["rides"] += 1
+            overall["rides"] += 1
+            
             if status == BookingStatus.COMPLETED:
-                drivers_set.add(did)
+                r["completed"] += 1
+                overall["completed"] += 1
+                if driver_rating is not None:
+                    r["rating_sum"] += float(driver_rating)
+                    r["rating_count"] += 1
+                    overall["rating_sum"] += float(driver_rating)
+                    overall["rating_count"] += 1
+            elif status == BookingStatus.CANCELLED:
+                r["cancelled"] += 1
+                overall["cancelled"] += 1
+                
+            if driver_id is not None:
+                r["active_drivers"].add(driver_id)
+                if status == BookingStatus.COMPLETED:
+                    overall["active_drivers"].add(driver_id)
 
-    rows_sorted = sorted(rows_by_day.values(), key=lambda r: r["date"], reverse=True)
-    serialized_rows = [
-        {
-            "date": r["date"],
-            "rides": r["rides"],
-            "completed": r["completed"],
-            "cancelled": r["cancelled"],
-            "revenue": float(r["revenue"]),
-            "drivers": len(r["drivers"]),
-            "riders": len(r["riders"]),
+        serialized_rows = []
+        for r in sorted(rows_by_day.values(), key=lambda x: x["date"], reverse=True):
+            total_rides = r["rides"]
+            comp_rate = (r["completed"] / total_rides * 100) if total_rides > 0 else 0.0
+            avg_r = (r["rating_sum"] / r["rating_count"]) if r["rating_count"] > 0 else 0.0
+            serialized_rows.append({
+                "date": r["date"],
+                "active_drivers": len(r["active_drivers"]),
+                "rides": total_rides,
+                "completed": r["completed"],
+                "cancelled": r["cancelled"],
+                "completion_rate": round(comp_rate, 1),
+                "avg_rating": round(avg_r, 2),
+            })
+
+        trend = [
+            {"date": r["date"], "active_drivers": r["active_drivers"], "completion_rate": r["completion_rate"]}
+            for r in serialized_rows
+        ]
+        trend.reverse()
+
+        overall_comp_rate = (overall["completed"] / overall["rides"] * 100) if overall["rides"] > 0 else 0.0
+        overall_avg_rating = (overall["rating_sum"] / overall["rating_count"]) if overall["rating_count"] > 0 else 0.0
+
+        return {
+            "totals": {
+                "active_drivers": len(overall["active_drivers"]),
+                "total_rides": overall["rides"],
+                "completed": overall["completed"],
+                "cancelled": overall["cancelled"],
+                "completion_rate": round(overall_comp_rate, 1),
+                "avg_rating": round(overall_avg_rating, 2),
+            },
+            "trend": trend,
+            "rows": serialized_rows,
         }
-        for r in rows_sorted
-    ]
-    trend = [
-        {"date": r["date"], "rides": r["completed"], "revenue": r["revenue"]}
-        for r in serialized_rows
-    ]
-    trend.reverse()  # chart wants oldest → newest
 
-    return {
-        "totals": {
-            "admin_net": float(overall["platform"]),
-            "total_rides": overall["rides"],
-            "active_drivers": len(drivers_set),
-            "gross_bookings": float(overall["revenue"]),
-            "completed": overall["completed"],
-            "cancelled": overall["cancelled"],
-        },
-        "trend": trend,
-        "rows": serialized_rows,
-    }
+    elif type == "riders":
+        # Per-day rider analytics rollup
+        new_users_q = await db.execute(
+            select(
+                cast(User.created_at, Date).label("day"),
+                func.count(User.id)
+            )
+            .where(
+                User.role == UserRole.CUSTOMER,
+                User.created_at >= start_dt,
+                User.created_at < end_dt_exclusive
+            )
+            .group_by(cast(User.created_at, Date))
+        )
+        new_riders_by_day = {day.isoformat(): count for day, count in new_users_q.all()}
+
+        rows_by_day = {}
+        cur = start_dt.date()
+        end_d = (end_dt_exclusive - timedelta(seconds=1)).date()
+        while cur <= end_d:
+            day_str = cur.isoformat()
+            rows_by_day[day_str] = {
+                "date": day_str,
+                "active_riders": set(),
+                "rides": 0,
+                "completed": 0,
+                "fare_sum": 0.0,
+                "new_riders": new_riders_by_day.get(day_str, 0),
+            }
+            cur = cur + timedelta(days=1)
+
+        overall = {
+            "active_riders": set(),
+            "rides": 0,
+            "completed": 0,
+            "fare_sum": 0.0,
+            "new_riders": sum(new_riders_by_day.values()),
+        }
+
+        qb = await db.execute(
+            select(
+                bucket,
+                Booking.status,
+                Booking.customer_id,
+                Booking.final_amount
+            )
+            .where(Booking.booked_at >= start_dt, Booking.booked_at < end_dt_exclusive)
+        )
+        for day, status, customer_id, final_amount in qb.all():
+            key = day.isoformat()
+            if key not in rows_by_day:
+                continue
+            r = rows_by_day[key]
+            r["rides"] += 1
+            overall["rides"] += 1
+            
+            if customer_id is not None:
+                r["active_riders"].add(customer_id)
+                overall["active_riders"].add(customer_id)
+                
+            if status == BookingStatus.COMPLETED:
+                r["completed"] += 1
+                overall["completed"] += 1
+                val = float(final_amount or 0.0)
+                r["fare_sum"] += val
+                overall["fare_sum"] += val
+
+        serialized_rows = []
+        for r in sorted(rows_by_day.values(), key=lambda x: x["date"], reverse=True):
+            avg_f = (r["fare_sum"] / r["completed"]) if r["completed"] > 0 else 0.0
+            serialized_rows.append({
+                "date": r["date"],
+                "active_riders": len(r["active_riders"]),
+                "rides": r["rides"],
+                "completed": r["completed"],
+                "avg_fare": round(avg_f, 2),
+                "new_riders": r["new_riders"],
+            })
+
+        trend = [
+            {"date": r["date"], "active_riders": r["active_riders"], "new_riders": r["new_riders"]}
+            for r in serialized_rows
+        ]
+        trend.reverse()
+
+        overall_avg_fare = (overall["fare_sum"] / overall["completed"]) if overall["completed"] > 0 else 0.0
+
+        return {
+            "totals": {
+                "active_riders": len(overall["active_riders"]),
+                "total_rides": overall["rides"],
+                "completed": overall["completed"],
+                "avg_fare": round(overall_avg_fare, 2),
+                "new_riders": overall["new_riders"],
+            },
+            "trend": trend,
+            "rows": serialized_rows,
+        }
+
+    else:
+        # Per-day per-status rollup
+        q = await db.execute(
+            select(
+                bucket,
+                Booking.status,
+                func.count(Booking.id),
+                func.coalesce(func.sum(Booking.final_amount), 0),
+                func.coalesce(func.sum(Booking.platform_fee), 0),
+                func.count(distinct(Booking.customer_id)),
+                func.count(distinct(Booking.driver_id)),
+            )
+            .where(Booking.booked_at >= start_dt, Booking.booked_at < end_dt_exclusive)
+            .group_by(bucket, Booking.status)
+            .order_by(bucket)
+        )
+        rows_by_day: dict[str, dict] = {}
+        overall = {"rides": 0, "completed": 0, "cancelled": 0, "revenue": D("0"), "platform": D("0")}
+        drivers_set: set[int] = set()
+
+        # Walk every day in range so the chart and table have zero-filled rows.
+        cur = start_dt.date()
+        end_d = (end_dt_exclusive - timedelta(seconds=1)).date()
+        while cur <= end_d:
+            rows_by_day[cur.isoformat()] = {
+                "date": cur.isoformat(),
+                "rides": 0,
+                "completed": 0,
+                "cancelled": 0,
+                "revenue": D("0"),
+                "drivers": set(),
+                "riders": set(),
+            }
+            cur = cur + timedelta(days=1)
+
+        for day, status, n, revenue, platform, customers, drivers in q.all():
+            key = day.isoformat()
+            r = rows_by_day.setdefault(key, {
+                "date": key, "rides": 0, "completed": 0, "cancelled": 0,
+                "revenue": D("0"), "drivers": set(), "riders": set(),
+            })
+            r["rides"] += n
+            overall["rides"] += n
+            if status == BookingStatus.COMPLETED:
+                r["completed"] += n
+                r["revenue"] += revenue
+                overall["completed"] += n
+                overall["revenue"] += revenue
+                overall["platform"] += platform
+            elif status == BookingStatus.CANCELLED:
+                r["cancelled"] += n
+                overall["cancelled"] += n
+
+        # Distinct riders/drivers per day need a second pass (the group_by-status
+        # query above can't aggregate distinct customer_id correctly because the
+        # status dimension splits the same customer's bookings across rows).
+        # The per-day "drivers" column counts everyone who took a trip that day
+        # (any status). The top-level "Active drivers" KPI only counts drivers
+        # who actually completed a ride — that's the meaningful business metric.
+        qd = await db.execute(
+            select(bucket, Booking.status, Booking.customer_id, Booking.driver_id)
+            .where(Booking.booked_at >= start_dt, Booking.booked_at < end_dt_exclusive)
+        )
+        for day, status, cid, did in qd.all():
+            key = day.isoformat()
+            if key not in rows_by_day:
+                continue
+            if cid is not None:
+                rows_by_day[key]["riders"].add(cid)
+            if did is not None:
+                rows_by_day[key]["drivers"].add(did)
+                if status == BookingStatus.COMPLETED:
+                    drivers_set.add(did)
+
+        rows_sorted = sorted(rows_by_day.values(), key=lambda r: r["date"], reverse=True)
+        serialized_rows = [
+            {
+                "date": r["date"],
+                "rides": r["rides"],
+                "completed": r["completed"],
+                "cancelled": r["cancelled"],
+                "revenue": float(r["revenue"]),
+                "drivers": len(r["drivers"]),
+                "riders": len(r["riders"]),
+            }
+            for r in rows_sorted
+        ]
+        trend = [
+            {"date": r["date"], "rides": r["completed"], "revenue": r["revenue"]}
+            for r in serialized_rows
+        ]
+        trend.reverse()  # chart wants oldest → newest
+
+        return {
+            "totals": {
+                "admin_net": float(overall["platform"]),
+                "total_rides": overall["rides"],
+                "active_drivers": len(drivers_set),
+                "gross_bookings": float(overall["revenue"]),
+                "completed": overall["completed"],
+                "cancelled": overall["cancelled"],
+            },
+            "trend": trend,
+            "rows": serialized_rows,
+        }
 
 
 def _default_reports_range() -> tuple[datetime, datetime]:
@@ -2119,7 +3165,7 @@ async def admin_reports(
     end_dt = _parse_iso_date_or(default_end, end).replace(hour=23, minute=59, second=59, microsecond=0)
     if end_dt < start_dt:
         start_dt, end_dt = end_dt, start_dt
-    data = await _reports_aggregate(db, start_dt, end_dt + timedelta(seconds=1))
+    data = await _reports_aggregate(db, start_dt, end_dt + timedelta(seconds=1), type)
 
     return templates.TemplateResponse(
         request,
@@ -2139,7 +3185,7 @@ async def admin_reports(
 async def admin_reports_data(
     start: str = "",
     end: str = "",
-    type: str = "summary",  # noqa: F841 — reserved for future report types
+    type: str = "summary",
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -2148,7 +3194,7 @@ async def admin_reports_data(
     end_dt = _parse_iso_date_or(default_end, end).replace(hour=23, minute=59, second=59, microsecond=0)
     if end_dt < start_dt:
         start_dt, end_dt = end_dt, start_dt
-    data = await _reports_aggregate(db, start_dt, end_dt + timedelta(seconds=1))
+    data = await _reports_aggregate(db, start_dt, end_dt + timedelta(seconds=1), type)
     return {
         **data,
         "start_date": start_dt.strftime("%Y-%m-%d"),
@@ -2159,16 +3205,45 @@ async def admin_reports_data(
 @router.get("/promotions", response_class=HTMLResponse)
 async def admin_promotions(
     request: Request,
+    page: int = 1,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
     from app.models import PromoCode
 
-    q = await db.execute(select(PromoCode).order_by(PromoCode.id.desc()))
+    limit = 50
+    offset = (page - 1) * limit
+
+    total = (await db.execute(select(func.count(PromoCode.id)))).scalar() or 0
+    total_pages = (total + limit - 1) // limit
+
+    q = await db.execute(
+        select(PromoCode)
+        .order_by(PromoCode.id.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    promos = q.scalars().all()
+
+    start_idx = (page - 1) * limit + 1 if total > 0 else 0
+    end_idx = min(page * limit, total)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
+
     return templates.TemplateResponse(
         request, "promotions.html",
-        {"request": request, "active_page": "promotions", "promos": q.scalars().all()},
+        {
+            "request": request,
+            "active_page": "promotions",
+            "promos": promos,
+            "page": page,
+            "total_pages": total_pages,
+            "total_promos": total,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
+        },
     )
+
 
 
 def _parse_admin_date(s: str):
@@ -2317,18 +3392,45 @@ async def admin_promotions_delete(
 @router.get("/complaints", response_class=HTMLResponse)
 async def admin_complaints(
     request: Request,
+    page: int = 1,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
     from app.models import Complaint
 
+    limit = 50
+    offset = (page - 1) * limit
+
+    total = (await db.execute(select(func.count(Complaint.id)))).scalar() or 0
+    total_pages = (total + limit - 1) // limit
+
     q = await db.execute(
-        select(Complaint).order_by(Complaint.id.desc()).limit(200)
+        select(Complaint)
+        .order_by(Complaint.id.desc())
+        .offset(offset)
+        .limit(limit)
     )
+    complaints = q.scalars().all()
+
+    start_idx = (page - 1) * limit + 1 if total > 0 else 0
+    end_idx = min(page * limit, total)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
+
     return templates.TemplateResponse(
         request, "complaints.html",
-        {"request": request, "active_page": "complaints", "complaints": q.scalars().all()},
+        {
+            "request": request,
+            "active_page": "complaints",
+            "complaints": complaints,
+            "page": page,
+            "total_pages": total_pages,
+            "total_complaints": total,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
+        },
     )
+
 
 
 # ---------- Live Tracking ----------
@@ -2354,6 +3456,7 @@ async def admin_live_tracking(
             "total_drivers": total,
             "online_drivers": online,
             "offline_drivers": (total or 0) - (online or 0),
+            "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY or "",
         },
     )
 
@@ -2435,24 +3538,38 @@ def _normalize_status(raw: str | None) -> str:
 @router.get("/incidents", response_class=HTMLResponse)
 async def admin_incidents(
     request: Request,
+    page: int = 1,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
     from app.models import Incident
 
+    limit = 50
+    offset = (page - 1) * limit
+
+    total = (await db.execute(select(func.count(Incident.id)))).scalar() or 0
+    total_pages = (total + limit - 1) // limit
+
     q = await db.execute(
         select(Incident)
         .options(selectinload(Incident.reporter))
         .order_by(Incident.id.desc())
-        .limit(200)
+        .offset(offset)
+        .limit(limit)
     )
     incidents = q.scalars().all()
+
     counts_q = await db.execute(
         select(Incident.kind, func.count(Incident.id))
         .where(Incident.status == "active")
         .group_by(Incident.kind)
     )
     counts = {k: n for k, n in counts_q.all()}
+
+    start_idx = (page - 1) * limit + 1 if total > 0 else 0
+    end_idx = min(page * limit, total)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
+
     return templates.TemplateResponse(
         request,
         "incidents.html",
@@ -2461,8 +3578,15 @@ async def admin_incidents(
             "active_page": "incidents",
             "incidents": incidents,
             "counts": counts,
+            "page": page,
+            "total_pages": total_pages,
+            "total_incidents": total,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
         },
     )
+
 
 
 @router.post("/incidents/{incident_id}/dismiss")
@@ -2479,6 +3603,149 @@ async def admin_incidents_dismiss(
     inc.status = "dismissed"
     await db.commit()
     return RedirectResponse(url="/admin/incidents", status_code=303)
+
+
+# ---------- Website contact-form inbox ----------
+@router.get("/inbox", response_class=HTMLResponse)
+async def admin_inbox(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.api.v1.public import ContactMessage
+
+    rows = (
+        await db.execute(
+            select(ContactMessage).order_by(ContactMessage.id.desc()).limit(500)
+        )
+    ).scalars().all()
+    total = (await db.execute(select(func.count(ContactMessage.id)))).scalar() or 0
+    unread = (
+        await db.execute(
+            select(func.count(ContactMessage.id)).where(
+                ContactMessage.is_read == False  # noqa: E712
+            )
+        )
+    ).scalar() or 0
+    return templates.TemplateResponse(
+        request,
+        "inbox.html",
+        {
+            "request": request,
+            "active_page": "inbox",
+            "messages": rows,
+            "total": total,
+            "unread": unread,
+            "read": total - unread,
+        },
+    )
+
+
+@router.post("/inbox/{msg_id}/read")
+async def admin_inbox_toggle_read(
+    msg_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.api.v1.public import ContactMessage
+
+    m = (
+        await db.execute(select(ContactMessage).where(ContactMessage.id == msg_id))
+    ).scalars().first()
+    if not m:
+        raise HTTPException(status_code=404, detail="Message not found")
+    m.is_read = not bool(m.is_read)
+    await db.commit()
+    return RedirectResponse(url="/admin/inbox", status_code=303)
+
+
+@router.post("/inbox/{msg_id}/delete")
+async def admin_inbox_delete(
+    msg_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.api.v1.public import ContactMessage
+
+    m = (
+        await db.execute(select(ContactMessage).where(ContactMessage.id == msg_id))
+    ).scalars().first()
+    if not m:
+        raise HTTPException(status_code=404, detail="Message not found")
+    await db.delete(m)
+    await db.commit()
+    return RedirectResponse(url="/admin/inbox", status_code=303)
+
+
+# ---------- Live notification feed for the top-bar bell ----------
+@router.get("/notif-feed")
+async def admin_notif_feed(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    """Real-time admin alerts for the bell popup. Read-only aggregate over
+    existing tables — adds nothing to and changes nothing in the rest of the app."""
+    from app.api.v1.public import ContactMessage, DriverApplication
+    from app.models import Complaint
+
+    def plural(n, word):
+        return f"{n} {word}" + ("s" if n != 1 else "")
+
+    items = []
+
+    unread_msgs = (
+        await db.execute(
+            select(func.count(ContactMessage.id)).where(
+                ContactMessage.is_read == False  # noqa: E712
+            )
+        )
+    ).scalar() or 0
+    if unread_msgs:
+        items.append({
+            "title": plural(unread_msgs, "new website message"),
+            "subtitle": "From the contact form",
+            "icon": "fa-inbox", "url": "/admin/inbox", "count": unread_msgs,
+        })
+
+    new_apps = (
+        await db.execute(
+            select(func.count(DriverApplication.id)).where(
+                DriverApplication.is_read == False  # noqa: E712
+            )
+        )
+    ).scalar() or 0
+    if new_apps:
+        items.append({
+            "title": plural(new_apps, "driver application"),
+            "subtitle": "Awaiting review",
+            "icon": "fa-id-card", "url": "/admin/drivers", "count": new_apps,
+        })
+
+    pending_drivers = (
+        await db.execute(
+            select(func.count(Driver.id)).where(Driver.status == DriverStatus.PENDING)
+        )
+    ).scalar() or 0
+    if pending_drivers:
+        items.append({
+            "title": plural(pending_drivers, "driver approval") + " pending",
+            "subtitle": "Review & approve drivers",
+            "icon": "fa-user-clock", "url": "/admin/drivers", "count": pending_drivers,
+        })
+
+    open_tickets = (
+        await db.execute(
+            select(func.count(Complaint.id)).where(Complaint.status == "open")
+        )
+    ).scalar() or 0
+    if open_tickets:
+        items.append({
+            "title": plural(open_tickets, "open support ticket"),
+            "subtitle": "Needs a response",
+            "icon": "fa-life-ring", "url": "/admin/support", "count": open_tickets,
+        })
+
+    return {"total": sum(i["count"] for i in items), "items": items}
 
 
 # ---------- BRD: Driver document verification ----------
@@ -2532,24 +3799,38 @@ async def admin_driver_doc_reject(
 @router.get("/emergencies", response_class=HTMLResponse)
 async def admin_emergencies(
     request: Request,
+    page: int = 1,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
     from app.models import EmergencyAlert
 
+    limit = 50
+    offset = (page - 1) * limit
+
+    total = (await db.execute(select(func.count(EmergencyAlert.id)))).scalar() or 0
+    total_pages = (total + limit - 1) // limit
+
     q = await db.execute(
         select(EmergencyAlert)
         .options(selectinload(EmergencyAlert.user))
         .order_by(EmergencyAlert.id.desc())
-        .limit(200)
+        .offset(offset)
+        .limit(limit)
     )
     alerts = q.scalars().all()
+
     # Tallies for the header cards
     counts_q = await db.execute(
         select(EmergencyAlert.status, func.count(EmergencyAlert.id))
         .group_by(EmergencyAlert.status)
     )
     counts = {s: n for s, n in counts_q.all()}
+
+    start_idx = (page - 1) * limit + 1 if total > 0 else 0
+    end_idx = min(page * limit, total)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
+
     return templates.TemplateResponse(
         request,
         "emergencies.html",
@@ -2557,10 +3838,17 @@ async def admin_emergencies(
             "request": request,
             "active_page": "emergencies",
             "alerts": alerts,
+            "counts": counts,
+            "page": page,
+            "total_pages": total_pages,
+            "total_emergencies": total,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
             "open_count": counts.get("open", 0),
             "acknowledged_count": counts.get("acknowledged", 0),
             "resolved_count": counts.get("resolved", 0) + counts.get("dismissed", 0),
-            "total_count": sum(counts.values()),
+            "total_count": total,
         },
     )
 
@@ -2781,13 +4069,34 @@ async def admin_finance(
 @router.get("/finance/drivers", response_class=HTMLResponse)
 async def admin_finance_drivers(
     request: Request,
+    page: int = 1,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
     rows = await fin.driver_finance_table(db)
+    limit = 50
+    offset = (page - 1) * limit
+    total = len(rows)
+    total_pages = (total + limit - 1) // limit
+    paginated_rows = rows[offset:offset+limit]
+
+    start_idx = (page - 1) * limit + 1 if total > 0 else 0
+    end_idx = min(page * limit, total)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
+
     return templates.TemplateResponse(
         request, "finance_drivers.html",
-        {"request": request, "active_page": "finance", "rows": rows},
+        {
+            "request": request,
+            "active_page": "finance",
+            "rows": paginated_rows,
+            "page": page,
+            "total_pages": total_pages,
+            "total_drivers": total,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
+        },
     )
 
 
@@ -2810,13 +4119,34 @@ async def admin_finance_driver_detail(
 @router.get("/finance/customers", response_class=HTMLResponse)
 async def admin_finance_customers(
     request: Request,
+    page: int = 1,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
     rows = await fin.customer_finance_table(db)
+    limit = 50
+    offset = (page - 1) * limit
+    total = len(rows)
+    total_pages = (total + limit - 1) // limit
+    paginated_rows = rows[offset:offset+limit]
+
+    start_idx = (page - 1) * limit + 1 if total > 0 else 0
+    end_idx = min(page * limit, total)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
+
     return templates.TemplateResponse(
         request, "finance_customers.html",
-        {"request": request, "active_page": "finance", "rows": rows},
+        {
+            "request": request,
+            "active_page": "finance",
+            "rows": paginated_rows,
+            "page": page,
+            "total_pages": total_pages,
+            "total_customers": total,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
+        },
     )
 
 
@@ -2839,13 +4169,34 @@ async def admin_finance_customer_detail(
 @router.get("/finance/restaurants", response_class=HTMLResponse)
 async def admin_finance_restaurants(
     request: Request,
+    page: int = 1,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
     rows = await fin.restaurant_finance_table(db)
+    limit = 50
+    offset = (page - 1) * limit
+    total = len(rows)
+    total_pages = (total + limit - 1) // limit
+    paginated_rows = rows[offset:offset+limit]
+
+    start_idx = (page - 1) * limit + 1 if total > 0 else 0
+    end_idx = min(page * limit, total)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
+
     return templates.TemplateResponse(
         request, "finance_restaurants.html",
-        {"request": request, "active_page": "finance", "rows": rows},
+        {
+            "request": request,
+            "active_page": "finance",
+            "rows": paginated_rows,
+            "page": page,
+            "total_pages": total_pages,
+            "total_restaurants": total,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
+        },
     )
 
 
@@ -2868,13 +4219,34 @@ async def admin_finance_restaurant_detail(
 @router.get("/finance/market", response_class=HTMLResponse)
 async def admin_finance_market(
     request: Request,
+    page: int = 1,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
     rows = await fin.vendor_finance_table(db)
+    limit = 50
+    offset = (page - 1) * limit
+    total = len(rows)
+    total_pages = (total + limit - 1) // limit
+    paginated_rows = rows[offset:offset+limit]
+
+    start_idx = (page - 1) * limit + 1 if total > 0 else 0
+    end_idx = min(page * limit, total)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
+
     return templates.TemplateResponse(
         request, "finance_market.html",
-        {"request": request, "active_page": "finance", "rows": rows},
+        {
+            "request": request,
+            "active_page": "finance",
+            "rows": paginated_rows,
+            "page": page,
+            "total_pages": total_pages,
+            "total_vendors": total,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
+        },
     )
 
 
@@ -2901,22 +4273,47 @@ async def admin_finance_vendor_detail(
 @router.get("/events", response_class=HTMLResponse)
 async def admin_events(
     request: Request,
+    page: int = 1,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
     from app.models import Event
     from sqlalchemy.orm import selectinload as _sel
 
+    limit = 50
+    offset = (page - 1) * limit
+
+    total = (await db.execute(select(func.count(Event.id)))).scalar() or 0
+    total_pages = (total + limit - 1) // limit
+
     q = await db.execute(
         select(Event)
         .options(_sel(Event.tiers))
         .order_by(desc(Event.starts_at))
+        .offset(offset)
+        .limit(limit)
     )
     events = q.scalars().all()
+
+    start_idx = (page - 1) * limit + 1 if total > 0 else 0
+    end_idx = min(page * limit, total)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
+
     return templates.TemplateResponse(
         request, "events.html",
-        {"request": request, "active_page": "events", "events": events},
+        {
+            "request": request,
+            "active_page": "events",
+            "events": events,
+            "page": page,
+            "total_pages": total_pages,
+            "total_events": total,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
+        },
     )
+
 
 
 @router.get("/events/new", response_class=HTMLResponse)
@@ -3040,5 +4437,136 @@ async def admin_events_delete(
     await db.delete(ev)
     await db.commit()
     return RedirectResponse(url="/admin/events", status_code=303)
+
+
+@router.get("/messages", response_class=HTMLResponse)
+async def admin_messages(
+    request: Request,
+    page: int = 1,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import Notification
+    import json
+
+    limit = 50
+    offset = (page - 1) * limit
+
+    # Count the groups
+    subq = (
+        select(Notification.title)
+        .where(Notification.type == "broadcast")
+        .group_by(Notification.title, Notification.body, Notification.created_at, Notification.data)
+        .subquery()
+    )
+    total = (await db.execute(select(func.count()).select_from(subq))).scalar() or 0
+    total_pages = (total + limit - 1) // limit
+
+    stmt = (
+        select(
+            Notification.title,
+            Notification.body,
+            Notification.created_at.label("sent_at"),
+            Notification.data,
+            func.count(Notification.id).label("count")
+        )
+        .where(Notification.type == "broadcast")
+        .group_by(Notification.title, Notification.body, Notification.created_at, Notification.data)
+        .order_by(desc(Notification.created_at))
+        .offset(offset)
+        .limit(limit)
+    )
+    res = await db.execute(stmt)
+    batches = []
+    for title, body, sent_at, data_str, count in res.all():
+        audience = "all"
+        if data_str:
+            try:
+                parsed = json.loads(data_str)
+                audience = parsed.get("audience", "all")
+            except Exception:
+                pass
+        batches.append({
+            "title": title,
+            "body": body,
+            "sent_at": sent_at,
+            "audience": audience,
+            "count": count
+        })
+
+    start_idx = (page - 1) * limit + 1 if total > 0 else 0
+    end_idx = min(page * limit, total)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
+
+    return templates.TemplateResponse(
+        request, "messages.html",
+        {
+            "request": request,
+            "active_page": "messages",
+            "batches": batches,
+            "page": page,
+            "total_pages": total_pages,
+            "total_messages": total,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
+        },
+    )
+
+
+
+@router.post("/messages/send")
+async def admin_messages_send(
+    request: Request,
+    audience: str = Form(...),
+    title: str = Form(...),
+    body: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import User, UserRole, Notification
+    from app.services.ws_manager import manager
+    from app.services import fcm_service
+
+    if audience == "customer":
+        q = await db.execute(select(User).where(User.role == UserRole.CUSTOMER, User.is_active == True))
+    elif audience == "driver":
+        q = await db.execute(select(User).where(User.role == UserRole.DRIVER, User.is_active == True))
+    else:
+        q = await db.execute(select(User).where(User.role.in_([UserRole.CUSTOMER, UserRole.DRIVER]), User.is_active == True))
+    
+    users = q.scalars().all()
+    user_ids = [u.id for u in users]
+    
+    if user_ids:
+        created_at_now = datetime.now(timezone.utc)
+        import json
+        data_str = json.dumps({"audience": audience})
+        
+        for uid in user_ids:
+            db.add(
+                Notification(
+                    user_id=uid,
+                    title=title,
+                    body=body,
+                    type="broadcast",
+                    data=data_str,
+                    created_at=created_at_now,
+                )
+            )
+            try:
+                await manager.send(uid, "broadcast_message", {"title": title, "body": body})
+            except Exception:
+                pass
+        
+        await db.commit()
+        
+        try:
+            await fcm_service.send_to_users(db, user_ids, title, body, {"event": "broadcast_message"})
+        except Exception as e:
+            print(f"[broadcast] FCM send failed: {e}")
+
+    return RedirectResponse(url="/admin/messages", status_code=303)
+
 
 

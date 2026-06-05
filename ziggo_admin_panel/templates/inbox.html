@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Inbox | Ziggo Admin{% endblock %}
+{% block page_title %}Inbox{% endblock %}
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Stat cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-4 flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-ziggo-soft text-ziggo flex items-center justify-center">
+                <i class="fas fa-envelope"></i>
+            </div>
+            <div>
+                <p class="text-[10px] text-ziggo-muted uppercase font-black tracking-wider">Total</p>
+                <p class="text-2xl font-black text-ziggo-ink leading-none">{{ total }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-4 flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <i class="fas fa-envelope-open-text"></i>
+            </div>
+            <div>
+                <p class="text-[10px] text-ziggo-muted uppercase font-black tracking-wider">Unread</p>
+                <p class="text-2xl font-black text-blue-600 leading-none">{{ unread }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-4 flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <i class="fas fa-check-double"></i>
+            </div>
+            <div>
+                <p class="text-[10px] text-ziggo-muted uppercase font-black tracking-wider">Read</p>
+                <p class="text-2xl font-black text-ziggo-ink leading-none">{{ read }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Message list -->
+    <div class="space-y-3">
+        {% for m in messages %}
+        <div class="group relative bg-white rounded-2xl border shadow-soft-sm overflow-hidden transition-all hover:shadow-soft
+            {% if not m.is_read %}border-blue-200{% else %}border-ziggo-line{% endif %}">
+            {% if not m.is_read %}<span class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-blue-500 to-ziggo"></span>{% endif %}
+            <div class="p-5 pl-6">
+                <div class="flex items-start gap-4">
+                    <!-- Avatar -->
+                    <div class="shrink-0 w-11 h-11 rounded-full flex items-center justify-center font-black text-white text-sm
+                        {% if not m.is_read %}bg-gradient-to-br from-blue-500 to-ziggo{% else %}bg-gradient-to-br from-gray-300 to-gray-400{% endif %}">
+                        {{ (m.name or '?')[0]|upper }}
+                    </div>
+
+                    <!-- Body -->
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <p class="font-black text-ziggo-ink truncate">{{ m.name }}</p>
+                            {% if not m.is_read %}
+                            <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-blue-100 text-blue-600">New</span>
+                            {% endif %}
+                            {% if m.subject %}
+                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-ziggo-soft text-ziggo">{{ m.subject }}</span>
+                            {% endif %}
+                            <span class="ml-auto text-[11px] text-ziggo-faint font-bold whitespace-nowrap">
+                                <i class="far fa-clock mr-1"></i>{{ m.created_at.strftime("%b %d, %Y · %H:%M") if m.created_at else '—' }}
+                            </span>
+                        </div>
+
+                        <a href="mailto:{{ m.email }}" class="inline-block text-xs text-ziggo font-bold hover:underline mt-0.5">
+                            <i class="far fa-envelope mr-1"></i>{{ m.email }}
+                        </a>
+
+                        <p class="text-sm text-ziggo-muted leading-relaxed mt-2 whitespace-pre-line">{{ m.message }}</p>
+
+                        <!-- Actions -->
+                        <div class="flex items-center gap-2 mt-4">
+                            <a href="mailto:{{ m.email }}?subject=Re: {{ (m.subject or 'Your message to Ziggo')|urlencode }}"
+                               class="px-3 py-1.5 rounded-lg text-xs font-black text-white bg-ziggo hover:opacity-90 transition">
+                                <i class="fas fa-reply mr-1"></i> Reply
+                            </a>
+                            <form method="POST" action="/admin/inbox/{{ m.id }}/read">
+                                <button class="px-3 py-1.5 border border-ziggo-line rounded-lg text-xs font-black text-ziggo-muted hover:bg-gray-50 transition">
+                                    {% if m.is_read %}<i class="far fa-circle mr-1"></i> Mark unread{% else %}<i class="far fa-circle-check mr-1"></i> Mark read{% endif %}
+                                </button>
+                            </form>
+                            <form method="POST" action="/admin/inbox/{{ m.id }}/delete"
+                                  onsubmit="return confirm('Delete this message permanently?');" class="ml-auto">
+                                <button class="px-3 py-1.5 border border-red-100 rounded-lg text-xs font-black text-red-500 hover:bg-red-50 transition">
+                                    <i class="far fa-trash-can mr-1"></i> Delete
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm px-6 py-20 text-center">
+            <i class="fas fa-inbox text-4xl text-ziggo-faint mb-3"></i>
+            <p class="text-ziggo-ink font-black">Your inbox is empty</p>
+            <p class="text-ziggo-muted text-sm mt-1">Messages sent from the website contact form will show up here.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

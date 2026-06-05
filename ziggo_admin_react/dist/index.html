@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ziggo Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ziggo: {
+              DEFAULT: '#1E3A8A', light: '#2563EB', dark: '#0E1530', deep: '#0A0F22',
+              soft: '#EEF3FF', ink: '#0B1220', muted: '#5B6675', faint: '#94A0B2', line: '#E9ECF3',
+              canvas: '#F5F6FA',
+            },
+          },
+          fontFamily: {
+            sans: ['Manrope', 'system-ui', 'sans-serif'],
+            display: ['Sora', 'Manrope', 'system-ui', 'sans-serif'],
+          },
+          boxShadow: {
+            'soft': '0 1px 2px rgba(15,23,42,0.04), 0 6px 18px -8px rgba(15,23,42,0.10)',
+            'card': '0 1px 3px rgba(15,23,42,0.05), 0 16px 40px -18px rgba(15,23,42,0.16)',
+            'glow': '0 10px 26px -10px rgba(37,99,235,0.5)',
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    html, body { font-family: 'Manrope', system-ui, sans-serif; -webkit-font-smoothing: antialiased; letter-spacing: -0.01em; color: #0B1220; }
+    h1,h2,h3,h4 { font-family: 'Sora', 'Manrope', sans-serif; letter-spacing: -0.02em; }
+    .tnum { font-variant-numeric: tabular-nums; }
+    body { background: #FAFBFD; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: #d6dbe6; border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+    ::-webkit-scrollbar-thumb:hover { background: #c3cad9; background-clip: content-box; }
+    @keyframes ziIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    .zi-in { animation: ziIn .45s cubic-bezier(0.22,0.61,0.36,1) both; }
+  </style>
+  <script type="module" crossorigin src="/admin-react/assets/index-4PaZ17jo.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+</body>
+</html>

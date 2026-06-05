@@ -2,21 +2,31 @@
 
 {% block title %}System Configuration | Ziggo Admin{% endblock %}
 {% block page_title %}System Configuration{% endblock %}
-
-{% block top_title %}{% endblock %}
 {% block content %}
+<style>
+    .settings-layout { display: grid; grid-template-columns: 248px 1fr; gap: 24px; align-items: start; }
+    .settings-tabs { display: flex; flex-direction: column; gap: 4px; position: sticky; top: 8px;
+        background: #fff; border: 1px solid #ECEFF3; border-radius: 16px; padding: 8px;
+        box-shadow: 0 1px 2px rgba(16,24,40,0.04), 0 6px 20px -10px rgba(16,24,40,0.10); }
+    .settings-tab { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
+        padding: 11px 14px; border: 0; background: transparent; border-radius: 12px; cursor: pointer;
+        font-size: 13px; font-weight: 700; color: #475569; transition: background .15s, color .15s; }
+    .settings-tab i { width: 18px; text-align: center; color: #94A3B8; transition: color .15s; }
+    .settings-tab:hover { background: rgba(30,58,138,0.05); color: #0F172A; }
+    .settings-tab.active { background: linear-gradient(135deg,#1E3A8A 0%,#2563EB 100%); color: #fff; box-shadow: 0 8px 18px -8px rgba(30,58,138,0.5); }
+    .settings-tab.active i { color: #fff; }
+    .settings-panel { display: none; }
+    /* opacity-only fade (no transform) so panels don't create a stacking
+       context that would paint over the pinned header */
+    .settings-panel.active { display: block; animation: ziSettingsFade 220ms ease both; }
+    @keyframes ziSettingsFade { from { opacity: 0; } to { opacity: 1; } }
+    @media (max-width: 900px) {
+        .settings-layout { grid-template-columns: 1fr; }
+        .settings-tabs { position: static; flex-direction: row; flex-wrap: nowrap; overflow-x: auto; }
+        .settings-tab { white-space: nowrap; }
+    }
+</style>
 <div class="space-y-6">
-
-    <!-- Header -->
-    <div class="flex items-center gap-3">
-        <div class="w-11 h-11 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-xl">
-            <i class="fas fa-cog"></i>
-        </div>
-        <div>
-            <h2 class="text-2xl font-black text-ziggo-ink leading-tight">System Configuration</h2>
-            <p class="text-xs text-ziggo-muted font-bold">Core operational settings — applied across the customer & driver apps</p>
-        </div>
-    </div>
 
     {% if saved %}
     <div class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-2xl p-4 flex items-center gap-3 font-bold">
@@ -25,253 +35,300 @@
     </div>
     {% endif %}
 
-    <form method="POST" action="/admin/settings" enctype="multipart/form-data" class="space-y-6">
+    <form method="POST" action="/admin/settings" enctype="multipart/form-data">
+        <div class="settings-layout">
 
-        <!-- Row 1: General + Pricing -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Left tabs -->
+            <aside class="settings-tabs" id="settingsTabs">
+                <button type="button" class="settings-tab active" data-tab="general"><i class="fas fa-globe"></i> General</button>
+                <button type="button" class="settings-tab" data-tab="pricing"><i class="fas fa-dollar-sign"></i> Pricing</button>
+                <button type="button" class="settings-tab" data-tab="security"><i class="fas fa-shield-alt"></i> Security</button>
+                <button type="button" class="settings-tab" data-tab="notifications"><i class="fas fa-bell"></i> Notifications</button>
+                <button type="button" class="settings-tab" data-tab="incentives"><i class="fas fa-gift"></i> Driver Incentives</button>
+                <button type="button" class="settings-tab" data-tab="loyalty"><i class="fas fa-medal"></i> Loyalty &amp; Membership</button>
+                <button type="button" class="settings-tab" data-tab="trips"><i class="fas fa-map-pin"></i> Trip Stops &amp; Waiting</button>
+                <button type="button" class="settings-tab" data-tab="branding"><i class="fas fa-image"></i> Logo &amp; Favicon</button>
+            </aside>
 
-            <!-- General -->
-            <section class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-6">
-                <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
-                    <i class="fas fa-globe text-ziggo"></i> General
-                </h3>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Site Name</label>
-                        <input type="text" name="site_name" value="{{ s.site_name or '' }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Admin Email</label>
-                        <input type="email" name="admin_email" value="{{ s.admin_email or '' }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Contact Phone</label>
-                        <input type="text" name="contact_phone" value="{{ s.contact_phone or '' }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Contact Email</label>
-                        <input type="email" name="contact_email" value="{{ s.contact_email or '' }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Address</label>
-                        <textarea name="address" rows="3" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">{{ s.address or '' }}</textarea>
-                    </div>
-                </div>
-            </section>
+            <!-- Right content -->
+            <div class="space-y-6 min-w-0">
 
-            <!-- Pricing -->
-            <section class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-6">
-                <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
-                    <i class="fas fa-dollar-sign text-ziggo"></i> Pricing
-                </h3>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Commission Rate (%)</label>
-                        <input type="number" step="0.01" min="0" max="100" name="commission_rate" value="{{ s.commission_rate or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Surge Start Hour (0–23)</label>
-                        <input type="number" min="0" max="23" name="surge_start_hour" value="{{ s.surge_start_hour if s.surge_start_hour is not none else 17 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Surge End Hour (0–23)</label>
-                        <input type="number" min="0" max="23" name="surge_end_hour" value="{{ s.surge_end_hour if s.surge_end_hour is not none else 20 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Surge Multiplier</label>
-                        <input type="number" step="0.01" min="0.1" name="surge_multiplier" value="{{ s.surge_multiplier or 1 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Standard Cancellation Fee (Rs.)</label>
-                        <input type="number" step="0.01" min="0" name="cancellation_fee" value="{{ s.cancellation_fee or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Unreasonable Penalty – Rider (Rs.)</label>
-                        <input type="number" step="0.01" min="0" name="rider_penalty" value="{{ s.rider_penalty or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                    </div>
-                </div>
-            </section>
-        </div>
-
-        <!-- Row 2: Security + Notifications -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-            <!-- Security -->
-            <section class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-6">
-                <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
-                    <i class="fas fa-shield-alt text-ziggo"></i> Security
-                </h3>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Min Password Length</label>
-                        <input type="number" min="1" name="min_password_length" value="{{ s.min_password_length or 6 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Session Timeout (minutes)</label>
-                        <input type="number" min="1" name="session_timeout_minutes" value="{{ s.session_timeout_minutes or 30 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Max Login Attempts</label>
-                        <input type="number" min="1" name="max_login_attempts" value="{{ s.max_login_attempts or 5 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                    </div>
-                </div>
-            </section>
-
-            <!-- Notifications -->
-            <section class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-6">
-                <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
-                    <i class="fas fa-bell text-ziggo"></i> Notifications
-                </h3>
-                <div class="space-y-3">
-                    <label class="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" name="email_notifications_enabled" {% if s.email_notifications_enabled %}checked{% endif %} class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
-                        <span class="text-sm font-bold text-ziggo-ink">Enable Email Notifications</span>
-                    </label>
-                    <label class="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" name="sms_notifications_enabled" {% if s.sms_notifications_enabled %}checked{% endif %} class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
-                        <span class="text-sm font-bold text-ziggo-ink">Enable SMS Notifications</span>
-                    </label>
-                    <label class="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" name="push_notifications_enabled" {% if s.push_notifications_enabled %}checked{% endif %} class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
-                        <span class="text-sm font-bold text-ziggo-ink">Enable Push Notifications</span>
-                    </label>
-                </div>
-            </section>
-        </div>
-
-        <!-- Row 3: Driver Incentives (full width on screenshot is single column on left; we keep it full) -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <section class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-6">
-                <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
-                    <i class="fas fa-gift text-ziggo"></i> Driver Incentives
-                </h3>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Min Rides for Daily Bonus</label>
-                        <input type="number" min="0" name="min_rides_daily_bonus" value="{{ s.min_rides_daily_bonus or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Daily Bonus Amount (Rs.)</label>
-                        <input type="number" step="0.01" min="0" name="daily_bonus_amount" value="{{ s.daily_bonus_amount or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Commission Cycle (Rides)</label>
-                        <input type="number" min="0" name="commission_cycle_rides" value="{{ s.commission_cycle_rides or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Commission Per Cycle (Rs.)</label>
-                        <input type="number" step="0.01" min="0" name="commission_per_cycle" value="{{ s.commission_per_cycle or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                    </div>
-                </div>
-            </section>
-
-            <!-- Loyalty & Membership (BRD: AD-13, RW-01, RW-02, RW-03) -->
-            <section class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-6">
-                <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
-                    <i class="fas fa-medal text-ziggo"></i> Loyalty &amp; Membership
-                </h3>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Earn rate — Rs. spent per 1 point</label>
-                        <input type="number" step="0.01" min="0.01" name="loyalty_earn_rupees_per_point" value="{{ s.loyalty_earn_rupees_per_point or 10 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                        <p class="text-[10px] text-ziggo-faint font-bold mt-1">e.g. <span class="text-ziggo">10</span> means customer earns 1 point per Rs.10 spent.</p>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Value per point (Rs.)</label>
-                        <input type="number" step="0.01" min="0.01" name="loyalty_value_per_point" value="{{ s.loyalty_value_per_point or 0.50 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Min points to redeem</label>
-                        <input type="number" min="1" name="loyalty_min_redeem_points" value="{{ s.loyalty_min_redeem_points or 100 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Max % of an order paid with points</label>
-                        <input type="number" step="0.01" min="0" max="100" name="loyalty_max_redeem_order_pct" value="{{ s.loyalty_max_redeem_order_pct or 20 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Gold delivery discount (%)</label>
-                        <input type="number" step="0.01" min="0" max="100" name="gold_delivery_discount_pct" value="{{ s.gold_delivery_discount_pct or 50 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                        <p class="text-[10px] text-ziggo-faint font-bold mt-1">Discount off the delivery fee for Gold members on food &amp; market orders.</p>
-                    </div>
-                </div>
-            </section>
-        </div>
-
-        <!-- Multi-stop policy (BRD: CD-19 / BE-16 / BR-9) -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <section class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-6">
-                <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
-                    <i class="fas fa-map-pin text-ziggo"></i> Trip Stops &amp; Waiting
-                </h3>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Max intermediate stops</label>
-                        <input type="number" min="0" max="5" name="multi_stop_max_count" value="{{ s.multi_stop_max_count or 2 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                        <p class="text-[10px] text-ziggo-faint font-bold mt-1">How many stops a rider can add between pickup &amp; drop.</p>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Free wait per stop (minutes)</label>
-                        <input type="number" min="0" name="multi_stop_free_minutes" value="{{ s.multi_stop_free_minutes or 3 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Excess wait charge (Rs./minute)</label>
-                        <input type="number" step="0.01" min="0" name="multi_stop_excess_per_minute" value="{{ s.multi_stop_excess_per_minute or 5 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                        <p class="text-[10px] text-ziggo-faint font-bold mt-1">Billed per started minute beyond the free window. Goes to the driver.</p>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-1">Fee per stop (Rs.)</label>
-                        <input type="number" step="0.01" min="0" name="multi_stop_fee_per_stop" value="{{ s.multi_stop_fee_per_stop or 50 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                        <p class="text-[10px] text-ziggo-faint font-bold mt-1">Fixed surcharge per added stop, on top of the per-km fare.</p>
-                    </div>
-                </div>
-            </section>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <!-- Logo & Favicon -->
-            <section class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-6">
-                <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
-                    <i class="fas fa-image text-ziggo"></i> Logo &amp; Favicon
-                </h3>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-2">Logo</label>
-                        <div class="bg-gray-50 border border-ziggo-line rounded-2xl p-3 flex items-center justify-center h-24 mb-2">
-                            {% if s.logo_url %}
-                                <img src="{{ s.logo_url }}" alt="Logo" class="max-h-full max-w-full object-contain">
-                            {% else %}
-                                <span class="text-xs text-ziggo-faint font-bold">No logo uploaded</span>
-                            {% endif %}
+                <!-- General -->
+                <section class="settings-panel active bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="general">
+                    <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                        <i class="fas fa-globe text-ziggo"></i> General
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Site Name</label>
+                            <input type="text" name="site_name" value="{{ s.site_name or '' }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                         </div>
-                        <input type="file" name="logo" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="w-full text-xs">
-                        <p class="text-[10px] text-ziggo-faint font-bold mt-1">JPG/PNG/WEBP/SVG, max 5 MB.</p>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-black text-ziggo-muted mb-2">Favicon</label>
-                        <div class="bg-gray-50 border border-ziggo-line rounded-2xl p-3 flex items-center justify-center h-24 mb-2">
-                            {% if s.favicon_url %}
-                                <img src="{{ s.favicon_url }}" alt="Favicon" class="max-h-full max-w-full object-contain">
-                            {% else %}
-                                <span class="text-xs text-ziggo-faint font-bold">No favicon uploaded</span>
-                            {% endif %}
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Admin Email</label>
+                            <input type="email" name="admin_email" value="{{ s.admin_email or '' }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                         </div>
-                        <input type="file" name="favicon" accept="image/png,image/x-icon,image/vnd.microsoft.icon,image/svg+xml" class="w-full text-xs">
-                        <p class="text-[10px] text-ziggo-faint font-bold mt-1">ICO/PNG/SVG, max 5 MB.</p>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Contact Phone</label>
+                            <input type="text" name="contact_phone" value="{{ s.contact_phone or '' }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Contact Email</label>
+                            <input type="email" name="contact_email" value="{{ s.contact_email or '' }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Address</label>
+                            <textarea name="address" rows="3" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">{{ s.address or '' }}</textarea>
+                        </div>
                     </div>
-                </div>
-            </section>
-        </div>
+                </section>
 
-        <!-- Save -->
-        <div class="flex items-center gap-3 pt-2">
-            <button type="submit" class="px-8 py-4 bg-ziggo text-white rounded-2xl font-black shadow-brand hover:bg-ziggo-light transition flex items-center gap-2">
-                <i class="fas fa-save"></i> Save All Settings
-            </button>
-            <a href="/admin/settings" class="px-6 py-4 border border-ziggo-line rounded-2xl font-black text-ziggo-muted hover:bg-gray-50">Reset</a>
-            {% if s.updated_at %}
-            <span class="text-xs text-ziggo-faint font-bold ml-auto">Last updated {{ s.updated_at.strftime("%Y-%m-%d %H:%M UTC") }}</span>
-            {% endif %}
+                <!-- Pricing -->
+                <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="pricing">
+                    <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                        <i class="fas fa-dollar-sign text-ziggo"></i> Pricing
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Commission Rate (%)</label>
+                            <input type="number" step="0.01" min="0" max="100" name="commission_rate" value="{{ s.commission_rate or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Surge Start Hour (0–23)</label>
+                            <input type="number" min="0" max="23" name="surge_start_hour" value="{{ s.surge_start_hour if s.surge_start_hour is not none else 17 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Surge End Hour (0–23)</label>
+                            <input type="number" min="0" max="23" name="surge_end_hour" value="{{ s.surge_end_hour if s.surge_end_hour is not none else 20 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Surge Multiplier</label>
+                            <input type="number" step="0.01" min="0.1" name="surge_multiplier" value="{{ s.surge_multiplier or 1 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Standard Cancellation Fee (Rs.)</label>
+                            <input type="number" step="0.01" min="0" name="cancellation_fee" value="{{ s.cancellation_fee or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Unreasonable Penalty – Rider (Rs.)</label>
+                            <input type="number" step="0.01" min="0" name="rider_penalty" value="{{ s.rider_penalty or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Security -->
+                <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="security">
+                    <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                        <i class="fas fa-shield-alt text-ziggo"></i> Security
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Min Password Length</label>
+                            <input type="number" min="1" name="min_password_length" value="{{ s.min_password_length or 6 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Session Timeout (minutes)</label>
+                            <input type="number" min="1" name="session_timeout_minutes" value="{{ s.session_timeout_minutes or 30 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Max Login Attempts</label>
+                            <input type="number" min="1" name="max_login_attempts" value="{{ s.max_login_attempts or 5 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Notifications -->
+                <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="notifications">
+                    <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                        <i class="fas fa-bell text-ziggo"></i> Notifications
+                    </h3>
+                    <div class="space-y-3">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" name="email_notifications_enabled" {% if s.email_notifications_enabled %}checked{% endif %} class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
+                            <span class="text-sm font-bold text-ziggo-ink">Enable Email Notifications</span>
+                        </label>
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" name="sms_notifications_enabled" {% if s.sms_notifications_enabled %}checked{% endif %} class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
+                            <span class="text-sm font-bold text-ziggo-ink">Enable SMS Notifications</span>
+                        </label>
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" name="push_notifications_enabled" {% if s.push_notifications_enabled %}checked{% endif %} class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
+                            <span class="text-sm font-bold text-ziggo-ink">Enable Push Notifications</span>
+                        </label>
+                    </div>
+                </section>
+
+                <!-- Driver Incentives -->
+                <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="incentives">
+                    <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                        <i class="fas fa-gift text-ziggo"></i> Driver Incentives
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Min Rides for Daily Bonus</label>
+                            <input type="number" min="0" name="min_rides_daily_bonus" value="{{ s.min_rides_daily_bonus or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Daily Bonus Amount (Rs.)</label>
+                            <input type="number" step="0.01" min="0" name="daily_bonus_amount" value="{{ s.daily_bonus_amount or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Commission Cycle (Rides)</label>
+                            <input type="number" min="0" name="commission_cycle_rides" value="{{ s.commission_cycle_rides or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Commission Per Cycle (Rs.)</label>
+                            <input type="number" step="0.01" min="0" name="commission_per_cycle" value="{{ s.commission_per_cycle or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Loyalty & Membership -->
+                <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="loyalty">
+                    <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                        <i class="fas fa-medal text-ziggo"></i> Loyalty &amp; Membership
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Earn rate — Rs. spent per 1 point</label>
+                            <input type="number" step="0.01" min="0.01" name="loyalty_earn_rupees_per_point" value="{{ s.loyalty_earn_rupees_per_point or 10 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                            <p class="text-[10px] text-ziggo-faint font-bold mt-1">e.g. <span class="text-ziggo">10</span> means customer earns 1 point per Rs.10 spent.</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Value per point (Rs.)</label>
+                            <input type="number" step="0.01" min="0.01" name="loyalty_value_per_point" value="{{ s.loyalty_value_per_point or 0.50 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Min points to redeem</label>
+                            <input type="number" min="1" name="loyalty_min_redeem_points" value="{{ s.loyalty_min_redeem_points or 100 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Max % of an order paid with points</label>
+                            <input type="number" step="0.01" min="0" max="100" name="loyalty_max_redeem_order_pct" value="{{ s.loyalty_max_redeem_order_pct or 20 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Gold delivery discount (%)</label>
+                            <input type="number" step="0.01" min="0" max="100" name="gold_delivery_discount_pct" value="{{ s.gold_delivery_discount_pct or 50 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                            <p class="text-[10px] text-ziggo-faint font-bold mt-1">Discount off the delivery fee for Gold members on food &amp; market orders.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Trip Stops & Waiting -->
+                <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="trips">
+                    <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                        <i class="fas fa-map-pin text-ziggo"></i> Trip Stops &amp; Waiting
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Max intermediate stops</label>
+                            <input type="number" min="0" max="5" name="multi_stop_max_count" value="{{ s.multi_stop_max_count or 2 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                            <p class="text-[10px] text-ziggo-faint font-bold mt-1">How many stops a rider can add between pickup &amp; drop.</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Free wait per stop (minutes)</label>
+                            <input type="number" min="0" name="multi_stop_free_minutes" value="{{ s.multi_stop_free_minutes or 3 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Excess wait charge (Rs./minute)</label>
+                            <input type="number" step="0.01" min="0" name="multi_stop_excess_per_minute" value="{{ s.multi_stop_excess_per_minute or 5 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                            <p class="text-[10px] text-ziggo-faint font-bold mt-1">Billed per started minute beyond the free window. Goes to the driver.</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Fee per stop (Rs.)</label>
+                            <input type="number" step="0.01" min="0" name="multi_stop_fee_per_stop" value="{{ s.multi_stop_fee_per_stop or 50 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                            <p class="text-[10px] text-ziggo-faint font-bold mt-1">Fixed surcharge per added stop, on top of the per-km fare.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Logo & Favicon -->
+                <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="branding">
+                    <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                        <i class="fas fa-image text-ziggo"></i> Logo &amp; Favicon
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-2">Logo</label>
+                            <div id="logoPreviewContainer" class="bg-gray-50 border border-ziggo-line rounded-2xl p-3 flex items-center justify-center h-24 mb-2">
+                                {% if s.logo_url %}
+                                    <img src="{{ s.logo_url }}" alt="Logo" class="max-h-full max-w-full object-contain">
+                                {% else %}
+                                    <span class="text-xs text-ziggo-faint font-bold">No logo uploaded</span>
+                                {% endif %}
+                            </div>
+                            <input type="file" name="logo" id="logoInput" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="w-full text-xs">
+                            <p class="text-[10px] text-ziggo-faint font-bold mt-1">JPG/PNG/WEBP/SVG, max 5 MB.</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-2">Favicon</label>
+                            <div id="faviconPreviewContainer" class="bg-gray-50 border border-ziggo-line rounded-2xl p-3 flex items-center justify-center h-24 mb-2">
+                                {% if s.favicon_url %}
+                                    <img src="{{ s.favicon_url }}" alt="Favicon" class="max-h-full max-w-full object-contain">
+                                {% else %}
+                                    <span class="text-xs text-ziggo-faint font-bold">No favicon uploaded</span>
+                                {% endif %}
+                            </div>
+                            <input type="file" name="favicon" id="faviconInput" accept="image/png,image/x-icon,image/vnd.microsoft.icon,image/svg+xml" class="w-full text-xs">
+                            <p class="text-[10px] text-ziggo-faint font-bold mt-1">ICO/PNG/SVG, max 5 MB.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Save (applies to every tab — all fields submit together) -->
+                <div class="flex items-center gap-3 pt-2">
+                    <button type="submit" class="px-8 py-4 bg-ziggo text-white rounded-2xl font-black shadow-brand hover:bg-ziggo-light transition flex items-center gap-2">
+                        <i class="fas fa-save"></i> Save All Settings
+                    </button>
+                    <a href="/admin/settings" class="px-6 py-4 border border-ziggo-line rounded-2xl font-black text-ziggo-muted hover:bg-gray-50">Reset</a>
+                    {% if s.updated_at %}
+                    <span class="text-xs text-ziggo-faint font-bold ml-auto">Last updated {{ s.updated_at.strftime("%Y-%m-%d %H:%M UTC") }}</span>
+                    {% endif %}
+                </div>
+
+            </div>
         </div>
     </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        var tabs = document.querySelectorAll('.settings-tab');
+        var panels = document.querySelectorAll('.settings-panel');
+        function show(name) {
+            tabs.forEach(function (t) { t.classList.toggle('active', t.dataset.tab === name); });
+            panels.forEach(function (p) { p.classList.toggle('active', p.dataset.panel === name); });
+            try { sessionStorage.setItem('ziSettingsTab', name); } catch (e) {}
+        }
+        tabs.forEach(function (t) { t.addEventListener('click', function () { show(this.dataset.tab); }); });
+        // Restore the last-opened tab (e.g. after Save reloads the page)
+        var saved = null;
+        try { saved = sessionStorage.getItem('ziSettingsTab'); } catch (e) {}
+        if (saved && document.querySelector('.settings-panel[data-panel="' + saved + '"]')) show(saved);
+
+        // Setup image preview helper
+        function setupPreview(inputId, containerId) {
+            var input = document.getElementById(inputId);
+            var container = document.getElementById(containerId);
+            if (!input || !container) return;
+            var originalHTML = container.innerHTML;
+            
+            input.addEventListener('change', function() {
+                var file = this.files[0];
+                if (file) {
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        container.innerHTML = '<img src="' + e.target.result + '" class="max-h-full max-w-full object-contain">';
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    container.innerHTML = originalHTML;
+                }
+            });
+        }
+        setupPreview('logoInput', 'logoPreviewContainer');
+        setupPreview('faviconInput', 'faviconPreviewContainer');
+    })();
+</script>
 {% endblock %}

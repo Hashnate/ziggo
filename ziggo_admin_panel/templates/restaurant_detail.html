@@ -10,7 +10,7 @@
     </a>
 
     <!-- Restaurant summary card -->
-    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 flex flex-wrap items-center gap-6">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-wrap items-center gap-6">
         <div class="w-20 h-20 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center text-3xl">
             <i class="fas fa-utensils"></i>
         </div>
@@ -18,7 +18,7 @@
             <h2 class="text-2xl font-black text-ziggo">{{ restaurant.name }}</h2>
             <p class="text-sm text-gray-500">{{ restaurant.cuisine or '' }} • {{ restaurant.address or '' }}</p>
             <div class="mt-2 flex flex-wrap gap-4 text-xs text-gray-600 font-bold">
-                <span><i class="fas fa-star text-yellow-400"></i> {{ restaurant.rating or 0 }}</span>
+                <span><i class="fas fa-star text-yellow-400"></i> {{ "{:.1f}".format((restaurant.rating or 0)|float) }}</span>
                 <span><i class="fas fa-clock"></i> {{ restaurant.eta_minutes or 30 }} min</span>
                 <span><i class="fas fa-truck"></i> Rs.{{ "{:,.0f}".format(restaurant.delivery_fee or 0) }}</span>
                 <span><i class="fas fa-business-time"></i> {{ restaurant.opening_time or '' }} – {{ restaurant.closing_time or '' }}</span>
@@ -30,7 +30,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Left: existing categories & items -->
         <div class="lg:col-span-2 space-y-4">
-            <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div class="p-6 border-b border-gray-100">
                     <h3 class="font-black text-ziggo">Menu</h3>
                     <p class="text-xs text-gray-400">{{ items | length }} item{{ '' if items|length == 1 else 's' }} across {{ categories | length }} categor{{ 'y' if categories|length == 1 else 'ies' }}</p>
@@ -71,7 +71,7 @@
         <div class="space-y-4">
             <!-- Add category -->
             <form method="post" action="/admin/restaurants/{{ restaurant.id }}/categories/new"
-                  class="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 space-y-4">
+                  class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
                 <h3 class="font-black text-ziggo">Add category</h3>
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Name</label>
@@ -91,7 +91,7 @@
             <!-- Add menu item -->
             {% if categories %}
             <form method="post" action="/admin/restaurants/{{ restaurant.id }}/items/new"
-                  class="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 space-y-4">
+                  class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
                 <h3 class="font-black text-ziggo">Add menu item</h3>
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Category</label>
@@ -136,7 +136,7 @@
                 </button>
             </form>
             {% else %}
-            <div class="bg-yellow-50 border border-yellow-200 rounded-3xl p-6 text-sm text-yellow-800 font-bold">
+            <div class="bg-yellow-50 border border-yellow-200 rounded-2xl p-6 text-sm text-yellow-800 font-bold">
                 Add a category first before adding menu items.
             </div>
             {% endif %}

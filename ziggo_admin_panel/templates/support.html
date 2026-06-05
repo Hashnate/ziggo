@@ -3,24 +3,12 @@
 {% block title %}Help & Support | Ziggo Admin{% endblock %}
 {% block page_title %}Help & Support Center{% endblock %}
 
-{% block top_title %}{% endblock %}
 {% block content %}
 <div class="space-y-6">
 
-    <!-- Header -->
-    <div class="flex items-center gap-3">
-        <div class="w-11 h-11 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-xl">
-            <i class="fas fa-headset"></i>
-        </div>
-        <div>
-            <h2 class="text-2xl font-black text-ziggo-ink leading-tight">Help &amp; Support Center</h2>
-            <p class="text-xs text-ziggo-muted font-bold">Manage customer support tickets and resolution workflow</p>
-        </div>
-    </div>
-
     <!-- Stat cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
             <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl">
                 <i class="fas fa-ticket-alt"></i>
             </div>
@@ -29,7 +17,7 @@
                 <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">{{ total }}</p>
             </div>
         </div>
-        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
             <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl">
                 <i class="far fa-envelope"></i>
             </div>
@@ -38,7 +26,7 @@
                 <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">{{ open_count }}</p>
             </div>
         </div>
-        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
             <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl">
                 <i class="fas fa-spinner"></i>
             </div>
@@ -47,7 +35,7 @@
                 <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">{{ in_progress_count }}</p>
             </div>
         </div>
-        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
             <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl">
                 <i class="fas fa-check-circle"></i>
             </div>
@@ -59,10 +47,10 @@
     </div>
 
     <!-- Filter row -->
-    <form method="GET" action="/admin/support" class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex flex-wrap items-center gap-4">
+    <form method="GET" action="/admin/support" class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex flex-wrap items-center gap-4">
         <div class="flex-1 min-w-[260px] relative">
             <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-ziggo-faint text-sm"></i>
-            <input type="text" name="q" value="{{ filter_q }}" placeholder="Search by name or subject..." class="w-full pl-11 pr-4 py-3 border border-ziggo-line rounded-2xl outline-none focus:border-ziggo">
+            <input type="text" name="q" value="{{ filter_q }}" placeholder="Search by name or subject..." class="w-full pl-11 pr-4 py-3 border border-ziggo-line rounded-2xl outline-none focus:border-ziggo" style="padding-left: 2.75rem !important;">
         </div>
         <div class="min-w-[180px]">
             <select name="status" class="w-full p-3 border border-ziggo-line rounded-2xl outline-none focus:border-ziggo bg-white">
@@ -79,7 +67,7 @@
     </form>
 
     <!-- Table -->
-    <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left">
                 <thead class="bg-gray-50 text-[11px] uppercase text-ziggo-muted font-black tracking-wider">
@@ -151,7 +139,7 @@
 
 <!-- Ticket thread modal -->
 <div id="ticketModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-3xl w-full max-w-3xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+    <div class="bg-white rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
         <div class="p-6 border-b border-ziggo-line flex justify-between items-start bg-gray-50/50 flex-shrink-0">
             <div class="min-w-0">
                 <h3 class="text-xl font-black text-ziggo" id="tkTitle">Ticket #—</h3>

@@ -10,7 +10,7 @@
             <div class="stat-icon bg-amber-100 text-amber-600"><i class="fas fa-clock"></i></div>
             <div>
                 <p class="text-[10px] text-ziggo-faint uppercase font-bold">Total pending</p>
-                <p class="text-2xl font-black text-amber-600">Rs.{{ "{:,.0f}".format(total_pending) }}</p>
+                <p class="text-2xl font-normal text-amber-600">Rs.{{ "{:,.0f}".format(total_pending) }}</p>
             </div>
         </div>
     </div>
@@ -41,7 +41,7 @@
     </div>
     <div class="overflow-x-auto">
         <table class="w-full text-left">
-            <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
+            <thead class="bg-ziggo-canvas/70 text-[11px] uppercase tracking-wider text-ziggo-faint font-black">
                 <tr>
                     <th class="px-6 py-3">Driver</th>
                     <th class="px-6 py-3">Type</th>
@@ -59,16 +59,16 @@
                         <p class="text-[10px] text-ziggo-faint">{{ r.phone }}</p>
                     </td>
                     <td class="px-6 py-3 text-xs capitalize">{{ r.vehicle_type }}</td>
-                    <td class="px-6 py-3 text-right text-sm font-bold">Rs.{{ "{:,.0f}".format(r.earned) }}</td>
+                    <td class="px-6 py-3 text-right text-sm font-normal">Rs.{{ "{:,.0f}".format(r.earned) }}</td>
                     <td class="px-6 py-3 text-right text-sm">Rs.{{ "{:,.0f}".format(r.paid) }}</td>
-                    <td class="px-6 py-3 text-right text-sm font-black {% if r.pending > 0 %}text-amber-600{% else %}text-gray-400{% endif %}">
+                    <td class="px-6 py-3 text-right text-sm font-normal {% if r.pending > 0 %}text-amber-600{% else %}text-gray-400{% endif %}">
                         Rs.{{ "{:,.0f}".format(r.pending) }}
                     </td>
                     <td class="px-6 py-3 text-right">
                         {% if r.pending > 0 %}
                         <form method="post" action="/admin/withdrawals/{{ r.driver_id }}/pay" class="inline-flex items-center gap-1">
                             <input type="number" step="0.01" min="0.01" max="{{ r.pending }}" value="{{ "%.2f"|format(r.pending) }}"
-                                   name="amount" class="w-24 px-2 py-1 rounded-lg border border-gray-200 text-xs text-right">
+                                   name="amount" class="w-24 px-2 py-1 rounded-lg border border-gray-200 text-xs text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none">
                             <input type="hidden" name="note" value="Manual payout">
                             <button class="px-3 py-1 rounded-lg bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-600">
                                 Pay
@@ -85,6 +85,37 @@
             </tbody>
         </table>
     </div>
+    <!-- Pagination controls -->
+    {% if total_pages > 1 %}
+    <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
+        <p class="text-sm text-gray-500">
+            Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
+            <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
+            <span class="font-bold text-ziggo">{{ total_drivers }}</span> drivers
+        </p>
+        <div class="flex items-center gap-1.5">
+            {% if page > 1 %}
+                <a href="/admin/withdrawals?page={{ page - 1 }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
+            {% else %}
+                <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Previous</span>
+            {% endif %}
+
+            {% for p in page_range %}
+                {% if p == page %}
+                    <span class="px-3 py-1.5 rounded-lg bg-ziggo text-white text-xs font-black">{{ p }}</span>
+                {% else %}
+                    <a href="/admin/withdrawals?page={{ p }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
+                {% endif %}
+            {% endfor %}
+
+            {% if page < total_pages %}
+                <a href="/admin/withdrawals?page={{ page + 1 }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
+            {% else %}
+                <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Next</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -93,7 +124,7 @@
     </div>
     <div class="overflow-x-auto">
         <table class="w-full text-left">
-            <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
+            <thead class="bg-ziggo-canvas/70 text-[11px] uppercase tracking-wider text-ziggo-faint font-black">
                 <tr>
                     <th class="px-6 py-3">Date</th>
                     <th class="px-6 py-3">Driver</th>
@@ -106,7 +137,7 @@
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-3 text-xs text-gray-500">{{ h.created_at.strftime("%Y-%m-%d %H:%M") if h.created_at else '' }}</td>
                     <td class="px-6 py-3 text-sm font-semibold">{{ h.user.full_name if h.user else '—' }}</td>
-                    <td class="px-6 py-3 text-right text-sm font-bold text-emerald-600">Rs.{{ "{:,.2f}".format(h.amount|float) }}</td>
+                    <td class="px-6 py-3 text-right text-sm font-normal text-emerald-600">Rs.{{ "{:,.2f}".format(h.amount|float) }}</td>
                     <td class="px-6 py-3 text-xs text-gray-500">{{ h.description or '' }}</td>
                 </tr>
                 {% else %}

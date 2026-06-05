@@ -39,6 +39,12 @@ async def verify_otp(request: OTPVerify, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.phone_number == request.phone_number))
     user = result.scalars().first()
 
+    if user and not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account has been deactivated. Please contact support.",
+        )
+
     if not user:
         user = User(
             phone_number=request.phone_number,

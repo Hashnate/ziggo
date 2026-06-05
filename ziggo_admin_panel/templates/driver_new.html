@@ -4,7 +4,7 @@
 {% block page_title %}Add New Driver{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+<div class="max-w-3xl mx-auto bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
     <form method="post" action="/admin/drivers/new" enctype="multipart/form-data" class="p-8 space-y-6">
         {% if error %}
         <div class="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl font-bold text-sm">
@@ -24,7 +24,24 @@
                         <span id="photoLabel">Choose photo</span>
                     </label>
                     <input id="profile_photo" name="profile_photo" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="previewPhoto(this)">
-                    <p class="text-xs text-ziggo-faint font-bold mt-2">JPG, PNG or WEBP. Max 5 MB. Optional.</p>
+                    <p class="text-xs text-ziggo-faint font-bold mt-2">JPG, PNG or WEBP. Max 5 MB. Leave empty to keep the current photo.</p>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h3 class="text-lg font-black text-ziggo mb-4">Billing Proof</h3>
+            <div class="flex items-center gap-5">
+                <div id="billingPreview" class="w-24 h-24 rounded-2xl bg-ziggo-soft/50 border-2 border-dashed border-ziggo-line flex items-center justify-center overflow-hidden">
+                    <i class="fas fa-file-invoice text-ziggo-faint text-3xl"></i>
+                </div>
+                <div class="flex-1">
+                    <label for="billing_proof" class="inline-flex items-center gap-2 cursor-pointer px-4 py-2.5 bg-ziggo-soft text-ziggo rounded-xl font-bold text-sm hover:bg-ziggo-soft/70 transition">
+                        <i class="fas fa-upload"></i>
+                        <span id="billingLabel">Choose billing proof</span>
+                    </label>
+                    <input id="billing_proof" name="billing_proof" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="previewBilling(this)">
+                    <p class="text-xs text-ziggo-faint font-bold mt-2">JPG, PNG or WEBP. Max 5 MB. Upload utility bill, bank statement, etc.</p>
                 </div>
             </div>
         </div>
@@ -38,6 +55,7 @@
                            type="tel" maxlength="10" minlength="10" pattern="\d{10}"
                            placeholder="0712345678"
                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    <p class="text-[10px] text-amber-600 font-bold mt-1">⚠️ Changing this changes the driver's login</p>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Full Name</label>
@@ -68,7 +86,7 @@
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Vehicle Type</label>
                     <select name="vehicle_type" required
-                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
                         {% set selected = form.vehicle_type or 'car' %}
                         <option value="bike" {% if selected == 'bike' %}selected{% endif %}>Bike</option>
                         <option value="tuk" {% if selected == 'tuk' %}selected{% endif %}>Tuk-tuk</option>
@@ -97,18 +115,96 @@
                 </div>
                 <div class="flex items-center mt-6">
                     <label class="inline-flex items-center cursor-pointer">
-                        <input name="auto_approve" type="checkbox" {% if form.auto_approve != '' and form.auto_approve != None %}checked{% else %}checked{% endif %}
-                               class="w-5 h-5 text-ziggo-accent border-gray-300 rounded">
-                        <span class="ml-2 text-sm font-bold text-gray-700">Auto-approve this driver</span>
+                        <input name="is_approved" type="checkbox" value="on" {% if form.is_approved == 'on' or form.is_approved == '1' %}checked{% endif %}
+                               class="w-5 h-5 text-ziggo border-gray-300 rounded">
+                        <span class="ml-2 text-sm font-bold text-gray-700">Approved (can go online & accept rides)</span>
                     </label>
                 </div>
             </div>
         </div>
 
+        <div>
+            <h3 class="text-lg font-black text-ziggo mb-4">Emergency Contact (Close Relative)</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Close Relative Name</label>
+                    <input name="relative_name" value="{{ form.relative_name or '' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo"
+                           placeholder="John Doe">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Contact Number</label>
+                    <input name="relative_contact" value="{{ form.relative_contact or '' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo"
+                           placeholder="0771234567">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Relationship</label>
+                    <input name="relative_relationship" value="{{ form.relative_relationship or '' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo"
+                           placeholder="Father, Spouse, etc.">
+                </div>
+            </div>
+        </div>
+
+        <!-- KYC Documents -->
+        <div class="pt-6 border-t border-gray-100">
+            <h4 class="font-black text-ziggo-ink mb-4 flex items-center gap-2">
+                <i class="fas fa-id-card text-ziggo"></i> KYC Documents
+            </h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
+                    <div class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
+                        <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-black text-sm text-ziggo-ink">NIC</p>
+                        <p class="text-[11px] text-rose-500 font-bold">Not uploaded yet</p>
+                    </div>
+                </div>
+                <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
+                    <div class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
+                        <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-black text-sm text-ziggo-ink">Driving License</p>
+                        <p class="text-[11px] text-rose-500 font-bold">Not uploaded yet</p>
+                    </div>
+                </div>
+                <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
+                    <div class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
+                        <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-black text-sm text-ziggo-ink">Vehicle Registration</p>
+                        <p class="text-[11px] text-rose-500 font-bold">Not uploaded yet</p>
+                    </div>
+                </div>
+                <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
+                    <div class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
+                        <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-black text-sm text-ziggo-ink">Insurance</p>
+                        <p class="text-[11px] text-rose-500 font-bold">Not uploaded yet</p>
+                    </div>
+                </div>
+                <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
+                    <div id="billingKycIconWrapper" class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
+                        <i class="fas fa-file-circle-xmark text-gray-300 text-xl" id="billingKycIcon"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-black text-sm text-ziggo-ink">Billing Proof</p>
+                        <p class="text-[11px] text-rose-500 font-bold" id="billingKycStatus">Not uploaded yet</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="pt-6 border-t border-gray-100 flex justify-end gap-3">
-            <a href="/admin/drivers" class="px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50">Cancel</a>
-            <button type="submit" class="px-8 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light">
-                <i class="fas fa-plus mr-2"></i> Create Driver
+            <a href="/admin/drivers" class="px-6 py-3 bg-[#1e3a8a] text-white hover:bg-blue-800 rounded-xl font-bold">Cancel</a>
+            <button type="submit" class="px-8 py-3 bg-[#0f172a] text-white rounded-xl font-bold hover:bg-slate-800 flex items-center gap-2">
+                <i class="fas fa-save"></i> Save changes
             </button>
         </div>
     </form>
@@ -131,6 +227,31 @@ function previewPhoto(input) {
     };
     reader.readAsDataURL(file);
     label.textContent = 'Change photo';
+}
+
+function previewBilling(input) {
+    const preview = document.getElementById('billingPreview');
+    const label = document.getElementById('billingLabel');
+    const kycIcon = document.getElementById('billingKycIcon');
+    const kycIconWrapper = document.getElementById('billingKycIconWrapper');
+    const kycStatus = document.getElementById('billingKycStatus');
+    
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    if (file.size > 5 * 1024 * 1024) {
+        alert('Billing Proof must be under 5 MB');
+        input.value = '';
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        preview.innerHTML = '<img src="' + e.target.result + '" class="w-full h-full object-cover">';
+        kycIconWrapper.innerHTML = '<img src="' + e.target.result + '" class="w-full h-full object-cover">';
+    };
+    reader.readAsDataURL(file);
+    label.textContent = 'Change file';
+    kycStatus.textContent = 'Ready to upload';
+    kycStatus.className = 'text-[11px] text-amber-500 font-bold';
 }
 </script>
 {% endblock %}

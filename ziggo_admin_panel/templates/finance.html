@@ -8,22 +8,22 @@
 <div class="space-y-6">
     <!-- Headline cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Total GMV</p>
             <p class="text-3xl font-black text-ziggo mt-1">Rs.{{ "{:,.0f}".format(rs.gmv.total) }}</p>
             <p class="text-xs text-gray-500 mt-1 font-bold">All services combined</p>
         </div>
-        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Platform commission</p>
             <p class="text-3xl font-black text-green-600 mt-1">Rs.{{ "{:,.0f}".format(rs.commission.total) }}</p>
             <p class="text-xs text-gray-500 mt-1 font-bold">Ziggo's earnings</p>
         </div>
-        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Driver payouts (rides)</p>
             <p class="text-3xl font-black text-blue-600 mt-1">Rs.{{ "{:,.0f}".format(rs.driver_payouts_rides) }}</p>
             <p class="text-xs text-gray-500 mt-1 font-bold">Sum of driver_earnings</p>
         </div>
-        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Wallet liability</p>
             <p class="text-3xl font-black text-purple-600 mt-1">Rs.{{ "{:,.0f}".format(rs.wallet.held) }}</p>
             <p class="text-xs text-gray-500 mt-1 font-bold">Customer credit on books</p>
@@ -31,7 +31,7 @@
     </div>
 
     <!-- Per-service breakdown -->
-    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div class="p-6 border-b border-gray-100">
             <h3 class="font-black text-ziggo">Revenue by service line</h3>
             <p class="text-xs text-gray-400 mt-1">GMV = what customers paid. Commission = Ziggo's slice (ride platform fee + 20% of food/market delivery fee).</p>
@@ -67,7 +67,7 @@
 
     <!-- Drill-down cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <a href="/admin/finance/drivers" class="block bg-white rounded-3xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
+        <a href="/admin/finance/drivers" class="block bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
             <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl mb-3">
                 <i class="fas fa-motorcycle"></i>
             </div>
@@ -75,7 +75,7 @@
             <p class="text-xl font-black mt-1">{{ rs.counts.drivers }}</p>
             <p class="text-xs text-gray-500 mt-1 font-bold">Per-driver earnings →</p>
         </a>
-        <a href="/admin/finance/customers" class="block bg-white rounded-3xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
+        <a href="/admin/finance/customers" class="block bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
             <div class="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl mb-3">
                 <i class="fas fa-users"></i>
             </div>
@@ -83,7 +83,7 @@
             <p class="text-xl font-black mt-1">{{ rs.counts.customers }}</p>
             <p class="text-xs text-gray-500 mt-1 font-bold">Per-customer spend →</p>
         </a>
-        <a href="/admin/finance/restaurants" class="block bg-white rounded-3xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
+        <a href="/admin/finance/restaurants" class="block bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
             <div class="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center text-xl mb-3">
                 <i class="fas fa-utensils"></i>
             </div>
@@ -91,7 +91,7 @@
             <p class="text-xl font-black mt-1">{{ rs.counts.restaurants }}</p>
             <p class="text-xs text-gray-500 mt-1 font-bold">Per-restaurant revenue →</p>
         </a>
-        <a href="/admin/finance/market" class="block bg-white rounded-3xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
+        <a href="/admin/finance/market" class="block bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
             <div class="w-12 h-12 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center text-xl mb-3">
                 <i class="fas fa-store"></i>
             </div>
@@ -102,7 +102,7 @@
     </div>
 
     <!-- Wallet -->
-    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
         <h3 class="font-black text-ziggo mb-4">Customer wallet activity</h3>
         <div class="grid grid-cols-3 gap-4 text-sm">
             <div>

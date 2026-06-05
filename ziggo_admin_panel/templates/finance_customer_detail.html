@@ -7,7 +7,7 @@
     <a href="/admin/finance/customers" class="inline-flex items-center text-sm font-bold text-gray-500 hover:text-ziggo">
         <i class="fas fa-arrow-left mr-2"></i> Back to customer spend
     </a>
-    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 flex flex-wrap items-center gap-6">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-wrap items-center gap-6">
         <div class="w-20 h-20 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center text-3xl">
             <i class="fas fa-user"></i>
         </div>
@@ -22,22 +22,22 @@
     </div>
 
     <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Wallet balance</p>
             <p class="text-2xl font-black text-purple-600 mt-1">Rs.{{ "{:,.0f}".format(c.wallet_balance) }}</p>
         </div>
-        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Total spend</p>
             <p class="text-2xl font-black text-ziggo mt-1">Rs.{{ "{:,.0f}".format(t.total_spend) }}</p>
         </div>
-        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Total orders</p>
             <p class="text-2xl font-black mt-1">{{ t.total_orders }}</p>
         </div>
     </div>
 
     <!-- Wallet transactions -->
-    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div class="p-6 border-b border-gray-100">
             <h3 class="font-black text-ziggo">Wallet transactions</h3>
         </div>
@@ -78,7 +78,7 @@
     </div>
 
     <!-- Orders timeline -->
-    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div class="p-6 border-b border-gray-100">
             <h3 class="font-black text-ziggo">Order history</h3>
         </div>

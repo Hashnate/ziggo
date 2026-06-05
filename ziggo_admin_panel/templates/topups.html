@@ -10,7 +10,7 @@
             <div class="stat-icon bg-emerald-100 text-emerald-600"><i class="fas fa-wallet"></i></div>
             <div>
                 <p class="text-[10px] text-ziggo-faint uppercase font-bold">Total credited</p>
-                <p class="text-2xl font-black text-emerald-600">Rs.{{ "{:,.0f}".format(total) }}</p>
+                <p class="text-2xl font-normal text-emerald-600">Rs.{{ "{:,.0f}".format(total) }}</p>
             </div>
         </div>
     </div>
@@ -40,13 +40,13 @@
 
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
     <div class="p-5 border-b border-gray-100 flex items-center justify-between">
-        <h3 class="font-black text-ziggo-ink">Recent top-ups ({{ topups | length }}, last 300)</h3>
+        <h3 class="font-black text-ziggo-ink">Recent top-ups ({{ count }})</h3>
         <input type="text" id="topupSearch" placeholder="Search phone, ref, note…"
                class="px-3 py-2 rounded-xl border border-gray-200 text-sm w-72 focus:outline-none focus:border-ziggo">
     </div>
     <div class="overflow-x-auto">
         <table class="w-full text-left" id="topupTable">
-            <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
+            <thead class="bg-ziggo-canvas/70 text-[11px] uppercase tracking-wider text-ziggo-faint font-black">
                 <tr>
                     <th class="px-6 py-3">Date</th>
                     <th class="px-6 py-3">User</th>
@@ -63,7 +63,7 @@
                     <td class="px-6 py-3 text-xs text-gray-500">{{ t.created_at.strftime("%Y-%m-%d %H:%M") if t.created_at else '' }}</td>
                     <td class="px-6 py-3 text-sm font-semibold">{{ t.user.full_name if t.user else '—' }}</td>
                     <td class="px-6 py-3 text-xs text-gray-500">{{ t.user.phone_number if t.user else '' }}</td>
-                    <td class="px-6 py-3 text-right text-sm font-black text-emerald-600">+Rs.{{ "{:,.2f}".format(t.amount|float) }}</td>
+                    <td class="px-6 py-3 text-right text-sm font-normal text-emerald-600">+Rs.{{ "{:,.2f}".format(t.amount|float) }}</td>
                     <td class="px-6 py-3 text-right text-xs text-gray-500">
                         {% if t.balance_after is not none %}Rs.{{ "{:,.2f}".format(t.balance_after|float) }}{% else %}—{% endif %}
                     </td>
@@ -76,6 +76,38 @@
             </tbody>
         </table>
     </div>
+
+    <!-- Pagination controls -->
+    {% if total_pages > 1 %}
+    <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
+        <p class="text-sm text-gray-500">
+            Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
+            <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
+            <span class="font-bold text-ziggo">{{ count }}</span> transactions
+        </p>
+        <div class="flex items-center gap-1.5">
+            {% if page > 1 %}
+                <a href="/admin/topups?page={{ page - 1 }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
+            {% else %}
+                <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Previous</span>
+            {% endif %}
+
+            {% for p in page_range %}
+                {% if p == page %}
+                    <span class="px-3 py-1.5 rounded-lg bg-ziggo text-white text-xs font-black">{{ p }}</span>
+                {% else %}
+                    <a href="/admin/topups?page={{ p }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
+                {% endif %}
+            {% endfor %}
+
+            {% if page < total_pages %}
+                <a href="/admin/topups?page={{ page + 1 }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
+            {% else %}
+                <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Next</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <script>

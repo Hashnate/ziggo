@@ -96,6 +96,11 @@ class Driver(Base):
     acceptance_rate = Column(DECIMAL(5, 2), default=100)
     status = Column(SQLEnum(DriverStatus, name="driver_status"), default=DriverStatus.PENDING)
     approved_at = Column(DateTime(timezone=True))
+    relative_name = Column(String(100))
+    relative_contact = Column(String(20))
+    relative_relationship = Column(String(50))
+    billing_proof_url = Column(String(255))
+
 
     user = relationship("User", back_populates="driver_profile")
     documents = relationship("DriverDocument", back_populates="driver", cascade="all, delete-orphan")

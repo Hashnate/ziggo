@@ -47,7 +47,12 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("bookings", "is_rental", "BOOLEAN NOT NULL DEFAULT FALSE"),
     ("bookings", "rental_hours", "INTEGER"),
     ("users", "notification_token", "VARCHAR(255)"),
+    ("drivers", "relative_name", "VARCHAR(100)"),
+    ("drivers", "relative_contact", "VARCHAR(20)"),
+    ("drivers", "relative_relationship", "VARCHAR(50)"),
+    ("drivers", "billing_proof_url", "VARCHAR(255)"),
 )
+
 
 
 DEFAULT_FLASH_TIERS = [

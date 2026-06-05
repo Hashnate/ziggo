@@ -2,92 +2,81 @@
 
 {% block title %}Reports | Ziggo Admin{% endblock %}
 {% block page_title %}Insight & Analytics{% endblock %}
-
-{% block top_title %}{% endblock %}
 {% block head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 {% endblock %}
-
 {% block content %}
 <div class="space-y-6">
 
-    <!-- Header -->
-    <div class="flex items-center gap-3">
-        <div class="w-11 h-11 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-xl">
-            <i class="fas fa-chart-bar"></i>
-        </div>
-        <div>
-            <h2 class="text-2xl font-black text-ziggo-ink leading-tight">Insight &amp; Analytics</h2>
-            <p class="text-xs text-ziggo-muted font-bold">Rides, revenue and platform health over a date range</p>
-        </div>
-    </div>
-
-    <!-- KPI rows (full-width like the reference) -->
-    <div class="space-y-4">
-        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-5">
-            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl">
-                <i class="fas fa-hand-holding-usd"></i>
+    <!-- KPI Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl flex-shrink-0">
+                <i class="fas fa-hand-holding-usd" id="kpiIcon1"></i>
             </div>
             <div>
-                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Admin Net (Commission)</p>
-                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">RS. <span id="kpiNet">0</span></p>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider" id="kpiLabel1">Admin Net (Commission)</p>
+                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1.5"><span id="kpiVal1">0</span></p>
             </div>
         </div>
-        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-5">
-            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl">
-                <i class="fas fa-route"></i>
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl flex-shrink-0">
+                <i class="fas fa-route" id="kpiIcon2"></i>
             </div>
             <div>
-                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Total Rides</p>
-                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1" id="kpiRides">0</p>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider" id="kpiLabel2">Total Rides</p>
+                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1.5"><span id="kpiVal2">0</span></p>
             </div>
         </div>
-        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-5">
-            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl">
-                <i class="far fa-id-card"></i>
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl flex-shrink-0">
+                <i class="far fa-id-card" id="kpiIcon3"></i>
             </div>
             <div>
-                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Active Drivers</p>
-                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1" id="kpiDrivers">0</p>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider" id="kpiLabel3">Active Drivers</p>
+                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1.5"><span id="kpiVal3">0</span></p>
             </div>
         </div>
-        <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-5">
-            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl">
-                <i class="far fa-credit-card"></i>
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl flex-shrink-0">
+                <i class="far fa-credit-card" id="kpiIcon4"></i>
             </div>
             <div>
-                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Gross Bookings</p>
-                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">RS. <span id="kpiGross">0</span></p>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider" id="kpiLabel4">Gross Bookings</p>
+                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1.5"><span id="kpiVal4">0</span></p>
             </div>
         </div>
     </div>
 
     <!-- Filter row -->
-    <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-5 flex flex-wrap items-end gap-4">
-        <div class="min-w-[180px]">
-            <label class="block text-[11px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Report type</label>
-            <select id="rptType" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white">
+    <div class="bg-white rounded-xl border border-ziggo-line shadow-soft-sm p-4 flex flex-wrap items-end gap-3">
+        <div class="min-w-[140px]">
+            <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Report type</label>
+            <select id="rptType" class="w-full px-3 py-2 border border-ziggo-line rounded-lg text-sm outline-none focus:border-ziggo bg-white">
                 <option value="summary" {% if report_type == 'summary' %}selected{% endif %}>Summary</option>
+                <option value="earnings" {% if report_type == 'earnings' %}selected{% endif %}>Earnings</option>
+                <option value="drivers" {% if report_type == 'drivers' %}selected{% endif %}>Driver Performance</option>
+                <option value="riders" {% if report_type == 'riders' %}selected{% endif %}>Rider Analytics</option>
             </select>
         </div>
         <div>
-            <label class="block text-[11px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Start date</label>
-            <input type="date" id="rptStart" value="{{ start_date }}" class="p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+            <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Start date</label>
+            <input type="date" id="rptStart" value="{{ start_date }}" class="px-3 py-2 border border-ziggo-line rounded-lg text-sm outline-none focus:border-ziggo">
         </div>
         <div>
-            <label class="block text-[11px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">End date</label>
-            <input type="date" id="rptEnd" value="{{ end_date }}" class="p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+            <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">End date</label>
+            <input type="date" id="rptEnd" value="{{ end_date }}" class="px-3 py-2 border border-ziggo-line rounded-lg text-sm outline-none focus:border-ziggo">
         </div>
-        <button id="rptApply" type="button" class="px-6 py-3 bg-ziggo text-white rounded-2xl font-black shadow-brand hover:bg-ziggo-light transition flex items-center gap-2">
+        <button id="rptApply" type="button" class="px-4 py-2 bg-ziggo text-white rounded-lg font-black text-xs shadow-brand hover:bg-ziggo-light transition flex items-center gap-1.5">
             <i class="fas fa-filter"></i> Apply
         </button>
-        <button data-quick="7" type="button" class="px-5 py-3 bg-slate-700 text-white rounded-2xl font-black hover:bg-slate-800 transition">Last 7 Days</button>
-        <button data-quick="30" type="button" class="px-5 py-3 bg-slate-700 text-white rounded-2xl font-black hover:bg-slate-800 transition">Last 30 Days</button>
+        <button data-quick="7" type="button" class="px-4 py-2 bg-slate-700 text-white rounded-lg font-black text-xs hover:bg-slate-800 transition">Last 7 Days</button>
+        <button data-quick="30" type="button" class="px-4 py-2 bg-slate-700 text-white rounded-lg font-black text-xs hover:bg-slate-800 transition">Last 30 Days</button>
         <span id="rptStatus" class="text-xs font-bold text-ziggo-muted ml-auto"></span>
     </div>
 
     <!-- Trend chart -->
-    <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm p-6">
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6">
         <div class="flex items-center gap-2 mb-3">
             <i class="fas fa-chart-line text-ziggo"></i>
             <h3 class="font-black text-ziggo-ink">Trend</h3>
@@ -96,7 +85,7 @@
     </div>
 
     <!-- Summary table -->
-    <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
         <div class="px-6 py-4 border-b border-ziggo-line flex items-center gap-2">
             <i class="fas fa-table text-ziggo"></i>
             <h3 class="font-black text-ziggo-ink">Summary Details</h3>
@@ -105,7 +94,7 @@
         <div class="overflow-x-auto">
             <table class="w-full text-left">
                 <thead class="bg-gray-50 text-[11px] uppercase text-ziggo-muted font-black tracking-wider">
-                    <tr>
+                    <tr id="tableHeader">
                         <th class="px-6 py-4">Date</th>
                         <th class="px-6 py-4">Rides</th>
                         <th class="px-6 py-4">Completed</th>
@@ -122,64 +111,88 @@
             <i class="fas fa-inbox text-3xl text-ziggo-faint mb-3"></i>
             <p class="text-ziggo-muted font-bold">No bookings in this range.</p>
         </div>
+        <!-- Pagination controls -->
+        <div id="paginationControls" class="px-6 py-4 border-t border-ziggo-line flex items-center justify-between bg-gray-50/50 hidden">
+        </div>
     </div>
 </div>
 
 <script>
     const initialData = {{ data|tojson }};
     let chart;
+    let currentPage = 1;
+    const rowsPerPage = 50;
+    let currentRows = [];
 
     function fmtMoney(n) { return Math.round(n).toLocaleString(); }
 
-    function applyData(d) {
-        document.getElementById('kpiNet').textContent     = fmtMoney(d.totals.admin_net);
-        document.getElementById('kpiRides').textContent   = d.totals.total_rides.toLocaleString();
-        document.getElementById('kpiDrivers').textContent = d.totals.active_drivers.toLocaleString();
-        document.getElementById('kpiGross').textContent   = fmtMoney(d.totals.gross_bookings);
+    function getActiveType() {
+        return document.getElementById('rptType').value;
+    }
 
-        // Trend chart
-        const labels = d.trend.map(r => r.date);
-        const rides = d.trend.map(r => r.rides);
-        const revenue = d.trend.map(r => r.revenue);
-        if (!chart) {
-            chart = new Chart(document.getElementById('trendChart'), {
-                type: 'line',
-                data: {
-                    labels,
-                    datasets: [
-                        { label: 'Rides', data: rides, borderColor: '#3B82F6', backgroundColor: 'rgba(59,130,246,0.10)',
-                          yAxisID: 'y', tension: 0.35, fill: false, pointRadius: 3 },
-                        { label: 'Revenue (Rs.)', data: revenue, borderColor: '#06B6D4', backgroundColor: 'rgba(6,182,212,0.10)',
-                          yAxisID: 'y1', tension: 0.35, fill: false, pointRadius: 3 },
-                    ]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    scales: {
-                        y:  { position: 'left',  beginAtZero: true, title: { display: true, text: 'Rides' } },
-                        y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false },
-                              title: { display: true, text: 'Revenue (Rs.)' } },
-                    },
-                    plugins: { legend: { position: 'top', align: 'center' } }
-                }
-            });
-        } else {
-            chart.data.labels = labels;
-            chart.data.datasets[0].data = rides;
-            chart.data.datasets[1].data = revenue;
-            chart.update();
-        }
-
-        // Table
+    function renderTable() {
         const body = document.getElementById('rowsBody');
         const empty = document.getElementById('rowsEmpty');
-        if (!d.rows.length) {
+        const pagControls = document.getElementById('paginationControls');
+        
+        if (!currentRows.length) {
             body.innerHTML = '';
             empty.classList.remove('hidden');
+            pagControls.classList.add('hidden');
+            document.getElementById('rowsCount').textContent = '0 days';
+            return;
+        }
+        
+        empty.classList.add('hidden');
+        
+        const totalRows = currentRows.length;
+        const totalPages = Math.ceil(totalRows / rowsPerPage);
+        
+        // Adjust current page if out of bounds
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+        
+        const startIdx = (currentPage - 1) * rowsPerPage;
+        const endIdx = Math.min(startIdx + rowsPerPage, totalRows);
+        const slicedRows = currentRows.slice(startIdx, endIdx);
+        
+        const type = getActiveType();
+        if (type === 'earnings') {
+            body.innerHTML = slicedRows.map(r => `
+                <tr class="hover:bg-gray-50/50">
+                    <td class="px-6 py-4 font-black text-ziggo-ink">${r.date}</td>
+                    <td class="px-6 py-4 font-bold text-ziggo-ink">Rs. ${fmtMoney(r.gross)}</td>
+                    <td class="px-6 py-4 text-emerald-600 font-bold">Rs. ${fmtMoney(r.driver_earnings)}</td>
+                    <td class="px-6 py-4 text-ziggo font-black">Rs. ${fmtMoney(r.commission)}</td>
+                    <td class="px-6 py-4 font-bold text-slate-600">Rs. ${fmtMoney(r.waiting_charge)}</td>
+                    <td class="px-6 py-4 text-rose-600 font-bold">Rs. ${fmtMoney(r.discount)}</td>
+                </tr>
+            `).join('');
+        } else if (type === 'drivers') {
+            body.innerHTML = slicedRows.map(r => `
+                <tr class="hover:bg-gray-50/50">
+                    <td class="px-6 py-4 font-black text-ziggo-ink">${r.date}</td>
+                    <td class="px-6 py-4 font-bold text-ziggo-ink">${r.active_drivers}</td>
+                    <td class="px-6 py-4 font-bold">${r.rides}</td>
+                    <td class="px-6 py-4 text-emerald-600 font-bold">${r.completed}</td>
+                    <td class="px-6 py-4 text-rose-600 font-bold">${r.cancelled}</td>
+                    <td class="px-6 py-4 font-black text-ziggo">${r.completion_rate}%</td>
+                    <td class="px-6 py-4 font-bold text-amber-500">${r.avg_rating} <i class="fas fa-star text-[10px]"></i></td>
+                </tr>
+            `).join('');
+        } else if (type === 'riders') {
+            body.innerHTML = slicedRows.map(r => `
+                <tr class="hover:bg-gray-50/50">
+                    <td class="px-6 py-4 font-black text-ziggo-ink">${r.date}</td>
+                    <td class="px-6 py-4 font-bold text-ziggo-ink">${r.active_riders}</td>
+                    <td class="px-6 py-4 font-bold">${r.rides}</td>
+                    <td class="px-6 py-4 text-emerald-600 font-bold">${r.completed}</td>
+                    <td class="px-6 py-4 text-ziggo font-black">Rs. ${fmtMoney(r.avg_fare)}</td>
+                    <td class="px-6 py-4 text-blue-600 font-bold">+${r.new_riders}</td>
+                </tr>
+            `).join('');
         } else {
-            empty.classList.add('hidden');
-            body.innerHTML = d.rows.map(r => `
+            body.innerHTML = slicedRows.map(r => `
                 <tr class="hover:bg-gray-50/50">
                     <td class="px-6 py-4 font-black text-ziggo-ink">${r.date}</td>
                     <td class="px-6 py-4 font-bold text-ziggo-ink">${r.rides}</td>
@@ -191,16 +204,273 @@
                 </tr>
             `).join('');
         }
-        document.getElementById('rowsCount').textContent = `${d.rows.length} day${d.rows.length === 1 ? '' : 's'}`;
+        
+        document.getElementById('rowsCount').textContent = `${totalRows} day${totalRows === 1 ? '' : 's'}`;
+        
+        if (totalPages > 1) {
+            pagControls.classList.remove('hidden');
+            
+            // Build pagination buttons
+            let buttonsHTML = '';
+            
+            // Previous button
+            if (currentPage > 1) {
+                buttonsHTML += `<button onclick="setPage(${currentPage - 1})" class="px-3 py-1.5 rounded-lg border border-ziggo-line bg-white text-ziggo-ink hover:bg-gray-50 text-xs font-bold transition">Previous</button>`;
+            } else {
+                buttonsHTML += `<span class="px-3 py-1.5 rounded-lg border border-ziggo-line bg-gray-50 text-ziggo-muted text-xs font-bold cursor-not-allowed">Previous</span>`;
+            }
+            
+            // Page numbers
+            for (let p = 1; p <= totalPages; p++) {
+                if (p === currentPage) {
+                    buttonsHTML += `<span class="px-3 py-1.5 rounded-lg bg-ziggo text-white text-xs font-black">${p}</span>`;
+                } else {
+                    buttonsHTML += `<button onclick="setPage(${p})" class="px-3 py-1.5 rounded-lg border border-ziggo-line bg-white text-ziggo-ink hover:bg-gray-50 text-xs font-bold transition">${p}</button>`;
+                }
+            }
+            
+            // Next button
+            if (currentPage < totalPages) {
+                buttonsHTML += `<button onclick="setPage(${currentPage + 1})" class="px-3 py-1.5 rounded-lg border border-ziggo-line bg-white text-ziggo-ink hover:bg-gray-50 text-xs font-bold transition">Next</button>`;
+            } else {
+                buttonsHTML += `<span class="px-3 py-1.5 rounded-lg border border-ziggo-line bg-gray-50 text-ziggo-muted text-xs font-bold cursor-not-allowed">Next</span>`;
+            }
+            
+            pagControls.innerHTML = `
+                <p class="text-sm text-ziggo-muted">
+                    Showing <span class="font-bold text-ziggo">${startIdx + 1}</span> to 
+                    <span class="font-bold text-ziggo">${endIdx}</span> of 
+                    <span class="font-bold text-ziggo">${totalRows}</span> entries
+                </p>
+                <div class="flex items-center gap-1.5">
+                    ${buttonsHTML}
+                </div>
+            `;
+        } else {
+            pagControls.classList.add('hidden');
+        }
+    }
+
+    window.setPage = function(page) {
+        currentPage = page;
+        renderTable();
+    };
+
+    function applyData(d) {
+        const type = getActiveType();
+
+        // 1. Update KPIs
+        const icon1 = document.getElementById('kpiIcon1');
+        const icon2 = document.getElementById('kpiIcon2');
+        const icon3 = document.getElementById('kpiIcon3');
+        const icon4 = document.getElementById('kpiIcon4');
+
+        const label1 = document.getElementById('kpiLabel1');
+        const label2 = document.getElementById('kpiLabel2');
+        const label3 = document.getElementById('kpiLabel3');
+        const label4 = document.getElementById('kpiLabel4');
+
+        const val1 = document.getElementById('kpiVal1');
+        const val2 = document.getElementById('kpiVal2');
+        const val3 = document.getElementById('kpiVal3');
+        const val4 = document.getElementById('kpiVal4');
+
+        if (type === 'earnings') {
+            icon1.className = 'fas fa-hand-holding-usd';
+            label1.textContent = 'Admin Commission';
+            val1.textContent = `Rs. ${fmtMoney(d.totals.admin_net)}`;
+
+            icon2.className = 'fas fa-wallet';
+            label2.textContent = 'Driver Earnings';
+            val2.textContent = `Rs. ${fmtMoney(d.totals.driver_earnings)}`;
+
+            icon3.className = 'fas fa-tags';
+            label3.textContent = 'Total Discounts';
+            val3.textContent = `Rs. ${fmtMoney(d.totals.total_discount)}`;
+
+            icon4.className = 'far fa-credit-card';
+            label4.textContent = 'Gross Bookings';
+            val4.textContent = `Rs. ${fmtMoney(d.totals.gross_bookings)}`;
+        } else if (type === 'drivers') {
+            icon1.className = 'far fa-id-card';
+            label1.textContent = 'Active Drivers';
+            val1.textContent = d.totals.active_drivers.toLocaleString();
+
+            icon2.className = 'fas fa-route';
+            label2.textContent = 'Total Rides';
+            val2.textContent = d.totals.total_rides.toLocaleString();
+
+            icon3.className = 'fas fa-check-circle';
+            label3.textContent = 'Completion Rate';
+            val3.textContent = `${d.totals.completion_rate}%`;
+
+            icon4.className = 'fas fa-star';
+            label4.textContent = 'Avg Rating';
+            val4.textContent = `${d.totals.avg_rating} / 5`;
+        } else if (type === 'riders') {
+            icon1.className = 'fas fa-users';
+            label1.textContent = 'Active Riders';
+            val1.textContent = d.totals.active_riders.toLocaleString();
+
+            icon2.className = 'fas fa-route';
+            label2.textContent = 'Total Rides';
+            val2.textContent = d.totals.total_rides.toLocaleString();
+
+            icon3.className = 'fas fa-user-plus';
+            label3.textContent = 'New Registrations';
+            val3.textContent = d.totals.new_riders.toLocaleString();
+
+            icon4.className = 'fas fa-money-bill-wave';
+            label4.textContent = 'Avg Fare';
+            val4.textContent = `Rs. ${fmtMoney(d.totals.avg_fare)}`;
+        } else {
+            icon1.className = 'fas fa-hand-holding-usd';
+            label1.textContent = 'Admin Net (Commission)';
+            val1.textContent = `Rs. ${fmtMoney(d.totals.admin_net)}`;
+
+            icon2.className = 'fas fa-route';
+            label2.textContent = 'Total Rides';
+            val2.textContent = d.totals.total_rides.toLocaleString();
+
+            icon3.className = 'far fa-id-card';
+            label3.textContent = 'Active Drivers';
+            val3.textContent = d.totals.active_drivers.toLocaleString();
+
+            icon4.className = 'far fa-credit-card';
+            label4.textContent = 'Gross Bookings';
+            val4.textContent = `Rs. ${fmtMoney(d.totals.gross_bookings)}`;
+        }
+
+        // 2. Update Table Headers
+        const header = document.getElementById('tableHeader');
+        if (type === 'earnings') {
+            header.innerHTML = `
+                <th class="px-6 py-4">Date</th>
+                <th class="px-6 py-4">Gross Bookings</th>
+                <th class="px-6 py-4">Driver Earnings</th>
+                <th class="px-6 py-4">Admin Commission</th>
+                <th class="px-6 py-4">Waiting Surcharge</th>
+                <th class="px-6 py-4">Discounts</th>
+            `;
+        } else if (type === 'drivers') {
+            header.innerHTML = `
+                <th class="px-6 py-4">Date</th>
+                <th class="px-6 py-4">Active Drivers</th>
+                <th class="px-6 py-4">Total Rides</th>
+                <th class="px-6 py-4">Completed</th>
+                <th class="px-6 py-4">Cancelled</th>
+                <th class="px-6 py-4">Completion Rate</th>
+                <th class="px-6 py-4">Avg Rating</th>
+            `;
+        } else if (type === 'riders') {
+            header.innerHTML = `
+                <th class="px-6 py-4">Date</th>
+                <th class="px-6 py-4">Active Riders</th>
+                <th class="px-6 py-4">Total Rides</th>
+                <th class="px-6 py-4">Completed</th>
+                <th class="px-6 py-4">Avg Fare</th>
+                <th class="px-6 py-4">New Registrations</th>
+            `;
+        } else {
+            header.innerHTML = `
+                <th class="px-6 py-4">Date</th>
+                <th class="px-6 py-4">Rides</th>
+                <th class="px-6 py-4">Completed</th>
+                <th class="px-6 py-4">Cancelled</th>
+                <th class="px-6 py-4">Revenue</th>
+                <th class="px-6 py-4">Drivers</th>
+                <th class="px-6 py-4">Riders</th>
+            `;
+        }
+
+        // 3. Trend Chart
+        const labels = d.trend.map(r => r.date);
+        
+        let datasets = [];
+        let scales = {};
+        
+        if (type === 'earnings') {
+            datasets = [
+                { label: 'Gross Bookings (Rs.)', data: d.trend.map(r => r.gross), borderColor: '#3B82F6', backgroundColor: 'rgba(59,130,246,0.10)',
+                  yAxisID: 'y', tension: 0.35, fill: false, pointRadius: 3 },
+                { label: 'Admin Commission (Rs.)', data: d.trend.map(r => r.commission), borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,0.10)',
+                  yAxisID: 'y1', tension: 0.35, fill: false, pointRadius: 3 },
+            ];
+            scales = {
+                y:  { position: 'left',  beginAtZero: true, title: { display: true, text: 'Gross Bookings (Rs.)' } },
+                y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false },
+                      title: { display: true, text: 'Commission (Rs.)' } },
+            };
+        } else if (type === 'drivers') {
+            datasets = [
+                { label: 'Active Drivers', data: d.trend.map(r => r.active_drivers), borderColor: '#F59E0B', backgroundColor: 'rgba(245,158,11,0.10)',
+                  yAxisID: 'y', tension: 0.35, fill: false, pointRadius: 3 },
+                { label: 'Completion Rate (%)', data: d.trend.map(r => r.completion_rate), borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,0.10)',
+                  yAxisID: 'y1', tension: 0.35, fill: false, pointRadius: 3 },
+            ];
+            scales = {
+                y:  { position: 'left',  beginAtZero: true, title: { display: true, text: 'Active Drivers' } },
+                y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false },
+                      title: { display: true, text: 'Completion Rate (%)' } },
+            };
+        } else if (type === 'riders') {
+            datasets = [
+                { label: 'Active Riders', data: d.trend.map(r => r.active_riders), borderColor: '#3B82F6', backgroundColor: 'rgba(59,130,246,0.10)',
+                  yAxisID: 'y', tension: 0.35, fill: false, pointRadius: 3 },
+                { label: 'New Registrations', data: d.trend.map(r => r.new_riders), borderColor: '#8B5CF6', backgroundColor: 'rgba(139,92,246,0.10)',
+                  yAxisID: 'y1', tension: 0.35, fill: false, pointRadius: 3 },
+            ];
+            scales = {
+                y:  { position: 'left',  beginAtZero: true, title: { display: true, text: 'Active Riders' } },
+                y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false },
+                      title: { display: true, text: 'New Registrations' } },
+            };
+        } else {
+            datasets = [
+                { label: 'Rides', data: d.trend.map(r => r.rides), borderColor: '#3B82F6', backgroundColor: 'rgba(59,130,246,0.10)',
+                  yAxisID: 'y', tension: 0.35, fill: false, pointRadius: 3 },
+                { label: 'Revenue (Rs.)', data: d.trend.map(r => r.revenue), borderColor: '#06B6D4', backgroundColor: 'rgba(6,182,212,0.10)',
+                  yAxisID: 'y1', tension: 0.35, fill: false, pointRadius: 3 },
+            ];
+            scales = {
+                y:  { position: 'left',  beginAtZero: true, title: { display: true, text: 'Rides' } },
+                y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false },
+                      title: { display: true, text: 'Revenue (Rs.)' } },
+            };
+        }
+
+        if (chart) {
+            chart.destroy();
+        }
+        
+        chart = new Chart(document.getElementById('trendChart'), {
+            type: 'line',
+            data: {
+                labels,
+                datasets
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                scales,
+                plugins: { legend: { position: 'top', align: 'center' } }
+            }
+        });
+
+        // 4. Table
+        currentRows = d.rows || [];
+        currentPage = 1;
+        renderTable();
     }
 
     async function reload() {
         const status = document.getElementById('rptStatus');
         const start = document.getElementById('rptStart').value;
         const end = document.getElementById('rptEnd').value;
+        const type = getActiveType();
         status.textContent = 'Loading…';
         try {
-            const r = await fetch(`/admin/reports/data?start=${start}&end=${end}&type=summary`);
+            const r = await fetch(`/admin/reports/data?start=${start}&end=${end}&type=${type}`);
             if (!r.ok) {
                 status.textContent = 'Error ' + r.status;
                 return;
@@ -217,6 +487,7 @@
     function toISO(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 
     document.getElementById('rptApply').addEventListener('click', reload);
+    document.getElementById('rptType').addEventListener('change', reload);
     document.querySelectorAll('[data-quick]').forEach(btn => {
         btn.addEventListener('click', () => {
             const days = parseInt(btn.dataset.quick, 10);

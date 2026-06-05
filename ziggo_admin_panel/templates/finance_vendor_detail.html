@@ -8,7 +8,7 @@
         <i class="fas fa-arrow-left mr-2"></i> Back to vendors
     </a>
 
-    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 flex flex-wrap items-center gap-6">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-wrap items-center gap-6">
         <div class="w-20 h-20 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center text-3xl">
             <i class="fas fa-store"></i>
         </div>
@@ -16,7 +16,7 @@
             <h2 class="text-2xl font-black text-ziggo">{{ v.name }}</h2>
             <p class="text-sm text-gray-500">{{ v.category or '—' }} · {{ v.address or '' }}</p>
             <div class="mt-2 flex flex-wrap gap-3 text-xs text-gray-600 font-bold">
-                <span><i class="fas fa-star text-yellow-400"></i> {{ v.rating }}</span>
+                <span><i class="fas fa-star text-yellow-400"></i> {{ "{:.1f}".format((v.rating or 0)|float) }}</span>
                 <span class="px-2 py-0.5 rounded-full {% if v.is_active %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-500{% endif %}">{{ 'Active' if v.is_active else 'Suspended' }}</span>
                 {% if v.owner_phone %}<span><i class="fas fa-user-tie"></i> {{ v.owner_name or '—' }} · {{ v.owner_phone }}</span>{% endif %}
             </div>
@@ -24,25 +24,25 @@
     </div>
 
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Items revenue</p>
             <p class="text-2xl font-black text-ziggo mt-1">Rs.{{ "{:,.0f}".format(t.items_revenue) }}</p>
         </div>
-        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Delivery fees</p>
             <p class="text-2xl font-black text-blue-600 mt-1">Rs.{{ "{:,.0f}".format(t.delivery_fees_collected) }}</p>
         </div>
-        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Platform commission</p>
             <p class="text-2xl font-black text-green-600 mt-1">Rs.{{ "{:,.0f}".format(t.platform_commission) }}</p>
         </div>
-        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Delivered / Cancelled</p>
             <p class="text-2xl font-black mt-1">{{ t.delivered }} <span class="text-sm text-red-500">/ {{ t.cancelled }}</span></p>
         </div>
     </div>
 
-    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div class="p-6 border-b border-gray-100"><h3 class="font-black text-ziggo">Order history</h3></div>
         <div class="overflow-x-auto">
         <table class="w-full text-sm">

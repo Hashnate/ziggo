@@ -3,30 +3,20 @@
 {% block title %}Standard Services | Ziggo Admin{% endblock %}
 {% block page_title %}Standard Services{% endblock %}
 
-{% block top_title %}{% endblock %}
 {% block content %}
 <div class="space-y-6">
 
-    <!-- Header -->
-    <div class="flex items-center justify-between flex-wrap gap-4">
-        <div class="flex items-center gap-3">
-            <div class="w-11 h-11 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-xl">
-                <i class="fas fa-concierge-bell"></i>
-            </div>
-            <div>
-                <h2 class="text-2xl font-black text-ziggo-ink leading-tight">Standard Services</h2>
-                <p class="text-xs text-ziggo-muted font-bold">Configure vehicle categories, standard fare matrices and service availability</p>
-            </div>
-        </div>
-        <button onclick="openCreateModal()" class="px-5 py-3 bg-ziggo text-white rounded-2xl font-black shadow-brand hover:bg-ziggo-light transition flex items-center gap-2">
-            <i class="fas fa-plus"></i> Add Service
+    <!-- Header Controls -->
+    <div class="flex justify-end">
+        <button onclick="openCreateModal()" class="px-3.5 py-2 text-sm bg-ziggo text-white rounded-xl font-bold shadow-brand hover:bg-ziggo-light transition flex items-center gap-2">
+            <i class="fas fa-plus text-xs"></i> Add Service
         </button>
     </div>
 
     <!-- Table -->
-    <div class="bg-white rounded-3xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="w-full text-left">
+            <table class="w-full text-left" style="table-layout:fixed">
                 <thead class="bg-gray-50 text-[11px] uppercase text-ziggo-muted font-black tracking-wider">
                     <tr>
                         <th class="px-6 py-4">Icon</th>
@@ -36,7 +26,7 @@
                         <th class="px-6 py-4">Per Min</th>
                         <th class="px-6 py-4">Min Fare</th>
                         <th class="px-6 py-4">Status</th>
-                        <th class="px-6 py-4 text-right">Actions</th>
+                        <th class="px-6 py-4">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-ziggo-line">
@@ -44,24 +34,25 @@
                     <tr class="hover:bg-gray-50/50">
                         <td class="px-6 py-4">
                             <div class="w-14 h-14 rounded-xl bg-gray-100 overflow-hidden flex items-center justify-center">
+                                {% set key = ((c.service_type or '') ~ ' ' ~ (c.display_name or ''))|lower %}
                                 {% if c.image_url %}
                                 <img src="{{ c.image_url }}" alt="" class="w-full h-full object-cover">
+                                {% elif 'tuk' in key or 'auto' in key or 'three' in key or 'rick' in key %}
+                                <svg viewBox="0 0 24 24" class="w-7 h-7 text-ziggo" fill="currentColor" aria-hidden="true"><path d="M20 14.05V12.73C20 12.26 19.84 11.8 19.54 11.44L15.6 6.72C15.22 6.26 14.66 6 14.06 6H4C2.9 6 2 6.9 2 8V15C2 16.1 2.9 17 4 17H4.05C4.28 18.14 5.29 19 6.5 19S8.72 18.14 8.95 17H17.05C17.28 18.14 18.29 19 19.5 19C20.88 19 22 17.88 22 16.5C22 15.29 21.14 14.28 20 14.05M3.5 8C3.5 7.73 3.73 7.5 4 7.5H7V12H3.5V8M6.5 17.5C5.95 17.5 5.5 17.05 5.5 16.5S5.95 15.5 6.5 15.5 7.5 15.95 7.5 16.5 7.05 17.5 6.5 17.5M13 15.5H9V14H11V12H9V7.5H13V15.5M15 8.34L18.05 12H15V8.34M19.5 17.5C18.95 17.5 18.5 17.05 18.5 16.5S18.95 15.5 19.5 15.5 20.5 15.95 20.5 16.5 20.05 17.5 19.5 17.5Z"/></svg>
                                 {% else %}
                                 <i class="fas
-                                    {% if c.service_type == 'bike' %}fa-motorcycle
-                                    {% elif c.service_type == 'tuk' %}fa-taxi
-                                    {% elif c.service_type == 'car' %}fa-car
-                                    {% elif c.service_type == 'van' %}fa-shuttle-van
-                                    {% elif c.service_type == 'truck' %}fa-truck
+                                    {% if 'bike' in key or 'moto' in key %}fa-motorcycle
+                                    {% elif 'van' in key %}fa-shuttle-van
+                                    {% elif 'truck' in key or 'lorry' in key %}fa-truck
                                     {% else %}fa-car{% endif %} text-ziggo text-xl"></i>
                                 {% endif %}
                             </div>
                         </td>
                         <td class="px-6 py-4 font-black text-ziggo-ink">{{ c.display_name or c.service_type|title }}</td>
-                        <td class="px-6 py-4 text-ziggo font-black">Rs.{{ "%.2f"|format(c.base_fare or 0) }}</td>
-                        <td class="px-6 py-4 text-ziggo-ink font-bold">Rs.{{ "%.2f"|format(c.per_km_rate or 0) }}</td>
-                        <td class="px-6 py-4 text-ziggo-ink font-bold">Rs.{{ "%.2f"|format(c.per_minute_rate or 0) }}</td>
-                        <td class="px-6 py-4 text-ziggo-ink font-bold">Rs.{{ "%.2f"|format(c.min_fare or 0) }}</td>
+                        <td class="px-6 py-4 text-ziggo font-normal">Rs.{{ "%.2f"|format(c.base_fare or 0) }}</td>
+                        <td class="px-6 py-4 text-ziggo-ink font-normal">Rs.{{ "%.2f"|format(c.per_km_rate or 0) }}</td>
+                        <td class="px-6 py-4 text-ziggo-ink font-normal">Rs.{{ "%.2f"|format(c.per_minute_rate or 0) }}</td>
+                        <td class="px-6 py-4 text-ziggo-ink font-normal">Rs.{{ "%.2f"|format(c.min_fare or 0) }}</td>
                         <td class="px-6 py-4">
                             <form method="POST" action="/admin/services/{{ c.id }}/toggle" class="inline">
                                 {% if c.is_active %}
@@ -72,7 +63,7 @@
                             </form>
                         </td>
                         <td class="px-6 py-4">
-                            <div class="flex items-center justify-end gap-2">
+                            <div class="flex items-center justify-start gap-2">
                                 <button
                                     onclick='openEditModal({{ {
                                         "id": c.id,
@@ -88,12 +79,12 @@
                                         "surge_multiplier": (c.surge_multiplier|float) if c.surge_multiplier is not none else 1,
                                         "is_active": c.is_active,
                                     }|tojson }})'
-                                    class="px-3 py-2 bg-slate-700 text-white rounded-lg text-xs font-black hover:bg-slate-800 transition flex items-center gap-1.5">
+                                    class="px-3 py-1.5 bg-blue-50 text-ziggo border border-blue-100 rounded-lg text-xs font-bold hover:bg-blue-100 transition flex items-center gap-1.5">
                                     <i class="fas fa-edit"></i> Edit
                                 </button>
                                 <form method="POST" action="/admin/categories/{{ c.id }}/delete" onsubmit="return confirmDelete({{ driver_counts.get(c.service_type, 0) }}, '{{ c.display_name or c.service_type }}')">
                                     <input type="hidden" name="next" value="/admin/services">
-                                    <button type="submit" class="px-3 py-2 bg-rose-500 text-white rounded-lg text-xs font-black hover:bg-rose-600 transition">
+                                    <button type="submit" class="px-3 py-1.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-lg text-xs font-bold hover:bg-rose-100 transition">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </form>
@@ -116,7 +107,7 @@
 
 <!-- Create / Edit Modal -->
 <div id="serviceModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+    <div class="bg-white rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
         <div class="p-6 border-b border-ziggo-line flex justify-between items-center bg-gray-50/50 flex-shrink-0">
             <h3 class="text-xl font-black text-ziggo" id="svcModalTitle">New service</h3>
             <button onclick="closeModal()" class="text-ziggo-faint hover:text-ziggo-ink">

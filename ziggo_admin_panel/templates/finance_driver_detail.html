@@ -9,15 +9,20 @@
     </a>
 
     <!-- Driver summary -->
-    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 flex flex-wrap items-center gap-6">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-wrap items-center gap-6">
         <div class="w-20 h-20 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-3xl">
-            <i class="fas fa-motorcycle"></i>
+            {% set vt = (d.vehicle_type or '')|lower %}
+            {% if 'tuk' in vt or 'auto' in vt or 'three' in vt or 'rick' in vt %}
+            <svg viewBox="0 0 24 24" class="w-8 h-8" fill="currentColor" aria-hidden="true"><path d="M20 14.05V12.73C20 12.26 19.84 11.8 19.54 11.44L15.6 6.72C15.22 6.26 14.66 6 14.06 6H4C2.9 6 2 6.9 2 8V15C2 16.1 2.9 17 4 17H4.05C4.28 18.14 5.29 19 6.5 19S8.72 18.14 8.95 17H17.05C17.28 18.14 18.29 19 19.5 19C20.88 19 22 17.88 22 16.5C22 15.29 21.14 14.28 20 14.05M3.5 8C3.5 7.73 3.73 7.5 4 7.5H7V12H3.5V8M6.5 17.5C5.95 17.5 5.5 17.05 5.5 16.5S5.95 15.5 6.5 15.5 7.5 15.95 7.5 16.5 7.05 17.5 6.5 17.5M13 15.5H9V14H11V12H9V7.5H13V15.5M15 8.34L18.05 12H15V8.34M19.5 17.5C18.95 17.5 18.5 17.05 18.5 16.5S18.95 15.5 19.5 15.5 20.5 15.95 20.5 16.5 20.05 17.5 19.5 17.5Z"/></svg>
+            {% else %}
+            <i class="fas {% if 'bike' in vt or 'moto' in vt %}fa-motorcycle{% elif 'van' in vt %}fa-shuttle-van{% elif 'truck' in vt or 'lorry' in vt %}fa-truck{% else %}fa-car{% endif %}"></i>
+            {% endif %}
         </div>
         <div class="flex-1 min-w-[220px]">
             <h2 class="text-2xl font-black text-ziggo">{{ d.name or '—' }}</h2>
             <p class="text-sm text-gray-500">{{ d.phone or '—' }} · <span class="capitalize">{{ d.vehicle_type or '—' }}</span> · {{ d.vehicle_number or '—' }}</p>
             <div class="mt-2 flex flex-wrap gap-3 text-xs text-gray-600 font-bold">
-                <span><i class="fas fa-star text-yellow-400"></i> {{ d.rating }}</span>
+                <span><i class="fas fa-star text-yellow-400"></i> {{ "{:.1f}".format((d.rating or 0)|float) }}</span>
                 <span class="px-2 py-0.5 rounded-full {% if d.is_online %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-500{% endif %}">{{ 'ONLINE' if d.is_online else 'OFFLINE' }}</span>
                 <span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 capitalize">{{ d.status or '—' }}</span>
             </div>
@@ -26,26 +31,26 @@
 
     <!-- Totals -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Lifetime earnings</p>
             <p class="text-2xl font-black text-ziggo mt-1">Rs.{{ "{:,.0f}".format(t.lifetime_earnings) }}</p>
         </div>
-        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Platform fees paid</p>
             <p class="text-2xl font-black text-amber-600 mt-1">Rs.{{ "{:,.0f}".format(t.lifetime_platform_paid) }}</p>
         </div>
-        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Rides / Parcels</p>
             <p class="text-2xl font-black mt-1">{{ t.rides }} <span class="text-sm text-gray-400">+ {{ t.flash }} flash</span></p>
         </div>
-        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Food / Market</p>
             <p class="text-2xl font-black mt-1">{{ t.food }} <span class="text-sm text-gray-400">+ {{ t.market }}</span></p>
         </div>
     </div>
 
     <!-- Transactions -->
-    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div class="p-6 border-b border-gray-100 flex items-baseline justify-between">
             <h3 class="font-black text-ziggo">Transaction history</h3>
             <p class="text-xs text-gray-400">{{ data.transactions | length }} latest</p>

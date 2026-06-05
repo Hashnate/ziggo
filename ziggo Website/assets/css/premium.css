@@ -159,10 +159,10 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
   50%     { box-shadow: 0 0 0 8px rgba(59,130,246,0); }
 }
 
-.pm.dark-section .pm-eyebrow {
-  background: rgba(96, 165, 250, 0.14);
-  color: var(--p-brand-bright);
-  border-color: rgba(96, 165, 250, 0.25);
+.pm .dark-section .pm-eyebrow {
+  background: rgba(96, 165, 250, 0.18);
+  color: var(--p-brand-glow);
+  border-color: rgba(147, 197, 253, 0.35);
 }
 
 /* ---------- Container & section ---------- */
@@ -241,11 +241,17 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
 .pm .pm-btn-bright {
   background: linear-gradient(135deg, #60A5FA 0%, #1E3A8A 100%);
   color: #fff;
-  box-shadow: 0 16px 40px -10px rgba(59, 130, 246, 0.45);
+  box-shadow: 0 6px 16px -4px rgba(30, 58, 138, 0.45);
+  transition-timing-function: var(--p-ease);
+  border-radius: 14px;
+  padding: 14px 28px;
+  border: none;
+  background-clip: padding-box;
 }
+.pm .pm-btn-bright::before { display: none; }
 .pm .pm-btn-bright:hover {
-  transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 22px 50px -10px rgba(59, 130, 246, 0.6);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px -6px rgba(30, 58, 138, 0.55);
   color: #fff;
 }
 
@@ -370,6 +376,9 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
 .pm-topbar .pm-nav-logo {
   position: relative;
   z-index: 1;
+  /* logo PNG has ~13.7% transparent left padding; pull it back so the
+     visible wordmark aligns with the content edge (and the footer) */
+  margin-left: -18.6px;
 }
 .pm-topbar .pm-nav-logo img {
   filter: none;
@@ -405,6 +414,9 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
   height: 140px;
   filter: none;
 }
+/* cancel the logo PNG's transparent left padding (28.3px @140h) so the
+   wordmark lines up with the paragraph + icons in its column */
+.pm-footer-logo { margin-left: -28.3px; }
 .pm-nav-links {
   display: flex;
   align-items: center;
@@ -501,8 +513,7 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
   border-top: 1px solid rgba(255, 255, 255, 0.7);
   border-radius: 4px 0 0 0;
 }
-.pm-nav-has-dropdown:hover .pm-nav-dropdown,
-.pm-nav-has-dropdown:focus-within .pm-nav-dropdown {
+.pm-nav-has-dropdown:hover .pm-nav-dropdown {
   opacity: 1;
   pointer-events: auto;
   transform: translateX(-50%) translateY(0);
@@ -1105,16 +1116,19 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
   background: #EEF3FA;
   overflow: hidden;
 }
-.pm-phone-map-iframe {
+.pm .pm-phone-map-iframe {
   position: absolute;
   top: -32px;
   left: -22px;
   width: calc(100% + 44px);
+  max-width: none;               /* opt out of the global .pm iframe{max-width:100%} so it fills both edges */
   height: calc(100% + 80px);
   border: 0;
   pointer-events: none;          /* don't steal scroll from the page */
   filter: saturate(0.92) contrast(0.96);
 }
+/* Hero phone only: pull the map up to meet the chips so there's no white band above it */
+.pm-hero-visual .pm-phone-map { margin-top: -26px; }
 .pm-phone-map .pm-here,
 .pm-phone-map .pm-map-pin {
   z-index: 2;                    /* keep the driver pins above the map */
@@ -1522,11 +1536,11 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
 .pm-floating-card strong { font-size: 0.85rem; color: var(--p-text); font-weight: 700; letter-spacing: -0.01em; }
 .pm-floating-card small { font-size: 0.68rem; color: var(--p-text-light); }
 .pm-floating-card.top-left {
-  top: 4%; left: -2%;
+  top: 4%; left: 0%;
   animation-delay: -0.5s;
 }
 .pm-floating-card.top-right {
-  top: 14%; right: -4%;
+  top: 14%; right: 0%;
   animation-delay: -3s;
 }
 .pm-floating-card.top-right .ico {
@@ -1534,7 +1548,7 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
   box-shadow: 0 6px 14px -4px rgba(251, 146, 60, 0.55);
 }
 .pm-floating-card.bottom-left {
-  bottom: 18%; left: -4%;
+  bottom: 18%; left: 0%;
   animation-delay: -1.5s;
 }
 .pm-floating-card.bottom-left .ico {
@@ -1542,7 +1556,7 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
   box-shadow: 0 6px 14px -4px rgba(52, 211, 153, 0.55);
 }
 .pm-floating-card.bottom-right {
-  bottom: 8%; right: -2%;
+  bottom: 8%; right: 0%;
   animation-delay: -4.5s;
 }
 .pm-floating-card.bottom-right .ico {
@@ -1779,15 +1793,9 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
   background: transparent;
   /* Push near-white pixels (the subtle ground shadow in the PNG) to pure white
      so they blend invisibly into the white tile */
-  filter: contrast(1.25) brightness(1.08) saturate(1.06);
+  filter: none;
 }
-/* Truck PNG has a stronger baked-in ground shadow — crank the contrast harder */
-.pm-bento-tile.photo-tile.accent-truck .bento-img.bento-img-photo {
-  filter: contrast(1.6) brightness(1.18) saturate(1.1);
-  /* Also clip-mask the bottom edge where the shadow sits */
-  -webkit-mask-image: linear-gradient(to bottom, black 0%, black 82%, transparent 96%);
-  mask-image: linear-gradient(to bottom, black 0%, black 82%, transparent 96%);
-}
+
 .pm-bento-tile.photo-tile:hover .bento-img.bento-img-photo {
   transform: scale(1.06) rotate(-2deg);
   box-shadow: none;
@@ -2029,6 +2037,62 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
   border-color: var(--p-brand);
   background: #fff;
 }
+/* Custom dropdown that always opens downward (native <select> flips up when
+   the list is long). The native select is kept in the DOM, just hidden. */
+.pm-fare-field select.pm-native-hidden { display: none; }
+.pm-dd { position: relative; }
+.pm-dd-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--p-bg-soft);
+  border: 1px solid var(--p-border);
+  font-family: var(--p-font-body);
+  font-size: 0.9rem;
+  color: var(--p-text);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.2s var(--p-ease), background 0.2s var(--p-ease);
+}
+.pm-dd-toggle::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--p-text-light);
+  border-bottom: 2px solid var(--p-text-light);
+  transform: rotate(45deg);
+  margin-top: -3px;
+  flex: 0 0 auto;
+}
+.pm-dd.open .pm-dd-toggle { border-color: var(--p-brand); background: #fff; }
+.pm-dd-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid var(--p-border);
+  border-radius: 10px;
+  box-shadow: 0 14px 34px rgba(11, 20, 38, 0.16);
+  z-index: 60;
+  display: none;
+  padding: 6px;
+}
+.pm-dd.open .pm-dd-menu { display: block; }
+.pm-dd-item {
+  padding: 9px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--p-text);
+}
+.pm-dd-item:hover, .pm-dd-item.sel { background: var(--p-bg-soft); }
 .pm-fare-go {
   padding: 9px 22px;
   border-radius: 10px;
@@ -2202,6 +2266,25 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
 .pm-flow-phone .pm-phone {
   top: auto;
   left: auto;
+}
+.pm-3dcar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 48px;
+  height: 48px;
+  transform-origin: center center;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  pointer-events: none;
+  will-change: left, top, transform;
+  filter: drop-shadow(0 4px 6px rgba(11, 20, 38, 0.35));
+}
+.pm-3dcar img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 /* ---------- Marquee ---------- */
@@ -2556,6 +2639,10 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
 }
 .pm body { margin: 0; }
 .pm .pm-section { overflow-x: clip; }
+/* Safety net: never let a stray wide element create horizontal scroll / zoom-out
+   on small screens (clip keeps the sticky topbar working, unlike overflow:hidden) */
+html, body.pm { overflow-x: clip; max-width: 100%; }
+.pm img, .pm video, .pm iframe { max-width: 100%; }
 
 /* ============================================================
    COVERAGE SECTION — city marquee + live pulse dot
@@ -2983,7 +3070,7 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
 .pm-calc-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
 .pm-calc-vehicles {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 8px;
 }
 .pm-calc-vehicle {
@@ -3003,6 +3090,8 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
   transition: all 0.25s var(--p-ease);
 }
 .pm-calc-vehicle i { font-size: 1.1rem; color: var(--p-text-muted); transition: color 0.25s; }
+.pm-calc-vehicle .veh-ico { width: 24px; height: 24px; display: block; color: var(--p-text-muted); transition: color 0.25s; }
+.pm-calc-vehicle.active .veh-ico { color: #fff; }
 .pm-calc-vehicle:hover {
   border-color: rgba(30, 58, 138, 0.2);
   color: var(--p-text);
@@ -3296,7 +3385,7 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
   padding: 11px 18px;
   background: var(--p-bg-dark);
   color: #fff;
-  border-radius: 14px;
+  border-radius: 24px;
   text-decoration: none;
   border: 1px solid rgba(255,255,255,0.08);
   transition: transform 0.3s var(--p-spring), background 0.3s var(--p-ease);
@@ -3335,11 +3424,14 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
   margin: 0 auto 56px;
   padding: 0 24px;
   display: grid;
-  grid-template-columns: 1.4fr repeat(4, 1fr);
-  gap: 40px;
+  grid-template-columns: 2.4fr repeat(4, 1fr) 0.6fr;
+  gap: 20px;
   position: relative;
   z-index: 1;
 }
+.pm .pm-footer-top { align-items: start; }
+/* indent the whole brand column (logo + text + icons) 25px from the edge */
+.pm-footer-brand { padding-left: 25px; }
 .pm-footer-brand .pm-nav-logo {
   font-size: 1.75rem;
   color: #fff;
@@ -3412,6 +3504,9 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
   margin-left: 16px;
 }
 .pm-footer-bottom a:hover { color: #fff; }
+/* Keep footer links clear of the floating action buttons (bottom-right) */
+.pm-footer-bottom > div:last-child { padding-right: 84px; }
+@media (max-width: 600px) { .pm-footer-bottom > div:last-child { padding-right: 0; } }
 
 /* ---------- Floating buttons ---------- */
 .pm-fab-stack {
@@ -3679,17 +3774,19 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
 .pm-gallery-device.alt:hover { transform: translateY(8px); }
 
 /* Device screen themes (per service) */
-.pm-gallery-device.ride .pm-gallery-device-screen {
+.pm-gallery-device.ride .pm-gallery-device-screen,
+.pm-gallery-device.food .pm-gallery-device-screen,
+.pm-gallery-device.flash .pm-gallery-device-screen,
+.pm-gallery-device.mart .pm-gallery-device-screen {
   background: linear-gradient(180deg, #DBEAFE 0%, #BFDBFE 100%);
 }
-.pm-gallery-device.food .pm-gallery-device-screen {
-  background: linear-gradient(180deg, #FFEDD5 0%, #FED7AA 100%);
-}
-.pm-gallery-device.flash .pm-gallery-device-screen {
-  background: linear-gradient(180deg, #FEF3C7 0%, #FDE68A 100%);
-}
-.pm-gallery-device.mart .pm-gallery-device-screen {
-  background: linear-gradient(180deg, #E0E7FF 0%, #C7D2FE 100%);
+.pm-gallery-shot {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+  flex: 1;
 }
 .pm-gallery-device-bar {
   height: 38px;
@@ -4016,6 +4113,8 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
   .pm-topbar .pm-nav-cta .signin { display: none; }
   .pm-topbar-inner { height: 60px; padding: 0 16px; }
   .pm-topbar .pm-nav-logo img { height: 72px; }
+  /* logo shrinks to 72px here -> transparent left pad is ~14.6px */
+  .pm-topbar .pm-nav-logo { margin-left: -14.6px; }
   .pm-topbar .pm-nav-cta .signup { padding: 8px 16px; font-size: 0.8rem; }
   .pm-nav-toggle {
     display: inline-flex;
@@ -4028,6 +4127,49 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
     color: var(--p-text);
   }
   .pm-announce-inner span:nth-child(2) { display: none; }
+}
+@media (max-width: 900px) {
+  /* Mobile nav: the hamburger toggles `.nav-open` on the topbar, which drops
+     the links down below the bar (native links are hidden by default above). */
+  .pm-topbar.nav-open .pm-nav-links {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border-bottom: 1px solid var(--p-border);
+    box-shadow: 0 18px 36px rgba(11, 20, 38, 0.14);
+    padding: 10px 16px 18px;
+    max-height: calc(100vh - 60px);
+    overflow-y: auto;
+  }
+  .pm-topbar.nav-open .pm-nav-links > li { width: 100%; }
+  .pm-topbar.nav-open .pm-nav-link {
+    width: 100%;
+    padding: 12px 6px;
+    justify-content: flex-start;
+  }
+  .pm-topbar.nav-open .pm-nav-dropdown {
+    position: static;
+    transform: none;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    display: block;
+    width: auto;
+    box-shadow: none;
+    background: transparent;
+    border: 0;
+    min-width: 0;
+    padding: 0 0 8px 14px;
+  }
+  .pm-topbar.nav-open .pm-nav-dropdown::before { display: none; }
+  .pm-topbar.nav-open .pm-nav-dropdown a { padding: 9px 6px; }
+  .pm-topbar.nav-open .pm-mega-footer { margin-top: 6px; }
 }
 @media (max-width: 720px) {
   .pm-fare-inputs { grid-template-columns: 1fr; }

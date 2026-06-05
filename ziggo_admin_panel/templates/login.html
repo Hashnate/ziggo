@@ -6,7 +6,7 @@
     <title>Ziggo Admin · Sign in</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
@@ -25,7 +25,7 @@
                             line: '#EEF1F6'
                         }
                     },
-                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'] },
                     boxShadow: {
                         'soft': '0 24px 60px -20px rgba(15, 23, 42, 0.14), 0 4px 10px -3px rgba(15, 23, 42, 0.04)',
                         'brand': '0 16px 40px -12px rgba(30, 64, 175, 0.45)'
@@ -35,7 +35,7 @@
         }
     </script>
     <style>
-        body { font-family: 'Inter', sans-serif; color: #0F172A; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; color: #0F172A; }
         .ambient-orb {
             position: absolute;
             border-radius: 9999px;
@@ -67,7 +67,7 @@
 
             <!-- Brand -->
             <div class="flex flex-col items-center mb-8">
-                <div class="w-20 h-20 rounded-3xl overflow-hidden mb-4 flex items-center justify-center" style="background: #fff; padding: 6px; box-shadow: 0 18px 44px -14px rgba(30, 64, 175, 0.45), inset 0 0 0 1px rgba(15,23,42,0.06);">
+                <div class="w-20 h-20 rounded-2xl overflow-hidden mb-4 flex items-center justify-center" style="background: #fff; padding: 6px; box-shadow: 0 18px 44px -14px rgba(30, 64, 175, 0.45), inset 0 0 0 1px rgba(15,23,42,0.06);">
                     <img src="/static/img/logo.jpeg" alt="Ziggo" class="w-full h-full object-cover rounded-2xl">
                 </div>
                 <p class="text-[10px] uppercase tracking-[0.32em] font-bold text-ziggo-faint">Welcome back to</p>
@@ -76,7 +76,7 @@
             </div>
 
             <!-- Card -->
-            <div class="bg-white rounded-3xl shadow-soft p-7">
+            <div class="bg-white rounded-2xl shadow-soft p-7">
 
                 {% if error %}
                 <div class="mb-5 p-3 rounded-2xl bg-red-50 border border-red-100 text-red-700 text-sm font-semibold flex items-center gap-2">
@@ -95,7 +95,6 @@
                                    class="brand-field w-full pl-11 pr-4 py-3.5 rounded-2xl text-sm font-semibold"
                                    required value="0700000000" maxlength="10" minlength="10" pattern="\d{10}">
                         </div>
-                        <p class="text-[11px] text-ziggo-faint mt-2">Seed admin: <code class="font-mono text-ziggo">0700000000</code></p>
                     </div>
 
                     <div>
@@ -106,7 +105,6 @@
                                    class="brand-field w-full pl-11 pr-4 py-3.5 rounded-2xl text-sm font-semibold"
                                    placeholder="••••••••" required value="admin123">
                         </div>
-                        <p class="text-[11px] text-ziggo-faint mt-2">Default: <code class="font-mono text-ziggo">admin123</code></p>
                     </div>
 
                     <div class="flex items-center justify-between pt-1">
@@ -114,7 +112,6 @@
                             <input id="remember-me" name="remember-me" type="checkbox" class="w-4 h-4 rounded text-ziggo border-ziggo-line focus:ring-ziggo-light">
                             <span class="text-sm font-semibold text-ziggo-muted">Remember me</span>
                         </label>
-                        <a href="#" class="text-sm font-bold text-ziggo hover:text-ziggo-light transition">Forgot password?</a>
                     </div>
 
                     <button type="submit"
@@ -130,5 +127,9 @@
             </p>
         </div>
     </div>
+
+    <script>
+        // No forgot password modal scripts needed anymore
+    </script>
 </body>
 </html>

@@ -6,7 +6,7 @@
 {% block content %}
 <!-- Driver Stats Bar -->
 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-    <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+    <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
         <div class="flex items-center justify-between mb-4">
             <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
                 <i class="fas fa-users"></i>
@@ -15,7 +15,7 @@
         <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Total Drivers</p>
         <p class="text-2xl font-black text-ziggo">{{ stats.total }}</p>
     </div>
-    <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+    <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
         <div class="flex items-center justify-between mb-4">
             <div class="w-10 h-10 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center">
                 <i class="fas fa-signal"></i>
@@ -25,7 +25,7 @@
         <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Online Now</p>
         <p class="text-2xl font-black text-ziggo">{{ stats.online }}</p>
     </div>
-    <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+    <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
         <div class="flex items-center justify-between mb-4">
             <div class="w-10 h-10 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center">
                 <i class="fas fa-clock"></i>
@@ -35,7 +35,7 @@
         <p class="text-xs font-black text-gray-400 uppercase tracking-widest">New Apps</p>
         <p class="text-2xl font-black text-ziggo">{{ stats.pending }}</p>
     </div>
-    <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+    <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
         <div class="flex items-center justify-between mb-4">
             <div class="w-10 h-10 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center">
                 <i class="fas fa-star"></i>
@@ -46,27 +46,36 @@
     </div>
 </div>
 
-<div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+<div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
     <!-- Filters & Actions -->
-    <div class="p-8 border-b border-gray-100 flex flex-wrap items-center justify-between gap-4 bg-gray-50/30">
-        <div class="flex items-center gap-4 flex-1 min-w-[300px]">
-            <div class="relative flex-1 max-w-sm">
-                <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                <input type="text" placeholder="Search by name, ID or vehicle..." class="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-2xl outline-none focus:border-ziggo transition-all text-sm font-bold shadow-sm">
+    <div class="py-4 px-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-4 bg-gray-50/30">
+        <form method="GET" action="/admin/drivers" class="flex flex-wrap items-end gap-4 flex-1 min-w-[300px]">
+            <div>
+                <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Status</label>
+                <select name="status" class="bg-white border border-gray-200 rounded-lg px-4 py-2 text-sm font-semibold outline-none shadow-soft-sm cursor-pointer hover:border-ziggo transition-all min-w-[140px]">
+                    <option value="all" {% if status == 'all' %}selected{% endif %}>All Drivers</option>
+                    <option value="active" {% if status == 'active' %}selected{% endif %}>Active</option>
+                    <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>Inactive</option>
+                </select>
             </div>
-            <select class="bg-white border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none shadow-sm cursor-pointer hover:border-ziggo transition-all">
-                <option>All Status</option>
-                <option>Online</option>
-                <option>Offline</option>
-                <option>Pending</option>
-                <option>Blocked</option>
-            </select>
-        </div>
-        <div class="flex gap-3">
-            <button class="bg-white border border-gray-200 text-gray-600 px-6 py-3 rounded-2xl font-black text-sm hover:bg-gray-50 transition-all shadow-sm">
-                <i class="fas fa-download mr-2"></i> Export
+            <div class="flex-1 max-w-sm">
+                <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Quick Search</label>
+                <input type="text" name="search" value="{{ search }}" placeholder="Search name / email / phone.." class="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg outline-none focus:border-ziggo transition-all text-sm font-semibold shadow-soft-sm">
+            </div>
+            <button type="submit" class="px-4 py-2 bg-ziggo text-white rounded-lg font-black text-xs shadow-brand hover:bg-ziggo-light transition flex items-center gap-1.5 h-[38px] items-center">
+                <i class="fas fa-search"></i> Search
             </button>
-            <a href="/admin/drivers/new" class="bg-ziggo text-white px-6 py-3 rounded-2xl font-black text-sm hover:bg-ziggo-light transition-all shadow-lg shadow-blue-900/20 inline-flex items-center">
+            {% if status != 'all' or search %}
+            <a href="/admin/drivers" class="px-4 py-2 bg-slate-100 border border-gray-200 text-gray-700 rounded-lg font-black text-xs hover:bg-slate-200 transition flex items-center gap-1.5 h-[38px] items-center">
+                Clear Filter
+            </a>
+            {% endif %}
+        </form>
+        <div class="flex gap-3 self-end mb-[2px]">
+            <a href="/admin/drivers/export" class="bg-white border border-gray-200 text-gray-600 px-4 py-2 rounded-xl font-bold text-sm hover:bg-gray-50 transition-all shadow-sm inline-flex items-center">
+                <i class="fas fa-download mr-2"></i> Export
+            </a>
+            <a href="/admin/drivers/new" class="bg-ziggo text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-ziggo-light transition-all shadow-lg shadow-blue-900/20 inline-flex items-center">
                 <i class="fas fa-plus mr-2"></i> Add New Driver
             </a>
         </div>
@@ -76,7 +85,7 @@
     <!-- Drivers Table -->
     <div class="overflow-x-auto">
         <table class="w-full text-left">
-            <thead class="bg-gray-50 text-xs uppercase text-gray-500 font-bold">
+            <thead class="bg-ziggo-canvas/70 text-[11px] uppercase tracking-wider text-ziggo-faint font-black">
                 <tr>
                     <th class="px-6 py-4">ID</th>
                     <th class="px-6 py-4">Driver Name</th>
@@ -105,28 +114,38 @@
                         <p class="text-xs text-gray-400">{{ driver.vehicle_number or 'N/A' }}</p>
                     </td>
                     <td class="px-6 py-4">
-                        <span class="px-3 py-1 {% if driver.is_online %}bg-green-100 text-green-700{% elif driver.is_approved %}bg-blue-100 text-blue-700{% else %}bg-orange-100 text-orange-700{% endif %} rounded-full text-xs font-bold">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 {% if driver.is_online %}bg-green-100 text-green-700{% elif driver.is_approved %}bg-blue-100 text-blue-700{% else %}bg-orange-100 text-orange-700{% endif %} rounded-full text-xs font-bold">
+                            <span class="w-1.5 h-1.5 rounded-full {% if driver.is_online %}bg-green-500{% elif driver.is_approved %}bg-blue-500{% else %}bg-orange-500{% endif %}"></span>
                             {% if driver.is_online %}Online{% elif driver.is_approved %}Offline{% else %}Pending{% endif %}
                         </span>
                     </td>
                     <td class="px-6 py-4">
                         <div class="flex items-center gap-1 text-sm font-bold">
-                            <i class="fas fa-star text-yellow-400"></i> {{ driver.user.rating or '5.0' }}
+                            <i class="fas fa-star text-yellow-400"></i> {{ "{:.1f}".format((driver.user.rating or 5)|float) }}
                         </div>
                     </td>
-                    <td class="px-6 py-4 text-sm font-bold">Rs.{{ "{:,.0f}".format(driver.total_earnings or 0) }}</td>
+                    <td class="px-6 py-4 text-sm font-normal">Rs.{{ "{:,.0f}".format(driver.total_earnings or 0) }}</td>
                     <td class="px-6 py-4">
-                        <div class="flex items-center gap-3">
-                            <a href="/admin/drivers/{{ driver.id }}/edit" class="text-ziggo hover:underline text-sm font-bold inline-flex items-center gap-1">
+                        <div class="flex items-center gap-2">
+                            <a href="/admin/drivers/{{ driver.id }}/edit" class="px-3 py-1.5 rounded-lg bg-ziggo-soft text-ziggo text-xs font-bold inline-flex items-center gap-1.5 hover:bg-ziggo hover:text-white transition">
                                 <i class="fas fa-edit"></i> Edit
                             </a>
                             {% if not driver.is_approved %}
                               <form method="post" action="/admin/drivers/{{ driver.id }}/approve" style="display:inline">
-                                <button class="text-green-600 hover:underline text-sm font-bold" type="submit">Approve</button>
+                                <button class="px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-bold hover:bg-green-600 hover:text-white transition" type="submit">Approve</button>
                               </form>
                             {% else %}
                               <form method="post" action="/admin/drivers/{{ driver.id }}/suspend" style="display:inline" onsubmit="return confirm('Suspend this driver? They will go offline and stop receiving rides.');">
-                                <button class="text-red-600 hover:underline text-sm font-bold" type="submit">Suspend</button>
+                                <button class="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-bold hover:bg-red-600 hover:text-white transition" type="submit">Suspend</button>
+                              </form>
+                            {% endif %}
+                            {% if driver.user.is_active %}
+                              <form method="post" action="/admin/drivers/{{ driver.id }}/deactivate" style="display:inline" onsubmit="return confirm('Deactivate this driver? They will not be able to log in.');">
+                                <button class="px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 text-xs font-bold hover:bg-orange-600 hover:text-white transition" type="submit">Deactivate</button>
+                              </form>
+                            {% else %}
+                              <form method="post" action="/admin/drivers/{{ driver.id }}/activate" style="display:inline">
+                                <button class="px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-bold hover:bg-green-600 hover:text-white transition" type="submit">Activate</button>
                               </form>
                             {% endif %}
                         </div>
@@ -143,10 +162,41 @@
         </table>
     </div>
 
-    <!-- Footer -->
+    <!-- Footer / Pagination controls -->
+    {% if total_pages > 1 %}
+    <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
+        <p class="text-sm text-gray-500">
+            Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
+            <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
+            <span class="font-bold text-ziggo">{{ total_drivers }}</span> drivers
+        </p>
+        <div class="flex items-center gap-1.5">
+            {% if page > 1 %}
+                <a href="/admin/drivers?page={{ page - 1 }}&status={{ status }}&search={{ search }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
+            {% else %}
+                <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Previous</span>
+            {% endif %}
+
+            {% for p in page_range %}
+                {% if p == page %}
+                    <span class="px-3 py-1.5 rounded-lg bg-ziggo text-white text-xs font-black">{{ p }}</span>
+                {% else %}
+                    <a href="/admin/drivers?page={{ p }}&status={{ status }}&search={{ search }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
+                {% endif %}
+            {% endfor %}
+
+            {% if page < total_pages %}
+                <a href="/admin/drivers?page={{ page + 1 }}&status={{ status }}&search={{ search }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
+            {% else %}
+                <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Next</span>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
     <div class="p-6 border-t border-gray-100">
         <p class="text-sm text-gray-500">{{ drivers | length }} driver{{ '' if drivers|length == 1 else 's' }} shown</p>
     </div>
+    {% endif %}
 </div>
 
 <!-- Old hardcoded modals below — kept for reference but not used. The real Add Driver page is /admin/drivers/new. -->
