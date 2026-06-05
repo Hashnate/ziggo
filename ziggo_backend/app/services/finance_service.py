@@ -890,3 +890,131 @@ async def vendor_finance_detail(db: AsyncSession, vendor_id: int) -> Optional[di
         },
         "orders": orders_view[:200],
     }
+
+
+async def get_withdrawals_data(db: AsyncSession, page: int = 1, page_size: int = 10) -> dict:
+    from app.models import DriverPayout
+    # Fetch all driver payouts grouped by driver
+    pq = await db.execute(select(DriverPayout))
+    payouts = pq.scalars().all()
+    payout_by_driver: dict[int, Decimal] = {}
+    for p in payouts:
+        payout_by_driver[p.driver_id] = payout_by_driver.get(p.driver_id, Decimal("0")) + _dec(p.amount)
+
+    # Use the existing driver_finance_table code to calculate total earnings dynamically
+    all_driver_rows = await driver_finance_table(db)
+    
+    rows = []
+    total_pending_all = Decimal("0")
+    
+    for r in all_driver_rows:
+        drv_id = r["driver_id"]
+        earned = Decimal(str(r["total_earnings"]))
+        paid = payout_by_driver.get(drv_id, Decimal("0"))
+        pending = earned - paid
+        if pending < 0:
+            pending = Decimal("0")
+        total_pending_all += pending
+        
+        rows.append({
+            "driver_id": drv_id,
+            "name": r["name"] or f"Driver #{drv_id}",
+            "phone": r["phone"] or "",
+            "vehicle_type": r["vehicle_type"] or "",
+            "earned": float(earned),
+            "paid": float(paid),
+            "pending": float(pending),
+        })
+
+    # Pagination
+    total_drivers = len(rows)
+    total_pages = max(1, (total_drivers + page_size - 1) // page_size)
+    page = max(1, min(page, total_pages))
+    
+    start_idx = (page - 1) * page_size
+    end_idx = min(start_idx + page_size, total_drivers)
+    
+    paginated_rows = rows[start_idx:end_idx]
+    
+    # Recent payouts history
+    from sqlalchemy.orm import selectinload
+    hist_q = await db.execute(
+        select(DriverPayout)
+        .options(selectinload(DriverPayout.user))
+        .order_by(DriverPayout.created_at.desc())
+        .limit(50)
+    )
+    history = hist_q.scalars().all()
+
+    page_range = list(range(1, total_pages + 1))
+    
+    return {
+        "total_pending": float(total_pending_all),
+        "rows": paginated_rows,
+        "history": history,
+        "total_pages": total_pages,
+        "start_idx": start_idx + 1 if total_drivers > 0 else 0,
+        "end_idx": end_idx,
+        "total_drivers": total_drivers,
+        "page": page,
+        "page_range": page_range,
+    }
+
+
+async def execute_driver_payout(db: AsyncSession, driver_id: int, amount: Decimal, note: str) -> None:
+    from app.models import DriverPayout, Driver
+    dq = await db.execute(select(Driver).where(Driver.id == driver_id))
+    driver = dq.scalars().first()
+    if not driver:
+        raise ValueError("Driver not found")
+        
+    payout = DriverPayout(
+        driver_id=driver.id,
+        user_id=driver.user_id,
+        amount=amount,
+        description=note,
+    )
+    db.add(payout)
+    await db.commit()
+
+
+async def get_driver_payout_stats(db: AsyncSession, driver_id: int) -> dict:
+    from app.models import DriverPayout, Booking, FoodOrder, MarketOrder
+    # Calculate lifetime earnings dynamically
+    # For rides:
+    bq = await db.execute(
+        select(Booking)
+        .where(Booking.driver_id == driver_id, Booking.status == BookingStatus.COMPLETED)
+    )
+    ride_earn = sum((_dec(b.driver_earnings) for b in bq.scalars().all()), Decimal("0"))
+
+    # For food:
+    fq = await db.execute(
+        select(FoodOrder)
+        .where(FoodOrder.driver_id == driver_id, FoodOrder.status == FoodOrderStatus.DELIVERED)
+    )
+    food_earn = sum(((_dec(o.delivery_fee) * (Decimal("1") - _PLATFORM_DELIVERY_CUT)).quantize(Decimal("0.01")) for o in fq.scalars().all()), Decimal("0"))
+
+    # For market:
+    mq = await db.execute(
+        select(MarketOrder)
+        .where(MarketOrder.driver_id == driver_id, MarketOrder.status == MarketOrderStatus.DELIVERED)
+    )
+    market_earn = sum(((_dec(o.delivery_fee) * (Decimal("1") - _PLATFORM_DELIVERY_CUT)).quantize(Decimal("0.01")) for o in mq.scalars().all()), Decimal("0"))
+
+    total_earned = ride_earn + food_earn + market_earn
+
+    # Get sum of payouts
+    pq = await db.execute(select(DriverPayout).where(DriverPayout.driver_id == driver_id))
+    total_paid = sum((_dec(p.amount) for p in pq.scalars().all()), Decimal("0"))
+
+    pending = total_earned - total_paid
+    if pending < 0:
+        pending = Decimal("0")
+
+    return {
+        "earned": float(total_earned),
+        "paid": float(total_paid),
+        "pending": float(pending),
+    }
+

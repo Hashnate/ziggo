@@ -35,6 +35,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AddressesProvider>().refresh();
       context.read<PromosProvider>().refresh();
+      context.read<PaymentMethodsProvider>().fetchCards();
+      context.read<PaymentMethodsProvider>().fetchCorporateProfile();
     });
   }
 
@@ -349,7 +351,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             : _payment == 'wallet'
                                 ? 'Ziggo Wallet (Rs.${context.read<WalletProvider>().balance.toStringAsFixed(0)})'
                                 : _payment == 'corporate'
-                                    ? 'Corporate Profile (${context.read<PaymentMethodsProvider>().corporateProfile?['company_name'] ?? 'Business'})'
+                                    ? 'Corporate (${context.read<PaymentMethodsProvider>().corporateProfile?['company_name'] ?? 'Business'})'
                                     : _getSelectedCardLabel(),
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                       ),
