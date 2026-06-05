@@ -20,11 +20,19 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...database import get_db
-from ...models import Customer, User, WalletTransaction, CustomerCard
-from ...schemas import WalletTransactionResponse
+from ...models import Customer, User, WalletTransaction, CustomerCard, Restaurant, MarketVendor
+from ...schemas import (
+    WalletTransactionResponse,
+    QRResolveRequest,
+    QRResolveResponse,
+    MerchantPayRequest,
+    MerchantPayResponse,
+)
 from ...services import payhere_service
 from ...services.auth_service import require_role
 from ...services.ws_manager import manager
+
+from urllib.parse import urlparse, parse_qs
 
 router = APIRouter()
 
@@ -418,3 +426,148 @@ async def add_mock_card(
     db.add(card)
     await db.commit()
     return {"ok": True, "card_id": card.id}
+
+
+@router.post("/qr/resolve", response_model=QRResolveResponse)
+async def qr_resolve(
+    body: QRResolveRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    """Resolve a QR code payload (e.g. ziggopay://pay?type=restaurant&id=1)
+    and return the merchant details.
+    """
+    payload = body.payload.strip()
+    try:
+        parsed = urlparse(payload)
+        query = parse_qs(parsed.query)
+        merchant_type = query.get("type", [None])[0]
+        merchant_id_str = query.get("id", [None])[0]
+    except Exception:
+        merchant_type = None
+        merchant_id_str = None
+
+    if not merchant_type or not merchant_id_str:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid QR code payload format. Expected ziggopay://pay?type=...&id=..."
+        )
+
+    try:
+        m_id = int(merchant_id_str)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid merchant ID")
+
+    if merchant_type == "restaurant":
+        q = await db.execute(select(Restaurant).where(Restaurant.id == m_id))
+        restaurant = q.scalars().first()
+        if not restaurant:
+            raise HTTPException(status_code=404, detail="Restaurant merchant not found")
+        return QRResolveResponse(
+            merchant_type="restaurant",
+            merchant_id=restaurant.id,
+            name=restaurant.name,
+            address=restaurant.address,
+            image_url=restaurant.image_url,
+        )
+    elif merchant_type == "market_vendor":
+        q = await db.execute(select(MarketVendor).where(MarketVendor.id == m_id))
+        vendor = q.scalars().first()
+        if not vendor:
+            raise HTTPException(status_code=404, detail="Market merchant not found")
+        return QRResolveResponse(
+            merchant_type="market_vendor",
+            merchant_id=vendor.id,
+            name=vendor.name,
+            address=vendor.address,
+            image_url=vendor.image_url,
+        )
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported merchant type")
+
+
+@router.post("/qr/pay", response_model=MerchantPayResponse)
+async def qr_pay(
+    body: MerchantPayRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    """Execute a QR payment from customer wallet to merchant."""
+    cq = await db.execute(select(Customer).where(Customer.user_id == user.id))
+    customer = cq.scalars().first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer profile not found")
+
+    amount = Decimal(str(body.amount))
+    if customer.wallet_balance < amount:
+        raise HTTPException(status_code=400, detail="Insufficient wallet balance")
+
+    merchant_name = ""
+    owner_id = None
+    if body.merchant_type == "restaurant":
+        q = await db.execute(select(Restaurant).where(Restaurant.id == body.merchant_id))
+        restaurant = q.scalars().first()
+        if not restaurant:
+            raise HTTPException(status_code=404, detail="Restaurant merchant not found")
+        merchant_name = restaurant.name
+        owner_id = restaurant.owner_id
+    elif body.merchant_type == "market_vendor":
+        q = await db.execute(select(MarketVendor).where(MarketVendor.id == body.merchant_id))
+        vendor = q.scalars().first()
+        if not vendor:
+            raise HTTPException(status_code=404, detail="Market merchant not found")
+        merchant_name = vendor.name
+        owner_id = vendor.owner_id
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported merchant type")
+
+    customer.wallet_balance -= amount
+    ref_id = "QR" + secrets.token_hex(6).upper()
+
+    customer_txn = WalletTransaction(
+        user_id=user.id,
+        amount=amount,
+        type="debit",
+        description=f"QR payment to {merchant_name}",
+        reference_id=ref_id,
+        balance_after=customer.wallet_balance,
+    )
+    db.add(customer_txn)
+
+    if owner_id:
+        oq = await db.execute(select(Customer).where(Customer.user_id == owner_id))
+        owner_cust = oq.scalars().first()
+        if owner_cust:
+            owner_cust.wallet_balance = (owner_cust.wallet_balance or Decimal(0)) + amount
+            owner_txn = WalletTransaction(
+                user_id=owner_id,
+                amount=amount,
+                type="credit",
+                description=f"QR payment received from customer {user.full_name or user.phone_number} at {merchant_name}",
+                reference_id=ref_id,
+                balance_after=owner_cust.wallet_balance,
+            )
+            db.add(owner_txn)
+
+            await manager.send(
+                owner_id,
+                "payment_received",
+                {"reference_id": ref_id, "amount": float(amount), "balance": float(owner_cust.wallet_balance)},
+            )
+
+    await db.commit()
+
+    await manager.send(
+        user.id,
+        "wallet_debited",
+        {"reference_id": ref_id, "amount": float(amount), "balance": float(customer.wallet_balance)},
+    )
+
+    return MerchantPayResponse(
+        success=True,
+        reference_id=ref_id,
+        amount=amount,
+        remaining_balance=customer.wallet_balance,
+        merchant_name=merchant_name
+    )
+

@@ -57,4 +57,37 @@ class WalletProvider extends ChangeNotifier {
     }
     return result.message ?? 'Payment failed';
   }
+
+  Future<Map<String, dynamic>?> resolveQrCode(String payload) async {
+    try {
+      final resp = await ApiClient.instance.dio.post(
+        '/payments/qr/resolve',
+        data: {'payload': payload},
+      );
+      return resp.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      final errorMsg = e.response?.data?['detail'] ?? 'Failed to resolve QR code';
+      throw Exception(errorMsg);
+    }
+  }
+
+  Future<Map<String, dynamic>> payMerchant(
+      String merchantType, int merchantId, double amount) async {
+    try {
+      final resp = await ApiClient.instance.dio.post(
+        '/payments/qr/pay',
+        data: {
+          'merchant_type': merchantType,
+          'merchant_id': merchantId,
+          'amount': amount,
+        },
+      );
+      await refresh();
+      return resp.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      final errorMsg = e.response?.data?['detail'] ?? 'Failed to execute payment';
+      throw Exception(errorMsg);
+    }
+  }
 }
+
