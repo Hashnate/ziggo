@@ -5,8 +5,10 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/widgets/motion.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../market_provider.dart';
 import 'market_checkout_screen.dart';
+
 
 class MarketVendorScreen extends StatefulWidget {
   final Map<String, dynamic> vendor;
@@ -61,7 +63,26 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
                     ),
                   ),
                 ),
+                actions: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 16, top: 6),
+                    child: GestureDetector(
+                      onTap: () => _showPayQrCode(context, widget.vendor),
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 20),
+                      ),
+                    ),
+                  ),
+                ],
                 flexibleSpace: FlexibleSpaceBar(
+
                   titlePadding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
                   title: Text(
                     widget.vendor['name']?.toString() ?? '',
@@ -201,7 +222,75 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
+
+  void _showPayQrCode(BuildContext context, Map<String, dynamic> vendor) {
+    final qrData = 'ziggopay://pay?type=market_vendor&id=${vendor['id']}';
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Text(
+              vendor['name']?.toString() ?? 'Merchant',
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Scan to Pay QR Code',
+              style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.cardBorder),
+              ),
+              child: QrImageView(
+                data: qrData,
+                version: QrVersions.auto,
+                size: 200.0,
+              ),
+            ),
+            const SizedBox(height: 16),
+            SelectableText(
+              qrData,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 10,
+                color: Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+        actions: [
+          Center(
+            child: SizedBox(
+              width: 120,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.black,
+                  foregroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
+
 
 class _ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;

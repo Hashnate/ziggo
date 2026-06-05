@@ -9,6 +9,8 @@ import '../../../core/widgets/animated_counter.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/motion.dart';
 import '../wallet_provider.dart';
+import 'qr_pay_scan_screen.dart';
+
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
@@ -247,29 +249,40 @@ class _WalletScreenState extends State<WalletScreen> {
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.send_rounded, color: Colors.white, size: 18),
-                              SizedBox(width: 6),
-                              Text('Send',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w900,
-                                  )),
-                            ],
+                        child: GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const QrPayScanScreen(),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.qr_code_scanner_rounded, color: Colors.white, size: 18),
+                                SizedBox(width: 6),
+                                Text('Scan to pay',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w900,
+                                    )),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ],
                   ),
+
                 ],
               ),
             ),

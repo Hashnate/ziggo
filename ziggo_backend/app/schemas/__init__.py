@@ -61,6 +61,13 @@ from .corporate_schema import (
     CorporateProfileResponse,
 )
 
+from .pay_schema import (
+    QRResolveRequest,
+    QRResolveResponse,
+    MerchantPayRequest,
+    MerchantPayResponse,
+)
+
 __all__ = [
     "Token",
     "TokenData",
@@ -102,4 +109,8 @@ __all__ = [
     "CorporateAddMember",
     "CorporateTopup",
     "CorporateProfileResponse",
+    "QRResolveRequest",
+    "QRResolveResponse",
+    "MerchantPayRequest",
+    "MerchantPayResponse",
 ]
