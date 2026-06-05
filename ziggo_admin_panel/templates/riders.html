@@ -1,0 +1,366 @@
+{% extends "base.html" %}
+
+{% block title %}Rider Management | Ziggo Admin{% endblock %}
+{% block page_title %}Rider Management{% endblock %}
+
+{% block head %}
+<style>
+    .rider-stat-card {
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid #E7EBF1;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        transition: box-shadow 160ms ease, border-color 160ms ease;
+        position: relative;
+        overflow: hidden;
+    }
+    .rider-stat-card::after {
+        content: '';
+        position: absolute;
+        top: 0; right: 0;
+        width: 80px; height: 80px;
+        border-radius: 50%;
+        opacity: 0.04;
+        transform: translate(20px, -20px);
+    }
+    .rider-stat-card:hover {
+        box-shadow: 0 4px 20px -6px rgba(15, 23, 42, 0.10);
+        border-color: #D5DCE6;
+    }
+    .rsc-blue::after  { background: #3B82F6; }
+    .rsc-green::after { background: #22C55E; }
+    .rsc-red::after   { background: #EF4444; }
+    .rsc-purple::after{ background: #A855F7; }
+
+    .rsc-icon {
+        width: 48px; height: 48px; border-radius: 14px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 18px; flex-shrink: 0;
+    }
+    .rsc-icon.blue   { background: #EFF6FF; color: #3B82F6; }
+    .rsc-icon.green  { background: #F0FDF4; color: #22C55E; }
+    .rsc-icon.red    { background: #FEF2F2; color: #EF4444; }
+    .rsc-icon.purple { background: #FAF5FF; color: #A855F7; }
+
+    .rsc-val  { font-size: 26px; font-weight: 800; color: #0F172A; line-height: 1; }
+    .rsc-lbl  { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #94A3B8; margin-top: 2px; }
+
+    /* Avatar initial circle */
+    .rider-avatar {
+        width: 36px; height: 36px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 13px; font-weight: 700; color: #fff;
+        flex-shrink: 0;
+        background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%);
+        box-shadow: 0 2px 8px -2px rgba(30,58,138,0.35);
+    }
+
+    /* Status pill */
+    .status-active   { background: #DCFCE7; color: #15803D; }
+    .status-inactive { background: #F1F5F9; color: #64748B; }
+    .status-pill {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 3px 10px; border-radius: 100px;
+        font-size: 11px; font-weight: 700;
+    }
+    .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .status-active .dot  { background: #22C55E; }
+    .status-inactive .dot{ background: #94A3B8; }
+
+    /* Gold badge */
+    .gold-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 2px 7px; border-radius: 100px;
+        background: #FEF9C3; color: #A16207;
+        font-size: 10px; font-weight: 700;
+    }
+
+    /* Action buttons */
+    .act-btn {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 5px 10px; border-radius: 8px;
+        font-size: 11px; font-weight: 700; cursor: pointer;
+        border: 1px solid transparent; transition: all 140ms ease;
+        white-space: nowrap;
+    }
+    .act-deactivate { background:#FFF7ED; border-color:#FED7AA; color:#C2410C; }
+    .act-deactivate:hover { background:#EA580C; border-color:#EA580C; color:#fff; }
+    .act-activate   { background:#F0FDF4; border-color:#BBF7D0; color:#15803D; }
+    .act-activate:hover { background:#16A34A; border-color:#16A34A; color:#fff; }
+    .act-delete     { background:#FEF2F2; border-color:#FECACA; color:#DC2626; }
+    .act-delete:hover { background:#DC2626; border-color:#DC2626; color:#fff; }
+
+    /* Search / filter bar */
+    .filter-bar {
+        padding: 14px 20px;
+        border-bottom: 1px solid #EEF1F6;
+        background: #FAFBFC;
+        display: flex; flex-wrap: wrap; align-items: flex-end;
+        gap: 12px; justify-content: space-between;
+    }
+    .filter-bar select,
+    .filter-bar input[type=text] {
+        height: 36px !important;
+        padding: 0 12px !important;
+        font-size: 13px !important;
+        border-radius: 9px !important;
+    }
+    .filter-bar label {
+        display: block; font-size: 10px; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.08em;
+        color: #94A3B8; margin-bottom: 4px;
+    }
+
+    /* Empty state */
+    .empty-state { padding: 64px 24px; text-align: center; }
+    .empty-state .icon { font-size: 40px; color: #CBD5E1; margin-bottom: 12px; }
+    .empty-state p { font-size: 14px; color: #94A3B8; font-weight: 500; }
+
+    /* Page header row */
+    .page-hd {
+        display: flex; align-items: center; gap: 14px; margin-bottom: 24px;
+    }
+    .page-hd .ph-icon {
+        width: 46px; height: 46px; border-radius: 14px;
+        background: linear-gradient(135deg,#1E3A8A,#3B82F6);
+        display: flex; align-items: center; justify-content: center;
+        color: #fff; font-size: 18px;
+        box-shadow: 0 8px 20px -8px rgba(30,58,138,0.45);
+    }
+    .page-hd h2  { font-size: 22px; font-weight: 800; color: #0F172A; line-height: 1.15; }
+    .page-hd sub { font-size: 12px; font-weight: 500; color: #94A3B8; display: block; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+
+<!-- ── Stat Cards ─────────────────────────────────────────────────────────── -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+
+    <div class="rider-stat-card rsc-blue">
+        <div class="rsc-icon blue"><i class="fas fa-users"></i></div>
+        <div>
+            <div class="rsc-val">{{ total_riders }}</div>
+            <div class="rsc-lbl">Total Riders</div>
+        </div>
+    </div>
+
+    <div class="rider-stat-card rsc-green">
+        <div class="rsc-icon green"><i class="fas fa-user-check"></i></div>
+        <div>
+            <div class="rsc-val">{{ active_riders }}</div>
+            <div class="rsc-lbl">Active</div>
+        </div>
+    </div>
+
+    <div class="rider-stat-card rsc-red">
+        <div class="rsc-icon red"><i class="fas fa-user-slash"></i></div>
+        <div>
+            <div class="rsc-val">{{ inactive_riders }}</div>
+            <div class="rsc-lbl">Inactive</div>
+        </div>
+    </div>
+
+    <div class="rider-stat-card rsc-purple">
+        <div class="rsc-icon purple"><i class="fas fa-user-plus"></i></div>
+        <div>
+            <div class="rsc-val">{{ joined_today }}</div>
+            <div class="rsc-lbl">Joined Today</div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ── Main Card ──────────────────────────────────────────────────────────── -->
+<div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+
+    <!-- Filter bar -->
+    <div class="filter-bar">
+        <form method="GET" action="/admin/riders" class="flex flex-wrap items-end gap-3 flex-1">
+            <div>
+                <label>Status</label>
+                <select name="status" style="min-width:140px">
+                    <option value="all"      {% if status == 'all'      %}selected{% endif %}>All Riders</option>
+                    <option value="active"   {% if status == 'active'   %}selected{% endif %}>🟢 Active</option>
+                    <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>⚫ Inactive</option>
+                </select>
+            </div>
+            <div style="flex:1;min-width:200px;max-width:320px">
+                <label>Quick Search</label>
+                <input type="text" name="search" value="{{ search }}"
+                       placeholder="Search name / email / phone…"
+                       style="width:100%">
+            </div>
+            <button type="submit"
+                    class="inline-flex items-center gap-1.5 px-4 py-0 bg-ziggo text-white rounded-lg font-bold text-xs hover:bg-ziggo-light transition"
+                    style="height:36px">
+                <i class="fas fa-search"></i> Search
+            </button>
+            {% if status != 'all' or search %}
+            <a href="/admin/riders"
+               class="inline-flex items-center gap-1.5 px-4 bg-slate-100 border border-gray-200 text-gray-600 rounded-lg font-bold text-xs hover:bg-slate-200 transition"
+               style="height:36px">
+                <i class="fas fa-times"></i> Clear
+            </a>
+            {% endif %}
+        </form>
+
+        <a href="/admin/riders/export"
+           class="inline-flex items-center gap-2 px-4 bg-white border border-gray-200 text-gray-600 rounded-xl font-bold text-sm hover:bg-gray-50 transition shadow-sm"
+           style="height:36px">
+            <i class="fas fa-download text-xs"></i> Export CSV
+        </a>
+    </div>
+
+    <!-- Table -->
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead>
+                <tr>
+                    <th class="px-5 py-3">Rider</th>
+                    <th class="px-5 py-3">Email</th>
+                    <th class="px-5 py-3">Phone</th>
+                    <th class="px-5 py-3">Joined</th>
+                    <th class="px-5 py-3 text-center">Rides</th>
+                    <th class="px-5 py-3">Wallet</th>
+                    <th class="px-5 py-3">Status</th>
+                    <th class="px-5 py-3">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in riders %}
+                <tr>
+                    <td class="px-5 py-3">
+                        <div class="flex items-center gap-2.5">
+                            <div class="rider-avatar">
+                                {{ (c.user.full_name or c.user.phone_number or 'R')[0]|upper }}
+                            </div>
+                            <div>
+                                <p class="text-sm font-bold text-ziggo leading-tight">
+                                    {{ c.user.full_name or 'Guest' }}
+                                    {% if c.gold_member %}
+                                    <span class="gold-badge ml-1"><i class="fas fa-star" style="font-size:8px"></i> Gold</span>
+                                    {% endif %}
+                                </p>
+                                <p class="text-[11px] text-gray-400">#{{ c.id }}</p>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-5 py-3 text-sm text-gray-500">{{ c.user.email or '—' }}</td>
+                    <td class="px-5 py-3 text-sm font-semibold text-gray-700">{{ c.user.phone_number or '—' }}</td>
+                    <td class="px-5 py-3 text-xs text-gray-400 whitespace-nowrap">
+                        {{ c.user.created_at.strftime("%b %d, %Y") if c.user.created_at else '—' }}
+                    </td>
+                    <td class="px-5 py-3 text-sm font-bold text-gray-700 text-center">
+                        {{ c.user.total_rides or 0 }}
+                    </td>
+                    <td class="px-5 py-3 text-sm font-bold text-gray-700">
+                        Rs.{{ "{:,.2f}".format(c.wallet_balance or 0) }}
+                    </td>
+                    <td class="px-5 py-3">
+                        {% if c.user.is_active %}
+                        <span class="status-pill status-active">
+                            <span class="dot"></span>Active
+                        </span>
+                        {% else %}
+                        <span class="status-pill status-inactive">
+                            <span class="dot"></span>Inactive
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-5 py-3">
+                        <div class="flex items-center gap-1.5">
+                            {% if c.user.is_active %}
+                            <form method="post" action="/admin/riders/{{ c.id }}/deactivate" style="display:inline"
+                                  onsubmit="return confirm('Deactivate this rider?');">
+                                <button type="submit" class="act-btn act-deactivate">
+                                    <i class="fas fa-ban"></i> Deactivate
+                                </button>
+                            </form>
+                            {% else %}
+                            <form method="post" action="/admin/riders/{{ c.id }}/activate" style="display:inline">
+                                <button type="submit" class="act-btn act-activate">
+                                    <i class="fas fa-check"></i> Activate
+                                </button>
+                            </form>
+                            {% endif %}
+                            <form method="post" action="/admin/riders/{{ c.id }}/delete" style="display:inline"
+                                  onsubmit="return confirm('Permanently delete this rider?');">
+                                <button type="submit" class="act-btn act-delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8">
+                        <div class="empty-state">
+                            <div class="icon"><i class="fas fa-users"></i></div>
+                            <p>No riders found{% if search or status != 'all' %} matching your filters{% endif %}.</p>
+                            {% if search or status != 'all' %}
+                            <a href="/admin/riders" class="inline-block mt-3 text-ziggo text-xs font-bold hover:underline">Clear filters</a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div class="px-5 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50/40">
+        <p class="text-xs text-gray-400 font-medium">
+            Showing <strong class="text-ziggo">{{ start_idx }}–{{ end_idx }}</strong> of
+            <strong class="text-ziggo">{{ total_riders }}</strong> riders
+        </p>
+        <div class="flex items-center gap-1">
+            {% if page > 1 %}
+                <a href="/admin/riders?page={{ page - 1 }}&status={{ status }}&search={{ search }}"
+                   class="px-3 py-1 rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 text-xs font-bold transition">
+                   <i class="fas fa-chevron-left text-[9px]"></i>
+                </a>
+            {% else %}
+                <span class="px-3 py-1 rounded-lg border border-gray-100 bg-gray-50 text-gray-300 text-xs font-bold cursor-not-allowed">
+                    <i class="fas fa-chevron-left text-[9px]"></i>
+                </span>
+            {% endif %}
+
+            {% for p in page_range %}
+                {% if p == page %}
+                    <span class="px-3 py-1 rounded-lg bg-ziggo text-white text-xs font-black">{{ p }}</span>
+                {% else %}
+                    <a href="/admin/riders?page={{ p }}&status={{ status }}&search={{ search }}"
+                       class="px-3 py-1 rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
+                {% endif %}
+            {% endfor %}
+
+            {% if page < total_pages %}
+                <a href="/admin/riders?page={{ page + 1 }}&status={{ status }}&search={{ search }}"
+                   class="px-3 py-1 rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 text-xs font-bold transition">
+                   <i class="fas fa-chevron-right text-[9px]"></i>
+                </a>
+            {% else %}
+                <span class="px-3 py-1 rounded-lg border border-gray-100 bg-gray-50 text-gray-300 text-xs font-bold cursor-not-allowed">
+                    <i class="fas fa-chevron-right text-[9px]"></i>
+                </span>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="px-5 py-3 border-t border-gray-100">
+        <p class="text-xs text-gray-400">
+            {{ riders | length }} rider{{ '' if riders|length == 1 else 's' }} shown
+        </p>
+    </div>
+    {% endif %}
+
+</div><!-- /main card -->
+{% endblock %}

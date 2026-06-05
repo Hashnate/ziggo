@@ -937,6 +937,187 @@ async def admin_customers(
     )
 
 
+# ─── Riders ──────────────────────────────────────────────────────────────────
+
+@router.get("/riders", response_class=HTMLResponse)
+async def admin_riders(
+    request: Request,
+    page: int = 1,
+    status: str = "all",
+    search: str = "",
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from sqlalchemy import or_, and_
+    from datetime import date
+
+    limit = 50
+    offset = (page - 1) * limit
+
+    # Build filter conditions on the User join
+    conditions = []
+    if status == "active":
+        conditions.append(User.is_active == True)
+    elif status == "inactive":
+        conditions.append(User.is_active == False)
+    if search:
+        s = f"%{search}%"
+        conditions.append(
+            or_(
+                User.full_name.ilike(s),
+                User.phone_number.ilike(s),
+                User.email.ilike(s),
+            )
+        )
+
+    base_stmt = (
+        select(Customer)
+        .join(Customer.user)
+        .options(selectinload(Customer.user))
+    )
+    if conditions:
+        base_stmt = base_stmt.where(and_(*conditions))
+
+    total = (await db.execute(
+        select(func.count()).select_from(base_stmt.subquery())
+    )).scalar() or 0
+
+    riders_q = await db.execute(
+        base_stmt.order_by(Customer.id.desc()).offset(offset).limit(limit)
+    )
+    riders = riders_q.scalars().all()
+
+    total_pages = (total + limit - 1) // limit
+    start_idx = (page - 1) * limit + 1 if total > 0 else 0
+    end_idx = min(page * limit, total)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
+
+    # Stat counts (full table, ignore current filters)
+    total_riders = (await db.execute(select(func.count(Customer.id)))).scalar() or 0
+    active_riders = (
+        await db.execute(
+            select(func.count(Customer.id)).join(Customer.user).where(User.is_active == True)
+        )
+    ).scalar() or 0
+    inactive_riders = total_riders - active_riders
+
+    today = date.today()
+    joined_today = (
+        await db.execute(
+            select(func.count(Customer.id)).join(Customer.user).where(func.date(User.created_at) == today)
+        )
+    ).scalar() or 0
+
+    return templates.TemplateResponse(
+        request, "riders.html",
+        {
+            "request": request,
+            "active_page": "riders",
+            "riders": riders,
+            "page": page,
+            "total_pages": total_pages,
+            "total_riders": total_riders,
+            "active_riders": active_riders,
+            "inactive_riders": inactive_riders,
+            "joined_today": joined_today,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
+            "status": status,
+            "search": search,
+        },
+    )
+
+
+@router.get("/riders/export")
+async def admin_riders_export(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    import csv
+    import io
+    from fastapi.responses import StreamingResponse
+
+    q = await db.execute(
+        select(Customer).options(selectinload(Customer.user)).order_by(Customer.id.desc())
+    )
+    riders = q.scalars().all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID", "Name", "Email", "Phone", "Total Rides", "Wallet Balance", "Gold Member", "Status", "Joined"])
+    for c in riders:
+        u = c.user
+        writer.writerow([
+            c.id,
+            u.full_name or "",
+            u.email or "",
+            u.phone_number or "",
+            u.total_rides or 0,
+            float(c.wallet_balance or 0),
+            "Yes" if c.gold_member else "No",
+            "Active" if u.is_active else "Inactive",
+            u.created_at.strftime("%Y-%m-%d") if u.created_at else "",
+        ])
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=riders.csv"},
+    )
+
+
+@router.post("/riders/{customer_id}/deactivate")
+async def admin_rider_deactivate(
+    customer_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    q = await db.execute(
+        select(Customer).options(selectinload(Customer.user)).where(Customer.id == customer_id)
+    )
+    c = q.scalars().first()
+    if c and c.user:
+        c.user.is_active = False
+        await db.commit()
+    return RedirectResponse(url="/admin/riders", status_code=303)
+
+
+@router.post("/riders/{customer_id}/activate")
+async def admin_rider_activate(
+    customer_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    q = await db.execute(
+        select(Customer).options(selectinload(Customer.user)).where(Customer.id == customer_id)
+    )
+    c = q.scalars().first()
+    if c and c.user:
+        c.user.is_active = True
+        await db.commit()
+    return RedirectResponse(url="/admin/riders", status_code=303)
+
+
+@router.post("/riders/{customer_id}/delete")
+async def admin_rider_delete(
+    customer_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    q = await db.execute(
+        select(Customer).options(selectinload(Customer.user)).where(Customer.id == customer_id)
+    )
+    c = q.scalars().first()
+    if c:
+        user = c.user
+        await db.delete(c)
+        if user:
+            await db.delete(user)
+        await db.commit()
+    return RedirectResponse(url="/admin/riders", status_code=303)
+
 
 @router.get("/bookings", response_class=HTMLResponse)
 async def admin_bookings(
