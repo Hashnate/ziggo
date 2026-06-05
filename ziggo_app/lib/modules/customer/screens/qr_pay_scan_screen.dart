@@ -164,7 +164,7 @@ class _QrPayScanScreenState extends State<QrPayScanScreen> {
             onPressed: () => _scannerController.toggleTorch(),
           ),
           IconButton(
-            icon: const Icon(Icons.flip_camera_rounded),
+            icon: const Icon(Icons.switch_camera_rounded),
             onPressed: () => _scannerController.switchCamera(),
           ),
         ],

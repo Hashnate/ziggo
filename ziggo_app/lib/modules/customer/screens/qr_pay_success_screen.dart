@@ -127,7 +127,6 @@ class _QrPaySuccessScreenState extends State<QrPaySuccessScreen> with SingleTick
                 ],
               ),
 
-              // Transaction Receipt Card
               AnimatedBuilder(
                 animation: _opacityAnimation,
                 builder: (context, child) {
@@ -136,7 +135,8 @@ class _QrPaySuccessScreenState extends State<QrPaySuccessScreen> with SingleTick
                     child: Transform.translate(
                       offset: Offset(0, (1.0 - _opacityAnimation.value) * 30),
                       child: child,
-                    );
+                    ),
+                  );
                 },
                 child: Container(
                   padding: const EdgeInsets.all(20),
@@ -148,7 +148,7 @@ class _QrPaySuccessScreenState extends State<QrPaySuccessScreen> with SingleTick
                   child: Column(
                     children: [
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.between,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text(
                             'Paid to',
@@ -168,7 +168,7 @@ class _QrPaySuccessScreenState extends State<QrPaySuccessScreen> with SingleTick
                       ),
                       const Divider(height: 24),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.between,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text(
                             'Amount Paid',
@@ -188,7 +188,7 @@ class _QrPaySuccessScreenState extends State<QrPaySuccessScreen> with SingleTick
                       ),
                       const Divider(height: 24),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.between,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text(
                             'Reference ID',
@@ -209,7 +209,7 @@ class _QrPaySuccessScreenState extends State<QrPaySuccessScreen> with SingleTick
                       ),
                       const Divider(height: 24),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.between,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text(
                             'Date & Time',

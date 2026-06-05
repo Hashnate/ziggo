@@ -135,7 +135,7 @@ class _QrPayConfirmScreenState extends State<QrPayConfirmScreen> {
             child: ConstrainedBox(
               constraints: BoxConstraints(minHeight: constraints.maxHeight - 48),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.between,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Merchant Profile Card
