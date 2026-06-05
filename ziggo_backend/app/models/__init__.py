@@ -7,6 +7,7 @@ from .user import (
     DriverDocument,
     SavedAddress,
     OTPCode,
+    CustomerCard,
 )
 from .booking import Booking, BookingStatus, BookingStop, Payment, PromoCode
 from .misc import (
@@ -42,6 +43,7 @@ __all__ = [
     "User",
     "UserRole",
     "Customer",
+    "CustomerCard",
     "Driver",
     "DriverStatus",
     "DriverDocument",

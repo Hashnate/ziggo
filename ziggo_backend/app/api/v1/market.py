@@ -20,6 +20,8 @@ from ...models import (
     Notification,
     User,
     UserRole,
+    CustomerCard,
+    Payment,
 )
 from ...schemas.market_schema import (
     ProductResponse,
@@ -29,6 +31,7 @@ from ...schemas.market_schema import (
 from ...services.auth_service import get_current_user, require_role
 from ...services.matching_service import find_all_nearby_drivers
 from ...services.ws_manager import manager
+from ...services import payhere_service
 
 router = APIRouter()
 
@@ -187,6 +190,19 @@ async def create_market_order(
 
     if body.payment_method == "wallet" and (customer.wallet_balance or Decimal(0)) < final:
         raise HTTPException(status_code=400, detail="Insufficient wallet balance")
+    elif body.payment_method and body.payment_method.startswith("card_"):
+        try:
+            card_id = int(body.payment_method.split("_")[1])
+        except (ValueError, IndexError):
+            card_id = None
+        if not card_id:
+            raise HTTPException(status_code=400, detail="Invalid card selection")
+        card_q = await db.execute(
+            select(CustomerCard).where(CustomerCard.id == card_id, CustomerCard.customer_id == customer.id)
+        )
+        card = card_q.scalars().first()
+        if not card:
+            raise HTTPException(status_code=400, detail="Card not found")
 
     order_ref = "MK" + secrets.token_hex(4).upper()
     order = MarketOrder(
@@ -258,6 +274,32 @@ async def create_market_order(
             )
         )
         order.payment_status = "paid"
+    elif body.payment_method and body.payment_method.startswith("card_"):
+        card_id = int(body.payment_method.split("_")[1])
+        card_q = await db.execute(
+            select(CustomerCard).where(CustomerCard.id == card_id)
+        )
+        card = card_q.scalars().first()
+        if card:
+            charge_res = await payhere_service.charge_tokenized_card(
+                customer_token=card.customer_token,
+                amount=final,
+                order_id=order_ref,
+                items=f"Market order {order_ref}",
+            )
+            if not charge_res.get("success"):
+                raise HTTPException(status_code=400, detail=f"Card charge failed: {charge_res.get('message')}")
+            
+            order.payment_status = "paid"
+            pay_rec = Payment(
+                customer_id=customer.id,
+                amount=final,
+                payment_method=f"{card.card_type} ({card.card_no[-4:]})",
+                transaction_id=charge_res.get("transaction_id"),
+                payment_gateway_response=charge_res.get("message"),
+                status="paid",
+            )
+            db.add(pay_rec)
 
     await db.commit()
     await db.refresh(order)

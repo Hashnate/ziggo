@@ -13,6 +13,7 @@ import 'saved_addresses_screen.dart';
 import 'subscription_screen.dart';
 import 'support_screen.dart';
 import 'wallet_screen.dart';
+import 'payment_methods_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -163,6 +164,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               label: 'My Wallet',
               subtitle: 'Top up & transactions',
               onTap: () => _open(const WalletScreen()),
+            ),
+            _MenuItem(
+              icon: Icons.credit_card_rounded,
+              color: AppColors.accent,
+              label: 'Payment Methods',
+              subtitle: 'Manage saved cards',
+              onTap: () => _open(const PaymentMethodsScreen()),
             ),
             _MenuItem(
               icon: Icons.receipt_long_rounded,

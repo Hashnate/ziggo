@@ -41,7 +41,7 @@ class WSManager:
             except Exception:
                 pass
         # Visible in uvicorn logs — tells you the user was/wasn't reachable.
-        print(f"[ws] → user_id={user_id} event={event} sockets={len(targets)} delivered={delivered}")
+        print(f"[ws] -> user_id={user_id} event={event} sockets={len(targets)} delivered={delivered}")
 
         # Piggyback FCM so the user still gets notified when their WS is dead
         # (app killed, phone asleep, carrier NAT closed the socket). Safe

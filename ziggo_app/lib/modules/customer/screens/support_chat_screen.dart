@@ -303,16 +303,16 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
               ),
             ),
           Padding(
-            padding: EdgeInsets.fromLTRB(
+            padding: const EdgeInsets.fromLTRB(
               12,
               8,
               12,
-              12 + MediaQuery.of(context).viewInsets.bottom,
+              12,
             ),
             child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
+                children: [
+                  Expanded(
+                    child: TextField(
                     controller: _messageController,
                     minLines: 1,
                     maxLines: 4,
