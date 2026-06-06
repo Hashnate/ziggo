@@ -13,6 +13,7 @@ from .booking import Booking, BookingStatus, BookingStop, Payment, PromoCode
 from .corporate import CorporateAccount, CorporateMember
 from .misc import (
     WalletTransaction,
+    WalletTopupRequest,
     Complaint,
     ComplaintMessage,
     Notification,
@@ -57,6 +58,7 @@ __all__ = [
     "Payment",
     "PromoCode",
     "WalletTransaction",
+    "WalletTopupRequest",
     "Complaint",
     "ComplaintMessage",
     "Notification",

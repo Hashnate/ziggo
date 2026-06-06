@@ -30,6 +30,22 @@ class WalletTransaction(Base):
     user = relationship("User", back_populates="wallet_transactions")
 
 
+class WalletTopupRequest(Base):
+    __tablename__ = "wallet_topup_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    amount = Column(DECIMAL(10, 2))
+    status = Column(String(20), default="pending")  # pending, approved, rejected
+    note = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    approved_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    user = relationship("User", foreign_keys=[user_id])
+    approved_by = relationship("User", foreign_keys=[approved_by_id])
+
+
 class Complaint(Base):
     __tablename__ = "complaints"
 

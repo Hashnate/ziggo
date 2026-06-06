@@ -38,6 +38,47 @@
     </div>
 </div>
 
+{% if pending_requests %}
+<div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-6">
+    <div class="p-5 border-b border-gray-100 flex items-center justify-between bg-orange-50">
+        <h3 class="font-black text-orange-600"><i class="fas fa-exclamation-circle mr-2"></i>Pending Top-up Requests</h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead class="bg-gray-50 text-[11px] uppercase tracking-wider text-gray-500 font-black">
+                <tr>
+                    <th class="px-6 py-3">Date</th>
+                    <th class="px-6 py-3">User</th>
+                    <th class="px-6 py-3">Phone</th>
+                    <th class="px-6 py-3 text-right">Amount</th>
+                    <th class="px-6 py-3">Note</th>
+                    <th class="px-6 py-3 text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for r in pending_requests %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-3 text-xs text-gray-500">{{ r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else '' }}</td>
+                    <td class="px-6 py-3 text-sm font-semibold">{{ r.user.full_name if r.user else '—' }}</td>
+                    <td class="px-6 py-3 text-xs text-gray-500">{{ r.user.phone_number if r.user else '' }}</td>
+                    <td class="px-6 py-3 text-right text-sm font-bold text-orange-600">Rs.{{ "{:,.2f}".format(r.amount|float) }}</td>
+                    <td class="px-6 py-3 text-xs text-gray-500">{{ r.note or '' }}</td>
+                    <td class="px-6 py-3 text-right flex justify-end gap-2">
+                        <form method="post" action="/admin/topups/requests/{{ r.id }}/approve">
+                            <button class="px-3 py-1.5 bg-green-50 text-green-600 hover:bg-green-100 rounded-lg text-xs font-bold transition">Approve</button>
+                        </form>
+                        <form method="post" action="/admin/topups/requests/{{ r.id }}/reject">
+                            <button class="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-xs font-bold transition">Reject</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
     <div class="p-5 border-b border-gray-100 flex items-center justify-between">
         <h3 class="font-black text-ziggo-ink">Recent top-ups ({{ count }})</h3>

@@ -6,12 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
 from ...database import get_db
-from ...models import Customer, User, UserRole, SavedAddress, WalletTransaction, Notification
+from ...models import Customer, User, UserRole, SavedAddress, WalletTransaction, Notification, WalletTopupRequest
 from ...schemas import (
     SavedAddressCreate,
     SavedAddressResponse,
     WalletTopUp,
     WalletTransactionResponse,
+    WalletTopupRequestCreate,
+    WalletTopupRequestResponse,
     UserUpdate,
     UserResponse,
 )
@@ -156,6 +158,38 @@ async def wallet_topup(
     await db.commit()
     await db.refresh(txn)
     return txn
+
+
+@router.post("/wallet/topup-request", response_model=WalletTopupRequestResponse)
+async def create_wallet_topup_request(
+    body: WalletTopupRequestCreate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    req = WalletTopupRequest(
+        user_id=user.id,
+        amount=Decimal(str(body.amount)),
+        note=body.note,
+        status="pending"
+    )
+    db.add(req)
+    await db.commit()
+    await db.refresh(req)
+    return req
+
+
+@router.get("/wallet/topup-requests", response_model=List[WalletTopupRequestResponse])
+async def list_wallet_topup_requests(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    q = await db.execute(
+        select(WalletTopupRequest)
+        .where(WalletTopupRequest.user_id == user.id)
+        .order_by(WalletTopupRequest.id.desc())
+        .limit(100)
+    )
+    return q.scalars().all()
 
 
 @router.get("/wallet/transactions", response_model=List[WalletTransactionResponse])

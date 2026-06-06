@@ -1513,7 +1513,7 @@ async def admin_topups(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from app.models import WalletTransaction
+    from app.models import WalletTransaction, WalletTopupRequest
     from decimal import Decimal
 
     limit = 50
@@ -1541,6 +1541,14 @@ async def admin_topups(
     end_idx = min(page * limit, total)
     page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
 
+    req_q = await db.execute(
+        select(WalletTopupRequest)
+        .options(selectinload(WalletTopupRequest.user))
+        .where(WalletTopupRequest.status == "pending")
+        .order_by(WalletTopupRequest.created_at.asc())
+    )
+    pending_requests = req_q.scalars().all()
+
     return templates.TemplateResponse(
         request, "topups.html",
         {
@@ -1554,6 +1562,7 @@ async def admin_topups(
             "start_idx": start_idx,
             "end_idx": end_idx,
             "page_range": page_range,
+            "pending_requests": pending_requests,
         },
     )
 
@@ -1590,6 +1599,81 @@ async def admin_topups_manual(
             description=note or "Manual top-up",
             reference_id="MANUAL",
             balance_after=new_balance,
+        )
+    )
+    await db.commit()
+    return RedirectResponse(url="/admin/topups", status_code=303)
+
+
+@router.post("/topups/requests/{id}/approve")
+async def admin_topups_approve(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(current_admin),
+):
+    from app.models import WalletTopupRequest, Customer, WalletTransaction, Notification
+    from decimal import Decimal
+
+    q = await db.execute(select(WalletTopupRequest).options(selectinload(WalletTopupRequest.user)).where(WalletTopupRequest.id == id))
+    req = q.scalars().first()
+    if not req or req.status != "pending":
+        raise HTTPException(status_code=404, detail="Request not found or not pending")
+
+    req.status = "approved"
+    req.approved_by_id = admin.id
+
+    cust_q = await db.execute(select(Customer).where(Customer.user_id == req.user_id))
+    c = cust_q.scalars().first()
+    new_balance = Decimal("0")
+    if c:
+        c.wallet_balance = (c.wallet_balance or Decimal("0")) + req.amount
+        new_balance = c.wallet_balance
+
+    db.add(
+        WalletTransaction(
+            user_id=req.user_id,
+            amount=req.amount,
+            type="credit",
+            description=req.note or "Wallet top-up (Approved)",
+            reference_id="TOPUP_REQ",
+            balance_after=new_balance,
+        )
+    )
+
+    db.add(
+        Notification(
+            user_id=req.user_id,
+            title="Top-up Approved",
+            body=f"Your top-up request for Rs.{req.amount:,.2f} has been approved.",
+            type="payment",
+        )
+    )
+    await db.commit()
+    return RedirectResponse(url="/admin/topups", status_code=303)
+
+
+@router.post("/topups/requests/{id}/reject")
+async def admin_topups_reject(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(current_admin),
+):
+    from app.models import WalletTopupRequest, Notification
+
+    q = await db.execute(select(WalletTopupRequest).where(WalletTopupRequest.id == id))
+    req = q.scalars().first()
+    if not req or req.status != "pending":
+        raise HTTPException(status_code=404, detail="Request not found or not pending")
+
+    req.status = "rejected"
+    req.approved_by_id = admin.id
+
+    db.add(
+        Notification(
+            user_id=req.user_id,
+            title="Top-up Rejected",
+            body=f"Your top-up request for Rs.{req.amount:,.2f} has been rejected.",
+            type="payment",
         )
     )
     await db.commit()
@@ -2355,6 +2439,8 @@ async def admin_flash_pricing_delete(
 async def admin_restaurants(
     request: Request,
     page: int = 1,
+    search: str = "",
+    status: str = "all",
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -2363,18 +2449,28 @@ async def admin_restaurants(
     limit = 50
     offset = (page - 1) * limit
 
-    total = (await db.execute(select(func.count(Restaurant.id)))).scalar() or 0
+    count_q = select(func.count(Restaurant.id))
+    q = select(Restaurant)
+
+    if search:
+        count_q = count_q.where(Restaurant.name.ilike(f"%{search}%"))
+        q = q.where(Restaurant.name.ilike(f"%{search}%"))
+        
+    if status == "active":
+        count_q = count_q.where(Restaurant.is_active == True)
+        q = q.where(Restaurant.is_active == True)
+    elif status == "pending":
+        count_q = count_q.where(Restaurant.is_active == False)
+        q = q.where(Restaurant.is_active == False)
+
+    total = (await db.execute(count_q)).scalar() or 0
     total_pages = (total + limit - 1) // limit
 
     # Order pending (is_active=False) first so owner self-registrations rise
     # to the top of the admin's attention. Within each group, newest first.
-    q = await db.execute(
-        select(Restaurant)
-        .order_by(Restaurant.is_active.asc(), Restaurant.id.desc())
-        .offset(offset)
-        .limit(limit)
-    )
-    restaurants = q.scalars().all()
+    q = q.order_by(Restaurant.is_active.asc(), Restaurant.id.desc()).offset(offset).limit(limit)
+    result = await db.execute(q)
+    restaurants = result.scalars().all()
 
     # Join the owner's phone so the admin can identify who registered each one.
     owner_ids = [r.owner_id for r in restaurants if r.owner_id]
@@ -2417,6 +2513,8 @@ async def admin_restaurants(
             "start_idx": start_idx,
             "end_idx": end_idx,
             "page_range": page_range,
+            "search": search,
+            "status": status,
         },
     )
 
@@ -2719,6 +2817,8 @@ async def admin_restaurant_add_item(
 async def admin_market(
     request: Request,
     page: int = 1,
+    search: str = "",
+    status: str = "all",
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -2727,16 +2827,26 @@ async def admin_market(
     limit = 50
     offset = (page - 1) * limit
 
-    total = (await db.execute(select(func.count(MarketVendor.id)))).scalar() or 0
+    count_q = select(func.count(MarketVendor.id))
+    q = select(MarketVendor)
+
+    if search:
+        count_q = count_q.where(MarketVendor.name.ilike(f"%{search}%"))
+        q = q.where(MarketVendor.name.ilike(f"%{search}%"))
+        
+    if status == "active":
+        count_q = count_q.where(MarketVendor.is_active == True)
+        q = q.where(MarketVendor.is_active == True)
+    elif status == "suspended":
+        count_q = count_q.where(MarketVendor.is_active == False)
+        q = q.where(MarketVendor.is_active == False)
+
+    total = (await db.execute(count_q)).scalar() or 0
     total_pages = (total + limit - 1) // limit
 
-    q = await db.execute(
-        select(MarketVendor)
-        .order_by(MarketVendor.id.desc())
-        .offset(offset)
-        .limit(limit)
-    )
-    vendors = q.scalars().all()
+    q = q.order_by(MarketVendor.id.desc()).offset(offset).limit(limit)
+    result = await db.execute(q)
+    vendors = result.scalars().all()
 
     start_idx = (page - 1) * limit + 1 if total > 0 else 0
     end_idx = min(page * limit, total)
@@ -2754,6 +2864,8 @@ async def admin_market(
             "start_idx": start_idx,
             "end_idx": end_idx,
             "page_range": page_range,
+            "search": search,
+            "status": status,
         },
     )
 

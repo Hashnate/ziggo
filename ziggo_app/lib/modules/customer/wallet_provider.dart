@@ -30,8 +30,8 @@ class WalletProvider extends ChangeNotifier {
   Future<bool> topUp(double amount, {String? description}) async {
     try {
       await ApiClient.instance.dio.post(
-        '/customer/wallet/topup',
-        data: {'amount': amount, if (description != null) 'description': description},
+        '/customer/wallet/topup-request',
+        data: {'amount': amount, if (description != null) 'note': description},
       );
       await refresh();
       return true;
@@ -47,7 +47,7 @@ class WalletProvider extends ChangeNotifier {
   Future<String?> topUpViaPayHere(BuildContext context, double amount) async {
     final enabled = await PayHereService.instance.isEnabled();
     if (!enabled) {
-      final ok = await topUp(amount, description: 'Wallet top-up (mock)');
+      final ok = await topUp(amount, description: 'Wallet top-up (requested)');
       return ok ? null : 'Failed to top up wallet';
     }
     final result = await PayHereService.instance.topUpWallet(context, amount);

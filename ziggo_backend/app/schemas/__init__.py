@@ -22,6 +22,8 @@ from .customer_schema import (
     SavedAddressResponse,
     WalletTopUp,
     WalletTransactionResponse,
+    WalletTopupRequestCreate,
+    WalletTopupRequestResponse,
 )
 from .driver_schema import (
     DriverLocationUpdate,
@@ -88,6 +90,8 @@ __all__ = [
     "SavedAddressResponse",
     "WalletTopUp",
     "WalletTransactionResponse",
+    "WalletTopupRequestCreate",
+    "WalletTopupRequestResponse",
     "DriverLocationUpdate",
     "DriverOnlineToggle",
     "DriverProfileResponse",

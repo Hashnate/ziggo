@@ -5,8 +5,30 @@
 
 {% block content %}
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-    <div class="p-6 border-b border-gray-100 flex items-center justify-between">
+    <div class="p-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-4">
         <h3 class="font-bold text-ziggo">Restaurants ({{ total_restaurants }})</h3>
+        
+        <form method="GET" action="/admin/restaurants" class="flex flex-wrap items-center gap-3 ml-auto">
+            <div>
+                <input type="text" name="search" value="{{ search }}" placeholder="Search by name..." class="px-3 py-2 border border-ziggo-line rounded-lg text-sm outline-none focus:border-ziggo w-48">
+            </div>
+            <div class="min-w-[120px]">
+                <select name="status" class="w-full px-3 py-2 border border-ziggo-line rounded-lg text-sm outline-none focus:border-ziggo bg-white">
+                    <option value="all" {% if status == 'all' %}selected{% endif %}>All Status</option>
+                    <option value="active" {% if status == 'active' %}selected{% endif %}>Active</option>
+                    <option value="pending" {% if status == 'pending' %}selected{% endif %}>Pending</option>
+                </select>
+            </div>
+            <button type="submit" class="px-4 py-2 bg-ziggo text-white rounded-lg font-black text-sm hover:bg-ziggo-light transition flex items-center gap-1.5">
+                <i class="fas fa-search"></i>
+            </button>
+            {% if search or status != 'all' %}
+            <a href="/admin/restaurants" class="px-4 py-2 bg-slate-700 text-white rounded-lg font-black text-sm hover:bg-slate-800 transition flex items-center gap-1.5">
+                <i class="fas fa-undo"></i>
+            </a>
+            {% endif %}
+        </form>
+
         <a href="/admin/restaurants/new"
            class="bg-ziggo text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-ziggo-light transition-all inline-flex items-center">
             <i class="fas fa-plus mr-2"></i> Add Restaurant
@@ -94,7 +116,7 @@
         </p>
         <div class="flex items-center gap-1.5">
             {% if page > 1 %}
-                <a href="/admin/restaurants?page={{ page - 1 }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
+                <a href="/admin/restaurants?page={{ page - 1 }}&search={{ search }}&status={{ status }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
             {% else %}
                 <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Previous</span>
             {% endif %}
@@ -103,12 +125,12 @@
                 {% if p == page %}
                     <span class="px-3 py-1.5 rounded-lg bg-ziggo text-white text-xs font-black">{{ p }}</span>
                 {% else %}
-                    <a href="/admin/restaurants?page={{ p }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
+                    <a href="/admin/restaurants?page={{ p }}&search={{ search }}&status={{ status }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
                 {% endif %}
             {% endfor %}
 
             {% if page < total_pages %}
-                <a href="/admin/restaurants?page={{ page + 1 }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
+                <a href="/admin/restaurants?page={{ page + 1 }}&search={{ search }}&status={{ status }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
             {% else %}
                 <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Next</span>
             {% endif %}
