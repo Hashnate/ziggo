@@ -1549,12 +1549,37 @@ async def admin_topups(
     )
     pending_requests = req_q.scalars().all()
 
+    items = []
+    for r in pending_requests:
+        items.append({
+            "type": "request",
+            "date": r.created_at,
+            "user": r.user,
+            "amount": float(r.amount),
+            "status": r.status,
+            "note": r.note,
+            "id": r.id
+        })
+    for t in topups:
+        items.append({
+            "type": "transaction",
+            "date": t.created_at,
+            "user": t.user,
+            "amount": float(t.amount),
+            "balance_after": float(t.balance_after) if t.balance_after else None,
+            "reference": t.reference_id,
+            "note": t.description,
+        })
+    
+    # Sort them descending by date
+    items.sort(key=lambda x: x["date"].timestamp() if x["date"] else 0, reverse=True)
+
     return templates.TemplateResponse(
         request, "topups.html",
         {
             "request": request,
             "active_page": "topups",
-            "topups": topups,
+            "items": items,
             "total": float(total_val),
             "count": total,
             "page": page,
@@ -1562,7 +1587,6 @@ async def admin_topups(
             "start_idx": start_idx,
             "end_idx": end_idx,
             "page_range": page_range,
-            "pending_requests": pending_requests,
         },
     )
 
