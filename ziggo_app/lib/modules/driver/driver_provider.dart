@@ -159,6 +159,7 @@ class DriverProvider extends ChangeNotifier {
       );
       if (status == 'delivered' || status == 'cancelled') {
         _activeMarketOrder = null;
+        await loadProfile();
       } else {
         await loadActiveMarketOrder();
       }
@@ -253,6 +254,7 @@ class DriverProvider extends ChangeNotifier {
       );
       if (status == 'delivered' || status == 'cancelled') {
         _activeFoodOrder = null;
+        await loadProfile();
       } else {
         await loadActiveFoodOrder();
       }
@@ -327,6 +329,7 @@ class DriverProvider extends ChangeNotifier {
       _activeRide = Map<String, dynamic>.from(resp.data);
       if (status == 'completed' || status == 'cancelled') {
         _activeRide = null;
+        await loadProfile();
       }
       notifyListeners();
     } on DioException {

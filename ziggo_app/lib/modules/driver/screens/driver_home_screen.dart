@@ -35,6 +35,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   double _heading = 0.0;         // updated by the geolocator stream to orient location arrow
   bool _muted = false;           // local-only — wired into TTS when we add it
   StreamSubscription<Position>? _speedSub;
+  bool _isShowingRideRequest = false;
 
   @override
   void initState() {
@@ -1287,6 +1288,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   void _showRideRequest(Map<String, dynamic> request) {
+    if (_isShowingRideRequest) return;
+    _isShowingRideRequest = true;
+
     showModalBottomSheet(
       context: context,
       isDismissible: false,
@@ -1294,7 +1298,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => _RideRequestSheet(request: request),
-    );
+    ).whenComplete(() {
+      _isShowingRideRequest = false;
+    });
   }
 }
 
