@@ -312,7 +312,7 @@ async def upload_driver_document(
     if not d:
         raise HTTPException(status_code=404, detail="Driver profile not found")
 
-    url = await _save_driver_doc(document, doc_type)
+    url = await _save_doc(document, doc_type)
 
     # Upsert by (driver_id, document_type)
     exq = await db.execute(
