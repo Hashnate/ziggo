@@ -34,10 +34,10 @@ import '../network/api_client.dart';
 // (see fcm_service.py `channel_id="ziggo_ride_alerts"`). Bumping this id
 // here forces Android to create a fresh channel (use this trick if you ever
 // swap the sound file — Android won't update an existing channel's sound).
-const String _rideAlertChannelId = 'ziggo_ride_alerts';
+const String _rideAlertChannelId = 'ziggo_ride_alerts_v2';
 const String _rideAlertChannelName = 'Ride alerts';
 const String _rideAlertChannelDesc =
-    'New ride requests and ride status updates. Plays ride_alert.mp3.';
+    'New ride requests and ride status updates. Plays default sound.';
 
 /// Required for background message handling on Android — Firebase invokes a
 /// top-level function in an isolated Dart isolate. The OS shows the system
@@ -105,7 +105,6 @@ class FcmService {
                 description: _rideAlertChannelDesc,
                 importance: Importance.max,
                 playSound: true,
-                sound: RawResourceAndroidNotificationSound('ride_alert'),
                 enableVibration: true,
               ),
             );
@@ -219,7 +218,6 @@ class FcmService {
             importance: Importance.max,
             priority: Priority.high,
             playSound: true,
-            sound: const RawResourceAndroidNotificationSound('ride_alert'),
             enableVibration: true,
             // Tap → opens the app (since we don't set a payload route)
           ),
