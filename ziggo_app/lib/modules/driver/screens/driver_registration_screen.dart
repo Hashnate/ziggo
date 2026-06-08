@@ -36,17 +36,25 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
   String? _error;
 
   File? _profilePhoto;
-  File? _nicDoc;
-  File? _licenseDoc;
+  File? _nicFrontDoc;
+  File? _nicBackDoc;
+  File? _licenseFrontDoc;
+  File? _licenseBackDoc;
   File? _vehicleRegDoc;
   File? _insuranceDoc;
+  File? _yearLicenseDoc;
+  File? _ecoTestDoc;
   File? _billingProofDoc;
 
   static const _typeLabels = {
-    'nic': 'NIC (front)',
-    'license': 'Driving License',
+    'nic_front': 'NIC (front)',
+    'nic_back': 'NIC (back)',
+    'license_front': 'Driving License (front)',
+    'license_back': 'Driving License (back)',
     'vehicle_reg': 'Vehicle Registration',
     'insurance': 'Insurance',
+    'year_license': 'Year License',
+    'eco_test': 'Eco Test Report',
   };
 
   Future<File?> _pickImage() async {
@@ -109,8 +117,8 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
       setState(() => _error = 'Please upload your Billing Proof');
       return;
     }
-    if (_nicDoc == null || _licenseDoc == null || _vehicleRegDoc == null || _insuranceDoc == null) {
-      setState(() => _error = 'Please upload all 4 required KYC documents');
+    if (_nicFrontDoc == null || _nicBackDoc == null || _licenseFrontDoc == null || _licenseBackDoc == null || _vehicleRegDoc == null || _insuranceDoc == null || _yearLicenseDoc == null || _ecoTestDoc == null) {
+      setState(() => _error = 'Please upload all 8 required KYC documents');
       return;
     }
 
@@ -162,10 +170,14 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
 
       // 3. Upload KYC Documents
       final docs = {
-        'nic': _nicDoc,
-        'license': _licenseDoc,
+        'nic_front': _nicFrontDoc,
+        'nic_back': _nicBackDoc,
+        'license_front': _licenseFrontDoc,
+        'license_back': _licenseBackDoc,
         'vehicle_reg': _vehicleRegDoc,
         'insurance': _insuranceDoc,
+        'year_license': _yearLicenseDoc,
+        'eco_test': _ecoTestDoc,
       };
 
       for (final entry in docs.entries) {
@@ -401,13 +413,21 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                     _card(
                       Column(
                         children: [
-                          _docUploadRow('nic', 'NIC (front)', _nicDoc, (file) => setState(() => _nicDoc = file)),
+                          _docUploadRow('nic_front', 'NIC (front)', _nicFrontDoc, (file) => setState(() => _nicFrontDoc = file)),
                           const Divider(height: 20),
-                          _docUploadRow('license', 'Driving License', _licenseDoc, (file) => setState(() => _licenseDoc = file)),
+                          _docUploadRow('nic_back', 'NIC (back)', _nicBackDoc, (file) => setState(() => _nicBackDoc = file)),
+                          const Divider(height: 20),
+                          _docUploadRow('license_front', 'Driving License (front)', _licenseFrontDoc, (file) => setState(() => _licenseFrontDoc = file)),
+                          const Divider(height: 20),
+                          _docUploadRow('license_back', 'Driving License (back)', _licenseBackDoc, (file) => setState(() => _licenseBackDoc = file)),
                           const Divider(height: 20),
                           _docUploadRow('vehicle_reg', 'Vehicle Registration Book', _vehicleRegDoc, (file) => setState(() => _vehicleRegDoc = file)),
                           const Divider(height: 20),
                           _docUploadRow('insurance', 'Insurance Document', _insuranceDoc, (file) => setState(() => _insuranceDoc = file)),
+                          const Divider(height: 20),
+                          _docUploadRow('year_license', 'Year License', _yearLicenseDoc, (file) => setState(() => _yearLicenseDoc = file)),
+                          const Divider(height: 20),
+                          _docUploadRow('eco_test', 'Eco Test Report', _ecoTestDoc, (file) => setState(() => _ecoTestDoc = file)),
                           const Divider(height: 20),
                           _docUploadRow('billing_proof', 'Billing Proof (Utility bill / Bank statement)', _billingProofDoc, (file) => setState(() => _billingProofDoc = file)),
                         ],

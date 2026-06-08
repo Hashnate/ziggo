@@ -265,7 +265,7 @@ def _find_admin_panel_dir() -> str:
 _ADMIN_PANEL_DIR = _find_admin_panel_dir()
 _DOC_UPLOAD_DIR = os.path.join(_ADMIN_PANEL_DIR, "static", "uploads", "driver_docs")
 os.makedirs(_DOC_UPLOAD_DIR, exist_ok=True)
-_VALID_DOC_TYPES = {"nic", "license", "vehicle_reg", "insurance"}
+_VALID_DOC_TYPES = {"nic_front", "nic_back", "license_front", "license_back", "vehicle_reg", "insurance", "year_license", "eco_test"}
 _ALLOWED_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".pdf"}
 _MAX_DOC_BYTES = 25 * 1024 * 1024  # 25 MB
 
@@ -365,7 +365,7 @@ async def list_my_documents(
     )
     by_type = {row.document_type: row for row in q.scalars().all()}
     out = []
-    for kind in ("nic", "license", "vehicle_reg", "insurance"):
+    for kind in ("nic_front", "nic_back", "license_front", "license_back", "vehicle_reg", "insurance", "year_license", "eco_test"):
         row = by_type.get(kind)
         out.append({
             "document_type": kind,

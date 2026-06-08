@@ -26,10 +26,14 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
   bool _loading = true;
 
   static const _typeLabels = {
-    'nic': 'NIC (front)',
-    'license': 'Driving License',
+    'nic_front': 'NIC (front)',
+    'nic_back': 'NIC (back)',
+    'license_front': 'Driving License (front)',
+    'license_back': 'Driving License (back)',
     'vehicle_reg': 'Vehicle Registration',
     'insurance': 'Insurance',
+    'year_license': 'Year License',
+    'eco_test': 'Eco Test Report',
   };
 
   @override

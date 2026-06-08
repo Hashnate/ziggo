@@ -32,7 +32,9 @@
             <div class="flex items-center gap-5">
                 <div id="photoPreview" class="w-24 h-24 rounded-2xl bg-ziggo-soft/50 border-2 border-dashed border-ziggo-line flex items-center justify-center overflow-hidden">
                     {% if user.profile_photo %}
-                    <img src="{{ user.profile_photo }}" class="w-full h-full object-cover">
+                    <a href="{{ user.profile_photo }}" target="_blank" class="w-full h-full block">
+                        <img src="{{ user.profile_photo }}" class="w-full h-full object-cover hover:opacity-80 transition">
+                    </a>
                     {% else %}
                     <i class="fas fa-user text-ziggo-faint text-3xl"></i>
                     {% endif %}
@@ -59,7 +61,9 @@
             <div class="flex items-center gap-5">
                 <div id="billingPreview" class="w-24 h-24 rounded-2xl bg-ziggo-soft/50 border-2 border-dashed border-ziggo-line flex items-center justify-center overflow-hidden">
                     {% if driver.billing_proof_url %}
-                    <img src="{{ driver.billing_proof_url }}" class="w-full h-full object-cover">
+                    <a href="{{ driver.billing_proof_url }}" target="_blank" class="w-full h-full block">
+                        <img src="{{ driver.billing_proof_url }}" class="w-full h-full object-cover hover:opacity-80 transition">
+                    </a>
                     {% else %}
                     <i class="fas fa-file-invoice text-ziggo-faint text-3xl"></i>
                     {% endif %}
@@ -189,11 +193,11 @@
                 <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
                     <div id="{{ doc.kind }}IconWrapper" class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
                         {% if doc.document_url %}
-                        <a href="{{ doc.document_url }}" target="_blank">
+                        <a href="{{ doc.document_url }}" target="_blank" class="w-full h-full flex items-center justify-center">
                             {% if doc.document_url.endswith('.pdf') %}
-                            <i class="fas fa-file-pdf text-2xl text-rose-500"></i>
+                            <i class="fas fa-file-pdf text-2xl text-rose-500 hover:opacity-80 transition"></i>
                             {% else %}
-                            <img src="{{ doc.document_url }}" alt="{{ doc.label }}" class="w-full h-full object-cover">
+                            <img src="{{ doc.document_url }}" alt="{{ doc.label }}" class="w-full h-full object-cover hover:opacity-80 transition">
                             {% endif %}
                         </a>
                         {% else %}
@@ -268,7 +272,7 @@ function previewPhoto(input) {
     }
     const reader = new FileReader();
     reader.onload = function (e) {
-        preview.innerHTML = '<img src="' + e.target.result + '" class="w-full h-full object-cover">';
+        preview.innerHTML = '<a href="' + e.target.result + '" target="_blank" class="w-full h-full block"><img src="' + e.target.result + '" class="w-full h-full object-cover hover:opacity-80 transition"></a>';
     };
     reader.readAsDataURL(file);
     label.textContent = 'Change photo';
@@ -286,7 +290,7 @@ function previewBilling(input) {
     }
     const reader = new FileReader();
     reader.onload = function (e) {
-        preview.innerHTML = '<img src="' + e.target.result + '" class="w-full h-full object-cover">';
+        preview.innerHTML = '<a href="' + e.target.result + '" target="_blank" class="w-full h-full block"><img src="' + e.target.result + '" class="w-full h-full object-cover hover:opacity-80 transition"></a>';
     };
     reader.readAsDataURL(file);
     label.textContent = 'Change file';
@@ -315,7 +319,7 @@ function previewDoc(input, kind) {
     } else {
         const reader = new FileReader();
         reader.onload = function (e) {
-            wrapper.innerHTML = '<img src="' + e.target.result + '" class="w-full h-full object-cover">';
+            wrapper.innerHTML = '<a href="' + e.target.result + '" target="_blank" class="w-full h-full flex items-center justify-center"><img src="' + e.target.result + '" class="w-full h-full object-cover hover:opacity-80 transition"></a>';
         };
         reader.readAsDataURL(file);
     }

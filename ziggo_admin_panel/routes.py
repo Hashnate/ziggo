@@ -510,10 +510,14 @@ async def admin_drivers_new_submit(
     relative_relationship: str = Form(""),
     profile_photo: UploadFile | None = File(None),
     billing_proof: UploadFile | None = File(None),
-    doc_nic: UploadFile | None = File(None),
-    doc_license: UploadFile | None = File(None),
+    doc_nic_front: UploadFile | None = File(None),
+    doc_nic_back: UploadFile | None = File(None),
+    doc_license_front: UploadFile | None = File(None),
+    doc_license_back: UploadFile | None = File(None),
     doc_vehicle_reg: UploadFile | None = File(None),
     doc_insurance: UploadFile | None = File(None),
+    doc_year_license: UploadFile | None = File(None),
+    doc_eco_test: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -608,7 +612,7 @@ async def admin_drivers_new_submit(
     await db.flush()
 
     from app.models import DriverDocument
-    for kind in ("nic", "license", "vehicle_reg", "insurance"):
+    for kind in ("nic_front", "nic_back", "license_front", "license_back", "vehicle_reg", "insurance", "year_license", "eco_test"):
         file_input = locals().get(f"doc_{kind}")
         if file_input:
             url = await _save_uploaded_doc(file_input, kind)
@@ -649,10 +653,14 @@ async def admin_drivers_edit_form(
     docs_by_kind = {row.document_type: row for row in dq.scalars().all()}
     docs = []
     for kind, label in [
-        ("nic", "NIC"),
-        ("license", "Driving License"),
+        ("nic_front", "NIC Front"),
+        ("nic_back", "NIC Back"),
+        ("license_front", "Driving License Front"),
+        ("license_back", "Driving License Back"),
         ("vehicle_reg", "Vehicle Registration"),
         ("insurance", "Insurance"),
+        ("year_license", "Year License"),
+        ("eco_test", "Eco Test Report"),
     ]:
         row = docs_by_kind.get(kind)
         docs.append({
@@ -698,10 +706,14 @@ async def admin_drivers_edit_submit(
     relative_relationship: str = Form(""),
     billing_proof: UploadFile | None = File(None),
     remove_billing: str = Form(""),
-    doc_nic: UploadFile | None = File(None),
-    doc_license: UploadFile | None = File(None),
+    doc_nic_front: UploadFile | None = File(None),
+    doc_nic_back: UploadFile | None = File(None),
+    doc_license_front: UploadFile | None = File(None),
+    doc_license_back: UploadFile | None = File(None),
     doc_vehicle_reg: UploadFile | None = File(None),
     doc_insurance: UploadFile | None = File(None),
+    doc_year_license: UploadFile | None = File(None),
+    doc_eco_test: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -791,7 +803,7 @@ async def admin_drivers_edit_submit(
         d.status = DriverStatus.SUSPENDED
 
     from app.models import DriverDocument
-    for kind in ("nic", "license", "vehicle_reg", "insurance"):
+    for kind in ("nic_front", "nic_back", "license_front", "license_back", "vehicle_reg", "insurance", "year_license", "eco_test"):
         file_input = locals().get(f"doc_{kind}")
         if file_input:
             url = await _save_uploaded_doc(file_input, kind)
