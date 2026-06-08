@@ -123,4 +123,9 @@ async def get_me(user: User = Depends(get_current_user)):
         rating=float(user.rating) if user.rating is not None else None,
         total_rides=user.total_rides,
         profile_completeness=compute_profile_completeness(user),
+        birthday=user.birthday,
+        gender=user.gender,
+        language=user.language,
+        emergency_contact_name=user.emergency_contact_name,
+        emergency_contact_number=user.emergency_contact_number,
     )

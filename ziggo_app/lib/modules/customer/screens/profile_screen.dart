@@ -14,6 +14,7 @@ import 'subscription_screen.dart';
 import 'support_screen.dart';
 import 'wallet_screen.dart';
 import 'payment_methods_screen.dart';
+import 'edit_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -23,62 +24,15 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final _nameCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
-  bool _busy = false;
-
   @override
   void initState() {
     super.initState();
-    final auth = context.read<AuthProvider>();
-    _nameCtrl.text = auth.fullName ?? '';
-    _emailCtrl.text = auth.email ?? '';
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<WalletProvider>().refresh();
     });
   }
 
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _emailCtrl.dispose();
-    super.dispose();
-  }
 
-  Future<void> _save() async {
-    setState(() => _busy = true);
-    try {
-      await context.read<AuthProvider>().updateProfile(
-            fullName: _nameCtrl.text.trim(),
-            email: _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
-          );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-              SizedBox(width: 8),
-              Text('Profile updated'),
-            ],
-          ),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed: $e'),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
 
   Future<void> _confirmLogout() async {
     final yes = await showDialog<bool>(
@@ -142,7 +96,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
         children: staggered([
-          _heroCard(name: name, phone: auth.phoneNumber ?? '', initial: initial, role: auth.role ?? 'customer'),
+          GestureDetector(
+            onTap: () => _open(const EditProfileScreen()),
+            child: _heroCard(name: name, phone: auth.phoneNumber ?? '', initial: initial, role: auth.role ?? 'customer'),
+          ),
           const SizedBox(height: 16),
           _walletStrip(balance: wallet.balance, currency: wallet.currency),
           const SizedBox(height: 10),
@@ -213,41 +170,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onTap: () => _open(const SupportScreen()),
             ),
           ]),
-          const SizedBox(height: 22),
-          _sectionLabel('EDIT YOUR INFO'),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.cardBorder),
-            ),
-            child: Column(
-              children: [
-                _field(
-                  ctrl: _nameCtrl,
-                  label: 'Full name',
-                  icon: Icons.person_rounded,
-                ),
-                const Divider(height: 18),
-                _field(
-                  ctrl: _emailCtrl,
-                  label: 'Email (optional)',
-                  icon: Icons.email_rounded,
-                  keyboard: TextInputType.emailAddress,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          PrimaryButton(
-            label: 'SAVE CHANGES',
-            icon: Icons.check_rounded,
-            gold: true,
-            busy: _busy,
-            onPressed: _save,
-          ),
+          // Inline edit info removed, moved to EditProfileScreen
           const SizedBox(height: 14),
           _logoutButton(),
           const SizedBox(height: 10),
@@ -796,61 +719,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _field({
-    required TextEditingController ctrl,
-    required String label,
-    required IconData icon,
-    TextInputType? keyboard,
-  }) {
-    return Row(
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: AppColors.primarySoft,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: AppColors.primary, size: 18),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: AppColors.textTertiary,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              TextField(
-                controller: ctrl,
-                keyboardType: keyboard,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 15,
-                  color: AppColors.textPrimary,
-                ),
-                decoration: const InputDecoration(
-                  filled: false,
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 4),
-                  isDense: true,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+
 }
 
 class _MenuItem {

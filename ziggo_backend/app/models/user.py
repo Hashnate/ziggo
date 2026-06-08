@@ -7,6 +7,7 @@ from sqlalchemy import (
     DECIMAL,
     ForeignKey,
     Enum as SQLEnum,
+    Date,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -35,6 +36,11 @@ class User(Base):
     rating = Column(DECIMAL(3, 2), default=0)
     total_rides = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)
+    birthday = Column(Date)
+    gender = Column(String(20))
+    language = Column(String(50))
+    emergency_contact_name = Column(String(100))
+    emergency_contact_number = Column(String(20))
     # FCM device token. User-level (not customer/driver) so the same person
     # gets pushes across roles + devices. ensure_schema auto-adds this column
     # on startup if it doesn't exist — no manual migration needed.
