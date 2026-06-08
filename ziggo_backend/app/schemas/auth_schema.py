@@ -1,6 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
 from typing import List, Optional
-from datetime import date
 from ..models.user import UserRole
 
 
@@ -30,11 +29,6 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     email: Optional[EmailStr] = None
     profile_photo: Optional[str] = None
-    birthday: Optional[date] = None
-    gender: Optional[str] = None
-    language: Optional[str] = None
-    emergency_contact_name: Optional[str] = None
-    emergency_contact_number: Optional[str] = None
 
 
 class ProfileCompleteness(BaseModel):
@@ -53,11 +47,6 @@ class UserResponse(UserBase):
     total_rides: Optional[int] = None
     # BRD: CD-34 — populated server-side from the user record
     profile_completeness: Optional[ProfileCompleteness] = None
-    birthday: Optional[date] = None
-    gender: Optional[str] = None
-    language: Optional[str] = None
-    emergency_contact_name: Optional[str] = None
-    emergency_contact_number: Optional[str] = None
 
     class Config:
         from_attributes = True

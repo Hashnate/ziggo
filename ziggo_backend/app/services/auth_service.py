@@ -122,10 +122,6 @@ _PROFILE_FIELDS = [
     ("full_name", lambda u: bool((u.full_name or "").strip())),
     ("email", lambda u: bool((u.email or "").strip())),
     ("profile_photo", lambda u: bool((u.profile_photo or "").strip())),
-    ("birthday", lambda u: bool(u.birthday)),
-    ("gender", lambda u: bool((u.gender or "").strip())),
-    ("language", lambda u: bool((u.language or "").strip())),
-    ("emergency_contact", lambda u: bool((u.emergency_contact_name or "").strip() and (u.emergency_contact_number or "").strip())),
 ]
 
 
