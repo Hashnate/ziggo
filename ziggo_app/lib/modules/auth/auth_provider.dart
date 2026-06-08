@@ -17,6 +17,11 @@ class AuthProvider extends ChangeNotifier {
   String? _phoneNumber;
   String? _fullName;
   String? _email;
+  String? _birthday;
+  String? _gender;
+  String? _language;
+  String? _emergencyContactName;
+  String? _emergencyContactNumber;
   String? _lastError;
   String? _devOtp;
 
@@ -27,6 +32,11 @@ class AuthProvider extends ChangeNotifier {
   String? get phoneNumber => _phoneNumber;
   String? get fullName => _fullName;
   String? get email => _email;
+  String? get birthday => _birthday;
+  String? get gender => _gender;
+  String? get language => _language;
+  String? get emergencyContactName => _emergencyContactName;
+  String? get emergencyContactNumber => _emergencyContactNumber;
   String? get lastError => _lastError;
   String? get devOtp => _devOtp;
 
@@ -117,6 +127,11 @@ class AuthProvider extends ChangeNotifier {
       _fullName = resp.data['full_name'] as String?;
       _email = resp.data['email'] as String?;
       _phoneNumber = resp.data['phone_number'] as String?;
+      _birthday = resp.data['birthday'] as String?;
+      _gender = resp.data['gender'] as String?;
+      _language = resp.data['language'] as String?;
+      _emergencyContactName = resp.data['emergency_contact_name'] as String?;
+      _emergencyContactNumber = resp.data['emergency_contact_number'] as String?;
       _completeness = resp.data['profile_completeness'] is Map
           ? Map<String, dynamic>.from(resp.data['profile_completeness'] as Map)
           : null;
@@ -138,14 +153,33 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> updateProfile({String? fullName, String? email}) async {
+  Future<void> updateProfile({
+    String? fullName,
+    String? email,
+    String? birthday,
+    String? gender,
+    String? language,
+    String? emergencyContactName,
+    String? emergencyContactNumber,
+  }) async {
     final body = <String, dynamic>{};
     if (fullName != null) body['full_name'] = fullName;
     if (email != null) body['email'] = email;
+    if (birthday != null) body['birthday'] = birthday;
+    if (gender != null) body['gender'] = gender;
+    if (language != null) body['language'] = language;
+    if (emergencyContactName != null) body['emergency_contact_name'] = emergencyContactName;
+    if (emergencyContactNumber != null) body['emergency_contact_number'] = emergencyContactNumber;
+    
     if (body.isEmpty) return;
     final resp = await ApiClient.instance.dio.patch('/customer/profile', data: body);
     _fullName = resp.data['full_name'] as String?;
     _email = resp.data['email'] as String?;
+    _birthday = resp.data['birthday'] as String?;
+    _gender = resp.data['gender'] as String?;
+    _language = resp.data['language'] as String?;
+    _emergencyContactName = resp.data['emergency_contact_name'] as String?;
+    _emergencyContactNumber = resp.data['emergency_contact_number'] as String?;
     notifyListeners();
   }
 
