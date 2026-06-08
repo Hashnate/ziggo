@@ -93,6 +93,7 @@ class DriverMini(BaseModel):
     phone_number: Optional[str] = None
     current_lat: Optional[float] = None
     current_lng: Optional[float] = None
+    profile_photo: Optional[str] = None
 
     class Config:
         from_attributes = True

@@ -64,6 +64,7 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
             "phone_number": b.driver.user.phone_number if b.driver.user else None,
             "current_lat": float(b.driver.current_lat) if b.driver.current_lat else None,
             "current_lng": float(b.driver.current_lng) if b.driver.current_lng else None,
+            "profile_photo": b.driver.user.profile_photo if b.driver.user else None,
         }
 
     return BookingResponse(

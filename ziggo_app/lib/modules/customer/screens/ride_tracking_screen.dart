@@ -651,9 +651,14 @@ class _DriverCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initial = (d['full_name']?.toString().isNotEmpty ?? false)
-        ? d['full_name'].toString()[0].toUpperCase()
+    final initial = (d['full_name']?.toString().trim().isNotEmpty ?? false)
+        ? d['full_name'].toString().trim()[0].toUpperCase()
         : 'D';
+    final photo = d['profile_photo']?.toString();
+    final photoUrl = (photo != null && photo.isNotEmpty)
+        ? (photo.startsWith('http') ? photo : '${ApiConfig.baseHost}/$photo')
+        : null;
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(22),
       child: Stack(
@@ -704,15 +709,23 @@ class _DriverCard extends StatelessWidget {
                         offset: const Offset(0, 6),
                       ),
                     ],
+                    image: photoUrl != null
+                        ? DecorationImage(
+                            image: NetworkImage(photoUrl),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
                   ),
-                  child: Text(
-                    initial,
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 22,
-                    ),
-                  ),
+                  child: photoUrl != null
+                      ? null
+                      : Text(
+                          initial,
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 22,
+                          ),
+                        ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
