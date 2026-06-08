@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -186,16 +187,26 @@ class _Header extends StatelessWidget {
             decoration: BoxDecoration(
               gradient: AppColors.primaryGradient,
               borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+              image: auth.profilePhoto != null && auth.profilePhoto!.isNotEmpty
+                  ? DecorationImage(
+                      image: auth.profilePhoto!.startsWith('http')
+                          ? NetworkImage(auth.profilePhoto!)
+                          : FileImage(File(auth.profilePhoto!)) as ImageProvider,
+                      fit: BoxFit.cover,
+                    )
+                  : null,
               boxShadow: AppStyles.shadowSm,
             ),
-            child: Text(
-              initial,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-                fontSize: 18,
-              ),
-            ),
+            child: auth.profilePhoto == null || auth.profilePhoto!.isEmpty
+                ? Text(
+                    initial,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                    ),
+                  )
+                : null,
           ),
         ),
       ],

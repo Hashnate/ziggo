@@ -19,6 +19,10 @@ class AuthProvider extends ChangeNotifier {
   String? _email;
   String? _lastError;
   String? _devOtp;
+  String? _birthday;
+  String? _gender;
+  String? _emergencyContact;
+  String? _profilePhoto;
 
   AuthStatus get status => _status;
   String? get token => _token;
@@ -29,6 +33,10 @@ class AuthProvider extends ChangeNotifier {
   String? get email => _email;
   String? get lastError => _lastError;
   String? get devOtp => _devOtp;
+  String? get birthday => _birthday;
+  String? get gender => _gender;
+  String? get emergencyContact => _emergencyContact;
+  String? get profilePhoto => _profilePhoto;
 
   Future<void> bootstrap() async {
     final t = await TokenStorage.getToken();
@@ -114,9 +122,13 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _refreshMe() async {
     try {
       final resp = await ApiClient.instance.dio.get('/auth/me');
-      _fullName = resp.data['full_name'] as String?;
-      _email = resp.data['email'] as String?;
-      _phoneNumber = resp.data['phone_number'] as String?;
+      _fullName = resp.data['full_name'] as String? ?? _fullName;
+      _email = resp.data['email'] as String? ?? _email;
+      _phoneNumber = resp.data['phone_number'] as String? ?? _phoneNumber;
+      _birthday = resp.data['birthday'] as String? ?? _birthday;
+      _gender = resp.data['gender'] as String? ?? _gender;
+      _emergencyContact = resp.data['emergency_contact'] as String? ?? _emergencyContact;
+      _profilePhoto = resp.data['profile_photo'] as String? ?? _profilePhoto;
       _completeness = resp.data['profile_completeness'] is Map
           ? Map<String, dynamic>.from(resp.data['profile_completeness'] as Map)
           : null;
@@ -138,14 +150,30 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> updateProfile({String? fullName, String? email}) async {
+  Future<void> updateProfile({
+    String? fullName,
+    String? email,
+    String? birthday,
+    String? gender,
+    String? emergencyContact,
+    String? profilePhoto,
+  }) async {
     final body = <String, dynamic>{};
     if (fullName != null) body['full_name'] = fullName;
     if (email != null) body['email'] = email;
+    if (birthday != null) body['birthday'] = birthday;
+    if (gender != null) body['gender'] = gender;
+    if (emergencyContact != null) body['emergency_contact'] = emergencyContact;
+    if (profilePhoto != null) body['profile_photo'] = profilePhoto;
     if (body.isEmpty) return;
+    
     final resp = await ApiClient.instance.dio.patch('/customer/profile', data: body);
-    _fullName = resp.data['full_name'] as String?;
-    _email = resp.data['email'] as String?;
+    _fullName = resp.data['full_name'] as String? ?? fullName ?? _fullName;
+    _email = resp.data['email'] as String? ?? email ?? _email;
+    _birthday = resp.data['birthday'] as String? ?? birthday ?? _birthday;
+    _gender = resp.data['gender'] as String? ?? gender ?? _gender;
+    _emergencyContact = resp.data['emergency_contact'] as String? ?? emergencyContact ?? _emergencyContact;
+    _profilePhoto = resp.data['profile_photo'] as String? ?? profilePhoto ?? _profilePhoto;
     notifyListeners();
   }
 
@@ -164,6 +192,10 @@ class AuthProvider extends ChangeNotifier {
     _phoneNumber = null;
     _fullName = null;
     _email = null;
+    _birthday = null;
+    _gender = null;
+    _emergencyContact = null;
+    _profilePhoto = null;
     await TokenStorage.clear();
     notifyListeners();
   }

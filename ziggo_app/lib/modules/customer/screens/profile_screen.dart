@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -14,6 +15,7 @@ import 'subscription_screen.dart';
 import 'support_screen.dart';
 import 'wallet_screen.dart';
 import 'payment_methods_screen.dart';
+import 'edit_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -23,94 +25,13 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final _nameCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
-  bool _busy = false;
 
   @override
   void initState() {
     super.initState();
-    final auth = context.read<AuthProvider>();
-    _nameCtrl.text = auth.fullName ?? '';
-    _emailCtrl.text = auth.email ?? '';
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<WalletProvider>().refresh();
     });
-  }
-
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _emailCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    setState(() => _busy = true);
-    try {
-      await context.read<AuthProvider>().updateProfile(
-            fullName: _nameCtrl.text.trim(),
-            email: _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
-          );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-              SizedBox(width: 8),
-              Text('Profile updated'),
-            ],
-          ),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed: $e'),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _confirmLogout() async {
-    final yes = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        icon: const Icon(Icons.logout_rounded, color: AppColors.error, size: 36),
-        title: const Text('Log out?', textAlign: TextAlign.center),
-        content: const Text(
-          'You will need to sign in again with your phone number.',
-          textAlign: TextAlign.center,
-        ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Log out'),
-          ),
-        ],
-      ),
-    );
-    if (yes != true || !mounted) return;
-    await context.read<AuthProvider>().logout();
-    if (mounted) Navigator.popUntil(context, (r) => r.isFirst);
   }
 
   void _open(Widget screen) {
@@ -142,7 +63,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
         children: staggered([
-          _heroCard(name: name, phone: auth.phoneNumber ?? '', initial: initial, role: auth.role ?? 'customer'),
+          GestureDetector(
+            onTap: () => _open(const EditProfileScreen()),
+            child: _heroCard(name: name, phone: auth.phoneNumber ?? '', initial: initial, role: auth.role ?? 'customer', profilePhoto: auth.profilePhoto),
+          ),
           const SizedBox(height: 16),
           _walletStrip(balance: wallet.balance, currency: wallet.currency),
           const SizedBox(height: 10),
@@ -213,46 +137,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onTap: () => _open(const SupportScreen()),
             ),
           ]),
-          const SizedBox(height: 22),
-          _sectionLabel('EDIT YOUR INFO'),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.cardBorder),
-            ),
-            child: Column(
-              children: [
-                _field(
-                  ctrl: _nameCtrl,
-                  label: 'Full name',
-                  icon: Icons.person_rounded,
-                ),
-                const Divider(height: 18),
-                _field(
-                  ctrl: _emailCtrl,
-                  label: 'Email (optional)',
-                  icon: Icons.email_rounded,
-                  keyboard: TextInputType.emailAddress,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          PrimaryButton(
-            label: 'SAVE CHANGES',
-            icon: Icons.check_rounded,
-            gold: true,
-            busy: _busy,
-            onPressed: _save,
-          ),
-          const SizedBox(height: 14),
-          _logoutButton(),
-          const SizedBox(height: 10),
-          // BRD: CD-32 — account deletion entry point
-          _deleteAccountButton(),
           const SizedBox(height: 24),
           const Center(
             child: Text(
@@ -275,6 +159,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required String phone,
     required String initial,
     required String role,
+    String? profilePhoto,
   }) {
     return Container(
       padding: const EdgeInsets.all(22),
@@ -298,6 +183,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(22),
+              image: profilePhoto != null && profilePhoto.isNotEmpty
+                  ? DecorationImage(
+                      image: profilePhoto.startsWith('http')
+                          ? NetworkImage(profilePhoto)
+                          : FileImage(File(profilePhoto)) as ImageProvider,
+                      fit: BoxFit.cover,
+                    )
+                  : null,
               boxShadow: [
                 BoxShadow(
                   color: AppColors.primaryDark.withOpacity(0.25),
@@ -306,14 +199,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ],
             ),
-            child: Text(
-              initial,
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontSize: 34,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
+            child: profilePhoto == null || profilePhoto.isEmpty
+                ? Text(
+                    initial,
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 34,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  )
+                : null,
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -366,6 +261,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
+          const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 28),
         ],
       ),
     );
@@ -691,166 +587,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  /// BRD: CD-32 — opens the data-erasure confirmation flow.
-  Widget _deleteAccountButton() {
-    return GestureDetector(
-      onTap: _confirmDeleteAccount,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.cardBorder),
-        ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.no_accounts_rounded,
-                color: AppColors.error, size: 16),
-            SizedBox(width: 8),
-            Text('Delete my account',
-                style: TextStyle(
-                  color: AppColors.error,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 13,
-                  letterSpacing: 0.4,
-                )),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _confirmDeleteAccount() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete your Ziggo account?'),
-        content: const Text(
-          'This will permanently remove your personal data (name, email, '
-          'photo, phone, push tokens). Past trip and payment records are '
-          'retained for Sri Lanka Inland Revenue compliance (6 years). '
-          'Any wallet balance is forfeit per Terms of Service. '
-          '\n\nThis cannot be undone.',
-          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Delete account'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true) return;
-    final msg = await context.read<AuthProvider>().deleteAccount();
-    if (!mounted) return;
-    if (msg != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(msg),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not delete account — please try again.'),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
-
-  Widget _logoutButton() {
-    return GestureDetector(
-      onTap: _confirmLogout,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: AppColors.error.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.logout_rounded, color: AppColors.error, size: 18),
-            SizedBox(width: 8),
-            Text(
-              'Log out',
-              style: TextStyle(
-                color: AppColors.error,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.4,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _field({
-    required TextEditingController ctrl,
-    required String label,
-    required IconData icon,
-    TextInputType? keyboard,
-  }) {
-    return Row(
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: AppColors.primarySoft,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: AppColors.primary, size: 18),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: AppColors.textTertiary,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              TextField(
-                controller: ctrl,
-                keyboardType: keyboard,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 15,
-                  color: AppColors.textPrimary,
-                ),
-                decoration: const InputDecoration(
-                  filled: false,
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 4),
-                  isDense: true,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 class _MenuItem {
