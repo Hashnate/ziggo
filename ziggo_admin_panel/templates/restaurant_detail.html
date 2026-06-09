@@ -38,18 +38,27 @@
                 <div class="divide-y divide-gray-100">
                     {% for cat in categories %}
                     <div class="p-6">
-                        <h4 class="font-black text-ziggo-accent uppercase tracking-widest text-xs mb-3">{{ cat.name }}</h4>
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="font-black text-ziggo-accent uppercase tracking-widest text-xs">{{ cat.name }}</h4>
+                            <button onclick='openEditCategoryModal({{ cat.id }}, {{ cat.name | tojson | safe }}, {{ cat.display_order }})' class="text-gray-400 hover:text-ziggo text-xs"><i class="fas fa-edit"></i> Edit</button>
+                        </div>
+
                         {% set cat_items = items | selectattr('category_id', 'equalto', cat.id) | list %}
                         {% if cat_items %}
                             <div class="space-y-2">
                             {% for it in cat_items %}
-                                <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                                <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl group relative">
                                     <div class="w-2 h-2 rounded-full {% if it.is_veg %}bg-green-500{% else %}bg-red-500{% endif %}"></div>
                                     <div class="flex-1">
                                         <p class="font-bold text-sm text-ziggo">{{ it.name }}</p>
                                         {% if it.description %}<p class="text-xs text-gray-500">{{ it.description }}</p>{% endif %}
                                     </div>
-                                    <span class="font-black text-sm">Rs.{{ "{:,.0f}".format(it.price) }}</span>
+                                    <div class="flex items-center gap-4">
+                                        <span class="font-black text-sm">Rs.{{ "{:,.0f}".format(it.price) }}</span>
+                                        <button onclick='openEditItemModal({{ it.id }}, {{ it.name | tojson | safe }}, {{ (it.description or "") | tojson | safe }}, {{ it.price }}, {{ it.category_id }}, {{ (it.image_url or "") | tojson | safe }}, {{ "true" if it.is_veg else "false" }}, {{ it.prep_time_min }})' class="opacity-0 group-hover:opacity-100 bg-white shadow-sm border border-gray-200 text-ziggo px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:bg-gray-50">
+                                            <i class="fas fa-edit"></i> Edit
+                                        </button>
+                                    </div>
                                 </div>
                             {% endfor %}
                             </div>
@@ -169,4 +178,119 @@
         </div>
     </div>
 </div>
+
+<!-- Edit Category Modal -->
+<div id="editCatModal" class="fixed inset-0 z-50 bg-gray-900/50 hidden flex items-center justify-center backdrop-blur-sm" onclick="closeEditCatModal()">
+    <div class="bg-white rounded-3xl shadow-xl w-full max-w-md p-6 m-4" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-black text-ziggo text-xl">Edit Category</h3>
+            <button onclick="closeEditCatModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
+        </div>
+        <form id="editCatForm" method="post" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Name</label>
+                <input id="editCatName" name="name" required class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Display order</label>
+                <input id="editCatOrder" name="display_order" type="number" class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="submit" class="flex-1 px-4 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light">Save Changes</button>
+                <button type="button" onclick="deleteCategory()" class="px-4 py-3 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100"><i class="fas fa-trash"></i></button>
+            </div>
+        </form>
+        <form id="deleteCatForm" method="post" class="hidden"></form>
+    </div>
+</div>
+
+<!-- Edit Item Modal -->
+<div id="editItemModal" class="fixed inset-0 z-50 bg-gray-900/50 hidden flex items-center justify-center backdrop-blur-sm" onclick="closeEditItemModal()">
+    <div class="bg-white rounded-3xl shadow-xl w-full max-w-md p-6 m-4" onclick="event.stopPropagation()" style="max-height: 90vh; overflow-y: auto;">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-black text-ziggo text-xl">Edit Menu Item</h3>
+            <button onclick="closeEditItemModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
+        </div>
+        <form id="editItemForm" method="post" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Category</label>
+                <select id="editItemCat" name="category_id" required class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}">{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Name</label>
+                <input id="editItemName" name="name" required class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Description</label>
+                <input id="editItemDesc" name="description" class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Price (Rs.)</label>
+                    <input id="editItemPrice" name="price" type="number" step="0.01" min="0" required class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Prep time (min)</label>
+                    <input id="editItemPrep" name="prep_time_min" type="number" min="1" class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Image URL</label>
+                <input id="editItemImage" name="image_url" class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+            </div>
+            <label class="inline-flex items-center gap-2 cursor-pointer">
+                <input id="editItemVeg" name="is_veg" type="checkbox" class="w-4 h-4">
+                <span class="text-sm font-bold text-gray-700">Vegetarian</span>
+            </label>
+            <div class="flex gap-3 pt-2">
+                <button type="submit" class="flex-1 px-4 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light">Save Changes</button>
+                <button type="button" onclick="deleteItem()" class="px-4 py-3 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100"><i class="fas fa-trash"></i></button>
+            </div>
+        </form>
+        <form id="deleteItemForm" method="post" class="hidden"></form>
+    </div>
+</div>
+
+<script>
+function openEditCategoryModal(id, name, order) {
+    document.getElementById('editCatForm').action = `/admin/restaurants/{{ restaurant.id }}/categories/${id}/edit`;
+    document.getElementById('deleteCatForm').action = `/admin/restaurants/{{ restaurant.id }}/categories/${id}/delete`;
+    document.getElementById('editCatName').value = name;
+    document.getElementById('editCatOrder').value = order;
+    document.getElementById('editCatModal').classList.remove('hidden');
+}
+function closeEditCatModal() {
+    document.getElementById('editCatModal').classList.add('hidden');
+}
+function deleteCategory() {
+    if(confirm('Are you sure you want to delete this category and all its items?')) {
+        document.getElementById('deleteCatForm').submit();
+    }
+}
+
+function openEditItemModal(id, name, desc, price, cat_id, image, is_veg, prep_time) {
+    document.getElementById('editItemForm').action = `/admin/restaurants/{{ restaurant.id }}/items/${id}/edit`;
+    document.getElementById('deleteItemForm').action = `/admin/restaurants/{{ restaurant.id }}/items/${id}/delete`;
+    document.getElementById('editItemName').value = name;
+    document.getElementById('editItemDesc').value = desc || '';
+    document.getElementById('editItemPrice').value = price;
+    document.getElementById('editItemCat').value = cat_id;
+    document.getElementById('editItemImage').value = image || '';
+    document.getElementById('editItemVeg').checked = is_veg;
+    document.getElementById('editItemPrep').value = prep_time;
+    document.getElementById('editItemModal').classList.remove('hidden');
+}
+function closeEditItemModal() {
+    document.getElementById('editItemModal').classList.add('hidden');
+}
+function deleteItem() {
+    if(confirm('Are you sure you want to delete this item?')) {
+        document.getElementById('deleteItemForm').submit();
+    }
+}
+</script>
 {% endblock %}

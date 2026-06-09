@@ -2860,6 +2860,83 @@ async def admin_restaurant_add_item(
     return RedirectResponse(url=f"/admin/restaurants/{restaurant_id}", status_code=303)
 
 
+@router.post("/restaurants/{restaurant_id}/categories/{category_id}/edit")
+async def admin_restaurant_edit_category(
+    restaurant_id: int,
+    category_id: int,
+    name: str = Form(...),
+    display_order: int = Form(0),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import MenuCategory
+    cat = (await db.execute(select(MenuCategory).where(MenuCategory.id == category_id, MenuCategory.restaurant_id == restaurant_id))).scalars().first()
+    if cat:
+        cat.name = name.strip()
+        cat.display_order = display_order
+        await db.commit()
+    return RedirectResponse(url=f"/admin/restaurants/{restaurant_id}", status_code=303)
+
+
+@router.post("/restaurants/{restaurant_id}/categories/{category_id}/delete")
+async def admin_restaurant_delete_category(
+    restaurant_id: int,
+    category_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import MenuCategory
+    cat = (await db.execute(select(MenuCategory).where(MenuCategory.id == category_id, MenuCategory.restaurant_id == restaurant_id))).scalars().first()
+    if cat:
+        await db.delete(cat)
+        await db.commit()
+    return RedirectResponse(url=f"/admin/restaurants/{restaurant_id}", status_code=303)
+
+
+@router.post("/restaurants/{restaurant_id}/items/{item_id}/edit")
+async def admin_restaurant_edit_item(
+    restaurant_id: int,
+    item_id: int,
+    name: str = Form(...),
+    description: str = Form(""),
+    price: float = Form(...),
+    category_id: int = Form(...),
+    image_url: str = Form(""),
+    is_veg: str = Form(""),
+    prep_time_min: int = Form(15),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from decimal import Decimal
+    from app.models import MenuItem
+    item = (await db.execute(select(MenuItem).where(MenuItem.id == item_id, MenuItem.restaurant_id == restaurant_id))).scalars().first()
+    if item:
+        item.name = name.strip()
+        item.description = description.strip() or None
+        item.price = Decimal(str(price))
+        item.category_id = category_id
+        item.image_url = image_url.strip() or None
+        item.is_veg = bool(is_veg)
+        item.prep_time_min = prep_time_min
+        await db.commit()
+    return RedirectResponse(url=f"/admin/restaurants/{restaurant_id}", status_code=303)
+
+
+@router.post("/restaurants/{restaurant_id}/items/{item_id}/delete")
+async def admin_restaurant_delete_item(
+    restaurant_id: int,
+    item_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import MenuItem
+    item = (await db.execute(select(MenuItem).where(MenuItem.id == item_id, MenuItem.restaurant_id == restaurant_id))).scalars().first()
+    if item:
+        await db.delete(item)
+        await db.commit()
+    return RedirectResponse(url=f"/admin/restaurants/{restaurant_id}", status_code=303)
+
+
 # ---------- Market vendors ----------
 @router.get("/market", response_class=HTMLResponse)
 async def admin_market(
