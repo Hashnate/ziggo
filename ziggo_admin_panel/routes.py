@@ -88,6 +88,26 @@ async def _save_uploaded_doc(doc: UploadFile | None, doc_type: str) -> str | Non
     return f"/static/uploads/driver_docs/{fname}"
 
 
+async def _save_vendor_doc(doc: UploadFile | None, doc_type: str) -> str | None:
+    if doc is None or not doc.filename:
+        return None
+    ext = os.path.splitext(doc.filename)[1].lower()
+    if ext not in ALLOWED_DOC_EXTS:
+        raise HTTPException(status_code=400, detail="Document must be JPG, PNG, WEBP, or PDF")
+    data = await doc.read()
+    if len(data) == 0:
+        return None
+    if len(data) > MAX_DOC_BYTES:
+        raise HTTPException(status_code=400, detail="Document must be under 8 MB")
+    import secrets
+    fname = f"{doc_type}_{secrets.token_hex(8)}{ext}"
+    vendor_docs_dir = os.path.join(current_dir, "static", "uploads", "vendor_docs")
+    os.makedirs(vendor_docs_dir, exist_ok=True)
+    fpath = os.path.join(vendor_docs_dir, fname)
+    with open(fpath, "wb") as f:
+        f.write(data)
+    return f"/static/uploads/vendor_docs/{fname}"
+
 
 async def _save_category_image(photo: UploadFile | None) -> str | None:
     if photo is None or not photo.filename:
@@ -2902,6 +2922,7 @@ async def admin_market(
             "page_range": page_range,
             "search": search,
             "status": status,
+            "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY or "",
         },
     )
 
@@ -2914,7 +2935,13 @@ async def admin_market_new_form(
 ):
     return templates.TemplateResponse(
         request, "market_new.html",
-        {"request": request, "active_page": "market", "error": None, "form": {}},
+        {
+            "request": request,
+            "active_page": "market",
+            "error": None,
+            "form": {},
+            "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY or "",
+        },
     )
 
 
@@ -2923,6 +2950,7 @@ async def admin_market_new_submit(
     request: Request,
     owner_phone: str = Form(...),
     owner_full_name: str = Form(""),
+    owner_email: str = Form(...),
     name: str = Form(...),
     category: str = Form(""),
     description: str = Form(""),
@@ -2935,18 +2963,40 @@ async def admin_market_new_submit(
     closing_time: str = Form("22:00"),
     delivery_fee: float = Form(250.0),
     eta_minutes: int = Form(40),
+    
+    business_registration_number: str = Form(""),
+    tax_vat_number: str = Form(""),
+    self_delivery: str = Form("no"),
+    marketplace_delivery: str = Form("yes"),
+    delivery_radius_km: float = Form(None),
+    average_prep_time_minutes: int = Form(30),
+    bank_name: str = Form(...),
+    account_holder_name: str = Form(...),
+    account_number: str = Form(...),
+    branch_name: str = Form(""),
+    
+    commission_percentage: float = Form(10.00),
+    priority_level: str = Form("standard"),
+    is_featured: str = Form("no"),
+    vendor_status: str = Form("active"),
+    
+    nic_passport_copy: UploadFile = File(None),
+    business_reg_cert: UploadFile = File(None),
+    tax_cert: UploadFile = File(None),
+    food_license: UploadFile = File(None),
+    additional_documents: UploadFile = File(None),
+    
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    """Admin pre-creates a market vendor. Finds or creates the owner user
-    by phone, links them via owner_id, and promotes them to market_owner
-    when safe (no conflicting restaurant tied to them)."""
+    """Admin pre-creates a market vendor with comprehensive details."""
     from decimal import Decimal
     from app.models import MarketVendor, Restaurant, UserRole
 
     form_echo = {
         "owner_phone": owner_phone,
         "owner_full_name": owner_full_name,
+        "owner_email": owner_email,
         "name": name,
         "category": category,
         "description": description,
@@ -2959,6 +3009,20 @@ async def admin_market_new_submit(
         "closing_time": closing_time,
         "delivery_fee": delivery_fee,
         "eta_minutes": eta_minutes,
+        "business_registration_number": business_registration_number,
+        "tax_vat_number": tax_vat_number,
+        "self_delivery": self_delivery,
+        "marketplace_delivery": marketplace_delivery,
+        "delivery_radius_km": delivery_radius_km,
+        "average_prep_time_minutes": average_prep_time_minutes,
+        "bank_name": bank_name,
+        "account_holder_name": account_holder_name,
+        "account_number": account_number,
+        "branch_name": branch_name,
+        "commission_percentage": commission_percentage,
+        "priority_level": priority_level,
+        "is_featured": is_featured,
+        "vendor_status": vendor_status,
     }
 
     phone = owner_phone.strip()
@@ -2970,6 +3034,7 @@ async def admin_market_new_submit(
                 "active_page": "market",
                 "error": "Owner phone must be exactly 10 digits.",
                 "form": form_echo,
+                "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY or "",
             },
         )
 
@@ -2981,6 +3046,7 @@ async def admin_market_new_submit(
             phone_number=phone,
             role=UserRole.MARKET_OWNER,
             full_name=owner_full_name.strip() or None,
+            email=owner_email.strip() or None,
             is_active=True,
         )
         db.add(owner)
@@ -2997,23 +3063,33 @@ async def admin_market_new_submit(
                     "active_page": "market",
                     "error": f"User {phone} already owns a market vendor.",
                     "form": form_echo,
+                    "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY or "",
                 },
             )
-        # Promote to market_owner whenever it's safe — i.e. they don't have
-        # a Restaurant binding them to a different portal. Covers plain
-        # customers AND restaurant_owners who never registered.
-        has_restaurant = (
-            await db.execute(
-                select(Restaurant).where(Restaurant.owner_id == owner.id)
-            )
-        ).scalars().first()
-        if (
-            owner.role in (UserRole.CUSTOMER, UserRole.RESTAURANT_OWNER)
-            and not has_restaurant
-        ):
-            owner.role = UserRole.MARKET_OWNER
-            if owner_full_name.strip() and not owner.full_name:
-                owner.full_name = owner_full_name.strip()
+        # Promote / update owner details
+        if owner.role in (UserRole.CUSTOMER, UserRole.RESTAURANT_OWNER):
+            has_restaurant = (
+                await db.execute(
+                    select(Restaurant).where(Restaurant.owner_id == owner.id)
+                )
+            ).scalars().first()
+            if not has_restaurant:
+                owner.role = UserRole.MARKET_OWNER
+        
+        if owner_full_name.strip():
+            owner.full_name = owner_full_name.strip()
+        if owner_email.strip():
+            owner.email = owner_email.strip()
+
+    # Save uploaded documents
+    nic_url = await _save_vendor_doc(nic_passport_copy, "nic")
+    biz_cert_url = await _save_vendor_doc(business_reg_cert, "biz_cert")
+    tax_cert_url = await _save_vendor_doc(tax_cert, "tax_cert")
+    food_lic_url = await _save_vendor_doc(food_license, "food_lic")
+    add_docs_url = await _save_vendor_doc(additional_documents, "add_docs")
+
+    is_active_val = (vendor_status == "active")
+    is_open_val = is_active_val
 
     v = MarketVendor(
         owner_id=owner.id,
@@ -3030,8 +3106,27 @@ async def admin_market_new_submit(
         delivery_fee=Decimal(str(delivery_fee)),
         eta_minutes=eta_minutes,
         rating=Decimal("4.3"),
-        is_active=True,
-        is_open=True,
+        is_active=is_active_val,
+        is_open=is_open_val,
+        
+        business_registration_number=business_registration_number.strip() or None,
+        tax_vat_number=tax_vat_number.strip() or None,
+        self_delivery=(self_delivery == "yes"),
+        marketplace_delivery=(marketplace_delivery == "yes"),
+        delivery_radius_km=Decimal(str(delivery_radius_km)) if delivery_radius_km is not None else None,
+        average_prep_time_minutes=average_prep_time_minutes,
+        bank_name=bank_name.strip(),
+        account_holder_name=account_holder_name.strip(),
+        account_number=account_number.strip(),
+        branch_name=branch_name.strip() or None,
+        nic_passport_copy_url=nic_url,
+        business_reg_cert_url=biz_cert_url,
+        tax_cert_url=tax_cert_url,
+        food_license_url=food_lic_url,
+        additional_docs_url=add_docs_url,
+        commission_percentage=Decimal(str(commission_percentage)),
+        priority_level=priority_level.strip(),
+        is_featured=(is_featured == "yes"),
     )
     db.add(v)
     await db.commit()
@@ -3083,6 +3178,7 @@ async def admin_market_add_product(
     price: float = Form(...),
     unit: str = Form(""),
     stock_quantity: int = Form(0),
+    weight_kg: str = Form(""),
     image_url: str = Form(""),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
@@ -3098,6 +3194,7 @@ async def admin_market_add_product(
             price=Decimal(str(price)),
             unit=unit.strip() or None,
             stock_quantity=stock_quantity,
+            weight_kg=Decimal(weight_kg.strip()) if weight_kg.strip() else None,
             image_url=image_url.strip() or None,
             is_available=True,
         )
@@ -3174,6 +3271,32 @@ async def admin_market_activate(
             )
             await db.commit()
     return RedirectResponse(url=f"/admin/market/{vendor_id}", status_code=303)
+
+
+@router.post("/market/{vendor_id}/delete")
+async def admin_market_delete(
+    vendor_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    """Permanently delete a market vendor, associated products, and orders."""
+    from sqlalchemy import delete
+    from app.models import MarketVendor, Product, MarketOrder, MarketOrderItem
+
+    q = await db.execute(select(MarketVendor).where(MarketVendor.id == vendor_id))
+    v = q.scalars().first()
+    if v:
+        # Delete order items first
+        order_ids_q = await db.execute(select(MarketOrder.id).where(MarketOrder.vendor_id == vendor_id))
+        order_ids = order_ids_q.scalars().all()
+        if order_ids:
+            await db.execute(delete(MarketOrderItem).where(MarketOrderItem.order_id.in_(order_ids)))
+            await db.execute(delete(MarketOrder).where(MarketOrder.id.in_(order_ids)))
+        
+        # Products are cascade deleted via relationship cascade
+        await db.delete(v)
+        await db.commit()
+    return RedirectResponse(url="/admin/market", status_code=303)
 
 
 # ---------- Reports / Insight & Analytics ----------

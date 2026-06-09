@@ -15,6 +15,7 @@ class ProductResponse(BaseModel):
     category: Optional[str] = None
     is_popular: bool = False
     is_available: bool
+    weight_kg: Optional[float] = None
 
     class Config:
         from_attributes = True
@@ -63,6 +64,9 @@ class MarketOrderResponse(BaseModel):
     delivery_address: str
     payment_method: str
     payment_status: str
+    delivery_distance_km: Optional[float] = None
+    total_weight_kg: Optional[float] = None
+    delivery_mode: Optional[str] = None
     created_at: datetime
     cancellation_reason: Optional[str] = None
 
@@ -92,6 +96,9 @@ class MarketVendorProfileResponse(BaseModel):
     is_active: bool = False
     is_open: bool = True
     is_approved: bool = False
+    delivery_radius_km: Optional[float] = None
+    self_delivery: bool = False
+    marketplace_delivery: bool = True
     created_at: Optional[datetime] = None
 
 
@@ -107,6 +114,9 @@ class MarketVendorProfileUpdate(BaseModel):
     closing_time: Optional[str] = Field(None, max_length=10)
     delivery_fee: Optional[float] = Field(None, ge=0)
     eta_minutes: Optional[int] = Field(None, ge=5)
+    delivery_radius_km: Optional[float] = Field(None, ge=0)
+    self_delivery: Optional[bool] = None
+    marketplace_delivery: Optional[bool] = None
 
 
 class ProductCreate(BaseModel):
@@ -120,6 +130,7 @@ class ProductCreate(BaseModel):
     is_popular: bool = False
     image_url: Optional[str] = Field(None, max_length=255)
     is_available: bool = True
+    weight_kg: Optional[float] = Field(None, ge=0)
 
 
 class ProductUpdate(BaseModel):
@@ -133,6 +144,7 @@ class ProductUpdate(BaseModel):
     is_popular: Optional[bool] = None
     image_url: Optional[str] = Field(None, max_length=255)
     is_available: Optional[bool] = None
+    weight_kg: Optional[float] = Field(None, ge=0)
 
 
 class MarketVendorRegisterRequest(BaseModel):

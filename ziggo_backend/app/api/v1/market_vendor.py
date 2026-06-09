@@ -40,6 +40,7 @@ from ...schemas.market_schema import (
 from ...services.auth_service import require_role
 from ...services.matching_service import find_all_nearby_drivers
 from ...services.ws_manager import manager
+from ...services import market_delivery_service as delivery
 
 router = APIRouter()
 
@@ -97,6 +98,9 @@ def _to_response(v: MarketVendor) -> MarketVendorProfileResponse:
         is_active=bool(v.is_active),
         is_open=bool(v.is_open) if v.is_open is not None else True,
         is_approved=bool(v.is_active),
+        delivery_radius_km=float(v.delivery_radius_km) if v.delivery_radius_km is not None else None,
+        self_delivery=bool(v.self_delivery),
+        marketplace_delivery=bool(v.marketplace_delivery),
         created_at=v.created_at,
     )
 
@@ -220,6 +224,12 @@ async def update_profile(
         v.delivery_fee = Decimal(str(body.delivery_fee))
     if body.eta_minutes is not None:
         v.eta_minutes = body.eta_minutes
+    if body.delivery_radius_km is not None:
+        v.delivery_radius_km = Decimal(str(body.delivery_radius_km))
+    if body.self_delivery is not None:
+        v.self_delivery = body.self_delivery
+    if body.marketplace_delivery is not None:
+        v.marketplace_delivery = body.marketplace_delivery
 
     await db.commit()
     await db.refresh(v)
@@ -276,6 +286,7 @@ def _product_to_dict(p: Product) -> dict:
         "is_popular": bool(p.is_popular),
         "image_url": p.image_url,
         "is_available": bool(p.is_available),
+        "weight_kg": float(p.weight_kg) if p.weight_kg is not None else None,
     }
 
 
@@ -316,6 +327,7 @@ async def create_product(
         is_popular=body.is_popular,
         image_url=body.image_url,
         is_available=body.is_available,
+        weight_kg=Decimal(str(body.weight_kg)) if body.weight_kg is not None else None,
     )
     db.add(p)
     await db.commit()
@@ -368,6 +380,8 @@ async def update_product(
         p.image_url = body.image_url
     if body.is_available is not None:
         p.is_available = body.is_available
+    if body.weight_kg is not None:
+        p.weight_kg = Decimal(str(body.weight_kg)) if body.weight_kg > 0 else None
     await db.commit()
     await db.refresh(p)
     return _product_to_dict(p)
@@ -418,6 +432,9 @@ def _order_to_dict(o: MarketOrder, cust_user: Optional[User] = None) -> dict:
         "delivery_address": o.delivery_address,
         "delivery_lat": float(o.delivery_lat) if o.delivery_lat is not None else None,
         "delivery_lng": float(o.delivery_lng) if o.delivery_lng is not None else None,
+        "delivery_mode": o.delivery_mode,
+        "delivery_distance_km": float(o.delivery_distance_km) if o.delivery_distance_km is not None else None,
+        "total_weight_kg": float(o.total_weight_kg) if o.total_weight_kg is not None else None,
         "payment_method": o.payment_method,
         "payment_status": o.payment_status,
         "instructions": o.instructions,
@@ -727,7 +744,7 @@ async def _broadcast_market_to_riders(
         float(vendor.lat),
         float(vendor.lng),
         vehicle_type=None,
-        max_distance_km=10,
+        max_distance_km=float(delivery.vendor_radius_km(vendor.delivery_radius_km)),
     )
 
     driver_earnings = float(delivery_fee) * 0.8
@@ -822,21 +839,64 @@ async def rebroadcast_to_riders(
     return {"ok": True, "status": o.status.value}
 
 
+def _resolve_delivery_mode(vendor: MarketVendor, requested: Optional[str]) -> str:
+    """Decide how a ready order is delivered, honouring the vendor's flags.
+
+    - only marketplace_delivery → "marketplace"
+    - only self_delivery        → "self"
+    - both enabled              → the vendor MUST pick (`requested`); this is
+      the per-order "deliver it yourself, or find a rider?" prompt.
+    """
+    requested = (requested or "").strip().lower() or None
+    if requested and requested not in ("self", "marketplace"):
+        raise HTTPException(status_code=400, detail="delivery_mode must be 'self' or 'marketplace'")
+
+    can_self = bool(vendor.self_delivery)
+    # If neither flag is set (legacy vendors), fall back to marketplace so the
+    # order can still be delivered.
+    can_market = bool(vendor.marketplace_delivery) or not can_self
+
+    if requested == "self" and not can_self:
+        raise HTTPException(status_code=400, detail="Self-delivery is not enabled for this store")
+    if requested == "marketplace" and not can_market:
+        raise HTTPException(status_code=400, detail="Marketplace delivery is not enabled for this store")
+
+    if can_self and can_market:
+        if not requested:
+            raise HTTPException(
+                status_code=400,
+                detail="Choose delivery_mode: 'self' (deliver it yourself) or 'marketplace' (find a rider)",
+            )
+        return requested
+    return "self" if can_self else "marketplace"
+
+
 @router.post("/orders/{order_id}/ready")
 async def mark_ready(
     order_id: int,
+    body: dict = Body(default_factory=dict),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_role("market_owner", "restaurant_owner")),
 ):
-    """PROCESSING/CONFIRMED → READY_FOR_PICKUP. Broadcasts to nearby riders."""
+    """PROCESSING/CONFIRMED → READY_FOR_PICKUP.
+
+    `delivery_mode` in the body decides dispatch: "marketplace" broadcasts to
+    nearby riders (the default flow); "self" means the vendor delivers it and
+    no rider broadcast fires. When the store has both options enabled, the
+    caller must pass one — this is the per-order self-deliver-or-find-a-rider
+    decision.
+    """
     v, o = await _load_owner_scoped_order(db, user, order_id)
     if o.status not in (MarketOrderStatus.CONFIRMED, MarketOrderStatus.PROCESSING):
         raise HTTPException(
             status_code=400,
             detail=f"Order must be CONFIRMED or PROCESSING to mark ready (current: {o.status.value})",
         )
+    mode = _resolve_delivery_mode(v, body.get("delivery_mode"))
+
     o.status = MarketOrderStatus.READY_FOR_PICKUP
     o.ready_at = datetime.now(timezone.utc)
+    o.delivery_mode = mode
     await db.commit()
     await db.refresh(o)
 
@@ -849,8 +909,23 @@ async def mark_ready(
         await manager.send(
             c.user_id,
             "market_order_update",
-            {"market_order_id": o.id, "status": o.status.value},
+            {"market_order_id": o.id, "status": o.status.value, "delivery_mode": mode},
         )
+
+    if mode == "self":
+        # Vendor delivers — no rider broadcast. Vendor advances the order via
+        # /out-for-delivery and /delivered.
+        if c:
+            db.add(
+                Notification(
+                    user_id=c.user_id,
+                    title="Order ready",
+                    body=f"{v.name} is delivering your order {o.order_ref}",
+                    type="market_order_update",
+                )
+            )
+            await db.commit()
+        return {"ok": True, "status": o.status.value, "delivery_mode": mode}
 
     items_q = await db.execute(
         select(MarketOrderItem).where(MarketOrderItem.order_id == o.id)
@@ -861,6 +936,85 @@ async def mark_ready(
         await _broadcast_market_to_riders(
             db, o, v, cust_user, items_count, Decimal(str(o.delivery_fee or 0))
         )
+    await db.commit()
+    return {"ok": True, "status": o.status.value, "delivery_mode": mode}
+
+
+async def _notify_market_status(db: AsyncSession, o: MarketOrder, title: str) -> None:
+    cq = await db.execute(select(Customer).where(Customer.id == o.customer_id))
+    c = cq.scalars().first()
+    if not c:
+        return
+    await manager.send(
+        c.user_id,
+        "market_order_update",
+        {"market_order_id": o.id, "status": o.status.value},
+    )
+    db.add(
+        Notification(
+            user_id=c.user_id,
+            title=title,
+            body=f"Order {o.order_ref} is now {o.status.value.replace('_', ' ')}",
+            type="market_order_update",
+        )
+    )
+
+
+@router.post("/orders/{order_id}/out-for-delivery")
+async def vendor_out_for_delivery(
+    order_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("market_owner", "restaurant_owner")),
+):
+    """Self-delivery only: READY_FOR_PICKUP → OUT_FOR_DELIVERY, driven by the
+    vendor instead of a rider."""
+    _, o = await _load_owner_scoped_order(db, user, order_id)
+    if o.delivery_mode != "self":
+        raise HTTPException(status_code=400, detail="This order is delivered by a marketplace rider")
+    if o.status != MarketOrderStatus.READY_FOR_PICKUP:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Order must be READY_FOR_PICKUP (current: {o.status.value})",
+        )
+    o.status = MarketOrderStatus.OUT_FOR_DELIVERY
+    o.picked_up_at = datetime.now(timezone.utc)
+    await _notify_market_status(db, o, "Out for delivery")
+    await db.commit()
+    return {"ok": True, "status": o.status.value}
+
+
+@router.post("/orders/{order_id}/delivered")
+async def vendor_delivered(
+    order_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("market_owner", "restaurant_owner")),
+):
+    """Self-delivery only: OUT_FOR_DELIVERY → DELIVERED, driven by the vendor.
+    Awards loyalty points, same as the rider-completed path."""
+    _, o = await _load_owner_scoped_order(db, user, order_id)
+    if o.delivery_mode != "self":
+        raise HTTPException(status_code=400, detail="This order is delivered by a marketplace rider")
+    if o.status != MarketOrderStatus.OUT_FOR_DELIVERY:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Order must be OUT_FOR_DELIVERY (current: {o.status.value})",
+        )
+    o.status = MarketOrderStatus.DELIVERED
+    o.delivered_at = datetime.now(timezone.utc)
+    o.payment_status = "paid"
+
+    cq = await db.execute(select(Customer).where(Customer.id == o.customer_id))
+    c_for_pts = cq.scalars().first()
+    if c_for_pts and o.final_amount:
+        from ...services.loyalty_service import award_points as _award
+        await _award(
+            db, c_for_pts,
+            spend_amount=o.final_amount,
+            source_kind="market_order",
+            source_id=o.id,
+            description=f"Earned on {o.order_ref}",
+        )
+    await _notify_market_status(db, o, "Delivered")
     await db.commit()
     return {"ok": True, "status": o.status.value}
 

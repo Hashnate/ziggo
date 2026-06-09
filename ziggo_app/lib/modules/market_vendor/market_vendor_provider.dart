@@ -27,6 +27,12 @@ class MarketVendorProvider extends ChangeNotifier {
   bool get isOpen => _profile?['is_open'] == true;
   bool get hasProfile => _profile != null;
 
+  /// Delivery capabilities — drive the "deliver yourself or find a rider?"
+  /// prompt when the vendor marks an order ready.
+  bool get canSelfDeliver => _profile?['self_delivery'] == true;
+  bool get canMarketplaceDeliver => _profile?['marketplace_delivery'] != false;
+  bool get mustChooseDeliveryMode => canSelfDeliver && canMarketplaceDeliver;
+
   String? _lastError;
   String? get lastError => _lastError;
 
@@ -177,8 +183,21 @@ class MarketVendorProvider extends ChangeNotifier {
   Future<String?> markPreparing(int orderId) =>
       _orderAction('/market/vendor/orders/$orderId/preparing');
 
-  Future<String?> markReady(int orderId) =>
-      _orderAction('/market/vendor/orders/$orderId/ready');
+  /// Mark an order ready. [deliveryMode] is "self" (vendor delivers) or
+  /// "marketplace" (broadcast to riders). Required only when the vendor has
+  /// both delivery options enabled; otherwise the backend resolves it.
+  Future<String?> markReady(int orderId, {String? deliveryMode}) => _orderAction(
+        '/market/vendor/orders/$orderId/ready',
+        body: deliveryMode == null ? null : {'delivery_mode': deliveryMode},
+      );
+
+  /// Self-delivery: vendor has set off with the order.
+  Future<String?> markOutForDelivery(int orderId) =>
+      _orderAction('/market/vendor/orders/$orderId/out-for-delivery');
+
+  /// Self-delivery: vendor handed the order to the customer.
+  Future<String?> markDelivered(int orderId) =>
+      _orderAction('/market/vendor/orders/$orderId/delivered');
 
   /// Re-trigger the rider broadcast for an order stuck at READY_FOR_PICKUP.
   /// Useful when the first broadcast missed (no riders in range / wrong
@@ -361,6 +380,7 @@ class MarketVendorProvider extends ChangeNotifier {
     String? category,
     double? originalPrice,
     bool isPopular = false,
+    double? weightKg,
   }) async {
     try {
       await ApiClient.instance.dio.post('/market/vendor/products', data: {
@@ -373,6 +393,7 @@ class MarketVendorProvider extends ChangeNotifier {
         if (category != null && category.isNotEmpty) 'category': category,
         if (originalPrice != null && originalPrice > 0) 'original_price': originalPrice,
         'is_popular': isPopular,
+        if (weightKg != null) 'weight_kg': weightKg,
       });
       await loadProducts();
       return null;
@@ -392,6 +413,7 @@ class MarketVendorProvider extends ChangeNotifier {
     String? category,
     double? originalPrice,
     bool? isPopular,
+    double? weightKg,
   }) async {
     try {
       await ApiClient.instance.dio.patch('/market/vendor/products/$id', data: {
@@ -404,6 +426,7 @@ class MarketVendorProvider extends ChangeNotifier {
         if (category != null) 'category': category,
         if (originalPrice != null) 'original_price': originalPrice > 0 ? originalPrice : null,
         if (isPopular != null) 'is_popular': isPopular,
+        if (weightKg != null) 'weight_kg': weightKg,
       });
       await loadProducts();
       return null;

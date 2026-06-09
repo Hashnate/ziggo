@@ -15,12 +15,17 @@ class MarketProvider extends ChangeNotifier {
   /// Promo code entered on the vendor page, carried through to checkout.
   String? _pendingPromoCode;
 
+  /// Latest delivery quote (distance/weight/fee/in_range) for the current cart
+  /// and chosen drop location. Null until checkout fetches one.
+  Map<String, dynamic>? _quote;
+
   List<Map<String, dynamic>> get vendors => _vendors;
   bool get loading => _loading;
   String? get error => _error;
   Map<int, Map<String, dynamic>> get cart => _cart;
   int? get activeVendorId => _activeVendorId;
   String? get pendingPromoCode => _pendingPromoCode;
+  Map<String, dynamic>? get quote => _quote;
 
   void setPromoCode(String? code) {
     final trimmed = code?.trim();
@@ -96,7 +101,36 @@ class MarketProvider extends ChangeNotifier {
     _cart.clear();
     _activeVendorId = null;
     _pendingPromoCode = null;
+    _quote = null;
     notifyListeners();
+  }
+
+  /// Preview the distance+weight delivery fee for the current cart at a chosen
+  /// drop location. Result is cached in [quote] so the checkout bill can show
+  /// the exact fee and whether the address is `in_range` before placing.
+  Future<Map<String, dynamic>?> quoteDelivery({
+    required double lat,
+    required double lng,
+  }) async {
+    if (_activeVendorId == null || _cart.isEmpty) return null;
+    final items = _cart.values
+        .map((e) => {'product_id': (e['product'] as Map)['id'], 'quantity': e['quantity']})
+        .toList();
+    try {
+      final resp = await ApiClient.instance.dio.post('/market/quote', data: {
+        'vendor_id': _activeVendorId,
+        'delivery_lat': lat,
+        'delivery_lng': lng,
+        'items': items,
+      });
+      _quote = Map<String, dynamic>.from(resp.data as Map);
+      notifyListeners();
+      return _quote;
+    } on DioException catch (e) {
+      _error = e.response?.data?['detail']?.toString() ?? e.message;
+      notifyListeners();
+      return null;
+    }
   }
 
   Future<Map<String, dynamic>?> placeOrder({

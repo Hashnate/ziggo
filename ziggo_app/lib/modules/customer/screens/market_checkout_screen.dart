@@ -48,7 +48,24 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
 
   Future<void> _pickPlace() async {
     final p = await showPlaceSearch(context, title: 'Delivery address');
-    if (p != null) setState(() { _picked = p; _saved = null; });
+    if (p != null) {
+      setState(() { _picked = p; _saved = null; });
+      _refreshQuote();
+    }
+  }
+
+  /// Re-fetch the delivery quote for the currently chosen address.
+  void _refreshQuote() {
+    double? lat, lng;
+    if (_saved != null) {
+      lat = (_saved!['lat'] as num).toDouble();
+      lng = (_saved!['lng'] as num).toDouble();
+    } else if (_picked != null) {
+      lat = _picked!.location.latitude;
+      lng = _picked!.location.longitude;
+    }
+    if (lat == null || lng == null) return;
+    context.read<MarketProvider>().quoteDelivery(lat: lat, lng: lng);
   }
 
   Future<void> _placeOrder() async {
@@ -105,9 +122,14 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
     final p = context.watch<MarketProvider>();
     final addr = context.watch<AddressesProvider>();
     final promos = context.watch<PromosProvider>();
-    const deliveryFee = 150.0;
-    
-    double total = p.cartTotal + deliveryFee;
+    final quote = p.quote;
+    final hasAddress = _saved != null || _picked != null;
+    final outOfRange = quote != null && quote['in_range'] == false;
+    // Show the live quoted fee once an address is chosen; before then the
+    // delivery line is a placeholder and isn't added to the total.
+    final deliveryFee = (quote?['delivery_fee'] as num?)?.toDouble() ?? 0.0;
+
+    double total = p.cartTotal + (hasAddress ? deliveryFee : 0.0);
     double discount = 0.0;
     if (_usePoints) {
       discount = promos.pointsValue;
@@ -169,7 +191,10 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
                 ...addr.items.map((a) {
                   final selected = _saved?['id'] == a['id'];
                   return GestureDetector(
-                    onTap: () => setState(() { _saved = a; _picked = null; }),
+                    onTap: () {
+                      setState(() { _saved = a; _picked = null; });
+                      _refreshQuote();
+                    },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       margin: const EdgeInsets.only(bottom: 8),
@@ -373,12 +398,62 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
                 ],
               ),
             ),
+          if (outOfRange)
+            Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.error.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.error.withOpacity(0.4)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.location_off_rounded, color: AppColors.error, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'This address is outside the store\'s ${(quote['radius_km'] as num?)?.toStringAsFixed(0) ?? ''}km delivery range. Pick a closer address.',
+                      style: const TextStyle(
+                        color: AppColors.error,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           _section(
             'BILL SUMMARY',
             Column(
               children: [
                 _row('Items', 'Rs.${p.cartTotal.toStringAsFixed(0)}'),
-                _row('Delivery', 'Rs.${deliveryFee.toStringAsFixed(0)}'),
+                _row(
+                  'Delivery',
+                  !hasAddress
+                      ? 'Pick address'
+                      : quote == null
+                          ? 'Calculating…'
+                          : 'Rs.${deliveryFee.toStringAsFixed(0)}',
+                ),
+                if (quote != null && hasAddress)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2, bottom: 2),
+                    child: Row(
+                      children: [
+                        Text(
+                          '${(quote['distance_km'] as num?)?.toStringAsFixed(1) ?? '—'} km'
+                          ' • ${(quote['weight_kg'] as num?)?.toStringAsFixed(1) ?? '—'} kg',
+                          style: const TextStyle(
+                            color: AppColors.textTertiary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 if (_usePoints && discount > 0)
                   _row('Points Discount', '-Rs.${discount.toStringAsFixed(0)}', color: AppColors.success),
                 const Divider(height: 16),
@@ -393,10 +468,12 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: PrimaryButton(
-            label: 'PLACE ORDER • Rs.${total.toStringAsFixed(0)}',
-            icon: Icons.check_rounded,
+            label: outOfRange
+                ? 'OUT OF DELIVERY RANGE'
+                : 'PLACE ORDER • Rs.${total.toStringAsFixed(0)}',
+            icon: outOfRange ? Icons.location_off_rounded : Icons.check_rounded,
             busy: _busy,
-            onPressed: _placeOrder,
+            onPressed: outOfRange ? null : _placeOrder,
           ),
         ),
       ),

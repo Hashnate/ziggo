@@ -31,6 +31,7 @@ from ...schemas.market_schema import (
 from ...services.auth_service import get_current_user, require_role
 from ...services.fare_service import haversine_km
 from ...services.matching_service import find_all_nearby_drivers
+from ...services import market_delivery_service as delivery
 from ...services.ws_manager import manager
 from ...services import payhere_service
 
@@ -81,6 +82,10 @@ async def list_vendors(
             distance_km = round(
                 haversine_km(lat, lng, float(v.lat), float(v.lng)), 2
             )
+            # Hard radius block: hide stalls that can't deliver to this point.
+            radius = float(delivery.vendor_radius_km(v.delivery_radius_km))
+            if distance_km > radius:
+                continue
         enriched.append(
             {
                 "id": v.id,
@@ -122,6 +127,61 @@ async def list_products(vendor_id: int, db: AsyncSession = Depends(get_db)):
         )
     )
     return q.scalars().all()
+
+
+@router.post("/quote")
+async def quote_delivery(
+    body: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    """Preview the delivery fee for a cart before checkout. Body:
+    `{vendor_id, delivery_lat, delivery_lng, items: [{product_id, quantity}]}`.
+    Returns distance/weight/fee and `in_range`. Mirrors the fee math in
+    create_market_order so the customer sees the exact charge up front."""
+    try:
+        vendor_id = int(body["vendor_id"])
+        drop_lat = float(body["delivery_lat"])
+        drop_lng = float(body["delivery_lng"])
+        items = body.get("items") or []
+    except (KeyError, ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="vendor_id, delivery_lat, delivery_lng required")
+
+    v_q = await db.execute(select(MarketVendor).where(MarketVendor.id == vendor_id))
+    vendor = v_q.scalars().first()
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+    if vendor.lat is None or vendor.lng is None:
+        raise HTTPException(status_code=400, detail="Vendor location not set")
+
+    lines = []
+    for line in items:
+        p_q = await db.execute(
+            select(Product).where(
+                Product.id == int(line["product_id"]),
+                Product.vendor_id == vendor_id,
+            )
+        )
+        product = p_q.scalars().first()
+        if product:
+            lines.append((product, int(line.get("quantity", 1))))
+
+    q = delivery.quote(
+        vendor.lat,
+        vendor.lng,
+        drop_lat,
+        drop_lng,
+        lines,
+        vendor.delivery_radius_km,
+        base_fee_override=Decimal(str(vendor.delivery_fee)) if vendor.delivery_fee else None,
+    )
+    return {
+        "distance_km": q["distance_km"],
+        "weight_kg": float(q["weight_kg"]),
+        "delivery_fee": float(q["fee"]),
+        "radius_km": float(q["radius_km"]),
+        "in_range": q["in_range"],
+    }
 
 
 @router.post("/orders", response_model=MarketOrderResponse, status_code=201)
@@ -178,7 +238,32 @@ async def create_market_order(
         total += line_total
         lines.append((product, line.quantity))
 
-    base_delivery_fee = Decimal(str(vendor.delivery_fee or 0)) if (vendor.delivery_fee or 0) > 0 else Decimal("150")
+    # Distance + weight delivery fee. The vendor's own `delivery_fee`, if set,
+    # overrides the engine's base fare. Hard-block drops outside the radius.
+    delivery_distance_km = None
+    total_weight_kg = None
+    if vendor.lat is not None and vendor.lng is not None:
+        q = delivery.quote(
+            vendor.lat,
+            vendor.lng,
+            body.delivery_lat,
+            body.delivery_lng,
+            lines,
+            vendor.delivery_radius_km,
+            base_fee_override=Decimal(str(vendor.delivery_fee)) if vendor.delivery_fee else None,
+        )
+        if not q["in_range"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Delivery address is outside {vendor.name}'s {q['radius_km']}km delivery range",
+            )
+        base_delivery_fee = q["fee"]
+        delivery_distance_km = Decimal(str(q["distance_km"]))
+        total_weight_kg = q["weight_kg"]
+    else:
+        base_delivery_fee = (
+            Decimal(str(vendor.delivery_fee)) if (vendor.delivery_fee or 0) > 0 else Decimal("150")
+        )
 
     # BRD: RW-03 — Gold delivery discount.
     from ...services import loyalty_service as L
@@ -244,6 +329,8 @@ async def create_market_order(
         delivery_address=body.delivery_address,
         delivery_lat=Decimal(str(body.delivery_lat)),
         delivery_lng=Decimal(str(body.delivery_lng)),
+        delivery_distance_km=delivery_distance_km,
+        total_weight_kg=total_weight_kg,
         payment_method=body.payment_method,
         payment_status="pending",
         instructions=body.instructions,
@@ -373,6 +460,9 @@ async def create_market_order(
         delivery_address=order.delivery_address or "",
         payment_method=order.payment_method or "",
         payment_status=order.payment_status or "",
+        delivery_distance_km=float(order.delivery_distance_km) if order.delivery_distance_km is not None else None,
+        total_weight_kg=float(order.total_weight_kg) if order.total_weight_kg is not None else None,
+        delivery_mode=order.delivery_mode,
         created_at=order.created_at,
     )
 
@@ -403,6 +493,9 @@ async def list_my_market_orders(
             delivery_address=o.delivery_address or "",
             payment_method=o.payment_method or "",
             payment_status=o.payment_status or "",
+            delivery_distance_km=float(o.delivery_distance_km) if o.delivery_distance_km is not None else None,
+            total_weight_kg=float(o.total_weight_kg) if o.total_weight_kg is not None else None,
+            delivery_mode=o.delivery_mode,
             created_at=o.created_at,
             cancellation_reason=o.cancellation_reason,
         )

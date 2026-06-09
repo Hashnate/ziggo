@@ -48,6 +48,27 @@ class MarketVendor(Base):
     eta_minutes = Column(Integer, default=40)
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     logo_url = Column(String(255))
+    
+    # New fields requested by user
+    business_registration_number = Column(String(100), nullable=True)
+    tax_vat_number = Column(String(100), nullable=True)
+    self_delivery = Column(Boolean, default=False, nullable=False)
+    marketplace_delivery = Column(Boolean, default=True, nullable=False)
+    delivery_radius_km = Column(DECIMAL(10, 2), nullable=True)
+    average_prep_time_minutes = Column(Integer, default=30)
+    bank_name = Column(String(100), nullable=True)
+    account_holder_name = Column(String(100), nullable=True)
+    account_number = Column(String(100), nullable=True)
+    branch_name = Column(String(100), nullable=True)
+    nic_passport_copy_url = Column(String(255), nullable=True)
+    business_reg_cert_url = Column(String(255), nullable=True)
+    tax_cert_url = Column(String(255), nullable=True)
+    food_license_url = Column(String(255), nullable=True)
+    additional_docs_url = Column(String(255), nullable=True)
+    commission_percentage = Column(DECIMAL(5, 2), default=10.00, nullable=False)
+    priority_level = Column(String(50), default="standard", nullable=False)
+    is_featured = Column(Boolean, default=False, nullable=False)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     products = relationship("Product", back_populates="vendor", cascade="all, delete-orphan")
@@ -68,6 +89,9 @@ class Product(Base):
     stock_quantity = Column(Integer, default=0)
     image_url = Column(String(255))
     unit = Column(String(20))
+    # Per-unit weight in kilograms, used by the distance+weight delivery-fee
+    # engine. Null is treated as the DEFAULT_ITEM_WEIGHT_KG fallback.
+    weight_kg = Column(DECIMAL(10, 3), nullable=True)
     # Free-form product category (e.g. "Fresh Produce", "Skin Care") that the
     # customer vendor page groups products into as tabs.
     category = Column(String(100))
@@ -105,6 +129,12 @@ class MarketOrder(Base):
     delivery_address = Column(Text)
     delivery_lat = Column(DECIMAL(10, 7))
     delivery_lng = Column(DECIMAL(10, 7))
+    # How this order gets to the customer: "marketplace" (broadcast to riders)
+    # or "self" (the vendor delivers it). Null until the vendor marks ready.
+    delivery_mode = Column(String(20), nullable=True)
+    # Snapshot of what drove the delivery fee, for vendor/customer transparency.
+    delivery_distance_km = Column(DECIMAL(10, 2), nullable=True)
+    total_weight_kg = Column(DECIMAL(10, 3), nullable=True)
     payment_method = Column(String(20))
     payment_status = Column(String(20), default="pending")
 
