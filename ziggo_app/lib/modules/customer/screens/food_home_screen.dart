@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -74,7 +75,8 @@ class FoodHomeScreen extends StatefulWidget {
 class _FoodHomeScreenState extends State<FoodHomeScreen> {
   String _filter = '';
   bool _favoritesOnly = false;
-  final PageController _bannerController = PageController();
+  final PageController _bannerController = PageController(viewportFraction: 0.93);
+  Timer? _bannerTimer;
 
   @override
   void initState() {
@@ -104,10 +106,28 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
     } else {
       food.fetchRestaurants();
     }
+
+    _bannerTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (_bannerController.hasClients) {
+        final p = context.read<FoodProvider>();
+        if (p.banners.isEmpty) return;
+        
+        int nextPage = _bannerController.page!.round() + 1;
+        if (nextPage >= p.banners.length) {
+          nextPage = 0;
+        }
+        _bannerController.animateToPage(
+          nextPage,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
   }
 
   @override
   void dispose() {
+    _bannerTimer?.cancel();
     _bannerController.dispose();
     super.dispose();
   }
@@ -364,33 +384,64 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
 
   Widget _buildBanners(List<Map<String, dynamic>> banners) {
     return SliverToBoxAdapter(
-      child: SizedBox(
-        height: 160,
-        child: PageView.builder(
-          controller: _bannerController,
-          itemCount: banners.length,
-          itemBuilder: (context, index) {
-            final banner = banners[index];
-            final img = _resolveAsset(banner['image_url']?.toString());
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: GestureDetector(
-                onTap: () => _onBannerTap(banner),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: img == null
-                      ? Container(color: AppColors.surfaceMuted)
-                      : Image.network(
-                          img,
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          errorBuilder: (_, __, ___) => Container(color: AppColors.surfaceMuted),
-                        ),
-                ),
-              ),
-            );
-          },
-        ),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 160,
+            child: PageView.builder(
+              controller: _bannerController,
+              padEnds: true,
+              itemCount: banners.length,
+              itemBuilder: (context, index) {
+                final banner = banners[index];
+                final img = _resolveAsset(banner['image_url']?.toString());
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: GestureDetector(
+                    onTap: () => _onBannerTap(banner),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: img == null
+                          ? Container(color: AppColors.surfaceMuted)
+                          : Image.network(
+                              img,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              errorBuilder: (_, __, ___) => Container(color: AppColors.surfaceMuted),
+                            ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(banners.length, (index) {
+              return AnimatedBuilder(
+                animation: _bannerController,
+                builder: (context, child) {
+                  double page = 0.0;
+                  if (_bannerController.hasClients && _bannerController.position.haveDimensions) {
+                    page = _bannerController.page ?? 0.0;
+                  }
+                  final isSelected = (page.round() == index);
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    height: 6,
+                    width: isSelected ? 20 : 6,
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.food : AppColors.divider,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  );
+                },
+              );
+            }),
+          ),
+        ],
       ),
     );
   }

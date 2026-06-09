@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(python -c \"from app import models; from app.database import Base; print\\('Tables registered:'\\); [print\\(' -', t.name\\) for t in Base.metadata.sorted_tables]\")",
-      "Bash(docker exec *)"
+      "Bash(docker exec *)",
+      "Bash(python -c \"import multipart; print\\('python-multipart OK'\\)\")",
+      "Bash(python -c \"from fastapi.testclient import TestClient; print\\('TestClient OK'\\)\")",
+      "Bash(python -c \"import jinja2; print\\('jinja2', jinja2.__version__\\)\")",
+      "Bash(git add *)"
     ]
   }
 }
