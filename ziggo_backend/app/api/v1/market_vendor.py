@@ -29,6 +29,7 @@ from ...models import (
     User,
     UserRole,
     WalletTransaction,
+    MarketAd,
 )
 from ...schemas.market_schema import (
     MarketVendorProfileResponse,
@@ -266,6 +267,78 @@ async def upload_logo(
     await db.commit()
     await db.refresh(v)
     return _to_response(v)
+
+
+@router.get("/ads")
+async def list_my_ads(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("market_owner", "restaurant_owner")),
+):
+    v = await _get_owned_vendor(db, user)
+    if v is None:
+        raise HTTPException(status_code=404, detail="Vendor account not found")
+    q = await db.execute(select(MarketAd).where(MarketAd.vendor_id == v.id))
+    rows = q.scalars().all()
+    return [
+        {
+            "id": ad.id,
+            "vendor_id": ad.vendor_id,
+            "image_url": ad.image_url,
+            "radius_km": float(ad.radius_km),
+            "is_active": ad.is_active,
+            "created_at": ad.created_at,
+        }
+        for ad in rows
+    ]
+
+
+@router.post("/ads", status_code=201)
+async def upload_ad(
+    photo: UploadFile = File(...),
+    radius_km: float = 5.0,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("market_owner", "restaurant_owner")),
+):
+    v = await _get_owned_vendor(db, user)
+    if v is None:
+        raise HTTPException(status_code=404, detail="Vendor account not found")
+    url = await _save_image(photo, "market_ads")
+    ad = MarketAd(
+        vendor_id=v.id,
+        image_url=url,
+        radius_km=Decimal(str(radius_km)),
+        is_active=True,
+    )
+    db.add(ad)
+    await db.commit()
+    await db.refresh(ad)
+    return {
+        "id": ad.id,
+        "vendor_id": ad.vendor_id,
+        "image_url": ad.image_url,
+        "radius_km": float(ad.radius_km),
+        "is_active": ad.is_active,
+    }
+
+
+@router.delete("/ads/{ad_id}")
+async def delete_ad(
+    ad_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("market_owner", "restaurant_owner")),
+):
+    v = await _get_owned_vendor(db, user)
+    if v is None:
+        raise HTTPException(status_code=404, detail="Vendor account not found")
+    ad_q = await db.execute(
+        select(MarketAd).where(MarketAd.id == ad_id, MarketAd.vendor_id == v.id)
+    )
+    ad = ad_q.scalars().first()
+    if not ad:
+        raise HTTPException(status_code=404, detail="Ad not found")
+    await db.delete(ad)
+    await db.commit()
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------

@@ -22,6 +22,7 @@ from ...models import (
     UserRole,
     CustomerCard,
     Payment,
+    MarketAd,
 )
 from ...schemas.market_schema import (
     ProductResponse,
@@ -127,6 +128,64 @@ async def list_products(vendor_id: int, db: AsyncSession = Depends(get_db)):
         )
     )
     return q.scalars().all()
+
+
+@router.get("/vendors/{vendor_id}")
+async def get_vendor(vendor_id: int, db: AsyncSession = Depends(get_db)):
+    v_q = await db.execute(select(MarketVendor).where(MarketVendor.id == vendor_id))
+    v = v_q.scalars().first()
+    if not v:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+    return {
+        "id": v.id,
+        "name": v.name,
+        "category": v.category,
+        "description": v.description,
+        "address": v.address,
+        "image_url": v.image_url,
+        "logo_url": v.logo_url,
+        "rating": float(v.rating or 0),
+        "delivery_fee": float(v.delivery_fee or 0),
+        "eta_minutes": v.eta_minutes,
+        "opening_time": v.opening_time,
+        "closing_time": v.closing_time,
+        "is_active": bool(v.is_active),
+        "is_open": bool(v.is_open) if v.is_open is not None else True,
+    }
+
+
+@router.get("/ads")
+async def list_ads(
+    db: AsyncSession = Depends(get_db),
+    lat: Optional[float] = None,
+    lng: Optional[float] = None,
+):
+    """Retrieve active advertisements. If lat and lng are provided, filter ads
+    so only those targeting a radius that includes the user are returned."""
+    q = await db.execute(
+        select(MarketAd)
+        .join(MarketVendor, MarketAd.vendor_id == MarketVendor.id)
+        .where(MarketAd.is_active == True, MarketVendor.is_active == True)  # noqa: E712
+    )
+    rows = q.scalars().all()
+    has_origin = lat is not None and lng is not None
+    res = []
+    for ad in rows:
+        vendor = ad.vendor
+        if has_origin and vendor.lat is not None and vendor.lng is not None:
+            distance_km = haversine_km(lat, lng, float(vendor.lat), float(vendor.lng))
+            # check targeting radius
+            radius = float(ad.radius_km)
+            if distance_km > radius:
+                continue
+        res.append({
+            "id": ad.id,
+            "vendor_id": ad.vendor_id,
+            "vendor_name": vendor.name,
+            "image_url": ad.image_url,
+            "radius_km": float(ad.radius_km),
+        })
+    return res
 
 
 @router.post("/quote")

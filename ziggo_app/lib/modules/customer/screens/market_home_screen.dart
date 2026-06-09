@@ -42,6 +42,7 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<MarketProvider>().refreshVendors();
+      context.read<MarketProvider>().fetchAds();
       context.read<AddressesProvider>().refresh();
     });
     _bannerTimer = Timer.periodic(const Duration(seconds: 4), (_) {
@@ -98,6 +99,37 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
             lat: picked.location.latitude,
             lng: picked.location.longitude,
           );
+      context.read<MarketProvider>().fetchAds(
+            lat: picked.location.latitude,
+            lng: picked.location.longitude,
+          );
+    }
+  }
+
+  String? _resolveImg(String? path) {
+    if (path == null || path.isEmpty) return null;
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    return '${ApiConfig.baseHost}$path';
+  }
+
+  Future<void> _handleAdTap(Map<String, dynamic> ad) async {
+    final provider = context.read<MarketProvider>();
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    final vendor = await provider.fetchVendorById(ad['vendor_id'] as int);
+    if (mounted) Navigator.pop(context);
+    if (vendor != null && mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => MarketVendorScreen(vendor: vendor)),
+      );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open vendor shop'), backgroundColor: AppColors.warning),
+      );
     }
   }
 
@@ -133,7 +165,12 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
-          onRefresh: () => p.refreshVendors(),
+          onRefresh: () async {
+            final lat = _selectedPlace?.location.latitude;
+            final lng = _selectedPlace?.location.longitude;
+            await p.refreshVendors(lat: lat, lng: lng);
+            await p.fetchAds(lat: lat, lng: lng);
+          },
           child: CustomScrollView(
             slivers: [
               SliverToBoxAdapter(child: _header()),
@@ -343,8 +380,20 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
     );
   }
 
-  // ----------------------------------------------------------- banners
+  int get _clampedBannerPage {
+    final p = context.read<MarketProvider>();
+    final itemsCount = p.ads.isNotEmpty ? p.ads.length : _kBanners.length;
+    if (_bannerPage >= itemsCount) {
+      return 0;
+    }
+    return _bannerPage;
+  }
+
   Widget _bannerCarousel() {
+    final p = context.watch<MarketProvider>();
+    final ads = p.ads;
+    final itemsCount = ads.isNotEmpty ? ads.length : _kBanners.length;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 14, 0, 4),
       child: Column(
@@ -354,15 +403,44 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
             child: PageView.builder(
               controller: _bannerCtrl,
               onPageChanged: (i) => setState(() => _bannerPage = i),
-              itemCount: _kBanners.length,
-              itemBuilder: (_, i) => _bannerCard(_kBanners[i]),
+              itemCount: itemsCount,
+              itemBuilder: (_, i) {
+                if (ads.isNotEmpty) {
+                  final ad = ads[i];
+                  final imageUrl = _resolveImg(ad['image_url']?.toString());
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: GestureDetector(
+                      onTap: () => _handleAdTap(ad),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(AppStyles.radiusLg),
+                        child: imageUrl != null
+                            ? Image.network(
+                                imageUrl,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                errorBuilder: (_, __, ___) => Container(
+                                  color: AppColors.surfaceMuted,
+                                  child: const Center(
+                                    child: Icon(Icons.broken_image_rounded, color: AppColors.textTertiary, size: 44),
+                                  ),
+                                ),
+                              )
+                            : Container(color: AppColors.surfaceMuted),
+                      ),
+                    ),
+                  );
+                } else {
+                  return _bannerCard(_kBanners[i]);
+                }
+              },
             ),
           ),
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(_kBanners.length, (i) {
-              final active = i == _bannerPage;
+            children: List.generate(itemsCount, (i) {
+              final active = i == _clampedBannerPage;
               return AnimatedContainer(
                 duration: const Duration(milliseconds: 220),
                 margin: const EdgeInsets.symmetric(horizontal: 3),
@@ -970,6 +1048,16 @@ class _OutletCard extends StatelessWidget {
     return '${ApiConfig.baseHost}$path';
   }
 
+  Widget _coverPlaceholder() {
+    return Container(
+      height: 144,
+      width: double.infinity,
+      alignment: Alignment.center,
+      decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
+      child: const Icon(Icons.storefront_rounded, color: Colors.white, size: 46),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isOpenNow = vendor['is_open_now'] != false;
@@ -1001,26 +1089,15 @@ class _OutletCard extends StatelessWidget {
                     borderRadius:
                         const BorderRadius.vertical(top: Radius.circular(22)),
                     child: coverUrl == null
-                        ? Container(
-                            height: 144,
-                            width: double.infinity,
-                            decoration: const BoxDecoration(
-                              gradient: AppColors.primaryGradient,
-                            ),
-                            child: const Icon(Icons.storefront_rounded,
-                                color: Colors.white, size: 46),
-                          )
+                        ? _coverPlaceholder()
                         : Image.network(
                             coverUrl,
                             height: 144,
                             width: double.infinity,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              height: 144,
-                              color: AppColors.surfaceMuted,
-                              child: const Icon(Icons.broken_image_rounded,
-                                  color: AppColors.textTertiary),
-                            ),
+                            loadingBuilder: (_, child, progress) =>
+                                progress == null ? child : _coverPlaceholder(),
+                            errorBuilder: (_, __, ___) => _coverPlaceholder(),
                           ),
                   ),
                   Positioned(

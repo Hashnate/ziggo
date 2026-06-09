@@ -23,7 +23,7 @@ from sqlalchemy import inspect, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from ..database import Base
-from ..models import Event, EventTicketTier, FlashWeightTier, CorporateAccount, CorporateMember, DriverPayout  # noqa: F401 — ensures import for create_all
+from ..models import Event, EventTicketTier, FlashWeightTier, CorporateAccount, CorporateMember, DriverPayout, MarketAd  # noqa: F401 — ensures import for create_all
 
 # (table_name, column_name, column_ddl)
 PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (

@@ -5,6 +5,7 @@ import '../../core/network/api_client.dart';
 
 class MarketProvider extends ChangeNotifier {
   List<Map<String, dynamic>> _vendors = const [];
+  List<Map<String, dynamic>> _ads = const [];
   bool _loading = false;
   String? _error;
 
@@ -20,6 +21,7 @@ class MarketProvider extends ChangeNotifier {
   Map<String, dynamic>? _quote;
 
   List<Map<String, dynamic>> get vendors => _vendors;
+  List<Map<String, dynamic>> get ads => _ads;
   bool get loading => _loading;
   String? get error => _error;
   Map<int, Map<String, dynamic>> get cart => _cart;
@@ -175,6 +177,31 @@ class MarketProvider extends ChangeNotifier {
       return List<Map<String, dynamic>>.from(resp.data as List);
     } on DioException {
       return [];
+    }
+  }
+
+  Future<void> fetchAds({double? lat, double? lng}) async {
+    try {
+      final resp = await ApiClient.instance.dio.get(
+        '/market/ads',
+        queryParameters: {
+          if (lat != null && lng != null) 'lat': lat,
+          if (lat != null && lng != null) 'lng': lng,
+        },
+      );
+      _ads = List<Map<String, dynamic>>.from(resp.data as List);
+      notifyListeners();
+    } on DioException {
+      // ignore
+    }
+  }
+
+  Future<Map<String, dynamic>?> fetchVendorById(int id) async {
+    try {
+      final resp = await ApiClient.instance.dio.get('/market/vendors/$id');
+      return Map<String, dynamic>.from(resp.data as Map);
+    } on DioException {
+      return null;
     }
   }
 }

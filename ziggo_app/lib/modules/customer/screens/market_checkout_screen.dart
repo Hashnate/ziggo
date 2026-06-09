@@ -46,9 +46,27 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
     });
   }
 
+  Future<void> _refreshQuote() async {
+    double? lat;
+    double? lng;
+    if (_saved != null) {
+      lat = (_saved!['lat'] as num).toDouble();
+      lng = (_saved!['lng'] as num).toDouble();
+    } else if (_picked != null) {
+      lat = _picked!.location.latitude;
+      lng = _picked!.location.longitude;
+    }
+    if (lat != null && lng != null) {
+      await context.read<MarketProvider>().quoteDelivery(lat: lat, lng: lng);
+    }
+  }
+
   Future<void> _pickPlace() async {
     final p = await showPlaceSearch(context, title: 'Delivery address', allowCurrentLocation: true);
-    if (p != null) setState(() { _picked = p; _saved = null; });
+    if (p != null) {
+      setState(() { _picked = p; _saved = null; });
+      _refreshQuote();
+    }
   }
 
   Future<void> _placeOrder() async {
