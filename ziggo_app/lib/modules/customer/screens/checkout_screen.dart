@@ -47,7 +47,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _pickPlace() async {
-    final p = await showPlaceSearch(context, title: 'Delivery address');
+    final p = await showPlaceSearch(context, title: 'Delivery address', allowCurrentLocation: true);
     if (p != null) {
       setState(() {
         _deliveryPlace = p;

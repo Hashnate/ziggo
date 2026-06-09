@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
+import '../../../core/map/maps_service.dart';
 import '../../../core/map/place_search_sheet.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/widgets/motion.dart';
@@ -319,6 +320,12 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
               ),
             ),
             ListTile(
+              leading: const Icon(Icons.my_location_rounded, color: AppColors.primary),
+              title: const Text('Use current location',
+                  style: TextStyle(fontWeight: FontWeight.w800)),
+              onTap: () => Navigator.pop(context, {'__current__': true}),
+            ),
+            ListTile(
               leading: const Icon(Icons.search_rounded, color: AppColors.primary),
               title: const Text('Search a new address',
                   style: TextStyle(fontWeight: FontWeight.w800)),
@@ -332,13 +339,30 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
     if (selected == null || !mounted) return;
     final food = context.read<FoodProvider>();
     if (selected['__search__'] == true) {
-      final place = await showPlaceSearch(context, title: 'Delivery location');
+      final place = await showPlaceSearch(context, title: 'Delivery location', allowCurrentLocation: true);
       if (place != null && mounted) {
         food.setDeliveryLocation(
           label: place.name,
           subtitle: place.fullAddress,
           lat: place.location.latitude,
           lng: place.location.longitude,
+        );
+      }
+    } else if (selected['__current__'] == true) {
+      // Need to import MapsService
+      // Wait, is MapsService imported in food_home_screen.dart? 
+      // Let's check imports first. We can do it inside the function, or add it at the top.
+      final place = await MapsService.instance.currentLocationAsPlace();
+      if (place != null && mounted) {
+        food.setDeliveryLocation(
+          label: place.name,
+          subtitle: place.fullAddress,
+          lat: place.location.latitude,
+          lng: place.location.longitude,
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not get current location — check GPS / permission')),
         );
       }
     } else {
