@@ -115,7 +115,8 @@
                         <td class="px-6 py-4 text-right">
                             <button
                                 onclick='openTicket({{ tp|tojson }})'
-                                class="px-3 py-2 bg-ziggo text-white rounded-lg text-xs font-black hover:bg-ziggo-light transition inline-flex items-center gap-1.5">
+                                style="width:112px"
+                                class="px-3 py-2 bg-ziggo text-white rounded-lg text-xs font-black hover:bg-ziggo-light transition inline-flex items-center justify-center gap-1.5">
                                 <i class="fas fa-comments"></i> Open
                                 {% if t.messages|length %}
                                 <span class="bg-white/30 text-white px-1.5 py-0.5 rounded-full text-[10px] font-black">{{ t.messages|length }}</span>

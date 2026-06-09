@@ -35,53 +35,69 @@
         }
     </script>
     <style>
-        body { font-family: 'Sora', sans-serif; color: #0F172A; }
+        body {
+            font-family: 'Sora', sans-serif; color: #E2E8F0;
+            background:
+                radial-gradient(1000px 560px at 50% -10%, #1E3A8A 0%, rgba(30,58,138,0) 55%),
+                linear-gradient(160deg, #0A0F22 0%, #0E1530 55%, #101A3A 100%);
+        }
         .ambient-orb {
             position: absolute;
             border-radius: 9999px;
-            filter: blur(60px);
-            opacity: 0.5;
+            filter: blur(85px);
+            opacity: 0.55;
             pointer-events: none;
+        }
+        .glass {
+            background: rgba(255,255,255,0.06);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.12);
         }
         input.brand-field {
             transition: all 0.18s ease;
-            background: #F5F7FB;
-            border: 1.5px solid transparent;
+            background: rgba(255,255,255,0.05);
+            border: 1.5px solid rgba(255,255,255,0.10);
+            color: #fff;
         }
-        input.brand-field:hover { background: #EEF2F9; }
+        input.brand-field::placeholder { color: #64748B; }
+        input.brand-field:hover { background: rgba(255,255,255,0.08); }
         input.brand-field:focus {
             outline: none;
-            background: #fff;
+            background: rgba(255,255,255,0.10);
             border-color: #3B82F6;
-            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.14);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.22);
         }
+        @keyframes cardIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+        .card-in { animation: cardIn .5s cubic-bezier(.22,.61,.36,1) both; }
     </style>
 </head>
-<body class="min-h-screen bg-ziggo-canvas relative overflow-hidden">
+<body class="min-h-screen relative overflow-hidden">
 
-    <!-- Ambient brand orbs -->
-    <div class="ambient-orb" style="background:#3B82F6; width:360px; height:360px; top:-120px; left:-100px;"></div>
-    <div class="ambient-orb" style="background:#FBBF24; width:300px; height:300px; bottom:-100px; right:-80px;"></div>
+    <!-- Ambient brand glows -->
+    <div class="ambient-orb" style="background:#3B82F6; width:480px; height:480px; top:-180px; left:-140px;"></div>
+    <div class="ambient-orb" style="background:#1E40AF; width:420px; height:420px; bottom:-180px; right:-120px; opacity:.4;"></div>
+    <div class="ambient-orb" style="background:#6366F1; width:300px; height:300px; top:30%; right:-120px; opacity:.25;"></div>
 
     <div class="relative min-h-screen flex items-center justify-center p-6">
-        <div class="w-full max-w-md">
+        <div class="w-full max-w-md card-in">
 
             <!-- Brand -->
             <div class="flex flex-col items-center mb-8">
-                <div class="w-20 h-20 rounded-2xl overflow-hidden mb-4 flex items-center justify-center" style="background: #fff; padding: 6px; box-shadow: 0 18px 44px -14px rgba(30, 64, 175, 0.45), inset 0 0 0 1px rgba(15,23,42,0.06);">
+                <div class="w-20 h-20 rounded-2xl overflow-hidden mb-4 flex items-center justify-center" style="background: #fff; padding: 6px; box-shadow: 0 18px 50px -12px rgba(59,130,246,0.6), inset 0 0 0 1px rgba(255,255,255,0.2);">
                     <img src="/static/img/logo.jpeg" alt="Ziggo" class="w-full h-full object-cover rounded-2xl">
                 </div>
-                <p class="text-[10px] uppercase tracking-[0.32em] font-bold text-ziggo-faint">Welcome back to</p>
-                <img src="/static/img/ziggo.png" alt="Ziggo" class="h-9 mt-2" onerror="this.outerHTML='<h1 class=\'text-3xl font-black text-ziggo-ink tracking-tight mt-1\'>Ziggo Admin</h1>';">
-                <p class="text-sm text-ziggo-muted mt-2">Sign in to manage rides, drivers and more.</p>
+                <p class="text-[10px] uppercase tracking-[0.32em] font-bold text-blue-300/80">Welcome back to</p>
+                <h1 class="text-3xl font-extrabold text-white tracking-tight mt-1.5">Ziggo</h1>
+                <p class="text-sm text-slate-400 mt-2">Sign in to manage rides, drivers and more.</p>
             </div>
 
             <!-- Card -->
-            <div class="bg-white rounded-3xl border border-ziggo-line/70 shadow-soft p-8 relative overflow-hidden">
-                <div class="absolute top-0 inset-x-0 h-1" style="background:linear-gradient(90deg,#1E40AF,#3B82F6,#1E40AF);"></div>
+            <div class="glass rounded-3xl p-8 relative overflow-hidden"
+                 style="box-shadow: 0 40px 90px -30px rgba(0,0,0,0.65), 0 0 60px -20px rgba(59,130,246,0.35), inset 0 1px 0 rgba(255,255,255,0.15);">
+                <div class="absolute top-0 inset-x-0 h-1" style="background:linear-gradient(90deg,#1E40AF,#3B82F6,#60A5FA,#1E40AF);"></div>
 
                 {% if error %}
-                <div class="mb-5 p-3 rounded-2xl bg-red-50 border border-red-100 text-red-700 text-sm font-semibold flex items-center gap-2">
+                <div class="mb-5 p-3 rounded-2xl bg-red-500/15 border border-red-400/30 text-red-300 text-sm font-semibold flex items-center gap-2">
                     <i class="fas fa-circle-exclamation"></i>
                     <span>{{ error }}</span>
                 </div>
@@ -90,9 +106,9 @@
                 <form action="/admin/login" method="POST" class="space-y-5">
 
                     <div>
-                        <label for="phone_number" class="block text-[11px] font-black tracking-[0.18em] text-ziggo-faint uppercase mb-2">Phone number</label>
+                        <label for="phone_number" class="block text-[11px] font-black tracking-[0.18em] text-slate-400 uppercase mb-2">Phone number</label>
                         <div class="relative">
-                            <i class="fas fa-phone absolute left-4 top-1/2 -translate-y-1/2 text-ziggo-faint text-sm"></i>
+                            <i class="fas fa-phone absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
                             <input type="tel" name="phone_number" id="phone_number"
                                    class="brand-field w-full pl-11 pr-4 py-4 rounded-2xl text-sm font-semibold"
                                    required value="0700000000" maxlength="10" minlength="10" pattern="\d{10}">
@@ -100,14 +116,14 @@
                     </div>
 
                     <div>
-                        <label for="password" class="block text-[11px] font-black tracking-[0.18em] text-ziggo-faint uppercase mb-2">Password</label>
+                        <label for="password" class="block text-[11px] font-black tracking-[0.18em] text-slate-400 uppercase mb-2">Password</label>
                         <div class="relative">
-                            <i class="fas fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-ziggo-faint text-sm"></i>
+                            <i class="fas fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
                             <input type="password" name="password" id="password"
                                    class="brand-field w-full pl-11 pr-11 py-4 rounded-2xl text-sm font-semibold"
                                    placeholder="••••••••" required value="admin123">
                             <button type="button" id="togglePw" tabindex="-1" aria-label="Show password"
-                                    class="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg text-ziggo-faint hover:text-ziggo hover:bg-ziggo-soft/60 transition">
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-white hover:bg-white/10 transition">
                                 <i class="fas fa-eye text-sm"></i>
                             </button>
                         </div>
@@ -115,20 +131,20 @@
 
                     <div class="flex items-center justify-between pt-1">
                         <label class="flex items-center gap-2 cursor-pointer">
-                            <input id="remember-me" name="remember-me" type="checkbox" class="w-4 h-4 rounded text-ziggo border-ziggo-line focus:ring-ziggo-light">
-                            <span class="text-sm font-semibold text-ziggo-muted">Remember me</span>
+                            <input id="remember-me" name="remember-me" type="checkbox" class="w-4 h-4 rounded bg-white/10 border-white/20 text-ziggo-light focus:ring-ziggo-light">
+                            <span class="text-sm font-semibold text-slate-300">Remember me</span>
                         </label>
                     </div>
 
                     <button type="submit"
-                            class="group w-full py-4 rounded-2xl text-sm font-black tracking-wide text-white shadow-brand transition-all duration-200 active:scale-[0.98] hover:brightness-110 hover:shadow-[0_20px_44px_-12px_rgba(30,64,175,0.55)]"
-                            style="background: linear-gradient(135deg, #1E40AF 0%, #3B82F6 100%);">
+                            class="group w-full py-4 rounded-2xl text-sm font-black tracking-wide text-white transition-all duration-200 active:scale-[0.98] hover:brightness-110"
+                            style="background: linear-gradient(135deg, #1E40AF 0%, #3B82F6 100%); box-shadow: 0 18px 40px -12px rgba(59,130,246,0.6);">
                         SIGN IN <i class="fas fa-arrow-right ml-1 transition-transform group-hover:translate-x-1"></i>
                     </button>
                 </form>
             </div>
 
-            <p class="text-center text-[11px] text-ziggo-faint mt-6 font-semibold">
+            <p class="text-center text-[11px] text-slate-500 mt-6 font-semibold">
                 © Ziggo · Internal use only
             </p>
         </div>

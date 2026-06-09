@@ -10,48 +10,42 @@
 
     <!-- KPI Grid -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
-            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl flex-shrink-0">
-                <i class="fas fa-hand-holding-usd" id="kpiIcon1"></i>
-            </div>
-            <div>
-                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider" id="kpiLabel1">Admin Net (Commission)</p>
-                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1.5"><span id="kpiVal1">0</span></p>
-            </div>
+        <div class="zi-kpi">
+            <div class="zi-kpi-ic"><i class="fas fa-hand-holding-usd" id="kpiIcon1"></i></div>
+            <p class="zi-kpi-lbl" id="kpiLabel1">Admin Net (Commission)</p>
+            <p class="zi-kpi-val"><span id="kpiVal1">0</span></p>
         </div>
-        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
-            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl flex-shrink-0">
-                <i class="fas fa-route" id="kpiIcon2"></i>
-            </div>
-            <div>
-                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider" id="kpiLabel2">Total Rides</p>
-                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1.5"><span id="kpiVal2">0</span></p>
-            </div>
+        <div class="zi-kpi">
+            <div class="zi-kpi-ic"><i class="fas fa-route" id="kpiIcon2"></i></div>
+            <p class="zi-kpi-lbl" id="kpiLabel2">Total Rides</p>
+            <p class="zi-kpi-val"><span id="kpiVal2">0</span></p>
         </div>
-        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
-            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl flex-shrink-0">
-                <i class="far fa-id-card" id="kpiIcon3"></i>
-            </div>
-            <div>
-                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider" id="kpiLabel3">Active Drivers</p>
-                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1.5"><span id="kpiVal3">0</span></p>
-            </div>
+        <div class="zi-kpi">
+            <div class="zi-kpi-ic"><i class="far fa-id-card" id="kpiIcon3"></i></div>
+            <p class="zi-kpi-lbl" id="kpiLabel3">Active Drivers</p>
+            <p class="zi-kpi-val"><span id="kpiVal3">0</span></p>
         </div>
-        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
-            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl flex-shrink-0">
-                <i class="far fa-credit-card" id="kpiIcon4"></i>
-            </div>
-            <div>
-                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider" id="kpiLabel4">Gross Bookings</p>
-                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1.5"><span id="kpiVal4">0</span></p>
-            </div>
+        <div class="zi-kpi">
+            <div class="zi-kpi-ic"><i class="far fa-credit-card" id="kpiIcon4"></i></div>
+            <p class="zi-kpi-lbl" id="kpiLabel4">Gross Bookings</p>
+            <p class="zi-kpi-val"><span id="kpiVal4">0</span></p>
         </div>
     </div>
 
+    <style>
+        .zi-kpi { background:#fff; border:1px solid #E7EBF1; border-radius:16px; padding:18px 18px 16px; box-shadow:0 1px 2px rgba(15,23,42,.03); transition:box-shadow .16s ease, border-color .16s ease; }
+        .zi-kpi:hover { box-shadow:0 8px 24px -10px rgba(15,23,42,.12); border-color:#D5DCE6; }
+        .zi-kpi-ic { width:42px; height:42px; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:18px; background:linear-gradient(135deg,#1E40AF,#3B82F6); box-shadow:0 8px 18px -8px rgba(30,64,175,.5); margin-bottom:12px; }
+        .zi-kpi-lbl { font-size:10px; letter-spacing:.12em; text-transform:uppercase; font-weight:700; color:#94A3B8; }
+        .zi-kpi-val { font-size:26px; line-height:1.1; font-weight:800; color:#0F172A; margin-top:4px; }
+        .zi-quick { padding:8px 14px; border-radius:10px; font-size:12px; font-weight:600; border:1px solid #E7EBF1; background:#F4F7FB; color:#334155; transition:all .15s ease; }
+        .zi-quick:hover { background:#DBEAFE; color:#1E3A8A; border-color:#BFD3F5; }
+    </style>
+
     <!-- Filter row -->
-    <div class="bg-white rounded-xl border border-ziggo-line shadow-soft-sm p-4 flex flex-wrap items-end gap-3">
-        <div class="min-w-[140px]">
-            <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Report type</label>
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm px-5 py-4 flex flex-wrap items-end gap-3">
+        <div class="min-w-[150px]">
+            <label class="block text-[10px] font-black text-ziggo-muted mb-1.5 uppercase tracking-wider">Report type</label>
             <select id="rptType" class="w-full px-3 py-2 border border-ziggo-line rounded-lg text-sm outline-none focus:border-ziggo bg-white">
                 <option value="summary" {% if report_type == 'summary' %}selected{% endif %}>Summary</option>
                 <option value="earnings" {% if report_type == 'earnings' %}selected{% endif %}>Earnings</option>
@@ -60,18 +54,18 @@
             </select>
         </div>
         <div>
-            <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Start date</label>
+            <label class="block text-[10px] font-black text-ziggo-muted mb-1.5 uppercase tracking-wider">Start date</label>
             <input type="date" id="rptStart" value="{{ start_date }}" class="px-3 py-2 border border-ziggo-line rounded-lg text-sm outline-none focus:border-ziggo">
         </div>
         <div>
-            <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">End date</label>
+            <label class="block text-[10px] font-black text-ziggo-muted mb-1.5 uppercase tracking-wider">End date</label>
             <input type="date" id="rptEnd" value="{{ end_date }}" class="px-3 py-2 border border-ziggo-line rounded-lg text-sm outline-none focus:border-ziggo">
         </div>
-        <button id="rptApply" type="button" class="px-4 py-2 bg-ziggo text-white rounded-lg font-black text-xs shadow-brand hover:bg-ziggo-light transition flex items-center gap-1.5">
-            <i class="fas fa-filter"></i> Apply
+        <button id="rptApply" type="button" class="px-4 py-2 bg-ziggo text-white rounded-lg font-semibold text-xs shadow-brand hover:bg-ziggo-light transition flex items-center gap-1.5">
+            <i class="fas fa-filter text-[10px]"></i> Apply
         </button>
-        <button data-quick="7" type="button" class="px-4 py-2 bg-slate-700 text-white rounded-lg font-black text-xs hover:bg-slate-800 transition">Last 7 Days</button>
-        <button data-quick="30" type="button" class="px-4 py-2 bg-slate-700 text-white rounded-lg font-black text-xs hover:bg-slate-800 transition">Last 30 Days</button>
+        <button data-quick="7" type="button" class="zi-quick">Last 7 Days</button>
+        <button data-quick="30" type="button" class="zi-quick">Last 30 Days</button>
         <span id="rptStatus" class="text-xs font-bold text-ziggo-muted ml-auto"></span>
     </div>
 
@@ -439,10 +433,23 @@
             };
         }
 
+        // Thin out the x-axis date labels and lighten the axes (UI only)
+        scales.x = {
+            grid: { display: false },
+            ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8, color: '#94A3B8', font: { size: 11 } }
+        };
+        Object.keys(scales).forEach(function (k) {
+            if (k === 'x') return;
+            scales[k].grid = Object.assign({ color: 'rgba(15,23,42,0.05)', drawBorder: false }, scales[k].grid || {});
+            scales[k].ticks = Object.assign({ color: '#94A3B8', font: { size: 11 } }, scales[k].ticks || {});
+        });
+        // Slimmer lines and smaller points for a cleaner look
+        datasets.forEach(function (ds) { ds.borderWidth = 2; ds.pointRadius = 0; ds.pointHoverRadius = 5; });
+
         if (chart) {
             chart.destroy();
         }
-        
+
         chart = new Chart(document.getElementById('trendChart'), {
             type: 'line',
             data: {
@@ -453,7 +460,7 @@
                 responsive: true, maintainAspectRatio: false,
                 interaction: { mode: 'index', intersect: false },
                 scales,
-                plugins: { legend: { position: 'top', align: 'center' } }
+                plugins: { legend: { position: 'top', align: 'center', labels: { usePointStyle: true, boxWidth: 8, font: { size: 12 } } } }
             }
         });
 
