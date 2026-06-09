@@ -377,6 +377,7 @@ class ZiggoMap extends StatefulWidget {
   final bool interactive;
   final bool showMyLocation;
   final void Function(LatLng)? onTap;
+  final void Function(LatLng)? onPositionChanged;
 
   const ZiggoMap({
     super.key,
@@ -388,6 +389,7 @@ class ZiggoMap extends StatefulWidget {
     this.interactive = true,
     this.showMyLocation = false,
     this.onTap,
+    this.onPositionChanged,
   });
 
   @override
@@ -554,6 +556,9 @@ class _ZiggoMapState extends State<ZiggoMap> {
       onTap: widget.onTap == null
           ? null
           : (pos) => widget.onTap!(LatLng(pos.latitude, pos.longitude)),
+      onCameraMove: widget.onPositionChanged == null
+          ? null
+          : (pos) => widget.onPositionChanged!(LatLng(pos.target.latitude, pos.target.longitude)),
       onMapCreated: (c) => widget.controller?._attach(c),
     );
   }

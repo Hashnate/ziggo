@@ -4,17 +4,12 @@ import 'package:provider/provider.dart';
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/map/maps_service.dart';
-import '../../../core/map/place_search_sheet.dart';
 import '../../../core/map/places.dart';
-import '../../../core/map/ziggo_map.dart';
+import '../../../core/map/place_search_sheet.dart';
 import '../booking_provider.dart';
-import '../wallet_provider.dart';
-import '../payment_methods_provider.dart';
-import 'payment_methods_screen.dart';
 import 'ride_tracking_screen.dart';
+import 'rental_pickup_map_screen.dart';
 
-/// Rental booking — customer hires a vehicle for an hourly block. No fixed
-/// drop-off; the customer roams. Mirrors the FlashHomeScreen layout.
 class RentalHomeScreen extends StatefulWidget {
   const RentalHomeScreen({super.key});
 
@@ -24,34 +19,26 @@ class RentalHomeScreen extends StatefulWidget {
 
 class _RentalHomeScreenState extends State<RentalHomeScreen> {
   Place? _pickup;
+  bool _isNow = true;
   String _vehicleType = 'car';
-  int _hours = 4;
-  String _payment = 'cash';
+  int _hours = 1;
+  double _distance = 5;
+  ({String name, String phone})? _friend;
 
-  final ZiggoMapController _mapController = ZiggoMapController();
-  Map<String, dynamic>? _estimate;
   bool _busy = false;
-  String? _error;
 
   static const _vehicles = [
-    ('bike', 'Bike', Icons.electric_bike_rounded, 400),
-    ('tuk', 'Tuk', Icons.electric_rickshaw_rounded, 600),
-    ('car', 'Car', Icons.directions_car_filled_rounded, 1200),
-    ('van', 'Van', Icons.airport_shuttle_rounded, 1800),
-    ('truck', 'Truck', Icons.local_shipping_rounded, 2500),
+    ('mini', 'Mini', Icons.directions_car_rounded, 3, 1100),
+    ('car', 'Car', Icons.directions_car_filled_rounded, 4, 1300),
+    ('minivan', 'Minivan', Icons.airport_shuttle_rounded, 5, 1200),
+    ('van', 'Van', Icons.airport_shuttle_outlined, 10, 2500),
   ];
-
-  static const _hourPresets = [2, 4, 6, 8, 12];
 
   @override
   void initState() {
     super.initState();
-    _pickup = kColomboPlaces[0];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _useCurrentLocationForPickup();
-      context.read<PaymentMethodsProvider>().fetchCards();
-      context.read<PaymentMethodsProvider>().fetchCorporateProfile();
-      context.read<WalletProvider>().refresh();
     });
   }
 
@@ -59,74 +46,69 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
     final here = await MapsService.instance.currentLocationAsPlace();
     if (!mounted || here == null) return;
     setState(() => _pickup = here);
-    await _recalc();
-  }
-
-  Future<void> _recalc() async {
-    if (_pickup == null) return;
-    final res = await context.read<BookingProvider>().estimateFare(
-          serviceType: _vehicleType,
-          pickup: _pickup!.location,
-          drop: _pickup!.location,
-          isRental: true,
-          rentalHours: _hours,
-        );
-    if (mounted) setState(() => _estimate = res);
   }
 
   Future<void> _selectPickup() async {
+    final startLoc = _pickup ?? await MapsService.instance.currentLocationAsPlace() ?? kColomboPlaces[0];
+    
     final p = await showPlaceSearch(
       context,
-      title: 'Pickup location',
-      near: _pickup?.location ?? kColomboCenter,
+      title: 'Choose Pickup Location',
+      near: startLoc.location,
       allowCurrentLocation: true,
+      allowSetOnMap: true,
     );
-    if (p != null) {
-      setState(() {
-        _pickup = p;
-        _error = null;
-      });
-      _mapController.moveTo(p.location, zoom: 15);
-      await _recalc();
+
+    if (p == null || !mounted) return;
+
+    if (p.name == '__SET_ON_MAP__') {
+      final confirmedPlace = await Navigator.push<Place>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => RentalPickupMapScreen(initialLocation: startLoc),
+        ),
+      );
+      if (confirmedPlace != null && mounted) {
+        setState(() => _pickup = confirmedPlace);
+      }
+    } else {
+      setState(() => _pickup = p);
     }
   }
 
-  String? _validate() {
-    if (_pickup == null) return 'Set a pickup location';
-    if (_hours < 1) return 'Pick at least 1 hour';
-    if (_estimate == null) return 'Waiting for fare estimate…';
-    return null;
+  void _onNext() async {
+    if (_pickup == null) {
+      await _selectPickup();
+      if (_pickup == null) return;
+    }
+    _book();
   }
-
-  bool get _formReady => _validate() == null && !_busy;
 
   Future<void> _book() async {
-    final err = _validate();
-    if (err != null) {
-      setState(() => _error = err);
-      return;
-    }
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
+    setState(() => _busy = true);
     final created = await context.read<BookingProvider>().createBooking(
           serviceType: _vehicleType,
           pickup: _pickup!.location,
           pickupAddress: _pickup!.fullAddress,
           drop: _pickup!.location,
           dropAddress: _pickup!.fullAddress,
-          paymentMethod: _payment,
+          paymentMethod: 'cash',
           isRental: true,
           rentalHours: _hours,
         );
     if (!mounted) return;
     setState(() => _busy = false);
+    
     if (created == null) {
-      setState(() => _error =
-          context.read<BookingProvider>().lastError ?? 'Could not book');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.read<BookingProvider>().lastError ?? 'Could not book'),
+          backgroundColor: AppColors.error,
+        ),
+      );
       return;
     }
+
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => const RideTrackingScreen()),
@@ -136,300 +118,93 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: Stack(
-        children: [
-          // Map background
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: MediaQuery.of(context).size.height * 0.40,
-            child: ZiggoMap(
-              controller: _mapController,
-              center: _pickup?.location ?? kColomboCenter,
-              zoom: 14,
-              showMyLocation: true,
-              markers: [
-                if (_pickup != null)
-                  pinMarker(
-                    point: _pickup!.location,
-                    icon: Icons.directions_car_filled_rounded,
-                    color: AppColors.primary,
-                  ),
-              ],
-            ),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Hourly Packages',
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.w900,
+            fontSize: 18,
           ),
-
-          // Gradient overlay for status bar
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              height: 120,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.black.withOpacity(0.4), Colors.transparent],
-                ),
-              ),
-            ),
-          ),
-
-          // Scrollable content
-          Positioned.fill(
-            child: ListView(
-              padding: EdgeInsets.only(
-                  top: MediaQuery.of(context).size.height * 0.33),
-              children: [
-                Container(
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF8FAFC),
-                    borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(32)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Color(0x1A000000),
-                        blurRadius: 30,
-                        offset: Offset(0, -10),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 12),
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: AppColors.divider.withOpacity(0.5),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 24),
-                        child: Text(
-                          'ZIGGO RENTALS',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 2,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 24),
-                        child: Text(
-                          'Hire a vehicle',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.5,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 24),
-                        child: Text(
-                          'Driver waits with you. Pay by the hour.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      _buildPickupCard(),
-
-                      const SizedBox(height: 24),
-                      _sectionHeader('VEHICLE TYPE'),
-                      const SizedBox(height: 12),
-                      _buildVehiclePicker(),
-
-                      const SizedBox(height: 24),
-                      _sectionHeader('HOW LONG?'),
-                      const SizedBox(height: 12),
-                      _buildHoursPicker(),
-
-                      const SizedBox(height: 24),
-                      _sectionHeader('PAYMENT'),
-                      const SizedBox(height: 12),
-                      _buildPaymentPicker(),
-
-                      if (_error != null) ...[
-                        const SizedBox(height: 20),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: AppColors.error.withOpacity(0.10),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: AppColors.error.withOpacity(0.3),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.error_outline_rounded,
-                                    color: AppColors.error, size: 18),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    _error!,
-                                    style: const TextStyle(
-                                      color: AppColors.error,
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-
-                      const SizedBox(height: 140),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Back button — placed AFTER the ListView so it renders on top of
-          // the Positioned.fill scroll area and actually receives taps.
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 10,
-            left: 20,
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0, top: 10, bottom: 10),
             child: GestureDetector(
-              onTap: () => Navigator.pop(context),
-              behavior: HitTestBehavior.opaque,
+              onTap: () => _showBookForFriendSheet(context),
               child: Container(
-                width: 44,
-                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: AppStyles.shadowMd,
+                  border: Border.all(color: Colors.black26),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Icon(Icons.arrow_back_rounded,
-                    color: AppColors.textPrimary),
+                child: Row(
+                  children: [
+                    const Icon(Icons.person_outline_rounded, color: Colors.black87, size: 18),
+                    const SizedBox(width: 6),
+                    Text(_friend?.name ?? 'For Me', style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600)),
+                  ],
+                ),
               ),
             ),
           ),
-
-          // Bottom action bar
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius:
-                    BorderRadius.vertical(top: Radius.circular(32)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Color(0x14000000),
-                    blurRadius: 30,
-                    offset: Offset(0, -8),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              children: [
+                const Text('Pickup date & time', style: TextStyle(color: Colors.black54, fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                _buildTimeToggle(),
+                const SizedBox(height: 16),
+                _buildPickupField(),
+                const SizedBox(height: 24),
+                _buildVehiclePicker(),
+                const SizedBox(height: 24),
+                _buildDurationDistanceBox(),
+              ],
+            ),
+          ),
+          
+          // Fixed Bottom Bar
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, -4),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              child: SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _busy ? null : _onNext,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
                   ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'TOTAL FARE',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.textTertiary,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                        Text(
-                          _estimate == null
-                              ? '--'
-                              : 'Rs.${(_estimate!['final_amount'] as num).toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.textPrimary,
-                            letterSpacing: -1,
-                          ),
-                        ),
-                        Text(
-                          '${_hours}h · Rs.${_hourlyRate()}/hr',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textTertiary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: SizedBox(
-                      height: 60,
-                      child: ElevatedButton(
-                        onPressed: _formReady ? _book : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.black,
-                          foregroundColor: Colors.white,
-                          disabledBackgroundColor: const Color(0xFFCBD5E1),
-                          disabledForegroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20)),
-                          elevation: 0,
-                        ),
-                        child: _busy
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2.5,
-                                ),
-                              )
-                            : Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: const [
-                                  Icon(Icons.key_rounded,
-                                      color: AppColors.primary, size: 20),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'BOOK NOW',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 14,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                      ),
-                    ),
-                  ),
-                ],
+                  child: _busy 
+                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Text('BOOK NOW', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                ),
               ),
             ),
           ),
@@ -438,84 +213,117 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
     );
   }
 
-  int _hourlyRate() {
-    final found = _vehicles.firstWhere(
-      (v) => v.$1 == _vehicleType,
-      orElse: () => _vehicles[2],
-    );
-    return found.$4;
-  }
-
-  Widget _sectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 1.5,
-          color: AppColors.textTertiary,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPickupCard() {
+  Widget _buildTimeToggle() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: AppStyles.shadowSm,
+        color: const Color(0xFFE6F0FA), // light blue
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF2943A3).withOpacity(0.3)),
       ),
-      child: InkWell(
-        onTap: _selectPickup,
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _isNow = true),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: _isNow ? const Color(0xFFE6F0FA) : Colors.white,
+                  borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      _isNow ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                      color: _isNow ? const Color(0xFF2943A3) : Colors.black38,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text('Now', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black87)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () async {
+                final d = await showDatePicker(
+                  context: context,
+                  initialDate: DateTime.now(),
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime.now().add(const Duration(days: 30)),
+                );
+                if (d == null || !mounted) return;
+                final t = await showTimePicker(
+                  context: context,
+                  initialTime: TimeOfDay.now(),
+                );
+                if (t != null && mounted) {
+                  setState(() => _isNow = false);
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: !_isNow ? const Color(0xFFE6F0FA) : Colors.white,
+                  borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
+                  border: const Border(left: BorderSide(color: Colors.black12)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      !_isNow ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                      color: !_isNow ? const Color(0xFF2943A3) : Colors.black38,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text('Schedule', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black87)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPickupField() {
+    return GestureDetector(
+      onTap: _selectPickup,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: Colors.black12),
+          borderRadius: BorderRadius.circular(24), // Pill shape
+        ),
         child: Row(
           children: [
             Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
+              padding: const EdgeInsets.all(8),
+              decoration: const BoxDecoration(
+                color: Color(0xFFE6F0FA),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.my_location_rounded,
-                size: 16,
-                color: AppColors.primary,
-              ),
+              child: const Icon(Icons.my_location_rounded, color: Color(0xFF2943A3), size: 16),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'PICKUP',
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.textTertiary,
-                    ),
-                  ),
-                  Text(
-                    _pickup?.fullAddress ?? 'Set pickup point',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('PICKUP', style: TextStyle(color: Colors.black45, fontWeight: FontWeight.w700, fontSize: 10)),
+                Text(
+                  _pickup?.name ?? 'Your Location',
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                ),
+              ],
             ),
-            const Icon(Icons.edit_rounded,
-                size: 16, color: AppColors.textTertiary),
+            const Spacer(),
+            const Icon(Icons.edit_rounded, color: Colors.black38, size: 18),
           ],
         ),
       ),
@@ -525,49 +333,32 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
   Widget _buildVehiclePicker() {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      clipBehavior: Clip.none,
       child: Row(
         children: _vehicles.map((v) {
           final sel = _vehicleType == v.$1;
           return GestureDetector(
-            onTap: () {
-              setState(() => _vehicleType = v.$1);
-              _recalc();
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
+            onTap: () => setState(() => _vehicleType = v.$1),
+            child: Container(
               margin: const EdgeInsets.only(right: 12),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: sel ? Colors.black : Colors.white,
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                    color:
-                        sel ? Colors.black : const Color(0xFFE2E8F0)),
+                  color: sel ? Colors.black : Colors.black12,
+                  width: 1,
+                ),
               ),
               child: Column(
                 children: [
-                  Icon(v.$3,
-                      size: 22,
-                      color: sel ? AppColors.primary : AppColors.textPrimary),
-                  const SizedBox(height: 6),
+                  Icon(v.$3, size: 36, color: sel ? Colors.white : const Color(0xFF334A52)),
+                  const SizedBox(height: 8),
+                  Text(v.$2, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: sel ? Colors.white : Colors.black)),
+                  const SizedBox(height: 4),
                   Text(
-                    v.$2,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 13,
-                      color: sel ? Colors.white : AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Rs.${v.$4}/hr',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      color: sel ? Colors.white70 : AppColors.textTertiary,
-                    ),
+                    'Rs.${v.$5.toInt()}/hr',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: sel ? Colors.white70 : Colors.black45),
                   ),
                 ],
               ),
@@ -578,273 +369,196 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
     );
   }
 
-  Widget _buildHoursPicker() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+  Widget _buildDurationDistanceBox() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Column(
         children: [
-          Row(
-            children: _hourPresets.map((h) {
-              final sel = _hours == h;
-              return Expanded(
-                child: GestureDetector(
+          // Hours Selector
+          Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                GestureDetector(
                   onTap: () {
-                    setState(() => _hours = h);
-                    _recalc();
+                    if (_hours > 1) setState(() => _hours--);
                   },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    margin: EdgeInsets.only(
-                      right: h == _hourPresets.last ? 0 : 8,
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    decoration: BoxDecoration(
-                      color: sel ? AppColors.primary : Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: sel
-                            ? AppColors.primary
-                            : const Color(0xFFE2E8F0),
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          '${h}h',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w900,
-                            color: sel ? Colors.white : AppColors.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(8)),
+                    child: const Icon(Icons.remove, color: Colors.black26),
                   ),
                 ),
-              );
-            }).toList(),
+                Text(
+                  '${_hours} hr',
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+                ),
+                GestureDetector(
+                  onTap: () => setState(() => _hours++),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(color: const Color(0xFF2943A3), borderRadius: BorderRadius.circular(8)),
+                    child: const Icon(Icons.add, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Slider 
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                SliderTheme(
+                  data: SliderThemeData(
+                    activeTrackColor: const Color(0xFF2943A3),
+                    inactiveTrackColor: Colors.black12,
+                    thumbColor: const Color(0xFF2943A3),
+                    trackHeight: 4,
+                    overlayColor: const Color(0xFF2943A3).withOpacity(0.1),
+                    valueIndicatorColor: const Color(0xFF2943A3),
+                  ),
+                  child: Slider(
+                    value: _distance,
+                    min: 5,
+                    max: 40,
+                    divisions: 7,
+                    onChanged: (v) => setState(() => _distance = v),
+                  ),
+                ),
+                // Custom 5Km Badge positioned manually for visual approximation
+                Positioned(
+                  top: -15,
+                  left: 20 + ((_distance - 5) / 35) * (MediaQuery.of(context).size.width - 100),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2943A3),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text('${_distance.toInt()} h', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: const [
+                Text('5', style: TextStyle(color: Colors.black54, fontSize: 10)),
+                Text('40', style: TextStyle(color: Colors.black54, fontSize: 10)),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
-          // Fine-grained slider for non-preset hour counts
-          Row(
-            children: [
-              const Icon(Icons.schedule_rounded,
-                  size: 18, color: AppColors.textTertiary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Slider(
-                  value: _hours.toDouble(),
-                  min: 1,
-                  max: 24,
-                  divisions: 23,
-                  label: '${_hours}h',
-                  onChanged: (v) {
-                    setState(() => _hours = v.round());
+
+          // Bottom Banner
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: const BoxDecoration(
+              color: Color(0xFFE6F0FA), // Light blue banner
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Don't know hours/distance?", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87)),
+                GestureDetector(
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Calculate feature coming soon')),
+                    );
                   },
-                  onChangeEnd: (_) => _recalc(),
+                  child: const Text("Calculate", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.black87, decoration: TextDecoration.underline)),
                 ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '${_hours}h',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  String _getSelectedCardLabel() {
-    final cards = context.read<PaymentMethodsProvider>().cards;
-    try {
-      final id = int.parse(_payment.split('_')[1]);
-      final card = cards.firstWhere((c) => c['id'] == id);
-      final no = card['card_no'].toString();
-      return "${card['card_type']} •••• ${no.substring(no.length - 4)}";
-    } catch (_) {
-      return "Card";
-    }
-  }
-
-  void _showPaymentPicker(BuildContext context) {
+  void _showBookForFriendSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) {
-        final cardsProvider = ctx.watch<PaymentMethodsProvider>();
-        final walletProvider = ctx.watch<WalletProvider>();
-        
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 44,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: AppColors.divider,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.divider,
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                const SizedBox(height: 18),
-                const Text(
-                  'Choose Payment Method',
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Who are you booking for?',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+              ),
+              const SizedBox(height: 24),
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.cardBorder),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(height: 16),
-                
-                // Cash Option
-                ListTile(
-                  leading: const Icon(Icons.payments_rounded, color: AppColors.primary),
-                  title: const Text('Cash', style: TextStyle(fontWeight: FontWeight.bold)),
-                  trailing: _payment == 'cash' ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
-                  onTap: () {
-                    setState(() => _payment = 'cash');
-                    Navigator.pop(ctx);
-                  },
-                ),
-                const Divider(height: 1),
-                
-                // Wallet Option
-                ListTile(
-                  leading: const Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary),
-                  title: const Text('Ziggo Wallet', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('Balance: Rs.${walletProvider.balance.toStringAsFixed(2)}'),
-                  trailing: _payment == 'wallet' ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
-                  onTap: () {
-                    setState(() => _payment = 'wallet');
-                    Navigator.pop(ctx);
-                  },
-                ),
-                const Divider(height: 1),
-
-                // Corporate Option
-                if (cardsProvider.corporateProfile != null) ...[
-                  ListTile(
-                    leading: const Icon(Icons.business_rounded, color: AppColors.primary),
-                    title: Text('Corporate: ${cardsProvider.corporateProfile!['company_name']}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text('Status: ${(cardsProvider.corporateProfile!['status'] ?? 'active').toUpperCase()}'),
-                    trailing: _payment == 'corporate' ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
-                    onTap: () {
-                      setState(() => _payment = 'corporate');
-                      Navigator.pop(ctx);
-                    },
-                  ),
-                  const Divider(height: 1),
-                ],
-
-                // Saved Cards
-                if (cardsProvider.cards.isNotEmpty) ...[
-                  Padding(
-                    padding: const EdgeInsets.only(left: 16, top: 12, bottom: 4),
-                    child: Text(
-                      'SAVED CARDS',
-                      style: TextStyle(fontSize: 10, color: AppColors.textTertiary, fontWeight: FontWeight.bold, letterSpacing: 1.1),
-                    ),
-                  ),
-                  ...cardsProvider.cards.map((c) {
-                    final String cardNo = c['card_no'] ?? '';
-                    final String value = 'card_${c['id']}';
-                    return ListTile(
-                      leading: const Icon(Icons.credit_card_rounded, color: AppColors.primary),
-                      title: Text('${c['card_type']} ending in ${cardNo.substring(cardNo.length - 4)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      trailing: _payment == value ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
+                child: Column(
+                  children: [
+                    ListTile(
                       onTap: () {
-                        setState(() => _payment = value);
                         Navigator.pop(ctx);
                       },
-                    );
-                  }),
-                  const Divider(height: 1),
-                ],
-
-                // Add card shortcut
-                ListTile(
-                  leading: const Icon(Icons.add_rounded, color: AppColors.accent),
-                  title: const Text('Add new card', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.accent)),
-                  onTap: () async {
-                    Navigator.pop(ctx);
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const PaymentMethodsScreen()),
-                    );
-                    if (context.mounted) {
-                      context.read<PaymentMethodsProvider>().fetchCards();
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildPaymentPicker() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-        ),
-        child: InkWell(
-          onTap: () => _showPaymentPicker(context),
-          child: Row(
-            children: [
-              Icon(
-                _payment == 'cash'
-                    ? Icons.payments_rounded
-                    : _payment == 'wallet'
-                        ? Icons.account_balance_wallet_rounded
-                        : _payment == 'corporate'
-                            ? Icons.business_rounded
-                            : Icons.credit_card_rounded,
-                color: AppColors.primary,
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  _payment == 'cash'
-                      ? 'Cash'
-                      : _payment == 'wallet'
-                          ? 'Ziggo Wallet (Rs.${context.read<WalletProvider>().balance.toStringAsFixed(0)})'
-                          : _payment == 'corporate'
-                              ? 'Corporate (${context.read<PaymentMethodsProvider>().corporateProfile?['company_name'] ?? 'Business'})'
-                              : _getSelectedCardLabel(),
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                ),
-              ),
-              const Text(
-                'CHANGE',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 12,
+                      leading: const Icon(Icons.contact_phone_outlined, color: AppColors.textPrimary),
+                      title: const Text('Phone book', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                      trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      onTap: () {
+                        setState(() => _friend = null);
+                        Navigator.pop(ctx);
+                      },
+                      leading: const Icon(Icons.person_outline_rounded, color: AppColors.textPrimary),
+                      title: const Text('Set as you', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                      trailing: _friend == null ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      onTap: () {
+                        setState(() => _friend = (name: 'John Doe', phone: '+94771234567'));
+                        Navigator.pop(ctx);
+                      },
+                      leading: const Icon(Icons.history_rounded, color: AppColors.textPrimary),
+                      title: const Text('Recent contacts (1)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                      trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary),
+                    ),
+                  ],
                 ),
               ),
             ],
