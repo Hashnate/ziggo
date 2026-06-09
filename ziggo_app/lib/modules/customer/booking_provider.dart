@@ -105,6 +105,8 @@ class BookingProvider extends ChangeNotifier {
     String paymentMethod = 'cash',
     String? promoCode,
     String tripType = 'one_way',
+    String? friendName,
+    String? friendPhone,
     // Flash parcel fields — only set for parcel deliveries
     bool isFlash = false,
     String? parcelType,
@@ -136,6 +138,8 @@ class BookingProvider extends ChangeNotifier {
           'payment_method': paymentMethod,
           'trip_type': tripType,
           if (promoCode != null && promoCode.isNotEmpty) 'promo_code': promoCode,
+          if (friendName != null && friendName.isNotEmpty) 'friend_name': friendName,
+          if (friendPhone != null && friendPhone.isNotEmpty) 'friend_phone': friendPhone,
           if (redeemPoints > 0) 'redeem_points': redeemPoints,
           if (stops.isNotEmpty) 'stops': stops,
           if (isFlash) ...{

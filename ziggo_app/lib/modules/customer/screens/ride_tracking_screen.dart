@@ -656,8 +656,23 @@ class _DriverCard extends StatelessWidget {
         : 'D';
     final photo = d['profile_photo']?.toString();
     final photoUrl = (photo != null && photo.isNotEmpty)
-        ? (photo.startsWith('http') ? photo : '${ApiConfig.baseHost}/$photo')
+        ? (photo.startsWith('http') 
+            ? photo 
+            : (photo.startsWith('/') 
+                ? '${ApiConfig.baseHost}$photo' 
+                : '${ApiConfig.baseHost}/$photo'))
         : null;
+
+    final fallback = Center(
+      child: Text(
+        initial,
+        style: const TextStyle(
+          color: Colors.black,
+          fontWeight: FontWeight.w900,
+          fontSize: 22,
+        ),
+      ),
+    );
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(22),
@@ -698,7 +713,6 @@ class _DriverCard extends StatelessWidget {
                 Container(
                   width: 54,
                   height: 54,
-                  alignment: Alignment.center,
                   decoration: BoxDecoration(
                     gradient: AppColors.goldGradient,
                     borderRadius: BorderRadius.circular(18),
@@ -709,23 +723,17 @@ class _DriverCard extends StatelessWidget {
                         offset: const Offset(0, 6),
                       ),
                     ],
-                    image: photoUrl != null
-                        ? DecorationImage(
-                            image: NetworkImage(photoUrl),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
                   ),
-                  child: photoUrl != null
-                      ? null
-                      : Text(
-                          initial,
-                          style: const TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 22,
-                          ),
-                        ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: photoUrl != null
+                        ? Image.network(
+                            photoUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => fallback,
+                          )
+                        : fallback,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -882,6 +890,64 @@ class _ActionRow extends StatelessWidget {
   final Map<String, dynamic> active;
   const _ActionRow({required this.active});
 
+  void _showCancelDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        final reasons = [
+          'Driver is too far',
+          'Wait time is too long',
+          'Changed my mind',
+          'Booked by mistake',
+          'Found another ride',
+        ];
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44, height: 5,
+                    decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text('Cancel Ride', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                const SizedBox(height: 8),
+                const Text('Please tell us why you are cancelling.', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 16),
+                ...reasons.map((r) => ListTile(
+                  title: Text(r, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                  contentPadding: EdgeInsets.zero,
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await context.read<BookingProvider>().cancelActive();
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                )),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Nevermind, don\'t cancel', style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final status = active['status'] as String?;
@@ -893,10 +959,7 @@ class _ActionRow extends StatelessWidget {
         if (canCancel)
           Expanded(
             child: GestureDetector(
-              onTap: () async {
-                await context.read<BookingProvider>().cancelActive();
-                if (context.mounted) Navigator.pop(context);
-              },
+              onTap: () => _showCancelDialog(context),
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 alignment: Alignment.center,
