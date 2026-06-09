@@ -152,7 +152,21 @@ class _RestaurantCategoryCardState extends State<_RestaurantCategoryCard> {
             }
             final r = snap.data!;
             final allItems = (r['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-            final matchedItems = allItems.where((it) => it['category_id'] == widget.category['id']).toList();
+            final internalCategories = (r['categories'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+            
+            final globalCatName = widget.category['name']?.toString().toLowerCase() ?? '';
+            
+            // Find internal category IDs that loosely match the global category name
+            final matchingCatIds = internalCategories
+                .where((c) => c['name']?.toString().toLowerCase().contains(globalCatName) ?? false)
+                .map((c) => c['id'])
+                .toSet();
+
+            final matchedItems = allItems.where((it) {
+              final isCatMatch = matchingCatIds.contains(it['category_id']);
+              final isNameMatch = it['name']?.toString().toLowerCase().contains(globalCatName) ?? false;
+              return isCatMatch || isNameMatch;
+            }).take(5).toList(); // Show up to 5 relevant items
 
             if (matchedItems.isEmpty) return const SizedBox(height: 16);
 
