@@ -11,7 +11,9 @@
       "Bash(Select-Object Name)",
       "PowerShell($path = 'c:\\\\Users\\\\musny\\\\Desktop\\\\Hashnate\\\\ziggo\\\\ziggo_app\\\\lib\\\\modules\\\\customer\\\\screens\\\\restaurant_detail_screen.dart'; \\(Get-Content $path -TotalCount 413\\) | Set-Content $path -Encoding utf8; \"Lines now: \" + \\(Get-Content $path | Measure-Object -Line\\).Lines)",
       "Bash(grep -vE \"withOpacity|Got dependencies|newer versions|pub outdated|Analyzing|^\\\\s*$\")",
-      "Bash(grep -vE \"withOpacity|Got dependencies|newer versions|pub outdated|available\\\\\\)|^\\\\s*$\")"
+      "Bash(grep -vE \"withOpacity|Got dependencies|newer versions|pub outdated|available\\\\\\)|^\\\\s*$\")",
+      "Bash(curl -s \"https://maps.googleapis.com/maps/api/place/autocomplete/json?input=Maradana&key=AIzaSyAxGlCCI4yoOn3umPPyX1VypSzL2Sutz9U&components=country:lk\")",
+      "Bash(curl -s -I -X OPTIONS \"https://maps.googleapis.com/maps/api/place/autocomplete/json?input=Maradana&key=AIzaSyAxGlCCI4yoOn3umPPyX1VypSzL2Sutz9U&components=country:lk\" -H \"Origin: http://localhost\" -H \"Access-Control-Request-Method: GET\")"
     ]
   }
 }
