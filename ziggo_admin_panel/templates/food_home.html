@@ -8,6 +8,30 @@
 {% set link_types = ['none', 'restaurant', 'category', 'collection', 'promo', 'url'] %}
 {% set colors = ['primary', 'orange', 'purple', 'green', 'blue', 'red', 'indigo', 'cyan'] %}
 
+{# Link-target picker for a banner: shows the right control for the chosen
+   link_type (restaurant/category/collection -> a name dropdown, promo -> a code
+   dropdown, url -> a text box). Only the matching control is enabled, so exactly
+   one link_value is submitted. JS (syncBannerLink) keeps it in sync on change. #}
+{% macro link_value_controls(ct, cv, restaurants, categories, collections, promos, input_cls) %}
+    <select name="link_value" data-lt="restaurant" class="lv {{ input_cls }}{% if ct != 'restaurant' %} hidden{% endif %}" {% if ct != 'restaurant' %}disabled{% endif %}>
+        <option value="">— pick restaurant —</option>
+        {% for r in restaurants %}<option value="{{ r.id }}" {% if ct == 'restaurant' and cv == r.id|string %}selected{% endif %}>{{ r.name }}</option>{% endfor %}
+    </select>
+    <select name="link_value" data-lt="category" class="lv {{ input_cls }}{% if ct != 'category' %} hidden{% endif %}" {% if ct != 'category' %}disabled{% endif %}>
+        <option value="">— pick category —</option>
+        {% for c in categories %}<option value="{{ c.id }}" {% if ct == 'category' and cv == c.id|string %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+    </select>
+    <select name="link_value" data-lt="collection" class="lv {{ input_cls }}{% if ct != 'collection' %} hidden{% endif %}" {% if ct != 'collection' %}disabled{% endif %}>
+        <option value="">— pick collection —</option>
+        {% for c in collections %}<option value="{{ c.id }}" {% if ct == 'collection' and cv == c.id|string %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+    </select>
+    <select name="link_value" data-lt="promo" class="lv {{ input_cls }}{% if ct != 'promo' %} hidden{% endif %}" {% if ct != 'promo' %}disabled{% endif %}>
+        <option value="">— pick promo —</option>
+        {% for p in promos %}<option value="{{ p.code }}" {% if ct == 'promo' and cv == p.code %}selected{% endif %}>{{ p.code }}</option>{% endfor %}
+    </select>
+    <input name="link_value" data-lt="url" class="lv {{ input_cls }}{% if ct != 'url' %} hidden{% endif %}" {% if ct != 'url' %}disabled{% endif %} placeholder="https://..." value="{% if ct == 'url' %}{{ cv }}{% endif %}">
+{% endmacro %}
+
 <div class="space-y-8 max-w-6xl">
     <p class="text-sm text-ziggo-muted font-bold">
         Everything here drives the customer <span class="text-ziggo">Food</span> home screen
@@ -30,12 +54,12 @@
                 <div class="w-24 h-14 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center flex-shrink-0">
                     {% if b.image_url %}<img src="{{ b.image_url }}" class="w-full h-full object-cover">{% else %}<i class="fas fa-image text-ziggo-faint"></i>{% endif %}
                 </div>
-                <form method="post" enctype="multipart/form-data" action="/admin/food-home/banners/{{ b.id }}/edit" class="flex-1 grid grid-cols-2 md:grid-cols-6 gap-2 items-center">
+                <form method="post" enctype="multipart/form-data" action="/admin/food-home/banners/{{ b.id }}/edit" class="banner-form flex-1 grid grid-cols-2 md:grid-cols-6 gap-2 items-center">
                     <input name="title" value="{{ b.title or '' }}" placeholder="Title" class="{{ input_cls }} md:col-span-1">
-                    <select name="link_type" class="{{ input_cls }}">
+                    <select name="link_type" onchange="syncBannerLink(this)" class="{{ input_cls }}">
                         {% for lt in link_types %}<option value="{{ lt }}" {% if b.link_type == lt %}selected{% endif %}>{{ lt }}</option>{% endfor %}
                     </select>
-                    <input name="link_value" value="{{ b.link_value or '' }}" placeholder="Link value" class="{{ input_cls }}">
+                    {{ link_value_controls(b.link_type, (b.link_value or ''), restaurants, categories, collections, promos, input_cls) }}
                     <input name="image_url" value="" placeholder="Image URL (or upload)" class="{{ input_cls }}">
                     <input type="file" name="image" accept="image/*" class="{{ input_cls }} text-xs">
                     <div class="flex items-center gap-1">
@@ -57,10 +81,10 @@
             {% endfor %}
         </div>
 
-        <form method="post" enctype="multipart/form-data" action="/admin/food-home/banners/new" class="p-4 bg-gray-50/60 grid grid-cols-2 md:grid-cols-7 gap-2 items-center">
+        <form method="post" enctype="multipart/form-data" action="/admin/food-home/banners/new" class="banner-form p-4 bg-gray-50/60 grid grid-cols-2 md:grid-cols-7 gap-2 items-center">
             <input name="title" placeholder="Title" class="{{ input_cls }}">
-            <select name="link_type" class="{{ input_cls }}">{% for lt in link_types %}<option value="{{ lt }}">{{ lt }}</option>{% endfor %}</select>
-            <input name="link_value" placeholder="Link value" class="{{ input_cls }}">
+            <select name="link_type" onchange="syncBannerLink(this)" class="{{ input_cls }}">{% for lt in link_types %}<option value="{{ lt }}">{{ lt }}</option>{% endfor %}</select>
+            {{ link_value_controls('none', '', restaurants, categories, collections, promos, input_cls) }}
             <input name="image_url" placeholder="Image URL" class="{{ input_cls }}">
             <input type="file" name="image" accept="image/*" class="{{ input_cls }} text-xs">
             <input name="display_order" type="number" value="0" placeholder="Order" class="{{ input_cls }}">
@@ -227,4 +251,21 @@
         </form>
     </section>
 </div>
+
+<script>
+// Banner link target: show only the control matching the chosen link_type and
+// disable the rest so exactly one `link_value` is submitted.
+function syncBannerLink(sel) {
+    var form = sel.closest('form');
+    var t = sel.value;
+    form.querySelectorAll('.lv').forEach(function (el) {
+        var match = el.getAttribute('data-lt') === t;
+        el.classList.toggle('hidden', !match);
+        el.disabled = !match;
+    });
+}
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.banner-form select[name="link_type"]').forEach(syncBannerLink);
+});
+</script>
 {% endblock %}
