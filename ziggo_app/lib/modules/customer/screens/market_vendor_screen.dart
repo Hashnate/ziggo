@@ -595,10 +595,10 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
             ),
           ),
           SizedBox(
-            height: 220,
+            height: 252,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+              padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
               itemCount: items.length,
               separatorBuilder: (_, __) => const SizedBox(width: 12),
               itemBuilder: (_, i) => _ProductTile(
@@ -1024,20 +1024,30 @@ bool _isOutOfStock(Map<String, dynamic> p) {
   return !available || (stock != null && stock <= 0);
 }
 
+Widget _productPlaceholder(double size) {
+  return Container(
+    width: size,
+    height: size,
+    alignment: Alignment.center,
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          AppColors.primary.withOpacity(0.10),
+          AppColors.primary.withOpacity(0.04),
+        ],
+      ),
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: Icon(Icons.shopping_basket_rounded,
+        color: AppColors.primary.withOpacity(0.45), size: size * 0.34),
+  );
+}
+
 Widget _productImage(Map<String, dynamic> p, double size) {
   final url = _imgUrl(p['image_url']?.toString());
-  if (url == null) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: const Icon(Icons.inventory_2_rounded,
-          color: AppColors.textTertiary, size: 28),
-    );
-  }
+  if (url == null) return _productPlaceholder(size);
   return ClipRRect(
     borderRadius: BorderRadius.circular(14),
     child: Image.network(
@@ -1045,13 +1055,9 @@ Widget _productImage(Map<String, dynamic> p, double size) {
       width: size,
       height: size,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Container(
-        width: size,
-        height: size,
-        color: AppColors.surfaceMuted,
-        child: const Icon(Icons.broken_image_rounded,
-            color: AppColors.textTertiary, size: 24),
-      ),
+      loadingBuilder: (_, child, progress) =>
+          progress == null ? child : _productPlaceholder(size),
+      errorBuilder: (_, __, ___) => _productPlaceholder(size),
     ),
   );
 }

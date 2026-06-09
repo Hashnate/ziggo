@@ -8,15 +8,19 @@ import '../../../core/widgets/motion.dart';
 import 'support_chat_screen.dart';
 
 class SupportScreen extends StatefulWidget {
-  const SupportScreen({super.key});
+  const SupportScreen({super.key, this.isDriver = false});
+
+  final bool isDriver;
 
   @override
   State<SupportScreen> createState() => _SupportScreenState();
 }
 
 class _SupportScreenState extends State<SupportScreen> {
-  static const _categories = [
-    {'value': 'driver_behavior', 'label': 'Driver behavior', 'icon': Icons.person_off_rounded, 'color': AppColors.error},
+  late final List<Map<String, dynamic>> _categories = [
+    widget.isDriver
+        ? {'value': 'passenger_behavior', 'label': 'Passenger behavior', 'icon': Icons.person_off_rounded, 'color': AppColors.error}
+        : {'value': 'driver_behavior', 'label': 'Driver behavior', 'icon': Icons.person_off_rounded, 'color': AppColors.error},
     {'value': 'fare_issue', 'label': 'Fare / billing', 'icon': Icons.payments_rounded, 'color': AppColors.warning},
     {'value': 'safety', 'label': 'Safety concern', 'icon': Icons.shield_rounded, 'color': AppColors.flash},
     {'value': 'technical', 'label': 'Technical issue', 'icon': Icons.bug_report_rounded, 'color': AppColors.bike},

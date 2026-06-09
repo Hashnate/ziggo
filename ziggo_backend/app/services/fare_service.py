@@ -27,7 +27,21 @@ RENTAL_HOURLY = {
     "truck": 2500,
 }
 
+# Courier (island-wide, 2-3 day, CityPak-style) pricing. Unlike rides/flash
+# the fare is weight-led, not distance-led: a flat handling base + the parcel
+# weight surcharge (reused from FlashWeightTier), plus a small per-km component
+# so cross-island parcels cost a little more than across-town ones.
+COURIER_BASE = 250.0          # flat handling fee (LKR)
+COURIER_PER_KM = 6.0          # gentle distance component (LKR/km)
+# SLA: nearby parcels land in 2 days, longer hauls in 3.
+COURIER_FAST_MAX_KM = 30.0
+
 EARTH_KM = 6371.0
+
+
+def courier_eta_days(distance_km: float) -> int:
+    """Promised delivery window in days, by haul distance."""
+    return 2 if distance_km <= COURIER_FAST_MAX_KM else 3
 
 
 def haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -80,6 +94,7 @@ async def calculate_fare(
     parcel_weight_kg: Optional[float] = None,
     is_rental: bool = False,
     rental_hours: Optional[int] = None,
+    is_courier: bool = False,
     # BRD: RW-01 (earn) + RW-02 (redeem) + RS-07 (display)
     customer=None,
     redeem_points: int = 0,
@@ -136,6 +151,60 @@ async def calculate_fare(
             "rental_hours": hours,
         }
         return await _enrich_with_loyalty(db, rental_dict, customer, redeem_points)
+
+    # Courier: weight-led island-wide delivery. Fare = handling base + weight
+    # surcharge (shared FlashWeightTier table) + a gentle per-km component.
+    # Promo discount + platform split still apply. No surge, no multi-stop.
+    if is_courier:
+        setting_q = await db.execute(
+            select(FareSetting).where(FareSetting.service_type == service_type)
+        )
+        setting = setting_q.scalars().first()
+        platform_pct = float(setting.platform_fee_percent or 15) if setting else 15.0
+
+        distance_km = haversine_km(pickup_lat, pickup_lng, drop_lat, drop_lng)
+        weight_surcharge = 0.0
+        if parcel_weight_kg is not None:
+            weight_surcharge = await _flash_surcharge(db, float(parcel_weight_kg))
+        fare = COURIER_BASE + weight_surcharge + COURIER_PER_KM * distance_km
+        eta_days = courier_eta_days(distance_km)
+
+        discount = 0.0
+        promo_applied = None
+        if promo:
+            promo_q = await db.execute(
+                select(PromoCode).where(PromoCode.code == promo.upper())
+            )
+            p = promo_q.scalars().first()
+            if p and p.is_active and (
+                p.usage_limit is None or p.used_count < p.usage_limit
+            ):
+                if p.discount_type == "percentage":
+                    discount = fare * (float(p.discount_value) / 100.0)
+                    if p.max_discount:
+                        discount = min(discount, float(p.max_discount))
+                else:
+                    discount = float(p.discount_value)
+                promo_applied = p.code
+
+        final = max(0, fare - discount)
+        platform_fee = final * (platform_pct / 100.0)
+        driver_earnings = final - platform_fee
+
+        courier_dict = {
+            "distance_km": round(distance_km, 2),
+            "duration_min": eta_days * 24 * 60,
+            "fare_amount": round(fare, 2),
+            "discount_amount": round(discount, 2),
+            "final_amount": round(final, 2),
+            "platform_fee": round(platform_fee, 2),
+            "driver_earnings": round(driver_earnings, 2),
+            "promo_code": promo_applied,
+            "surge_multiplier": 1.0,
+            "flash_surcharge": round(weight_surcharge, 2),
+            "courier_eta_days": eta_days,
+        }
+        return await _enrich_with_loyalty(db, courier_dict, customer, redeem_points)
 
     # BRD: CD-19 — sum of leg distances when intermediate stops are present.
     # Stops are an ordered list between pickup and drop; legs cover every

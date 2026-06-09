@@ -38,11 +38,7 @@ router = APIRouter()
 
 
 # ---------- Flash pricing tiers (public — used by the customer flash screen) ----------
-@router.get("/flash/pricing")
-async def list_flash_tiers(
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
-):
+async def _weight_tiers(db: AsyncSession) -> list:
     q = await db.execute(
         select(FlashWeightTier)
         .where(FlashWeightTier.is_active == True)  # noqa: E712
@@ -61,6 +57,25 @@ async def list_flash_tiers(
         }
         for t in q.scalars().all()
     ]
+
+
+@router.get("/flash/pricing")
+async def list_flash_tiers(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    return await _weight_tiers(db)
+
+
+# ---------- Courier pricing tiers (public — used by the customer courier screen) ----------
+# Courier shares the same weight bands as flash; the base/per-km differ in the
+# fare engine, not the tier table.
+@router.get("/courier/pricing")
+async def list_courier_tiers(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    return await _weight_tiers(db)
 
 
 # ---------- Promos (BRD: RW-04 promotions inbox) ----------

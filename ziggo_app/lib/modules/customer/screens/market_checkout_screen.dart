@@ -47,7 +47,8 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
   }
 
   Future<void> _refreshQuote() async {
-    double? lat, lng;
+    double? lat;
+    double? lng;
     if (_saved != null) {
       lat = (_saved!['lat'] as num).toDouble();
       lng = (_saved!['lng'] as num).toDouble();
@@ -55,7 +56,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
       lat = _picked!.location.latitude;
       lng = _picked!.location.longitude;
     }
-    if (lat != null && lng != null && mounted) {
+    if (lat != null && lng != null) {
       await context.read<MarketProvider>().quoteDelivery(lat: lat, lng: lng);
     }
   }
