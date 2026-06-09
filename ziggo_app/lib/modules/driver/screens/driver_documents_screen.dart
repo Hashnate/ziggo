@@ -253,25 +253,28 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          OutlinedButton(
-            onPressed: busy ? null : () => _uploadFor(kind),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              side: const BorderSide(color: AppColors.cardBorder),
+          if (verified)
+            const Icon(Icons.lock_rounded, color: AppColors.textTertiary, size: 18)
+          else
+            OutlinedButton(
+              onPressed: busy ? null : () => _uploadFor(kind),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                side: const BorderSide(color: AppColors.cardBorder),
+              ),
+              child: busy
+                  ? const SizedBox(
+                      width: 14, height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(url == null ? 'Upload' : 'Replace',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 11,
+                        color: AppColors.textPrimary,
+                      )),
             ),
-            child: busy
-                ? const SizedBox(
-                    width: 14, height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(url == null ? 'Upload' : 'Replace',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 11,
-                      color: AppColors.textPrimary,
-                    )),
-          ),
         ],
       ),
     );

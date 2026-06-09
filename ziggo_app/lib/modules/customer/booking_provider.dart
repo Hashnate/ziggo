@@ -52,6 +52,7 @@ class BookingProvider extends ChangeNotifier {
     double? parcelWeightKg,
     bool isRental = false,
     int? rentalHours,
+    bool isCourier = false,
     // BRD: RW-02 — preview redemption
     int redeemPoints = 0,
     // BRD: CD-19 — intermediate stops, each {lat,lng,address}
@@ -68,6 +69,7 @@ class BookingProvider extends ChangeNotifier {
           'drop_lng': drop.longitude,
           'trip_type': tripType,
           if (isFlash) 'is_flash': true,
+          if (isCourier) 'is_courier': true,
           if (parcelWeightKg != null) 'parcel_weight_kg': parcelWeightKg,
           if (isRental) 'is_rental': true,
           if (rentalHours != null) 'rental_hours': rentalHours,
@@ -114,6 +116,8 @@ class BookingProvider extends ChangeNotifier {
     String? receiverName,
     String? receiverPhone,
     String? parcelInstructions,
+    // Courier parcel fields — island-wide weight-priced delivery
+    bool isCourier = false,
     // Rental fields — only set when the booking is a vehicle-hire
     bool isRental = false,
     int? rentalHours,
@@ -142,8 +146,9 @@ class BookingProvider extends ChangeNotifier {
           if (friendPhone != null && friendPhone.isNotEmpty) 'friend_phone': friendPhone,
           if (redeemPoints > 0) 'redeem_points': redeemPoints,
           if (stops.isNotEmpty) 'stops': stops,
-          if (isFlash) ...{
-            'is_flash': true,
+          if (isFlash || isCourier) ...{
+            if (isFlash) 'is_flash': true,
+            if (isCourier) 'is_courier': true,
             if (parcelType != null) 'parcel_type': parcelType,
             if (parcelWeightKg != null) 'parcel_weight_kg': parcelWeightKg,
             if (receiverName != null && receiverName.isNotEmpty) 'receiver_name': receiverName,
@@ -254,6 +259,15 @@ class BookingProvider extends ChangeNotifier {
   Future<List<Map<String, dynamic>>> fetchFlashTiers() async {
     try {
       final resp = await ApiClient.instance.dio.get('/flash/pricing');
+      return List<Map<String, dynamic>>.from(resp.data as List);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchCourierTiers() async {
+    try {
+      final resp = await ApiClient.instance.dio.get('/courier/pricing');
       return List<Map<String, dynamic>>.from(resp.data as List);
     } catch (_) {
       return const [];

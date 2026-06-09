@@ -2191,7 +2191,7 @@ class _Drawer extends StatelessWidget {
                       Navigator.pop(context);
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const SupportScreen()),
+                        MaterialPageRoute(builder: (_) => const SupportScreen(isDriver: true)),
                       );
                     },
                   ),

@@ -93,7 +93,7 @@ class _ChooseLocationScreenState extends State<ChooseLocationScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Choose Location',
+          'Location',
           style: TextStyle(
             color: AppColors.textPrimary,
             fontWeight: FontWeight.w900,
@@ -267,7 +267,7 @@ class _ChooseLocationScreenState extends State<ChooseLocationScreen> {
               height: 44,
               alignment: Alignment.center,
               decoration: const BoxDecoration(
-                color: AppColors.primary,
+                color: AppColors.accent,
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: Colors.white, size: 22),
@@ -321,11 +321,11 @@ class _ChooseLocationScreenState extends State<ChooseLocationScreen> {
               height: 40,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.12),
+                color: AppColors.accent.withOpacity(0.12),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.history_rounded,
-                  color: AppColors.primary, size: 20),
+                  color: AppColors.accent, size: 20),
             ),
             const SizedBox(width: 14),
             Expanded(
