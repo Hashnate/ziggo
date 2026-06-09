@@ -8,6 +8,7 @@ import '../../../core/map/places.dart';
 import '../../../core/widgets/motion.dart';
 import '../addresses_provider.dart';
 import '../food_provider.dart';
+import '../food_ui.dart';
 import '../promos_provider.dart';
 import '../wallet_provider.dart';
 import '../payment_methods_provider.dart';
@@ -188,7 +189,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         const SizedBox(width: 10),
                         Expanded(child: Text(it['name'].toString())),
                         Text(
-                          'Rs.${((it['price'] as num) * qty).toStringAsFixed(0)}',
+                          formatRs((it['price'] as num) * qty),
                           style: const TextStyle(fontWeight: FontWeight.w900),
                         ),
                       ],
@@ -412,12 +413,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             title: 'BILL SUMMARY',
             child: Column(
               children: [
-                _row('Items total', 'Rs.${food.cartTotal.toStringAsFixed(0)}'),
-                _row('Delivery fee', 'Rs.${deliveryFee.toStringAsFixed(0)}'),
+                _row('Items total', formatRs(food.cartTotal)),
+                _row('Delivery fee', formatRs(deliveryFee)),
                 if (_usePoints && discount > 0)
-                  _row('Points Discount', '-Rs.${discount.toStringAsFixed(0)}', color: AppColors.success),
+                  _row('Points Discount', '-${formatRs(discount)}', color: AppColors.success),
                 const Divider(height: 16),
-                _row('Total', 'Rs.${total.toStringAsFixed(0)}', bold: true),
+                _row('Total', formatRs(total), bold: true),
               ],
             ),
           ),
@@ -428,7 +429,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: PrimaryButton(
-            label: 'PLACE ORDER • Rs.${total.toStringAsFixed(0)}',
+            label: 'PLACE ORDER • ${formatRs(total)}',
             icon: Icons.check_rounded,
             busy: _busy,
             onPressed: _placeOrder,
@@ -610,9 +611,9 @@ class _Section extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.cardBorder),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppStyles.radiusMd),
+        boxShadow: AppStyles.shadowSm,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

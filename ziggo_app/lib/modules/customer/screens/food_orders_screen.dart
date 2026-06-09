@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
+import '../../../app/app_styles.dart';
 import '../food_provider.dart';
+import '../food_ui.dart';
 import 'food_tracking_screen.dart';
 
 class FoodOrdersScreen extends StatefulWidget {
@@ -101,12 +103,9 @@ class _FoodOrdersScreenState extends State<FoodOrdersScreen> {
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.divider),
-                    boxShadow: [
-                      BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
-                    ],
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(AppStyles.radiusMd),
+                    boxShadow: AppStyles.shadowSm,
                   ),
                   child: ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -142,7 +141,7 @@ class _FoodOrdersScreenState extends State<FoodOrdersScreen> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'Rs.${(o['final_amount'] ?? 0).toStringAsFixed(0)}',
+                            formatRs(o['final_amount'] as num?),
                             style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textSecondary),
                           ),
                         ],

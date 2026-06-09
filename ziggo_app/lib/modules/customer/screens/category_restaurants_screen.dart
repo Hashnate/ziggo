@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
+import '../../../app/app_styles.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/widgets/motion.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../food_provider.dart';
-import 'food_home_screen.dart';
+import '../food_ui.dart';
+import 'checkout_screen.dart';
 import 'restaurant_detail_screen.dart';
 
 class CategoryRestaurantsScreen extends StatefulWidget {
@@ -37,7 +40,7 @@ class _CategoryRestaurantsScreenState extends State<CategoryRestaurantsScreen> {
         qp['lng'] = p.deliveryLng;
       }
       final resp = await ApiClient.instance.dio.get('/food/restaurants', queryParameters: qp);
-      
+
       if (!mounted) return;
       setState(() {
         _restaurants = List<Map<String, dynamic>>.from(
@@ -53,14 +56,17 @@ class _CategoryRestaurantsScreenState extends State<CategoryRestaurantsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final name = widget.category['name']?.toString() ?? 'Category';
+    final cartCount = context.select<FoodProvider, int>((f) => f.cartCount);
+
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         title: Text(
-          widget.category['name']?.toString() ?? 'Category',
+          name,
           style: const TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.w900),
         ),
         leading: IconButton(
@@ -69,64 +75,90 @@ class _CategoryRestaurantsScreenState extends State<CategoryRestaurantsScreen> {
         ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.food))
+          ? _loadingState()
           : _restaurants.isEmpty
               ? _empty()
               : ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  itemCount: _restaurants.length,
+                  padding: const EdgeInsets.only(top: 8, bottom: 120),
+                  itemCount: _restaurants.length + 1,
                   itemBuilder: (context, i) {
+                    if (i == 0) {
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                        child: Text(
+                          "${_restaurants.length} place${_restaurants.length == 1 ? '' : 's'} serving $name",
+                          style: const TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w700, fontSize: 13),
+                        ),
+                      );
+                    }
+                    final idx = i - 1;
                     return EntranceSlide(
-                      delay: Duration(milliseconds: 55 * i),
-                      child: _RestaurantCategoryCard(
-                        restaurant: _restaurants[i],
+                      delay: Duration(milliseconds: 50 * idx),
+                      child: _RestaurantSection(
+                        restaurant: _restaurants[idx],
                         category: widget.category,
                       ),
                     );
                   },
                 ),
+      bottomNavigationBar: cartCount == 0 ? null : const _CartBar(),
+    );
+  }
+
+  Widget _loadingState() {
+    return ListView(
+      padding: const EdgeInsets.only(top: 16),
+      children: List.generate(
+        3,
+        (_) => const Padding(
+          padding: EdgeInsets.only(bottom: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: Skeleton(width: 180, height: 18),
+              ),
+              DishTileSkeleton(),
+              DishTileSkeleton(),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
   Widget _empty() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 60),
-      child: Center(
-        child: Column(
-          children: [
-            Container(
-              width: 96,
-              height: 96,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.surfaceMuted,
-                borderRadius: BorderRadius.circular(28),
-              ),
-              child: const Icon(Icons.restaurant_menu_rounded, size: 44, color: AppColors.textTertiary),
-            ),
-            const SizedBox(height: 18),
-            const Text(
-              'No restaurants found',
-              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
-            ),
-          ],
-        ),
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 96,
+            height: 96,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: BorderRadius.circular(28)),
+            child: const Icon(Icons.restaurant_menu_rounded, size: 44, color: AppColors.textTertiary),
+          ),
+          const SizedBox(height: 18),
+          const Text('No restaurants found', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+        ],
       ),
     );
   }
 }
 
-class _RestaurantCategoryCard extends StatefulWidget {
+class _RestaurantSection extends StatefulWidget {
   final Map<String, dynamic> restaurant;
   final Map<String, dynamic> category;
 
-  const _RestaurantCategoryCard({required this.restaurant, required this.category});
+  const _RestaurantSection({required this.restaurant, required this.category});
 
   @override
-  State<_RestaurantCategoryCard> createState() => _RestaurantCategoryCardState();
+  State<_RestaurantSection> createState() => _RestaurantSectionState();
 }
 
-class _RestaurantCategoryCardState extends State<_RestaurantCategoryCard> {
+class _RestaurantSectionState extends State<_RestaurantSection> {
   late Future<Map<String, dynamic>?> _detailFuture;
 
   @override
@@ -135,110 +167,213 @@ class _RestaurantCategoryCardState extends State<_RestaurantCategoryCard> {
     _detailFuture = context.read<FoodProvider>().fetchRestaurantDetail(widget.restaurant['id'] as int);
   }
 
+  void _openDetail() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => RestaurantDetailScreen(restaurantId: widget.restaurant['id'] as int)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: RestaurantCard(restaurant: widget.restaurant),
-        ),
-        FutureBuilder<Map<String, dynamic>?>(
-          future: _detailFuture,
-          builder: (context, snap) {
-            if (snap.connectionState != ConnectionState.done || snap.data == null) {
-              return const SizedBox(height: 16);
-            }
-            final r = snap.data!;
-            final allItems = (r['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-            final internalCategories = (r['categories'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-            
-            final globalCatName = widget.category['name']?.toString().toLowerCase() ?? '';
-            
-            // Find internal category IDs that loosely match the global category name
-            final matchingCatIds = internalCategories
-                .where((c) => c['name']?.toString().toLowerCase().contains(globalCatName) ?? false)
-                .map((c) => c['id'])
-                .toSet();
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: _detailFuture,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const Column(
+            children: [
+              _HeaderSkeleton(),
+              DishTileSkeleton(),
+            ],
+          );
+        }
+        final r = snap.data;
+        if (r == null) return const SizedBox.shrink();
 
-            final matchedItems = allItems.where((it) {
-              final isCatMatch = matchingCatIds.contains(it['category_id']);
-              final isNameMatch = it['name']?.toString().toLowerCase().contains(globalCatName) ?? false;
-              return isCatMatch || isNameMatch;
-            }).take(5).toList(); // Show up to 5 relevant items
+        final allItems = (r['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        final internalCategories = (r['categories'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        final globalCatName = widget.category['name']?.toString().toLowerCase() ?? '';
 
-            if (matchedItems.isEmpty) return const SizedBox(height: 16);
+        final matchingCatIds = internalCategories
+            .where((c) => c['name']?.toString().toLowerCase().contains(globalCatName) ?? false)
+            .map((c) => c['id'])
+            .toSet();
 
-            return Transform.translate(
-              offset: const Offset(0, -12), // Pull up slightly to reduce gap from the 20px bottom margin
-              child: SizedBox(
-                height: 150,
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  scrollDirection: Axis.horizontal,
-                  itemCount: matchedItems.length,
-                  itemBuilder: (context, index) {
-                    final item = matchedItems[index];
-                    return _MatchedItemCard(item: item, restaurant: widget.restaurant);
-                  },
+        final matchedItems = allItems.where((it) {
+          final isCatMatch = matchingCatIds.contains(it['category_id']);
+          final isNameMatch = it['name']?.toString().toLowerCase().contains(globalCatName) ?? false;
+          return isCatMatch || isNameMatch;
+        }).toList();
+
+        if (matchedItems.isEmpty) return const SizedBox.shrink();
+        final shown = matchedItems.take(3).toList();
+        final extra = matchedItems.length - shown.length;
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _header(r),
+              ...shown.map(
+                (it) => DishTile(
+                  item: it,
+                  restaurant: widget.restaurant,
+                  onTap: _openDetail,
                 ),
               ),
-            );
-          },
+              if (extra > 0)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
+                  child: GestureDetector(
+                    onTap: _openDetail,
+                    behavior: HitTestBehavior.opaque,
+                    child: Row(
+                      children: [
+                        Text(
+                          'See all ${matchedItems.length} items',
+                          style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w900, fontSize: 13),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.arrow_forward_rounded, size: 16, color: AppColors.primary),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _header(Map<String, dynamic> r) {
+    final eta = r['eta_minutes'];
+    final fee = r['delivery_fee'] as num?;
+    final dist = widget.restaurant['distance_km'] as num?;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Pressable(
+        onTap: _openDetail,
+        borderRadius: BorderRadius.circular(AppStyles.radiusMd),
+        child: Row(
+          children: [
+            FoodImage(url: r['image_url']?.toString(), height: 52, width: 52, radius: 14),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    r['name']?.toString() ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                  ),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      RatingPill(rating: r['rating'] as num?, distanceKm: dist),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.timer_rounded, size: 13, color: AppColors.textTertiary),
+                      const SizedBox(width: 3),
+                      Text(
+                        '${eta ?? 30} min',
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.delivery_dining_rounded, size: 14, color: AppColors.textTertiary),
+                      const SizedBox(width: 3),
+                      Text(
+                        formatRs(fee),
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
 
-class _MatchedItemCard extends StatelessWidget {
-  final Map<String, dynamic> item;
-  final Map<String, dynamic> restaurant;
-  const _MatchedItemCard({required this.item, required this.restaurant});
+class _HeaderSkeleton extends StatelessWidget {
+  const _HeaderSkeleton();
 
   @override
   Widget build(BuildContext context) {
-    final img = item['image_url']?.toString();
-    final price = (item['price'] as num).toStringAsFixed(0);
-    return GestureDetector(
-      onTap: () {
-         Navigator.push(
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Row(
+        children: [
+          Skeleton(width: 52, height: 52, radius: 14),
+          SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Skeleton(width: 140, height: 15),
+              SizedBox(height: 8),
+              Skeleton(width: 180, height: 12),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Floating "view cart" bar shown once the user adds an item from the category
+/// list, mirroring the restaurant detail screen.
+class _CartBar extends StatelessWidget {
+  const _CartBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final food = context.watch<FoodProvider>();
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: GestureDetector(
+          onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => RestaurantDetailScreen(restaurantId: restaurant['id'] as int)),
-         );
-      },
-      child: Container(
-        width: 140,
-        margin: const EdgeInsets.only(right: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.divider),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
-                child: img != null && img.isNotEmpty
-                    ? Image.network(img, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_,__,___) => Container(color: AppColors.surfaceMuted))
-                    : Container(color: AppColors.surfaceMuted, width: double.infinity, child: const Icon(Icons.fastfood_rounded, color: AppColors.textTertiary)),
-              ),
+            MaterialPageRoute(builder: (_) => const CheckoutScreen()),
+          ),
+          child: Container(
+            height: 60,
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            decoration: BoxDecoration(
+              color: Colors.black,
+              borderRadius: BorderRadius.circular(AppStyles.radiusMd),
+              boxShadow: AppStyles.shadowLg,
             ),
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(item['name']?.toString() ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-                  const SizedBox(height: 2),
-                  Text('Rs.$price', style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.primary, fontSize: 12)),
-                ],
-              ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(10)),
+                  child: Text(
+                    '${food.cartCount}',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text('View cart', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+                const Spacer(),
+                Text(
+                  formatRs(food.cartTotal),
+                  style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w900, fontSize: 15),
+                ),
+                const SizedBox(width: 10),
+                const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 18),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

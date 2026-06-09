@@ -7,6 +7,7 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/widgets/motion.dart';
 import '../food_provider.dart';
+import '../food_ui.dart';
 
 class FoodTrackingScreen extends StatefulWidget {
   final String orderRef;
@@ -148,7 +149,7 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
                               borderRadius: BorderRadius.circular(100),
                             ),
                             child: Text(
-                              'Rs.${(_order!['final_amount'] as num).toStringAsFixed(0)}',
+                              formatRs(_order!['final_amount'] as num?),
                               style: const TextStyle(
                                 color: AppColors.primary,
                                 fontWeight: FontWeight.w900,
@@ -185,9 +186,9 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: AppColors.cardBorder),
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(AppStyles.radiusMd),
+                    boxShadow: AppStyles.shadowSm,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -253,9 +254,9 @@ class _StepList extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.cardBorder),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppStyles.radiusMd),
+        boxShadow: AppStyles.shadowSm,
       ),
       child: Column(
         children: List.generate(_FoodTrackingScreenState._steps.length, (i) {

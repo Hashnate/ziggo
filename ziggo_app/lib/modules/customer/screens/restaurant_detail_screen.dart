@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../food_provider.dart';
+import '../food_ui.dart';
 import 'checkout_screen.dart';
 
 
@@ -94,39 +95,57 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                   ),
                 ],
                 flexibleSpace: FlexibleSpaceBar(
-
-                  titlePadding: const EdgeInsets.fromLTRB(20, 0, 20, 90),
+                  titlePadding: const EdgeInsets.fromLTRB(20, 0, 20, 60),
                   title: Text(
                     r['name']?.toString() ?? '',
                     style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
-                  background: Container(
-                    decoration: const BoxDecoration(
-                      gradient: AppColors.primaryGradient,
-                    ),
-                    padding: const EdgeInsets.fromLTRB(24, 60, 24, 60),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.22),
-                            borderRadius: BorderRadius.circular(100),
-                          ),
-                          child: Text(
-                            (r['cuisine']?.toString() ?? '').toUpperCase(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.5,
-                            ),
+                  background: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _heroImage(r['image_url']?.toString()),
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Colors.black26, Colors.transparent, Colors.black87],
+                            stops: [0.0, 0.4, 1.0],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+                        child: Align(
+                          alignment: Alignment.bottomLeft,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if ((r['cuisine']?.toString() ?? '').isNotEmpty) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.24),
+                                    borderRadius: BorderRadius.circular(100),
+                                  ),
+                                  child: Text(
+                                    (r['cuisine']?.toString() ?? '').toUpperCase(),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 1.5,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              RatingPill(rating: r['rating'] as num?),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -146,7 +165,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                           child: _infoChip(
                             icon: Icons.star_rounded,
                             color: AppColors.success,
-                            label: '${r['rating']}',
+                            label: formatRating(r['rating'] as num?) ?? 'New',
                             sub: 'rating',
                           ),
                         ),
@@ -172,7 +191,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                           child: _infoChip(
                             icon: Icons.delivery_dining_rounded,
                             color: AppColors.primary,
-                            label: 'Rs.${r['delivery_fee']}',
+                            label: formatRs(r['delivery_fee'] as num?),
                             sub: 'fee',
                           ),
                         ),
@@ -208,7 +227,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                       ),
                     ),
                     ...(byCat[cat['id'] as int] ?? []).map(
-                      (it) => _MenuItemRow(item: it, restaurant: r),
+                      (it) => DishTile(item: it, restaurant: r),
                     ),
                   ],
                   const SizedBox(height: 100),
@@ -279,6 +298,19 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
               ),
             ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+    );
+  }
+
+  Widget _heroImage(String? url) {
+    final resolved = resolveFoodAsset(url);
+    if (resolved == null) {
+      return const DecoratedBox(decoration: BoxDecoration(gradient: AppColors.primaryGradient));
+    }
+    return Image.network(
+      resolved,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) =>
+          const DecoratedBox(decoration: BoxDecoration(gradient: AppColors.primaryGradient)),
     );
   }
 
@@ -375,215 +407,6 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-
-class _MenuItemRow extends StatelessWidget {
-  final Map<String, dynamic> item;
-  final Map<String, dynamic> restaurant;
-  const _MenuItemRow({required this.item, required this.restaurant});
-
-  @override
-  Widget build(BuildContext context) {
-    final food = context.watch<FoodProvider>();
-    final qty = (food.cart[item['id'] as int]?['quantity'] as int?) ?? 0;
-    final available = item['is_available'] != false;
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.cardBorder),
-      ),
-      child: Opacity(
-        opacity: available ? 1 : 0.55,
-        child: Row(
-        children: [
-          if (item['image_url'] != null && item['image_url'].toString().isNotEmpty) ...[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                item['image_url'].toString(),
-                width: 80,
-                height: 80,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(width: 80, height: 80, color: AppColors.surfaceMuted),
-              ),
-            ),
-            const SizedBox(width: 12),
-          ],
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: item['is_veg'] == true ? AppColors.success : AppColors.error,
-                          width: 1.5,
-                        ),
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                      child: Center(
-                        child: Container(
-                          width: 7,
-                          height: 7,
-                          decoration: BoxDecoration(
-                            color: item['is_veg'] == true ? AppColors.success : AppColors.error,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        item['name']?.toString() ?? '',
-                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
-                      ),
-                    ),
-                    if (!available)
-                      Container(
-                        margin: const EdgeInsets.only(left: 6),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.error.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Text(
-                          'SOLD OUT',
-                          style: TextStyle(
-                            color: AppColors.error,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.6,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                if ((item['description']?.toString() ?? '').isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      item['description'].toString(),
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 8),
-                Text(
-                  'Rs.${(item['price'] as num).toStringAsFixed(0)}',
-                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            child: !available
-                ? Container(
-                    key: const ValueKey('soldout'),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceMuted,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text(
-                      'UNAVAILABLE',
-                      style: TextStyle(
-                        color: AppColors.textTertiary,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 11,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                  )
-                : qty == 0
-                ? GestureDetector(
-                    key: const ValueKey('add'),
-                    onTap: () {
-                      context.read<FoodProvider>().setActiveRestaurant(restaurant);
-                      context.read<FoodProvider>().addToCart(item);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withOpacity(0.3),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: const Text(
-                        'ADD',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 12,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    ),
-                  )
-                : Container(
-                    key: const ValueKey('qty'),
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          onPressed: () =>
-                              context.read<FoodProvider>().changeQty(item['id'] as int, -1),
-                          icon: const Icon(Icons.remove_rounded, color: Colors.white),
-                          constraints: const BoxConstraints(maxHeight: 32, maxWidth: 32),
-                          padding: EdgeInsets.zero,
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: Text(
-                            '$qty',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () =>
-                              context.read<FoodProvider>().changeQty(item['id'] as int, 1),
-                          icon: const Icon(Icons.add_rounded, color: Colors.white),
-                          constraints: const BoxConstraints(maxHeight: 32, maxWidth: 32),
-                          padding: EdgeInsets.zero,
-                        ),
-                      ],
-                    ),
-                  ),
-          ),
-        ],
-      ),
       ),
     );
   }
