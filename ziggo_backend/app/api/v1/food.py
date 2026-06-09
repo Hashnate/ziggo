@@ -6,7 +6,7 @@ import secrets
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, func
 from sqlalchemy.orm import selectinload
 
 from ...database import get_db
@@ -300,6 +300,23 @@ async def get_restaurant(restaurant_id: int, db: AsyncSession = Depends(get_db))
 
     within = _is_within_hours(r.opening_time, r.closing_time)
 
+    # Popular Picks = the restaurant's most-ordered available items, derived
+    # from real order history (no static flag). Empty until orders exist.
+    available_ids = {it.id for it in r.items if it.is_available}
+    pop_q = await db.execute(
+        select(
+            FoodOrderItem.menu_item_id,
+            func.sum(FoodOrderItem.quantity).label("qty"),
+        )
+        .join(FoodOrder, FoodOrder.id == FoodOrderItem.order_id)
+        .where(FoodOrder.restaurant_id == restaurant_id)
+        .group_by(FoodOrderItem.menu_item_id)
+        .order_by(func.sum(FoodOrderItem.quantity).desc())
+    )
+    popular_item_ids = [
+        mid for (mid, _qty) in pop_q.all() if mid in available_ids
+    ][:6]
+
     return {
         "id": r.id,
         "name": r.name,
@@ -314,6 +331,7 @@ async def get_restaurant(restaurant_id: int, db: AsyncSession = Depends(get_db))
         "eta_minutes": r.eta_minutes,
         "is_open": bool(r.is_open),
         "is_open_now": bool(r.is_open) and within,
+        "popular_item_ids": popular_item_ids,
         "categories": [
             {"id": c.id, "name": c.name, "description": c.description}
             for c in sorted(r.categories, key=lambda x: x.display_order or 0)
