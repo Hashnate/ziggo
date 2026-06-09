@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
+import '../../../core/map/maps_service.dart';
 import '../../../core/map/place_search_sheet.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/widgets/motion.dart';
@@ -268,18 +269,85 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
   }
 
   Future<void> _pickDeliveryLocation() async {
-    final place = await showPlaceSearch(
-      context,
-      title: 'Delivery location',
-      allowCurrentLocation: true,
+    final addresses = context.read<AddressesProvider>().items;
+    final selected = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Deliver to', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+              ),
+            ),
+            ...addresses.map(
+              (a) => ListTile(
+                leading: const Icon(Icons.location_on_rounded, color: AppColors.food),
+                title: Text(a['label']?.toString() ?? 'Address',
+                    style: const TextStyle(fontWeight: FontWeight.w800)),
+                subtitle: Text(a['address']?.toString() ?? '',
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                onTap: () => Navigator.pop(context, a),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.my_location_rounded, color: AppColors.primary),
+              title: const Text('Use current location',
+                  style: TextStyle(fontWeight: FontWeight.w800)),
+              onTap: () => Navigator.pop(context, {'__current__': true}),
+            ),
+            ListTile(
+              leading: const Icon(Icons.search_rounded, color: AppColors.primary),
+              title: const Text('Search a new address',
+                  style: TextStyle(fontWeight: FontWeight.w800)),
+              onTap: () => Navigator.pop(context, {'__search__': true}),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
     );
-    if (place == null || !mounted) return;
-    context.read<FoodProvider>().setDeliveryLocation(
+    if (selected == null || !mounted) return;
+    final food = context.read<FoodProvider>();
+    if (selected['__search__'] == true) {
+      final place = await showPlaceSearch(context, title: 'Delivery location', allowCurrentLocation: true);
+      if (place != null && mounted) {
+        food.setDeliveryLocation(
           label: place.name,
           subtitle: place.fullAddress,
           lat: place.location.latitude,
           lng: place.location.longitude,
         );
+      }
+    } else if (selected['__current__'] == true) {
+      final place = await MapsService.instance.currentLocationAsPlace();
+      if (place != null && mounted) {
+        food.setDeliveryLocation(
+          label: place.name,
+          subtitle: place.fullAddress,
+          lat: place.location.latitude,
+          lng: place.location.longitude,
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not get current location — check GPS / permission')),
+        );
+      }
+    } else {
+      food.setDeliveryLocation(
+        label: selected['label']?.toString() ?? 'Delivery',
+        subtitle: selected['address']?.toString(),
+        lat: (selected['lat'] as num).toDouble(),
+        lng: (selected['lng'] as num).toDouble(),
+      );
+    }
   }
 
   Widget _buildSearchBar() {
