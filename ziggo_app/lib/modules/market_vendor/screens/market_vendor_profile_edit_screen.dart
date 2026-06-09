@@ -33,6 +33,8 @@ class _MarketVendorProfileEditScreenState
   Place? _newPlace;
   File? _pickedCover;
   bool _savingCover = false;
+  File? _pickedLogo;
+  bool _savingLogo = false;
   bool _busy = false;
   String? _error;
 
@@ -92,6 +94,29 @@ class _MarketVendorProfileEditScreenState
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Cover image updated'),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+  }
+
+  Future<void> _uploadLogo(File f) async {
+    setState(() {
+      _pickedLogo = f;
+      _savingLogo = true;
+    });
+    final err = await context.read<MarketVendorProvider>().uploadLogo(f);
+    if (!mounted) return;
+    setState(() => _savingLogo = false);
+    if (err != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(err),
+        backgroundColor: AppColors.error,
+        behavior: SnackBarBehavior.floating,
+      ));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Profile logo updated'),
         backgroundColor: AppColors.success,
         behavior: SnackBarBehavior.floating,
       ));
@@ -163,6 +188,15 @@ class _MarketVendorProfileEditScreenState
             busy: _savingCover,
             emptyHint: 'Tap to set a cover photo',
             onPicked: _uploadCover,
+          ),
+          const SizedBox(height: 18),
+          const _Label(text: 'PROFILE LOGO'),
+          ImagePickerTile(
+            existingUrl: profile['logo_url']?.toString(),
+            pickedFile: _pickedLogo,
+            busy: _savingLogo,
+            emptyHint: 'Tap to set a profile logo',
+            onPicked: _uploadLogo,
           ),
           const SizedBox(height: 18),
           _field(

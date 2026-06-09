@@ -53,6 +53,7 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("drivers", "billing_proof_url", "VARCHAR(255)"),
     ("bookings", "is_corporate", "BOOLEAN NOT NULL DEFAULT FALSE"),
     ("bookings", "corporate_id", "INTEGER"),
+    ("market_vendors", "logo_url", "VARCHAR(255)"),
 )
 
 

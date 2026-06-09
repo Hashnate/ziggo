@@ -29,6 +29,7 @@ from ...schemas.market_schema import (
     MarketOrderResponse,
 )
 from ...services.auth_service import get_current_user, require_role
+from ...services.fare_service import haversine_km
 from ...services.matching_service import find_all_nearby_drivers
 from ...services.ws_manager import manager
 from ...services import payhere_service
@@ -56,17 +57,30 @@ def _is_within_hours(opening: Optional[str], closing: Optional[str]) -> bool:
 
 
 @router.get("/vendors")
-async def list_vendors(db: AsyncSession = Depends(get_db)):
+async def list_vendors(
+    db: AsyncSession = Depends(get_db),
+    lat: Optional[float] = None,
+    lng: Optional[float] = None,
+):
+    """List active, currently-open market vendors. When `lat`/`lng` are
+    supplied the result is enriched with `distance_km` and sorted nearest-first
+    so "Outlets near you" reflects the customer's chosen delivery location."""
     q = await db.execute(
         select(MarketVendor).where(MarketVendor.is_active == True).order_by(MarketVendor.id)  # noqa: E712
     )
     rows = q.scalars().all()
+    has_origin = lat is not None and lng is not None
     enriched = []
     for v in rows:
         within = _is_within_hours(v.opening_time, v.closing_time)
         is_open_now = (bool(v.is_open) if v.is_open is not None else True) and within
         if not is_open_now:
             continue
+        distance_km = None
+        if has_origin and v.lat is not None and v.lng is not None:
+            distance_km = round(
+                haversine_km(lat, lng, float(v.lat), float(v.lng)), 2
+            )
         enriched.append(
             {
                 "id": v.id,
@@ -78,6 +92,7 @@ async def list_vendors(db: AsyncSession = Depends(get_db)):
                 "rating": float(v.rating or 0),
                 "delivery_fee": float(v.delivery_fee or 0),
                 "eta_minutes": v.eta_minutes,
+                "distance_km": distance_km,
                 "opening_time": v.opening_time,
                 "closing_time": v.closing_time,
                 "is_active": bool(v.is_active),
@@ -85,7 +100,17 @@ async def list_vendors(db: AsyncSession = Depends(get_db)):
                 "is_open_now": is_open_now,
             }
         )
-    enriched.sort(key=lambda x: (not x["is_open_now"], x["id"]))
+    if has_origin:
+        # Vendors without coordinates sort last (distance None -> +inf).
+        enriched.sort(
+            key=lambda x: (
+                not x["is_open_now"],
+                x["distance_km"] if x["distance_km"] is not None else float("inf"),
+                x["id"],
+            )
+        )
+    else:
+        enriched.sort(key=lambda x: (not x["is_open_now"], x["id"]))
     return enriched
 
 

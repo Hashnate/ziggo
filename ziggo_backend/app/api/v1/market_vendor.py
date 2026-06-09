@@ -88,6 +88,7 @@ def _to_response(v: MarketVendor) -> MarketVendorProfileResponse:
         lng=float(v.lng) if v.lng is not None else None,
         phone_number=v.phone_number,
         image_url=v.image_url,
+        logo_url=v.logo_url,
         opening_time=v.opening_time,
         closing_time=v.closing_time,
         delivery_fee=float(v.delivery_fee or 0),
@@ -241,6 +242,22 @@ async def upload_cover(
     return _to_response(v)
 
 
+@router.post("/logo-image", response_model=MarketVendorProfileResponse)
+async def upload_logo(
+    photo: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("market_owner", "restaurant_owner")),
+):
+    v = await _get_owned_vendor(db, user)
+    if v is None:
+        raise HTTPException(status_code=404, detail="Vendor account not found")
+    url = await _save_image(photo, "market_vendors")
+    v.logo_url = url
+    await db.commit()
+    await db.refresh(v)
+    return _to_response(v)
+
+
 # ---------------------------------------------------------------------------
 # Products
 # ---------------------------------------------------------------------------
@@ -252,8 +269,11 @@ def _product_to_dict(p: Product) -> dict:
         "name": p.name,
         "description": p.description,
         "price": float(p.price or 0),
+        "original_price": float(p.original_price) if p.original_price is not None else None,
         "stock_quantity": int(p.stock_quantity or 0),
         "unit": p.unit,
+        "category": p.category,
+        "is_popular": bool(p.is_popular),
         "image_url": p.image_url,
         "is_available": bool(p.is_available),
     }
@@ -287,8 +307,13 @@ async def create_product(
         name=body.name.strip(),
         description=body.description,
         price=Decimal(str(body.price)),
+        original_price=Decimal(str(body.original_price))
+        if body.original_price is not None
+        else None,
         stock_quantity=body.stock_quantity,
         unit=body.unit,
+        category=(body.category or "").strip() or None,
+        is_popular=body.is_popular,
         image_url=body.image_url,
         is_available=body.is_available,
     )
@@ -327,10 +352,18 @@ async def update_product(
         p.description = body.description
     if body.price is not None:
         p.price = Decimal(str(body.price))
+    if body.original_price is not None:
+        p.original_price = (
+            Decimal(str(body.original_price)) if body.original_price > 0 else None
+        )
     if body.stock_quantity is not None:
         p.stock_quantity = body.stock_quantity
     if body.unit is not None:
         p.unit = body.unit
+    if body.category is not None:
+        p.category = body.category.strip() or None
+    if body.is_popular is not None:
+        p.is_popular = body.is_popular
     if body.image_url is not None:
         p.image_url = body.image_url
     if body.is_available is not None:

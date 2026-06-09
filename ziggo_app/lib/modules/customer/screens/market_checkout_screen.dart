@@ -79,6 +79,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
       paymentMethod: _payment,
       instructions: _instructionsCtrl.text.trim(),
       redeemPoints: _usePoints ? context.read<PromosProvider>().points : 0,
+      promoCode: context.read<MarketProvider>().pendingPromoCode,
     );
     if (!mounted) return;
     setState(() => _busy = false);
