@@ -1146,8 +1146,9 @@ async def admin_bookings(
     limit = 50
     offset = (page - 1) * limit
 
-    # Build query base
-    base_where = [Booking.is_flash == False]
+    # Build query base. Rides exclude both parcel services (flash + courier),
+    # each of which has its own admin page.
+    base_where = [Booking.is_flash == False, Booking.is_courier == False]
 
     # Parse dates
     start_dt = None
@@ -1178,7 +1179,11 @@ async def admin_bookings(
             selectinload(Booking.customer).selectinload(Customer.user),
             selectinload(Booking.driver).selectinload(Driver.user),
         )
-        .where(Booking.is_flash == False, Booking.status.in_(active_statuses))
+        .where(
+            Booking.is_flash == False,
+            Booking.is_courier == False,
+            Booking.status.in_(active_statuses),
+        )
         .order_by(desc(Booking.id))
     )
     active_bookings = active_q.scalars().all()
@@ -1806,6 +1811,98 @@ async def admin_flash(
         },
     )
 
+
+@router.get("/courier", response_class=HTMLResponse)
+async def admin_courier(
+    request: Request,
+    page: int = 1,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    """Island-wide courier (2-3 day, weight-priced) parcel deliveries.
+
+    Mirrors /admin/flash but filters on is_courier instead of is_flash.
+    """
+    limit = 50
+    offset = (page - 1) * limit
+
+    total = (
+        await db.execute(select(func.count(Booking.id)).where(Booking.is_courier == True))  # noqa: E712
+    ).scalar() or 0
+    total_pages = (total + limit - 1) // limit
+
+    q = await db.execute(
+        select(Booking)
+        .options(
+            selectinload(Booking.customer).selectinload(Customer.user),
+            selectinload(Booking.driver).selectinload(Driver.user),
+        )
+        .where(Booking.is_courier == True)  # noqa: E712
+        .order_by(desc(Booking.id))
+        .offset(offset)
+        .limit(limit)
+    )
+    orders = q.scalars().all()
+
+    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    active_count = (
+        await db.execute(
+            select(func.count(Booking.id)).where(
+                Booking.is_courier == True,  # noqa: E712
+                Booking.status.in_([
+                    BookingStatus.SEARCHING,
+                    BookingStatus.ACCEPTED,
+                    BookingStatus.ARRIVED,
+                    BookingStatus.STARTED,
+                ]),
+            )
+        )
+    ).scalar() or 0
+
+    delivered_today = (
+        await db.execute(
+            select(func.count(Booking.id)).where(
+                Booking.is_courier == True,  # noqa: E712
+                Booking.status == BookingStatus.COMPLETED,
+                Booking.completed_at >= today,
+            )
+        )
+    ).scalar() or 0
+    revenue = (
+        await db.execute(
+            select(func.coalesce(func.sum(Booking.final_amount), 0)).where(
+                Booking.is_courier == True,  # noqa: E712
+                Booking.status == BookingStatus.COMPLETED,
+            )
+        )
+    ).scalar() or 0
+
+    stats = {
+        "total": int(total),
+        "active": active_count,
+        "delivered_today": int(delivered_today),
+        "revenue": float(revenue),
+    }
+
+    start_idx = (page - 1) * limit + 1 if total > 0 else 0
+    end_idx = min(page * limit, total)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
+
+    return templates.TemplateResponse(
+        request, "courier.html",
+        {
+            "request": request,
+            "active_page": "courier",
+            "orders": orders,
+            "stats": stats,
+            "page": page,
+            "total_pages": total_pages,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
+        },
+    )
 
 
 @router.get("/fare-settings", response_class=HTMLResponse)

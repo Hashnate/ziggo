@@ -90,6 +90,13 @@ class Booking(Base):
     receiver_phone = Column(String(20))
     parcel_instructions = Column(Text)
 
+    # Courier (island-wide, 2-3 day, CityPak-style) parcel deliveries. Shares
+    # all the parcel_* / receiver_* metadata above with flash, but is_courier
+    # marks the slower weight-priced service. booking_ref is prefixed `CR`.
+    # courier_eta_days is the promised SLA snapshot (2 or 3) shown to the user.
+    is_courier = Column(Boolean, default=False, index=True)
+    courier_eta_days = Column(Integer, nullable=True)
+
     # Rental / vehicle-hire fields. is_rental=True means the customer hires a
     # vehicle for `rental_hours` and the fare is hourly_rate * hours (no drop
     # address required at booking time — the customer can roam).

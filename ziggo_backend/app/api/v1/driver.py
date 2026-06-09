@@ -296,9 +296,10 @@ async def upload_driver_document(
 ):
     """Driver uploads (or replaces) a KYC document.
 
-    Replacing an existing doc of the same type wipes its `is_verified` flag —
-    admin needs to verify again. The old file isn't deleted from disk (keeps
-    an audit trail in case the driver disputes a rejection).
+    A doc that admin has already verified is locked — re-upload is rejected
+    with 409. Replacing a still-pending doc wipes nothing extra (it's already
+    unverified). The old file isn't deleted from disk (keeps an audit trail in
+    case the driver disputes a rejection).
     """
     doc_type = document_type.strip().lower()
     if doc_type not in _VALID_DOC_TYPES:
@@ -312,8 +313,6 @@ async def upload_driver_document(
     if not d:
         raise HTTPException(status_code=404, detail="Driver profile not found")
 
-    url = await _save_doc(document, doc_type)
-
     # Upsert by (driver_id, document_type)
     exq = await db.execute(
         select(DriverDocument).where(
@@ -322,6 +321,14 @@ async def upload_driver_document(
         )
     )
     existing = exq.scalars().first()
+    if existing and existing.is_verified:
+        raise HTTPException(
+            status_code=409,
+            detail="This document is already verified and can't be replaced. Contact support to change it.",
+        )
+
+    url = await _save_doc(document, doc_type)
+
     if existing:
         existing.document_url = url
         existing.is_verified = False
