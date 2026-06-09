@@ -7,6 +7,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/widgets/motion.dart';
 import '../food_provider.dart';
 import 'food_home_screen.dart';
+import 'restaurant_detail_screen.dart';
 
 class CategoryRestaurantsScreen extends StatefulWidget {
   final Map<String, dynamic> category;
@@ -72,14 +73,14 @@ class _CategoryRestaurantsScreenState extends State<CategoryRestaurantsScreen> {
           : _restaurants.isEmpty
               ? _empty()
               : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   itemCount: _restaurants.length,
                   itemBuilder: (context, i) {
                     return EntranceSlide(
                       delay: Duration(milliseconds: 55 * i),
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: RestaurantCard(restaurant: _restaurants[i]),
+                      child: _RestaurantCategoryCard(
+                        restaurant: _restaurants[i],
+                        category: widget.category,
                       ),
                     );
                   },
@@ -107,6 +108,121 @@ class _CategoryRestaurantsScreenState extends State<CategoryRestaurantsScreen> {
             const Text(
               'No restaurants found',
               style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RestaurantCategoryCard extends StatefulWidget {
+  final Map<String, dynamic> restaurant;
+  final Map<String, dynamic> category;
+
+  const _RestaurantCategoryCard({required this.restaurant, required this.category});
+
+  @override
+  State<_RestaurantCategoryCard> createState() => _RestaurantCategoryCardState();
+}
+
+class _RestaurantCategoryCardState extends State<_RestaurantCategoryCard> {
+  late Future<Map<String, dynamic>?> _detailFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _detailFuture = context.read<FoodProvider>().fetchRestaurantDetail(widget.restaurant['id'] as int);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: RestaurantCard(restaurant: widget.restaurant),
+        ),
+        FutureBuilder<Map<String, dynamic>?>(
+          future: _detailFuture,
+          builder: (context, snap) {
+            if (snap.connectionState != ConnectionState.done || snap.data == null) {
+              return const SizedBox(height: 16);
+            }
+            final r = snap.data!;
+            final allItems = (r['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+            final matchedItems = allItems.where((it) => it['category_id'] == widget.category['id']).toList();
+
+            if (matchedItems.isEmpty) return const SizedBox(height: 16);
+
+            return Transform.translate(
+              offset: const Offset(0, -12), // Pull up slightly to reduce gap from the 20px bottom margin
+              child: SizedBox(
+                height: 150,
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  scrollDirection: Axis.horizontal,
+                  itemCount: matchedItems.length,
+                  itemBuilder: (context, index) {
+                    final item = matchedItems[index];
+                    return _MatchedItemCard(item: item, restaurant: widget.restaurant);
+                  },
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _MatchedItemCard extends StatelessWidget {
+  final Map<String, dynamic> item;
+  final Map<String, dynamic> restaurant;
+  const _MatchedItemCard({required this.item, required this.restaurant});
+
+  @override
+  Widget build(BuildContext context) {
+    final img = item['image_url']?.toString();
+    final price = (item['price'] as num).toStringAsFixed(0);
+    return GestureDetector(
+      onTap: () {
+         Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => RestaurantDetailScreen(restaurantId: restaurant['id'] as int)),
+         );
+      },
+      child: Container(
+        width: 140,
+        margin: const EdgeInsets.only(right: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.divider),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+                child: img != null && img.isNotEmpty
+                    ? Image.network(img, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_,__,___) => Container(color: AppColors.surfaceMuted))
+                    : Container(color: AppColors.surfaceMuted, width: double.infinity, child: const Icon(Icons.fastfood_rounded, color: AppColors.textTertiary)),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item['name']?.toString() ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                  const SizedBox(height: 2),
+                  Text('Rs.$price', style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.primary, fontSize: 12)),
+                ],
+              ),
             ),
           ],
         ),

@@ -403,6 +403,19 @@ class _MenuItemRow extends StatelessWidget {
         opacity: available ? 1 : 0.55,
         child: Row(
         children: [
+          if (item['image_url'] != null && item['image_url'].toString().isNotEmpty) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                item['image_url'].toString(),
+                width: 80,
+                height: 80,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(width: 80, height: 80, color: AppColors.surfaceMuted),
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
