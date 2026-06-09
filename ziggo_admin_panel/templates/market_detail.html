@@ -52,6 +52,12 @@
                 </button>
             </form>
             {% endif %}
+            <form method="post" action="/admin/market/{{ vendor.id }}/delete"
+                  onsubmit="return confirm('Permanently delete {{ vendor.name }} and all associated products/orders? This action is irreversible.');">
+                <button type="submit" class="px-5 py-2.5 rounded-xl bg-red-600 text-white font-bold text-sm hover:bg-red-700">
+                    <i class="fas fa-trash-alt mr-1"></i> Remove
+                </button>
+            </form>
         </div>
     </div>
 
@@ -116,6 +122,11 @@
                     <input name="stock_quantity" type="number" min="0" value="10"
                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                 </div>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Weight (kg)</label>
+                <input name="weight_kg" type="number" step="0.001" min="0" placeholder="e.g. 1.5 — drives delivery fee"
+                       class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
             </div>
             <div>
                 <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Image URL</label>

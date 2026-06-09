@@ -3,123 +3,456 @@
 {% block title %}Add Vendor | Ziggo Admin{% endblock %}
 {% block page_title %}Add Market Vendor{% endblock %}
 
+{% block head %}
+<style>
+    .section-card {
+        background: #ffffff;
+        border: 1px solid #f1f5f9;
+        border-radius: 1rem;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+        padding: 1.5rem;
+        transition: all 0.2s ease;
+    }
+    .section-card:hover {
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="max-w-3xl mx-auto bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-    <form method="post" action="/admin/market/new" class="p-8 space-y-6">
+<div class="max-w-4xl mx-auto space-y-6">
+    <a href="/admin/market" class="inline-flex items-center text-sm font-bold text-gray-500 hover:text-ziggo">
+        <i class="fas fa-arrow-left mr-2"></i> Back to vendors
+    </a>
+
+    <form method="post" action="/admin/market/new" enctype="multipart/form-data" class="space-y-6">
         {% if error %}
         <div class="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl font-bold text-sm">
             <i class="fas fa-exclamation-circle mr-1"></i> {{ error }}
         </div>
         {% endif %}
 
-        <div>
-            <h3 class="text-lg font-black text-ziggo mb-4">Owner login</h3>
-            <p class="text-xs text-gray-500 mb-3">The vendor logs into the app with this phone number + OTP. Their account is created with role <code>market_owner</code> automatically.</p>
+        <!-- 1. Basic Information -->
+        <div class="section-card">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <i class="fas fa-info-circle"></i>
+                </div>
+                <h3 class="text-lg font-black text-ziggo">1. Basic Information</h3>
+            </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Owner phone (10 digits)</label>
-                    <input name="owner_phone" required pattern="\d{10}" value="{{ form.owner_phone or '' }}"
-                           placeholder="0712345678"
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Vendor Name *</label>
+                    <input name="name" required value="{{ form.name or '' }}" placeholder="e.g. Super Mart"
                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Owner full name</label>
-                    <input name="owner_full_name" value="{{ form.owner_full_name or '' }}"
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Owner Full Name *</label>
+                    <input name="owner_full_name" required value="{{ form.owner_full_name or '' }}" placeholder="John Doe"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Email Address *</label>
+                    <input type="email" name="owner_email" required value="{{ form.owner_email or '' }}" placeholder="john@example.com"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Mobile Number (10 digits) *</label>
+                    <input name="owner_phone" required pattern="\d{10}" value="{{ form.owner_phone or '' }}" placeholder="0712345678"
                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                 </div>
             </div>
         </div>
 
-        <div>
-            <h3 class="text-lg font-black text-ziggo mb-4">Basic info</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Vendor name</label>
-                    <input name="name" required value="{{ form.name or '' }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+        <!-- 2. Business Information -->
+        <div class="section-card">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-8 h-8 rounded-lg bg-green-50 text-green-600 flex items-center justify-center">
+                    <i class="fas fa-briefcase"></i>
                 </div>
+                <h3 class="text-lg font-black text-ziggo">2. Business Information</h3>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Category</label>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Business Type *</label>
                     <select name="category" required
-                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
-                        <option value="Grocery">Grocery</option>
-                        <option value="Pharmacy">Pharmacy</option>
-                        <option value="Electronics">Electronics</option>
-                        <option value="Bakery">Bakery</option>
-                        <option value="Liquor">Liquor</option>
-                        <option value="Stationery">Stationery</option>
-                        <option value="Other">Other</option>
+                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
+                        <option value="Grocery" {% if form.category == 'Grocery' %}selected{% endif %}>Grocery</option>
+                        <option value="Pharmacy" {% if form.category == 'Pharmacy' %}selected{% endif %}>Pharmacy</option>
+                        <option value="Electronics" {% if form.category == 'Electronics' %}selected{% endif %}>Electronics</option>
+                        <option value="Bakery" {% if form.category == 'Bakery' %}selected{% endif %}>Bakery</option>
+                        <option value="Liquor" {% if form.category == 'Liquor' %}selected{% endif %}>Liquor</option>
+                        <option value="Stationery" {% if form.category == 'Stationery' %}selected{% endif %}>Stationery</option>
+                        <option value="Other" {% if form.category == 'Other' %}selected{% endif %}>Other</option>
                     </select>
                 </div>
-                <div class="md:col-span-2">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Business Registration No.</label>
+                    <input name="business_registration_number" value="{{ form.business_registration_number or '' }}" placeholder="PV-12345"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Tax/VAT Number</label>
+                    <input name="tax_vat_number" value="{{ form.tax_vat_number or '' }}" placeholder="TIN-100234"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div class="md:col-span-3">
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Description</label>
-                    <input name="description" value="{{ form.description or '' }}"
-                           placeholder="e.g. Daily essentials"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Storefront phone</label>
-                    <input name="phone_number" value="{{ form.phone_number or '' }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Image URL (optional)</label>
-                    <input name="image_url" value="{{ form.image_url or '' }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Opens at</label>
-                    <input name="opening_time" value="{{ form.opening_time or '08:00' }}"
-                           placeholder="08:00"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Closes at</label>
-                    <input name="closing_time" value="{{ form.closing_time or '22:00' }}"
-                           placeholder="22:00"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Delivery fee (Rs.)</label>
-                    <input name="delivery_fee" type="number" step="0.01" min="0" value="{{ form.delivery_fee or 250 }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">ETA (minutes)</label>
-                    <input name="eta_minutes" type="number" min="5" value="{{ form.eta_minutes or 40 }}"
+                    <input name="description" value="{{ form.description or '' }}" placeholder="e.g. Organic foods & fresh produce"
                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                 </div>
             </div>
         </div>
 
-        <div>
-            <h3 class="text-lg font-black text-ziggo mb-4">Location</h3>
+        <!-- 3. Location Picker (Google Map + Autocomplete / Coordinates) -->
+        <div class="section-card">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center">
+                        <i class="fas fa-map-marked-alt"></i>
+                    </div>
+                    <h3 class="text-lg font-black text-ziggo">3. Location</h3>
+                </div>
+                <div class="flex rounded-lg border border-gray-200 p-0.5 bg-gray-50">
+                    <button type="button" id="btn_search_mode" onclick="setLocationMode('search')"
+                            class="px-3 py-1.5 rounded-md text-xs font-bold transition bg-white shadow-sm text-ziggo">
+                        <i class="fas fa-search mr-1"></i> Search Mode
+                    </button>
+                    <button type="button" id="btn_manual_mode" onclick="setLocationMode('manual')"
+                            class="px-3 py-1.5 rounded-md text-xs font-bold transition text-gray-500">
+                        <i class="fas fa-edit mr-1"></i> Manual coordinates
+                    </button>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <!-- Search inputs -->
+                <div id="search_location_container" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Search Address (Google Places)</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                                <i class="fas fa-search-location"></i>
+                            </span>
+                            <input id="autocomplete_search" placeholder="Type location address..."
+                                   class="w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo shadow-sm text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Form Lat/Lng and Address -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Store Address *</label>
+                        <input id="vendor_address" name="address" required value="{{ form.address or '' }}" placeholder="Vendor physical location"
+                               class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Latitude *</label>
+                        <input id="vendor_lat" name="lat" type="number" step="0.0000001" required value="{{ form.lat or 6.9271 }}"
+                               class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Longitude *</label>
+                        <input id="vendor_lng" name="lng" type="number" step="0.0000001" required value="{{ form.lng or 79.8612 }}"
+                               class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                </div>
+
+                <!-- Map Container -->
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-2 uppercase">Drag marker to exact location</label>
+                    <div id="map" class="w-full h-80 rounded-xl border border-gray-200 shadow-inner overflow-hidden" style="min-height: 320px; z-index: 1;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. Delivery Settings -->
+        <div class="section-card">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+                    <i class="fas fa-truck"></i>
+                </div>
+                <h3 class="text-lg font-black text-ziggo">4. Delivery Settings</h3>
+            </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="md:col-span-2">
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Address</label>
-                    <input name="address" value="{{ form.address or '' }}"
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Self Delivery *</label>
+                    <select name="self_delivery" id="self_delivery" onchange="toggleSelfDelivery()" required
+                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
+                        <option value="no" {% if form.self_delivery == 'no' %}selected{% endif %}>No</option>
+                        <option value="yes" {% if form.self_delivery == 'yes' %}selected{% endif %}>Yes (Vendor manages logistics)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Marketplace Delivery *</label>
+                    <select name="marketplace_delivery" required
+                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
+                        <option value="yes" {% if form.marketplace_delivery == 'yes' %}selected{% endif %}>Yes (Ziggo drivers)</option>
+                        <option value="no" {% if form.marketplace_delivery == 'no' %}selected{% endif %}>No</option>
+                    </select>
+                </div>
+                <div id="delivery_radius_container">
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase" id="radius_label">Delivery Radius (KM)</label>
+                    <input type="number" step="0.1" name="delivery_radius_km" id="delivery_radius_km" value="{{ form.delivery_radius_km or '' }}" placeholder="e.g. 5.0"
                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Latitude</label>
-                    <input name="lat" type="number" step="0.0000001" value="{{ form.lat or 6.9271 }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Longitude</label>
-                    <input name="lng" type="number" step="0.0000001" value="{{ form.lng or 79.8612 }}"
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Average Preparation Time (minutes)</label>
+                    <input type="number" name="average_prep_time_minutes" value="{{ form.average_prep_time_minutes or 30 }}" min="5"
                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                 </div>
             </div>
         </div>
 
+        <!-- 5. Bank / Settlement Details -->
+        <div class="section-card">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-8 h-8 rounded-lg bg-yellow-50 text-yellow-600 flex items-center justify-center">
+                    <i class="fas fa-university"></i>
+                </div>
+                <h3 class="text-lg font-black text-ziggo">5. Bank / Settlement Details</h3>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Bank Name *</label>
+                    <input name="bank_name" required value="{{ form.bank_name or '' }}" placeholder="e.g. Commercial Bank"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Account Holder Name *</label>
+                    <input name="account_holder_name" required value="{{ form.account_holder_name or '' }}" placeholder="John Doe"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Account Number *</label>
+                    <input name="account_number" required value="{{ form.account_number or '' }}" placeholder="1002300456"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Branch Name</label>
+                    <input name="branch_name" value="{{ form.branch_name or '' }}" placeholder="e.g. Colombo Fort"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. Verification Documents -->
+        <div class="section-card">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center">
+                    <i class="fas fa-file-invoice"></i>
+                </div>
+                <h3 class="text-lg font-black text-ziggo">6. Verification Documents</h3>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">NIC / Passport Copy (Image or PDF) *</label>
+                    <input type="file" name="nic_passport_copy" required accept="image/*,.pdf"
+                           class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-ziggo-soft file:text-ziggo hover:file:bg-ziggo/10">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Business Registration Certificate</label>
+                    <input type="file" name="business_reg_cert" accept="image/*,.pdf"
+                           class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-ziggo-soft file:text-ziggo hover:file:bg-ziggo/10">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Tax Certificate</label>
+                    <input type="file" name="tax_cert" accept="image/*,.pdf"
+                           class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-ziggo-soft file:text-ziggo hover:file:bg-ziggo/10">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Food License (for bakery/grocery stalls)</label>
+                    <input type="file" name="food_license" accept="image/*,.pdf"
+                           class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-ziggo-soft file:text-ziggo hover:file:bg-ziggo/10">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Additional Documents</label>
+                    <input type="file" name="additional_documents" accept="image/*,.pdf"
+                           class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-ziggo-soft file:text-ziggo hover:file:bg-ziggo/10">
+                </div>
+            </div>
+        </div>
+
+        <!-- 7. Marketplace Configuration (Admin Only) -->
+        <div class="section-card">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-8 h-8 rounded-lg bg-pink-50 text-pink-600 flex items-center justify-center">
+                    <i class="fas fa-sliders-h"></i>
+                </div>
+                <h3 class="text-lg font-black text-ziggo">7. Marketplace Configuration</h3>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Vendor Status *</label>
+                    <select name="vendor_status" required
+                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
+                        <option value="active" {% if form.vendor_status == 'active' %}selected{% endif %}>Active</option>
+                        <option value="pending" {% if form.vendor_status == 'pending' %}selected{% endif %}>Pending</option>
+                        <option value="suspended" {% if form.vendor_status == 'suspended' %}selected{% endif %}>Suspended</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Commission (%) *</label>
+                    <input type="number" step="0.01" name="commission_percentage" value="{{ form.commission_percentage or 10.00 }}" min="0" max="100" required
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Priority Level</label>
+                    <select name="priority_level"
+                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
+                        <option value="standard" {% if form.priority_level == 'standard' %}selected{% endif %}>Standard</option>
+                        <option value="premium" {% if form.priority_level == 'premium' %}selected{% endif %}>Premium</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Featured Vendor</label>
+                    <select name="is_featured"
+                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
+                        <option value="no" {% if form.is_featured == 'no' %}selected{% endif %}>No</option>
+                        <option value="yes" {% if form.is_featured == 'yes' %}selected{% endif %}>Yes</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit actions -->
         <div class="pt-6 border-t border-gray-100 flex justify-end gap-3">
             <a href="/admin/market" class="px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50">Cancel</a>
             <button type="submit" class="px-8 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light">
-                <i class="fas fa-plus mr-2"></i> Create Vendor
+                <i class="fas fa-plus mr-2"></i> Save Vendor Details
             </button>
         </div>
-        <p class="text-xs text-gray-400 mt-2">After creating, you'll be taken to the vendor page where you can add products.</p>
     </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    var map;
+    var marker;
+
+    function initMap() {
+        var initialLat = parseFloat(document.getElementById('vendor_lat').value) || 6.9271;
+        var initialLng = parseFloat(document.getElementById('vendor_lng').value) || 79.8612;
+        var initialLatLng = {lat: initialLat, lng: initialLng};
+
+        map = new google.maps.Map(document.getElementById('map'), {
+            center: initialLatLng,
+            zoom: 14,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false
+        });
+
+        marker = new google.maps.Marker({
+            position: initialLatLng,
+            map: map,
+            draggable: true,
+            title: "Drag to vendor location"
+        });
+
+        // Initialize Places Autocomplete
+        var searchInput = document.getElementById('autocomplete_search');
+        var autocomplete = new google.maps.places.Autocomplete(searchInput);
+        autocomplete.bindTo('bounds', map);
+
+        autocomplete.addListener('place_changed', function() {
+            var place = autocomplete.getPlace();
+            if (!place.geometry) {
+                return;
+            }
+
+            if (place.geometry.viewport) {
+                map.fitBounds(place.geometry.viewport);
+            } else {
+                map.setCenter(place.geometry.location);
+                map.setZoom(17);
+            }
+
+            marker.setPosition(place.geometry.location);
+            updateLocationFields(place.geometry.location.lat(), place.geometry.location.lng(), place.formatted_address || place.name);
+        });
+
+        // Draggable Marker dragend listener
+        marker.addListener('dragend', function() {
+            var pos = marker.getPosition();
+            geocodePosition(pos);
+        });
+
+        // Map Click listener to place marker
+        map.addListener('click', function(e) {
+            marker.setPosition(e.latLng);
+            geocodePosition(e.latLng);
+        });
+    }
+
+    function updateLocationFields(lat, lng, address) {
+        document.getElementById('vendor_lat').value = lat.toFixed(7);
+        document.getElementById('vendor_lng').value = lng.toFixed(7);
+        if (address) {
+            document.getElementById('vendor_address').value = address;
+        }
+    }
+
+    function geocodePosition(pos) {
+        updateLocationFields(pos.lat(), pos.lng());
+        var geocoder = new google.maps.Geocoder();
+        geocoder.geocode({
+            latLng: pos
+        }, function(results, status) {
+            if (status == google.maps.GeocoderStatus.OK) {
+                if (results[0]) {
+                    document.getElementById('vendor_address').value = results[0].formatted_address;
+                }
+            }
+        });
+    }
+
+    function setLocationMode(mode) {
+        var searchBtn = document.getElementById('btn_search_mode');
+        var manualBtn = document.getElementById('btn_manual_mode');
+        var searchContainer = document.getElementById('search_location_container');
+        var latInput = document.getElementById('vendor_lat');
+        var lngInput = document.getElementById('vendor_lng');
+
+        if (mode === 'search') {
+            searchBtn.className = "px-3 py-1.5 rounded-md text-xs font-bold transition bg-white shadow-sm text-ziggo";
+            manualBtn.className = "px-3 py-1.5 rounded-md text-xs font-bold transition text-gray-500";
+            searchContainer.style.display = "block";
+            latInput.readOnly = true;
+            lngInput.readOnly = true;
+        } else {
+            searchBtn.className = "px-3 py-1.5 rounded-md text-xs font-bold transition text-gray-500";
+            manualBtn.className = "px-3 py-1.5 rounded-md text-xs font-bold transition bg-white shadow-sm text-ziggo";
+            searchContainer.style.display = "none";
+            latInput.readOnly = false;
+            lngInput.readOnly = false;
+        }
+    }
+
+    function toggleSelfDelivery() {
+        var selfDelivery = document.getElementById('self_delivery').value;
+        var radiusContainer = document.getElementById('delivery_radius_container');
+        var radiusInput = document.getElementById('delivery_radius_km');
+        var radiusLabel = document.getElementById('radius_label');
+
+        if (selfDelivery === 'yes') {
+            radiusInput.required = true;
+            radiusLabel.innerHTML = "Delivery Radius (KM) *";
+            radiusContainer.style.opacity = "1";
+        } else {
+            radiusInput.required = false;
+            radiusInput.value = "";
+            radiusLabel.innerHTML = "Delivery Radius (KM)";
+        }
+    }
+
+    // Run toggle on init
+    document.addEventListener("DOMContentLoaded", function() {
+        toggleSelfDelivery();
+        setLocationMode('search');
+    });
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places&callback=initMap" async defer></script>
 {% endblock %}

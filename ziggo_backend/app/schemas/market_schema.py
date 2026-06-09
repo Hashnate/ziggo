@@ -8,10 +8,14 @@ class ProductResponse(BaseModel):
     name: str
     description: Optional[str] = None
     price: float
+    original_price: Optional[float] = None
     stock_quantity: int
     image_url: Optional[str] = None
     unit: Optional[str] = None
+    category: Optional[str] = None
+    is_popular: bool = False
     is_available: bool
+    weight_kg: Optional[float] = None
 
     class Config:
         from_attributes = True
@@ -60,6 +64,9 @@ class MarketOrderResponse(BaseModel):
     delivery_address: str
     payment_method: str
     payment_status: str
+    delivery_distance_km: Optional[float] = None
+    total_weight_kg: Optional[float] = None
+    delivery_mode: Optional[str] = None
     created_at: datetime
     cancellation_reason: Optional[str] = None
 
@@ -80,6 +87,7 @@ class MarketVendorProfileResponse(BaseModel):
     lng: Optional[float] = None
     phone_number: Optional[str] = None
     image_url: Optional[str] = None
+    logo_url: Optional[str] = None
     opening_time: Optional[str] = None
     closing_time: Optional[str] = None
     delivery_fee: float = 0.0
@@ -88,6 +96,9 @@ class MarketVendorProfileResponse(BaseModel):
     is_active: bool = False
     is_open: bool = True
     is_approved: bool = False
+    delivery_radius_km: Optional[float] = None
+    self_delivery: bool = False
+    marketplace_delivery: bool = True
     created_at: Optional[datetime] = None
 
 
@@ -103,26 +114,37 @@ class MarketVendorProfileUpdate(BaseModel):
     closing_time: Optional[str] = Field(None, max_length=10)
     delivery_fee: Optional[float] = Field(None, ge=0)
     eta_minutes: Optional[int] = Field(None, ge=5)
+    delivery_radius_km: Optional[float] = Field(None, ge=0)
+    self_delivery: Optional[bool] = None
+    marketplace_delivery: Optional[bool] = None
 
 
 class ProductCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
     price: float = Field(..., ge=0)
+    original_price: Optional[float] = Field(None, ge=0)
     stock_quantity: int = Field(0, ge=0)
     unit: Optional[str] = Field(None, max_length=20)
+    category: Optional[str] = Field(None, max_length=100)
+    is_popular: bool = False
     image_url: Optional[str] = Field(None, max_length=255)
     is_available: bool = True
+    weight_kg: Optional[float] = Field(None, ge=0)
 
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=200)
     description: Optional[str] = None
     price: Optional[float] = Field(None, ge=0)
+    original_price: Optional[float] = Field(None, ge=0)
     stock_quantity: Optional[int] = Field(None, ge=0)
     unit: Optional[str] = Field(None, max_length=20)
+    category: Optional[str] = Field(None, max_length=100)
+    is_popular: Optional[bool] = None
     image_url: Optional[str] = Field(None, max_length=255)
     is_available: Optional[bool] = None
+    weight_kg: Optional[float] = Field(None, ge=0)
 
 
 class MarketVendorRegisterRequest(BaseModel):

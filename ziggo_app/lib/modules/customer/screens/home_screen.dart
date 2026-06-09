@@ -8,6 +8,7 @@ import '../../../core/widgets/animated_counter.dart';
 import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/motion.dart';
 import '../../../core/widgets/pulse_dot.dart';
+import '../../../core/network/api_client.dart';
 import '../../auth/auth_provider.dart';
 import '../booking_provider.dart';
 import '../notifications_provider.dart';
@@ -15,11 +16,12 @@ import '../wallet_provider.dart';
 import 'fare_estimate_screen.dart';
 import 'event_home_screen.dart';
 import 'flash_home_screen.dart';
-import 'rental_home_screen.dart';
+import 'rental_type_screen.dart';
 import 'food_home_screen.dart';
 import 'market_home_screen.dart';
 import 'notifications_screen.dart';
 import 'profile_screen.dart';
+import 'location_search_screen.dart';
 import 'promotions_screen.dart';
 import 'ride_history_screen.dart';
 import 'ride_tracking_screen.dart';
@@ -836,7 +838,10 @@ class _ServicesGrid extends StatelessWidget {
                 icon: Icons.local_shipping_rounded,
                 imageAsset: 'assets/icons/truck.png',
                 label: 'Trucks',
-                onTap: onRide,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => LocationSearchScreen(isTruckMode: true)),
+                ),
               ),
               GradientServiceTile(
                 icon: Icons.event_rounded,
@@ -858,7 +863,7 @@ class _ServicesGrid extends StatelessWidget {
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const RentalHomeScreen(),
+                    builder: (_) => const RentalTypeScreen(),
                   ),
                 ),
               ),
@@ -971,6 +976,21 @@ class _Drawer extends StatelessWidget {
     final name = auth.fullName ?? 'Welcome';
     final phone = auth.phoneNumber ?? '';
     final initial = name.isNotEmpty ? name[0].toUpperCase() : 'Z';
+    final photo = auth.profilePhoto;
+    final hasPhoto = photo != null && photo.isNotEmpty;
+    final isNetwork = hasPhoto && photo.startsWith('http');
+    final isLocalPath = hasPhoto && !isNetwork && photo.startsWith('/');
+
+    final fallback = Center(
+      child: Text(
+        initial,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w900,
+          fontSize: 26,
+        ),
+      ),
+    );
 
     return Drawer(
       backgroundColor: Colors.white,
@@ -990,18 +1010,25 @@ class _Drawer extends StatelessWidget {
                   Container(
                     width: 56,
                     height: 56,
-                    alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.18),
                       borderRadius: BorderRadius.circular(AppStyles.radiusSm),
                     ),
-                    child: Text(
-                      initial,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 26,
-                      ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+                      child: hasPhoto
+                          ? (isNetwork || !isLocalPath
+                              ? Image.network(
+                                  isNetwork ? photo! : '${ApiConfig.baseHost}/$photo',
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => fallback,
+                                )
+                              : Image.file(
+                                  File(photo!),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => fallback,
+                                ))
+                          : fallback,
                     ),
                   ),
                   const SizedBox(width: 14),

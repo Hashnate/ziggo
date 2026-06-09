@@ -38,6 +38,10 @@ class _MarketVendorProductsScreenState
       description: result['description'] as String?,
       unit: result['unit'] as String?,
       isAvailable: result['is_available'] as bool? ?? true,
+      category: result['category'] as String?,
+      originalPrice: result['original_price'] as double?,
+      isPopular: result['is_popular'] as bool? ?? false,
+      weightKg: result['weight_kg'] as double?,
     );
     if (!mounted) return;
     if (err != null) {
@@ -70,6 +74,10 @@ class _MarketVendorProductsScreenState
       description: result['description'] as String?,
       unit: result['unit'] as String?,
       isAvailable: result['is_available'] as bool?,
+      category: result['category'] as String?,
+      originalPrice: result['original_price'] as double?,
+      isPopular: result['is_popular'] as bool?,
+      weightKg: result['weight_kg'] as double?,
     );
     if (!mounted) return;
     if (err != null) {
@@ -125,11 +133,21 @@ class _MarketVendorProductsScreenState
         text: initial == null
             ? ''
             : ((initial['price'] as num?) ?? 0).toStringAsFixed(0));
+    final originalPrice = TextEditingController(
+        text: initial?['original_price'] != null
+            ? ((initial?['original_price'] as num?) ?? 0).toStringAsFixed(0)
+            : '');
+    final category = TextEditingController(text: initial?['category']?.toString() ?? '');
     final stock = TextEditingController(
         text: (initial?['stock_quantity'] ?? 0).toString());
     final unit =
         TextEditingController(text: initial?['unit']?.toString() ?? '');
+    final weight = TextEditingController(
+        text: initial?['weight_kg'] != null
+            ? (initial!['weight_kg'] as num).toString()
+            : '');
     bool isAvailable = initial?['is_available'] != false;
+    bool isPopular = initial?['is_popular'] == true;
     File? pickedFile;
 
     return showDialog<Map<String, dynamic>>(
@@ -161,6 +179,14 @@ class _MarketVendorProductsScreenState
                     ),
                   ),
                   const SizedBox(height: 8),
+                  TextField(
+                    controller: category,
+                    decoration: const InputDecoration(
+                      labelText: 'Category',
+                      hintText: 'e.g. Fresh Produce, Skin Care',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       Expanded(
@@ -169,6 +195,31 @@ class _MarketVendorProductsScreenState
                           keyboardType: TextInputType.number,
                           decoration: const InputDecoration(
                             labelText: 'Price (Rs.)',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: originalPrice,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Original Price (Rs.)',
+                            hintText: 'For discounts',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: stock,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Stock on hand',
                           ),
                         ),
                       ),
@@ -186,10 +237,11 @@ class _MarketVendorProductsScreenState
                   ),
                   const SizedBox(height: 8),
                   TextField(
-                    controller: stock,
-                    keyboardType: TextInputType.number,
+                    controller: weight,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     decoration: const InputDecoration(
-                      labelText: 'Stock on hand',
+                      labelText: 'Weight (kg)',
+                      hintText: 'Used to calculate delivery fee — e.g. 1.5',
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -208,6 +260,13 @@ class _MarketVendorProductsScreenState
                     value: isAvailable,
                     onChanged: (v) => setLocal(() => isAvailable = v),
                   ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: const Text('Mark as Popular Pick'),
+                    value: isPopular,
+                    onChanged: (v) => setLocal(() => isPopular = v),
+                  ),
                 ],
               ),
             ),
@@ -223,11 +282,15 @@ class _MarketVendorProductsScreenState
                   Navigator.pop(ctx, {
                     'name': name.text.trim(),
                     'price': p,
+                    'original_price': double.tryParse(originalPrice.text.trim()),
+                    'category': category.text.trim(),
                     'stock_quantity':
                         int.tryParse(stock.text.trim()) ?? 0,
                     'unit': unit.text.trim(),
+                    'weight_kg': double.tryParse(weight.text.trim()),
                     'description': desc.text.trim(),
                     'is_available': isAvailable,
+                    'is_popular': isPopular,
                     'picked_file': pickedFile,
                   });
                 },

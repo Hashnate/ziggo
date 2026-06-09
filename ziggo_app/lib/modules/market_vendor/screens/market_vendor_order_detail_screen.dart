@@ -110,15 +110,116 @@ class _MarketVendorOrderDetailScreenState
   Future<void> _markReady() async {
     final id = _order['id'] as int?;
     if (id == null) return;
+    final provider = context.read<MarketVendorProvider>();
+
+    String? mode;
+    if (provider.mustChooseDeliveryMode) {
+      // Both delivery options enabled → ask per order.
+      mode = await _askDeliveryMode();
+      if (mode == null || !mounted) return;
+    }
+
     setState(() => _busy = true);
-    final err = await context.read<MarketVendorProvider>().markReady(id);
+    final err = await provider.markReady(id, deliveryMode: mode);
     if (!mounted) return;
     setState(() => _busy = false);
     if (err != null) {
       _toast(err, error: true);
       return;
     }
-    _toast('Marked ready — finding a rider');
+    _toast(mode == 'self'
+        ? 'Marked ready — deliver it to the customer'
+        : 'Marked ready — finding a rider');
+  }
+
+  /// The "deliver it yourself, or find a rider?" sheet, shown only when the
+  /// store has both self and marketplace delivery enabled.
+  Future<String?> _askDeliveryMode() {
+    return showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: AppColors.divider,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'How is this order delivered?',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Choose who takes it to the customer.',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 18),
+              _DeliveryModeTile(
+                icon: Icons.storefront_rounded,
+                color: AppColors.warning,
+                title: "I'll deliver it myself",
+                subtitle: 'Your own staff takes it to the customer',
+                onTap: () => Navigator.pop(ctx, 'self'),
+              ),
+              const SizedBox(height: 12),
+              _DeliveryModeTile(
+                icon: Icons.delivery_dining_rounded,
+                color: AppColors.primary,
+                title: 'Find a rider',
+                subtitle: 'Broadcast to nearby Ziggo riders',
+                onTap: () => Navigator.pop(ctx, 'marketplace'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _outForDelivery() async {
+    final id = _order['id'] as int?;
+    if (id == null) return;
+    setState(() => _busy = true);
+    final err = await context.read<MarketVendorProvider>().markOutForDelivery(id);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (err != null) {
+      _toast(err, error: true);
+      return;
+    }
+    _toast('On the way — mark delivered once handed over');
+  }
+
+  Future<void> _delivered() async {
+    final id = _order['id'] as int?;
+    if (id == null) return;
+    setState(() => _busy = true);
+    final err = await context.read<MarketVendorProvider>().markDelivered(id);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (err != null) {
+      _toast(err, error: true);
+      return;
+    }
+    _toast('Delivered — nice work!');
   }
 
   Future<void> _rebroadcast() async {
@@ -494,6 +595,7 @@ class _MarketVendorOrderDetailScreenState
       ),
       bottomNavigationBar: _ActionBar(
         status: status,
+        deliveryMode: _order['delivery_mode']?.toString(),
         driverAssigned: _order['driver_id'] != null,
         busy: _busy,
         onAccept: _accept,
@@ -501,6 +603,8 @@ class _MarketVendorOrderDetailScreenState
         onMarkPreparing: _markPreparing,
         onMarkReady: _markReady,
         onRebroadcast: _rebroadcast,
+        onOutForDelivery: _outForDelivery,
+        onDelivered: _delivered,
       ),
     );
   }
@@ -552,8 +656,9 @@ class _HeroStatus extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = order['status']?.toString() ?? '';
+    final selfDelivery = order['delivery_mode']?.toString() == 'self';
     final label = _label(status);
-    final hint = _hint(status);
+    final hint = _hint(status, selfDelivery);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -630,7 +735,7 @@ class _HeroStatus extends StatelessWidget {
     return s.toUpperCase();
   }
 
-  String _hint(String s) {
+  String _hint(String s, bool selfDelivery) {
     switch (s) {
       case 'pending':
         return 'Accept to start packing this order';
@@ -638,10 +743,14 @@ class _HeroStatus extends StatelessWidget {
       case 'processing':
         return 'Tap Mark Ready when the order is packed';
       case 'ready_for_pickup':
-        return 'Looking for a rider to pick up the order';
+        return selfDelivery
+            ? 'Deliver it to the customer, then mark out for delivery'
+            : 'Looking for a rider to pick up the order';
       case 'out_for_delivery':
       case 'shipped':
-        return 'Rider is on the way to the customer';
+        return selfDelivery
+            ? 'You\'re delivering — mark delivered once handed over'
+            : 'Rider is on the way to the customer';
       case 'delivered':
         return 'Completed — thanks for selling on Ziggo Mart';
       case 'cancelled':
@@ -721,6 +830,7 @@ class _LineItemRow extends StatelessWidget {
 
 class _ActionBar extends StatelessWidget {
   final String status;
+  final String? deliveryMode;
   final bool driverAssigned;
   final bool busy;
   final VoidCallback onAccept;
@@ -728,9 +838,12 @@ class _ActionBar extends StatelessWidget {
   final VoidCallback onMarkPreparing;
   final VoidCallback onMarkReady;
   final VoidCallback onRebroadcast;
+  final VoidCallback onOutForDelivery;
+  final VoidCallback onDelivered;
 
   const _ActionBar({
     required this.status,
+    required this.deliveryMode,
     required this.driverAssigned,
     required this.busy,
     required this.onAccept,
@@ -738,6 +851,8 @@ class _ActionBar extends StatelessWidget {
     required this.onMarkPreparing,
     required this.onMarkReady,
     required this.onRebroadcast,
+    required this.onOutForDelivery,
+    required this.onDelivered,
   });
 
   @override
@@ -803,10 +918,27 @@ class _ActionBar extends StatelessWidget {
         busy: busy,
         onPressed: onMarkReady,
       );
+    } else if (status == 'ready_for_pickup' && deliveryMode == 'self') {
+      // Vendor is delivering this one — drive it forward themselves.
+      body = _BarBtn(
+        label: 'OUT FOR DELIVERY',
+        icon: Icons.directions_run_rounded,
+        color: AppColors.primary,
+        busy: busy,
+        onPressed: onOutForDelivery,
+      );
+    } else if (status == 'out_for_delivery' && deliveryMode == 'self') {
+      body = _BarBtn(
+        label: 'MARK DELIVERED',
+        icon: Icons.task_alt_rounded,
+        color: AppColors.success,
+        busy: busy,
+        onPressed: onDelivered,
+      );
     } else if (status == 'ready_for_pickup' && !driverAssigned) {
-      // Stuck waiting for a rider — let the vendor re-fire the broadcast
-      // in case the first one missed everyone (no riders online, location
-      // changed, etc.).
+      // Marketplace order stuck waiting for a rider — let the vendor re-fire
+      // the broadcast in case the first one missed everyone (no riders online,
+      // location changed, etc.).
       body = _BarBtn(
         label: 'FIND A RIDER AGAIN',
         icon: Icons.delivery_dining_rounded,
@@ -899,6 +1031,74 @@ class _BarBtn extends StatelessWidget {
                   ],
                 ),
               ),
+      ),
+    );
+  }
+}
+
+class _DeliveryModeTile extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _DeliveryModeTile({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppStyles.radiusMd),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(AppStyles.radiusMd),
+          border: Border.all(color: color.withOpacity(0.35), width: 1.3),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.14),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: color),
+          ],
+        ),
       ),
     );
   }

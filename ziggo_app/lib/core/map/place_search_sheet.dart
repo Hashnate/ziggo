@@ -18,6 +18,7 @@ Future<Place?> showPlaceSearch(
   String title = 'Search location',
   LatLng? near,
   bool allowCurrentLocation = false,
+  bool allowSetOnMap = false,
 }) {
   return showModalBottomSheet<Place>(
     context: context,
@@ -31,6 +32,7 @@ Future<Place?> showPlaceSearch(
       title: title,
       near: near,
       allowCurrentLocation: allowCurrentLocation,
+      allowSetOnMap: allowSetOnMap,
     ),
   );
 }
@@ -39,10 +41,12 @@ class _PlaceSearchSheet extends StatefulWidget {
   final String title;
   final LatLng? near;
   final bool allowCurrentLocation;
+  final bool allowSetOnMap;
   const _PlaceSearchSheet({
     required this.title,
     this.near,
     this.allowCurrentLocation = false,
+    this.allowSetOnMap = false,
   });
 
   @override
@@ -222,6 +226,7 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
       return Column(
         children: [
           if (widget.allowCurrentLocation) _currentLocationTile(),
+          if (widget.allowSetOnMap) _setOnMapTile(),
           if (saved.isNotEmpty) ...[
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 12, 20, 6),
@@ -355,6 +360,35 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
                 ),
         );
       },
+    );
+  }
+
+  Widget _setOnMapTile() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+      child: ListTile(
+        onTap: () {
+          Navigator.pop(context, Place('__SET_ON_MAP__', '', widget.near ?? const LatLng(6.9271, 79.8612)));
+        },
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+        ),
+        leading: Container(
+          width: 40,
+          height: 40,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.10),
+            borderRadius: BorderRadius.circular(AppStyles.radiusXs),
+          ),
+          child: const Icon(Icons.pin_drop_outlined, color: AppColors.primary, size: 20),
+        ),
+        title: const Text(
+          'Set on map',
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+        ),
+        trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary, size: 20),
+      ),
     );
   }
 
