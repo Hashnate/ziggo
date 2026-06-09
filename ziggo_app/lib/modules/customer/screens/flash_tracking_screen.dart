@@ -211,7 +211,8 @@ class _FlashTrackingScreenState extends State<FlashTrackingScreen> {
     final status = active['status'] as String?;
     final meta = _statusMeta(status);
     final currentStage = _stageIndex(status);
-    final isFlash = active['is_flash'] == true;
+    final isCourier = active['is_courier'] == true;
+    final isParcel = active['is_flash'] == true || isCourier;
     final parcelType = (active['parcel_type'] ?? 'parcel').toString();
     final receiverName = active['receiver_name']?.toString() ?? 'Receiver';
     final receiverPhone = active['receiver_phone']?.toString();
@@ -334,9 +335,9 @@ class _FlashTrackingScreenState extends State<FlashTrackingScreen> {
                       children: [
                         PulseDot(color: meta.color, size: 8, pulseSize: 18),
                         const SizedBox(width: 8),
-                        const Text(
-                          'ZIGGO FLASH',
-                          style: TextStyle(
+                        Text(
+                          isCourier ? 'ZIGGO COURIER' : 'ZIGGO FLASH',
+                          style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 1.2,
@@ -418,7 +419,7 @@ class _FlashTrackingScreenState extends State<FlashTrackingScreen> {
                       _StageTimeline(currentStage: currentStage, stages: _stages),
                       const SizedBox(height: 16),
                       // Parcel card
-                      if (isFlash)
+                      if (isParcel)
                         Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(

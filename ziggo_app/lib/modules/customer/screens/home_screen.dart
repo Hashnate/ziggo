@@ -16,6 +16,7 @@ import '../wallet_provider.dart';
 import 'fare_estimate_screen.dart';
 import 'event_home_screen.dart';
 import 'flash_home_screen.dart';
+import 'flash_delivery_type_screen.dart';
 import 'rental_type_screen.dart';
 import 'food_home_screen.dart';
 import 'market_home_screen.dart';
@@ -113,7 +114,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _ServicesGrid(
               onRide: () => _open(const FareEstimateScreen()),
               onFood: () => _open(const FoodHomeScreen()),
-              onFlash: () => _open(const FlashHomeScreen()),
+              onFlash: () => _open(const FlashDeliveryTypeScreen()),
               onMarket: () => _open(const MarketHomeScreen()),
             ),
             const SizedBox(height: 24),
