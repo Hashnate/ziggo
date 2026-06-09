@@ -8,6 +8,7 @@ from decimal import Decimal
 from datetime import datetime, timezone, timedelta
 
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.database import AsyncSessionLocal
 from app.models import (
@@ -23,6 +24,9 @@ from app.models import (
     MenuItem,
     MarketVendor,
     Product,
+    FoodCategory,
+    FoodCollection,
+    FoodDeal,
 )
 
 # Colombo center
@@ -266,6 +270,98 @@ async def seed_market(db):
             )
 
 
+async def seed_food_home(db):
+    """Ensure the food home categories/collections exist (get-or-create by name,
+    shared with schema_sync's defaults) and tag the demo restaurants so the
+    home-screen category & collection filters return results. Idempotent."""
+    from app.services.schema_sync import (
+        DEFAULT_FOOD_CATEGORIES,
+        DEFAULT_FOOD_COLLECTIONS,
+        DEFAULT_FOOD_DEALS,
+    )
+
+    cat_by_name = {}
+    for row in DEFAULT_FOOD_CATEGORIES:
+        q = await db.execute(select(FoodCategory).where(FoodCategory.name == row["name"]))
+        c = q.scalars().first()
+        if not c:
+            c = FoodCategory(
+                name=row["name"],
+                icon_url=row["icon_url"],
+                display_order=row["display_order"],
+                is_active=True,
+            )
+            db.add(c)
+            await db.flush()
+        cat_by_name[c.name] = c
+
+    coll_by_name = {}
+    for row in DEFAULT_FOOD_COLLECTIONS:
+        q = await db.execute(select(FoodCollection).where(FoodCollection.name == row["name"]))
+        c = q.scalars().first()
+        if not c:
+            c = FoodCollection(
+                name=row["name"],
+                icon=row["icon"],
+                color=row["color"],
+                display_order=row["display_order"],
+                is_active=True,
+            )
+            db.add(c)
+            await db.flush()
+        coll_by_name[c.name] = c
+
+    restaurant_categories = {
+        "Spice Garden": ["Rice & Curry", "Indian"],
+        "Pizza Palace": ["Pizza"],
+        "Burger Hub": ["Burgers"],
+        "Bistro Café": ["Desserts", "Beverages"],
+    }
+    restaurant_collections = {
+        "Spice Garden": ["Popular", "Family Friendly"],
+        "Pizza Palace": ["Popular", "Featured Outlets"],
+        "Burger Hub": ["Newly Joined", "Popular"],
+        "Bistro Café": ["Featured Outlets"],
+    }
+
+    for rname in restaurant_categories:
+        rq = await db.execute(
+            select(Restaurant)
+            .options(
+                selectinload(Restaurant.food_categories),
+                selectinload(Restaurant.collections),
+            )
+            .where(Restaurant.name == rname)
+        )
+        r = rq.scalars().first()
+        if not r:
+            continue
+        have_cat = {c.id for c in r.food_categories}
+        for cn in restaurant_categories[rname]:
+            c = cat_by_name.get(cn)
+            if c and c.id not in have_cat:
+                r.food_categories.append(c)
+        have_coll = {c.id for c in r.collections}
+        for cn in restaurant_collections.get(rname, []):
+            c = coll_by_name.get(cn)
+            if c and c.id not in have_coll:
+                r.collections.append(c)
+
+    # Backfill deal -> promo links. The server may have seeded deals before the
+    # promo codes existed (server-first boot), leaving promo_code_id NULL; here
+    # promos are guaranteed present (seed_promos ran earlier in main()).
+    title_to_code = {d["title"]: d.get("promo_code") for d in DEFAULT_FOOD_DEALS if d.get("promo_code")}
+    dq = await db.execute(select(FoodDeal).where(FoodDeal.promo_code_id == None))  # noqa: E711
+    for deal in dq.scalars().all():
+        code = title_to_code.get(deal.title)
+        if not code:
+            continue
+        pq = await db.execute(select(PromoCode).where(PromoCode.code == code))
+        p = pq.scalars().first()
+        if p:
+            deal.promo_code_id = p.id
+
+
 async def main():
     async with AsyncSessionLocal() as db:
         await seed_admin(db)
@@ -275,6 +371,7 @@ async def main():
         await seed_demo_customer(db)
         await seed_restaurants(db)
         await seed_market(db)
+        await seed_food_home(db)
         await db.commit()
         print("[seed] Done.")
         print("  Admin login   : phone 0700000000  password admin123  -> /admin/login")

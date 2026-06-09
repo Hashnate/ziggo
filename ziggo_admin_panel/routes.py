@@ -2766,19 +2766,29 @@ async def admin_restaurant_detail(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from app.models import Restaurant, MenuCategory, MenuItem
+    from app.models import Restaurant, MenuCategory, MenuItem, FoodCategory
 
     rq = await db.execute(
         select(Restaurant)
         .options(
             selectinload(Restaurant.categories),
             selectinload(Restaurant.items),
+            selectinload(Restaurant.food_categories),
         )
         .where(Restaurant.id == restaurant_id)
     )
     restaurant = rq.scalars().first()
     if not restaurant:
         raise HTTPException(status_code=404, detail="Restaurant not found")
+
+    all_food_categories = (
+        await db.execute(
+            select(FoodCategory)
+            .where(FoodCategory.is_active == True)  # noqa: E712
+            .order_by(FoodCategory.display_order, FoodCategory.id)
+        )
+    ).scalars().all()
+    selected_food_category_ids = {c.id for c in restaurant.food_categories}
 
     return templates.TemplateResponse(
         request, "restaurant_detail.html",
@@ -2788,6 +2798,8 @@ async def admin_restaurant_detail(
             "restaurant": restaurant,
             "categories": sorted(restaurant.categories, key=lambda c: c.display_order or 0),
             "items": restaurant.items,
+            "all_food_categories": all_food_categories,
+            "selected_food_category_ids": selected_food_category_ids,
             "error": None,
         },
     )
@@ -5202,3 +5214,502 @@ async def admin_corporate_members_json(
         }
         for m in members
     ]
+
+
+# ===========================================================================
+# Food Home layout — banners / categories / collections / deals
+# (drives the customer Food home screen via GET /api/v1/food/home)
+# ===========================================================================
+FOOD_HOME_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "food_home")
+os.makedirs(FOOD_HOME_UPLOAD_DIR, exist_ok=True)
+
+
+async def _save_food_home_image(photo: UploadFile | None) -> str | None:
+    if photo is None or not photo.filename:
+        return None
+    ext = os.path.splitext(photo.filename)[1].lower()
+    if ext not in ALLOWED_PHOTO_EXTS:
+        raise HTTPException(status_code=400, detail="Image must be JPG, PNG, or WEBP")
+    data = await photo.read()
+    if len(data) == 0:
+        return None
+    if len(data) > MAX_PHOTO_BYTES:
+        raise HTTPException(status_code=400, detail="Image must be under 5 MB")
+    import secrets
+    fname = f"{secrets.token_hex(8)}{ext}"
+    fpath = os.path.join(FOOD_HOME_UPLOAD_DIR, fname)
+    with open(fpath, "wb") as f:
+        f.write(data)
+    return f"/static/uploads/food_home/{fname}"
+
+
+@router.get("/food-home", response_class=HTMLResponse)
+async def admin_food_home(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import (
+        FoodBanner,
+        FoodCategory,
+        FoodCollection,
+        FoodDeal,
+        Restaurant,
+        PromoCode,
+    )
+
+    banners = (
+        await db.execute(select(FoodBanner).order_by(FoodBanner.display_order, FoodBanner.id))
+    ).scalars().all()
+    categories = (
+        await db.execute(select(FoodCategory).order_by(FoodCategory.display_order, FoodCategory.id))
+    ).scalars().all()
+    collections = (
+        await db.execute(
+            select(FoodCollection)
+            .options(selectinload(FoodCollection.restaurants))
+            .order_by(FoodCollection.display_order, FoodCollection.id)
+        )
+    ).scalars().all()
+    deals = (
+        await db.execute(
+            select(FoodDeal)
+            .options(selectinload(FoodDeal.promo_code))
+            .order_by(FoodDeal.display_order, FoodDeal.id)
+        )
+    ).scalars().all()
+    restaurants = (
+        await db.execute(
+            select(Restaurant).where(Restaurant.is_active == True).order_by(Restaurant.name)  # noqa: E712
+        )
+    ).scalars().all()
+    promos = (
+        await db.execute(
+            select(PromoCode).where(PromoCode.is_active == True).order_by(PromoCode.code)  # noqa: E712
+        )
+    ).scalars().all()
+
+    return templates.TemplateResponse(
+        request,
+        "food_home.html",
+        {
+            "request": request,
+            "active_page": "food-home",
+            "banners": banners,
+            "categories": categories,
+            "collections": collections,
+            "deals": deals,
+            "restaurants": restaurants,
+            "promos": promos,
+        },
+    )
+
+
+# ---------- Banners ----------
+@router.post("/food-home/banners/new")
+async def admin_food_banner_new(
+    title: str = Form(""),
+    link_type: str = Form("none"),
+    link_value: str = Form(""),
+    image_url: str = Form(""),
+    display_order: int = Form(0),
+    is_active: str = Form("on"),
+    image: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import FoodBanner
+
+    url = await _save_food_home_image(image) or (image_url.strip() or None)
+    if not url:
+        raise HTTPException(status_code=400, detail="A banner image (upload or URL) is required")
+    db.add(
+        FoodBanner(
+            title=title.strip() or None,
+            image_url=url,
+            link_type=(link_type.strip() or "none"),
+            link_value=link_value.strip() or None,
+            display_order=int(display_order or 0),
+            is_active=(is_active == "on"),
+        )
+    )
+    await db.commit()
+    return RedirectResponse(url="/admin/food-home", status_code=303)
+
+
+@router.post("/food-home/banners/{id}/edit")
+async def admin_food_banner_edit(
+    id: int,
+    title: str = Form(""),
+    link_type: str = Form("none"),
+    link_value: str = Form(""),
+    image_url: str = Form(""),
+    display_order: int = Form(0),
+    image: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import FoodBanner
+
+    b = (await db.execute(select(FoodBanner).where(FoodBanner.id == id))).scalars().first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Banner not found")
+    b.title = title.strip() or None
+    b.link_type = link_type.strip() or "none"
+    b.link_value = link_value.strip() or None
+    b.display_order = int(display_order or 0)
+    new_url = await _save_food_home_image(image)
+    if new_url:
+        b.image_url = new_url
+    elif image_url.strip():
+        b.image_url = image_url.strip()
+    await db.commit()
+    return RedirectResponse(url="/admin/food-home", status_code=303)
+
+
+@router.post("/food-home/banners/{id}/toggle")
+async def admin_food_banner_toggle(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import FoodBanner
+
+    b = (await db.execute(select(FoodBanner).where(FoodBanner.id == id))).scalars().first()
+    if b:
+        b.is_active = not b.is_active
+        await db.commit()
+    return RedirectResponse(url="/admin/food-home", status_code=303)
+
+
+@router.post("/food-home/banners/{id}/delete")
+async def admin_food_banner_delete(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import FoodBanner
+
+    b = (await db.execute(select(FoodBanner).where(FoodBanner.id == id))).scalars().first()
+    if b:
+        await db.delete(b)
+        await db.commit()
+    return RedirectResponse(url="/admin/food-home", status_code=303)
+
+
+# ---------- Categories ----------
+@router.post("/food-home/categories/new")
+async def admin_food_category_new(
+    name: str = Form(...),
+    icon_url: str = Form(""),
+    display_order: int = Form(0),
+    is_active: str = Form("on"),
+    image: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import FoodCategory
+
+    if not name.strip():
+        raise HTTPException(status_code=400, detail="Category name is required")
+    url = await _save_food_home_image(image) or (icon_url.strip() or None)
+    db.add(
+        FoodCategory(
+            name=name.strip(),
+            icon_url=url,
+            display_order=int(display_order or 0),
+            is_active=(is_active == "on"),
+        )
+    )
+    await db.commit()
+    return RedirectResponse(url="/admin/food-home", status_code=303)
+
+
+@router.post("/food-home/categories/{id}/edit")
+async def admin_food_category_edit(
+    id: int,
+    name: str = Form(...),
+    icon_url: str = Form(""),
+    display_order: int = Form(0),
+    image: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import FoodCategory
+
+    c = (await db.execute(select(FoodCategory).where(FoodCategory.id == id))).scalars().first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Category not found")
+    c.name = name.strip() or c.name
+    c.display_order = int(display_order or 0)
+    new_url = await _save_food_home_image(image)
+    if new_url:
+        c.icon_url = new_url
+    elif icon_url.strip():
+        c.icon_url = icon_url.strip()
+    await db.commit()
+    return RedirectResponse(url="/admin/food-home", status_code=303)
+
+
+@router.post("/food-home/categories/{id}/toggle")
+async def admin_food_category_toggle(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import FoodCategory
+
+    c = (await db.execute(select(FoodCategory).where(FoodCategory.id == id))).scalars().first()
+    if c:
+        c.is_active = not c.is_active
+        await db.commit()
+    return RedirectResponse(url="/admin/food-home", status_code=303)
+
+
+@router.post("/food-home/categories/{id}/delete")
+async def admin_food_category_delete(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import FoodCategory
+
+    c = (await db.execute(select(FoodCategory).where(FoodCategory.id == id))).scalars().first()
+    if c:
+        await db.delete(c)
+        await db.commit()
+    return RedirectResponse(url="/admin/food-home", status_code=303)
+
+
+# ---------- Collections ----------
+@router.post("/food-home/collections/new")
+async def admin_food_collection_new(
+    name: str = Form(...),
+    icon: str = Form("local_fire_department"),
+    color: str = Form("blue"),
+    display_order: int = Form(0),
+    is_active: str = Form("on"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import FoodCollection
+
+    if not name.strip():
+        raise HTTPException(status_code=400, detail="Collection name is required")
+    db.add(
+        FoodCollection(
+            name=name.strip(),
+            icon=icon.strip() or "local_fire_department",
+            color=color.strip() or "blue",
+            display_order=int(display_order or 0),
+            is_active=(is_active == "on"),
+        )
+    )
+    await db.commit()
+    return RedirectResponse(url="/admin/food-home", status_code=303)
+
+
+@router.post("/food-home/collections/{id}/edit")
+async def admin_food_collection_edit(
+    id: int,
+    name: str = Form(...),
+    icon: str = Form("local_fire_department"),
+    color: str = Form("blue"),
+    display_order: int = Form(0),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import FoodCollection
+
+    c = (await db.execute(select(FoodCollection).where(FoodCollection.id == id))).scalars().first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    c.name = name.strip() or c.name
+    c.icon = icon.strip() or "local_fire_department"
+    c.color = color.strip() or "blue"
+    c.display_order = int(display_order or 0)
+    await db.commit()
+    return RedirectResponse(url="/admin/food-home", status_code=303)
+
+
+@router.post("/food-home/collections/{id}/restaurants")
+async def admin_food_collection_restaurants(
+    id: int,
+    restaurant_ids: list[int] = Form(default=[]),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import FoodCollection, Restaurant
+
+    c = (
+        await db.execute(
+            select(FoodCollection)
+            .options(selectinload(FoodCollection.restaurants))
+            .where(FoodCollection.id == id)
+        )
+    ).scalars().first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    chosen = []
+    if restaurant_ids:
+        chosen = (
+            await db.execute(select(Restaurant).where(Restaurant.id.in_(restaurant_ids)))
+        ).scalars().all()
+    c.restaurants = list(chosen)
+    await db.commit()
+    return RedirectResponse(url="/admin/food-home", status_code=303)
+
+
+@router.post("/food-home/collections/{id}/toggle")
+async def admin_food_collection_toggle(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import FoodCollection
+
+    c = (await db.execute(select(FoodCollection).where(FoodCollection.id == id))).scalars().first()
+    if c:
+        c.is_active = not c.is_active
+        await db.commit()
+    return RedirectResponse(url="/admin/food-home", status_code=303)
+
+
+@router.post("/food-home/collections/{id}/delete")
+async def admin_food_collection_delete(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import FoodCollection
+
+    c = (await db.execute(select(FoodCollection).where(FoodCollection.id == id))).scalars().first()
+    if c:
+        await db.delete(c)
+        await db.commit()
+    return RedirectResponse(url="/admin/food-home", status_code=303)
+
+
+# ---------- Deals ----------
+@router.post("/food-home/deals/new")
+async def admin_food_deal_new(
+    title: str = Form(...),
+    subtitle: str = Form(""),
+    color: str = Form("primary"),
+    promo_code_id: str = Form(""),
+    image_url: str = Form(""),
+    display_order: int = Form(0),
+    is_active: str = Form("on"),
+    image: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import FoodDeal
+
+    if not title.strip():
+        raise HTTPException(status_code=400, detail="Deal title is required")
+    url = await _save_food_home_image(image) or (image_url.strip() or None)
+    db.add(
+        FoodDeal(
+            title=title.strip(),
+            subtitle=subtitle.strip() or None,
+            color=color.strip() or "primary",
+            promo_code_id=int(promo_code_id) if promo_code_id.strip() else None,
+            image_url=url,
+            display_order=int(display_order or 0),
+            is_active=(is_active == "on"),
+        )
+    )
+    await db.commit()
+    return RedirectResponse(url="/admin/food-home", status_code=303)
+
+
+@router.post("/food-home/deals/{id}/edit")
+async def admin_food_deal_edit(
+    id: int,
+    title: str = Form(...),
+    subtitle: str = Form(""),
+    color: str = Form("primary"),
+    promo_code_id: str = Form(""),
+    image_url: str = Form(""),
+    display_order: int = Form(0),
+    image: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import FoodDeal
+
+    d = (await db.execute(select(FoodDeal).where(FoodDeal.id == id))).scalars().first()
+    if not d:
+        raise HTTPException(status_code=404, detail="Deal not found")
+    d.title = title.strip() or d.title
+    d.subtitle = subtitle.strip() or None
+    d.color = color.strip() or "primary"
+    d.promo_code_id = int(promo_code_id) if promo_code_id.strip() else None
+    d.display_order = int(display_order or 0)
+    new_url = await _save_food_home_image(image)
+    if new_url:
+        d.image_url = new_url
+    elif image_url.strip():
+        d.image_url = image_url.strip()
+    await db.commit()
+    return RedirectResponse(url="/admin/food-home", status_code=303)
+
+
+@router.post("/food-home/deals/{id}/toggle")
+async def admin_food_deal_toggle(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import FoodDeal
+
+    d = (await db.execute(select(FoodDeal).where(FoodDeal.id == id))).scalars().first()
+    if d:
+        d.is_active = not d.is_active
+        await db.commit()
+    return RedirectResponse(url="/admin/food-home", status_code=303)
+
+
+@router.post("/food-home/deals/{id}/delete")
+async def admin_food_deal_delete(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import FoodDeal
+
+    d = (await db.execute(select(FoodDeal).where(FoodDeal.id == id))).scalars().first()
+    if d:
+        await db.delete(d)
+        await db.commit()
+    return RedirectResponse(url="/admin/food-home", status_code=303)
+
+
+# ---------- Restaurant cuisine-category tagging (restaurant detail page) ----------
+@router.post("/restaurants/{restaurant_id}/cuisine-categories")
+async def admin_restaurant_set_cuisine_categories(
+    restaurant_id: int,
+    category_ids: list[int] = Form(default=[]),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import Restaurant, FoodCategory
+
+    r = (
+        await db.execute(
+            select(Restaurant)
+            .options(selectinload(Restaurant.food_categories))
+            .where(Restaurant.id == restaurant_id)
+        )
+    ).scalars().first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+    chosen = []
+    if category_ids:
+        chosen = (
+            await db.execute(select(FoodCategory).where(FoodCategory.id.in_(category_ids)))
+        ).scalars().all()
+    r.food_categories = list(chosen)
+    await db.commit()
+    return RedirectResponse(url=f"/admin/restaurants/{restaurant_id}", status_code=303)

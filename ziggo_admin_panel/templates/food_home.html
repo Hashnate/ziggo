@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}Food Home | Ziggo Admin{% endblock %}
+{% block page_title %}Food Home Layout{% endblock %}
+
+{% block content %}
+{% set input_cls = "w-full p-2.5 border border-ziggo-line rounded-lg outline-none focus:border-ziggo text-sm" %}
+{% set link_types = ['none', 'restaurant', 'category', 'collection', 'promo', 'url'] %}
+{% set colors = ['primary', 'orange', 'purple', 'green', 'blue', 'red', 'indigo', 'cyan'] %}
+
+<div class="space-y-8 max-w-6xl">
+    <p class="text-sm text-ziggo-muted font-bold">
+        Everything here drives the customer <span class="text-ziggo">Food</span> home screen
+        (banners, category chips, "Picked for you" collections, and deal cards).
+        Lower <span class="text-ziggo">order</span> shows first.
+    </p>
+
+    <!-- ============================ BANNERS ============================ -->
+    <section class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div class="p-5 border-b border-ziggo-line flex items-center justify-between">
+            <div>
+                <h3 class="text-lg font-black text-ziggo">Banners</h3>
+                <p class="text-xs text-ziggo-muted">{{ banners|length }} total — top carousel</p>
+            </div>
+        </div>
+
+        <div class="divide-y divide-ziggo-line">
+            {% for b in banners %}
+            <div class="p-4 flex flex-wrap items-center gap-3">
+                <div class="w-24 h-14 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center flex-shrink-0">
+                    {% if b.image_url %}<img src="{{ b.image_url }}" class="w-full h-full object-cover">{% else %}<i class="fas fa-image text-ziggo-faint"></i>{% endif %}
+                </div>
+                <form method="post" enctype="multipart/form-data" action="/admin/food-home/banners/{{ b.id }}/edit" class="flex-1 grid grid-cols-2 md:grid-cols-6 gap-2 items-center">
+                    <input name="title" value="{{ b.title or '' }}" placeholder="Title" class="{{ input_cls }} md:col-span-1">
+                    <select name="link_type" class="{{ input_cls }}">
+                        {% for lt in link_types %}<option value="{{ lt }}" {% if b.link_type == lt %}selected{% endif %}>{{ lt }}</option>{% endfor %}
+                    </select>
+                    <input name="link_value" value="{{ b.link_value or '' }}" placeholder="Link value" class="{{ input_cls }}">
+                    <input name="image_url" value="" placeholder="Image URL (or upload)" class="{{ input_cls }}">
+                    <input type="file" name="image" accept="image/*" class="{{ input_cls }} text-xs">
+                    <div class="flex items-center gap-1">
+                        <input name="display_order" type="number" value="{{ b.display_order }}" title="Order" class="{{ input_cls }} w-16">
+                        <button class="px-3 py-2 bg-ziggo text-white rounded-lg text-xs font-bold hover:bg-ziggo-light" title="Save"><i class="fas fa-save"></i></button>
+                    </div>
+                </form>
+                <div class="flex items-center gap-2">
+                    <form method="post" action="/admin/food-home/banners/{{ b.id }}/toggle">
+                        <button class="px-3 py-1.5 rounded-full text-[11px] font-black uppercase {% if b.is_active %}bg-emerald-50 text-emerald-600{% else %}bg-gray-100 text-gray-500{% endif %}">{{ 'Active' if b.is_active else 'Off' }}</button>
+                    </form>
+                    <form method="post" action="/admin/food-home/banners/{{ b.id }}/delete" onsubmit="return confirm('Delete this banner?')">
+                        <button class="px-2.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-xs"><i class="fas fa-trash"></i></button>
+                    </form>
+                </div>
+            </div>
+            {% else %}
+            <p class="p-6 text-sm text-ziggo-muted text-center">No banners yet.</p>
+            {% endfor %}
+        </div>
+
+        <form method="post" enctype="multipart/form-data" action="/admin/food-home/banners/new" class="p-4 bg-gray-50/60 grid grid-cols-2 md:grid-cols-7 gap-2 items-center">
+            <input name="title" placeholder="Title" class="{{ input_cls }}">
+            <select name="link_type" class="{{ input_cls }}">{% for lt in link_types %}<option value="{{ lt }}">{{ lt }}</option>{% endfor %}</select>
+            <input name="link_value" placeholder="Link value" class="{{ input_cls }}">
+            <input name="image_url" placeholder="Image URL" class="{{ input_cls }}">
+            <input type="file" name="image" accept="image/*" class="{{ input_cls }} text-xs">
+            <input name="display_order" type="number" value="0" placeholder="Order" class="{{ input_cls }}">
+            <button class="px-3 py-2.5 bg-ziggo text-white rounded-lg text-sm font-bold hover:bg-ziggo-light"><i class="fas fa-plus mr-1"></i> Add</button>
+        </form>
+    </section>
+
+    <!-- ============================ CATEGORIES ============================ -->
+    <section class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div class="p-5 border-b border-ziggo-line">
+            <h3 class="text-lg font-black text-ziggo">Cuisine Categories</h3>
+            <p class="text-xs text-ziggo-muted">{{ categories|length }} total — tap filters restaurants. Assign outlets on each restaurant's detail page.</p>
+        </div>
+
+        <div class="divide-y divide-ziggo-line">
+            {% for c in categories %}
+            <div class="p-4 flex flex-wrap items-center gap-3">
+                <div class="w-12 h-12 rounded-full bg-gray-100 overflow-hidden flex items-center justify-center flex-shrink-0">
+                    {% if c.icon_url %}<img src="{{ c.icon_url }}" class="w-full h-full object-cover">{% else %}<i class="fas fa-utensils text-ziggo-faint"></i>{% endif %}
+                </div>
+                <form method="post" enctype="multipart/form-data" action="/admin/food-home/categories/{{ c.id }}/edit" class="flex-1 grid grid-cols-2 md:grid-cols-4 gap-2 items-center">
+                    <input name="name" value="{{ c.name }}" required class="{{ input_cls }}">
+                    <input name="icon_url" value="" placeholder="Icon URL (or upload)" class="{{ input_cls }}">
+                    <input type="file" name="image" accept="image/*" class="{{ input_cls }} text-xs">
+                    <div class="flex items-center gap-1">
+                        <input name="display_order" type="number" value="{{ c.display_order }}" title="Order" class="{{ input_cls }} w-16">
+                        <button class="px-3 py-2 bg-ziggo text-white rounded-lg text-xs font-bold hover:bg-ziggo-light"><i class="fas fa-save"></i></button>
+                    </div>
+                </form>
+                <div class="flex items-center gap-2">
+                    <form method="post" action="/admin/food-home/categories/{{ c.id }}/toggle">
+                        <button class="px-3 py-1.5 rounded-full text-[11px] font-black uppercase {% if c.is_active %}bg-emerald-50 text-emerald-600{% else %}bg-gray-100 text-gray-500{% endif %}">{{ 'Active' if c.is_active else 'Off' }}</button>
+                    </form>
+                    <form method="post" action="/admin/food-home/categories/{{ c.id }}/delete" onsubmit="return confirm('Delete this category? Restaurant tags will be removed.')">
+                        <button class="px-2.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-xs"><i class="fas fa-trash"></i></button>
+                    </form>
+                </div>
+            </div>
+            {% else %}
+            <p class="p-6 text-sm text-ziggo-muted text-center">No categories yet.</p>
+            {% endfor %}
+        </div>
+
+        <form method="post" enctype="multipart/form-data" action="/admin/food-home/categories/new" class="p-4 bg-gray-50/60 grid grid-cols-2 md:grid-cols-5 gap-2 items-center">
+            <input name="name" placeholder="Name e.g. Pizza" required class="{{ input_cls }}">
+            <input name="icon_url" placeholder="Icon URL" class="{{ input_cls }}">
+            <input type="file" name="image" accept="image/*" class="{{ input_cls }} text-xs">
+            <input name="display_order" type="number" value="0" placeholder="Order" class="{{ input_cls }}">
+            <button class="px-3 py-2.5 bg-ziggo text-white rounded-lg text-sm font-bold hover:bg-ziggo-light"><i class="fas fa-plus mr-1"></i> Add</button>
+        </form>
+    </section>
+
+    <!-- ============================ COLLECTIONS ============================ -->
+    <section class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div class="p-5 border-b border-ziggo-line">
+            <h3 class="text-lg font-black text-ziggo">Collections ("Picked for you")</h3>
+            <p class="text-xs text-ziggo-muted">{{ collections|length }} total — curated restaurant groups. Icon is a Material icon name (e.g. local_fire_department).</p>
+        </div>
+
+        <div class="divide-y divide-ziggo-line">
+            {% for c in collections %}
+            <div class="p-4 space-y-3">
+                <div class="flex flex-wrap items-center gap-3">
+                    <span class="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center text-ziggo flex-shrink-0"><i class="fas fa-icons"></i></span>
+                    <form method="post" action="/admin/food-home/collections/{{ c.id }}/edit" class="flex-1 grid grid-cols-2 md:grid-cols-4 gap-2 items-center">
+                        <input name="name" value="{{ c.name }}" required class="{{ input_cls }}">
+                        <input name="icon" value="{{ c.icon }}" placeholder="Material icon name" class="{{ input_cls }}">
+                        <select name="color" class="{{ input_cls }}">{% for col in colors %}<option value="{{ col }}" {% if c.color == col %}selected{% endif %}>{{ col }}</option>{% endfor %}</select>
+                        <div class="flex items-center gap-1">
+                            <input name="display_order" type="number" value="{{ c.display_order }}" title="Order" class="{{ input_cls }} w-16">
+                            <button class="px-3 py-2 bg-ziggo text-white rounded-lg text-xs font-bold hover:bg-ziggo-light"><i class="fas fa-save"></i></button>
+                        </div>
+                    </form>
+                    <div class="flex items-center gap-2">
+                        <form method="post" action="/admin/food-home/collections/{{ c.id }}/toggle">
+                            <button class="px-3 py-1.5 rounded-full text-[11px] font-black uppercase {% if c.is_active %}bg-emerald-50 text-emerald-600{% else %}bg-gray-100 text-gray-500{% endif %}">{{ 'Active' if c.is_active else 'Off' }}</button>
+                        </form>
+                        <form method="post" action="/admin/food-home/collections/{{ c.id }}/delete" onsubmit="return confirm('Delete this collection?')">
+                            <button class="px-2.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-xs"><i class="fas fa-trash"></i></button>
+                        </form>
+                    </div>
+                </div>
+                <!-- restaurant membership -->
+                {% set member_ids = c.restaurants | map(attribute='id') | list %}
+                <form method="post" action="/admin/food-home/collections/{{ c.id }}/restaurants" class="flex flex-wrap items-center gap-2 pl-9">
+                    <span class="text-xs font-black text-ziggo-muted uppercase">Outlets:</span>
+                    {% for r in restaurants %}
+                    <label class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-ziggo-line cursor-pointer hover:bg-gray-50 text-xs font-bold">
+                        <input type="checkbox" name="restaurant_ids" value="{{ r.id }}" {% if r.id in member_ids %}checked{% endif %} class="w-3.5 h-3.5">
+                        {{ r.name }}
+                    </label>
+                    {% endfor %}
+                    <button class="px-3 py-1.5 bg-blue-50 text-ziggo border border-blue-100 rounded-lg text-xs font-bold hover:bg-blue-100">Save outlets</button>
+                </form>
+            </div>
+            {% else %}
+            <p class="p-6 text-sm text-ziggo-muted text-center">No collections yet.</p>
+            {% endfor %}
+        </div>
+
+        <form method="post" action="/admin/food-home/collections/new" class="p-4 bg-gray-50/60 grid grid-cols-2 md:grid-cols-5 gap-2 items-center">
+            <input name="name" placeholder="Name e.g. Popular" required class="{{ input_cls }}">
+            <input name="icon" value="local_fire_department" placeholder="Material icon" class="{{ input_cls }}">
+            <select name="color" class="{{ input_cls }}">{% for col in colors %}<option value="{{ col }}">{{ col }}</option>{% endfor %}</select>
+            <input name="display_order" type="number" value="0" placeholder="Order" class="{{ input_cls }}">
+            <button class="px-3 py-2.5 bg-ziggo text-white rounded-lg text-sm font-bold hover:bg-ziggo-light"><i class="fas fa-plus mr-1"></i> Add</button>
+        </form>
+    </section>
+
+    <!-- ============================ DEALS ============================ -->
+    <section class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div class="p-5 border-b border-ziggo-line">
+            <h3 class="text-lg font-black text-ziggo">Deals &amp; Offers</h3>
+            <p class="text-xs text-ziggo-muted">{{ deals|length }} total — promo-linked deal cards.</p>
+        </div>
+
+        <div class="divide-y divide-ziggo-line">
+            {% for d in deals %}
+            <div class="p-4 flex flex-wrap items-center gap-3">
+                <div class="w-20 h-14 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 bg-{{ 'orange' if d.color=='orange' else 'purple' if d.color=='purple' else 'green' if d.color=='green' else 'blue' }}-100">
+                    {% if d.image_url %}<img src="{{ d.image_url }}" class="w-full h-full object-cover">{% else %}<i class="fas fa-tags text-ziggo-faint"></i>{% endif %}
+                </div>
+                <form method="post" enctype="multipart/form-data" action="/admin/food-home/deals/{{ d.id }}/edit" class="flex-1 grid grid-cols-2 md:grid-cols-6 gap-2 items-center">
+                    <input name="title" value="{{ d.title }}" required class="{{ input_cls }}">
+                    <input name="subtitle" value="{{ d.subtitle or '' }}" placeholder="Subtitle" class="{{ input_cls }} md:col-span-2">
+                    <select name="color" class="{{ input_cls }}">{% for col in colors %}<option value="{{ col }}" {% if d.color == col %}selected{% endif %}>{{ col }}</option>{% endfor %}</select>
+                    <select name="promo_code_id" class="{{ input_cls }}">
+                        <option value="">— no promo —</option>
+                        {% for p in promos %}<option value="{{ p.id }}" {% if d.promo_code_id == p.id %}selected{% endif %}>{{ p.code }}</option>{% endfor %}
+                    </select>
+                    <div class="flex items-center gap-1">
+                        <input name="display_order" type="number" value="{{ d.display_order }}" title="Order" class="{{ input_cls }} w-16">
+                        <button class="px-3 py-2 bg-ziggo text-white rounded-lg text-xs font-bold hover:bg-ziggo-light"><i class="fas fa-save"></i></button>
+                    </div>
+                    <input name="image_url" value="" placeholder="Image URL (or upload)" class="{{ input_cls }} md:col-span-3">
+                    <input type="file" name="image" accept="image/*" class="{{ input_cls }} text-xs md:col-span-3">
+                </form>
+                <div class="flex items-center gap-2">
+                    <form method="post" action="/admin/food-home/deals/{{ d.id }}/toggle">
+                        <button class="px-3 py-1.5 rounded-full text-[11px] font-black uppercase {% if d.is_active %}bg-emerald-50 text-emerald-600{% else %}bg-gray-100 text-gray-500{% endif %}">{{ 'Active' if d.is_active else 'Off' }}</button>
+                    </form>
+                    <form method="post" action="/admin/food-home/deals/{{ d.id }}/delete" onsubmit="return confirm('Delete this deal?')">
+                        <button class="px-2.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-xs"><i class="fas fa-trash"></i></button>
+                    </form>
+                </div>
+            </div>
+            {% else %}
+            <p class="p-6 text-sm text-ziggo-muted text-center">No deals yet.</p>
+            {% endfor %}
+        </div>
+
+        <form method="post" enctype="multipart/form-data" action="/admin/food-home/deals/new" class="p-4 bg-gray-50/60 grid grid-cols-2 md:grid-cols-6 gap-2 items-center">
+            <input name="title" placeholder="Title e.g. 30% OFF" required class="{{ input_cls }}">
+            <input name="subtitle" placeholder="Subtitle" class="{{ input_cls }} md:col-span-2">
+            <select name="color" class="{{ input_cls }}">{% for col in colors %}<option value="{{ col }}">{{ col }}</option>{% endfor %}</select>
+            <select name="promo_code_id" class="{{ input_cls }}">
+                <option value="">— no promo —</option>
+                {% for p in promos %}<option value="{{ p.id }}">{{ p.code }}</option>{% endfor %}
+            </select>
+            <input name="display_order" type="number" value="0" placeholder="Order" class="{{ input_cls }}">
+            <input name="image_url" placeholder="Image URL" class="{{ input_cls }} md:col-span-3">
+            <input type="file" name="image" accept="image/*" class="{{ input_cls }} text-xs md:col-span-2">
+            <button class="px-3 py-2.5 bg-ziggo text-white rounded-lg text-sm font-bold hover:bg-ziggo-light md:col-span-1"><i class="fas fa-plus mr-1"></i> Add</button>
+        </form>
+    </section>
+</div>
+{% endblock %}

@@ -140,6 +140,32 @@
                 Add a category first before adding menu items.
             </div>
             {% endif %}
+
+            <!-- Home-screen cuisine categories (drives the Food home filter) -->
+            <form method="post" action="/admin/restaurants/{{ restaurant.id }}/cuisine-categories"
+                  class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+                <div>
+                    <h3 class="font-black text-ziggo">Home cuisine categories</h3>
+                    <p class="text-xs text-gray-400">Tapping these on the Food home screen filters to this outlet. Manage the list at <a href="/admin/food-home" class="text-ziggo font-bold">Food Home</a>.</p>
+                </div>
+                {% if all_food_categories %}
+                <div class="grid grid-cols-2 gap-2">
+                    {% for fc in all_food_categories %}
+                    <label class="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-50">
+                        <input type="checkbox" name="category_ids" value="{{ fc.id }}"
+                               {% if fc.id in selected_food_category_ids %}checked{% endif %}
+                               class="w-4 h-4 rounded border-gray-300 text-ziggo focus:ring-ziggo">
+                        <span class="text-sm font-bold text-gray-700">{{ fc.name }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                <button class="w-full px-4 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light">
+                    <i class="fas fa-save mr-2"></i> Save categories
+                </button>
+                {% else %}
+                <p class="text-xs text-gray-400 italic">No cuisine categories defined yet. Create some at Food Home first.</p>
+                {% endif %}
+            </form>
         </div>
     </div>
 </div>
