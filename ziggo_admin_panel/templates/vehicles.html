@@ -47,29 +47,29 @@
     </div>
 
     <!-- Filter row -->
-    <form method="GET" action="/admin/vehicles" class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex flex-wrap items-end gap-4">
-        <div class="flex-1 min-w-[200px]">
-            <label class="block text-[11px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Verification status</label>
-            <select name="status" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white">
+    <form method="GET" action="/admin/vehicles" class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-3.5 flex flex-wrap items-end gap-3">
+        <div class="flex-1 min-w-[180px]">
+            <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Verification status</label>
+            <select name="status" class="w-full text-sm border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white">
                 <option value="">All Status</option>
                 {% for s in statuses %}
                 <option value="{{ s }}" {% if filter_status == s %}selected{% endif %}>{{ s|title }}</option>
                 {% endfor %}
             </select>
         </div>
-        <div class="flex-1 min-w-[200px]">
-            <label class="block text-[11px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Vehicle category</label>
-            <select name="category" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white">
+        <div class="flex-1 min-w-[180px]">
+            <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Vehicle category</label>
+            <select name="category" class="w-full text-sm border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white">
                 <option value="">All Categories</option>
                 {% for c in categories %}
                 <option value="{{ c.service_type }}" {% if filter_category == c.service_type %}selected{% endif %}>{{ c.display_name or c.service_type|title }}</option>
                 {% endfor %}
             </select>
         </div>
-        <button type="submit" class="px-6 py-3 bg-ziggo text-white rounded-2xl font-black shadow-brand hover:bg-ziggo-light transition flex items-center gap-2">
-            <i class="fas fa-filter"></i> Filter
+        <button type="submit" class="px-4 py-2 text-sm bg-ziggo text-white rounded-xl font-bold shadow-brand hover:bg-ziggo-light transition flex items-center gap-2">
+            <i class="fas fa-filter text-xs"></i> Filter
         </button>
-        <a href="/admin/vehicles" class="px-6 py-3 border border-ziggo-line rounded-2xl font-black text-ziggo-muted hover:bg-gray-50 transition">Clear Filter</a>
+        <a href="/admin/vehicles" class="px-4 py-2 text-sm border border-ziggo-line rounded-xl font-bold text-ziggo-muted hover:bg-gray-50 transition">Clear Filter</a>
     </form>
 
     <!-- Table -->

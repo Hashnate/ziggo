@@ -105,6 +105,40 @@ DEFAULT_FLASH_TIERS = [
 ]
 
 
+# Default Food home-screen layout, seeded on first boot so the customer Food
+# screen renders content out of the box. Admin-editable at /admin/food-home.
+# Category/collection names are shared with seed.py (get-or-create by name) so
+# the demo restaurants can be tagged without duplicating the lists.
+DEFAULT_FOOD_BANNERS = [
+    {"title": "Pizza Festival", "image_url": "https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=800&auto=format&fit=crop", "link_type": "none", "link_value": None, "display_order": 1},
+    {"title": "Combo Deals", "image_url": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=800&auto=format&fit=crop", "link_type": "none", "link_value": None, "display_order": 2},
+]
+
+DEFAULT_FOOD_CATEGORIES = [
+    {"name": "Rice & Curry", "icon_url": "https://images.unsplash.com/photo-1546833999-b9f581a1996d?q=80&w=200&auto=format&fit=crop", "display_order": 1},
+    {"name": "Burgers", "icon_url": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=200&auto=format&fit=crop", "display_order": 2},
+    {"name": "Shawarma", "icon_url": "https://images.unsplash.com/photo-1628840042765-356cda07504e?q=80&w=200&auto=format&fit=crop", "display_order": 3},
+    {"name": "Desserts", "icon_url": "https://images.unsplash.com/photo-1551024506-0bccd828d307?q=80&w=200&auto=format&fit=crop", "display_order": 4},
+    {"name": "Beverages", "icon_url": "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?q=80&w=200&auto=format&fit=crop", "display_order": 5},
+    {"name": "Chinese", "icon_url": "https://images.unsplash.com/photo-1585032226651-759b368d7246?q=80&w=200&auto=format&fit=crop", "display_order": 6},
+    {"name": "Indian", "icon_url": "https://images.unsplash.com/photo-1585937421612-70a008356fbe?q=80&w=200&auto=format&fit=crop", "display_order": 7},
+    {"name": "Pizza", "icon_url": "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?q=80&w=200&auto=format&fit=crop", "display_order": 8},
+]
+
+DEFAULT_FOOD_COLLECTIONS = [
+    {"name": "Popular", "icon": "local_fire_department", "color": "blue", "display_order": 1},
+    {"name": "Newly Joined", "icon": "fiber_new", "color": "cyan", "display_order": 2},
+    {"name": "Featured Outlets", "icon": "verified", "color": "red", "display_order": 3},
+    {"name": "Family Friendly", "icon": "family_restroom", "color": "indigo", "display_order": 4},
+]
+
+DEFAULT_FOOD_DEALS = [
+    {"title": "30% OFF", "subtitle": "Save up to Rs.360", "image_url": "https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?q=80&w=400&auto=format&fit=crop", "color": "orange", "promo_code": "ZIGGO50", "display_order": 1},
+    {"title": "Rs.100 OFF", "subtitle": "Flat Rs.100 off your order", "image_url": "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=400&auto=format&fit=crop", "color": "purple", "promo_code": "FLAT100", "display_order": 2},
+    {"title": "Spend more, Save more", "subtitle": "Deals from your favourite outlets!", "image_url": "https://images.unsplash.com/photo-1576867757603-05b134ebc379?q=80&w=400&auto=format&fit=crop", "color": "green", "promo_code": None, "display_order": 3},
+]
+
+
 async def ensure_schema(engine: AsyncEngine) -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -129,6 +163,7 @@ async def ensure_schema(engine: AsyncEngine) -> None:
 
         await _seed_flash_tiers(conn)
         await _seed_sample_events(conn)
+        await _seed_food_home(conn)
 
 
 async def _seed_flash_tiers(conn) -> None:
@@ -206,3 +241,45 @@ async def _seed_sample_events(conn) -> None:
                 EventTicketTier.__table__.insert().values(event_id=event_id, **t)
             )
     print(f"[schema_sync] Seeded {len(samples)} sample events")
+
+
+async def _seed_food_home(conn) -> None:
+    """Seed the four food home-layout tables on first boot. Each is guarded
+    independently, so a table added later still gets its defaults. Deals link
+    to seeded promo codes by code when one exists. Restaurant tagging
+    (category/collection membership) happens in seed.py, which owns the demo
+    restaurants."""
+    from ..models import FoodBanner, FoodCategory, FoodCollection, FoodDeal, PromoCode
+
+    seeded: list[str] = []
+
+    if (await conn.execute(select(FoodBanner))).scalars().first() is None:
+        for row in DEFAULT_FOOD_BANNERS:
+            await conn.execute(FoodBanner.__table__.insert().values(is_active=True, **row))
+        seeded.append(f"{len(DEFAULT_FOOD_BANNERS)} banners")
+
+    if (await conn.execute(select(FoodCategory))).scalars().first() is None:
+        for row in DEFAULT_FOOD_CATEGORIES:
+            await conn.execute(FoodCategory.__table__.insert().values(is_active=True, **row))
+        seeded.append(f"{len(DEFAULT_FOOD_CATEGORIES)} categories")
+
+    if (await conn.execute(select(FoodCollection))).scalars().first() is None:
+        for row in DEFAULT_FOOD_COLLECTIONS:
+            await conn.execute(FoodCollection.__table__.insert().values(is_active=True, **row))
+        seeded.append(f"{len(DEFAULT_FOOD_COLLECTIONS)} collections")
+
+    if (await conn.execute(select(FoodDeal))).scalars().first() is None:
+        for row in DEFAULT_FOOD_DEALS:
+            values = {k: v for k, v in row.items() if k != "promo_code"}
+            code = row.get("promo_code")
+            promo_id = None
+            if code:
+                pq = await conn.execute(select(PromoCode.id).where(PromoCode.code == code))
+                promo_id = pq.scalar_one_or_none()
+            await conn.execute(
+                FoodDeal.__table__.insert().values(is_active=True, promo_code_id=promo_id, **values)
+            )
+        seeded.append(f"{len(DEFAULT_FOOD_DEALS)} deals")
+
+    if seeded:
+        print(f"[schema_sync] Seeded food home: {', '.join(seeded)}")

@@ -47,25 +47,8 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
   }
 
   Future<void> _pickPlace() async {
-    final p = await showPlaceSearch(context, title: 'Delivery address');
-    if (p != null) {
-      setState(() { _picked = p; _saved = null; });
-      _refreshQuote();
-    }
-  }
-
-  /// Re-fetch the delivery quote for the currently chosen address.
-  void _refreshQuote() {
-    double? lat, lng;
-    if (_saved != null) {
-      lat = (_saved!['lat'] as num).toDouble();
-      lng = (_saved!['lng'] as num).toDouble();
-    } else if (_picked != null) {
-      lat = _picked!.location.latitude;
-      lng = _picked!.location.longitude;
-    }
-    if (lat == null || lng == null) return;
-    context.read<MarketProvider>().quoteDelivery(lat: lat, lng: lng);
+    final p = await showPlaceSearch(context, title: 'Delivery address', allowCurrentLocation: true);
+    if (p != null) setState(() { _picked = p; _saved = null; });
   }
 
   Future<void> _placeOrder() async {

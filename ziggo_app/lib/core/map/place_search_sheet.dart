@@ -55,7 +55,7 @@ class _PlaceSearchSheet extends StatefulWidget {
 
 class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
   final _controller = TextEditingController();
-  List<PlacePrediction> _results = const [];
+  List<_PlaceResult> _results = const [];
   bool _loading = false;
   bool _resolving = false;
   Timer? _debounce;
@@ -86,18 +86,33 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
     }
     setState(() => _loading = true);
     _debounce = Timer(const Duration(milliseconds: 350), () async {
-      final r = await MapsService.instance.autocomplete(q, near: widget.near);
+      final remote = await MapsService.instance.autocomplete(q, near: widget.near);
+      // Offline fallback: when the Places API is unavailable (no API key) or
+      // returns nothing, search the curated Sri Lanka landmark list so the
+      // location picker still works without any paid API.
+      final results = remote.isNotEmpty
+          ? remote
+              .map((p) => _PlaceResult.remote(p.mainText, p.secondaryText, p.placeId))
+              .toList()
+          : searchPlaces(q)
+              .map((p) => _PlaceResult.local(p.name, p.area, p.location))
+              .toList();
       if (!mounted) return;
       setState(() {
-        _results = r;
+        _results = results;
         _loading = false;
       });
     });
   }
 
-  Future<void> _select(PlacePrediction p) async {
+  Future<void> _select(_PlaceResult p) async {
+    // Local (curated) results already carry coordinates — no resolution needed.
+    if (p.coords != null) {
+      Navigator.pop(context, Place(p.mainText, p.secondaryText, p.coords!));
+      return;
+    }
     setState(() => _resolving = true);
-    final coords = await MapsService.instance.placeLatLng(p.placeId);
+    final coords = await MapsService.instance.placeLatLng(p.placeId!);
     if (!mounted) return;
     setState(() => _resolving = false);
     if (coords == null) {
@@ -420,6 +435,19 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
       ),
     );
   }
+}
+
+/// A unified search result: either a remote Places prediction (resolved to
+/// coordinates on selection) or a local curated landmark (coords already known).
+class _PlaceResult {
+  final String mainText;
+  final String secondaryText;
+  final String? placeId; // set for remote results
+  final LatLng? coords; // set for local results
+  const _PlaceResult.remote(this.mainText, this.secondaryText, this.placeId)
+      : coords = null;
+  const _PlaceResult.local(this.mainText, this.secondaryText, this.coords)
+      : placeId = null;
 }
 
 class _Hint extends StatelessWidget {

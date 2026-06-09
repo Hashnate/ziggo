@@ -6,7 +6,7 @@ import secrets
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
 
 from ...database import get_db
@@ -24,7 +24,13 @@ from ...models import (
     UserRole,
     CustomerCard,
     Payment,
+    FoodBanner,
+    FoodCategory,
+    FoodCollection,
+    FoodDeal,
+    FavoriteRestaurant,
 )
+from ...services.fare_service import haversine_km
 from ...schemas.food_schema import (
     RestaurantResponse,
     MenuItemResponse,
@@ -143,41 +149,138 @@ def _is_within_hours(opening: Optional[str], closing: Optional[str]) -> bool:
     return cur >= o or cur < c
 
 
-@router.get("/restaurants")
-async def list_restaurants(db: AsyncSession = Depends(get_db)):
-    """List approved restaurants, ordered so currently-open ones rise to the
-    top. Returns `is_open_now` so the UI can grey out closed restaurants
-    instead of hiding them."""
-    q = await db.execute(
-        select(Restaurant).where(Restaurant.is_active == True).order_by(Restaurant.id)  # noqa: E712
+def _restaurant_summary(
+    r: "Restaurant", is_open_now: bool, distance_km: Optional[float] = None
+) -> dict:
+    return {
+        "id": r.id,
+        "name": r.name,
+        "description": r.description,
+        "address": r.address,
+        "cuisine": r.cuisine,
+        "image_url": r.image_url,
+        "rating": float(r.rating or 0),
+        "delivery_fee": float(r.delivery_fee or 0),
+        "opening_time": r.opening_time,
+        "closing_time": r.closing_time,
+        "eta_minutes": r.eta_minutes,
+        "is_active": bool(r.is_active),
+        "is_open": bool(r.is_open),
+        "is_open_now": is_open_now,
+        "distance_km": round(distance_km, 2) if distance_km is not None else None,
+    }
+
+
+@router.get("/home")
+async def food_home(db: AsyncSession = Depends(get_db)):
+    """Aggregated home-screen layout: carousel banners, cuisine categories,
+    curated collections, and promo-linked deals — all admin-managed at
+    /admin/food-home and seeded on first boot. One round-trip so the Flutter
+    home renders in a single call."""
+    banners_q = await db.execute(
+        select(FoodBanner)
+        .where(FoodBanner.is_active == True)  # noqa: E712
+        .order_by(FoodBanner.display_order, FoodBanner.id)
     )
-    rows = q.scalars().all()
+    cats_q = await db.execute(
+        select(FoodCategory)
+        .where(FoodCategory.is_active == True)  # noqa: E712
+        .order_by(FoodCategory.display_order, FoodCategory.id)
+    )
+    cols_q = await db.execute(
+        select(FoodCollection)
+        .where(FoodCollection.is_active == True)  # noqa: E712
+        .order_by(FoodCollection.display_order, FoodCollection.id)
+    )
+    deals_q = await db.execute(
+        select(FoodDeal)
+        .options(selectinload(FoodDeal.promo_code))
+        .where(FoodDeal.is_active == True)  # noqa: E712
+        .order_by(FoodDeal.display_order, FoodDeal.id)
+    )
+
+    return {
+        "banners": [
+            {
+                "id": b.id,
+                "title": b.title,
+                "image_url": b.image_url,
+                "link_type": b.link_type,
+                "link_value": b.link_value,
+            }
+            for b in banners_q.scalars().all()
+        ],
+        "categories": [
+            {"id": c.id, "name": c.name, "icon_url": c.icon_url}
+            for c in cats_q.scalars().all()
+        ],
+        "collections": [
+            {"id": c.id, "name": c.name, "icon": c.icon, "color": c.color}
+            for c in cols_q.scalars().all()
+        ],
+        "deals": [
+            {
+                "id": d.id,
+                "title": d.title,
+                "subtitle": d.subtitle,
+                "image_url": d.image_url,
+                "color": d.color,
+                "promo_id": d.promo_code_id,
+                "promo_code": d.promo_code.code if d.promo_code else None,
+            }
+            for d in deals_q.scalars().all()
+        ],
+    }
+
+
+@router.get("/restaurants")
+async def list_restaurants(
+    db: AsyncSession = Depends(get_db),
+    category_id: Optional[int] = None,
+    collection_id: Optional[int] = None,
+    lat: Optional[float] = None,
+    lng: Optional[float] = None,
+    q: Optional[str] = None,
+):
+    """List active restaurants, currently-open ones first. Optional filters:
+    `category_id` / `collection_id` narrow to a tagged or curated set; `q`
+    searches name/cuisine; `lat`+`lng` attach `distance_km` and order
+    nearest-first. Returns `is_open_now` for the UI."""
+    stmt = select(Restaurant).where(Restaurant.is_active == True)  # noqa: E712
+    if category_id is not None:
+        stmt = stmt.where(
+            Restaurant.food_categories.any(FoodCategory.id == category_id)
+        )
+    if collection_id is not None:
+        stmt = stmt.where(
+            Restaurant.collections.any(FoodCollection.id == collection_id)
+        )
+    if q and q.strip():
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(or_(Restaurant.name.ilike(like), Restaurant.cuisine.ilike(like)))
+
+    rows = (await db.execute(stmt.order_by(Restaurant.id))).scalars().all()
+
+    has_origin = lat is not None and lng is not None
     enriched = []
     for r in rows:
         within = _is_within_hours(r.opening_time, r.closing_time)
         is_open_now = bool(r.is_open) and within
         if not is_open_now:
             continue
-        enriched.append(
-            {
-                "id": r.id,
-                "name": r.name,
-                "description": r.description,
-                "address": r.address,
-                "cuisine": r.cuisine,
-                "image_url": r.image_url,
-                "rating": float(r.rating or 0),
-                "delivery_fee": float(r.delivery_fee or 0),
-                "opening_time": r.opening_time,
-                "closing_time": r.closing_time,
-                "eta_minutes": r.eta_minutes,
-                "is_active": bool(r.is_active),
-                "is_open": bool(r.is_open),
-                "is_open_now": is_open_now,
-            }
+        distance_km = None
+        if has_origin and r.lat is not None and r.lng is not None:
+            distance_km = haversine_km(lat, lng, float(r.lat), float(r.lng))
+        enriched.append(_restaurant_summary(r, is_open_now, distance_km))
+
+    # Open first; then nearest-first when an origin was supplied, else by id.
+    enriched.sort(
+        key=lambda x: (
+            not x["is_open_now"],
+            x["distance_km"] if x["distance_km"] is not None else float("inf"),
+            x["id"],
         )
-    # Open restaurants first, then closed.
-    enriched.sort(key=lambda x: (not x["is_open_now"], x["id"]))
+    )
     return enriched
 
 
@@ -537,6 +640,81 @@ async def list_my_food_orders(
         )
         for o in rows
     ]
+
+
+# ---------------------------------------------------------------------------
+# Favorites — per-customer restaurant bookmarks (heart toggle on the home card)
+# ---------------------------------------------------------------------------
+
+async def _require_customer(db: AsyncSession, user: User) -> Customer:
+    cust_q = await db.execute(select(Customer).where(Customer.user_id == user.id))
+    customer = cust_q.scalars().first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer profile not found")
+    return customer
+
+
+@router.get("/favorites")
+async def list_favorites(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    """The caller's favorited restaurants (same summary shape as /restaurants)."""
+    customer = await _require_customer(db, user)
+    fav_q = await db.execute(
+        select(Restaurant)
+        .join(FavoriteRestaurant, FavoriteRestaurant.restaurant_id == Restaurant.id)
+        .where(FavoriteRestaurant.customer_id == customer.id)
+        .order_by(FavoriteRestaurant.id.desc())
+    )
+    out = []
+    for r in fav_q.scalars().all():
+        within = _is_within_hours(r.opening_time, r.closing_time)
+        out.append(_restaurant_summary(r, bool(r.is_open) and within))
+    return out
+
+
+@router.post("/favorites/{restaurant_id}", status_code=201)
+async def add_favorite(
+    restaurant_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    """Idempotent — re-adding an existing favorite is a no-op."""
+    customer = await _require_customer(db, user)
+    r_q = await db.execute(select(Restaurant).where(Restaurant.id == restaurant_id))
+    if not r_q.scalars().first():
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+    existing = await db.execute(
+        select(FavoriteRestaurant).where(
+            FavoriteRestaurant.customer_id == customer.id,
+            FavoriteRestaurant.restaurant_id == restaurant_id,
+        )
+    )
+    if not existing.scalars().first():
+        db.add(FavoriteRestaurant(customer_id=customer.id, restaurant_id=restaurant_id))
+        await db.commit()
+    return {"ok": True, "restaurant_id": restaurant_id, "is_favorite": True}
+
+
+@router.delete("/favorites/{restaurant_id}")
+async def remove_favorite(
+    restaurant_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    customer = await _require_customer(db, user)
+    fav_q = await db.execute(
+        select(FavoriteRestaurant).where(
+            FavoriteRestaurant.customer_id == customer.id,
+            FavoriteRestaurant.restaurant_id == restaurant_id,
+        )
+    )
+    fav = fav_q.scalars().first()
+    if fav:
+        await db.delete(fav)
+        await db.commit()
+    return {"ok": True, "restaurant_id": restaurant_id, "is_favorite": False}
 
 
 # ---------------------------------------------------------------------------

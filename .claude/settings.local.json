@@ -2,7 +2,16 @@
   "permissions": {
     "allow": [
       "Bash(python -c \"from app import models; from app.database import Base; print\\('Tables registered:'\\); [print\\(' -', t.name\\) for t in Base.metadata.sorted_tables]\")",
-      "Bash(docker exec *)"
+      "Bash(docker exec *)",
+      "Bash(python -c \"import multipart; print\\('python-multipart OK'\\)\")",
+      "Bash(python -c \"from fastapi.testclient import TestClient; print\\('TestClient OK'\\)\")",
+      "Bash(python -c \"import jinja2; print\\('jinja2', jinja2.__version__\\)\")",
+      "Bash(git add *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\musny\\\\Desktop\\\\Hashnate\\\\ziggo\" -Directory)",
+      "Bash(Select-Object Name)",
+      "PowerShell($path = 'c:\\\\Users\\\\musny\\\\Desktop\\\\Hashnate\\\\ziggo\\\\ziggo_app\\\\lib\\\\modules\\\\customer\\\\screens\\\\restaurant_detail_screen.dart'; \\(Get-Content $path -TotalCount 413\\) | Set-Content $path -Encoding utf8; \"Lines now: \" + \\(Get-Content $path | Measure-Object -Line\\).Lines)",
+      "Bash(grep -vE \"withOpacity|Got dependencies|newer versions|pub outdated|Analyzing|^\\\\s*$\")",
+      "Bash(grep -vE \"withOpacity|Got dependencies|newer versions|pub outdated|available\\\\\\)|^\\\\s*$\")"
     ]
   }
 }

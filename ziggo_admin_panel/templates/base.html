@@ -237,6 +237,7 @@
         .zi-notif-item .tx strong { display: block; font-size: 13px; font-weight: 600; line-height: 1.2; }
         .zi-notif-item .tx small { font-size: 11px; color: #64748B; }
         .zi-notif-item .zi-cnt { flex: 0 0 auto; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 99px; background: #EF4444; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+        .zi-notif-item .zi-cnt.zi-cnt-seen { background: #E2E8F0; color: #64748B; }
         .zi-notif-empty { padding: 22px 12px; text-align: center; font-size: 12px; color: #94A3B8; font-weight: 500; }
         /* Numeric badge on bell icon */
         .zi-badge { position: absolute; top: -4px; right: -6px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 99px; background: #EF4444; color: #fff; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; pointer-events: none; }
@@ -392,6 +393,9 @@
             <a href="/admin/restaurants" class="sidebar-item {% if active_page == 'restaurants' %}active{% endif %}">
                 <i class="fas fa-utensils"></i><span>Restaurants</span>
             </a>
+            <a href="/admin/food-home" class="sidebar-item {% if active_page == 'food-home' %}active{% endif %}">
+                <i class="fas fa-mobile-screen-button"></i><span>Food Home</span>
+            </a>
             <a href="/admin/market" class="sidebar-item {% if active_page == 'market' %}active{% endif %}">
                 <i class="fas fa-store"></i><span>Market</span>
             </a>
@@ -522,6 +526,9 @@
               localStorage.setItem('ziNotifSeen', String(window._ziNotifTotal || 0));
               if (_dot)   _dot.style.display   = 'none';
               if (_badge) _badge.style.display = 'none';
+              // Mark each item as seen → its red count badge clears
+              markItemsSeen();
+              if (window._ziNotifData) renderList(window._ziNotifData);
             }
           });
           document.addEventListener('click', function (e) { if (!wrap.contains(e.target)) wrap.classList.remove('open'); });
@@ -531,6 +538,14 @@
         // Live notification feed from the backend
         function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]); }); }
         var _prevTotal = -1;
+
+        function getSeenItems(){ try { return JSON.parse(localStorage.getItem('ziNotifSeenItems') || '{}'); } catch(e){ return {}; } }
+        function markItemsSeen(){
+            var items = window._ziNotifItems || [];
+            var seen = {};
+            items.forEach(function(i){ seen[i.url] = i.count || 0; });
+            localStorage.setItem('ziNotifSeenItems', JSON.stringify(seen));
+        }
 
 
         function loadNotif() {
@@ -588,6 +603,8 @@
                 }
               }
               _prevTotal = total;
+              window._ziNotifItems = d.items || [];
+              window._ziNotifData = d;
               if (list) { renderList(d); }
             })
             .catch(function () {});
@@ -598,12 +615,15 @@
                 list.innerHTML = '<div class="zi-notif-empty">You\'re all caught up ✅</div>';
                 return;
               }
+              var seen = getSeenItems();
               var sorted = d.items.slice().sort(function(a, b){ return (b.count || 0) - (a.count || 0); });
               list.innerHTML = sorted.map(function (i) {
+                var newCount = (i.count || 0) - (seen[i.url] || 0);   // only items added since last view
+                var badge = newCount > 0 ? '<span class="zi-cnt">' + esc(newCount) + '</span>' : '';
                 return '<a href="' + esc(i.url) + '" class="zi-notif-item">'
                   + '<span class="ic"><i class="fas ' + esc(i.icon) + '"></i></span>'
                   + '<span class="tx"><strong>' + esc(i.title) + '</strong><small>' + esc(i.subtitle) + '</small></span>'
-                  + '<span class="zi-cnt">' + esc(i.count) + '</span></a>';
+                  + badge + '</a>';
               }).join('');
         }
 
@@ -631,6 +651,14 @@
             .catch(function() {});
         }
         loadBranding();
+      })();
+
+      // Keep the active sidebar item in view after navigation (don't reset to top)
+      (function () {
+        var nav = document.querySelector('aside .sidebar-item.active');
+        if (nav) {
+          try { nav.scrollIntoView({ block: 'center' }); } catch (e) { nav.scrollIntoView(); }
+        }
       })();
     </script>
     {% block scripts %}{% endblock %}

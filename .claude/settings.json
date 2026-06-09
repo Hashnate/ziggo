@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(DATABASE_URL=sqlite+aiosqlite:///./ziggo.db SYNC_DATABASE_URL=sqlite:///./ziggo.db python -c ' *)",
+      "Bash(python -c ' *)",
+      "Bash(DATABASE_URL=postgresql+asyncpg://u:p@localhost/db SYNC_DATABASE_URL=postgresql+psycopg2://u:p@localhost/db python -c ' *)",
+      "Bash(python -c \"import sys; print\\(sys.version\\)\")",
+      "Bash(python -m pip install \"aiosqlite>=0.20\" --quiet)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(python /tmp/verify_food.py)",
+      "Bash(rm -f _verify_food.db _verify_food2.db /tmp/verify_food.py /tmp/verify_food2.py 2>/dev/null; echo \"cleaned\"; ls _verify_food*.db 2>/dev/null || echo \"no leftover verify dbs\")"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
+    ]
+  }
+}
