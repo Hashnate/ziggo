@@ -54,6 +54,9 @@ class MarketVendorProvider extends ChangeNotifier {
   bool _loadingProducts = false;
   bool get loadingProducts => _loadingProducts;
 
+  List<Map<String, dynamic>> _ads = const [];
+  List<Map<String, dynamic>> get ads => _ads;
+
   final ValueNotifier<int> newOrderPing = ValueNotifier<int>(0);
 
   /// Latest message string when the backend's rider broadcast finds nobody
@@ -458,6 +461,40 @@ class MarketVendorProvider extends ChangeNotifier {
         data: form,
       );
       await loadProducts();
+      return null;
+    } on DioException catch (e) {
+      return e.response?.data?['detail']?.toString() ?? e.message ?? 'Failed';
+    }
+  }
+
+  Future<void> fetchMyAds() async {
+    try {
+      final resp = await ApiClient.instance.dio.get('/market/vendor/ads');
+      _ads = List<Map<String, dynamic>>.from(resp.data as List);
+      notifyListeners();
+    } on DioException {
+      // ignore
+    }
+  }
+
+  Future<String?> uploadAd(File file, double radiusKm) async {
+    try {
+      final form = FormData.fromMap({
+        'photo': await MultipartFile.fromFile(file.path),
+        'radius_km': radiusKm,
+      });
+      await ApiClient.instance.dio.post('/market/vendor/ads', data: form);
+      await fetchMyAds();
+      return null;
+    } on DioException catch (e) {
+      return e.response?.data?['detail']?.toString() ?? e.message ?? 'Failed';
+    }
+  }
+
+  Future<String?> deleteAd(int adId) async {
+    try {
+      await ApiClient.instance.dio.delete('/market/vendor/ads/$adId');
+      await fetchMyAds();
       return null;
     } on DioException catch (e) {
       return e.response?.data?['detail']?.toString() ?? e.message ?? 'Failed';
