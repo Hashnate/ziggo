@@ -47,6 +47,7 @@ class MarketVendor(Base):
     delivery_fee = Column(DECIMAL(10, 2), default=0)
     eta_minutes = Column(Integer, default=40)
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    logo_url = Column(String(255))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     products = relationship("Product", back_populates="vendor", cascade="all, delete-orphan")
@@ -61,9 +62,17 @@ class Product(Base):
     name = Column(String(200), nullable=False)
     description = Column(Text)
     price = Column(DECIMAL(10, 2), nullable=False)
+    # When set and greater than `price`, the product is an offer: the UI shows
+    # the strikethrough was-price and computes the % OFF badge.
+    original_price = Column(DECIMAL(10, 2))
     stock_quantity = Column(Integer, default=0)
     image_url = Column(String(255))
     unit = Column(String(20))
+    # Free-form product category (e.g. "Fresh Produce", "Skin Care") that the
+    # customer vendor page groups products into as tabs.
+    category = Column(String(100))
+    # Vendor-flagged "Popular Picks" surface on the vendor page.
+    is_popular = Column(Boolean, default=False)
     is_available = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

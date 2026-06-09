@@ -8,9 +8,12 @@ class ProductResponse(BaseModel):
     name: str
     description: Optional[str] = None
     price: float
+    original_price: Optional[float] = None
     stock_quantity: int
     image_url: Optional[str] = None
     unit: Optional[str] = None
+    category: Optional[str] = None
+    is_popular: bool = False
     is_available: bool
 
     class Config:
@@ -80,6 +83,7 @@ class MarketVendorProfileResponse(BaseModel):
     lng: Optional[float] = None
     phone_number: Optional[str] = None
     image_url: Optional[str] = None
+    logo_url: Optional[str] = None
     opening_time: Optional[str] = None
     closing_time: Optional[str] = None
     delivery_fee: float = 0.0
@@ -109,8 +113,11 @@ class ProductCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
     price: float = Field(..., ge=0)
+    original_price: Optional[float] = Field(None, ge=0)
     stock_quantity: int = Field(0, ge=0)
     unit: Optional[str] = Field(None, max_length=20)
+    category: Optional[str] = Field(None, max_length=100)
+    is_popular: bool = False
     image_url: Optional[str] = Field(None, max_length=255)
     is_available: bool = True
 
@@ -119,8 +126,11 @@ class ProductUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=200)
     description: Optional[str] = None
     price: Optional[float] = Field(None, ge=0)
+    original_price: Optional[float] = Field(None, ge=0)
     stock_quantity: Optional[int] = Field(None, ge=0)
     unit: Optional[str] = Field(None, max_length=20)
+    category: Optional[str] = Field(None, max_length=100)
+    is_popular: Optional[bool] = None
     image_url: Optional[str] = Field(None, max_length=255)
     is_available: Optional[bool] = None
 

@@ -317,6 +317,23 @@ class MarketVendorProvider extends ChangeNotifier {
     }
   }
 
+  Future<String?> uploadLogo(File file) async {
+    try {
+      final form = FormData.fromMap({
+        'photo': await MultipartFile.fromFile(file.path),
+      });
+      final resp = await ApiClient.instance.dio.post(
+        '/market/vendor/logo-image',
+        data: form,
+      );
+      _profile = Map<String, dynamic>.from(resp.data);
+      notifyListeners();
+      return null;
+    } on DioException catch (e) {
+      return e.response?.data?['detail']?.toString() ?? e.message ?? 'Failed';
+    }
+  }
+
   // -------- Products --------
 
   Future<void> loadProducts() async {
@@ -341,6 +358,9 @@ class MarketVendorProvider extends ChangeNotifier {
     String? description,
     String? unit,
     bool isAvailable = true,
+    String? category,
+    double? originalPrice,
+    bool isPopular = false,
   }) async {
     try {
       await ApiClient.instance.dio.post('/market/vendor/products', data: {
@@ -350,6 +370,9 @@ class MarketVendorProvider extends ChangeNotifier {
         if (description != null && description.isNotEmpty) 'description': description,
         if (unit != null && unit.isNotEmpty) 'unit': unit,
         'is_available': isAvailable,
+        if (category != null && category.isNotEmpty) 'category': category,
+        if (originalPrice != null && originalPrice > 0) 'original_price': originalPrice,
+        'is_popular': isPopular,
       });
       await loadProducts();
       return null;
@@ -366,6 +389,9 @@ class MarketVendorProvider extends ChangeNotifier {
     String? description,
     String? unit,
     bool? isAvailable,
+    String? category,
+    double? originalPrice,
+    bool? isPopular,
   }) async {
     try {
       await ApiClient.instance.dio.patch('/market/vendor/products/$id', data: {
@@ -375,6 +401,9 @@ class MarketVendorProvider extends ChangeNotifier {
         if (description != null) 'description': description,
         if (unit != null) 'unit': unit,
         if (isAvailable != null) 'is_available': isAvailable,
+        if (category != null) 'category': category,
+        if (originalPrice != null) 'original_price': originalPrice > 0 ? originalPrice : null,
+        if (isPopular != null) 'is_popular': isPopular,
       });
       await loadProducts();
       return null;

@@ -12,11 +12,21 @@ class MarketProvider extends ChangeNotifier {
   final Map<int, Map<String, dynamic>> _cart = {};
   int? _activeVendorId;
 
+  /// Promo code entered on the vendor page, carried through to checkout.
+  String? _pendingPromoCode;
+
   List<Map<String, dynamic>> get vendors => _vendors;
   bool get loading => _loading;
   String? get error => _error;
   Map<int, Map<String, dynamic>> get cart => _cart;
   int? get activeVendorId => _activeVendorId;
+  String? get pendingPromoCode => _pendingPromoCode;
+
+  void setPromoCode(String? code) {
+    final trimmed = code?.trim();
+    _pendingPromoCode = (trimmed == null || trimmed.isEmpty) ? null : trimmed;
+    notifyListeners();
+  }
 
   int get cartCount => _cart.values.fold(0, (s, e) => s + (e['quantity'] as int));
 
@@ -25,11 +35,17 @@ class MarketProvider extends ChangeNotifier {
         (s, e) => s + ((e['product']['price'] as num).toDouble() * (e['quantity'] as int)),
       );
 
-  Future<void> refreshVendors() async {
+  Future<void> refreshVendors({double? lat, double? lng}) async {
     _loading = true;
     notifyListeners();
     try {
-      final resp = await ApiClient.instance.dio.get('/market/vendors');
+      final resp = await ApiClient.instance.dio.get(
+        '/market/vendors',
+        queryParameters: {
+          if (lat != null && lng != null) 'lat': lat,
+          if (lat != null && lng != null) 'lng': lng,
+        },
+      );
       _vendors = List<Map<String, dynamic>>.from(resp.data as List);
     } on DioException {
       // ignore
@@ -51,6 +67,7 @@ class MarketProvider extends ChangeNotifier {
   void addToCart(int vendorId, Map<String, dynamic> product) {
     if (_activeVendorId != null && _activeVendorId != vendorId) {
       _cart.clear();
+      _pendingPromoCode = null;
     }
     _activeVendorId = vendorId;
     final pid = product['id'] as int;
@@ -78,6 +95,7 @@ class MarketProvider extends ChangeNotifier {
   void clearCart() {
     _cart.clear();
     _activeVendorId = null;
+    _pendingPromoCode = null;
     notifyListeners();
   }
 
