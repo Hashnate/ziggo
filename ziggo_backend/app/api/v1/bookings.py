@@ -102,6 +102,8 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
         receiver_name=b.receiver_name,
         receiver_phone=b.receiver_phone,
         parcel_instructions=b.parcel_instructions,
+        is_courier=bool(b.is_courier),
+        courier_eta_days=b.courier_eta_days,
     )
 
 
@@ -150,6 +152,7 @@ async def estimate_fare(
         parcel_weight_kg=req.parcel_weight_kg,
         is_rental=req.is_rental,
         rental_hours=req.rental_hours,
+        is_courier=req.is_courier,
         customer=customer,
         redeem_points=req.redeem_points or 0,
         stops=[s.model_dump() for s in (req.stops or [])],
@@ -179,13 +182,13 @@ async def create_booking(
             status_code=400,
             detail=f"Up to {max_stops} intermediate stop(s) allowed; got {len(incoming_stops)}",
         )
-    # Flash and rental trips don't make sense with multi-stop. The dispatcher
-    # doesn't know how to handle a courier with intermediate addresses, and a
-    # rental is by-the-hour so distance doesn't drive the fare.
-    if incoming_stops and (req.is_flash or req.is_rental):
+    # Flash, courier and rental trips don't make sense with multi-stop. The
+    # dispatcher doesn't know how to handle a parcel with intermediate
+    # addresses, and a rental is by-the-hour so distance doesn't drive the fare.
+    if incoming_stops and (req.is_flash or req.is_courier or req.is_rental):
         raise HTTPException(
             status_code=400,
-            detail="Intermediate stops are not supported on flash or rental bookings",
+            detail="Intermediate stops are not supported on flash, courier or rental bookings",
         )
 
     fare = await calculate_fare(
@@ -201,6 +204,7 @@ async def create_booking(
         parcel_weight_kg=req.parcel_weight_kg,
         is_rental=req.is_rental,
         rental_hours=req.rental_hours,
+        is_courier=req.is_courier,
         customer=customer,
         redeem_points=req.redeem_points or 0,
         stops=[s.model_dump() for s in incoming_stops],
@@ -242,11 +246,12 @@ async def create_booking(
         if not card:
             raise HTTPException(status_code=400, detail="Card not found")
 
-    # Flash deliveries must have a receiver phone — that's how the driver reaches them
-    if req.is_flash and not (req.receiver_phone or "").strip():
+    # Parcel deliveries (flash or courier) must have a receiver phone — that's
+    # how the driver/courier reaches the recipient.
+    if (req.is_flash or req.is_courier) and not (req.receiver_phone or "").strip():
         raise HTTPException(
             status_code=400,
-            detail="Flash parcel requires receiver phone number",
+            detail="Parcel delivery requires receiver phone number",
         )
     # Rentals must specify a positive hour count
     if req.is_rental and not req.rental_hours:
@@ -254,12 +259,18 @@ async def create_booking(
             status_code=400,
             detail="Rental booking requires rental_hours",
         )
-    if req.is_flash and req.is_rental:
+    # A booking is exactly one service type — reject contradictory combinations.
+    if sum([bool(req.is_flash), bool(req.is_courier), bool(req.is_rental)]) > 1:
         raise HTTPException(
             status_code=400,
-            detail="A booking can't be both a flash parcel and a rental",
+            detail="A booking can only be one of flash, courier or rental",
         )
-    ref_prefix = "FL" if req.is_flash else ("RT" if req.is_rental else "ZG")
+    ref_prefix = (
+        "CR" if req.is_courier
+        else "FL" if req.is_flash
+        else "RT" if req.is_rental
+        else "ZG"
+    )
     booking = Booking(
         booking_ref=ref_prefix + secrets.token_hex(4).upper(),
         customer_id=customer.id,
@@ -290,6 +301,8 @@ async def create_booking(
         receiver_name=req.receiver_name,
         receiver_phone=req.receiver_phone,
         parcel_instructions=req.parcel_instructions,
+        is_courier=req.is_courier,
+        courier_eta_days=fare.get("courier_eta_days") if req.is_courier else None,
         is_rental=req.is_rental,
         rental_hours=req.rental_hours,
         is_corporate=req.payment_method == "corporate",
@@ -337,11 +350,19 @@ async def create_booking(
     # Flash parcels broadcast to ANY nearby courier — vehicle type is just a
     # fare/surcharge hint, not a hard requirement (a tuk can carry a doc, a van
     # can carry a small parcel). Rides keep the strict vehicle-type filter.
-    dispatch_vehicle = None if req.is_flash else req.service_type
+    dispatch_vehicle = None if (req.is_flash or req.is_courier) else req.service_type
     nearby = await find_all_nearby_drivers(
         db, req.pickup_lat, req.pickup_lng, dispatch_vehicle, max_distance_km=15
     )
-    if booking.is_flash:
+    if booking.is_courier:
+        n_title = "New courier delivery"
+        n_body = (
+            f"{booking.parcel_type or 'Parcel'} • {booking.pickup_address} → "
+            f"{booking.drop_address} • {booking.courier_eta_days or 2}-day • "
+            f"Rs.{int(booking.final_amount or 0)}"
+        )
+        n_type = "courier_request"
+    elif booking.is_flash:
         n_title = "New parcel delivery"
         n_body = (
             f"{booking.parcel_type or 'Parcel'} • {booking.pickup_address} → "
@@ -387,6 +408,8 @@ async def create_booking(
         "parcel_instructions": booking.parcel_instructions,
         "is_rental": bool(booking.is_rental),
         "rental_hours": booking.rental_hours,
+        "is_courier": bool(booking.is_courier),
+        "courier_eta_days": booking.courier_eta_days,
         # BRD: CD-19 — intermediate stops so the driver popup can render them
         "stop_count": booking.stop_count or 0,
         "stops": [
@@ -568,7 +591,7 @@ async def accept_booking(
         db,
         float(b.pickup_lat),
         float(b.pickup_lng),
-        None if b.is_flash else b.service_type,
+        None if (b.is_flash or b.is_courier) else b.service_type,
         max_distance_km=15,
         exclude_driver_id=driver.id,
     )

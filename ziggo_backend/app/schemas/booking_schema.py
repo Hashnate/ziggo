@@ -22,6 +22,8 @@ class FareEstimateRequest(BaseModel):
     trip_type: str = "one_way"  # one_way | return
     is_flash: bool = False
     parcel_weight_kg: Optional[float] = None
+    # Courier (island-wide, weight-priced) parcel delivery.
+    is_courier: bool = False
     # Rental fields — when is_rental=True we ignore drop_* and price by
     # hourly_rate * rental_hours.
     is_rental: bool = False
@@ -44,6 +46,8 @@ class FareEstimateResponse(BaseModel):
     promo_code: Optional[str] = None
     surge_multiplier: float
     flash_surcharge: float = 0
+    # Courier SLA (days) — only populated on courier estimates.
+    courier_eta_days: Optional[int] = None
     # BRD: RS-07 — show this on the vehicle selection card
     points_earnable: int = 0
     # BRD: RW-02 — populated when the customer pre-applies points on estimate
@@ -73,6 +77,8 @@ class BookingCreate(BaseModel):
     receiver_name: Optional[str] = None
     receiver_phone: Optional[str] = None
     parcel_instructions: Optional[str] = None
+    # Courier (island-wide, weight-priced) parcel delivery.
+    is_courier: bool = False
     # Rental fields — when is_rental=True the customer is hiring the vehicle
     # for rental_hours. drop_* can be the same as pickup_* (no fixed dropoff).
     is_rental: bool = False
@@ -141,6 +147,10 @@ class BookingResponse(BaseModel):
     receiver_name: Optional[str] = None
     receiver_phone: Optional[str] = None
     parcel_instructions: Optional[str] = None
+
+    # Courier fields (only present when is_courier=True)
+    is_courier: bool = False
+    courier_eta_days: Optional[int] = None
 
     # Rental fields (only present when is_rental=True)
     is_rental: bool = False
