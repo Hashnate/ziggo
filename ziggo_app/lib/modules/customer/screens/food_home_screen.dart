@@ -9,6 +9,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/widgets/motion.dart';
 import '../addresses_provider.dart';
 import '../food_provider.dart';
+import 'category_restaurants_screen.dart';
 import 'food_orders_screen.dart';
 import 'restaurant_detail_screen.dart';
 
@@ -190,7 +191,7 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
                           delegate: SliverChildBuilderDelegate(
                             (_, i) => EntranceSlide(
                               delay: Duration(milliseconds: 55 * i),
-                              child: _RestaurantCard(restaurant: filtered[i]),
+                              child: RestaurantCard(restaurant: filtered[i]),
                             ),
                             childCount: filtered.length,
                           ),
@@ -501,7 +502,14 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
                   final isSel = id != null && id == selectedId;
                   final img = _resolveAsset(cat['icon_url']?.toString());
                   return GestureDetector(
-                    onTap: () => context.read<FoodProvider>().setCategoryFilter(id),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CategoryRestaurantsScreen(category: cat),
+                        ),
+                      );
+                    },
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                       child: Column(
@@ -787,9 +795,9 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
   }
 }
 
-class _RestaurantCard extends StatelessWidget {
+class RestaurantCard extends StatelessWidget {
   final Map<String, dynamic> restaurant;
-  const _RestaurantCard({required this.restaurant});
+  const RestaurantCard({super.key, required this.restaurant});
 
   @override
   Widget build(BuildContext context) {
