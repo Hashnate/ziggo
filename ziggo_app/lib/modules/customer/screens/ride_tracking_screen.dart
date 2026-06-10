@@ -838,7 +838,7 @@ class _DriverCard extends StatelessWidget {
       _toast(context, 'Driver phone unavailable');
       return;
     }
-    final uri = Uri(scheme: 'tel', path: phone.trim());
+    final uri = Uri.parse('tel:${phone.trim()}');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     } else {
@@ -851,7 +851,7 @@ class _DriverCard extends StatelessWidget {
       _toast(context, 'Driver phone unavailable');
       return;
     }
-    final uri = Uri(scheme: 'sms', path: phone.trim());
+    final uri = Uri.parse('sms:${phone.trim()}');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     } else {
