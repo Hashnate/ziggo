@@ -65,6 +65,11 @@ class Booking(Base):
     final_amount = Column(DECIMAL(10, 2))
     platform_fee = Column(DECIMAL(10, 2))
     driver_earnings = Column(DECIMAL(10, 2))
+    pickup_fee = Column(DECIMAL(10, 2), default=0.00)
+    boost = Column(DECIMAL(10, 2), default=0.00)
+    passenger_deductible = Column(DECIMAL(10, 2), default=0.00)
+    app_usage_charges = Column(DECIMAL(10, 2), default=0.00)
+    deductions = Column(DECIMAL(10, 2), default=0.00)
 
     booked_at = Column(DateTime(timezone=True), server_default=func.now())
     accepted_at = Column(DateTime(timezone=True))

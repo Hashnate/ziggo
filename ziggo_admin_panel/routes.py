@@ -1949,6 +1949,9 @@ async def admin_fare_settings_update(
     min_fare: float = Form(...),
     platform_fee_percent: float = Form(...),
     surge_multiplier: float = Form(...),
+    pickup_fee: float = Form(0),
+    boost: float = Form(0),
+    passenger_deductible: float = Form(0),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -1964,6 +1967,9 @@ async def admin_fare_settings_update(
         f.min_fare = Decimal(str(min_fare))
         f.platform_fee_percent = Decimal(str(platform_fee_percent))
         f.surge_multiplier = Decimal(str(surge_multiplier))
+        f.pickup_fee = Decimal(str(pickup_fee))
+        f.boost = Decimal(str(boost))
+        f.passenger_deductible = Decimal(str(passenger_deductible))
         await db.commit()
     return RedirectResponse(url="/admin/fare-settings", status_code=303)
 
@@ -2149,6 +2155,9 @@ async def admin_categories_new(
     min_fare: float = Form(0),
     platform_fee_percent: float = Form(15),
     surge_multiplier: float = Form(1.0),
+    pickup_fee: float = Form(0),
+    boost: float = Form(0),
+    passenger_deductible: float = Form(0),
     is_active: str = Form("on"),
     image: UploadFile | None = File(None),
     next: str = Form(""),
@@ -2180,6 +2189,9 @@ async def admin_categories_new(
             min_fare=Decimal(str(min_fare)),
             platform_fee_percent=Decimal(str(platform_fee_percent)),
             surge_multiplier=Decimal(str(surge_multiplier)),
+            pickup_fee=Decimal(str(pickup_fee)),
+            boost=Decimal(str(boost)),
+            passenger_deductible=Decimal(str(passenger_deductible)),
         )
     )
     await db.commit()
@@ -2198,6 +2210,9 @@ async def admin_categories_edit(
     min_fare: float = Form(0),
     platform_fee_percent: float = Form(15),
     surge_multiplier: float = Form(1.0),
+    pickup_fee: float = Form(0),
+    boost: float = Form(0),
+    passenger_deductible: float = Form(0),
     is_active: str = Form(""),
     image: UploadFile | None = File(None),
     next: str = Form(""),
@@ -2221,6 +2236,9 @@ async def admin_categories_edit(
     f.min_fare = Decimal(str(min_fare))
     f.platform_fee_percent = Decimal(str(platform_fee_percent))
     f.surge_multiplier = Decimal(str(surge_multiplier))
+    f.pickup_fee = Decimal(str(pickup_fee))
+    f.boost = Decimal(str(boost))
+    f.passenger_deductible = Decimal(str(passenger_deductible))
     new_image = await _save_category_image(image)
     if new_image:
         f.image_url = new_image

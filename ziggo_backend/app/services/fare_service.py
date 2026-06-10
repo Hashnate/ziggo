@@ -229,7 +229,6 @@ async def calculate_fare(
     for (a_lat, a_lng), (b_lat, b_lng) in zip(waypoints, waypoints[1:]):
         distance_km += haversine_km(a_lat, a_lng, b_lat, b_lng)
     duration_min = estimate_duration_min(distance_km)
-
     setting_q = await db.execute(
         select(FareSetting).where(FareSetting.service_type == service_type)
     )
@@ -242,13 +241,18 @@ async def calculate_fare(
         min_fare = float(setting.min_fare or 0)
         platform_pct = float(setting.platform_fee_percent or 15)
         surge = float(setting.surge_multiplier or 1)
+        pickup_fee_val = float(setting.pickup_fee or 0)
+        boost_val = float(setting.boost or 0)
+        passenger_deductible_val = float(setting.passenger_deductible or 0)
     else:
         d = DEFAULTS.get(service_type, DEFAULTS["car"])
         base, per_km, per_min, min_fare = d["base"], d["per_km"], d["per_min"], d["min"]
         platform_pct, surge = 15.0, 1.0
+        pickup_fee_val, boost_val, passenger_deductible_val = 0.0, 0.0, 0.0
 
-    raw = (base + per_km * distance_km + per_min * duration_min) * surge
-    fare = max(raw, min_fare)
+    raw = (base + pickup_fee_val + per_km * distance_km + per_min * duration_min) * surge
+    fare_val = max(raw, min_fare)
+    fare_val += boost_val
 
     # BRD: CD-19 — per-stop fee compensates the driver for the detour.
     stop_fee_total = 0.0
@@ -258,18 +262,18 @@ async def calculate_fare(
         ss = ss_q.scalars().first()
         per_stop = float(ss.multi_stop_fee_per_stop) if ss and ss.multi_stop_fee_per_stop is not None else 50.0
         stop_fee_total = per_stop * len(clean_stops)
-        fare += stop_fee_total
+        fare_val += stop_fee_total
 
     flash_surcharge = 0.0
     if is_flash and parcel_weight_kg is not None:
         flash_surcharge = await _flash_surcharge(db, float(parcel_weight_kg))
-        fare += flash_surcharge
+        fare_val += flash_surcharge
 
     is_return = trip_type == "return"
     if is_return:
         # Customer travels the route twice; fare gets a small return discount
         # (1.8x instead of 2x) to reflect that the driver doesn't drive empty back.
-        fare *= RETURN_TRIP_MULTIPLIER
+        fare_val *= RETURN_TRIP_MULTIPLIER
         distance_km *= 2
         duration_min = round(duration_min * 2)
 
@@ -280,24 +284,28 @@ async def calculate_fare(
         p = promo_q.scalars().first()
         if p and p.is_active and (p.usage_limit is None or p.used_count < p.usage_limit):
             if p.discount_type == "percentage":
-                discount = fare * (float(p.discount_value) / 100.0)
+                discount = fare_val * (float(p.discount_value) / 100.0)
                 if p.max_discount:
                     discount = min(discount, float(p.max_discount))
             else:
                 discount = float(p.discount_value)
             promo_applied = p.code
 
-    final = max(0, fare - discount)
-    platform_fee = final * (platform_pct / 100.0)
-    driver_earnings = final - platform_fee
+    final_pre_deductible = max(0.0, fare_val - discount)
+    feeable_amount = max(0.0, final_pre_deductible - boost_val)
+    app_usage_charges = feeable_amount * (platform_pct / 100.0)
+    
+    gross_total = final_pre_deductible + passenger_deductible_val
+    deductions = app_usage_charges + passenger_deductible_val
+    driver_earnings = gross_total - deductions
 
     base_dict = {
         "distance_km": round(distance_km, 2),
         "duration_min": duration_min,
-        "fare_amount": round(fare, 2),
+        "fare_amount": round(fare_val, 2),
         "discount_amount": round(discount, 2),
-        "final_amount": round(final, 2),
-        "platform_fee": round(platform_fee, 2),
+        "final_amount": round(gross_total, 2),
+        "platform_fee": round(app_usage_charges, 2),
         "driver_earnings": round(driver_earnings, 2),
         "promo_code": promo_applied,
         "surge_multiplier": surge,
@@ -305,9 +313,14 @@ async def calculate_fare(
         # BRD: CD-19 — surface multi-stop snapshot so the UI can render it
         "stop_count": len(clean_stops),
         "stops_fee": round(stop_fee_total, 2),
+        # Snapshot keys
+        "pickup_fee": round(pickup_fee_val, 2),
+        "boost": round(boost_val, 2),
+        "passenger_deductible": round(passenger_deductible_val, 2),
+        "app_usage_charges": round(app_usage_charges, 2),
+        "deductions": round(deductions, 2),
     }
     return await _enrich_with_loyalty(db, base_dict, customer, redeem_points)
-
 
 def to_decimal(x: float) -> Decimal:
     return Decimal(str(round(x, 2)))
@@ -328,6 +341,18 @@ async def _enrich_with_loyalty(
     `platform_fee` / `driver_earnings` accordingly.
     """
     from . import loyalty_service as L
+
+    # Set defaults for new snapshot fields if not present (e.g. on courier / rental paths)
+    if "pickup_fee" not in fare:
+        fare["pickup_fee"] = 0.0
+    if "boost" not in fare:
+        fare["boost"] = 0.0
+    if "passenger_deductible" not in fare:
+        fare["passenger_deductible"] = 0.0
+    if "app_usage_charges" not in fare:
+        fare["app_usage_charges"] = float(fare.get("platform_fee", 0))
+    if "deductions" not in fare:
+        fare["deductions"] = float(fare.get("app_usage_charges", 0)) + float(fare.get("passenger_deductible", 0))
 
     # `final_amount` here is post-promo, pre-redemption.
     pre_redemption_final = float(fare.get("final_amount", 0))
@@ -357,10 +382,13 @@ async def _enrich_with_loyalty(
             new_platform = round(new_final * platform_ratio, 2)
             fare["final_amount"] = round(new_final, 2)
             fare["platform_fee"] = new_platform
-            fare["driver_earnings"] = round(new_final - new_platform, 2)
+            fare["app_usage_charges"] = new_platform
+            fare["deductions"] = round(new_platform + float(fare.get("passenger_deductible", 0)), 2)
+            fare["driver_earnings"] = round(new_final - fare["deductions"], 2)
 
     fare["points_earnable"] = earnable
     fare["redeem_points_used"] = actual_points
     fare["redeem_discount"] = round(redeem_discount, 2)
     fare["redeem_reason"] = redeem_reason
     return fare
+

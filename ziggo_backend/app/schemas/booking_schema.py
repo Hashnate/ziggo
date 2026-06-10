@@ -57,6 +57,12 @@ class FareEstimateResponse(BaseModel):
     # BRD: CD-19 — multi-stop snapshot
     stop_count: int = 0
     stops_fee: float = 0
+    # Custom Calculations / Deductions
+    pickup_fee: float = 0
+    boost: float = 0
+    passenger_deductible: float = 0
+    app_usage_charges: float = 0
+    deductions: float = 0
 
 
 class BookingCreate(BaseModel):
@@ -156,8 +162,17 @@ class BookingResponse(BaseModel):
     is_rental: bool = False
     rental_hours: Optional[int] = None
 
+    # Custom Calculations / Deductions
+    pickup_fee: Optional[float] = 0
+    boost: Optional[float] = 0
+    passenger_deductible: Optional[float] = 0
+    app_usage_charges: Optional[float] = 0
+    deductions: Optional[float] = 0
+    driver_earnings: Optional[float] = 0
+
     class Config:
         from_attributes = True
+
 
 
 class BookingStatusUpdate(BaseModel):

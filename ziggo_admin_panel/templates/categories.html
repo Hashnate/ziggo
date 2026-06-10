@@ -84,6 +84,9 @@
                                         "min_fare": (c.min_fare|float) if c.min_fare is not none else 0,
                                         "platform_fee_percent": (c.platform_fee_percent|float) if c.platform_fee_percent is not none else 15,
                                         "surge_multiplier": (c.surge_multiplier|float) if c.surge_multiplier is not none else 1,
+                                        "pickup_fee": (c.pickup_fee|float) if c.pickup_fee is not none else 0,
+                                        "boost": (c.boost|float) if c.boost is not none else 0,
+                                        "passenger_deductible": (c.passenger_deductible|float) if c.passenger_deductible is not none else 0,
                                         "is_active": c.is_active,
                                     }|tojson }})'
                                     class="px-3 py-1.5 bg-blue-50 text-ziggo border border-blue-100 rounded-lg text-xs font-bold hover:bg-blue-100 transition flex items-center gap-1.5">
@@ -194,6 +197,18 @@
                     <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Surge multiplier</label>
                     <input type="number" step="0.01" min="0.1" name="surge_multiplier" id="catSurge" value="1.0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                 </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Pickup fee (Rs)</label>
+                    <input type="number" step="0.01" min="0" name="pickup_fee" id="catPickupFee" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Boost (Rs)</label>
+                    <input type="number" step="0.01" min="0" name="boost" id="catBoost" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Passenger Deductible (Rs)</label>
+                    <input type="number" step="0.01" min="0" name="passenger_deductible" id="catPassengerDeductible" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
             </div>
             <div class="pt-2 flex justify-end gap-3">
                 <button type="button" onclick="closeModal()" class="px-6 py-3 border border-ziggo-line rounded-xl font-black text-ziggo-muted hover:bg-gray-50">Cancel</button>
@@ -221,6 +236,9 @@ function openCreateModal() {
     document.getElementById('catMin').value = 0;
     document.getElementById('catFee').value = 15;
     document.getElementById('catSurge').value = 1.0;
+    document.getElementById('catPickupFee').value = 0;
+    document.getElementById('catBoost').value = 0;
+    document.getElementById('catPassengerDeductible').value = 0;
     document.getElementById('catActive').checked = true;
     
     // Reset image input and preview
@@ -247,6 +265,9 @@ function openEditModal(c) {
     document.getElementById('catMin').value = c.min_fare;
     document.getElementById('catFee').value = c.platform_fee_percent;
     document.getElementById('catSurge').value = c.surge_multiplier;
+    document.getElementById('catPickupFee').value = c.pickup_fee || 0;
+    document.getElementById('catBoost').value = c.boost || 0;
+    document.getElementById('catPassengerDeductible').value = c.passenger_deductible || 0;
     document.getElementById('catActive').checked = !!c.is_active;
     
     // Reset image input and set existing preview

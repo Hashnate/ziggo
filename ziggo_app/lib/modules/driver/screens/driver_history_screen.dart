@@ -16,6 +16,7 @@ class DriverHistoryScreen extends StatefulWidget {
 class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
   List<Map<String, dynamic>> _rides = [];
   bool _loading = true;
+  int? _expandedId;
 
   @override
   void initState() {
@@ -39,7 +40,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
 
   double get _totalEarned => _rides
       .where((r) => r['status'] == 'completed')
-      .fold(0.0, (s, r) => s + ((r['final_amount'] as num?)?.toDouble() ?? 0));
+      .fold(0.0, (s, r) => s + ((r['driver_earnings'] as num?)?.toDouble() ?? (r['final_amount'] as num?)?.toDouble() ?? 0));
 
   int get _completedCount => _rides.where((r) => r['status'] == 'completed').length;
   int get _cancelledCount => _rides.where((r) => r['status'] == 'cancelled').length;
@@ -170,157 +171,273 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                     ..._rides.map((r) {
                       final status = (r['status'] ?? '').toString();
                       final meta = _statusMeta(status);
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: AppColors.cardBorder),
-                        ),
-                        child: Column(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 38,
-                                    height: 38,
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                      color: meta.color.withOpacity(0.12),
-                                      borderRadius: BorderRadius.circular(12),
+                      final isExpanded = _expandedId == r['id'];
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _expandedId = isExpanded ? null : r['id'];
+                          });
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: AppColors.cardBorder),
+                          ),
+                          child: Column(
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 38,
+                                      height: 38,
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color: meta.color.withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Icon(meta.icon, color: meta.color, size: 18),
                                     ),
-                                    child: Icon(meta.icon, color: meta.color, size: 18),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          r['booking_ref']?.toString() ?? '',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w900,
-                                            fontSize: 14,
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            r['booking_ref']?.toString() ?? '',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w900,
+                                              fontSize: 14,
+                                            ),
                                           ),
+                                          Text(
+                                            r['booked_at']?.toString().substring(0, 16) ?? '',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              color: AppColors.textTertiary,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: meta.color.withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(100),
+                                      ),
+                                      child: Text(
+                                        meta.label,
+                                        style: TextStyle(
+                                          color: meta.color,
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 10,
+                                          letterSpacing: 0.4,
                                         ),
-                                        Text(
-                                          r['booked_at']?.toString().substring(0, 16) ?? '',
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            color: AppColors.textTertiary,
-                                            fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Divider(height: 1, color: AppColors.divider),
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.my_location_rounded,
+                                            color: AppColors.flash, size: 13),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            r['pickup_address']?.toString() ?? '',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
                                           ),
                                         ),
                                       ],
                                     ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: meta.color.withOpacity(0.12),
-                                      borderRadius: BorderRadius.circular(100),
-                                    ),
-                                    child: Text(
-                                      meta.label,
-                                      style: TextStyle(
-                                        color: meta.color,
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 10,
-                                        letterSpacing: 0.4,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const Divider(height: 1, color: AppColors.divider),
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.my_location_rounded,
-                                          color: AppColors.flash, size: 13),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: Text(
-                                          r['pickup_address']?.toString() ?? '',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.location_on_rounded,
+                                            color: AppColors.error, size: 13),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            r['drop_address']?.toString() ?? '',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.location_on_rounded,
-                                          color: AppColors.error, size: 13),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: Text(
-                                          r['drop_address']?.toString() ?? '',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: AppColors.surfaceMuted,
-                                borderRadius: const BorderRadius.only(
-                                  bottomLeft: Radius.circular(18),
-                                  bottomRight: Radius.circular(18),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               ),
-                              child: Row(
-                                children: [
-                                  Text(
-                                    'YOU EARNED',
-                                    style: const TextStyle(
-                                      color: AppColors.textTertiary,
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 10,
-                                      letterSpacing: 1.2,
-                                    ),
+                              if (isExpanded) ...[
+                                const Divider(height: 1, color: AppColors.divider),
+                                Padding(
+                                  padding: const EdgeInsets.all(14),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'FARE BREAKDOWN',
+                                        style: TextStyle(
+                                          color: AppColors.textTertiary,
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 10,
+                                          letterSpacing: 1.2,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      _breakdownRow(
+                                        'Trip Fare / Base Fare',
+                                        'Rs.${((r['fare_amount'] as num?) ?? 0).toStringAsFixed(2)}',
+                                      ),
+                                      if (((r['pickup_fee'] as num?) ?? 0) > 0)
+                                        _breakdownRow(
+                                          '  • Included Pickup Fee',
+                                          'Rs.${((r['pickup_fee'] as num?) ?? 0).toStringAsFixed(2)}',
+                                        ),
+                                      if (((r['boost'] as num?) ?? 0) > 0)
+                                        _breakdownRow(
+                                          'Boost Incentive (100% to you)',
+                                          'Rs.${((r['boost'] as num?) ?? 0).toStringAsFixed(2)}',
+                                        ),
+                                      if (((r['passenger_deductible'] as num?) ?? 0) > 0)
+                                        _breakdownRow(
+                                          'Passenger Deductible (Added)',
+                                          'Rs.${((r['passenger_deductible'] as num?) ?? 0).toStringAsFixed(2)}',
+                                        ),
+                                      if (((r['discount_amount'] as num?) ?? 0) > 0)
+                                        _breakdownRow(
+                                          'Promo / Redemption Discount',
+                                          'Rs.${((r['discount_amount'] as num?) ?? 0).toStringAsFixed(2)}',
+                                          isNegative: true,
+                                        ),
+                                      _breakdownRow(
+                                        'Gross Total',
+                                        'Rs.${((r['final_amount'] as num?) ?? 0).toStringAsFixed(2)}',
+                                        isBold: true,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      const Divider(height: 1, color: AppColors.divider),
+                                      const SizedBox(height: 6),
+                                      _breakdownRow(
+                                        'App Usage Charges (Commission)',
+                                        'Rs.${((r['app_usage_charges'] as num?) ?? (r['platform_fee'] as num?) ?? 0).toStringAsFixed(2)}',
+                                        isNegative: true,
+                                      ),
+                                      if (((r['passenger_deductible'] as num?) ?? 0) > 0)
+                                        _breakdownRow(
+                                          'Passenger Deductible (Deducted)',
+                                          'Rs.${((r['passenger_deductible'] as num?) ?? 0).toStringAsFixed(2)}',
+                                          isNegative: true,
+                                        ),
+                                      _breakdownRow(
+                                        'Total Deductions',
+                                        'Rs.${((r['deductions'] as num?) ?? 0).toStringAsFixed(2)}',
+                                        isNegative: true,
+                                        isBold: true,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      const Divider(height: 1, color: AppColors.divider),
+                                      const SizedBox(height: 6),
+                                      _breakdownRow(
+                                        'Net Driver Earnings',
+                                        'Rs.${((r['driver_earnings'] as num?) ?? (r['final_amount'] as num?) ?? 0).toStringAsFixed(2)}',
+                                        isBold: true,
+                                      ),
+                                    ],
                                   ),
-                                  const Spacer(),
-                                  Text(
-                                    'Rs.${((r['final_amount'] as num?) ?? 0).toStringAsFixed(0)}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 15,
-                                    ),
+                                ),
+                              ],
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceMuted,
+                                  borderRadius: const BorderRadius.only(
+                                    bottomLeft: Radius.circular(18),
+                                    bottomRight: Radius.circular(18),
                                   ),
-                                ],
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Text(
+                                      'YOU EARNED',
+                                      style: TextStyle(
+                                        color: AppColors.textTertiary,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 10,
+                                        letterSpacing: 1.2,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Text(
+                                      'Rs.${((r['driver_earnings'] as num?) ?? (r['final_amount'] as num?) ?? 0).toStringAsFixed(0)}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       );
                     }),
                 ]),
               ),
             ),
+    );
+  }
+
+  Widget _breakdownRow(String label, String value, {bool isNegative = false, bool isBold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+              color: isBold ? AppColors.textPrimary : AppColors.textSecondary,
+            ),
+          ),
+          Text(
+            isNegative ? '-$value' : value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+              color: isNegative
+                  ? AppColors.error
+                  : (isBold ? AppColors.primary : AppColors.textPrimary),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

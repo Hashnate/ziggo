@@ -3,6 +3,7 @@ from datetime import timedelta
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from ...config import settings
 from ...database import get_db
@@ -36,7 +37,14 @@ async def verify_otp(request: OTPVerify, db: AsyncSession = Depends(get_db)):
             detail="Invalid or expired OTP",
         )
 
-    result = await db.execute(select(User).where(User.phone_number == request.phone_number))
+    result = await db.execute(
+        select(User)
+        .where(User.phone_number == request.phone_number)
+        .options(
+            selectinload(User.customer_profile),
+            selectinload(User.driver_profile),
+        )
+    )
     user = result.scalars().first()
 
     if user and not user.is_active:
@@ -63,23 +71,41 @@ async def verify_otp(request: OTPVerify, db: AsyncSession = Depends(get_db)):
         await db.commit()
         await db.refresh(user)
     else:
-        # Existing user — block role mismatches loudly so a customer who
-        # tries to "register as driver" with the same phone doesn't end up
-        # silently logged in as their original role.
+        # Existing user — handle role switching.
         #
-        # Exception: the welcome-screen "Run a restaurant" card sends
+        # Customer <-> Driver: allow the same phone to operate as both.
+        # When a customer logs in as driver (or vice versa), auto-create
+        # the missing profile and switch the active role.
+        #
+        # Merchant roles: the welcome-screen "Run a restaurant" card sends
         # restaurant_owner even when the user is actually market_owner (one
         # card covers both merchant kinds). Treat merchant<->merchant as a
         # match and just use the stored role.
         merchant_roles = {UserRole.RESTAURANT_OWNER, UserRole.MARKET_OWNER}
+        switchable_roles = {UserRole.CUSTOMER, UserRole.DRIVER}
+
         roles_match = user.role == request.role or (
             user.role in merchant_roles and request.role in merchant_roles
         )
+
         if not roles_match:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Phone already registered as {user.role.value}",
-            )
+            # Allow customer <-> driver switching
+            if user.role in switchable_roles and request.role in switchable_roles:
+                # Auto-create the missing profile for the requested role
+                if request.role == UserRole.DRIVER and not user.driver_profile:
+                    db.add(Driver(user_id=user.id))
+                elif request.role == UserRole.CUSTOMER and not user.customer_profile:
+                    db.add(Customer(user_id=user.id))
+
+                # Switch the user's active role
+                user.role = request.role
+                await db.commit()
+                await db.refresh(user)
+            else:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Phone already registered as {user.role.value}",
+                )
 
     expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     token = create_access_token(

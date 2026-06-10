@@ -117,6 +117,9 @@ class FareSetting(Base):
     min_fare = Column(DECIMAL(10, 2), default=0)
     platform_fee_percent = Column(DECIMAL(5, 2), default=15)
     surge_multiplier = Column(DECIMAL(3, 2), default=1.00)
+    pickup_fee = Column(DECIMAL(10, 2), default=0.00)
+    boost = Column(DECIMAL(10, 2), default=0.00)
+    passenger_deductible = Column(DECIMAL(10, 2), default=0.00)
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

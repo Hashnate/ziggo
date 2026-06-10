@@ -857,6 +857,25 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final paymentMethod = (ride['payment_method'] ?? 'cash').toString().toLowerCase();
     final amount = (ride['final_amount'] as num?)?.toDouble() ?? 0.0;
 
+    final grossTotal = (ride['final_amount'] as num?)?.toDouble() ?? 0.0;
+    final appUsage = (ride['app_usage_charges'] as num?)?.toDouble() ?? (ride['platform_fee'] as num?)?.toDouble() ?? 0.0;
+    final passDeductible = (ride['passenger_deductible'] as num?)?.toDouble() ?? 0.0;
+    final totalDeductions = (ride['deductions'] as num?)?.toDouble() ?? (appUsage + passDeductible);
+    final driverEarnings = (ride['driver_earnings'] as num?)?.toDouble() ?? (grossTotal - totalDeductions);
+
+    Widget buildItemizedRow(String label, String val, {bool isNegative = false, bool isBold = false}) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: TextStyle(fontSize: 12, color: isBold ? AppColors.textPrimary : AppColors.textSecondary, fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+            Text(isNegative ? '-Rs.$val' : 'Rs.$val', style: TextStyle(fontSize: 12, color: isNegative ? AppColors.error : (isBold ? AppColors.primary : AppColors.textPrimary), fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+          ],
+        ),
+      );
+    }
+
     if (paymentMethod == 'cash') {
       final confirmed = await showDialog<bool>(
         context: context,
@@ -871,6 +890,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               const Text('Please collect', style: TextStyle(color: AppColors.textSecondary)),
               Text('Rs.${amount.toStringAsFixed(0)}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900)),
               const Text('from the customer.', style: TextStyle(color: AppColors.textSecondary)),
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 8),
+              buildItemizedRow('Gross Total', grossTotal.toStringAsFixed(2), isBold: true),
+              buildItemizedRow('App Usage Charges', appUsage.toStringAsFixed(2), isNegative: true),
+              if (passDeductible > 0)
+                buildItemizedRow('Passenger Deductible', passDeductible.toStringAsFixed(2), isNegative: true),
+              buildItemizedRow('Total Deductions', totalDeductions.toStringAsFixed(2), isNegative: true, isBold: true),
+              const Divider(height: 1),
+              const SizedBox(height: 8),
+              buildItemizedRow('Your Net Earnings', driverEarnings.toStringAsFixed(2), isBold: true),
             ],
           ),
           actionsAlignment: MainAxisAlignment.center,
@@ -906,6 +936,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               const Text('Payment of', style: TextStyle(color: AppColors.textSecondary)),
               Text('Rs.${amount.toStringAsFixed(0)}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: AppColors.primary)),
               const Text('was successfully deducted from customer.', style: TextStyle(color: AppColors.textSecondary), textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 8),
+              buildItemizedRow('Gross Total', grossTotal.toStringAsFixed(2), isBold: true),
+              buildItemizedRow('App Usage Charges', appUsage.toStringAsFixed(2), isNegative: true),
+              if (passDeductible > 0)
+                buildItemizedRow('Passenger Deductible', passDeductible.toStringAsFixed(2), isNegative: true),
+              buildItemizedRow('Total Deductions', totalDeductions.toStringAsFixed(2), isNegative: true, isBold: true),
+              const Divider(height: 1),
+              const SizedBox(height: 8),
+              buildItemizedRow('Your Net Earnings', driverEarnings.toStringAsFixed(2), isBold: true),
             ],
           ),
           actionsAlignment: MainAxisAlignment.center,

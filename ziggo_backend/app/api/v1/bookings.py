@@ -104,6 +104,11 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
         parcel_instructions=b.parcel_instructions,
         is_courier=bool(b.is_courier),
         courier_eta_days=b.courier_eta_days,
+        pickup_fee=float(b.pickup_fee) if b.pickup_fee is not None else 0.0,
+        boost=float(b.boost) if b.boost is not None else 0.0,
+        passenger_deductible=float(b.passenger_deductible) if b.passenger_deductible is not None else 0.0,
+        app_usage_charges=float(b.app_usage_charges) if b.app_usage_charges is not None else 0.0,
+        deductions=float(b.deductions) if b.deductions is not None else 0.0,
     )
 
 
@@ -307,6 +312,11 @@ async def create_booking(
         rental_hours=req.rental_hours,
         is_corporate=req.payment_method == "corporate",
         corporate_id=corporate_acct.id if corporate_acct else None,
+        pickup_fee=to_decimal(fare.get("pickup_fee", 0)),
+        boost=to_decimal(fare.get("boost", 0)),
+        passenger_deductible=to_decimal(fare.get("passenger_deductible", 0)),
+        app_usage_charges=to_decimal(fare.get("app_usage_charges", 0)),
+        deductions=to_decimal(fare.get("deductions", 0)),
     )
     db.add(booking)
     await db.flush()

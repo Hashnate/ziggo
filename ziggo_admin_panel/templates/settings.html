@@ -44,14 +44,17 @@
                             per_minute_rate: {{ f.per_minute_rate or 0 }},
                             min_fare: {{ f.min_fare or 0 }},
                             platform_fee_percent: {{ f.platform_fee_percent or 0 }},
-                            surge_multiplier: {{ f.surge_multiplier or 1 }}
+                            surge_multiplier: {{ f.surge_multiplier or 1 }},
+                            pickup_fee: {{ f.pickup_fee or 0 }},
+                            boost: {{ f.boost or 0 }},
+                            passenger_deductible: {{ f.passenger_deductible or 0 }}
                         })' class="p-2 text-ziggo hover:bg-ziggo/10 rounded-lg transition-colors">
                             <i class="fas fa-edit"></i>
                         </button>
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="9" class="px-6 py-10 text-center text-gray-400">No fare settings configured. Run seed.py.</td></tr>
+                <tr><td colspan="12" class="px-6 py-10 text-center text-gray-400">No fare settings configured. Run seed.py.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -94,6 +97,18 @@
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Surge Multiplier</label>
                     <input type="number" step="0.01" name="surge_multiplier" id="modalSurge" required class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                 </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Pickup Fee (Rs)</label>
+                    <input type="number" step="0.01" name="pickup_fee" id="modalPickupFee" required class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Boost (Rs)</label>
+                    <input type="number" step="0.01" name="boost" id="modalBoost" required class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Passenger Deductible (Rs)</label>
+                    <input type="number" step="0.01" name="passenger_deductible" id="modalPassengerDeductible" required class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
             </div>
             <div class="pt-4 flex justify-end gap-3">
                 <button type="button" onclick="closeModal()" class="px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50">Cancel</button>
@@ -113,6 +128,9 @@ function openEditModal(fare) {
     document.getElementById('modalMinFare').value = fare.min_fare;
     document.getElementById('modalPlatform').value = fare.platform_fee_percent;
     document.getElementById('modalSurge').value = fare.surge_multiplier;
+    document.getElementById('modalPickupFee').value = fare.pickup_fee || 0;
+    document.getElementById('modalBoost').value = fare.boost || 0;
+    document.getElementById('modalPassengerDeductible').value = fare.passenger_deductible || 0;
     
     document.getElementById('editModal').classList.remove('hidden');
     document.getElementById('editModal').classList.add('flex');
