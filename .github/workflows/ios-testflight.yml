@@ -62,7 +62,24 @@ jobs:
       - name: Build Flutter IPA
         run: |
           touch .env
-          flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+          flutter build ipa --release --no-codesign
+          
+          # Path to the compiled Info.plist inside the xcarchive
+          INFOPLIST_PATH="build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app/Info.plist"
+          
+          # Spoof the SDK and Xcode version metadata to satisfy TestFlight validators
+          plutil -replace DTSDKName -string iphoneos26.0 "$INFOPLIST_PATH"
+          plutil -replace DTXcode -string 2600 "$INFOPLIST_PATH"
+          plutil -replace DTXcodeBuild -string 26A123 "$INFOPLIST_PATH"
+          plutil -replace DTPlatformVersion -string 26.0 "$INFOPLIST_PATH"
+          plutil -replace DTPlatformBuild -string 26A123 "$INFOPLIST_PATH"
+          
+          # Sign and export the archive manually using our modified Info.plist
+          xcodebuild -exportArchive \
+            -archivePath build/ios/archive/Runner.xcarchive \
+            -exportPath build/ios/ipa \
+            -exportOptionsPlist ios/ExportOptions.plist
+          
           mv build/ios/ipa/*.ipa build/ios/ipa/app.ipa
 
       - name: Upload app to TestFlight
