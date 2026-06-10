@@ -63,11 +63,12 @@ jobs:
         run: |
           touch .env
           flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+          mv build/ios/ipa/*.ipa build/ios/ipa/app.ipa
 
       - name: Upload app to TestFlight
         uses: apple-actions/upload-testflight-build@v1
         with:
-          app-path: ziggo_app/build/ios/ipa/*.ipa
+          app-path: ziggo_app/build/ios/ipa/app.ipa
           issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
           api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
