@@ -6,10 +6,10 @@ import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
-import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/motion.dart';
 import '../../../core/network/api_client.dart';
 import '../driver_provider.dart';
+import '../driver_theme.dart';
 
 class DriverRegistrationScreen extends StatefulWidget {
   const DriverRegistrationScreen({super.key});
@@ -226,8 +226,15 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return Theme(
+      data: driverDarkTheme(context),
+      child: _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: kDriverBg,
       body: SafeArea(
         child: Form(
           key: _formKey,
@@ -315,7 +322,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                         },
                         child: CircleAvatar(
                           radius: 36,
-                          backgroundColor: AppColors.surfaceMuted,
+                          backgroundColor: kDriverCardLight,
                           backgroundImage: _profilePhoto != null ? FileImage(_profilePhoto!) : null,
                           child: _profilePhoto == null
                               ? const Icon(Icons.add_a_photo_rounded, color: AppColors.textTertiary, size: 24)
@@ -446,14 +453,14 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                             const SizedBox(
                               width: 16,
                               height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryLight),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
                                 _uploadStatus!,
                                 style: const TextStyle(
-                                  color: AppColors.primary,
+                                  color: AppColors.primaryLight,
                                   fontWeight: FontWeight.w700,
                                   fontSize: 13,
                                 ),
@@ -540,9 +547,9 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: kDriverCard,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: Colors.white10),
       ),
       child: child,
     );
@@ -602,7 +609,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: sel ? Colors.black : AppColors.surfaceMuted,
+                  color: sel ? AppColors.primary : kDriverCardLight,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -610,7 +617,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                   children: [
                     Icon(
                       t.$2,
-                      color: sel ? AppColors.primary : AppColors.textPrimary,
+                      color: sel ? Colors.white : Colors.white70,
                       size: 16,
                     ),
                     const SizedBox(width: 6),
@@ -619,7 +626,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                       style: TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 12,
-                        color: sel ? Colors.white : AppColors.textPrimary,
+                        color: sel ? Colors.white : Colors.white70,
                       ),
                     ),
                   ],
@@ -639,7 +646,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: AppColors.surfaceMuted,
+            color: kDriverCardLight,
             borderRadius: BorderRadius.circular(12),
             image: file != null
                 ? DecorationImage(image: FileImage(file), fit: BoxFit.cover)
@@ -680,13 +687,13 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
           style: OutlinedButton.styleFrom(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            side: const BorderSide(color: AppColors.cardBorder),
+            side: const BorderSide(color: Colors.white24),
           ),
           child: Text(file == null ? 'Upload' : 'Replace',
               style: const TextStyle(
                 fontWeight: FontWeight.w900,
                 fontSize: 11,
-                color: AppColors.textPrimary,
+                color: Colors.white,
               )),
         ),
       ],

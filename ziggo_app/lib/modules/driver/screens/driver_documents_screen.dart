@@ -1,12 +1,10 @@
-import 'dart:io';
-
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../app/app_colors.dart';
-import '../../../app/app_styles.dart';
 import '../../../core/network/api_client.dart';
+import '../driver_theme.dart';
 
 /// BRD: Driver KYC document upload UI.
 ///
@@ -125,10 +123,17 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
         _docs.where((d) => d['document_url'] != null && d['is_verified'] != true).length;
     final verifiedCount = _docs.where((d) => d['is_verified'] == true).length;
 
+    return Theme(
+      data: driverDarkTheme(context),
+      child: _buildScaffold(missingCount, pendingCount, verifiedCount),
+    );
+  }
+
+  Widget _buildScaffold(int missingCount, int pendingCount, int verifiedCount) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: kDriverBg,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: kDriverBg,
         elevation: 0,
         title: const Text('KYC Documents'),
       ),
@@ -198,9 +203,9 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: kDriverCard,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: AppStyles.shadowSm,
+        border: Border.all(color: Colors.white10),
       ),
       child: Row(
         children: [
@@ -210,7 +215,7 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
             height: 56,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: AppColors.surfaceMuted,
+              color: kDriverCardLight,
               borderRadius: BorderRadius.circular(14),
               image: (url != null && !url.endsWith('.pdf'))
                   ? DecorationImage(
@@ -261,7 +266,7 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                side: const BorderSide(color: AppColors.cardBorder),
+                side: const BorderSide(color: Colors.white24),
               ),
               child: busy
                   ? const SizedBox(
@@ -272,7 +277,7 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
                       style: const TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 11,
-                        color: AppColors.textPrimary,
+                        color: Colors.white,
                       )),
             ),
         ],

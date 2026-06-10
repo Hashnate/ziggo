@@ -1,0 +1,766 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../../app/app_colors.dart';
+import '../../../core/network/api_client.dart';
+import '../../auth/auth_provider.dart';
+import '../../customer/screens/support_screen.dart';
+import '../driver_provider.dart';
+import 'driver_documents_screen.dart';
+import 'driver_history_screen.dart';
+
+// Local dark tokens — mirror the driver home's Ziggo navy theme.
+const Color _kBg = Color(0xFF12151C);
+const Color _kCard = Color(0xFF1B1E25);
+const Color _kCardLight = Color(0xFF262A33);
+
+/// PickMe-style driver profile — blue gradient hero + dark body with the
+/// driver's stats, bio basics, and account actions.
+class DriverProfileScreen extends StatelessWidget {
+  const DriverProfileScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final driver = context.watch<DriverProvider>();
+    final profile = driver.profile ?? const <String, dynamic>{};
+
+    final name = auth.fullName ?? profile['full_name']?.toString() ?? 'Driver';
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : 'D';
+    final driverId = (profile['id'] ?? '—').toString();
+    final phone = auth.phoneNumber ?? profile['phone_number']?.toString() ?? '';
+    final photoPath = profile['profile_photo']?.toString();
+    final photoUrl = (photoPath != null && photoPath.isNotEmpty)
+        ? (photoPath.startsWith('http')
+            ? photoPath
+            : '${ApiConfig.baseHost}$photoPath')
+        : null;
+
+    final rating = (profile['rating'] as num?)?.toDouble() ?? 0;
+    final trips = (profile['today_rides'] as num?)?.toInt() ?? 0;
+    final acceptance = (profile['acceptance_rate'] as num?)?.toDouble() ?? 100;
+    final isApproved = profile['is_approved'] == true;
+    final vehicleType = (profile['vehicle_type'] ?? '').toString();
+    final vehicleNumber = (profile['vehicle_number'] ?? '').toString();
+
+    return Scaffold(
+      backgroundColor: _kBg,
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: _Header(
+              name: name,
+              initial: initial,
+              driverId: driverId,
+              photoUrl: photoUrl,
+              vehicleType: vehicleType,
+              onBack: () => Navigator.pop(context),
+              onEditPhoto: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const DriverDocumentsScreen()),
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: _statsRow(rating, trips, acceptance),
+            ),
+          ),
+          if (!isApproved)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                child: _banner(
+                  'Your account is pending approval. You can\'t go online yet.',
+                ),
+              ),
+            ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: Column(
+                children: [
+                  _infoRow(Icons.phone_rounded, 'Phone',
+                      phone.isEmpty ? '—' : phone),
+                  _infoRow(Icons.language_rounded, 'Knows', 'English'),
+                  _infoRow(Icons.directions_car_rounded, 'Vehicle',
+                      vehicleNumber.isEmpty ? '—' : vehicleNumber),
+                ],
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+              child: _outlinedAction(
+                icon: Icons.group_add_rounded,
+                label: 'Invite a friend',
+                subtitle: 'Earn cash from referrals',
+                onTap: () => _comingSoon(context, 'Referrals'),
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: _outlinedAction(
+                icon: Icons.verified_rounded,
+                label: 'E-training',
+                subtitle: 'Become a better driver partner',
+                onTap: () => _comingSoon(context, 'E-training'),
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: _kCard,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Column(
+                  children: [
+                    _listTile(
+                      icon: Icons.directions_car_filled_rounded,
+                      title: 'Vehicle details',
+                      trailing: vehicleNumber.isEmpty ? null : '($vehicleNumber)',
+                      onTap: () => _detailsSheet(
+                        context,
+                        title: 'Vehicle details',
+                        rows: {
+                          'Type': vehicleType.toUpperCase(),
+                          'Model': (profile['vehicle_model'] ?? '—').toString(),
+                          'Number': vehicleNumber.isEmpty ? '—' : vehicleNumber,
+                          'Color': (profile['vehicle_color'] ?? '—').toString(),
+                        },
+                      ),
+                    ),
+                    _divider(),
+                    _listTile(
+                      icon: Icons.person_rounded,
+                      title: 'My details',
+                      onTap: () => _detailsSheet(
+                        context,
+                        title: 'My details',
+                        rows: {
+                          'Name': name,
+                          'Driver ID': driverId,
+                          'Phone': phone.isEmpty ? '—' : phone,
+                          'NIC': (profile['nic_number'] ?? '—').toString(),
+                          'License': (profile['license_number'] ?? '—').toString(),
+                        },
+                      ),
+                    ),
+                    _divider(),
+                    _listTile(
+                      icon: Icons.shield_rounded,
+                      title: 'My insurance',
+                      onTap: () => _comingSoon(context, 'Insurance'),
+                    ),
+                    _divider(),
+                    _listTile(
+                      icon: Icons.badge_rounded,
+                      title: 'KYC documents',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const DriverDocumentsScreen()),
+                      ),
+                    ),
+                    _divider(),
+                    _listTile(
+                      icon: Icons.receipt_long_rounded,
+                      title: 'My rides & statements',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const DriverHistoryScreen()),
+                      ),
+                    ),
+                    _divider(),
+                    _listTile(
+                      icon: Icons.emergency_share_rounded,
+                      title: 'Emergency contacts',
+                      onTap: () => _detailsSheet(
+                        context,
+                        title: 'Emergency contact',
+                        rows: {
+                          'Name': (profile['relative_name'] ?? '—').toString(),
+                          'Relationship':
+                              (profile['relative_relationship'] ?? '—').toString(),
+                          'Contact':
+                              (profile['relative_contact'] ?? '—').toString(),
+                        },
+                      ),
+                    ),
+                    _divider(),
+                    _listTile(
+                      icon: Icons.support_agent_rounded,
+                      title: 'Help & support',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const SupportScreen(isDriver: true)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+              child: GestureDetector(
+                onTap: () => _confirmLogout(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: _kCardLight,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.logout_rounded, color: Colors.white, size: 18),
+                      SizedBox(width: 8),
+                      Text(
+                        'Logout',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statsRow(double rating, int trips, double acceptance) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 18),
+      decoration: BoxDecoration(
+        color: _kCard,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _stat(
+              rating > 0 ? rating.toStringAsFixed(1) : '0',
+              'Rating',
+              icon: Icons.star_rounded,
+              iconColor: _kGold,
+            ),
+          ),
+          _statDivider(),
+          Expanded(child: _stat(trips.toString(), 'Trips')),
+          _statDivider(),
+          Expanded(child: _stat('${acceptance.toStringAsFixed(0)}%', 'Accept')),
+        ],
+      ),
+    );
+  }
+
+  Widget _stat(String value, String label, {IconData? icon, Color? iconColor}) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 20,
+              ),
+            ),
+            if (icon != null) ...[
+              const SizedBox(width: 3),
+              Icon(icon, color: iconColor, size: 16),
+            ],
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white54,
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _statDivider() =>
+      Container(width: 1, height: 30, color: Colors.white12);
+
+  Widget _banner(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.error.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.error.withOpacity(0.4)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded,
+              color: AppColors.error, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 12.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white38, size: 20),
+          const SizedBox(width: 12),
+          Text(
+            '$label  ',
+            style: const TextStyle(
+              color: Colors.white38,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 13.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _outlinedAction({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: _kCardLight,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.white12),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: Colors.white, size: 19),
+                const SizedBox(width: 10),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              color: Colors.white38,
+              fontWeight: FontWeight.w600,
+              fontSize: 11.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _listTile({
+    required IconData icon,
+    required String title,
+    String? trailing,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Row(
+            children: [
+              Icon(icon, color: Colors.white70, size: 22),
+              const SizedBox(width: 14),
+              Expanded(
+                child: RichText(
+                  text: TextSpan(
+                    text: title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
+                    children: trailing == null
+                        ? null
+                        : [
+                            TextSpan(
+                              text: '  $trailing',
+                              style: const TextStyle(
+                                color: Colors.white38,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12.5,
+                              ),
+                            ),
+                          ],
+                  ),
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded,
+                  color: Colors.white38, size: 22),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _divider() => const Divider(
+        height: 1,
+        thickness: 1,
+        color: Colors.white10,
+        indent: 16,
+        endIndent: 16,
+      );
+
+  static void _comingSoon(BuildContext context, String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$feature is coming soon.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  static void _detailsSheet(
+    BuildContext context, {
+    required String title,
+    required Map<String, String> rows,
+  }) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: _kCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (ctx) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 14),
+              for (final e in rows.entries)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 9),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 110,
+                        child: Text(
+                          e.key.toUpperCase(),
+                          style: const TextStyle(
+                            color: Colors.white38,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 10,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          e.value,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static Future<void> _confirmLogout(BuildContext context) async {
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _kCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        icon: const Icon(Icons.logout_rounded, color: AppColors.error, size: 36),
+        title: const Text('Log out?',
+            textAlign: TextAlign.center, style: TextStyle(color: Colors.white)),
+        content: const Text(
+          'You will go offline and stop receiving requests until you log back in.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white70),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Log out'),
+          ),
+        ],
+      ),
+    );
+    if (yes != true) return;
+    if (!context.mounted) return;
+    final driver = context.read<DriverProvider>();
+    if (driver.isOnline) {
+      await driver.toggleOnline(false);
+    }
+    if (!context.mounted) return;
+    await context.read<AuthProvider>().logout();
+    if (context.mounted) Navigator.popUntil(context, (r) => r.isFirst);
+  }
+}
+
+const Color _kGold = AppColors.accent;
+
+class _Header extends StatelessWidget {
+  final String name;
+  final String initial;
+  final String driverId;
+  final String? photoUrl;
+  final String vehicleType;
+  final VoidCallback onBack;
+  final VoidCallback onEditPhoto;
+
+  const _Header({
+    required this.name,
+    required this.initial,
+    required this.driverId,
+    required this.photoUrl,
+    required this.vehicleType,
+    required this.onBack,
+    required this.onEditPhoto,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final top = MediaQuery.of(context).padding.top;
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(16, top + 8, 16, 26),
+      decoration: const BoxDecoration(
+        gradient: AppColors.primaryGradient,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+      ),
+      child: Column(
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: GestureDetector(
+              onTap: onBack,
+              child: const Icon(Icons.arrow_back_rounded,
+                  color: Colors.white, size: 26),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Stack(
+            children: [
+              Container(
+                width: 108,
+                height: 108,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                  border: Border.all(color: Colors.white, width: 3),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: photoUrl != null
+                    ? Image.network(
+                        photoUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _fallback(),
+                      )
+                    : _fallback(),
+              ),
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: GestureDetector(
+                  onTap: onEditPhoto,
+                  child: Container(
+                    width: 34,
+                    height: 34,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.primary, width: 2),
+                    ),
+                    child: const Icon(Icons.edit_rounded,
+                        color: AppColors.primary, size: 16),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            name,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 19,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Driver ID : $driverId',
+            style: const TextStyle(
+              color: Colors.white70,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(100),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(_vehicleIcon(vehicleType),
+                    color: AppColors.primary, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  vehicleType.isEmpty ? 'Driver' : _vehicleLabel(vehicleType),
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _fallback() => Container(
+        color: AppColors.primaryLight,
+        alignment: Alignment.center,
+        child: Text(
+          initial,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            fontSize: 40,
+          ),
+        ),
+      );
+
+  static IconData _vehicleIcon(String type) {
+    switch (type.toLowerCase()) {
+      case 'bike':
+        return Icons.two_wheeler_rounded;
+      case 'tuk':
+        return Icons.electric_rickshaw_rounded;
+      case 'van':
+        return Icons.airport_shuttle_rounded;
+      case 'truck':
+        return Icons.local_shipping_rounded;
+      default:
+        return Icons.directions_car_rounded;
+    }
+  }
+
+  static String _vehicleLabel(String type) {
+    final t = type.toLowerCase();
+    if (t == 'car') return 'Cabbie';
+    return type.toUpperCase();
+  }
+}

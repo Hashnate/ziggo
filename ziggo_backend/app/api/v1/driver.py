@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from ...database import get_db
-from ...models import Driver, DriverDocument, DriverStatus, User
+from ...models import Driver, DriverDocument, DriverStatus, FareSetting, User
 from ...schemas import (
     DriverLocationUpdate,
     DriverOnlineToggle,
@@ -128,6 +128,82 @@ async def get_my_driver_profile(
     from ...services.finance_service import get_driver_payout_stats
     stats = await get_driver_payout_stats(db, d.id)
     return _to_response(user, d, paid_payouts=stats["paid"], pending_payout=stats["pending"])
+
+
+# Fallback rate card when no FareSetting row exists for the driver's vehicle.
+_FARE_DEFAULTS = {
+    "bike":  {"base": 60,  "per_km": 35,  "per_min": 2, "min": 100},
+    "tuk":   {"base": 80,  "per_km": 55,  "per_min": 3, "min": 150},
+    "car":   {"base": 150, "per_km": 80,  "per_min": 4, "min": 250},
+    "van":   {"base": 250, "per_km": 120, "per_min": 5, "min": 400},
+    "truck": {"base": 500, "per_km": 200, "per_min": 6, "min": 750},
+}
+
+
+@router.get("/fare-card")
+async def get_my_fare_card(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("driver")),
+):
+    """The live, admin-editable rate card for the driver's own vehicle type,
+    plus a worked example so the driver sees exactly how a fare — and their
+    share of it — is calculated. Read-only mirror of the booking fare engine."""
+    d = await _get_driver(db, user)
+    service_type = d.vehicle_type or "car"
+
+    fs = (
+        await db.execute(
+            select(FareSetting).where(FareSetting.service_type == service_type)
+        )
+    ).scalars().first()
+
+    if fs:
+        base = float(fs.base_fare or 0)
+        per_km = float(fs.per_km_rate or 0)
+        per_min = float(fs.per_minute_rate or 0)
+        min_fare = float(fs.min_fare or 0)
+        platform_pct = float(fs.platform_fee_percent or 15)
+        surge = float(fs.surge_multiplier or 1)
+        pickup_fee = float(fs.pickup_fee or 0)
+        boost = float(fs.boost or 0)
+        passenger_deductible = float(fs.passenger_deductible or 0)
+        display_name = fs.display_name or service_type
+    else:
+        dft = _FARE_DEFAULTS.get(service_type, _FARE_DEFAULTS["car"])
+        base, per_km, per_min, min_fare = dft["base"], dft["per_km"], dft["per_min"], dft["min"]
+        platform_pct, surge = 15.0, 1.0
+        pickup_fee, boost, passenger_deductible = 0.0, 0.0, 0.0
+        display_name = service_type
+
+    # Worked example — a typical 5 km / 15 min trip.
+    ex_km, ex_min = 5.0, 15.0
+    raw = (base + pickup_fee + per_km * ex_km + per_min * ex_min) * surge
+    fare = max(raw, min_fare) + boost
+    gross = fare + passenger_deductible
+    platform_fee = round(gross * (platform_pct / 100.0), 2)
+    driver_earnings = round(gross - platform_fee, 2)
+
+    return {
+        "service_type": service_type,
+        "display_name": display_name,
+        "base_fare": round(base, 2),
+        "per_km_rate": round(per_km, 2),
+        "per_minute_rate": round(per_min, 2),
+        "min_fare": round(min_fare, 2),
+        "pickup_fee": round(pickup_fee, 2),
+        "boost": round(boost, 2),
+        "passenger_deductible": round(passenger_deductible, 2),
+        "surge_multiplier": round(surge, 2),
+        "platform_fee_percent": round(platform_pct, 2),
+        "driver_share_percent": round(100 - platform_pct, 2),
+        "example": {
+            "distance_km": ex_km,
+            "duration_min": ex_min,
+            "gross_total": round(gross, 2),
+            "platform_fee": platform_fee,
+            "driver_earnings": driver_earnings,
+        },
+    }
 
 
 @router.post("/register", response_model=DriverProfileResponse)
