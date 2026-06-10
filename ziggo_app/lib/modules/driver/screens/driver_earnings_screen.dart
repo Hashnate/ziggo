@@ -20,6 +20,7 @@ class DriverEarningsScreen extends StatefulWidget {
 
 class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
   Map<String, dynamic>? _fareCard;
+  Map<String, dynamic>? _summary;
   bool _loading = true;
 
   @override
@@ -30,10 +31,14 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
 
   Future<void> _load() async {
     try {
-      final r = await ApiClient.instance.dio.get('/driver/fare-card');
+      final results = await Future.wait([
+        ApiClient.instance.dio.get('/driver/earnings-summary'),
+        ApiClient.instance.dio.get('/driver/fare-card'),
+      ]);
       if (!mounted) return;
       setState(() {
-        _fareCard = Map<String, dynamic>.from(r.data);
+        _summary = Map<String, dynamic>.from(results[0].data);
+        _fareCard = Map<String, dynamic>.from(results[1].data);
         _loading = false;
       });
     } on DioException {
@@ -139,6 +144,24 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
             ),
             const SizedBox(height: 24),
             const Text(
+              'LIFETIME BREAKDOWN',
+              style: TextStyle(
+                color: Colors.white54,
+                fontWeight: FontWeight.w900,
+                fontSize: 11,
+                letterSpacing: 1.4,
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else
+              _breakdownCard(_summary),
+            const SizedBox(height: 24),
+            const Text(
               'HOW YOUR FARE IS CALCULATED',
               style: TextStyle(
                 color: Colors.white54,
@@ -236,6 +259,78 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
               fontSize: 18,
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _breakdownCard(Map<String, dynamic>? s) {
+    if (s == null) {
+      return _infoCard('Could not load your earnings. Pull down to retry.');
+    }
+    final collected = _d(s, 'collected');
+    final commission = _d(s, 'commission');
+    final earnings = _d(s, 'earnings');
+    final paid = _d(s, 'paid');
+    final pending = _d(s, 'pending');
+    final trips = (s['trips'] as num?)?.toInt() ?? 0;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: kDriverCard,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'TOTAL COLLECTED',
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 10,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Rs.${collected.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 26,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Text(
+                '$trips trips',
+                style: const TextStyle(
+                  color: Colors.white38,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 24, color: Colors.white12),
+          _rateRow('Admin commission', 'Rs.${commission.toStringAsFixed(2)}',
+              negative: true),
+          _rateRow('Driver earnings', 'Rs.${earnings.toStringAsFixed(2)}',
+              highlight: true),
+          const Divider(height: 24, color: Colors.white12),
+          _rateRow('Paid out', 'Rs.${paid.toStringAsFixed(2)}'),
+          _rateRow('Pending payout', 'Rs.${pending.toStringAsFixed(2)}'),
         ],
       ),
     );

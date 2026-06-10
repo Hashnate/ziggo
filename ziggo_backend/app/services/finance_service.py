@@ -978,6 +978,74 @@ async def execute_driver_payout(db: AsyncSession, driver_id: int, amount: Decima
     await db.commit()
 
 
+async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
+    """Lifetime money split for a single driver, for the in-app Earnings page:
+      - collected  : gross the driver handled (ride/flash fares + delivery fees)
+      - commission : the platform's share (app usage charge)
+      - earnings   : what the driver keeps (collected - commission)
+    Mirrors the admin finance maths so the two never disagree."""
+    from app.models import DriverPayout
+
+    bq = await db.execute(
+        select(Booking).where(
+            Booking.driver_id == driver_id,
+            Booking.status == BookingStatus.COMPLETED,
+        )
+    )
+    bookings = bq.scalars().all()
+    ride_collected = sum((_dec(b.final_amount or b.total_amount) for b in bookings), Decimal("0"))
+    ride_commission = sum((_dec(b.platform_fee) for b in bookings), Decimal("0"))
+    ride_earnings = sum((_dec(b.driver_earnings) for b in bookings), Decimal("0"))
+    ride_count = len(bookings)
+
+    fq = await db.execute(
+        select(FoodOrder).where(
+            FoodOrder.driver_id == driver_id,
+            FoodOrder.status == FoodOrderStatus.DELIVERED,
+        )
+    )
+    foods = fq.scalars().all()
+    mq = await db.execute(
+        select(MarketOrder).where(
+            MarketOrder.driver_id == driver_id,
+            MarketOrder.status == MarketOrderStatus.DELIVERED,
+        )
+    )
+    markets = mq.scalars().all()
+
+    delivery_collected = Decimal("0")
+    delivery_commission = Decimal("0")
+    delivery_earnings = Decimal("0")
+    for o in [*foods, *markets]:
+        df = _dec(o.delivery_fee)
+        cut = (df * _PLATFORM_DELIVERY_CUT).quantize(Decimal("0.01"))
+        delivery_collected += df
+        delivery_commission += cut
+        delivery_earnings += df - cut
+    delivery_count = len(foods) + len(markets)
+
+    collected = ride_collected + delivery_collected
+    commission = ride_commission + delivery_commission
+    earnings = ride_earnings + delivery_earnings
+
+    pq = await db.execute(select(DriverPayout).where(DriverPayout.driver_id == driver_id))
+    paid = sum((_dec(p.amount) for p in pq.scalars().all()), Decimal("0"))
+    pending = earnings - paid
+    if pending < 0:
+        pending = Decimal("0")
+
+    return {
+        "collected": float(collected),
+        "commission": float(commission),
+        "earnings": float(earnings),
+        "paid": float(paid),
+        "pending": float(pending),
+        "trips": ride_count + delivery_count,
+        "rides": ride_count,
+        "deliveries": delivery_count,
+    }
+
+
 async def get_driver_payout_stats(db: AsyncSession, driver_id: int) -> dict:
     from app.models import DriverPayout, Booking, FoodOrder, MarketOrder
     # Calculate lifetime earnings dynamically

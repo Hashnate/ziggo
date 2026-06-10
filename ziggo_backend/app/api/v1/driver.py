@@ -140,6 +140,18 @@ _FARE_DEFAULTS = {
 }
 
 
+@router.get("/earnings-summary")
+async def get_my_earnings_summary(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("driver")),
+):
+    """Lifetime money split for the in-app Earnings page — total collected,
+    admin commission, and the driver's net earnings (plus paid/pending)."""
+    d = await _get_driver(db, user)
+    from ...services.finance_service import get_driver_earnings_summary
+    return await get_driver_earnings_summary(db, d.id)
+
+
 @router.get("/fare-card")
 async def get_my_fare_card(
     db: AsyncSession = Depends(get_db),
