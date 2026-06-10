@@ -67,20 +67,44 @@ jobs:
           # Path to the compiled Info.plist inside the xcarchive
           INFOPLIST_PATH="build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app/Info.plist"
           
-          # Spoof the SDK and Xcode version metadata to satisfy TestFlight validators
+          # Spoof the SDK and Xcode version metadata to satisfy TestFlight validators in the archive
           plutil -replace DTSDKName -string iphoneos26.0 "$INFOPLIST_PATH"
           plutil -replace DTXcode -string 2600 "$INFOPLIST_PATH"
           plutil -replace DTXcodeBuild -string 26A123 "$INFOPLIST_PATH"
           plutil -replace DTPlatformVersion -string 26.0 "$INFOPLIST_PATH"
           plutil -replace DTPlatformBuild -string 26A123 "$INFOPLIST_PATH"
           
-          # Sign and export the archive manually using our modified Info.plist
+          # Sign and export the archive manually
           xcodebuild -exportArchive \
             -archivePath build/ios/archive/Runner.xcarchive \
             -exportPath build/ios/ipa \
             -exportOptionsPlist ios/ExportOptions.plist
           
-          mv build/ios/ipa/*.ipa build/ios/ipa/app.ipa
+          # 1. Unzip the exported IPA
+          unzip build/ios/ipa/*.ipa -d build/ios/ipa/extracted
+          
+          # 2. Extract the original XML entitlements
+          codesign -d --entitlements - --xml build/ios/ipa/extracted/Payload/Runner.app > entitlements.plist
+          
+          # 3. Modify the Info.plist inside the unzipped bundle
+          APP_INFOPLIST_PATH="build/ios/ipa/extracted/Payload/Runner.app/Info.plist"
+          plutil -replace DTSDKName -string iphoneos26.0 "$APP_INFOPLIST_PATH"
+          plutil -replace DTXcode -string 2600 "$APP_INFOPLIST_PATH"
+          plutil -replace DTXcodeBuild -string 26A123 "$APP_INFOPLIST_PATH"
+          plutil -replace DTPlatformVersion -string 26.0 "$APP_INFOPLIST_PATH"
+          plutil -replace DTPlatformBuild -string 26A123 "$APP_INFOPLIST_PATH"
+          
+          # 4. Re-sign the app bundle using the imported distribution certificate and the same entitlements
+          codesign --force --sign "Apple Distribution: Hashnate Software Engineering (Private) Limited (5X9A8V7S49)" --entitlements entitlements.plist --timestamp=none build/ios/ipa/extracted/Payload/Runner.app
+          
+          # 5. Remove original IPA and re-zip the modified bundle
+          rm build/ios/ipa/*.ipa
+          cd build/ios/ipa/extracted
+          zip -r ../app.ipa *
+          cd -
+          
+          # Clean up temporary files
+          rm -rf build/ios/ipa/extracted entitlements.plist
 
       - name: Upload app to TestFlight
         uses: apple-actions/upload-testflight-build@v1
