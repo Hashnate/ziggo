@@ -260,7 +260,18 @@
             }
         }
     });
-    // Render after the Sora font is ready so the axis labels use it
-    if (document.fonts && document.fonts.ready) { document.fonts.ready.then(drawChart); } else { drawChart(); }
+    // If there's no revenue in this period, show a clean empty state instead of a flat 0 line
+    const _revData = {{ stats.revenue_chart_data | tojson }};
+    if (!_revData.some(function (v) { return v > 0; })) {
+        document.getElementById('revenueChart').parentElement.innerHTML =
+            '<div class="h-full flex flex-col items-center justify-center text-center px-4">' +
+            '<i class="fas fa-chart-line text-3xl text-ziggo-faint mb-3"></i>' +
+            '<p class="text-sm font-bold text-ziggo-ink">No revenue data for this period yet</p>' +
+            '<p class="text-xs text-ziggo-faint mt-1">Completed bookings will appear here.</p></div>';
+    } else if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(drawChart);
+    } else {
+        drawChart();
+    }
 </script>
 {% endblock %}
