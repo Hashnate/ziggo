@@ -98,15 +98,25 @@ jobs:
             plutil -replace DTPlatformBuild -string 26A123 "$plist" || true
           done
           
-          # 4. Re-sign all nested frameworks inside the app bundle first
+          # 4. Patch binary LC_BUILD_VERSION using vtool to spoof SDK 26.0
+          echo "Patching main executable Mach-O headers..."
+          vtool -set-build-version ios 15.5 26.0 -output build/ios/ipa/extracted/Payload/Runner.app/Runner build/ios/ipa/extracted/Payload/Runner.app/Runner || true
+          
+          # 5. Re-sign all nested frameworks inside the app bundle first (patching them with vtool first)
           if [ -d "build/ios/ipa/extracted/Payload/Runner.app/Frameworks" ]; then
             find build/ios/ipa/extracted/Payload/Runner.app/Frameworks -depth 1 -name "*.framework" | while read -r framework; do
+              name=$(basename "$framework" .framework)
+              binary="$framework/$name"
+              if [ -f "$binary" ]; then
+                echo "Patching framework binary: $binary"
+                vtool -set-build-version ios 15.5 26.0 -output "$binary" "$binary" || true
+              fi
               echo "Re-signing framework: $framework"
               codesign --force --sign "Apple Distribution: Hashnate Software Engineering (Private) Limited (5X9A8V7S49)" --timestamp=none "$framework"
             done
           fi
           
-          # 5. Re-sign the main app bundle using the same entitlements
+          # 6. Re-sign the main app bundle using the same entitlements
           codesign --force --sign "Apple Distribution: Hashnate Software Engineering (Private) Limited (5X9A8V7S49)" --entitlements entitlements.plist --timestamp=none build/ios/ipa/extracted/Payload/Runner.app
           
           # 6. Remove original IPA and re-zip the modified bundle
