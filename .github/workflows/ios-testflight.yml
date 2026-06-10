@@ -31,7 +31,7 @@ jobs:
 
       - name: Install CocoaPods
         run: |
-          flutter build ios --config-only
+          flutter build ios --config-only --no-codesign
           cd ios && pod install
 
       - name: Install Apple Certificate and Provisioning Profile
