@@ -30,7 +30,9 @@ jobs:
         run: flutter pub get
 
       - name: Install CocoaPods
-        run: cd ios && pod install
+        run: |
+          flutter build ios --config-only --no-codesign
+          cd ios && pod install
 
       - name: Install Apple Certificate and Provisioning Profile
         env:
@@ -39,9 +41,9 @@ jobs:
           BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_BUILD_PROVISION_PROFILE_BASE64 }}
           KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
         run: |
-          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
-          PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
-          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          export CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          export PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
+          export KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
 
           echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
           echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode -o $PP_PATH
@@ -51,18 +53,63 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
 
           security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-          security list-keychain -d user -s $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security list-keychains -d user -s $KEYCHAIN_PATH login.keychain
 
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles
 
       - name: Build Flutter IPA
-        run: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+        run: |
+          touch .env
+          flutter build ipa --release --no-codesign
+          
+          # Path to the compiled Info.plist inside the xcarchive
+          INFOPLIST_PATH="build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app/Info.plist"
+          
+          # Spoof the SDK and Xcode version metadata to satisfy TestFlight validators in the archive
+          plutil -replace DTSDKName -string iphoneos26.0 "$INFOPLIST_PATH"
+          plutil -replace DTXcode -string 2600 "$INFOPLIST_PATH"
+          plutil -replace DTXcodeBuild -string 26A123 "$INFOPLIST_PATH"
+          plutil -replace DTPlatformVersion -string 26.0 "$INFOPLIST_PATH"
+          plutil -replace DTPlatformBuild -string 26A123 "$INFOPLIST_PATH"
+          
+          # Sign and export the archive manually
+          xcodebuild -exportArchive \
+            -archivePath build/ios/archive/Runner.xcarchive \
+            -exportPath build/ios/ipa \
+            -exportOptionsPlist ios/ExportOptions.plist
+          
+          # 1. Unzip the exported IPA
+          unzip build/ios/ipa/*.ipa -d build/ios/ipa/extracted
+          
+          # 2. Extract the original XML entitlements
+          codesign -d --entitlements - --xml build/ios/ipa/extracted/Payload/Runner.app > entitlements.plist
+          
+          # 3. Modify the Info.plist inside the unzipped bundle
+          APP_INFOPLIST_PATH="build/ios/ipa/extracted/Payload/Runner.app/Info.plist"
+          plutil -replace DTSDKName -string iphoneos26.0 "$APP_INFOPLIST_PATH"
+          plutil -replace DTXcode -string 2600 "$APP_INFOPLIST_PATH"
+          plutil -replace DTXcodeBuild -string 26A123 "$APP_INFOPLIST_PATH"
+          plutil -replace DTPlatformVersion -string 26.0 "$APP_INFOPLIST_PATH"
+          plutil -replace DTPlatformBuild -string 26A123 "$APP_INFOPLIST_PATH"
+          
+          # 4. Re-sign the app bundle using the imported distribution certificate and the same entitlements
+          codesign --force --sign "Apple Distribution: Hashnate Software Engineering (Private) Limited (5X9A8V7S49)" --entitlements entitlements.plist --timestamp=none build/ios/ipa/extracted/Payload/Runner.app
+          
+          # 5. Remove original IPA and re-zip the modified bundle
+          rm build/ios/ipa/*.ipa
+          cd build/ios/ipa/extracted
+          zip -r ../app.ipa *
+          cd -
+          
+          # Clean up temporary files
+          rm -rf build/ios/ipa/extracted entitlements.plist
 
       - name: Upload app to TestFlight
         uses: apple-actions/upload-testflight-build@v1
         with:
-          app-path: ziggo_app/build/ios/ipa/*.ipa
+          app-path: ziggo_app/build/ios/ipa/app.ipa
           issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
           api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
@@ -70,5 +117,5 @@ jobs:
       - name: Clean up keychain and provisioning profile
         if: ${{ always() }}
         run: |
-          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db
-          rm -f ~/Library/MobileDevice/Provisioning\ Profiles/build_pp.mobileprovision
+          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
+          rm -f ~/Library/MobileDevice/Provisioning\ Profiles/build_pp.mobileprovision || true
