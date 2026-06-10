@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -302,9 +303,24 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   Future<void> _openNavigation(double lat, double lng) async {
-    final uri = Uri.parse('https://www.openstreetmap.org/?mlat=$lat&mlon=$lng#map=17/$lat/$lng');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    final candidates = <Uri>[
+      if (Platform.isAndroid) Uri.parse('google.navigation:q=$lat,$lng&mode=d'),
+      if (Platform.isAndroid) Uri.parse('geo:$lat,$lng?q=$lat,$lng'),
+      if (Platform.isIOS) Uri.parse('comgooglemaps://?daddr=$lat,$lng&directionsmode=driving'),
+      if (Platform.isIOS) Uri.parse('https://maps.apple.com/?daddr=$lat,$lng&dirflg=d'),
+      Uri.parse('https://www.openstreetmap.org/?mlat=$lat&mlon=$lng#map=17/$lat/$lng'),
+    ];
+
+    for (final uri in candidates) {
+      if (await canLaunchUrl(uri)) {
+        if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+      }
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No navigation app available')),
+      );
     }
   }
 
@@ -1299,7 +1315,135 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             ),
           ],
         ),
+        const SizedBox(height: 6),
+        Center(
+          child: TextButton.icon(
+            onPressed: () => _handleCancelRide(driver, ride),
+            icon: const Icon(Icons.close_rounded,
+                size: 16, color: AppColors.error),
+            label: const Text(
+              'Cancel ride',
+              style: TextStyle(
+                color: AppColors.error,
+                fontWeight: FontWeight.w900,
+                fontSize: 12,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ),
+        ),
       ],
+    );
+  }
+
+  Future<void> _handleCancelRide(
+      DriverProvider driver, Map<String, dynamic> ride) async {
+    final reasons = const [
+      'Customer not at pickup',
+      'Customer asked to cancel',
+      'Unable to reach customer',
+      'Vehicle / mechanical issue',
+      'Wrong pickup location',
+      'Other',
+    ];
+
+    final reason = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Cancel ride?',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
+              const SizedBox(height: 4),
+              const Text(
+                'Let the customer know why you are cancelling.',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 14),
+              for (final r in reasons)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(ctx, r),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceMuted,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Text(
+                        r,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (reason == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Cancel this ride?', textAlign: TextAlign.center),
+        content: Text(
+          'Reason: $reason\n\nFrequent cancellations can affect your rating.',
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Keep ride',
+                style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Cancel ride'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    await driver.updateRideStatus('cancelled', reason: reason);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        backgroundColor: AppColors.error,
+        content: Text('Ride cancelled.'),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 
