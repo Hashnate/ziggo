@@ -109,6 +109,7 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
         passenger_deductible=float(b.passenger_deductible) if b.passenger_deductible is not None else 0.0,
         app_usage_charges=float(b.app_usage_charges) if b.app_usage_charges is not None else 0.0,
         deductions=float(b.deductions) if b.deductions is not None else 0.0,
+        driver_earnings=float(b.driver_earnings) if b.driver_earnings is not None else 0.0,
     )
 
 
