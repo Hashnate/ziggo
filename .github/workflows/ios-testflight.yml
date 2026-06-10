@@ -56,6 +56,13 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security list-keychains -d user -s $KEYCHAIN_PATH login.keychain
 
+          echo "=== Provisioning Profile Info ==="
+          security cms -D -i $PP_PATH | grep -A 10 -i "DeveloperCertificates" || true
+          security cms -D -i $PP_PATH | grep -A 12 -i "Entitlements" || true
+          security cms -D -i $PP_PATH | grep -A 5 -i "UUID" || true
+          security cms -D -i $PP_PATH | grep -A 5 -i "Name" || true
+          echo "================================="
+
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles
 
