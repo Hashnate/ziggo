@@ -71,6 +71,7 @@ jobs:
           plutil -replace DTSDKName -string iphoneos26.0 "$INFOPLIST_PATH"
           plutil -replace DTXcode -string 2600 "$INFOPLIST_PATH"
           plutil -replace DTXcodeBuild -string 26A123 "$INFOPLIST_PATH"
+          plutil -replace DTSDKBuild -string 26A123 "$INFOPLIST_PATH"
           plutil -replace DTPlatformVersion -string 26.0 "$INFOPLIST_PATH"
           plutil -replace DTPlatformBuild -string 26A123 "$INFOPLIST_PATH"
           
@@ -91,6 +92,7 @@ jobs:
           plutil -replace DTSDKName -string iphoneos26.0 "$APP_INFOPLIST_PATH"
           plutil -replace DTXcode -string 2600 "$APP_INFOPLIST_PATH"
           plutil -replace DTXcodeBuild -string 26A123 "$APP_INFOPLIST_PATH"
+          plutil -replace DTSDKBuild -string 26A123 "$APP_INFOPLIST_PATH"
           plutil -replace DTPlatformVersion -string 26.0 "$APP_INFOPLIST_PATH"
           plutil -replace DTPlatformBuild -string 26A123 "$APP_INFOPLIST_PATH"
           
