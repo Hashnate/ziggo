@@ -44,10 +44,14 @@ def _gen_ref() -> str:
 
 
 async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingResponse:
-    # Reload with driver+user joined so we can show driver details to the customer
+    # Reload with driver+user joined so we can show driver details to the customer,
+    # and customer+user joined so the driver can see customer contact details.
     q = await db.execute(
         select(Booking)
-        .options(selectinload(Booking.driver).selectinload(Driver.user))
+        .options(
+            selectinload(Booking.driver).selectinload(Driver.user),
+            selectinload(Booking.customer).selectinload(Customer.user),
+        )
         .where(Booking.id == booking.id)
     )
     b = q.scalars().first() or booking
@@ -66,6 +70,9 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
             "current_lng": float(b.driver.current_lng) if b.driver.current_lng else None,
             "profile_photo": b.driver.user.profile_photo if b.driver.user else None,
         }
+
+    customer_name = b.customer.user.full_name if b.customer and b.customer.user else None
+    customer_phone = b.customer.user.phone_number if b.customer and b.customer.user else None
 
     return BookingResponse(
         id=b.id,
@@ -96,6 +103,8 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
         cancellation_reason=b.cancellation_reason,
         customer_rating=b.customer_rating,
         driver=driver_obj,
+        customer_name=customer_name,
+        customer_phone=customer_phone,
         is_flash=bool(b.is_flash),
         parcel_type=b.parcel_type,
         parcel_weight_kg=float(b.parcel_weight_kg) if b.parcel_weight_kg else None,

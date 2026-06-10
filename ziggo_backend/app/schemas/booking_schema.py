@@ -145,6 +145,8 @@ class BookingResponse(BaseModel):
 
     customer_rating: Optional[int] = None
     driver: Optional[DriverMini] = None
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
 
     # Flash parcel fields (only present when is_flash=True)
     is_flash: bool = False

@@ -302,6 +302,33 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     if (goingOnline) _centerOnDriver();
   }
 
+  Future<void> _callPhone(String? phone) async {
+    if (phone == null || phone.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Phone number unavailable')),
+      );
+      return;
+    }
+    final uri = Uri(scheme: 'tel', path: phone.trim());
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No phone app available')),
+          );
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to launch call')),
+        );
+      }
+    }
+  }
+
   Future<void> _openNavigation(double lat, double lng) async {
     final candidates = <Uri>[
       if (Platform.isAndroid) Uri.parse('google.navigation:q=$lat,$lng&mode=d'),
@@ -1079,6 +1106,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final customerLng = (ride['pickup_lng'] as num).toDouble();
     final dropLat = (ride['drop_lat'] as num).toDouble();
     final dropLng = (ride['drop_lng'] as num).toDouble();
+    final customerName = (ride['customer_name'] ?? 'Customer').toString();
+    final customerPhone = (ride['customer_phone'] ?? '').toString();
 
     String nextAction = 'COMPLETE';
     String nextStatus = 'completed';
@@ -1152,6 +1181,61 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           const SizedBox(height: 10),
           _parcelInfoBanner(ride),
         ],
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceMuted,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: AppColors.primary.withOpacity(0.12),
+                radius: 18,
+                child: Text(
+                  customerName.isNotEmpty ? customerName[0].toUpperCase() : 'C',
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      customerName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      customerPhone.isNotEmpty ? customerPhone : 'No phone number',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (customerPhone.isNotEmpty)
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  icon: const Icon(Icons.phone_rounded, color: AppColors.success, size: 22),
+                  onPressed: () => _callPhone(customerPhone),
+                ),
+            ],
+          ),
+        ),
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(14),
@@ -1804,19 +1888,49 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   ),
                 ],
               ),
-              Padding(
-                padding: const EdgeInsets.only(left: 20, top: 2),
-                child: Text(
-                  customerName +
-                      (customerPhone.isNotEmpty ? ' • $customerPhone' : ''),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
+              Row(
+                children: [
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Text(
+                      customerName +
+                          (customerPhone.isNotEmpty ? ' • $customerPhone' : ''),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
-                ),
+                  if (customerPhone.isNotEmpty)
+                    GestureDetector(
+                      onTap: () => _callPhone(customerPhone),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.phone_rounded, color: AppColors.success, size: 12),
+                            SizedBox(width: 4),
+                            Text(
+                              'CALL',
+                              style: TextStyle(
+                                color: AppColors.success,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ],
           ),
