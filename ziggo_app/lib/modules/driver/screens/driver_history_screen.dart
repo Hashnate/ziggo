@@ -5,6 +5,7 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/widgets/motion.dart';
+import '../driver_theme.dart';
 
 class DriverHistoryScreen extends StatefulWidget {
   const DriverHistoryScreen({super.key});
@@ -58,10 +59,17 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return Theme(
+      data: driverDarkTheme(context),
+      child: _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: kDriverBg,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: kDriverBg,
         elevation: 0,
         title: const Text('My Rides'),
       ),
@@ -152,7 +160,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                               height: 96,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
-                                color: AppColors.surfaceMuted,
+                                color: kDriverCardLight,
                                 borderRadius: BorderRadius.circular(28),
                               ),
                               child: const Icon(Icons.history_rounded,
@@ -181,9 +189,9 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                         child: Container(
                           margin: const EdgeInsets.only(bottom: 10),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: kDriverCard,
                             borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: AppColors.cardBorder),
+                            border: Border.all(color: Colors.white10),
                           ),
                           child: Column(
                             children: [
@@ -244,7 +252,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                   ],
                                 ),
                               ),
-                              const Divider(height: 1, color: AppColors.divider),
+                              const Divider(height: 1, color: Colors.white12),
                               Padding(
                                 padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
                                 child: Column(
@@ -291,7 +299,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                 ),
                               ),
                               if (isExpanded) ...[
-                                const Divider(height: 1, color: AppColors.divider),
+                                const Divider(height: 1, color: Colors.white12),
                                 Padding(
                                   padding: const EdgeInsets.all(14),
                                   child: Column(
@@ -338,7 +346,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                         isBold: true,
                                       ),
                                       const SizedBox(height: 6),
-                                      const Divider(height: 1, color: AppColors.divider),
+                                      const Divider(height: 1, color: Colors.white12),
                                       const SizedBox(height: 6),
                                       _breakdownRow(
                                         'App Usage Charges (Commission)',
@@ -358,7 +366,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                         isBold: true,
                                       ),
                                       const SizedBox(height: 6),
-                                      const Divider(height: 1, color: AppColors.divider),
+                                      const Divider(height: 1, color: Colors.white12),
                                       const SizedBox(height: 6),
                                       _breakdownRow(
                                         'Net Driver Earnings',
@@ -372,9 +380,9 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 14, vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: AppColors.surfaceMuted,
-                                  borderRadius: const BorderRadius.only(
+                                decoration: const BoxDecoration(
+                                  color: kDriverCardLight,
+                                  borderRadius: BorderRadius.only(
                                     bottomLeft: Radius.circular(18),
                                     bottomRight: Radius.circular(18),
                                   ),
@@ -423,7 +431,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-              color: isBold ? AppColors.textPrimary : AppColors.textSecondary,
+              color: isBold ? Colors.white : Colors.white70,
             ),
           ),
           Text(
@@ -433,7 +441,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
               fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
               color: isNegative
                   ? AppColors.error
-                  : (isBold ? AppColors.primary : AppColors.textPrimary),
+                  : (isBold ? kDriverGold : Colors.white),
             ),
           ),
         ],

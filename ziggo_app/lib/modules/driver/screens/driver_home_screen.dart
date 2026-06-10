@@ -11,13 +11,20 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/map/ziggo_map.dart';
 import '../../../core/network/api_client.dart';
-import '../../../core/widgets/pulse_dot.dart';
 import '../../auth/auth_provider.dart';
 import '../../customer/screens/support_screen.dart';
 import '../driver_provider.dart';
+import '../driver_theme.dart';
 import 'driver_history_screen.dart';
 import 'driver_documents_screen.dart';
+import 'driver_earnings_screen.dart';
+import 'driver_profile_screen.dart';
 import 'driver_registration_screen.dart';
+
+// Ziggo dark driver UI tokens — deep navy brand surfaces + gold accent.
+const Color _kPanel = Color(0xFF111A33);       // deep navy (brand primaryDark tone)
+const Color _kPanelLight = Color(0xFF1B2A52);  // lighter navy for inset cards
+const Color _kGold = AppColors.accent;         // Ziggo gold accent (#FBBF24)
 
 class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({super.key});
@@ -36,6 +43,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   bool _muted = false;           // local-only — wired into TTS when we add it
   StreamSubscription<Position>? _speedSub;
   bool _isShowingRideRequest = false;
+  bool _incentivesExpanded = true;   // PickMe bottom panel collapse/expand
 
   @override
   void initState() {
@@ -348,12 +356,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         children: [
           Positioned.fill(
             child: Opacity(
-              opacity: driver.isOnline ? 1.0 : 0.55,
+              opacity: 1.0,
               child: ZiggoMap(
                 controller: _mapController,
                 center: loc,
-                zoom: 14,
+                zoom: 15,
                 showMyLocation: true,
+                darkMode: true,
                 markers: [
                   pinMarker(
                     point: loc,
@@ -406,70 +415,20 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               ),
             ),
           ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => _scaffoldKey.currentState?.openDrawer(),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: AppStyles.shadowSm,
-                      ),
-                      child: const Icon(Icons.menu_rounded, color: AppColors.textPrimary),
-                    ),
-                  ),
-                  const Spacer(),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: driver.isOnline ? AppColors.success : Colors.black,
-                      borderRadius: BorderRadius.circular(100),
-                      boxShadow: AppStyles.shadowSm,
-                    ),
-                    child: Row(
-                      children: [
-                        if (driver.isOnline)
-                          const PulseDot(color: Colors.white, size: 8, pulseSize: 18)
-                        else
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Colors.white24,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        const SizedBox(width: 8),
-                        Text(
-                          driver.isOnline ? 'ONLINE' : 'OFFLINE',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 11,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+          SafeArea(child: _buildTopBar(driver)),
+          if (ride != null || food != null || market != null)
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: _buildBottomCard(driver, ride, food, market),
+            )
+          else
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: _buildPickMeIdle(driver),
             ),
-          ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: _buildBottomCard(driver, ride, food, market),
-          ),
           // BRD: speed display + mute toggle + incident-report quick action.
-          // Only shown when the driver is online — same gating as the map.
-          if (driver.isOnline)
+          // Only shown while on an active trip (mirrors the PickMe driving HUD).
+          if (driver.isOnline && (ride != null || food != null || market != null))
             Positioned(
               right: 12,
               top: MediaQuery.of(context).padding.top + 12,
@@ -481,6 +440,497 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  // ── PickMe-style driver home ─────────────────────────────────────────────
+
+  Widget _buildTopBar(DriverProvider driver) {
+    final auth = context.read<AuthProvider>();
+    final profile = driver.profile ?? const <String, dynamic>{};
+    final name = auth.fullName ?? 'Driver';
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : 'D';
+    final photoPath = profile['profile_photo']?.toString();
+    final photoUrl = (photoPath != null && photoPath.isNotEmpty)
+        ? (photoPath.startsWith('http')
+            ? photoPath
+            : '${ApiConfig.baseHost}$photoPath')
+        : null;
+    final earnings = (profile['today_earnings'] as num?)?.toDouble() ?? 0;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => _scaffoldKey.currentState?.openDrawer(),
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _kPanel,
+                border: Border.all(color: Colors.white24, width: 2),
+                boxShadow: AppStyles.shadowSm,
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: photoUrl != null
+                  ? Image.network(
+                      photoUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _avatarFallback(initial),
+                    )
+                  : _avatarFallback(initial),
+            ),
+          ),
+          const Spacer(),
+          GestureDetector(
+            onTap: () => _scaffoldKey.currentState?.openDrawer(),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 7),
+              decoration: BoxDecoration(
+                color: _kPanel,
+                borderRadius: BorderRadius.circular(100),
+                boxShadow: AppStyles.shadowSm,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      const Text(
+                        'LKR ',
+                        style: TextStyle(
+                          color: Colors.white54,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                        ),
+                      ),
+                      Text(
+                        earnings.toStringAsFixed(2),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 17,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 1),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.savings_rounded, color: _kGold, size: 12),
+                      SizedBox(width: 4),
+                      Text(
+                        'Earnings',
+                        style: TextStyle(
+                          color: Colors.white60,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const Spacer(),
+          GestureDetector(
+            onTap: () => _handleToggleOnline(!driver.isOnline),
+            child: Container(
+              width: 48,
+              height: 48,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _kPanel,
+                boxShadow: AppStyles.shadowSm,
+              ),
+              child: Icon(
+                Icons.swap_horiz_rounded,
+                color: driver.isOnline ? _kGold : Colors.white,
+                size: 24,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _avatarFallback(String initial) {
+    return Center(
+      child: Text(
+        initial,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w900,
+          fontSize: 20,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPickMeIdle(DriverProvider driver) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _statusPill(driver),
+        const SizedBox(height: 16),
+        _incentivesPanel(driver),
+      ],
+    );
+  }
+
+  /// Floating availability toggle — a sliding switch. The power knob sits on
+  /// the left (dark) when offline and slides right (green) when online. Tapping
+  /// anywhere on the pill flips the state.
+  Widget _statusPill(DriverProvider driver) {
+    final online = driver.isOnline;
+    const dur = Duration(milliseconds: 260);
+    const curve = Curves.easeOut;
+
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.mediumImpact();
+        _handleToggleOnline(!online);
+      },
+      child: AnimatedContainer(
+        duration: dur,
+        curve: curve,
+        width: 208,
+        height: 60,
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: online ? AppColors.success : _kPanel,
+          borderRadius: BorderRadius.circular(100),
+          boxShadow: online
+              ? [
+                  BoxShadow(
+                    color: AppColors.success.withOpacity(0.45),
+                    blurRadius: 22,
+                    offset: const Offset(0, 8),
+                  ),
+                ]
+              : AppStyles.shadowLg,
+        ),
+        child: Stack(
+          children: [
+            // Label — sits opposite the knob.
+            AnimatedAlign(
+              duration: dur,
+              curve: curve,
+              alignment:
+                  online ? Alignment.centerLeft : Alignment.centerRight,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: Text(
+                  online ? 'Online' : 'Go online',
+                  style: TextStyle(
+                    color: online ? Colors.white : _kGold,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 17,
+                  ),
+                ),
+              ),
+            ),
+            // Sliding knob.
+            AnimatedAlign(
+              duration: dur,
+              curve: curve,
+              alignment:
+                  online ? Alignment.centerRight : Alignment.centerLeft,
+              child: Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.power_settings_new_rounded,
+                  color: online ? AppColors.success : const Color(0xFF24345E),
+                  size: 24,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _incentivesPanel(DriverProvider driver) {
+    final todayRides = (driver.profile?['today_rides'] as num?)?.toInt() ?? 0;
+    const goal = 3;
+    final progress = (todayRides / goal).clamp(0.0, 1.0);
+
+    final expanded = _incentivesExpanded;
+
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        color: _kPanel,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 6, 18, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Drag handle — tap or swipe to collapse/expand the panel.
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () =>
+                    setState(() => _incentivesExpanded = !_incentivesExpanded),
+                onVerticalDragEnd: (d) {
+                  final v = d.primaryVelocity ?? 0;
+                  if (v > 80 && _incentivesExpanded) {
+                    setState(() => _incentivesExpanded = false);
+                  } else if (v < -80 && !_incentivesExpanded) {
+                    setState(() => _incentivesExpanded = true);
+                  }
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Center(
+                    child: Container(
+                      width: 44,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Text(
+                    'One Day Incentives',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const Spacer(),
+                  const Icon(Icons.access_time_rounded, color: _kGold, size: 15),
+                  const SizedBox(width: 5),
+                  const Text(
+                    '14 hours',
+                    style: TextStyle(
+                      color: Colors.white60,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    expanded
+                        ? Icons.keyboard_arrow_down_rounded
+                        : Icons.keyboard_arrow_up_rounded,
+                    color: Colors.white38,
+                    size: 20,
+                  ),
+                ],
+              ),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOut,
+                alignment: Alignment.topCenter,
+                child: expanded
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
+                            decoration: BoxDecoration(
+                              color: _kPanelLight,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  '1. Complete 3 trips to earn an additional LKR 350.',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13,
+                                    height: 1.3,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                _incentiveProgress(todayRides, goal, progress),
+                              ],
+                            ),
+                          ),
+                          if (driver.isOnline) ...[
+                            const SizedBox(height: 18),
+                            const Text(
+                              'Shortcuts',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            _shortcutButton(
+                              icon: Icons.insights_rounded,
+                              label: 'My performance',
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const DriverHistoryScreen()),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            _shortcutButton(
+                              icon: Icons.directions_walk_rounded,
+                              label: 'Road pickup trip',
+                              onTap: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content:
+                                        Text('Road pickup trips are coming soon.'),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ],
+                      )
+                    : const SizedBox(width: double.infinity),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _incentiveProgress(int rides, int goal, double progress) {
+    return LayoutBuilder(
+      builder: (context, c) {
+        final w = c.maxWidth;
+        final knobX = ((w - 22) * progress).clamp(0.0, w - 22);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              height: 22,
+              child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.centerLeft,
+                children: [
+                  Container(
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: Colors.white12,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  Container(
+                    height: 8,
+                    width: (w * progress).clamp(0.0, w),
+                    decoration: BoxDecoration(
+                      color: _kGold,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: Center(
+                      child: Text(
+                        '$rides/$goal',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: knobX,
+                    child: Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: _kGold, width: 3),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Center(
+              child: Text(
+                'Goal: 3 trips',
+                style: TextStyle(
+                  color: Colors.white38,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 10,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _shortcutButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white24),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.white70, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Center(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded,
+                color: Colors.white38, size: 22),
+          ],
+        ),
       ),
     );
   }
@@ -1979,730 +2429,206 @@ class _Drawer extends StatelessWidget {
     final photoUrl = (photoPath != null && photoPath.isNotEmpty)
         ? (photoPath.startsWith('http') ? photoPath : '${ApiConfig.baseHost}$photoPath')
         : null;
-    final todayEarnings = (profile['today_earnings'] as num?)?.toDouble() ?? 0;
-    final totalEarnings = (profile['total_earnings'] as num?)?.toDouble() ?? 0;
-    final todayRides = (profile['today_rides'] as num?)?.toInt() ?? 0;
-    final paidPayouts = (profile['paid_payouts'] as num?)?.toDouble() ?? 0;
-    final pendingPayout = (profile['pending_payout'] as num?)?.toDouble() ?? 0;
-    final rating = (profile['rating'] as num?)?.toDouble() ?? 0;
-    final isOnline = driver.isOnline;
-    final vehicleType = (profile['vehicle_type'] ?? '').toString().toUpperCase();
-    final vehicleModel = (profile['vehicle_model'] ?? '').toString();
-    final vehicleNumber = (profile['vehicle_number'] ?? '').toString();
-    final phone = auth.phoneNumber ?? '';
+    final driverId = (profile['id'] ?? '—').toString();
 
     return Drawer(
-      backgroundColor: Colors.white,
-      child: SafeArea(
-        child: Column(
-          children: [
-            // Hero card
-            Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                gradient: AppColors.primaryGradient,
-                borderRadius: BorderRadius.circular(22),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withOpacity(0.32),
-                    blurRadius: 22,
-                    offset: const Offset(0, 12),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 58,
-                        height: 58,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primaryDark.withOpacity(0.25),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: photoUrl != null
-                            ? Image.network(
-                                photoUrl,
-                                width: 58,
-                                height: 58,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Text(
-                                  initial,
-                                  style: const TextStyle(
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 26,
-                                  ),
-                                ),
-                              )
-                            : Text(
-                                initial,
-                                style: const TextStyle(
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 26,
-                                ),
-                              ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 17,
-                                color: Colors.white,
-                                letterSpacing: -0.2,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Row(
-                              children: [
-                                const Icon(Icons.star_rounded,
-                                    size: 13, color: AppColors.accent),
-                                const SizedBox(width: 3),
-                                Text(
-                                  rating > 0 ? rating.toStringAsFixed(1) : '—',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 12,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                if (vehicleType.isNotEmpty)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 7, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(100),
-                                    ),
-                                    child: Text(
-                                      vehicleType,
-                                      style: const TextStyle(
-                                        color: AppColors.primary,
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: 1,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.22),
-                          borderRadius: BorderRadius.circular(100),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 7,
-                              height: 7,
-                              decoration: BoxDecoration(
-                                color: isOnline ? AppColors.success : Colors.white60,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              isOnline ? 'ONLINE' : 'OFFLINE',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.8,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _heroStat(
-                          label: 'TODAY',
-                          value: 'Rs.${todayEarnings.toStringAsFixed(0)}',
-                        ),
-                      ),
-                      Container(
-                        width: 1,
-                        height: 28,
-                        color: Colors.white24,
-                      ),
-                      Expanded(
-                        child: _heroStat(
-                          label: 'RIDES',
-                          value: todayRides.toString(),
-                        ),
-                      ),
-                      Container(
-                        width: 1,
-                        height: 28,
-                        color: Colors.white24,
-                      ),
-                      Expanded(
-                        child: _heroStat(
-                          label: 'TOTAL',
-                          value: 'Rs.${totalEarnings.toStringAsFixed(0)}',
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+      backgroundColor: _kPanel,
+      child: Column(
+        children: [
+          // Blue gradient header
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.fromLTRB(
+                18, MediaQuery.of(context).padding.top + 16, 16, 22),
+            decoration: const BoxDecoration(
+              gradient: AppColors.primaryGradient,
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
             ),
-            // Menu
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-                children: [
-                  _sectionLabel('ACCOUNT'),
-                  _menuItem(
-                    icon: Icons.history_rounded,
-                    color: AppColors.primary,
-                    label: 'My Rides',
-                    subtitle: 'History & earnings',
-                    onTap: onHistory,
-                  ),
-                  // BRD: Driver document upload UI
-                  _menuItem(
-                    icon: Icons.badge_rounded,
-                    color: AppColors.warning,
-                    label: 'KYC Documents',
-                    subtitle: 'NIC, license, vehicle reg, insurance',
-                    onTap: onDocuments,
-                  ),
-                  _menuItem(
-                    icon: Icons.payments_rounded,
-                    color: AppColors.success,
-                    label: 'Earnings breakdown',
-                    subtitle: 'Today, total and trips',
-                    onTap: () => _showEarningsSheet(
-                      context,
-                      todayEarnings: todayEarnings,
-                      totalEarnings: totalEarnings,
-                      todayRides: todayRides,
-                      paidPayouts: paidPayouts,
-                      pendingPayout: pendingPayout,
-                    ),
-                  ),
-                  _menuItem(
-                    icon: Icons.directions_car_filled_rounded,
-                    color: AppColors.info,
-                    label: 'Vehicle info',
-                    subtitle: vehicleModel.isEmpty && vehicleNumber.isEmpty
-                        ? 'Tap to view'
-                        : '$vehicleModel${vehicleNumber.isNotEmpty ? ' • $vehicleNumber' : ''}',
-                    onTap: () => _showVehicleSheet(context, profile, phone),
-                  ),
-                  const SizedBox(height: 14),
-                  _sectionLabel('SUPPORT'),
-                  _menuItem(
-                    icon: Icons.support_agent_rounded,
-                    color: AppColors.warning,
-                    label: 'Help & Support',
-                    subtitle: 'Contact our team',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const SupportScreen(isDriver: true)),
-                      );
-                    },
-                  ),
-                  _menuItem(
-                    icon: Icons.info_outline_rounded,
-                    color: AppColors.textSecondary,
-                    label: 'About Ziggo',
-                    subtitle: 'Version 1.0.0',
-                    onTap: () => _showAboutSheet(context),
-                  ),
-                ],
-              ),
-            ),
-            // Logout
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-              child: GestureDetector(
-                onTap: () => _confirmLogout(context),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: AppColors.error.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(14),
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
                   ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  clipBehavior: Clip.antiAlias,
+                  child: photoUrl != null
+                      ? Image.network(
+                          photoUrl,
+                          width: 56,
+                          height: 56,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _drawerInitial(initial),
+                        )
+                      : _drawerInitial(initial),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.logout_rounded, color: AppColors.error, size: 18),
-                      SizedBox(width: 8),
                       Text(
-                        'Log out',
-                        style: TextStyle(
-                          color: AppColors.error,
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
                           fontWeight: FontWeight.w900,
+                          fontSize: 18,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        driverId,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  static Widget _heroStat({required String label, required String value}) {
-    return Column(
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 9,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 1.2,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w900,
-            fontSize: 14,
-          ),
-        ),
-      ],
-    );
-  }
-
-  static Widget _sectionLabel(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 6, top: 4, bottom: 6),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 10,
-          color: AppColors.textTertiary,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 1.4,
-        ),
-      ),
-    );
-  }
-
-  static Widget _menuItem({
-    required IconData icon,
-    required Color color,
-    required String label,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color, size: 19),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 13.5,
+                GestureDetector(
+                  onTap: () => _confirmLogout(context),
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.65),
+                      shape: BoxShape.circle,
                     ),
-                  ),
-                  Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 11,
-                      color: AppColors.textTertiary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textTertiary, size: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  static void _showEarningsSheet(
-    BuildContext context, {
-    required double todayEarnings,
-    required double totalEarnings,
-    required int todayRides,
-    required double paidPayouts,
-    required double pendingPayout,
-  }) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 26),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 44,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: AppColors.divider,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            const Text(
-              'Earnings',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                gradient: AppColors.primaryGradient,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'LIFETIME EARNINGS',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Rs.${totalEarnings.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 30,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.6,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _earnTile(
-                    label: 'Today',
-                    value: 'Rs.${todayEarnings.toStringAsFixed(0)}',
-                    icon: Icons.today_rounded,
-                    color: AppColors.success,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _earnTile(
-                    label: 'Trips today',
-                    value: todayRides.toString(),
-                    icon: Icons.directions_car_rounded,
-                    color: AppColors.info,
+                    child: const Icon(Icons.logout_rounded,
+                        color: Colors.white, size: 20),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _earnTile(
-                    label: 'Paid out',
-                    value: 'Rs.${paidPayouts.toStringAsFixed(0)}',
-                    icon: Icons.payments_rounded,
-                    color: AppColors.error,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _earnTile(
-                    label: 'Pending payout',
-                    value: 'Rs.${pendingPayout.toStringAsFixed(0)}',
-                    icon: Icons.hourglass_empty_rounded,
-                    color: AppColors.warning,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Tip — earnings update in real-time after each completed ride. Tap "My Rides" to see per-trip breakdowns.',
-              style: TextStyle(
-                fontSize: 11.5,
-                color: AppColors.textTertiary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  static Widget _earnTile({
-    required String label,
-    required String value,
-    required IconData icon,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.cardBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 16),
           ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.textTertiary,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0.6,
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 18,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static void _showVehicleSheet(
-    BuildContext context,
-    Map<String, dynamic> profile,
-    String phone,
-  ) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 26),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 44,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: AppColors.divider,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            const Text(
-              'Vehicle info',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 16),
-            _kv('Type', (profile['vehicle_type'] ?? '-').toString().toUpperCase()),
-            _kv('Model', (profile['vehicle_model'] ?? '-').toString()),
-            _kv('Number', (profile['vehicle_number'] ?? '-').toString()),
-            _kv('Color', (profile['vehicle_color'] ?? '-').toString()),
-            _kv('License', (profile['license_number'] ?? '-').toString()),
-            _kv('NIC', (profile['nic_number'] ?? '-').toString()),
-            if (phone.isNotEmpty) _kv('Phone', phone),
-            const SizedBox(height: 8),
-            const Text(
-              'Need to update? Contact support — vehicle details can only be changed by the admin team.',
-              style: TextStyle(
-                fontSize: 11.5,
-                color: AppColors.textTertiary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  static Widget _kv(String k, String v) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 90,
-            child: Text(
-              k.toUpperCase(),
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                color: AppColors.textTertiary,
-                fontSize: 10,
-                letterSpacing: 1.2,
-              ),
-            ),
-          ),
+          // Menu list
           Expanded(
-            child: Text(
-              v,
-              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5),
+            child: ListView(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              children: [
+                _drawerTile(
+                  icon: Icons.person_outline_rounded,
+                  label: 'Profile',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const DriverProfileScreen()),
+                    );
+                  },
+                ),
+                _drawerTile(
+                  icon: Icons.account_balance_wallet_outlined,
+                  label: 'Earnings',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const DriverEarningsScreen()),
+                    );
+                  },
+                ),
+                _drawerTile(
+                  icon: Icons.insights_rounded,
+                  label: 'My performance',
+                  chevronDown: true,
+                  onTap: onHistory,
+                ),
+                _drawerTile(
+                  icon: Icons.badge_outlined,
+                  label: 'KYC documents',
+                  onTap: onDocuments,
+                ),
+              ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  static void _showAboutSheet(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 26),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Center(
-              child: Container(
-                width: 44,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: AppColors.divider,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Container(
-              width: 64,
-              height: 64,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                gradient: AppColors.primaryGradient,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Text(
-                'Z',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 32,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Ziggo',
-              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20),
-            ),
-            const Text(
+          // Settings + version footer
+          _drawerTile(
+            icon: Icons.settings_outlined,
+            label: 'Settings and support',
+            accent: true,
+            chevronDown: true,
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const SupportScreen(isDriver: true)),
+              );
+            },
+          ),
+          const SizedBox(height: 6),
+          const Padding(
+            padding: EdgeInsets.only(bottom: 16),
+            child: Text(
               'Version 1.0.0',
               style: TextStyle(
-                color: AppColors.textTertiary,
-                fontWeight: FontWeight.w700,
+                color: Colors.white38,
+                fontWeight: FontWeight.w600,
                 fontSize: 12,
               ),
             ),
-            const SizedBox(height: 14),
-            const Text(
-              'Ride · Food · Market · Flash — your super app for Sri Lanka.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: AppColors.textSecondary,
-                fontSize: 12.5,
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Widget _drawerInitial(String initial) => Text(
+        initial,
+        style: const TextStyle(
+          color: AppColors.primary,
+          fontWeight: FontWeight.w900,
+          fontSize: 24,
+        ),
+      );
+
+  static Widget _drawerTile({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool accent = false,
+    bool chevronDown = false,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+          child: Row(
+            children: [
+              Icon(icon, color: Colors.white, size: 24),
+              const SizedBox(width: 18),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
               ),
-            ),
-          ],
+              if (accent) ...[
+                const SizedBox(width: 8),
+                const Icon(Icons.auto_awesome, color: AppColors.primaryLight, size: 14),
+              ],
+              const Spacer(),
+              if (chevronDown)
+                const Icon(Icons.keyboard_arrow_down_rounded,
+                    color: Colors.white38, size: 22),
+            ],
+          ),
         ),
       ),
     );
@@ -2761,8 +2687,15 @@ class _PendingApprovalScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return Theme(
+      data: driverDarkTheme(context),
+      child: _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: kDriverBg,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -2807,9 +2740,9 @@ class _PendingApprovalScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: kDriverCard,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.cardBorder),
+                  border: Border.all(color: Colors.white10),
                 ),
                 child: Column(
                   children: [
