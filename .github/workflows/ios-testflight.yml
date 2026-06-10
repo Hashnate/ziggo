@@ -69,6 +69,7 @@ jobs:
           import base64
           from cryptography import x509
           from cryptography.hazmat.backends import default_backend
+          from cryptography.hazmat.primitives import hashes
           import plistlib
           import subprocess
 
@@ -82,7 +83,7 @@ jobs:
               'openssl', 'pkcs12', '-in', cert_path, '-nokeys', '-clcerts', '-passin', f'pass:{p12_password}'
           ])
           imported_cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
-          imported_sha1 = imported_cert.fingerprint(x509.algorithms.SHA1()).hex()
+          imported_sha1 = imported_cert.fingerprint(hashes.SHA1()).hex()
           print(f'Imported P12 Certificate SHA-1: {imported_sha1}')
           print(f'Imported P12 Certificate Serial: {imported_cert.serial_number}')
 
@@ -92,7 +93,7 @@ jobs:
           pp_plist = plistlib.loads(pp_plist_data)
           for idx, cert_bytes in enumerate(pp_plist.get('DeveloperCertificates', [])):
               cert = x509.load_der_x509_certificate(cert_bytes, default_backend())
-              sha1 = cert.fingerprint(x509.algorithms.SHA1()).hex()
+              sha1 = cert.fingerprint(hashes.SHA1()).hex()
               print(f'Profile Cert #{idx} SHA-1: {sha1}')
               print(f'Profile Cert #{idx} Serial: {cert.serial_number}')
           EOF
