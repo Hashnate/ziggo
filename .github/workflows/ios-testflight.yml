@@ -60,7 +60,9 @@ jobs:
           cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles
 
       - name: Build Flutter IPA
-        run: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+        run: |
+          touch .env
+          flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
 
       - name: Upload app to TestFlight
         uses: apple-actions/upload-testflight-build@v1
