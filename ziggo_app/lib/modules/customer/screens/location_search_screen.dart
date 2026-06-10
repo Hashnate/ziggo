@@ -9,6 +9,7 @@ import '../../../app/app_styles.dart';
 import '../../../core/map/maps_service.dart';
 import '../../../core/map/place_search_sheet.dart';
 import '../../../core/map/places.dart';
+import '../../../core/map/recent_places.dart';
 import '../../../core/map/ziggo_map.dart';
 import '../../customer/addresses_provider.dart';
 import 'vehicle_selection_screen.dart';
@@ -74,6 +75,9 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
       if (_drop == null) {
         _dropFocus.requestFocus();
       }
+    });
+    RecentPlaces.load().then((_) {
+      if (mounted) setState(() {});
     });
   }
 
@@ -149,6 +153,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
   }
   
   void _setPlace(Place place) {
+    RecentPlaces.add(place);
     if (_isPickupFocused) {
       setState(() {
         _pickup = place;
@@ -418,6 +423,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
     // Default view: saved addresses, set location on map, etc.
     final addrProvider = context.watch<AddressesProvider>();
     final saved = addrProvider.items;
+    final recents = RecentPlaces.items;
 
     return Container(
       color: Colors.white,
@@ -429,6 +435,67 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
               leading: const Icon(Icons.my_location_rounded, color: AppColors.primary),
               title: const Text('Your current location', style: TextStyle(fontWeight: FontWeight.w600)),
             ),
+          if (recents.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 16, 6),
+              child: Row(
+                children: [
+                  const Text(
+                    'RECENT',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textTertiary,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () async {
+                      await RecentPlaces.clear();
+                      if (mounted) setState(() {});
+                    },
+                    child: const Text(
+                      'Clear',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            for (final p in recents)
+              ListTile(
+                onTap: _resolving ? null : () => _setPlace(p),
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(
+                    color: AppColors.surfaceMuted,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.history_rounded,
+                      color: AppColors.textSecondary, size: 20),
+                ),
+                title: Text(
+                  p.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+                subtitle: p.area.isEmpty
+                    ? null
+                    : Text(
+                        p.area,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+              ),
+            const Divider(height: 1, indent: 56),
+          ],
           ListTile(
             onTap: () {
               // TODO: Implement saved addresses screen logic or expand

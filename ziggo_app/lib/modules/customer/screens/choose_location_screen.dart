@@ -6,6 +6,7 @@ import '../../../app/app_styles.dart';
 import '../../../core/map/maps_service.dart';
 import '../../../core/map/place_search_sheet.dart';
 import '../../../core/map/places.dart';
+import '../../../core/map/recent_places.dart';
 import '../addresses_provider.dart';
 import 'saved_addresses_screen.dart';
 
@@ -27,10 +28,14 @@ class _ChooseLocationScreenState extends State<ChooseLocationScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AddressesProvider>().refresh();
     });
+    RecentPlaces.load().then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   void _return(Place place) {
     if (!mounted) return;
+    RecentPlaces.add(place);
     Navigator.pop(context, place);
   }
 
@@ -80,7 +85,7 @@ class _ChooseLocationScreenState extends State<ChooseLocationScreen> {
   @override
   Widget build(BuildContext context) {
     final saved = context.watch<AddressesProvider>().items;
-    final recents = kColomboPlaces.take(6).toList();
+    final recents = RecentPlaces.items;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -120,10 +125,12 @@ class _ChooseLocationScreenState extends State<ChooseLocationScreen> {
             label: 'Add Work',
             onTap: () => _addLabelled('Work'),
           ),
-          const SizedBox(height: 22),
-          _recentHeader(recents.length),
-          const SizedBox(height: 6),
-          ...recents.map(_recentTile),
+          if (recents.isNotEmpty) ...[
+            const SizedBox(height: 22),
+            _recentHeader(recents.length),
+            const SizedBox(height: 6),
+            ...recents.map(_recentTile),
+          ],
         ],
       ),
     );

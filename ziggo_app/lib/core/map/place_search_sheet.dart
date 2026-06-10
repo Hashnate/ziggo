@@ -10,6 +10,7 @@ import '../../app/app_styles.dart';
 import '../../modules/customer/addresses_provider.dart';
 import 'maps_service.dart';
 import 'places.dart';
+import 'recent_places.dart';
 
 /// Opens a Google Places-backed search sheet and returns the chosen [Place]
 /// (with resolved coordinates), or null if dismissed.
@@ -66,6 +67,16 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AddressesProvider>().refresh();
     });
+    RecentPlaces.load().then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  /// Records the chosen place into the recents cache, then closes the sheet
+  /// returning it. The single exit point for every selection in this sheet.
+  void _finishWith(Place place) {
+    RecentPlaces.add(place);
+    if (mounted) Navigator.pop(context, place);
   }
 
   @override
@@ -108,7 +119,7 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
   Future<void> _select(_PlaceResult p) async {
     // Local (curated) results already carry coordinates — no resolution needed.
     if (p.coords != null) {
-      Navigator.pop(context, Place(p.mainText, p.secondaryText, p.coords!));
+      _finishWith(Place(p.mainText, p.secondaryText, p.coords!));
       return;
     }
     setState(() => _resolving = true);
@@ -121,7 +132,7 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
       );
       return;
     }
-    Navigator.pop(context, Place(p.mainText, p.secondaryText, coords));
+    _finishWith(Place(p.mainText, p.secondaryText, coords));
   }
 
   Future<void> _selectCurrentLocation() async {
@@ -137,7 +148,7 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
       );
       return;
     }
-    Navigator.pop(context, here);
+    _finishWith(here);
   }
 
   @override
@@ -223,86 +234,72 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
     if (_controller.text.trim().length < 2) {
       final addrProvider = context.watch<AddressesProvider>();
       final saved = addrProvider.items;
+      final recents = RecentPlaces.items;
+      final hasLists = recents.isNotEmpty || saved.isNotEmpty;
       return Column(
         children: [
           if (widget.allowCurrentLocation) _currentLocationTile(),
           if (widget.allowSetOnMap) _setOnMapTile(),
-          if (saved.isNotEmpty) ...[
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 12, 20, 6),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'SAVED PLACES',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.textTertiary,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ),
-            ),
+          if (hasLists)
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                itemCount: saved.length,
-                itemBuilder: (_, i) {
-                  final a = saved[i];
-                  final label = a['label']?.toString() ?? 'Saved Place';
-                  IconData icon = Icons.place_rounded;
-                  Color color = AppColors.market;
-                  final l = label.toLowerCase();
-                  if (l.contains('home')) {
-                    icon = Icons.home_rounded;
-                    color = AppColors.primary;
-                  } else if (l.contains('work') || l.contains('office')) {
-                    icon = Icons.work_rounded;
-                    color = AppColors.flash;
-                  } else if (l.contains('gym')) {
-                    icon = Icons.fitness_center_rounded;
-                    color = AppColors.bike;
-                  }
-                  
-                  return ListTile(
-                    onTap: _resolving ? null : () {
-                      final lat = (a['lat'] as num).toDouble();
-                      final lng = (a['lng'] as num).toDouble();
-                      final address = a['address'].toString();
-                      Navigator.pop(context, Place(label, address, LatLng(lat, lng)));
-                    },
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppStyles.radiusSm),
-                    ),
-                    leading: Container(
-                      width: 40,
-                      height: 40,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        gradient: AppColors.serviceGradient(color),
-                        borderRadius: BorderRadius.circular(AppStyles.radiusXs),
+              child: ListView(
+                padding: const EdgeInsets.only(bottom: 24),
+                children: [
+                  if (recents.isNotEmpty) ...[
+                    _sectionHeader('RECENT', onClear: () async {
+                      await RecentPlaces.clear();
+                      if (mounted) setState(() {});
+                    }),
+                    for (final p in recents)
+                      ListTile(
+                        onTap: _resolving ? null : () => _finishWith(p),
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 24),
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(AppStyles.radiusSm),
+                        ),
+                        leading: Container(
+                          width: 40,
+                          height: 40,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceMuted,
+                            borderRadius:
+                                BorderRadius.circular(AppStyles.radiusXs),
+                          ),
+                          child: const Icon(Icons.history_rounded,
+                              color: AppColors.textSecondary, size: 20),
+                        ),
+                        title: Text(
+                          p.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w800, fontSize: 14),
+                        ),
+                        subtitle: p.area.isEmpty
+                            ? null
+                            : Text(
+                                p.area,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
                       ),
-                      child: Icon(icon, color: Colors.white, size: 20),
-                    ),
-                    title: Text(
-                      label,
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-                    ),
-                    subtitle: Text(
-                      a['address']?.toString() ?? '',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w500,
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  );
-                },
+                  ],
+                  if (saved.isNotEmpty) ...[
+                    _sectionHeader('SAVED PLACES'),
+                    for (final a in saved) _savedTile(a),
+                  ],
+                ],
               ),
-            ),
-          ] else
+            )
+          else
             const Expanded(
               child: _Hint(
                 icon: Icons.travel_explore_rounded,
@@ -360,6 +357,94 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
                 ),
         );
       },
+    );
+  }
+
+  Widget _sectionHeader(String label, {Future<void> Function()? onClear}) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 14, 16, 6),
+      child: Row(
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w900,
+              color: AppColors.textTertiary,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const Spacer(),
+          if (onClear != null)
+            GestureDetector(
+              onTap: onClear,
+              child: const Text(
+                'Clear',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _savedTile(Map<String, dynamic> a) {
+    final label = a['label']?.toString() ?? 'Saved Place';
+    IconData icon = Icons.place_rounded;
+    Color color = AppColors.market;
+    final l = label.toLowerCase();
+    if (l.contains('home')) {
+      icon = Icons.home_rounded;
+      color = AppColors.primary;
+    } else if (l.contains('work') || l.contains('office')) {
+      icon = Icons.work_rounded;
+      color = AppColors.flash;
+    } else if (l.contains('gym')) {
+      icon = Icons.fitness_center_rounded;
+      color = AppColors.bike;
+    }
+
+    return ListTile(
+      onTap: _resolving
+          ? null
+          : () {
+              final lat = (a['lat'] as num).toDouble();
+              final lng = (a['lng'] as num).toDouble();
+              final address = a['address'].toString();
+              _finishWith(Place(label, address, LatLng(lat, lng)));
+            },
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+      ),
+      leading: Container(
+        width: 40,
+        height: 40,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          gradient: AppColors.serviceGradient(color),
+          borderRadius: BorderRadius.circular(AppStyles.radiusXs),
+        ),
+        child: Icon(icon, color: Colors.white, size: 20),
+      ),
+      title: Text(
+        label,
+        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+      ),
+      subtitle: Text(
+        a['address']?.toString() ?? '',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          fontWeight: FontWeight.w500,
+          fontSize: 12,
+          color: AppColors.textSecondary,
+        ),
+      ),
     );
   }
 
