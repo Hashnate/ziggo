@@ -44,6 +44,9 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
   File? _insuranceDoc;
   File? _yearLicenseDoc;
   File? _ecoTestDoc;
+  File? _vehicleFrontDoc;
+  File? _vehicleBackDoc;
+  File? _vehicleSideDoc;
   File? _billingProofDoc;
 
   static const _typeLabels = {
@@ -55,6 +58,9 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
     'insurance': 'Insurance',
     'year_license': 'Year License',
     'eco_test': 'Eco Test Report',
+    'vehicle_front': 'Vehicle Photo (front)',
+    'vehicle_back': 'Vehicle Photo (back)',
+    'vehicle_side': 'Vehicle Photo (side)',
   };
 
   Future<File?> _pickImage() async {
@@ -117,8 +123,8 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
       setState(() => _error = 'Please upload your Billing Proof');
       return;
     }
-    if (_nicFrontDoc == null || _nicBackDoc == null || _licenseFrontDoc == null || _licenseBackDoc == null || _vehicleRegDoc == null || _insuranceDoc == null || _yearLicenseDoc == null || _ecoTestDoc == null) {
-      setState(() => _error = 'Please upload all 8 required KYC documents');
+    if (_nicFrontDoc == null || _nicBackDoc == null || _licenseFrontDoc == null || _licenseBackDoc == null || _vehicleRegDoc == null || _insuranceDoc == null || _yearLicenseDoc == null || _ecoTestDoc == null || _vehicleFrontDoc == null || _vehicleBackDoc == null || _vehicleSideDoc == null) {
+      setState(() => _error = 'Please upload all required KYC documents');
       return;
     }
 
@@ -178,6 +184,9 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
         'insurance': _insuranceDoc,
         'year_license': _yearLicenseDoc,
         'eco_test': _ecoTestDoc,
+        'vehicle_front': _vehicleFrontDoc,
+        'vehicle_back': _vehicleBackDoc,
+        'vehicle_side': _vehicleSideDoc,
       };
 
       for (final entry in docs.entries) {
@@ -435,6 +444,12 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                           _docUploadRow('year_license', 'Year License', _yearLicenseDoc, (file) => setState(() => _yearLicenseDoc = file)),
                           const Divider(height: 20),
                           _docUploadRow('eco_test', 'Eco Test Report', _ecoTestDoc, (file) => setState(() => _ecoTestDoc = file)),
+                          const Divider(height: 20),
+                          _docUploadRow('vehicle_front', 'Vehicle Photo (front)', _vehicleFrontDoc, (file) => setState(() => _vehicleFrontDoc = file)),
+                          const Divider(height: 20),
+                          _docUploadRow('vehicle_back', 'Vehicle Photo (back)', _vehicleBackDoc, (file) => setState(() => _vehicleBackDoc = file)),
+                          const Divider(height: 20),
+                          _docUploadRow('vehicle_side', 'Vehicle Photo (side)', _vehicleSideDoc, (file) => setState(() => _vehicleSideDoc = file)),
                           const Divider(height: 20),
                           _docUploadRow('billing_proof', 'Billing Proof (Utility bill / Bank statement)', _billingProofDoc, (file) => setState(() => _billingProofDoc = file)),
                         ],

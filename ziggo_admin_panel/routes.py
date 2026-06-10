@@ -681,6 +681,9 @@ async def admin_drivers_edit_form(
         ("insurance", "Insurance"),
         ("year_license", "Year License"),
         ("eco_test", "Eco Test Report"),
+        ("vehicle_front", "Vehicle Photo — Front"),
+        ("vehicle_back", "Vehicle Photo — Back"),
+        ("vehicle_side", "Vehicle Photo — Side"),
     ]:
         row = docs_by_kind.get(kind)
         docs.append({
@@ -734,6 +737,9 @@ async def admin_drivers_edit_submit(
     doc_insurance: UploadFile | None = File(None),
     doc_year_license: UploadFile | None = File(None),
     doc_eco_test: UploadFile | None = File(None),
+    doc_vehicle_front: UploadFile | None = File(None),
+    doc_vehicle_back: UploadFile | None = File(None),
+    doc_vehicle_side: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -823,7 +829,7 @@ async def admin_drivers_edit_submit(
         d.status = DriverStatus.SUSPENDED
 
     from app.models import DriverDocument
-    for kind in ("nic_front", "nic_back", "license_front", "license_back", "vehicle_reg", "insurance", "year_license", "eco_test"):
+    for kind in ("nic_front", "nic_back", "license_front", "license_back", "vehicle_reg", "insurance", "year_license", "eco_test", "vehicle_front", "vehicle_back", "vehicle_side"):
         file_input = locals().get(f"doc_{kind}")
         if file_input:
             url = await _save_uploaded_doc(file_input, kind)

@@ -26,7 +26,7 @@ ThemeData driverDarkTheme(BuildContext context) {
       onSurface: Colors.white,
       error: AppColors.error,
     ),
-    textTheme: GoogleFonts.outfitTextTheme(Theme.of(context).textTheme).apply(
+    textTheme: GoogleFonts.poppinsTextTheme(Theme.of(context).textTheme).apply(
       bodyColor: Colors.white,
       displayColor: Colors.white,
     ),

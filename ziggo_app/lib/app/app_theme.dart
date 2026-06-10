@@ -19,7 +19,7 @@ class AppTheme {
         surface: AppColors.surface,
         error: AppColors.error,
       ),
-      textTheme: GoogleFonts.outfitTextTheme().apply(
+      textTheme: GoogleFonts.poppinsTextTheme().apply(
         bodyColor: AppColors.textPrimary,
         displayColor: AppColors.textPrimary,
       ),
