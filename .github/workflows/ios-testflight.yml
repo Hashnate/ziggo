@@ -56,50 +56,6 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security list-keychains -d user -s $KEYCHAIN_PATH login.keychain
 
-          echo "=== Provisioning Profile Info ==="
-          security cms -D -i $PP_PATH | grep -A 10 -i "DeveloperCertificates" || true
-          security cms -D -i $PP_PATH | grep -A 12 -i "Entitlements" || true
-          security cms -D -i $PP_PATH | grep -A 5 -i "UUID" || true
-          security cms -D -i $PP_PATH | grep -A 5 -i "Name" || true
-          echo "================================="
-
-          echo "=== Certificate Comparison ==="
-          cat << 'EOF' | sed 's/^          //' > $RUNNER_TEMP/compare_certs.py
-          import os
-          import base64
-          from cryptography import x509
-          from cryptography.hazmat.backends import default_backend
-          from cryptography.hazmat.primitives import hashes
-          import plistlib
-          import subprocess
-
-          cert_path = os.environ['CERTIFICATE_PATH']
-          p12_password = os.environ['P12_PASSWORD']
-          pp_path = os.environ['PP_PATH']
-
-          # Read certificate from P12
-          print('Loading P12 certificate...')
-          cert_pem = subprocess.check_output([
-              'openssl', 'pkcs12', '-in', cert_path, '-nokeys', '-clcerts', '-passin', f'pass:{p12_password}'
-          ])
-          imported_cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
-          imported_sha1 = imported_cert.fingerprint(hashes.SHA1()).hex()
-          print(f'Imported P12 Certificate SHA-1: {imported_sha1}')
-          print(f'Imported P12 Certificate Serial: {imported_cert.serial_number}')
-
-          # Read certificate from Provisioning Profile
-          print('Loading Provisioning Profile certificate...')
-          pp_plist_data = subprocess.check_output(['security', 'cms', '-D', '-i', pp_path])
-          pp_plist = plistlib.loads(pp_plist_data)
-          for idx, cert_bytes in enumerate(pp_plist.get('DeveloperCertificates', [])):
-              cert = x509.load_der_x509_certificate(cert_bytes, default_backend())
-              sha1 = cert.fingerprint(hashes.SHA1()).hex()
-              print(f'Profile Cert #{idx} SHA-1: {sha1}')
-              print(f'Profile Cert #{idx} Serial: {cert.serial_number}')
-          EOF
-          python3 $RUNNER_TEMP/compare_certs.py || echo "Note: Python comparison failed (cryptography library might not be installed, but it was worth a shot)"
-          echo "==============================="
-
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles
 
