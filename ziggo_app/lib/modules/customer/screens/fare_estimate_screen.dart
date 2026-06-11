@@ -117,6 +117,7 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
                     color: AppColors.primary,
                     size: 30,
                     assetPath: 'assets/icons/top_car.png',
+                    rotation: (d['heading'] as num?)?.toDouble() ?? 0.0,
                   ),
                 if (_currentLocation != null)
                   pinMarker(

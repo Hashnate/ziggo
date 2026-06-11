@@ -5,6 +5,7 @@ from typing import Optional
 class DriverLocationUpdate(BaseModel):
     lat: float
     lng: float
+    heading: Optional[float] = None
 
 
 class DriverOnlineToggle(BaseModel):

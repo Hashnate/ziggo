@@ -113,6 +113,7 @@ async def list_nearby_drivers(
             "vehicle_type": d.vehicle_type,
             "lat": float(d.current_lat),
             "lng": float(d.current_lng),
+            "heading": float(d.current_heading) if d.current_heading is not None else 0.0,
             "distance_km": round(dist, 2),
         })
     out.sort(key=lambda r: r["distance_km"])
@@ -285,6 +286,8 @@ async def update_location(
     d = await _get_driver(db, user)
     d.current_lat = Decimal(str(body.lat))
     d.current_lng = Decimal(str(body.lng))
+    if body.heading is not None:
+        d.current_heading = Decimal(str(body.heading))
     d.last_location_update = datetime.now(timezone.utc)
     await db.commit()
 
@@ -297,9 +300,31 @@ async def update_location(
         "vehicle_number": d.vehicle_number or "",
         "lat": float(d.current_lat),
         "lng": float(d.current_lng),
+        "heading": float(d.current_heading) if d.current_heading is not None else 0.0,
         "is_online": bool(d.is_online),
         "last_seen": d.last_location_update.isoformat(),
     })
+
+    # Find active booking and push update to customer
+    from ...models import Booking, BookingStatus, Customer
+    q_b = await db.execute(
+        select(Booking)
+        .where(
+            Booking.driver_id == d.id,
+            Booking.status.in_([BookingStatus.ACCEPTED, BookingStatus.ARRIVED, BookingStatus.STARTED])
+        )
+    )
+    active_b = q_b.scalars().first()
+    if active_b and active_b.customer_id:
+        q_c = await db.execute(select(Customer).where(Customer.id == active_b.customer_id))
+        cust = q_c.scalars().first()
+        if cust:
+            await manager.send(cust.user_id, "driver_location_update", {
+                "booking_id": active_b.id,
+                "lat": float(d.current_lat),
+                "lng": float(d.current_lng),
+                "heading": float(d.current_heading) if d.current_heading is not None else 0.0,
+            })
     return {"ok": True}
 
 
