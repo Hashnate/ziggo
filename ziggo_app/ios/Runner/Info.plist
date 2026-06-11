@@ -26,6 +26,18 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>We need your location to show nearby rides and track your journey.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>We need your location to show nearby rides and track your journey.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>We need access to your camera to scan QR codes and take profile photos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We need access to your photo library to let you upload a profile picture.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>We need access to your microphone to record video with your camera.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>LSApplicationQueriesSchemes</key>
