@@ -162,23 +162,39 @@
             .coll-outlet:hover { background: #F5F7FB; }
             .coll-outlet:has(input:checked) { background: #1E3A8A; border-color: #1E3A8A; color: #fff; }
             .coll-outlets-wrap { background: #FAFBFD; border: 1px solid #EEF1F6; border-radius: 12px; }
+            .coll-row { border: 1px solid #EEF1F6; border-radius: 14px; transition: box-shadow .15s ease, border-color .15s ease; }
+            .coll-row:hover { box-shadow: 0 8px 24px -12px rgba(15,23,42,.14); border-color: #D5DCE6; }
+            .coll-lbl { display: block; font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #94A3B8; margin-bottom: 4px; }
+            .coll-ic { width: 40px; height: 40px; border-radius: 11px; background: linear-gradient(135deg,#1E40AF,#3B82F6); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 18px -8px rgba(30,64,175,.5); }
         </style>
 
-        <div class="divide-y divide-ziggo-line">
+        <div class="p-4 space-y-3">
             {% for c in collections %}
-            <div class="p-4 space-y-3">
-                <div class="flex flex-wrap items-center gap-3">
-                    <span class="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center text-ziggo flex-shrink-0"><i class="fas fa-icons"></i></span>
-                    <form method="post" action="/admin/food-home/collections/{{ c.id }}/edit" class="flex-1 grid grid-cols-2 md:grid-cols-4 gap-2 items-center">
-                        <input name="name" value="{{ c.name }}" required class="{{ input_cls }}">
-                        <input name="icon" value="{{ c.icon }}" placeholder="Material icon name" class="{{ input_cls }}">
-                        <select name="color" class="{{ input_cls }}">{% for col in colors %}<option value="{{ col }}" {% if c.color == col %}selected{% endif %}>{{ col }}</option>{% endfor %}</select>
-                        <div class="flex items-center gap-1">
-                            <input name="display_order" type="number" value="{{ c.display_order }}" title="Order" class="{{ input_cls }} w-16">
-                            <button class="px-3 py-2 bg-ziggo text-white rounded-lg text-xs font-bold hover:bg-ziggo-light"><i class="fas fa-save"></i></button>
+            <div class="coll-row p-4 space-y-3">
+                <div class="flex flex-wrap items-end gap-3">
+                    <span class="coll-ic flex-shrink-0"><i class="fas fa-icons"></i></span>
+                    <form method="post" action="/admin/food-home/collections/{{ c.id }}/edit" class="flex-1 grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+                        <div>
+                            <label class="coll-lbl">Name</label>
+                            <input name="name" value="{{ c.name }}" required class="{{ input_cls }}">
+                        </div>
+                        <div>
+                            <label class="coll-lbl">Material icon</label>
+                            <input name="icon" value="{{ c.icon }}" placeholder="local_fire_department" class="{{ input_cls }}">
+                        </div>
+                        <div>
+                            <label class="coll-lbl">Color</label>
+                            <select name="color" class="{{ input_cls }}">{% for col in colors %}<option value="{{ col }}" {% if c.color == col %}selected{% endif %}>{{ col }}</option>{% endfor %}</select>
+                        </div>
+                        <div>
+                            <label class="coll-lbl">Order</label>
+                            <div class="flex items-center gap-1">
+                                <input name="display_order" type="number" value="{{ c.display_order }}" title="Order" class="{{ input_cls }} w-16">
+                                <button class="px-3 py-2 bg-ziggo text-white rounded-lg text-xs font-bold hover:bg-ziggo-light" title="Save"><i class="fas fa-save"></i></button>
+                            </div>
                         </div>
                     </form>
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 pb-0.5">
                         <form method="post" action="/admin/food-home/collections/{{ c.id }}/toggle">
                             <button class="px-3 py-1.5 rounded-full text-[11px] font-black uppercase {% if c.is_active %}bg-emerald-50 text-emerald-600{% else %}bg-gray-100 text-gray-500{% endif %}">{{ 'Active' if c.is_active else 'Off' }}</button>
                         </form>
@@ -189,7 +205,7 @@
                 </div>
                 <!-- restaurant membership -->
                 {% set member_ids = c.restaurants | map(attribute='id') | list %}
-                <form method="post" action="/admin/food-home/collections/{{ c.id }}/restaurants" class="coll-outlets-wrap flex flex-wrap items-center gap-2 ml-9 p-3">
+                <form method="post" action="/admin/food-home/collections/{{ c.id }}/restaurants" class="coll-outlets-wrap flex flex-wrap items-center gap-2 p-3">
                     <span class="text-[10px] font-black text-ziggo-faint uppercase tracking-wider mr-1">Outlets</span>
                     {% for r in restaurants %}
                     <label class="coll-outlet flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-ziggo-line cursor-pointer text-xs font-bold">
