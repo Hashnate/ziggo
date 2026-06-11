@@ -38,6 +38,16 @@ class BookingProvider extends ChangeNotifier {
         }
         // Lazy refresh
         loadActive();
+      } else if (event == 'driver_location_update') {
+        final bid = data['booking_id'];
+        if (_activeBooking != null && _activeBooking!['id'] == bid && _activeBooking!['driver'] != null) {
+          final driverData = Map<String, dynamic>.from(_activeBooking!['driver']);
+          driverData['current_lat'] = data['lat'];
+          driverData['current_lng'] = data['lng'];
+          driverData['current_heading'] = data['heading'];
+          _activeBooking = {..._activeBooking!, 'driver': driverData};
+          notifyListeners();
+        }
       }
     });
   }

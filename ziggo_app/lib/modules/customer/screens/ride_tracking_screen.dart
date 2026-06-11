@@ -172,6 +172,27 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
     }
   }
 
+  List<LatLng> _getRemainingRoute(List<LatLng> routePoints, LatLng? driverLoc) {
+    if (routePoints.isEmpty) return [];
+    if (driverLoc == null) return routePoints;
+    int closestIndex = 0;
+    double minSqDistance = double.infinity;
+    for (int i = 0; i < routePoints.length; i++) {
+      final p = routePoints[i];
+      final dLat = driverLoc.latitude - p.latitude;
+      final dLng = driverLoc.longitude - p.longitude;
+      final sqDist = dLat * dLat + dLng * dLng;
+      if (sqDist < minSqDistance) {
+        minSqDistance = sqDist;
+        closestIndex = i;
+      }
+    }
+    if (closestIndex >= routePoints.length - 1) {
+      return [driverLoc, routePoints.last];
+    }
+    return [driverLoc, ...routePoints.sublist(closestIndex)];
+  }
+
   @override
   Widget build(BuildContext context) {
     final booking = context.watch<BookingProvider>();
@@ -225,6 +246,11 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
       });
     }
 
+    final showRemainingRoute = status == 'started';
+    final activeRoutePoints = (showRemainingRoute && driverLatLng != null)
+        ? _getRemainingRoute(_routePoints, driverLatLng)
+        : (_routePoints.isNotEmpty ? _routePoints : [pickup, drop]);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Stack(
@@ -248,6 +274,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                     color: AppColors.primary,
                     size: 30,
                     assetPath: _vehicleAsset(d['vehicle_type'] as String?),
+                    rotation: (d['heading'] as num?)?.toDouble() ?? 0.0,
                   ),
                 pinMarker(
                   point: pickup,
@@ -267,13 +294,12 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                     icon: Icons.directions_car_rounded,
                     color: Colors.black,
                     assetPath: _vehicleAsset(driver?['vehicle_type'] as String?),
+                    rotation: (driver?['current_heading'] as num?)?.toDouble() ?? 0.0,
                   ),
               ],
               polylines: [
                 ZiggoPolyline(
-                  points: _routePoints.isNotEmpty
-                      ? _routePoints
-                      : [pickup, drop],
+                  points: activeRoutePoints,
                   strokeWidth: 4,
                   color: Colors.black,
                 ),

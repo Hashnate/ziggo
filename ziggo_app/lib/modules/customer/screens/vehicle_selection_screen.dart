@@ -541,6 +541,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                     color: _vehicleColor(d['vehicle_type'] as String?),
                     size: 30,
                     assetPath: _vehicleAsset(d['vehicle_type'] as String?),
+                    rotation: (d['heading'] as num?)?.toDouble() ?? 0.0,
                   ),
                 pinMarker(
                   point: widget.pickup.location,

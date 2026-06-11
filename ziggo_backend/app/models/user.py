@@ -106,6 +106,7 @@ class Driver(Base):
     is_online = Column(Boolean, default=False)
     current_lat = Column(DECIMAL(10, 7))
     current_lng = Column(DECIMAL(10, 7))
+    current_heading = Column(DECIMAL(5, 2))
     last_location_update = Column(DateTime(timezone=True))
     total_earnings = Column(DECIMAL(12, 2), default=0)
     today_earnings = Column(DECIMAL(10, 2), default=0)

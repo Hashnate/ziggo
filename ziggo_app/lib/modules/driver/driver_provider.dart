@@ -313,7 +313,11 @@ class DriverProvider extends ChangeNotifier {
 
       await ApiClient.instance.dio.post(
         '/driver/location',
-        data: {'lat': pos.latitude, 'lng': pos.longitude},
+        data: {
+          'lat': pos.latitude,
+          'lng': pos.longitude,
+          if (pos.heading >= 0.0 && pos.heading <= 360.0) 'heading': pos.heading,
+        },
       );
     } catch (_) {}
   }
