@@ -46,6 +46,8 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
   String _payment = 'cash';
   String _promo = '';
   final _promoController = TextEditingController();
+  String _driverNote = '';
+  String? _secondaryPhone;
 
   final Map<String, Map<String, dynamic>> _estimates = {};
   bool _loadingEstimates = false;
@@ -59,6 +61,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
   @override
   void initState() {
     super.initState();
+    _secondaryPhone = widget.friend?.phone;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<PromosProvider>().refresh();
       context.read<PaymentMethodsProvider>().fetchCorporateProfile();
@@ -214,8 +217,11 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
         redeemPoints: _usePoints ? context.read<PromosProvider>().points : 0,
         tripType: widget.tripType,
         stops: [],
-        friendName: widget.friend?.name,
-        friendPhone: widget.friend?.phone,
+        friendName: _secondaryPhone != null && _secondaryPhone!.isNotEmpty ? 'Secondary' : widget.friend?.name,
+        friendPhone: _secondaryPhone != null && _secondaryPhone!.isNotEmpty ? _secondaryPhone : widget.friend?.phone,
+        receiverName: _secondaryPhone != null && _secondaryPhone!.isNotEmpty ? 'Secondary' : null,
+        receiverPhone: _secondaryPhone != null && _secondaryPhone!.isNotEmpty ? _secondaryPhone : null,
+        parcelInstructions: _driverNote.isNotEmpty ? _driverNote : null,
       );
     } catch (e) {
       caughtError = e.toString();
@@ -332,6 +338,184 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
               ],
             ),
           ),
+        );
+      },
+    );
+  }
+
+  void _showNoteBottomSheet() {
+    final noteController = TextEditingController(text: _driverNote);
+    final phoneController = TextEditingController(text: _secondaryPhone);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 5,
+                      decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Add note for driver',
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: AppColors.textPrimary),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Send a special note to your driver',
+                    style: TextStyle(fontSize: 14, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: noteController,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      hintText: "E.g., I'm standing next to the Kohuwala Sampath ATM. Wearing a red t-shirt",
+                      hintStyle: const TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.normal),
+                      filled: true,
+                      fillColor: Colors.grey.withOpacity(0.08),
+                      contentPadding: const EdgeInsets.all(12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.withOpacity(0.2)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.withOpacity(0.2)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(height: 1),
+                  const SizedBox(height: 12),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.08),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.call_outlined, color: AppColors.textPrimary, size: 20),
+                    ),
+                    title: const Text(
+                      'Secondary mobile number',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary),
+                    ),
+                    subtitle: Text(
+                      _secondaryPhone != null && _secondaryPhone!.isNotEmpty
+                          ? _secondaryPhone!
+                          : 'If you are unavailable, the driver partner will call this number',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _secondaryPhone != null && _secondaryPhone!.isNotEmpty
+                            ? AppColors.primary
+                            : AppColors.textSecondary,
+                        fontWeight: _secondaryPhone != null && _secondaryPhone!.isNotEmpty
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                    ),
+                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: AppColors.textPrimary),
+                    onTap: () {
+                      // Show phone input dialog
+                      showDialog(
+                        context: context,
+                        builder: (dCtx) => AlertDialog(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          title: const Text('Secondary Mobile Number', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                          content: TextField(
+                            controller: phoneController,
+                            keyboardType: TextInputType.phone,
+                            autofocus: true,
+                            decoration: const InputDecoration(
+                              hintText: 'e.g. +94771234567',
+                              labelText: 'Mobile Number',
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(dCtx),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                setModalState(() {
+                                  _secondaryPhone = phoneController.text.trim();
+                                });
+                                Navigator.pop(dCtx);
+                              },
+                              child: const Text('Save'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  const Divider(height: 1),
+                  const SizedBox(height: 16),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.info_rounded, color: Colors.blue, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'This is an optional message, your driver partner may or may not read your note. We suggest calling your driver partner to relay any important information',
+                          style: TextStyle(fontSize: 11, color: Colors.blue, height: 1.4, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _driverNote = noteController.text.trim();
+                        });
+                        Navigator.pop(ctx);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.divider.withOpacity(0.3),
+                        foregroundColor: AppColors.textPrimary,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                      ),
+                      child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
@@ -475,19 +659,19 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: GestureDetector(
-                            onTap: () {},
+                            onTap: _showNoteBottomSheet,
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               decoration: BoxDecoration(
                                 border: Border.all(color: AppColors.cardBorder),
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: const Row(
+                              child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.edit_note_rounded, color: AppColors.textSecondary, size: 18),
-                                  SizedBox(width: 8),
-                                  Text('Add note', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                                  Icon(Icons.edit_note_rounded, color: _driverNote.isNotEmpty ? AppColors.primary : AppColors.textSecondary, size: 18),
+                                  const SizedBox(width: 8),
+                                  Text(_driverNote.isNotEmpty ? 'Note Added' : 'Add note', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                                 ],
                               ),
                             ),

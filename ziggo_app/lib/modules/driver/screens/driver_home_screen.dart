@@ -45,6 +45,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   StreamSubscription<Position>? _speedSub;
   bool _isShowingRideRequest = false;
   bool _incentivesExpanded = true;   // PickMe bottom panel collapse/expand
+  bool _activeRideExpanded = true;
 
   @override
   void initState() {
@@ -998,13 +999,34 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: AppColors.divider,
-                    borderRadius: BorderRadius.circular(10),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  if (ride != null) {
+                    setState(() => _activeRideExpanded = !_activeRideExpanded);
+                  }
+                },
+                onVerticalDragEnd: (d) {
+                  if (ride != null) {
+                    final v = d.primaryVelocity ?? 0;
+                    if (v > 80 && _activeRideExpanded) {
+                      setState(() => _activeRideExpanded = false);
+                    } else if (v < -80 && !_activeRideExpanded) {
+                      setState(() => _activeRideExpanded = true);
+                    }
+                  }
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Center(
+                    child: Container(
+                      width: 44,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: AppColors.divider,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -1108,6 +1130,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final dropLng = (ride['drop_lng'] as num).toDouble();
     final customerName = (ride['customer_name'] ?? 'Customer').toString();
     final customerPhone = (ride['customer_phone'] ?? '').toString();
+    final note = ride['parcel_instructions'] as String?;
+    final secondaryPhone = ride['receiver_phone'] as String?;
 
     String nextAction = 'COMPLETE';
     String nextStatus = 'completed';
@@ -1134,197 +1158,261 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         break;
     }
 
+    final expanded = _activeRideExpanded;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
+        if (expanded) ...[
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (ride['is_flash'] == true) ...[
+                      const Icon(Icons.inventory_2_rounded,
+                          color: AppColors.textPrimary, size: 12),
+                      const SizedBox(width: 4),
+                    ],
+                    Text(
+                      ride['is_flash'] == true
+                          ? 'PARCEL • ${(status ?? '').toUpperCase()}'
+                          : (status ?? '').toUpperCase(),
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 10,
+                        letterSpacing: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              Text(
+                'Rs.${ride['final_amount'] ?? 0}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 18,
+                ),
+              ),
+            ],
+          ),
+          if (ride['is_flash'] == true) ...[
+            const SizedBox(height: 10),
+            _parcelInfoBanner(ride),
+          ],
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceMuted,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: AppColors.primary.withOpacity(0.12),
+                  radius: 18,
+                  child: Text(
+                    customerName.isNotEmpty ? customerName[0].toUpperCase() : 'C',
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        customerName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        customerPhone.isNotEmpty ? customerPhone : 'No phone number',
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (secondaryPhone != null && secondaryPhone.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Secondary: $secondaryPhone',
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (customerPhone.isNotEmpty)
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: const Icon(Icons.phone_rounded, color: AppColors.success, size: 22),
+                        onPressed: () => _callPhone(customerPhone),
+                      ),
+                    if (customerPhone.isNotEmpty && secondaryPhone != null && secondaryPhone.isNotEmpty)
+                      const SizedBox(width: 12),
+                    if (secondaryPhone != null && secondaryPhone.isNotEmpty)
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: const Icon(Icons.phone_iphone_rounded, color: AppColors.primary, size: 22),
+                        onPressed: () => _callPhone(secondaryPhone),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (note != null && note.isNotEmpty) ...[
+            const SizedBox(height: 10),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.18),
-                borderRadius: BorderRadius.circular(100),
+                color: Colors.amber.withOpacity(0.08),
+                border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Row(
-                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (ride['is_flash'] == true) ...[
-                    const Icon(Icons.inventory_2_rounded,
-                        color: AppColors.textPrimary, size: 12),
-                    const SizedBox(width: 4),
-                  ],
-                  Text(
-                    ride['is_flash'] == true
-                        ? 'PARCEL • ${(status ?? '').toUpperCase()}'
-                        : (status ?? '').toUpperCase(),
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 10,
-                      letterSpacing: 1.4,
+                  const Icon(Icons.edit_note_rounded, color: Colors.amber, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Note from Customer',
+                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: Colors.amber),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          note,
+                          style: const TextStyle(fontSize: 12, color: AppColors.textPrimary, fontWeight: FontWeight.w500),
+                        ),
+                      ],
                     ),
                   ),
                 ],
-              ),
-            ),
-            const Spacer(),
-            Text(
-              'Rs.${ride['final_amount'] ?? 0}',
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 18,
               ),
             ),
           ],
-        ),
-        if (ride['is_flash'] == true) ...[
-          const SizedBox(height: 10),
-          _parcelInfoBanner(ride),
-        ],
-        const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceMuted,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: AppColors.primary.withOpacity(0.12),
-                radius: 18,
-                child: Text(
-                  customerName.isNotEmpty ? customerName[0].toUpperCase() : 'C',
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceMuted,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Text(
-                      customerName,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      customerPhone.isNotEmpty ? customerPhone : 'No phone number',
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                    const Icon(Icons.my_location_rounded,
+                        color: AppColors.flash, size: 14),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        ride['pickup_address']?.toString() ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
                       ),
                     ),
                   ],
                 ),
-              ),
-              if (customerPhone.isNotEmpty)
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  icon: const Icon(Icons.phone_rounded, color: AppColors.success, size: 22),
-                  onPressed: () => _callPhone(customerPhone),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceMuted,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.my_location_rounded,
-                      color: AppColors.flash, size: 14),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      ride['pickup_address']?.toString() ?? '',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
-                    ),
+                // BRD: CD-19 — intermediate stops between pickup and drop
+                for (final stop in (ride['stops'] as List? ?? const [])) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Container(
+                        width: 14,
+                        height: 14,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '${stop['order_index'] ?? '·'}',
+                          style: const TextStyle(
+                            color: AppColors.warning,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          (stop['address'] ?? '').toString().isEmpty
+                              ? 'Stop ${stop['order_index'] ?? ''}'
+                              : stop['address'].toString(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.warning,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
-              ),
-              // BRD: CD-19 — intermediate stops between pickup and drop
-              for (final stop in (ride['stops'] as List? ?? const [])) ...[
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    Container(
-                      width: 14,
-                      height: 14,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: AppColors.warning.withOpacity(0.18),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        '${stop['order_index'] ?? '·'}',
-                        style: const TextStyle(
-                          color: AppColors.warning,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
+                    const Icon(Icons.location_on_rounded,
+                        color: AppColors.error, size: 14),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        (stop['address'] ?? '').toString().isEmpty
-                            ? 'Stop ${stop['order_index'] ?? ''}'
-                            : stop['address'].toString(),
+                        ride['drop_address']?.toString() ?? '',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: AppColors.warning,
+                          color: AppColors.textSecondary,
                           fontSize: 12,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
                   ],
                 ),
               ],
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(Icons.location_on_rounded,
-                      color: AppColors.error, size: 14),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      ride['drop_address']?.toString() ?? '',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
-        ),
-        const SizedBox(height: 14),
+          const SizedBox(height: 14),
+        ],
         Row(
           children: [
             Expanded(
@@ -1399,23 +1487,25 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 6),
-        Center(
-          child: TextButton.icon(
-            onPressed: () => _handleCancelRide(driver, ride),
-            icon: const Icon(Icons.close_rounded,
-                size: 16, color: AppColors.error),
-            label: const Text(
-              'Cancel ride',
-              style: TextStyle(
-                color: AppColors.error,
-                fontWeight: FontWeight.w900,
-                fontSize: 12,
-                letterSpacing: 0.3,
+        if (expanded) ...[
+          const SizedBox(height: 6),
+          Center(
+            child: TextButton.icon(
+              onPressed: () => _handleCancelRide(driver, ride),
+              icon: const Icon(Icons.close_rounded,
+                  size: 16, color: AppColors.error),
+              label: const Text(
+                'Cancel ride',
+                style: TextStyle(
+                  color: AppColors.error,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12,
+                  letterSpacing: 0.3,
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ],
     );
   }

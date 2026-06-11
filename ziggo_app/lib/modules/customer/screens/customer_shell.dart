@@ -8,6 +8,12 @@ import 'home_screen.dart';
 import 'market_home_screen.dart';
 import 'notifications_screen.dart';
 import 'profile_screen.dart';
+import 'saved_addresses_screen.dart';
+import 'ride_history_screen.dart';
+import 'promotions_screen.dart';
+import 'wallet_screen.dart';
+import 'support_screen.dart';
+import 'subscription_screen.dart';
 
 /// 5-tab shell wrapping the customer experience with a Foodix-style floating
 /// navbar. Slots: 0 Mart · 1 Rides · 2 Home (raised center) · 3 Alerts · 4 Profile.
@@ -19,23 +25,30 @@ class CustomerShell extends StatefulWidget {
 }
 
 class CustomerShellState extends State<CustomerShell> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
   // Home is the center slot and the default landing tab.
   int _index = 2;
 
   void goToTab(int i) => setState(() => _index = i);
 
-  final _screens = const [
-    MarketHomeScreen(),
-    FareEstimateScreen(),
-    HomeScreen(),
-    NotificationsScreen(),
-    ProfileScreen(),
-  ];
+  late final List<Widget> _screens;
 
   @override
   void initState() {
     super.initState();
+    _screens = [
+      const MarketHomeScreen(),
+      const FareEstimateScreen(),
+      HomeScreen(onMenu: () => _scaffoldKey.currentState?.openDrawer()),
+      const NotificationsScreen(),
+      const ProfileScreen(),
+    ];
     WidgetsBinding.instance.addPostFrameCallback((_) => _ensureLocationReady());
+  }
+
+  void _open(Widget screen) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
 
   Future<void> _ensureLocationReady() async {
@@ -109,8 +122,19 @@ class CustomerShellState extends State<CustomerShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: AppColors.background,
       extendBody: true,
+      drawer: CustomerDrawer(
+        onProfile: () => _open(const ProfileScreen()),
+        onPlaces: () => _open(const SavedAddressesScreen()),
+        onTrips: () => _open(const RideHistoryScreen()),
+        onPromos: () => _open(const PromotionsScreen()),
+        onWallet: () => _open(const WalletScreen()),
+        onNotifications: () => _open(const NotificationsScreen()),
+        onSupport: () => _open(const SupportScreen()),
+        onGold: () => _open(const SubscriptionScreen()),
+      ),
       body: IndexedStack(
         index: _index,
         children: _screens,
