@@ -34,6 +34,44 @@ String? _tierWindowLabel(Map<String, dynamic> tier) {
   return null;
 }
 
+class _OfferChip extends StatelessWidget {
+  final String label;
+  const _OfferChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2563EB).withOpacity(0.04),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: const Color(0xFF2563EB).withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.sell_rounded, size: 14, color: Color(0xFF2563EB)),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF2563EB),
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _moneyDecimal(num v) => 'LKR ${NumberFormat('#,##0.00').format(v)}';
+
+
 /// ---------------------------------------------------------------------------
 /// Step 2 — Cart: pick ticket quantities per tier.
 /// ---------------------------------------------------------------------------
@@ -46,7 +84,7 @@ class EventCartScreen extends StatefulWidget {
 }
 
 class _EventCartScreenState extends State<EventCartScreen> {
-  final Map<int, int> _qty = {}; // tier_id -> quantity
+  final Map<dynamic, int> _qty = {}; // tier_id -> quantity
 
   List<Map<String, dynamic>> get _tiers {
     final raw = widget.event['tiers'];
@@ -57,7 +95,7 @@ class _EventCartScreenState extends State<EventCartScreen> {
   double get _subtotal {
     double s = 0;
     for (final t in _tiers) {
-      final id = t['id'] as int;
+      final id = t['id'];
       s += _tierPrice(t) * (_qty[id] ?? 0);
     }
     return s;
@@ -82,6 +120,15 @@ class _EventCartScreenState extends State<EventCartScreen> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
           _eventStrip(ev, startsAt),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: const [
+              _OfferChip(label: 'NTB Offer'),
+              _OfferChip(label: 'Save Up to 5000'),
+            ],
+          ),
           const SizedBox(height: 20),
           const Text('Available Tickets',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black)),
@@ -135,7 +182,7 @@ class _EventCartScreenState extends State<EventCartScreen> {
   }
 
   Widget _tierCard(Map<String, dynamic> t) {
-    final id = t['id'] as int;
+    final id = t['id'];
     final available = _tierAvailable(t);
     final qty = _qty[id] ?? 0;
     final window = _tierWindowLabel(t);
@@ -273,7 +320,7 @@ class _EventCartScreenState extends State<EventCartScreen> {
                 children: [
                   const Text('Subtotal',
                       style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w700)),
-                  Text(_money(_subtotal),
+                  Text(_moneyDecimal(_subtotal),
                       style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.black)),
                 ],
               ),
@@ -282,7 +329,7 @@ class _EventCartScreenState extends State<EventCartScreen> {
               onPressed: () {
                 final selected = <Map<String, dynamic>>[];
                 for (final t in _tiers) {
-                  final id = t['id'] as int;
+                  final id = t['id'];
                   final q = _qty[id] ?? 0;
                   if (q > 0) selected.add({...t, 'quantity': q});
                 }
@@ -294,6 +341,7 @@ class _EventCartScreenState extends State<EventCartScreen> {
                 );
               },
               style: ElevatedButton.styleFrom(
+                minimumSize: const Size(0, 0),
                 backgroundColor: _gold,
                 foregroundColor: Colors.black,
                 elevation: 0,
@@ -586,6 +634,9 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
                 children: [
                   Text(isWallet ? 'Ziggo Wallet' : 'Cash',
                       style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+                  if (!isWallet)
+                    const Text('Payment method is not available',
+                        style: TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
@@ -601,31 +652,43 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
           onTap: _enterPromo,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.local_offer_rounded, color: Colors.black54),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Promo', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
-                      Text(
-                        _promoCode == null || _promoCode!.isEmpty
-                            ? 'Have a promo code?'
-                            : 'Applied: $_promoCode',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: _promoCode == null || _promoCode!.isEmpty
-                              ? Colors.grey
-                              : const Color(0xFF16A34A),
-                        ),
+                Row(
+                  children: [
+                    const Icon(Icons.local_offer_rounded, color: Colors.black54),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Promo', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+                          Text(
+                            _promoCode == null || _promoCode!.isEmpty
+                                ? '4 promotions available'
+                                : 'Applied: $_promoCode',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF16A34A),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+                  ],
                 ),
-                const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: const [
+                    _OfferChip(label: 'NTB Offer'),
+                    _OfferChip(label: 'Save Up to 5000'),
+                  ],
+                ),
               ],
             ),
           ),
@@ -719,9 +782,23 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
                   activeColor: const Color(0xFF16A34A),
                 ),
                 const Expanded(
-                  child: Text(
-                    'I agree to the terms and conditions of Ziggo and the Event.',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  child: Text.rich(
+                    TextSpan(
+                      text: 'I agree to the terms and conditions of the ',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87),
+                      children: [
+                        TextSpan(
+                          text: 'PickMe',
+                          style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.w700),
+                        ),
+                        TextSpan(text: ' and the '),
+                        TextSpan(
+                          text: 'Event',
+                          style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.w700),
+                        ),
+                        TextSpan(text: '.'),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -732,10 +809,10 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
               child: ElevatedButton(
                 onPressed: _agreed && !_busy ? _purchase : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _gold,
-                  foregroundColor: Colors.black,
-                  disabledBackgroundColor: const Color(0xFFB7C6A8),
-                  disabledForegroundColor: Colors.white,
+                  backgroundColor: const Color(0xFF16A34A),
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: const Color(0xFFA5C2B0),
+                  disabledForegroundColor: Colors.white.withOpacity(0.9),
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
@@ -743,7 +820,7 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
                 child: _busy
                     ? const SizedBox(
                         height: 20, width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Text('Purchase',
                         style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
               ),

@@ -8,6 +8,7 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/widgets/motion.dart';
 import '../../../core/network/api_client.dart';
+import '../../auth/auth_provider.dart';
 import '../driver_provider.dart';
 import '../driver_theme.dart';
 
@@ -233,11 +234,53 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
     }
   }
 
+  Future<void> _logout() async {
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: kDriverCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        icon: const Icon(Icons.logout_rounded, color: AppColors.error, size: 36),
+        title: const Text('Exit Registration?', textAlign: TextAlign.center, style: TextStyle(color: Colors.white)),
+        content: const Text(
+          'You will be logged out. Are you sure you want to exit?',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white70),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Exit'),
+          ),
+        ],
+      ),
+    );
+    if (yes != true) return;
+    if (!mounted) return;
+    await context.read<AuthProvider>().logout();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Theme(
       data: driverDarkTheme(context),
-      child: _buildScaffold(context),
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) async {
+          if (didPop) return;
+          await _logout();
+        },
+        child: _buildScaffold(context),
+      ),
     );
   }
 
@@ -288,6 +331,31 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                               fontSize: 10,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 1.4,
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: _logout,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: const [
+                                Icon(Icons.logout_rounded, color: Colors.black, size: 16),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Exit',
+                                  style: TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),

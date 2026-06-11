@@ -9,6 +9,19 @@ import '../../core/storage/token_storage.dart';
 
 enum AuthStatus { unauthenticated, authenticating, authenticated, error }
 
+/// Pull a human-readable message out of a DioException without assuming the
+/// error body is JSON. FastAPI normally returns `{"detail": ...}`, but a 500
+/// HTML page / proxy error / plain-text body comes back as a String — indexing
+/// that with `['detail']` used to crash the whole app.
+String? _dioMessage(DioException e) {
+  final data = e.response?.data;
+  if (data is Map) return data['detail']?.toString();
+  if (data is String && data.trim().isNotEmpty && !data.contains('<')) {
+    return data;
+  }
+  return e.message;
+}
+
 class AuthProvider extends ChangeNotifier {
   AuthStatus _status = AuthStatus.unauthenticated;
   String? _token;
@@ -63,12 +76,12 @@ class AuthProvider extends ChangeNotifier {
         '/auth/send-otp',
         data: {'phone_number': phoneNumber},
       );
-      _devOtp = resp.data['dev_otp'] as String?;
+      _devOtp = resp.data is Map ? resp.data['dev_otp'] as String? : null;
       _phoneNumber = phoneNumber;
       notifyListeners();
       return true;
     } on DioException catch (e) {
-      _lastError = e.response?.data?['detail']?.toString() ?? e.message;
+      _lastError = _dioMessage(e);
       notifyListeners();
       return false;
     }
@@ -113,7 +126,7 @@ class AuthProvider extends ChangeNotifier {
 
       return true;
     } on DioException catch (e) {
-      _lastError = e.response?.data?['detail']?.toString() ?? e.message;
+      _lastError = _dioMessage(e);
       _status = AuthStatus.error;
       notifyListeners();
       return false;
