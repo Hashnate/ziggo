@@ -20,6 +20,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -59,77 +64,25 @@ jobs:
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles
 
-      - name: Build Flutter IPA
+      - name: Compute build number
+        run: echo "BUILD_NUMBER=$(( ${{ github.run_number }} + 100 ))" >> "$GITHUB_ENV"
+
+      - name: Build and export signed IPA
         run: |
           touch .env
-          flutter build ipa --release --no-codesign
-          
-          # Path to the compiled Info.plist inside the xcarchive
-          INFOPLIST_PATH="build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app/Info.plist"
-          
-          # Spoof the SDK and Xcode version metadata to satisfy TestFlight validators in the archive
-          plutil -replace DTSDKName -string iphoneos26.0 "$INFOPLIST_PATH"
-          plutil -replace DTXcode -string 2600 "$INFOPLIST_PATH"
-          plutil -replace DTXcodeBuild -string 26A123 "$INFOPLIST_PATH"
-          plutil -replace DTSDKBuild -string 26A123 "$INFOPLIST_PATH"
-          plutil -replace DTPlatformVersion -string 26.0 "$INFOPLIST_PATH"
-          plutil -replace DTPlatformBuild -string 26A123 "$INFOPLIST_PATH"
-          
-          # Sign and export the archive manually
+
+          # Archive unsigned, then sign at export time from ExportOptions.plist.
+          flutter build ipa --release --no-codesign --build-number="$BUILD_NUMBER"
+
           xcodebuild -exportArchive \
             -archivePath build/ios/archive/Runner.xcarchive \
             -exportPath build/ios/ipa \
             -exportOptionsPlist ios/ExportOptions.plist
-          
-          # 1. Unzip the exported IPA
-          unzip build/ios/ipa/*.ipa -d build/ios/ipa/extracted
-          
-          # 2. Extract the original XML entitlements
-          codesign -d --entitlements - --xml build/ios/ipa/extracted/Payload/Runner.app > entitlements.plist
-          
-          # 3. Recursively find and patch all Info.plist files inside the app bundle
-          find build/ios/ipa/extracted/Payload/Runner.app -name "Info.plist" | while read -r plist; do
-            echo "Patching metadata in: $plist"
-            plutil -replace DTSDKName -string iphoneos26.0 "$plist" || true
-            plutil -replace DTXcode -string 2600 "$plist" || true
-            plutil -replace DTXcodeBuild -string 26A123 "$plist" || true
-            plutil -replace DTSDKBuild -string 26A123 "$plist" || true
-            plutil -replace DTPlatformVersion -string 26.0 "$plist" || true
-            plutil -replace DTPlatformBuild -string 26A123 "$plist" || true
-          done
-          
-          # 4. Patch binary LC_BUILD_VERSION using vtool to spoof SDK 26.0
-          echo "Patching main executable Mach-O headers..."
-          vtool -set-build-version ios 15.5 26.0 -output build/ios/ipa/extracted/Payload/Runner.app/Runner build/ios/ipa/extracted/Payload/Runner.app/Runner || true
-          
-          # 5. Re-sign all nested frameworks inside the app bundle first (patching them with vtool first)
-          if [ -d "build/ios/ipa/extracted/Payload/Runner.app/Frameworks" ]; then
-            find build/ios/ipa/extracted/Payload/Runner.app/Frameworks -depth 1 -name "*.framework" | while read -r framework; do
-              name=$(basename "$framework" .framework)
-              binary="$framework/$name"
-              if [ -f "$binary" ]; then
-                echo "Patching framework binary: $binary"
-                vtool -set-build-version ios 15.5 26.0 -output "$binary" "$binary" || true
-              fi
-              echo "Re-signing framework: $framework"
-              codesign --force --sign "Apple Distribution: Hashnate Software Engineering (Private) Limited (5X9A8V7S49)" --timestamp=none "$framework"
-            done
-          fi
-          
-          # 6. Re-sign the main app bundle using the same entitlements
-          codesign --force --sign "Apple Distribution: Hashnate Software Engineering (Private) Limited (5X9A8V7S49)" --entitlements entitlements.plist --timestamp=none build/ios/ipa/extracted/Payload/Runner.app
-          
-          # 6. Remove original IPA and re-zip the modified bundle
-          rm build/ios/ipa/*.ipa
-          cd build/ios/ipa/extracted
-          zip -r ../app.ipa *
-          cd -
-          
-          # Clean up temporary files
-          rm -rf build/ios/ipa/extracted entitlements.plist
+
+          mv build/ios/ipa/*.ipa build/ios/ipa/app.ipa
 
       - name: Upload app to TestFlight
-        uses: apple-actions/upload-testflight-build@v1
+        uses: apple-actions/upload-testflight-build@v3
         with:
           app-path: ziggo_app/build/ios/ipa/app.ipa
           issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
