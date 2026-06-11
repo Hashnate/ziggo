@@ -1030,3 +1030,109 @@ async def get_active_food_order(
         "payment_status": o.payment_status,
         "instructions": o.instructions,
     }
+
+
+@router.post("/orders/{order_id}/cancel")
+async def cancel_food_order(
+    order_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    """Allow customer to cancel their own food order, but only if it's still PENDING."""
+    cust_q = await db.execute(select(Customer).where(Customer.user_id == user.id))
+    customer = cust_q.scalars().first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer profile not found")
+
+    q = await db.execute(select(FoodOrder).where(FoodOrder.id == order_id))
+    order = q.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    if order.customer_id != customer.id:
+        raise HTTPException(status_code=403, detail="Not your order")
+
+    if order.status != FoodOrderStatus.PENDING:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot cancel an order in status {order.status.value}. Only pending orders can be cancelled.",
+        )
+
+    order.status = FoodOrderStatus.CANCELLED
+    order.cancellation_reason = "Customer cancelled the order"
+
+    # Wallet refund
+    if order.payment_method == "wallet" and order.payment_status == "paid":
+        customer.wallet_balance = (customer.wallet_balance or Decimal(0)) + (order.final_amount or Decimal(0))
+        from ...models import WalletTransaction
+        db.add(
+            WalletTransaction(
+                user_id=user.id,
+                amount=order.final_amount,
+                type="credit",
+                description=f"Refund — Customer cancelled food order {order.order_ref}",
+                reference_id=order.order_ref,
+                balance_after=customer.wallet_balance,
+            )
+        )
+        order.payment_status = "refunded"
+
+    # Loyalty points refund
+    if order.redeem_points and order.redeem_points > 0:
+        customer.loyalty_points = int(customer.loyalty_points or 0) + int(order.redeem_points)
+        from ...models import LoyaltyTransaction
+        db.add(LoyaltyTransaction(
+            customer_id=customer.id,
+            points=int(order.redeem_points),
+            kind="adjust",
+            source_kind="food_order",
+            source_id=order.id,
+            description=f"Refund — Customer cancelled food order {order.order_ref}",
+            balance_after=customer.loyalty_points,
+        ))
+        order.redeem_points = 0
+        order.redeem_discount = Decimal("0.00")
+
+    await db.commit()
+    await db.refresh(order)
+
+    # Notify customer via WebSocket and in-app notification
+    await manager.send(
+        user.id,
+        "order_update",
+        {"food_order_id": order.id, "status": order.status.value},
+    )
+    db.add(
+        Notification(
+            user_id=user.id,
+            title="Order Cancelled",
+            body=f"You cancelled order {order.order_ref}",
+            type="order_update",
+        )
+    )
+
+    # Notify restaurant owner so the pending order disappears from their portal
+    r_q = await db.execute(select(Restaurant).where(Restaurant.id == order.restaurant_id))
+    restaurant = r_q.scalars().first()
+    if restaurant and restaurant.owner_id:
+        await manager.send(
+            restaurant.owner_id,
+            "order_update",
+            {
+                "food_order_id": order.id,
+                "status": order.status.value,
+                "reason": "Customer cancelled the order",
+            },
+        )
+        db.add(
+            Notification(
+                user_id=restaurant.owner_id,
+                title="Order Cancelled by Customer",
+                body=f"Order {order.order_ref} was cancelled by the customer",
+                type="order_update",
+            )
+        )
+
+    await db.commit()
+    return {"ok": True, "status": order.status.value}
+

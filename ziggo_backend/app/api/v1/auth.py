@@ -83,14 +83,19 @@ async def verify_otp(request: OTPVerify, db: AsyncSession = Depends(get_db)):
         # card covers both merchant kinds). Treat merchant<->merchant as a
         # match and just use the stored role.
         merchant_roles = {UserRole.RESTAURANT_OWNER, UserRole.MARKET_OWNER}
-        switchable_roles = {UserRole.CUSTOMER, UserRole.DRIVER}
+        switchable_roles = {
+            UserRole.CUSTOMER,
+            UserRole.DRIVER,
+            UserRole.RESTAURANT_OWNER,
+            UserRole.MARKET_OWNER,
+        }
 
         roles_match = user.role == request.role or (
             user.role in merchant_roles and request.role in merchant_roles
         )
 
         if not roles_match:
-            # Allow customer <-> driver switching
+            # Allow customer <-> driver <-> merchant switching
             if user.role in switchable_roles and request.role in switchable_roles:
                 # Auto-create the missing profile for the requested role
                 if request.role == UserRole.DRIVER and not user.driver_profile:

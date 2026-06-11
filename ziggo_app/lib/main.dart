@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -44,10 +46,12 @@ Future<void> main() async {
     const Duration(seconds: 4),
     onTimeout: () {},
   );
-  // Initialise Firebase (FCM). Safe no-op if google-services.json /
-  // GoogleService-Info.plist are missing — caught inside FcmService.init().
-  await FcmService.instance.init();
   runApp(const ZiggoApp());
+  // Initialise Firebase (FCM) AFTER the first frame. APNs/token retrieval must
+  // never gate runApp — on iOS getToken() blocks until APNs registration
+  // completes, which would white-screen the app. FcmService.init() guards its
+  // own failures internally.
+  unawaited(FcmService.instance.init());
 }
 
 class ZiggoApp extends StatelessWidget {
