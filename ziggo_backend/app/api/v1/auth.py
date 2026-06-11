@@ -46,6 +46,7 @@ async def verify_otp(request: OTPVerify, db: AsyncSession = Depends(get_db)):
         )
     )
     user = result.scalars().first()
+    is_new = user is None
 
     if user and not user.is_active:
         raise HTTPException(
@@ -112,7 +113,7 @@ async def verify_otp(request: OTPVerify, db: AsyncSession = Depends(get_db)):
         data={"sub": user.phone_number, "role": user.role.value},
         expires_delta=expires,
     )
-    return Token(access_token=token, user_id=user.id, role=user.role)
+    return Token(access_token=token, user_id=user.id, role=user.role, is_new=is_new)
 
 
 @router.put("/fcm-token")
