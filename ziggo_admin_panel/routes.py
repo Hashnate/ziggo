@@ -283,39 +283,62 @@ async def admin_dashboard(
     pending_drivers = (
         await db.execute(select(func.count(Driver.id)).where(Driver.status == DriverStatus.PENDING))
     ).scalar()
-    revenue = (
-        await db.execute(
-            select(func.coalesce(func.sum(Booking.final_amount), 0)).where(
-                Booking.status == BookingStatus.COMPLETED
-            )
-        )
-    ).scalar()
+    # Total revenue across ALL streams (rides + flash, food, market, gold)
+    from app.models import FoodOrder, FoodOrderStatus, MarketOrder, MarketOrderStatus, WalletTransaction
+    from sqlalchemy import cast as _cast, Date as _Date
+    _rev_rides = (await db.execute(select(func.coalesce(func.sum(Booking.final_amount), 0)).where(Booking.status == BookingStatus.COMPLETED))).scalar() or 0
+    _rev_food = (await db.execute(select(func.coalesce(func.sum(FoodOrder.final_amount), 0)).where(FoodOrder.status == FoodOrderStatus.DELIVERED))).scalar() or 0
+    _rev_market = (await db.execute(select(func.coalesce(func.sum(MarketOrder.final_amount), 0)).where(MarketOrder.status == MarketOrderStatus.DELIVERED))).scalar() or 0
+    _rev_gold = (await db.execute(select(func.coalesce(func.sum(WalletTransaction.amount), 0)).where(WalletTransaction.reference_id == "GOLD"))).scalar() or 0
+    revenue = float(_rev_rides) + float(_rev_food) + float(_rev_market) + float(_rev_gold)
     avg_surge = (
         await db.execute(
             select(func.coalesce(func.avg(FareSetting.surge_multiplier), 1))
         )
     ).scalar()
 
-    # Revenue for the last N days
+    # Daily revenue for the last N days — across ALL streams
+    window_start = today_start - timedelta(days=days - 1)
+    window_end = today_start + timedelta(days=1)
+    rev_by_day = {}
+
+    def _acc_rev(day, amt):
+        rev_by_day[day.isoformat()] = rev_by_day.get(day.isoformat(), 0.0) + float(amt or 0)
+
+    for day, amt in (await db.execute(
+        select(_cast(Booking.booked_at, _Date), func.coalesce(func.sum(Booking.final_amount), 0))
+        .where(Booking.status == BookingStatus.COMPLETED, Booking.booked_at >= window_start, Booking.booked_at < window_end)
+        .group_by(_cast(Booking.booked_at, _Date))
+    )).all():
+        _acc_rev(day, amt)
+    for day, amt in (await db.execute(
+        select(_cast(FoodOrder.created_at, _Date), func.coalesce(func.sum(FoodOrder.final_amount), 0))
+        .where(FoodOrder.status == FoodOrderStatus.DELIVERED, FoodOrder.created_at >= window_start, FoodOrder.created_at < window_end)
+        .group_by(_cast(FoodOrder.created_at, _Date))
+    )).all():
+        _acc_rev(day, amt)
+    for day, amt in (await db.execute(
+        select(_cast(MarketOrder.created_at, _Date), func.coalesce(func.sum(MarketOrder.final_amount), 0))
+        .where(MarketOrder.status == MarketOrderStatus.DELIVERED, MarketOrder.created_at >= window_start, MarketOrder.created_at < window_end)
+        .group_by(_cast(MarketOrder.created_at, _Date))
+    )).all():
+        _acc_rev(day, amt)
+    for day, amt in (await db.execute(
+        select(_cast(WalletTransaction.created_at, _Date), func.coalesce(func.sum(WalletTransaction.amount), 0))
+        .where(WalletTransaction.reference_id == "GOLD", WalletTransaction.created_at >= window_start, WalletTransaction.created_at < window_end)
+        .group_by(_cast(WalletTransaction.created_at, _Date))
+    )).all():
+        _acc_rev(day, amt)
+
     labels = []
     data = []
     for i in range(days - 1, -1, -1):
         day_start = today_start - timedelta(days=i)
-        day_end = day_start + timedelta(days=1)
         if days == 30:
             labels.append(day_start.strftime("%b %d"))
         else:
             labels.append(day_start.strftime("%a"))
-        day_rev = (
-            await db.execute(
-                select(func.coalesce(func.sum(Booking.final_amount), 0)).where(
-                    Booking.status == BookingStatus.COMPLETED,
-                    Booking.completed_at >= day_start,
-                    Booking.completed_at < day_end,
-                )
-            )
-        ).scalar()
-        data.append(float(day_rev or 0))
+        data.append(rev_by_day.get(day_start.date().isoformat(), 0.0))
 
     return templates.TemplateResponse(
         request, "dashboard.html",
@@ -3605,6 +3628,129 @@ async def _reports_aggregate(db: AsyncSession, start_dt: datetime, end_dt_exclus
                 "redeem_discount": overall["redeem_discount"],
                 "total_discount": overall["promo_discount"] + overall["redeem_discount"],
             },
+            "trend": trend,
+            "rows": rows_sorted,
+        }
+
+    elif type == "revenue":
+        # Full revenue breakdown across every stream: Rides, Flash delivery,
+        # Food, Marketplace and Gold subscriptions.
+        from app.models import (
+            FoodOrder, FoodOrderStatus, MarketOrder, MarketOrderStatus,
+            MarketVendor, WalletTransaction, SystemSettings,
+        )
+
+        # Platform commission rate for food (no per-order field) — use the
+        # configured global rate, falling back to 15%.
+        food_rate = (await db.execute(select(SystemSettings.commission_rate).limit(1))).scalar()
+        food_rate = float(food_rate) / 100.0 if food_rate is not None else 0.15
+
+        rows_by_day = {}
+        days_list = []
+        cur = start_dt.date()
+        end_d = (end_dt_exclusive - timedelta(seconds=1)).date()
+        while cur <= end_d:
+            k = cur.isoformat()
+            rows_by_day[k] = {
+                "date": k, "rides": 0.0, "delivery": 0.0, "food": 0.0,
+                "market": 0.0, "gold": 0.0, "commission": 0.0,
+            }
+            days_list.append(k)
+            cur = cur + timedelta(days=1)
+
+        svc = {s: {"gmv": 0.0, "orders": 0, "commission": 0.0}
+               for s in ("rides", "delivery", "food", "market", "gold")}
+
+        def _add(day_key, stream, gross, comm, orders):
+            r = rows_by_day.get(day_key)
+            if r is None:
+                return
+            r[stream] += float(gross)
+            r["commission"] += float(comm)
+            svc[stream]["gmv"] += float(gross)
+            svc[stream]["commission"] += float(comm)
+            svc[stream]["orders"] += int(orders)
+
+        # Rides + Flash deliveries (bookings)
+        bday = cast(Booking.booked_at, Date)
+        qb = await db.execute(
+            select(bday, Booking.is_flash, func.count(Booking.id),
+                   func.coalesce(func.sum(Booking.final_amount), 0),
+                   func.coalesce(func.sum(Booking.platform_fee), 0))
+            .where(Booking.booked_at >= start_dt, Booking.booked_at < end_dt_exclusive,
+                   Booking.status == BookingStatus.COMPLETED)
+            .group_by(bday, Booking.is_flash)
+        )
+        for day, is_flash, cnt, gross, comm in qb.all():
+            _add(day.isoformat(), "delivery" if is_flash else "rides", gross, comm, cnt)
+
+        # Food orders (delivered)
+        fday = cast(FoodOrder.created_at, Date)
+        qf = await db.execute(
+            select(fday, func.count(FoodOrder.id),
+                   func.coalesce(func.sum(FoodOrder.final_amount), 0))
+            .where(FoodOrder.created_at >= start_dt, FoodOrder.created_at < end_dt_exclusive,
+                   FoodOrder.status == FoodOrderStatus.DELIVERED)
+            .group_by(fday)
+        )
+        for day, cnt, gross in qf.all():
+            _add(day.isoformat(), "food", gross, float(gross) * food_rate, cnt)
+
+        # Market orders (delivered) — commission from each vendor's rate
+        mday = cast(MarketOrder.created_at, Date)
+        qm = await db.execute(
+            select(mday, func.count(MarketOrder.id),
+                   func.coalesce(func.sum(MarketOrder.final_amount), 0),
+                   func.coalesce(func.sum(MarketOrder.total_amount * MarketVendor.commission_percentage / 100), 0))
+            .join(MarketVendor, MarketVendor.id == MarketOrder.vendor_id)
+            .where(MarketOrder.created_at >= start_dt, MarketOrder.created_at < end_dt_exclusive,
+                   MarketOrder.status == MarketOrderStatus.DELIVERED)
+            .group_by(mday)
+        )
+        for day, cnt, gross, comm in qm.all():
+            _add(day.isoformat(), "market", gross, comm, cnt)
+
+        # Gold subscriptions (wallet payments tagged GOLD) — 100% platform income
+        gday = cast(WalletTransaction.created_at, Date)
+        qg = await db.execute(
+            select(gday, func.count(WalletTransaction.id),
+                   func.coalesce(func.sum(WalletTransaction.amount), 0))
+            .where(WalletTransaction.created_at >= start_dt, WalletTransaction.created_at < end_dt_exclusive,
+                   WalletTransaction.reference_id == "GOLD")
+            .group_by(gday)
+        )
+        for day, cnt, gross in qg.all():
+            _add(day.isoformat(), "gold", gross, gross, cnt)
+
+        trend = []
+        for k in days_list:
+            r = rows_by_day[k]
+            total = r["rides"] + r["delivery"] + r["food"] + r["market"] + r["gold"]
+            trend.append({
+                "date": k, "rides": r["rides"], "delivery": r["delivery"],
+                "food": r["food"], "market": r["market"], "total": total,
+                "commission": r["commission"],
+            })
+        rows_sorted = list(reversed(trend))
+
+        names = {"rides": "Rides", "delivery": "Flash Delivery", "food": "Food",
+                 "market": "Marketplace", "gold": "Gold Subscriptions"}
+        services = [
+            {"key": s, "name": names[s], "gmv": svc[s]["gmv"],
+             "orders": svc[s]["orders"], "commission": svc[s]["commission"]}
+            for s in ("rides", "delivery", "food", "market", "gold")
+        ]
+        gross_total = sum(s["gmv"] for s in services)
+        commission_total = sum(s["commission"] for s in services)
+
+        return {
+            "totals": {
+                "gross_total": gross_total,
+                "commission_total": commission_total,
+                "food_revenue": svc["food"]["gmv"],
+                "market_revenue": svc["market"]["gmv"],
+            },
+            "services": services,
             "trend": trend,
             "rows": rows_sorted,
         }

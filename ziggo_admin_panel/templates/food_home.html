@@ -81,15 +81,21 @@
             {% endfor %}
         </div>
 
-        <form method="post" enctype="multipart/form-data" action="/admin/food-home/banners/new" class="banner-form p-4 bg-gray-50/60 grid grid-cols-2 md:grid-cols-7 gap-2 items-center">
-            <input name="title" placeholder="Title" class="{{ input_cls }}">
-            <select name="link_type" onchange="syncBannerLink(this)" class="{{ input_cls }}">{% for lt in link_types %}<option value="{{ lt }}">{{ lt }}</option>{% endfor %}</select>
-            {{ link_value_controls('none', '', restaurants, categories, collections, promos, input_cls) }}
-            <input name="image_url" placeholder="Image URL" class="{{ input_cls }}">
-            <input type="file" name="image" accept="image/*" class="{{ input_cls }} text-xs">
-            <input name="display_order" type="number" value="0" placeholder="Order" class="{{ input_cls }}">
-            <button class="px-3 py-2.5 bg-ziggo text-white rounded-lg text-sm font-bold hover:bg-ziggo-light"><i class="fas fa-plus mr-1"></i> Add</button>
-        </form>
+        <div class="p-4 bg-gray-50/60 flex flex-wrap items-center gap-3">
+            <div class="w-24 flex-shrink-0 hidden md:block"></div>
+            <form method="post" enctype="multipart/form-data" action="/admin/food-home/banners/new" class="banner-form flex-1 grid grid-cols-2 md:grid-cols-6 gap-2 items-center">
+                <input name="title" placeholder="Title" class="{{ input_cls }} md:col-span-1">
+                <select name="link_type" onchange="syncBannerLink(this)" class="{{ input_cls }}">{% for lt in link_types %}<option value="{{ lt }}">{{ lt }}</option>{% endfor %}</select>
+                {{ link_value_controls('none', '', restaurants, categories, collections, promos, input_cls) }}
+                <input name="image_url" placeholder="Image URL" class="{{ input_cls }}">
+                <input type="file" name="image" accept="image/*" class="{{ input_cls }} text-xs">
+                <div class="flex items-center gap-1">
+                    <input name="display_order" type="number" value="0" placeholder="Order" class="{{ input_cls }} w-16">
+                    <button class="px-3 py-2 bg-ziggo text-white rounded-lg text-xs font-bold hover:bg-ziggo-light whitespace-nowrap"><i class="fas fa-plus mr-1"></i> Add</button>
+                </div>
+            </form>
+            <div class="flex-shrink-0 hidden md:block" style="width:104px"></div>
+        </div>
     </section>
 
     <!-- ============================ CATEGORIES ============================ -->
@@ -128,13 +134,19 @@
             {% endfor %}
         </div>
 
-        <form method="post" enctype="multipart/form-data" action="/admin/food-home/categories/new" class="p-4 bg-gray-50/60 grid grid-cols-2 md:grid-cols-5 gap-2 items-center">
-            <input name="name" placeholder="Name e.g. Pizza" required class="{{ input_cls }}">
-            <input name="icon_url" placeholder="Icon URL" class="{{ input_cls }}">
-            <input type="file" name="image" accept="image/*" class="{{ input_cls }} text-xs">
-            <input name="display_order" type="number" value="0" placeholder="Order" class="{{ input_cls }}">
-            <button class="px-3 py-2.5 bg-ziggo text-white rounded-lg text-sm font-bold hover:bg-ziggo-light"><i class="fas fa-plus mr-1"></i> Add</button>
-        </form>
+        <div class="p-4 bg-gray-50/60 flex flex-wrap items-center gap-3">
+            <div class="w-12 flex-shrink-0 hidden md:block"></div>
+            <form method="post" enctype="multipart/form-data" action="/admin/food-home/categories/new" class="flex-1 grid grid-cols-2 md:grid-cols-4 gap-2 items-center">
+                <input name="name" placeholder="Name e.g. Pizza" required class="{{ input_cls }}">
+                <input name="icon_url" placeholder="Icon URL" class="{{ input_cls }}">
+                <input type="file" name="image" accept="image/*" class="{{ input_cls }} text-xs">
+                <div class="flex items-center gap-1">
+                    <input name="display_order" type="number" value="0" placeholder="Order" class="{{ input_cls }} w-16">
+                    <button class="px-3 py-2 bg-ziggo text-white rounded-lg text-xs font-bold hover:bg-ziggo-light whitespace-nowrap"><i class="fas fa-plus mr-1"></i> Add</button>
+                </div>
+            </form>
+            <div class="flex-shrink-0 hidden md:block" style="width:104px"></div>
+        </div>
     </section>
 
     <!-- ============================ COLLECTIONS ============================ -->
@@ -143,6 +155,14 @@
             <h3 class="text-lg font-black text-ziggo">Collections ("Picked for you")</h3>
             <p class="text-xs text-ziggo-muted">{{ collections|length }} total — curated restaurant groups. Icon is a Material icon name (e.g. local_fire_department).</p>
         </div>
+
+        <style>
+            .coll-outlet { transition: all .15s ease; }
+            .coll-outlet input { position: absolute; opacity: 0; pointer-events: none; }
+            .coll-outlet:hover { background: #F5F7FB; }
+            .coll-outlet:has(input:checked) { background: #1E3A8A; border-color: #1E3A8A; color: #fff; }
+            .coll-outlets-wrap { background: #FAFBFD; border: 1px solid #EEF1F6; border-radius: 12px; }
+        </style>
 
         <div class="divide-y divide-ziggo-line">
             {% for c in collections %}
@@ -169,15 +189,15 @@
                 </div>
                 <!-- restaurant membership -->
                 {% set member_ids = c.restaurants | map(attribute='id') | list %}
-                <form method="post" action="/admin/food-home/collections/{{ c.id }}/restaurants" class="flex flex-wrap items-center gap-2 pl-9">
-                    <span class="text-xs font-black text-ziggo-muted uppercase">Outlets:</span>
+                <form method="post" action="/admin/food-home/collections/{{ c.id }}/restaurants" class="coll-outlets-wrap flex flex-wrap items-center gap-2 ml-9 p-3">
+                    <span class="text-[10px] font-black text-ziggo-faint uppercase tracking-wider mr-1">Outlets</span>
                     {% for r in restaurants %}
-                    <label class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-ziggo-line cursor-pointer hover:bg-gray-50 text-xs font-bold">
-                        <input type="checkbox" name="restaurant_ids" value="{{ r.id }}" {% if r.id in member_ids %}checked{% endif %} class="w-3.5 h-3.5">
+                    <label class="coll-outlet flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-ziggo-line cursor-pointer text-xs font-bold">
+                        <input type="checkbox" name="restaurant_ids" value="{{ r.id }}" {% if r.id in member_ids %}checked{% endif %}>
                         {{ r.name }}
                     </label>
                     {% endfor %}
-                    <button class="px-3 py-1.5 bg-blue-50 text-ziggo border border-blue-100 rounded-lg text-xs font-bold hover:bg-blue-100">Save outlets</button>
+                    <button class="ml-auto px-3.5 py-1.5 bg-ziggo text-white rounded-lg text-xs font-bold hover:bg-ziggo-light transition">Save outlets</button>
                 </form>
             </div>
             {% else %}
@@ -185,13 +205,19 @@
             {% endfor %}
         </div>
 
-        <form method="post" action="/admin/food-home/collections/new" class="p-4 bg-gray-50/60 grid grid-cols-2 md:grid-cols-5 gap-2 items-center">
-            <input name="name" placeholder="Name e.g. Popular" required class="{{ input_cls }}">
-            <input name="icon" value="local_fire_department" placeholder="Material icon" class="{{ input_cls }}">
-            <select name="color" class="{{ input_cls }}">{% for col in colors %}<option value="{{ col }}">{{ col }}</option>{% endfor %}</select>
-            <input name="display_order" type="number" value="0" placeholder="Order" class="{{ input_cls }}">
-            <button class="px-3 py-2.5 bg-ziggo text-white rounded-lg text-sm font-bold hover:bg-ziggo-light"><i class="fas fa-plus mr-1"></i> Add</button>
-        </form>
+        <div class="p-4 bg-gray-50/60 flex flex-wrap items-center gap-3">
+            <div class="w-9 flex-shrink-0 hidden md:block"></div>
+            <form method="post" action="/admin/food-home/collections/new" class="flex-1 grid grid-cols-2 md:grid-cols-4 gap-2 items-center">
+                <input name="name" placeholder="Name e.g. Popular" required class="{{ input_cls }}">
+                <input name="icon" value="local_fire_department" placeholder="Material icon" class="{{ input_cls }}">
+                <select name="color" class="{{ input_cls }}">{% for col in colors %}<option value="{{ col }}">{{ col }}</option>{% endfor %}</select>
+                <div class="flex items-center gap-1">
+                    <input name="display_order" type="number" value="0" placeholder="Order" class="{{ input_cls }} w-16">
+                    <button class="px-3 py-2 bg-ziggo text-white rounded-lg text-xs font-bold hover:bg-ziggo-light whitespace-nowrap"><i class="fas fa-plus mr-1"></i> Add</button>
+                </div>
+            </form>
+            <div class="flex-shrink-0 hidden md:block" style="width:104px"></div>
+        </div>
     </section>
 
     <!-- ============================ DEALS ============================ -->
@@ -236,19 +262,25 @@
             {% endfor %}
         </div>
 
-        <form method="post" enctype="multipart/form-data" action="/admin/food-home/deals/new" class="p-4 bg-gray-50/60 grid grid-cols-2 md:grid-cols-6 gap-2 items-center">
-            <input name="title" placeholder="Title e.g. 30% OFF" required class="{{ input_cls }}">
-            <input name="subtitle" placeholder="Subtitle" class="{{ input_cls }} md:col-span-2">
-            <select name="color" class="{{ input_cls }}">{% for col in colors %}<option value="{{ col }}">{{ col }}</option>{% endfor %}</select>
-            <select name="promo_code_id" class="{{ input_cls }}">
-                <option value="">— no promo —</option>
-                {% for p in promos %}<option value="{{ p.id }}">{{ p.code }}</option>{% endfor %}
-            </select>
-            <input name="display_order" type="number" value="0" placeholder="Order" class="{{ input_cls }}">
-            <input name="image_url" placeholder="Image URL" class="{{ input_cls }} md:col-span-3">
-            <input type="file" name="image" accept="image/*" class="{{ input_cls }} text-xs md:col-span-2">
-            <button class="px-3 py-2.5 bg-ziggo text-white rounded-lg text-sm font-bold hover:bg-ziggo-light md:col-span-1"><i class="fas fa-plus mr-1"></i> Add</button>
-        </form>
+        <div class="p-4 bg-gray-50/60 flex flex-wrap items-center gap-3">
+            <div class="w-20 flex-shrink-0 hidden md:block"></div>
+            <form method="post" enctype="multipart/form-data" action="/admin/food-home/deals/new" class="flex-1 grid grid-cols-2 md:grid-cols-6 gap-2 items-center">
+                <input name="title" placeholder="Title e.g. 30% OFF" required class="{{ input_cls }}">
+                <input name="subtitle" placeholder="Subtitle" class="{{ input_cls }} md:col-span-2">
+                <select name="color" class="{{ input_cls }}">{% for col in colors %}<option value="{{ col }}">{{ col }}</option>{% endfor %}</select>
+                <select name="promo_code_id" class="{{ input_cls }}">
+                    <option value="">— no promo —</option>
+                    {% for p in promos %}<option value="{{ p.id }}">{{ p.code }}</option>{% endfor %}
+                </select>
+                <div class="flex items-center gap-1">
+                    <input name="display_order" type="number" value="0" placeholder="Order" class="{{ input_cls }} w-16">
+                    <button class="px-3 py-2 bg-ziggo text-white rounded-lg text-xs font-bold hover:bg-ziggo-light whitespace-nowrap"><i class="fas fa-plus mr-1"></i> Add</button>
+                </div>
+                <input name="image_url" placeholder="Image URL" class="{{ input_cls }} md:col-span-3">
+                <input type="file" name="image" accept="image/*" class="{{ input_cls }} text-xs md:col-span-3">
+            </form>
+            <div class="flex-shrink-0 hidden md:block" style="width:104px"></div>
+        </div>
     </section>
 </div>
 
