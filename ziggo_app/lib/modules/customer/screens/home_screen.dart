@@ -32,7 +32,8 @@ import 'support_screen.dart';
 import 'wallet_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final VoidCallback? onMenu;
+  const HomeScreen({super.key, this.onMenu});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -65,16 +66,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: AppColors.background,
-      drawer: _Drawer(
-        onProfile: () => _open(const ProfileScreen()),
-        onPlaces: () => _open(const SavedAddressesScreen()),
-        onTrips: () => _open(const RideHistoryScreen()),
-        onPromos: () => _open(const PromotionsScreen()),
-        onWallet: () => _open(const WalletScreen()),
-        onNotifications: () => _open(const NotificationsScreen()),
-        onSupport: () => _open(const SupportScreen()),
-        onGold: () => _open(const SubscriptionScreen()),
-      ),
       body: SafeArea(
         bottom: false,
         child: ListView(
@@ -82,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: staggered([
             _Header(
               auth: auth,
-              onMenu: () => _scaffoldKey.currentState?.openDrawer(),
+              onMenu: widget.onMenu ?? () {},
               onNotifications: () => _open(const NotificationsScreen()),
               onProfile: () => _open(const ProfileScreen()),
             ),
@@ -949,7 +940,7 @@ class _GoldStrip extends StatelessWidget {
   }
 }
 
-class _Drawer extends StatelessWidget {
+class CustomerDrawer extends StatelessWidget {
   final VoidCallback onProfile;
   final VoidCallback onPlaces;
   final VoidCallback onTrips;
@@ -959,7 +950,7 @@ class _Drawer extends StatelessWidget {
   final VoidCallback onSupport;
   final VoidCallback onGold;
 
-  const _Drawer({
+  const CustomerDrawer({
     required this.onProfile,
     required this.onPlaces,
     required this.onTrips,

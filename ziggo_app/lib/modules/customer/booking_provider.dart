@@ -144,6 +144,10 @@ class BookingProvider extends ChangeNotifier {
           if (promoCode != null && promoCode.isNotEmpty) 'promo_code': promoCode,
           if (friendName != null && friendName.isNotEmpty) 'friend_name': friendName,
           if (friendPhone != null && friendPhone.isNotEmpty) 'friend_phone': friendPhone,
+          if (receiverName != null && receiverName.isNotEmpty) 'receiver_name': receiverName,
+          if (receiverPhone != null && receiverPhone.isNotEmpty) 'receiver_phone': receiverPhone,
+          if (parcelInstructions != null && parcelInstructions.isNotEmpty)
+            'parcel_instructions': parcelInstructions,
           if (redeemPoints > 0) 'redeem_points': redeemPoints,
           if (stops.isNotEmpty) 'stops': stops,
           if (isFlash || isCourier) ...{
@@ -151,10 +155,6 @@ class BookingProvider extends ChangeNotifier {
             if (isCourier) 'is_courier': true,
             if (parcelType != null) 'parcel_type': parcelType,
             if (parcelWeightKg != null) 'parcel_weight_kg': parcelWeightKg,
-            if (receiverName != null && receiverName.isNotEmpty) 'receiver_name': receiverName,
-            if (receiverPhone != null && receiverPhone.isNotEmpty) 'receiver_phone': receiverPhone,
-            if (parcelInstructions != null && parcelInstructions.isNotEmpty)
-              'parcel_instructions': parcelInstructions,
           },
           if (isRental) ...{
             'is_rental': true,
