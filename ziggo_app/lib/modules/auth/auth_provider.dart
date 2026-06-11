@@ -19,6 +19,7 @@ class AuthProvider extends ChangeNotifier {
   String? _email;
   String? _lastError;
   String? _devOtp;
+  bool _isNewUser = false;
   String? _birthday;
   String? _gender;
   String? _emergencyContact;
@@ -33,6 +34,9 @@ class AuthProvider extends ChangeNotifier {
   String? get email => _email;
   String? get lastError => _lastError;
   String? get devOtp => _devOtp;
+  /// True only for the first-ever OTP verification on this phone (signup).
+  /// Used to route new users through the "Your details" screen before home.
+  bool get isNewUser => _isNewUser;
   String? get birthday => _birthday;
   String? get gender => _gender;
   String? get emergencyContact => _emergencyContact;
@@ -93,6 +97,7 @@ class AuthProvider extends ChangeNotifier {
       _token = resp.data['access_token'] as String;
       _role = resp.data['role'] as String;
       _userId = resp.data['user_id'] as int;
+      _isNewUser = resp.data['is_new'] as bool? ?? false;
       _phoneNumber = phoneNumber;
       await TokenStorage.save(token: _token!, role: _role!, userId: _userId!);
 

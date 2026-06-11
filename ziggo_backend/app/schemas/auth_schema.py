@@ -8,6 +8,10 @@ class Token(BaseModel):
     token_type: str = "bearer"
     user_id: int
     role: UserRole
+    # True only on first-ever OTP verification for this phone (signup). The app
+    # uses it to route new users through the "Your details" profile-completion
+    # screen before landing on home.
+    is_new: bool = False
 
 
 class TokenData(BaseModel):

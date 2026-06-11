@@ -5,6 +5,7 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/widgets/motion.dart';
 import '../auth_provider.dart';
+import 'profile_details_screen.dart';
 
 class OTPVerificationScreen extends StatefulWidget {
   final String phoneNumber;
@@ -81,6 +82,17 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     setState(() => _busy = false);
     if (!ok) {
       setState(() => _error = auth.lastError ?? 'Invalid or expired OTP');
+      return;
+    }
+    // New customers complete their profile ("Your details") before landing on
+    // home. The details screen pops back to root when done. Returning users —
+    // and non-customer roles, which have their own onboarding — skip straight
+    // through.
+    if (auth.isNewUser && widget.role == 'customer') {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const ProfileDetailsScreen()),
+      );
       return;
     }
     Navigator.popUntil(context, (r) => r.isFirst);
