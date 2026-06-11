@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -34,17 +35,39 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
   Timer? _nearbyTimer;
   List<Map<String, dynamic>> _nearbyDrivers = const [];
 
+  StreamSubscription<Position>? _positionSubscription;
+  LatLng? _customerLatLng;
+  double? _customerHeading;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<BookingProvider>().loadActive();
     });
+    _startPositionUpdates();
+  }
+
+  void _startPositionUpdates() {
+    _positionSubscription = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 5,
+      ),
+    ).listen((position) {
+      if (mounted) {
+        setState(() {
+          _customerLatLng = LatLng(position.latitude, position.longitude);
+          _customerHeading = position.heading;
+        });
+      }
+    }, onError: (_) {});
   }
 
   @override
   void dispose() {
     _nearbyTimer?.cancel();
+    _positionSubscription?.cancel();
     super.dispose();
   }
 
@@ -213,11 +236,13 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
     final driver = active['driver'] as Map<String, dynamic>?;
     final driverLat = driver?['current_lat'] as num?;
     final driverLng = driver?['current_lng'] as num?;
-    final driverLatLng = (driverLat != null && driverLng != null)
-        ? LatLng(driverLat.toDouble(), driverLng.toDouble())
-        : null;
-
     final status = active['status'] as String?;
+    final driverLatLng = (status == 'started' && _customerLatLng != null)
+        ? _customerLatLng
+        : ((driverLat != null && driverLng != null)
+            ? LatLng(driverLat.toDouble(), driverLng.toDouble())
+            : null);
+
     final meta = _statusMeta(status);
     final serviceType = active['service_type'] as String?;
 
@@ -294,7 +319,9 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                     icon: Icons.directions_car_rounded,
                     color: Colors.black,
                     assetPath: _vehicleAsset(driver?['vehicle_type'] as String?),
-                    rotation: (driver?['current_heading'] as num?)?.toDouble() ?? 0.0,
+                    rotation: (status == 'started' && _customerHeading != null)
+                        ? _customerHeading!
+                        : ((driver?['current_heading'] as num?)?.toDouble() ?? 0.0),
                   ),
               ],
               polylines: [
