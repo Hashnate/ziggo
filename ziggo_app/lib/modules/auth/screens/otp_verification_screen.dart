@@ -89,7 +89,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     // and non-customer roles, which have their own onboarding — skip straight
     // through.
     if (auth.isNewUser && widget.role == 'customer') {
-      Navigator.pushReplacement(
+      Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const ProfileDetailsScreen()),
       );

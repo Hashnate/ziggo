@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/network/api_client.dart';
+import 'event_booking_screens.dart';
 
 /// Events / ticketing — browse concerts, shows, festivals. Purchase pipeline
 /// is not wired yet; tapping Buy on a tier surfaces a "contact organizer" CTA.
@@ -423,7 +423,6 @@ class _EventCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = event['name']?.toString() ?? 'Untitled';
     final venue = event['venue']?.toString();
-    final city = event['city']?.toString();
     final image = event['image_url']?.toString();
     final startsAtRaw = event['starts_at']?.toString() ?? '';
     final startsAt = DateTime.tryParse(startsAtRaw)?.toLocal();
@@ -567,20 +566,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   Map<String, dynamic>? _event;
   String? _error;
   bool _loading = true;
-  final Map<int, int> _selectedQuantities = {};
-
-  double _calculateTotal(List<Map<String, dynamic>> tiers) {
-    double total = 0;
-    _selectedQuantities.forEach((index, qty) {
-      if (index < tiers.length) {
-        final price = double.tryParse(tiers[index]['price']?.toString() ?? '') ?? 0.0;
-        total += price * qty;
-      }
-    });
-    return total;
-  }
-  
-  int get _totalItems => _selectedQuantities.values.fold(0, (a, b) => a + b);
+  bool _aboutExpanded = false;
 
   @override
   void initState() {
@@ -613,20 +599,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     }
   }
 
-  Future<void> _contactOrganizer() async {
-    final phone = _event?['organizer_phone']?.toString();
-    if (phone == null || phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No organizer phone on file'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-    final uri = Uri.parse('tel:$phone');
+  Future<void> _openMaps() async {
+    final venue = _event?['venue']?.toString() ?? '';
+    final city = _event?['city']?.toString() ?? '';
+    final query = Uri.encodeComponent([venue, city].where((s) => s.isNotEmpty).join(', '));
+    if (query.isEmpty) return;
+    final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
     if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
@@ -654,27 +634,15 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     }
 
     final ev = _event!;
-    debugPrint('EventDetailScreen: event data is $ev');
     final name = ev['name']?.toString() ?? '';
     final description = ev['description']?.toString();
     final venue = ev['venue']?.toString();
     final city = ev['city']?.toString();
     final image = ev['image_url']?.toString();
-    final organizer = ev['organizer_name']?.toString();
     final startsAtRaw = ev['starts_at']?.toString();
-    final endsAtRaw = ev['ends_at']?.toString();
     final startsAt = startsAtRaw == null ? null : DateTime.tryParse(startsAtRaw)?.toLocal();
-    final endsAt = endsAtRaw == null ? null : DateTime.tryParse(endsAtRaw)?.toLocal();
-    final List<Map<String, dynamic>> tiers = [];
-    try {
-      if (ev['tiers'] != null) {
-        for (final t in ev['tiers'] as List) {
-          tiers.add(Map<String, dynamic>.from(t as Map));
-        }
-      }
-    } catch (e, stack) {
-      debugPrint('EventDetailScreen: Error parsing tiers: $e\n$stack');
-    }
+    final fromPrice = (ev['from_price'] as num?)?.toDouble();
+    final hasTiers = ev['tiers'] is List && (ev['tiers'] as List).isNotEmpty;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -725,62 +693,105 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    name.toUpperCase(),
+                    name,
                     style: const TextStyle(
-                      fontSize: 24,
+                      fontSize: 22,
                       fontWeight: FontWeight.w900,
                       color: Colors.black,
                       letterSpacing: -0.4,
                     ),
                   ),
+                  if (fromPrice != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'LKR ${fromPrice.toStringAsFixed(0)} upwards',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black54),
+                    ),
+                  ],
                   const SizedBox(height: 16),
-                  if (startsAt != null) _iconRow(Icons.calendar_today_rounded, DateFormat('E, d MMM y · h:mm a').format(startsAt)),
-                  if (endsAt != null) ...[
-                    const SizedBox(height: 8),
-                    _iconRow(Icons.schedule_rounded, 'Ends ${DateFormat('h:mm a').format(endsAt)}'),
-                  ],
-                  if (venue != null) ...[
-                    const SizedBox(height: 8),
-                    _iconRow(Icons.place_rounded, '$venue${city != null ? " · $city" : ""}'),
-                  ],
-                  if (organizer != null) ...[
-                    const SizedBox(height: 8),
-                    _iconRow(Icons.person_outline_rounded, 'Organized by $organizer'),
-                  ],
+                  Row(
+                    children: const [
+                      _OfferChip(label: 'NTB Offer'),
+                      SizedBox(width: 12),
+                      _OfferChip(label: 'Save Up to 5000'),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF6F7F9),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Column(
+                      children: [
+                        if (startsAt != null)
+                          _iconRow(
+                            Icons.calendar_today_rounded,
+                            '${DateFormat('d MMM').format(startsAt)}   |   ${DateFormat('h:mm a').format(startsAt)} onwards',
+                          ),
+                        if (startsAt != null && venue != null)
+                          const Divider(height: 24),
+                        if (venue != null)
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.place_rounded, size: 16, color: AppColors.textSecondary),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '$venue${city != null ? " · $city" : ""}',
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.black87),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    GestureDetector(
+                                      onTap: _openMaps,
+                                      child: const Text(
+                                        'Open Venue in Maps  ›',
+                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFFF57F17)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
                   if (description != null && description.isNotEmpty) ...[
                     const SizedBox(height: 24),
-                    const Text('ABOUT', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.grey, letterSpacing: 1.2)),
-                    const SizedBox(height: 8),
-                    Text(
-                      description,
-                      style: const TextStyle(fontSize: 14, height: 1.5, fontWeight: FontWeight.w600, color: Colors.black87),
+                    const Text('About Event', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black)),
+                    const SizedBox(height: 10),
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 180),
+                      alignment: Alignment.topCenter,
+                      child: Text(
+                        description,
+                        maxLines: _aboutExpanded ? null : 3,
+                        overflow: _aboutExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 14, height: 1.5, fontWeight: FontWeight.w600, color: Colors.black87),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => setState(() => _aboutExpanded = !_aboutExpanded),
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          _aboutExpanded ? 'Read less' : 'Read more',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFFF57F17),
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
-                  const SizedBox(height: 32),
-                  const Text('TICKETS', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.black, letterSpacing: 0.5)),
-                  const SizedBox(height: 16),
-                  for (int i = 0; i < tiers.length; i++)
-                    _InteractiveTierRow(
-                      tier: tiers[i],
-                      quantity: _selectedQuantities[i] ?? 0,
-                      onAdd: () {
-                        setState(() {
-                          _selectedQuantities[i] = (_selectedQuantities[i] ?? 0) + 1;
-                        });
-                      },
-                      onRemove: () {
-                        if ((_selectedQuantities[i] ?? 0) > 0) {
-                          setState(() {
-                            _selectedQuantities[i] = (_selectedQuantities[i] ?? 0) - 1;
-                          });
-                        }
-                      },
-                    ),
-                  if (tiers.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 14),
-                      child: Text('No tickets configured yet.', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w700)),
-                    ),
                   const SizedBox(height: 100), // padding for bottom bar
                 ],
               ),
@@ -788,130 +799,36 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: _totalItems > 0
-          ? Container(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5)),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('$_totalItems Ticket${_totalItems > 1 ? 's' : ''}', style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w700, fontSize: 13)),
-                        Text('LKR ${_calculateTotal(tiers).toStringAsFixed(0)}', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 20)),
-                      ],
+      bottomNavigationBar: hasTiers
+          ? SafeArea(
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, -4)),
+                  ],
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => EventCartScreen(event: ev)),
                     ),
-                  ),
-                  ElevatedButton(
-                    onPressed: () {
-                      final selectedTiers = <Map<String, dynamic>>[];
-                      _selectedQuantities.forEach((index, qty) {
-                        if (qty > 0 && index < tiers.length) {
-                          selectedTiers.add({
-                            ...tiers[index],
-                            'quantity': qty,
-                          });
-                        }
-                      });
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => EventCheckoutScreen(
-                            event: ev,
-                            selectedTiers: selectedTiers,
-                            totalPrice: _calculateTotal(tiers),
-                          ),
-                        ),
-                      );
-                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFFFD54F),
                       foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                       elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
                     ),
-                    child: const Text('PROCEED TO CHECKOUT', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
+                    child: const Text('Buy Now', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
                   ),
-                ],
+                ),
               ),
             )
           : null,
-    );
-  }
-
-  void _showComingSoon() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.10),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.confirmation_number_rounded,
-                  color: AppColors.primary, size: 30),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Tickets launching soon',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'For now, contact the organizer directly to reserve your ticket.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(height: 22),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.phone_rounded, size: 18),
-                label: const Text('CONTACT ORGANIZER'),
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _contactOrganizer();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                  elevation: 0,
-                  textStyle: const TextStyle(
-                      fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -944,314 +861,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   }
 }
 
-class _InteractiveTierRow extends StatelessWidget {
-  final Map<String, dynamic> tier;
-  final int quantity;
-  final VoidCallback onAdd;
-  final VoidCallback onRemove;
-  
-  const _InteractiveTierRow({required this.tier, required this.quantity, required this.onAdd, required this.onRemove});
-
-  @override
-  Widget build(BuildContext context) {
-    final name = tier['name']?.toString() ?? '';
-    final price = double.tryParse(tier['price']?.toString() ?? '') ?? 0.0;
-    final desc = tier['description']?.toString();
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2))],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.black)),
-                Text('LKR ${price.toStringAsFixed(0)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Colors.grey)),
-                if (desc != null && desc.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(desc, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54)),
-                  ),
-              ],
-            ),
-          ),
-          Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFFF3F4F6),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.remove_rounded, size: 18),
-                  color: quantity > 0 ? Colors.black : Colors.grey,
-                  onPressed: onRemove,
-                ),
-                Text('$quantity', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.black)),
-                IconButton(
-                  icon: const Icon(Icons.add_rounded, size: 18),
-                  color: Colors.black,
-                  onPressed: onAdd,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class EventCheckoutScreen extends StatefulWidget {
-  final Map<String, dynamic> event;
-  final List<Map<String, dynamic>> selectedTiers;
-  final double totalPrice;
-
-  const EventCheckoutScreen({super.key, required this.event, required this.selectedTiers, required this.totalPrice});
-
-  @override
-  State<EventCheckoutScreen> createState() => _EventCheckoutScreenState();
-}
-
-class _EventCheckoutScreenState extends State<EventCheckoutScreen> {
-  bool _isProcessing = false;
-
-  Future<void> _processPayment() async {
-    setState(() => _isProcessing = true);
-    // Mock network delay for payment
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => TicketSuccessScreen(event: widget.event, selectedTiers: widget.selectedTiers)),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
-        title: const Text('Checkout', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 18)),
-      ),
-      body: _isProcessing
-          ? Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  CircularProgressIndicator(color: Colors.black),
-                  SizedBox(height: 16),
-                  Text('Processing Payment...', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                ],
-              ),
-            )
-          : ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                const Text('Order Summary', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Column(
-                    children: widget.selectedTiers.map((t) {
-                      final name = t['name'] ?? 'Ticket';
-                      final qty = t['quantity'] as int;
-                      final price = double.tryParse(t['price']?.toString() ?? '') ?? 0.0;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('${qty}x $name', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                            Text('LKR ${(price * qty).toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Platform Fee', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey)),
-                    Text('LKR 0', style: TextStyle(fontWeight: FontWeight.w900)),
-                  ],
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Divider(color: Color(0xFFE2E8F0)),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Total Amount', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-                    Text('LKR ${widget.totalPrice.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 24, color: Colors.black)),
-                  ],
-                ),
-                const SizedBox(height: 40),
-                const Text('Payment Method', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFFFFD54F), width: 2),
-                    borderRadius: BorderRadius.circular(16),
-                    color: const Color(0xFFFFD54F).withOpacity(0.1),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.account_balance_wallet_rounded, color: Colors.orange),
-                      const SizedBox(width: 16),
-                      const Expanded(child: Text('Ziggo Wallet', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16))),
-                      const Icon(Icons.check_circle_rounded, color: Colors.orange),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-      bottomNavigationBar: _isProcessing ? null : SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: ElevatedButton(
-            onPressed: _processPayment,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              elevation: 0,
-            ),
-            child: const Text('PAY NOW', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1)),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class TicketSuccessScreen extends StatelessWidget {
-  final Map<String, dynamic> event;
-  final List<Map<String, dynamic>> selectedTiers;
-
-  const TicketSuccessScreen({super.key, required this.event, required this.selectedTiers});
-
-  @override
-  Widget build(BuildContext context) {
-    final name = event['name'] ?? 'Event';
-    final startsAtRaw = event['starts_at']?.toString();
-    final startsAt = startsAtRaw == null ? null : DateTime.tryParse(startsAtRaw)?.toLocal();
-    final qrData = 'ziggo_ticket_${DateTime.now().millisecondsSinceEpoch}';
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFFFD54F),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.close_rounded, color: Colors.black),
-            onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
-          ),
-        ],
-      ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
-                child: const Icon(Icons.check_rounded, color: Colors.white, size: 40),
-              ),
-              const SizedBox(height: 24),
-              const Text('Payment Successful!', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.black)),
-              const SizedBox(height: 8),
-              const Text('Here is your digital ticket. Have fun!', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black87)),
-              const SizedBox(height: 32),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 10))],
-                ),
-                child: Column(
-                  children: [
-                    Text(name, textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 8),
-                    if (startsAt != null)
-                      Text(DateFormat('EEEE, d MMMM y · h:mm a').format(startsAt), style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.grey)),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: Divider(color: Color(0xFFE2E8F0), thickness: 2, height: 2),
-                    ),
-                    QrImageView(
-                      data: qrData,
-                      version: QrVersions.auto,
-                      size: 200.0,
-                    ),
-                    const SizedBox(height: 24),
-                    const Text('SCAN AT ENTRANCE', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 2, color: Colors.grey)),
-                    const SizedBox(height: 24),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: selectedTiers.map((t) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('${t['quantity']}x ${t['name']}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-                              const Icon(Icons.check_circle_rounded, color: Colors.green, size: 16),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 40),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.black, width: 2),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                  child: const Text('BACK TO HOME', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class EventSearchScreen extends StatefulWidget {
   final List<Map<String, dynamic>> allEvents;
@@ -1509,6 +1118,48 @@ class EventCategoryScreen extends StatelessWidget {
                   ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Decorative bank/promo offer pill shown on the event detail page
+/// (dashed outline, matching the PickMe "NTB Offer" / "Save Up to" chips).
+class _OfferChip extends StatelessWidget {
+  final String label;
+  const _OfferChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2563EB).withOpacity(0.04),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: const Color(0xFF2563EB).withOpacity(0.4),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.sell_rounded, size: 16, color: Color(0xFF2563EB)),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF2563EB),
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

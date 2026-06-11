@@ -70,6 +70,11 @@ from .pay_schema import (
     MerchantPayResponse,
 )
 
+from .event_schema import (
+    EventBookItem,
+    EventBookRequest,
+)
+
 __all__ = [
     "Token",
     "TokenData",
@@ -117,4 +122,6 @@ __all__ = [
     "QRResolveResponse",
     "MerchantPayRequest",
     "MerchantPayResponse",
+    "EventBookItem",
+    "EventBookRequest",
 ]
