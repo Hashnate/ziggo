@@ -7,6 +7,9 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
+import '../../../core/notifications/fcm_service.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
@@ -43,6 +46,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   double _heading = 0.0;         // updated by the geolocator stream to orient location arrow
   bool _muted = false;           // local-only — wired into TTS when we add it
   StreamSubscription<Position>? _speedSub;
+  StreamSubscription<RemoteMessage>? _notificationSubscription;
   bool _isShowingRideRequest = false;
   bool _incentivesExpanded = true;   // PickMe bottom panel collapse/expand
   bool _activeRideExpanded = true;
@@ -51,6 +55,41 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
+
+    _notificationSubscription = FcmService.instance.onNotificationClicked.listen((message) {
+      _processNotificationMessage(message);
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final initialMessage = FcmService.instance.consumePendingClick();
+      if (initialMessage != null) {
+        _processNotificationMessage(initialMessage);
+      }
+    });
+  }
+
+  void _processNotificationMessage(RemoteMessage message) {
+    if (!mounted) return;
+    
+    final data = message.data;
+    final event = data['event'];
+    
+    final isRequestEvent = event == 'new_ride_request' || 
+                           event == 'new_ride' || 
+                           event == 'new_market_order' || 
+                           event == 'new_market_request' || 
+                           event.toString().contains('request') ||
+                           event.toString().contains('broadcast') ||
+                           (data.containsKey('pickup_lat') && data.containsKey('fare'));
+                           
+    if (isRequestEvent) {
+      final parsed = FcmService.instance.parseFcmData(data);
+      
+      // If we are currently on a sub-screen, return to the home screen first
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      
+      context.read<DriverProvider>().setPendingRequest(parsed);
+    }
   }
 
   Future<void> _bootstrap() async {
@@ -86,6 +125,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   @override
   void dispose() {
     _speedSub?.cancel();
+    _notificationSubscription?.cancel();
     super.dispose();
   }
 
@@ -1488,20 +1528,33 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           ],
         ),
         if (expanded) ...[
-          const SizedBox(height: 6),
-          Center(
-            child: TextButton.icon(
-              onPressed: () => _handleCancelRide(driver, ride),
-              icon: const Icon(Icons.close_rounded,
-                  size: 16, color: AppColors.error),
-              label: const Text(
-                'Cancel ride',
-                style: TextStyle(
-                  color: AppColors.error,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 12,
-                  letterSpacing: 0.3,
-                ),
+          const SizedBox(height: 12),
+          GestureDetector(
+            onTap: () => _handleCancelRide(driver, ride),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.error.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.error.withOpacity(0.3)),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.close_rounded, size: 16, color: AppColors.error),
+                  SizedBox(width: 6),
+                  Text(
+                    'CANCEL RIDE',
+                    style: TextStyle(
+                      color: AppColors.error,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

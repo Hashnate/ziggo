@@ -133,6 +133,24 @@ class FcmService {
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
       _foregroundSub = FirebaseMessaging.onMessage.listen(_onForegroundMessage);
 
+      // Handle when the app is in the background and opened by a notification tap
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+        if (kDebugMode) {
+          debugPrint('[fcm] notification opened app: ${message.data}');
+        }
+        _handleNotificationClick(message);
+      });
+
+      // Handle when the app is completely terminated and opened by a notification tap
+      FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+        if (message != null) {
+          if (kDebugMode) {
+            debugPrint('[fcm] initial message: ${message.data}');
+          }
+          _handleNotificationClick(message);
+        }
+      });
+
       // 6. Cache token + listen for rotations
       _cachedToken = await messaging.getToken();
       _tokenSub = messaging.onTokenRefresh.listen((t) {
@@ -146,6 +164,77 @@ class FcmService {
     } catch (e) {
       if (kDebugMode) debugPrint('[fcm] init step failed: $e');
     }
+  }
+
+  final StreamController<RemoteMessage> _clickController = StreamController<RemoteMessage>.broadcast();
+  Stream<RemoteMessage> get onNotificationClicked => _clickController.stream;
+  RemoteMessage? _pendingClick;
+
+  RemoteMessage? consumePendingClick() {
+    final msg = _pendingClick;
+    _pendingClick = null;
+    return msg;
+  }
+
+  void _handleNotificationClick(RemoteMessage message) {
+    _pendingClick = message;
+    _clickController.add(message);
+  }
+  /// Parses a Map<String, dynamic> FCM data payload into typed fields suitable for DriverProvider/BookingProvider.
+  Map<String, dynamic> parseFcmData(Map<String, dynamic> data) {
+    final result = <String, dynamic>{};
+    
+    data.forEach((key, value) {
+      result[key] = value;
+    });
+
+    const intFields = [
+      'booking_id',
+      'food_order_id',
+      'market_order_id',
+      'duration_min',
+      'expires_in_seconds',
+      'rental_hours',
+      'courier_eta_days',
+      'stop_count',
+    ];
+    for (final field in intFields) {
+      if (data.containsKey(field) && data[field] != null) {
+        result[field] = int.tryParse(data[field]!.toString()) ?? result[field];
+      }
+    }
+
+    const doubleFields = [
+      'pickup_lat',
+      'pickup_lng',
+      'drop_lat',
+      'drop_lng',
+      'distance_km',
+      'fare',
+      'driver_earnings',
+      'parcel_weight_kg',
+    ];
+    for (final field in doubleFields) {
+      if (data.containsKey(field) && data[field] != null) {
+        result[field] = double.tryParse(data[field]!.toString()) ?? result[field];
+      }
+    }
+
+    const boolFields = [
+      'is_flash',
+      'is_rental',
+      'is_courier',
+      'is_food',
+      'is_market',
+    ];
+    for (final field in boolFields) {
+      if (data.containsKey(field) && data[field] != null) {
+        final val = data[field]!.toString().toLowerCase();
+        result[field] = val == 'true' || val == '1';
+      }
+    }
+
+    return result;
   }
 
   /// Push the FCM token to the backend. Called after a successful login.
@@ -236,5 +325,6 @@ class FcmService {
   Future<void> dispose() async {
     await _foregroundSub?.cancel();
     await _tokenSub?.cancel();
+    await _clickController.close();
   }
 }

@@ -337,6 +337,11 @@ class DriverProvider extends ChangeNotifier {
     }
   }
 
+  void setPendingRequest(Map<String, dynamic> request) {
+    _pendingRequest = request;
+    notifyListeners();
+  }
+
   void dismissPendingRequest() {
     _pendingRequest = null;
     notifyListeners();
