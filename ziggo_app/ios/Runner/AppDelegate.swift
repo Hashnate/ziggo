@@ -9,10 +9,11 @@ import GoogleMaps
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     if let key = Bundle.main.object(forInfoDictionaryKey: "MAPS_API_KEY") as? String,
-       !key.isEmpty {
+       !key.isEmpty,
+       !key.contains("$") {
       GMSServices.provideAPIKey(key)
     } else {
-      NSLog("MAPS_API_KEY missing — add it to ios/Flutter/Secrets.xcconfig")
+      NSLog("MAPS_API_KEY missing or invalid — add it to ios/Flutter/Secrets.xcconfig")
     }
     
     GeneratedPluginRegistrant.register(with: self)
