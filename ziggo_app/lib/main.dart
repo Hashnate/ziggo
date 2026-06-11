@@ -42,10 +42,14 @@ Future<void> main() async {
   // On web, inject the Google Maps JS SDK now that we have the key. No-op on
   // mobile/desktop where the SDK comes from native config.
   injectGoogleMapsJs(dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '');
-  await ApiClient.init().timeout(
-    const Duration(seconds: 4),
-    onTimeout: () {},
-  );
+  // Best-effort backend host discovery. This must NEVER prevent runApp:
+  // .timeout() only guards the *duration* — a thrown error (MissingPluginException,
+  // SharedPreferences, a failed probe) would otherwise crash main() before the
+  // first frame and leave the app stuck on the white launch screen. ApiConfig
+  // falls back to its default host, so screens still render and work.
+  try {
+    await ApiClient.init().timeout(const Duration(seconds: 4));
+  } catch (_) {}
   runApp(const ZiggoApp());
   // Initialise Firebase (FCM) AFTER the first frame. APNs/token retrieval must
   // never gate runApp — on iOS getToken() blocks until APNs registration

@@ -267,4 +267,18 @@ class FoodProvider extends ChangeNotifier {
       return [];
     }
   }
+
+  Future<bool> cancelOrder(int orderId, {String? reason}) async {
+    try {
+      await ApiClient.instance.dio.post(
+        '/food/orders/$orderId/cancel',
+        data: reason != null ? {'reason': reason} : null,
+      );
+      return true;
+    } on DioException catch (e) {
+      _error = e.response?.data?['detail']?.toString() ?? e.message;
+      notifyListeners();
+      return false;
+    }
+  }
 }

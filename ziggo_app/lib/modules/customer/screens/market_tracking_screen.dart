@@ -52,6 +52,65 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
     setState(() => _order = match.isEmpty ? null : match);
   }
 
+  Future<void> _showCancelConfirmation(BuildContext context) async {
+    final TextEditingController reasonController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppStyles.radiusMd)),
+        title: const Text('Cancel Order', style: TextStyle(fontWeight: FontWeight.w900)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Are you sure you want to cancel this order? This action cannot be undone.'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                labelText: 'Reason for cancellation',
+                hintText: 'e.g., changed my mind, wrong items',
+                border: OutlineInputBorder(),
+              ),
+              maxLength: 200,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('NO', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('YES, CANCEL', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      final orderId = _order?['id'] as int?;
+      if (orderId == null) return;
+      final reason = reasonController.text.trim();
+      final ok = await context.read<MarketProvider>().cancelOrder(
+            orderId,
+            reason: reason.isNotEmpty ? reason : 'Customer cancelled the order',
+          );
+      if (mounted) {
+        if (ok) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Order cancelled successfully.')),
+          );
+          _refresh();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(context.read<MarketProvider>().error ?? 'Failed to cancel order.')),
+          );
+        }
+      }
+    }
+  }
+
   void _showStatusToast(String status, String? reason) {
     String msg;
     Color color = AppColors.primary;
@@ -551,6 +610,25 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
                     }),
                   ),
                 ),
+                if (status == 'pending') ...[
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () => _showCancelConfirmation(context),
+                    icon: const Icon(Icons.cancel_rounded, color: Colors.white),
+                    label: const Text(
+                      'CANCEL ORDER',
+                      style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 16),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.error,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      minimumSize: const Size(double.infinity, 56),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppStyles.radiusMd),
+                      ),
+                    ),
+                  ),
+                ],
                 if (status == 'delivered') ...[
                   const SizedBox(height: 24),
                   PrimaryButton(

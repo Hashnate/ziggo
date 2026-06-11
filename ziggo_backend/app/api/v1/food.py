@@ -1035,6 +1035,7 @@ async def get_active_food_order(
 @router.post("/orders/{order_id}/cancel")
 async def cancel_food_order(
     order_id: int,
+    body: dict = Body(default_factory=dict),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_role("customer")),
 ):
@@ -1058,8 +1059,9 @@ async def cancel_food_order(
             detail=f"Cannot cancel an order in status {order.status.value}. Only pending orders can be cancelled.",
         )
 
+    reason = (body.get("reason") or "Customer cancelled the order").strip()
     order.status = FoodOrderStatus.CANCELLED
-    order.cancellation_reason = "Customer cancelled the order"
+    order.cancellation_reason = reason
 
     # Wallet refund
     if order.payment_method == "wallet" and order.payment_status == "paid":

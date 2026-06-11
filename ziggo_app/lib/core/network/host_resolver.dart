@@ -47,8 +47,11 @@ class HostResolver {
       return _save(_envHost);
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString(_prefsKey);
+    String? saved;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      saved = prefs.getString(_prefsKey);
+    } catch (_) {}
     if (saved != null && saved.isNotEmpty && await _probe(saved)) {
       _cached = saved;
       return saved;
