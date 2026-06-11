@@ -3805,6 +3805,171 @@ async def _reports_aggregate(db: AsyncSession, start_dt: datetime, end_dt_exclus
             "rows": serialized_rows,
         }
 
+    elif type == "revenue":
+        # Per-day revenue broken down by every service line: rides, delivery
+        # (flash parcels), food and marketplace. Mirrors the commission model in
+        # services/finance_service.py — rides/flash use Booking.platform_fee,
+        # food/market take 20% of delivery_fee as platform commission.
+        from decimal import Decimal as D
+        from app.models import (
+            FoodOrder, FoodOrderStatus, MarketOrder, MarketOrderStatus,
+        )
+        PLATFORM_CUT = D("0.20")
+
+        rows_by_day = {}
+        cur = start_dt.date()
+        end_d = (end_dt_exclusive - timedelta(seconds=1)).date()
+        while cur <= end_d:
+            rows_by_day[cur.isoformat()] = {
+                "date": cur.isoformat(),
+                "rides": 0.0, "delivery": 0.0, "food": 0.0, "market": 0.0,
+                "ride_commission": 0.0, "delivery_commission": 0.0,
+                "food_commission": 0.0, "market_commission": 0.0,
+            }
+            cur = cur + timedelta(days=1)
+
+        services = {
+            "rides":    {"gmv": 0.0, "commission": 0.0, "orders": 0},
+            "delivery": {"gmv": 0.0, "commission": 0.0, "orders": 0},
+            "food":     {"gmv": 0.0, "commission": 0.0, "orders": 0},
+            "market":   {"gmv": 0.0, "commission": 0.0, "orders": 0},
+        }
+
+        # Rides + flash parcels (split by is_flash), completed only.
+        bq = await db.execute(
+            select(
+                bucket,
+                Booking.is_flash,
+                Booking.final_amount,
+                Booking.fare_amount,
+                Booking.platform_fee,
+            )
+            .where(
+                Booking.booked_at >= start_dt,
+                Booking.booked_at < end_dt_exclusive,
+                Booking.status == BookingStatus.COMPLETED,
+            )
+        )
+        for day, is_flash, final_amount, fare_amount, platform_fee in bq.all():
+            r = rows_by_day.get(day.isoformat())
+            if r is None:
+                continue
+            amt = float(final_amount if final_amount is not None else (fare_amount or 0))
+            fee = float(platform_fee or 0)
+            line = "delivery" if is_flash else "rides"
+            comm_key = "delivery_commission" if is_flash else "ride_commission"
+            r[line] += amt
+            r[comm_key] += fee
+            services[line]["gmv"] += amt
+            services[line]["commission"] += fee
+            services[line]["orders"] += 1
+
+        # Food — delivered only, commission = 20% of delivery_fee.
+        food_bucket = cast(FoodOrder.created_at, Date).label("day")
+        fq = await db.execute(
+            select(food_bucket, FoodOrder.final_amount, FoodOrder.delivery_fee)
+            .where(
+                FoodOrder.created_at >= start_dt,
+                FoodOrder.created_at < end_dt_exclusive,
+                FoodOrder.status == FoodOrderStatus.DELIVERED,
+            )
+        )
+        for day, final_amount, delivery_fee in fq.all():
+            r = rows_by_day.get(day.isoformat())
+            if r is None:
+                continue
+            amt = float(final_amount or 0)
+            comm = float((D(str(delivery_fee or 0)) * PLATFORM_CUT).quantize(D("0.01")))
+            r["food"] += amt
+            r["food_commission"] += comm
+            services["food"]["gmv"] += amt
+            services["food"]["commission"] += comm
+            services["food"]["orders"] += 1
+
+        # Marketplace — delivered only, same delivery-fee split as food.
+        market_bucket = cast(MarketOrder.created_at, Date).label("day")
+        mq = await db.execute(
+            select(market_bucket, MarketOrder.final_amount, MarketOrder.delivery_fee)
+            .where(
+                MarketOrder.created_at >= start_dt,
+                MarketOrder.created_at < end_dt_exclusive,
+                MarketOrder.status == MarketOrderStatus.DELIVERED,
+            )
+        )
+        for day, final_amount, delivery_fee in mq.all():
+            r = rows_by_day.get(day.isoformat())
+            if r is None:
+                continue
+            amt = float(final_amount or 0)
+            comm = float((D(str(delivery_fee or 0)) * PLATFORM_CUT).quantize(D("0.01")))
+            r["market"] += amt
+            r["market_commission"] += comm
+            services["market"]["gmv"] += amt
+            services["market"]["commission"] += comm
+            services["market"]["orders"] += 1
+
+        serialized_rows = []
+        for r in sorted(rows_by_day.values(), key=lambda x: x["date"], reverse=True):
+            total = r["rides"] + r["delivery"] + r["food"] + r["market"]
+            commission = (
+                r["ride_commission"] + r["delivery_commission"]
+                + r["food_commission"] + r["market_commission"]
+            )
+            serialized_rows.append({
+                "date": r["date"],
+                "rides": round(r["rides"], 2),
+                "delivery": round(r["delivery"], 2),
+                "food": round(r["food"], 2),
+                "market": round(r["market"], 2),
+                "total": round(total, 2),
+                "commission": round(commission, 2),
+            })
+
+        trend = [
+            {
+                "date": r["date"], "rides": r["rides"], "delivery": r["delivery"],
+                "food": r["food"], "market": r["market"], "total": r["total"],
+            }
+            for r in serialized_rows
+        ]
+        trend.reverse()
+
+        total_gmv = sum(s["gmv"] for s in services.values())
+        total_commission = sum(s["commission"] for s in services.values())
+        total_orders = sum(s["orders"] for s in services.values())
+
+        return {
+            "totals": {
+                "gross_total": round(total_gmv, 2),
+                "commission_total": round(total_commission, 2),
+                "ride_revenue": round(services["rides"]["gmv"], 2),
+                "delivery_revenue": round(services["delivery"]["gmv"], 2),
+                "food_revenue": round(services["food"]["gmv"], 2),
+                "market_revenue": round(services["market"]["gmv"], 2),
+                "total_orders": total_orders,
+            },
+            "services": [
+                {"key": "rides", "name": "Rides",
+                 "gmv": round(services["rides"]["gmv"], 2),
+                 "commission": round(services["rides"]["commission"], 2),
+                 "orders": services["rides"]["orders"]},
+                {"key": "delivery", "name": "Delivery (Parcels)",
+                 "gmv": round(services["delivery"]["gmv"], 2),
+                 "commission": round(services["delivery"]["commission"], 2),
+                 "orders": services["delivery"]["orders"]},
+                {"key": "food", "name": "Food",
+                 "gmv": round(services["food"]["gmv"], 2),
+                 "commission": round(services["food"]["commission"], 2),
+                 "orders": services["food"]["orders"]},
+                {"key": "market", "name": "Marketplace",
+                 "gmv": round(services["market"]["gmv"], 2),
+                 "commission": round(services["market"]["commission"], 2),
+                 "orders": services["market"]["orders"]},
+            ],
+            "trend": trend,
+            "rows": serialized_rows,
+        }
+
     else:
         # Per-day per-status rollup
         q = await db.execute(

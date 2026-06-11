@@ -42,12 +42,27 @@
         .zi-quick:hover { background:#DBEAFE; color:#1E3A8A; border-color:#BFD3F5; }
     </style>
 
+    <!-- Service revenue breakdown (revenue report only) -->
+    <div id="serviceBreakdown" class="hidden">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="serviceCards"></div>
+    </div>
+
+    <style>
+        .zi-svc { background:#fff; border:1px solid #E7EBF1; border-radius:16px; padding:16px 18px; box-shadow:0 1px 2px rgba(15,23,42,.03); }
+        .zi-svc-top { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+        .zi-svc-ic { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:15px; }
+        .zi-svc-name { font-size:13px; font-weight:800; color:#0F172A; }
+        .zi-svc-gmv { font-size:22px; font-weight:800; color:#0F172A; line-height:1.1; }
+        .zi-svc-sub { font-size:11px; font-weight:700; color:#94A3B8; margin-top:6px; display:flex; justify-content:space-between; }
+    </style>
+
     <!-- Filter row -->
     <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm px-5 py-4 flex flex-wrap items-end gap-3">
         <div class="min-w-[150px]">
             <label class="block text-[10px] font-black text-ziggo-muted mb-1.5 uppercase tracking-wider">Report type</label>
             <select id="rptType" class="w-full px-3 py-2 border border-ziggo-line rounded-lg text-sm outline-none focus:border-ziggo bg-white">
                 <option value="summary" {% if report_type == 'summary' %}selected{% endif %}>Summary</option>
+                <option value="revenue" {% if report_type == 'revenue' %}selected{% endif %}>Revenue Breakdown</option>
                 <option value="earnings" {% if report_type == 'earnings' %}selected{% endif %}>Earnings</option>
                 <option value="drivers" {% if report_type == 'drivers' %}selected{% endif %}>Driver Performance</option>
                 <option value="riders" {% if report_type == 'riders' %}selected{% endif %}>Rider Analytics</option>
@@ -151,7 +166,19 @@
         const slicedRows = currentRows.slice(startIdx, endIdx);
         
         const type = getActiveType();
-        if (type === 'earnings') {
+        if (type === 'revenue') {
+            body.innerHTML = slicedRows.map(r => `
+                <tr class="hover:bg-gray-50/50">
+                    <td class="px-6 py-4 font-black text-ziggo-ink">${r.date}</td>
+                    <td class="px-6 py-4 font-bold text-ziggo-ink">Rs. ${fmtMoney(r.rides)}</td>
+                    <td class="px-6 py-4 font-bold text-violet-600">Rs. ${fmtMoney(r.delivery)}</td>
+                    <td class="px-6 py-4 font-bold text-orange-600">Rs. ${fmtMoney(r.food)}</td>
+                    <td class="px-6 py-4 font-bold text-emerald-600">Rs. ${fmtMoney(r.market)}</td>
+                    <td class="px-6 py-4 font-black text-ziggo-ink">Rs. ${fmtMoney(r.total)}</td>
+                    <td class="px-6 py-4 font-black text-ziggo">Rs. ${fmtMoney(r.commission)}</td>
+                </tr>
+            `).join('');
+        } else if (type === 'earnings') {
             body.innerHTML = slicedRows.map(r => `
                 <tr class="hover:bg-gray-50/50">
                     <td class="px-6 py-4 font-black text-ziggo-ink">${r.date}</td>
@@ -269,7 +296,49 @@
         const val3 = document.getElementById('kpiVal3');
         const val4 = document.getElementById('kpiVal4');
 
-        if (type === 'earnings') {
+        // Service breakdown cards only render for the revenue report.
+        const breakdown = document.getElementById('serviceBreakdown');
+        if (type === 'revenue') {
+            breakdown.classList.remove('hidden');
+            const meta = {
+                rides:    { ic: 'fas fa-route',         grad: 'linear-gradient(135deg,#1E40AF,#3B82F6)' },
+                delivery: { ic: 'fas fa-box',           grad: 'linear-gradient(135deg,#7C3AED,#A78BFA)' },
+                food:     { ic: 'fas fa-utensils',      grad: 'linear-gradient(135deg,#EA580C,#FB923C)' },
+                market:   { ic: 'fas fa-shopping-basket',grad: 'linear-gradient(135deg,#059669,#34D399)' },
+            };
+            document.getElementById('serviceCards').innerHTML = (d.services || []).map(s => {
+                const m = meta[s.key] || { ic: 'fas fa-circle', grad: 'linear-gradient(135deg,#64748B,#94A3B8)' };
+                return `
+                <div class="zi-svc">
+                    <div class="zi-svc-top">
+                        <div class="zi-svc-ic" style="background:${m.grad}"><i class="${m.ic}"></i></div>
+                        <span class="zi-svc-name">${s.name}</span>
+                    </div>
+                    <div class="zi-svc-gmv">Rs. ${fmtMoney(s.gmv)}</div>
+                    <div class="zi-svc-sub"><span>${s.orders.toLocaleString()} orders</span><span class="text-ziggo">Comm. Rs. ${fmtMoney(s.commission)}</span></div>
+                </div>`;
+            }).join('');
+        } else {
+            breakdown.classList.add('hidden');
+        }
+
+        if (type === 'revenue') {
+            icon1.className = 'far fa-credit-card';
+            label1.textContent = 'Total Revenue';
+            val1.textContent = `Rs. ${fmtMoney(d.totals.gross_total)}`;
+
+            icon2.className = 'fas fa-hand-holding-usd';
+            label2.textContent = 'Admin Commission';
+            val2.textContent = `Rs. ${fmtMoney(d.totals.commission_total)}`;
+
+            icon3.className = 'fas fa-utensils';
+            label3.textContent = 'Food Revenue';
+            val3.textContent = `Rs. ${fmtMoney(d.totals.food_revenue)}`;
+
+            icon4.className = 'fas fa-shopping-basket';
+            label4.textContent = 'Marketplace Revenue';
+            val4.textContent = `Rs. ${fmtMoney(d.totals.market_revenue)}`;
+        } else if (type === 'earnings') {
             icon1.className = 'fas fa-hand-holding-usd';
             label1.textContent = 'Admin Commission';
             val1.textContent = `Rs. ${fmtMoney(d.totals.admin_net)}`;
@@ -337,7 +406,17 @@
 
         // 2. Update Table Headers
         const header = document.getElementById('tableHeader');
-        if (type === 'earnings') {
+        if (type === 'revenue') {
+            header.innerHTML = `
+                <th class="px-6 py-4">Date</th>
+                <th class="px-6 py-4">Rides</th>
+                <th class="px-6 py-4">Delivery</th>
+                <th class="px-6 py-4">Food</th>
+                <th class="px-6 py-4">Marketplace</th>
+                <th class="px-6 py-4">Total Revenue</th>
+                <th class="px-6 py-4">Commission</th>
+            `;
+        } else if (type === 'earnings') {
             header.innerHTML = `
                 <th class="px-6 py-4">Date</th>
                 <th class="px-6 py-4">Gross Bookings</th>
@@ -383,7 +462,23 @@
         let datasets = [];
         let scales = {};
         
-        if (type === 'earnings') {
+        if (type === 'revenue') {
+            datasets = [
+                { label: 'Rides (Rs.)', data: d.trend.map(r => r.rides), borderColor: '#3B82F6', backgroundColor: 'rgba(59,130,246,0.10)',
+                  yAxisID: 'y', tension: 0.35, fill: false, pointRadius: 3 },
+                { label: 'Delivery (Rs.)', data: d.trend.map(r => r.delivery), borderColor: '#7C3AED', backgroundColor: 'rgba(124,58,237,0.10)',
+                  yAxisID: 'y', tension: 0.35, fill: false, pointRadius: 3 },
+                { label: 'Food (Rs.)', data: d.trend.map(r => r.food), borderColor: '#EA580C', backgroundColor: 'rgba(234,88,12,0.10)',
+                  yAxisID: 'y', tension: 0.35, fill: false, pointRadius: 3 },
+                { label: 'Marketplace (Rs.)', data: d.trend.map(r => r.market), borderColor: '#059669', backgroundColor: 'rgba(5,150,105,0.10)',
+                  yAxisID: 'y', tension: 0.35, fill: false, pointRadius: 3 },
+                { label: 'Total (Rs.)', data: d.trend.map(r => r.total), borderColor: '#0F172A', backgroundColor: 'rgba(15,23,42,0.06)',
+                  yAxisID: 'y', tension: 0.35, fill: false, pointRadius: 3, borderDash: [5, 4] },
+            ];
+            scales = {
+                y: { position: 'left', beginAtZero: true, title: { display: true, text: 'Revenue (Rs.)' } },
+            };
+        } else if (type === 'earnings') {
             datasets = [
                 { label: 'Gross Bookings (Rs.)', data: d.trend.map(r => r.gross), borderColor: '#3B82F6', backgroundColor: 'rgba(59,130,246,0.10)',
                   yAxisID: 'y', tension: 0.35, fill: false, pointRadius: 3 },
