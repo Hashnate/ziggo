@@ -53,7 +53,15 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
       setState(() => _error = 'Please enter your first name');
       return;
     }
-    if (email.isNotEmpty && !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+    if (last.length < 2) {
+      setState(() => _error = 'Please enter your last name');
+      return;
+    }
+    if (email.isEmpty) {
+      setState(() => _error = 'Please enter your email');
+      return;
+    }
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
       setState(() => _error = 'Enter a valid email address');
       return;
     }
@@ -63,19 +71,20 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
       _error = null;
     });
 
-    final fullName = [first, last].where((s) => s.isNotEmpty).join(' ');
+    final fullName = '$first $last';
     final auth = context.read<AuthProvider>();
     try {
-      await auth.updateProfile(
-        fullName: fullName,
-        email: email.isEmpty ? null : email,
-      );
+      await auth.updateProfile(fullName: fullName, email: email);
     } catch (_) {
-      // Don't trap the user on a save failure — let them into the app; the
-      // profile screen can collect these again later.
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = 'Could not save your details. Please try again.';
+      });
+      return;
     }
     if (!mounted) return;
-    // Back to _Root, which now routes to home for the authenticated user.
+    // Details saved — drop to _Root, which now routes to home.
     Navigator.popUntil(context, (r) => r.isFirst);
   }
 
@@ -89,9 +98,9 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
-          // Already authenticated at this point — "back" just skips into home
-          // rather than dropping back onto the login stack.
-          onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
+          // Details are mandatory — back returns to the OTP page rather than
+          // letting the user slip into home with an incomplete profile.
+          onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Your details',
@@ -127,7 +136,6 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
                       child: _field(
                         label: 'First Name',
                         controller: _firstCtrl,
-                        hint: 'e.g. Mohamed',
                         keyboardType: TextInputType.name,
                         capitalize: true,
                       ),
@@ -137,7 +145,6 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
                       child: _field(
                         label: 'Last Name',
                         controller: _lastCtrl,
-                        hint: 'e.g. Faris',
                         keyboardType: TextInputType.name,
                         capitalize: true,
                       ),
@@ -149,9 +156,8 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
               EntranceSlide(
                 delay: const Duration(milliseconds: 100),
                 child: _field(
-                  label: 'E-mail (Optional)',
+                  label: 'E-mail',
                   controller: _emailCtrl,
-                  hint: 'name@example.com',
                   keyboardType: TextInputType.emailAddress,
                 ),
               ),
@@ -200,7 +206,6 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
   Widget _field({
     required String label,
     required TextEditingController controller,
-    required String hint,
     TextInputType? keyboardType,
     bool capitalize = false,
   }) {
@@ -233,18 +238,13 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               isDense: true,
-              hintText: hint,
-              hintStyle: const TextStyle(
-                color: AppColors.textTertiary,
-                fontWeight: FontWeight.w500,
-              ),
               filled: false,
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 4),
+              contentPadding: EdgeInsets.symmetric(vertical: 4),
             ),
           ),
         ],

@@ -27,6 +27,8 @@ from app.models import (
     FoodCategory,
     FoodCollection,
     FoodDeal,
+    Event,
+    EventTicketTier,
 )
 
 # Colombo center
@@ -362,6 +364,54 @@ async def seed_food_home(db):
             deal.promo_code_id = p.id
 
 
+async def seed_events(db):
+    """Seed a demo concert with mixed ticket tiers. Two tiers carry sale windows
+    so the customer cart shows the 'Not Available' / 'Starting …' states."""
+    now = datetime.now(timezone.utc)
+    name = "SUN FM proudly presents SUNFEST 2026"
+    q = await db.execute(select(Event).where(Event.name == name))
+    if q.scalars().first():
+        return
+    ev = Event(
+        name=name,
+        description=(
+            "An international musical festival titled “SUNFEST” proudly "
+            "presented by SUN FM.\n\nThis event is planned as a large-scale "
+            "international production bringing world-class artists to Colombo for "
+            "one unforgettable night under the stars."
+        ),
+        venue="Port City Colombo",
+        city="Colombo",
+        image_url="https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=1200",
+        organizer_name="SUN FM Events",
+        organizer_phone="+94112000111",
+        starts_at=now + timedelta(days=65),
+        ends_at=now + timedelta(days=65, hours=6),
+        is_published=True,
+    )
+    db.add(ev)
+    await db.flush()
+    tiers = [
+        # name, price, capacity, desc, sale_starts_at, sale_ends_at
+        ("Tier 1 - Platinum", 6000,  200, "Early-bird platinum", None, now - timedelta(days=2)),
+        ("Tier 1 - VIP",      7500,  100, "Early-bird VIP",       None, now - timedelta(days=2)),
+        ("Tier 2 - Platinum", 7500,  300, "Standard platinum",    None, None),
+        ("Tier 2 - VIP",      10000, 150, "Standard VIP",         None, None),
+    ]
+    for tname, price, cap, desc, s_from, s_to in tiers:
+        db.add(
+            EventTicketTier(
+                event_id=ev.id,
+                name=tname,
+                price=Decimal(str(price)),
+                capacity=cap,
+                description=desc,
+                sale_starts_at=s_from,
+                sale_ends_at=s_to,
+            )
+        )
+
+
 async def main():
     async with AsyncSessionLocal() as db:
         await seed_admin(db)
@@ -372,6 +422,7 @@ async def main():
         await seed_restaurants(db)
         await seed_market(db)
         await seed_food_home(db)
+        await seed_events(db)
         await db.commit()
         print("[seed] Done.")
         print("  Admin login   : phone 0700000000  password admin123  -> /admin/login")
