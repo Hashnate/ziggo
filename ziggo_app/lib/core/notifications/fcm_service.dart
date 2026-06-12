@@ -80,7 +80,7 @@ class FcmService {
 
     try {
       // 1. flutter_local_notifications init (Android + iOS)
-      const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const androidInit = AndroidInitializationSettings('@mipmap/launcher_icon');
       const iosInit = DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
