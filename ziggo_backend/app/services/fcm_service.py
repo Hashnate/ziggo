@@ -123,12 +123,12 @@ async def _send_to_token(
                 # ziggo_app/android/app/src/main/res/raw/ride_alert.mp3 in the
                 # APK). Non-urgent ones use the OS default tone. Note:
                 # Android references res/raw assets WITHOUT extension.
-                sound="default",
+                sound="ride_alert" if urgent else "default",
                 # Channel id — Firebase auto-creates this channel on first
                 # delivery, using the sound from the payload as the channel's
                 # default. Once created, the channel's sound is fixed; to
-                # change later, bump the id (e.g. ziggo_ride_alerts_v2).
-                channel_id="ziggo_ride_alerts_v2" if urgent else None,
+                # change later, bump the id (e.g. ziggo_ride_alerts_v3).
+                channel_id="ziggo_ride_alerts_v3" if urgent else None,
             ),
         ),
         apns=messaging.APNSConfig(
@@ -137,7 +137,7 @@ async def _send_to_token(
                 aps=messaging.Aps(
                     # iOS uses default sound until an .caf/.wav of ride_alert
                     # is added to the Xcode project (Android-only for now).
-                    sound="default",
+                    sound="ride_alert.caf" if urgent else "default",
                     content_available=True,
                 ),
             ),
