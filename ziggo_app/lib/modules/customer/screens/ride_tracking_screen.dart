@@ -712,12 +712,12 @@ class _BottomCard extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.payments_rounded, color: Colors.black, size: 18),
+                            const Icon(Icons.payments_rounded, color: Colors.white, size: 18),
                             const SizedBox(width: 6),
                             Text(
                               'Rs.$amount',
                               style: const TextStyle(
-                                color: Colors.black,
+                                color: Colors.white,
                                 fontWeight: FontWeight.w900,
                                 fontSize: 15,
                               ),
@@ -1189,12 +1189,12 @@ class _ActionRow extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.payments_rounded, color: Colors.black, size: 18),
+                const Icon(Icons.payments_rounded, color: Colors.white, size: 18),
                 const SizedBox(width: 6),
                 Text(
                   'Rs.$amount',
                   style: const TextStyle(
-                    color: Colors.black,
+                    color: Colors.white,
                     fontWeight: FontWeight.w900,
                     fontSize: 15,
                   ),

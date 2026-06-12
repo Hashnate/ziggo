@@ -37,7 +37,7 @@ class _WalletScreenState extends State<WalletScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(err ?? 'Added Rs.${amount.toStringAsFixed(0)} to wallet'),
+        content: Text(err ?? 'Top-up request of Rs.${amount.toStringAsFixed(0)} sent for admin approval'),
         backgroundColor: err == null ? AppColors.success : AppColors.error,
         behavior: SnackBarBehavior.floating,
       ),
@@ -92,7 +92,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   onPressed: () => Navigator.pop(ctx, double.tryParse(controller.text) ?? 0),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.black,
-                    foregroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   child: const Text('TOP UP',

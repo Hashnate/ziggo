@@ -6,6 +6,8 @@ import '../../../core/network/api_client.dart';
 import '../../auth/auth_provider.dart';
 import '../../customer/screens/support_screen.dart';
 import '../driver_provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import '../../../app/app_styles.dart';
 import 'driver_documents_screen.dart';
 import 'driver_history_screen.dart';
 
@@ -91,28 +93,7 @@ class DriverProfileScreen extends StatelessWidget {
               ),
             ),
           ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-              child: _outlinedAction(
-                icon: Icons.group_add_rounded,
-                label: 'Invite a friend',
-                subtitle: 'Earn cash from referrals',
-                onTap: () => _comingSoon(context, 'Referrals'),
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: _outlinedAction(
-                icon: Icons.verified_rounded,
-                label: 'E-training',
-                subtitle: 'Become a better driver partner',
-                onTap: () => _comingSoon(context, 'E-training'),
-              ),
-            ),
-          ),
+
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
@@ -154,11 +135,12 @@ class DriverProfileScreen extends StatelessWidget {
                         },
                       ),
                     ),
+
                     _divider(),
                     _listTile(
-                      icon: Icons.shield_rounded,
-                      title: 'My insurance',
-                      onTap: () => _comingSoon(context, 'Insurance'),
+                      icon: Icons.qr_code_rounded,
+                      title: 'Show Scan & Go QR',
+                      onTap: () => _showQrSheet(context, driverId, name, vehicleNumber, vehicleType),
                     ),
                     _divider(),
                     _listTile(
@@ -551,6 +533,105 @@ class DriverProfileScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static void _showQrSheet(
+    BuildContext context,
+    String driverId,
+    String name,
+    String vehicleNumber,
+    String vehicleType,
+  ) {
+    final qrData = 'ziggo://scan-and-go?driver_id=$driverId&name=${Uri.encodeComponent(name)}&vehicle=${Uri.encodeComponent(vehicleNumber)}&vehicle_type=${Uri.encodeComponent(vehicleType)}';
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (ctx) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: AppColors.divider,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Your Scan & Go QR',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Let passengers scan this to start a ride instantly',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: AppStyles.shadowSm,
+                ),
+                child: QrImageView(
+                  data: qrData,
+                  version: QrVersions.auto,
+                  size: 200.0,
+                  gapless: false,
+                  eyeStyle: const QrEyeStyle(
+                    eyeShape: QrEyeShape.circle,
+                    color: AppColors.primary,
+                  ),
+                  dataModuleStyle: const QrDataModuleStyle(
+                    dataModuleShape: QrDataModuleShape.circle,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Driver ID: $driverId',
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 15,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${vehicleType.toUpperCase()} • $vehicleNumber',
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
             ],
           ),
         ),

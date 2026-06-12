@@ -485,6 +485,150 @@ async def create_booking(
     return await _booking_to_response(db, booking)
 
 
+@router.post("/scan-and-go", response_model=BookingResponse, status_code=201)
+async def scan_and_go_booking(
+    req: BookingCreate,
+    driver_id: int = Query(...),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    customer = await _get_customer(db, user)
+
+    # Verify driver exists and is approved
+    dq = await db.execute(
+        select(Driver)
+        .options(selectinload(Driver.user))
+        .where(Driver.id == driver_id)
+    )
+    driver = dq.scalars().first()
+    if not driver:
+        raise HTTPException(status_code=404, detail="Driver not found")
+    if not driver.is_approved:
+        raise HTTPException(status_code=400, detail="Driver is not approved")
+
+    # Calculate fare
+    fare = await calculate_fare(
+        db,
+        req.service_type,
+        req.pickup_lat,
+        req.pickup_lng,
+        req.drop_lat,
+        req.drop_lng,
+        req.promo_code,
+        trip_type=req.trip_type,
+        is_flash=req.is_flash,
+        parcel_weight_kg=req.parcel_weight_kg,
+        is_rental=req.is_rental,
+        rental_hours=req.rental_hours,
+        is_courier=req.is_courier,
+        customer=customer,
+        redeem_points=req.redeem_points or 0,
+        stops=[s.model_dump() for s in (req.stops or [])],
+    )
+
+    # Check wallet payment balance
+    if req.payment_method == "wallet" and float(customer.wallet_balance or 0) < fare["final_amount"]:
+        raise HTTPException(status_code=400, detail="Insufficient wallet balance")
+
+    ref_prefix = (
+        "CR" if req.is_courier
+        else "FL" if req.is_flash
+        else "RT" if req.is_rental
+        else "ZG"
+    )
+
+    now = datetime.now(timezone.utc)
+    booking = Booking(
+        booking_ref=ref_prefix + secrets.token_hex(4).upper(),
+        customer_id=customer.id,
+        driver_id=driver.id,
+        pickup_lat=Decimal(str(req.pickup_lat)),
+        pickup_lng=Decimal(str(req.pickup_lng)),
+        pickup_address=req.pickup_address,
+        drop_lat=Decimal(str(req.drop_lat)),
+        drop_lng=Decimal(str(req.drop_lng)),
+        drop_address=req.drop_address,
+        service_type=req.service_type,
+        trip_type=req.trip_type,
+        status=BookingStatus.ACCEPTED,  # Set directly to ACCEPTED
+        accepted_at=now,
+        distance_km=to_decimal(fare["distance_km"]),
+        duration_min=fare["duration_min"],
+        fare_amount=to_decimal(fare["fare_amount"]),
+        discount_amount=to_decimal(fare["discount_amount"]),
+        redeem_points=int(fare.get("redeem_points_used", 0) or 0),
+        redeem_discount=to_decimal(fare.get("redeem_discount", 0) or 0),
+        final_amount=to_decimal(fare["final_amount"]),
+        platform_fee=to_decimal(fare["platform_fee"]),
+        driver_earnings=to_decimal(fare["driver_earnings"]),
+        payment_method=req.payment_method,
+        payment_status="pending",
+        promo_code=fare["promo_code"],
+        is_flash=req.is_flash,
+        parcel_type=req.parcel_type,
+        parcel_weight_kg=Decimal(str(req.parcel_weight_kg)) if req.parcel_weight_kg else None,
+        receiver_name=req.receiver_name,
+        receiver_phone=req.receiver_phone,
+        parcel_instructions=req.parcel_instructions,
+        is_courier=req.is_courier,
+        courier_eta_days=fare.get("courier_eta_days") if req.is_courier else None,
+        is_rental=req.is_rental,
+        rental_hours=req.rental_hours,
+        pickup_fee=to_decimal(fare.get("pickup_fee", 0)),
+        boost=to_decimal(fare.get("boost", 0)),
+        passenger_deductible=to_decimal(fare.get("passenger_deductible", 0)),
+        app_usage_charges=to_decimal(fare.get("app_usage_charges", 0)),
+        deductions=to_decimal(fare.get("deductions", 0)),
+    )
+    db.add(booking)
+    await db.flush()
+
+    if booking.redeem_points and booking.redeem_points > 0:
+        from ...services.loyalty_service import redeem_points as _redeem
+        await _redeem(
+            db, customer,
+            points=int(booking.redeem_points),
+            source_kind="booking",
+            source_id=booking.id,
+            description=f"Redeemed on {booking.booking_ref}",
+        )
+
+    if fare["promo_code"]:
+        pq = await db.execute(select(PromoCode).where(PromoCode.code == fare["promo_code"]))
+        p = pq.scalars().first()
+        if p:
+            p.used_count = (p.used_count or 0) + 1
+
+    await db.commit()
+    await db.refresh(booking)
+
+    # Notify driver (via ws manager) so their app transitions
+    if driver.user_id:
+        await manager.send(
+            driver.user_id,
+            "booking_update",
+            {"booking_id": booking.id, "status": booking.status.value},
+        )
+        db.add(
+            Notification(
+                user_id=driver.user_id,
+                title="Scan & Go Trip Started",
+                body=f"A passenger scanned your QR code and started ride {booking.booking_ref}",
+                type="ride_update",
+            )
+        )
+        await db.commit()
+
+    # Notify customer
+    await manager.send(
+        user.id,
+        "booking_update",
+        {"booking_id": booking.id, "status": booking.status.value},
+    )
+
+    return await _booking_to_response(db, booking)
+
+
 @router.get("", response_model=List[BookingResponse])
 async def list_my_bookings(
     db: AsyncSession = Depends(get_db),

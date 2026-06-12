@@ -65,6 +65,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     _secondaryPhone = widget.friend?.phone;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<PromosProvider>().refresh();
+      context.read<PaymentMethodsProvider>().fetchCards();
       context.read<PaymentMethodsProvider>().fetchCorporateProfile();
       _usePoints = false;
       _recalculate();
@@ -343,6 +344,60 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                   onTap: () {
                     setState(() => _payment = 'wallet');
                     Navigator.pop(ctx);
+                  },
+                ),
+                const Divider(height: 1),
+
+                if (cardsProvider.corporateProfile != null) ...[
+                  ListTile(
+                    leading: const Icon(Icons.business_rounded, color: AppColors.primary),
+                    title: Text('Corporate: ${cardsProvider.corporateProfile!['company_name']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text('Status: ${(cardsProvider.corporateProfile!['status'] ?? 'active').toUpperCase()}'),
+                    trailing: _payment == 'corporate' ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
+                    onTap: () {
+                      setState(() => _payment = 'corporate');
+                      Navigator.pop(ctx);
+                    },
+                  ),
+                  const Divider(height: 1),
+                ],
+
+                if (cardsProvider.cards.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(left: 16, top: 12, bottom: 4),
+                    child: Text(
+                      'SAVED CARDS',
+                      style: TextStyle(fontSize: 10, color: AppColors.textTertiary, fontWeight: FontWeight.bold, letterSpacing: 1.1),
+                    ),
+                  ),
+                  ...cardsProvider.cards.map((c) {
+                    final String cardNo = c['card_no'] ?? '';
+                    final String value = 'card_${c['id']}';
+                    return ListTile(
+                      leading: const Icon(Icons.credit_card_rounded, color: AppColors.primary),
+                      title: Text('${c['card_type']} ending in ${cardNo.substring(cardNo.length - 4)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      trailing: _payment == value ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
+                      onTap: () {
+                        setState(() => _payment = value);
+                        Navigator.pop(ctx);
+                      },
+                    );
+                  }),
+                  const Divider(height: 1),
+                ],
+
+                ListTile(
+                  leading: const Icon(Icons.add_rounded, color: AppColors.accent),
+                  title: const Text('Add new card', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.accent)),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const PaymentMethodsScreen()),
+                    );
+                    if (context.mounted) {
+                      context.read<PaymentMethodsProvider>().fetchCards();
+                    }
                   },
                 ),
               ],
@@ -661,9 +716,28 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Icon(Icons.payments_rounded, color: AppColors.success, size: 18),
+                                  Icon(
+                                    _payment == 'cash'
+                                        ? Icons.payments_rounded
+                                        : _payment == 'wallet'
+                                            ? Icons.account_balance_wallet_rounded
+                                            : _payment == 'corporate'
+                                                ? Icons.business_rounded
+                                                : Icons.credit_card_rounded,
+                                    color: AppColors.success,
+                                    size: 18,
+                                  ),
                                   const SizedBox(width: 8),
-                                  Text(_payment == 'cash' ? 'Cash' : 'Wallet', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                                  Text(
+                                    _payment == 'cash'
+                                        ? 'Cash'
+                                        : _payment == 'wallet'
+                                            ? 'Wallet'
+                                            : _payment == 'corporate'
+                                                ? 'Corporate'
+                                                : _getSelectedCardLabel(),
+                                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                                  ),
                                 ],
                               ),
                             ),
@@ -859,5 +933,17 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
         ),
       ),
     );
+  }
+
+  String _getSelectedCardLabel() {
+    final cards = context.read<PaymentMethodsProvider>().cards;
+    try {
+      final id = int.parse(_payment.split('_')[1]);
+      final card = cards.firstWhere((c) => c['id'] == id);
+      final no = card['card_no'].toString();
+      return "${card['card_type']} •••• ${no.substring(no.length - 4)}";
+    } catch (_) {
+      return "Card";
+    }
   }
 }

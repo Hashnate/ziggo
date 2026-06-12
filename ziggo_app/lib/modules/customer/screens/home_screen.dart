@@ -30,6 +30,7 @@ import 'saved_addresses_screen.dart';
 import 'subscription_screen.dart';
 import 'support_screen.dart';
 import 'wallet_screen.dart';
+import 'scan_and_go_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onMenu;
@@ -860,9 +861,14 @@ class _ServicesGrid extends StatelessWidget {
                 ),
               ),
               GradientServiceTile(
-                icon: Icons.apps_rounded,
-                imageAsset: 'assets/icons/more.png',
-                label: 'More',
+                icon: Icons.qr_code_scanner_rounded,
+                label: 'Scan & Go',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ScanAndGoScreen(),
+                  ),
+                ),
               ),
             ],
           ),
