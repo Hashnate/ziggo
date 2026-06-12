@@ -11,7 +11,6 @@ import '../../../app/app_styles.dart';
 import '../../../core/map/maps_service.dart';
 import '../../../core/map/ziggo_map.dart';
 import '../../../core/network/api_client.dart';
-import '../../../core/widgets/ambient_orbs.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../booking_provider.dart';
 import 'rating_screen.dart';
@@ -29,6 +28,8 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
   List<LatLng> _routePoints = const [];
   List<DirectionStep> _routeSteps = const [];
   String? _routeKey;
+  bool _sheetExpanded = true;
+  String? _lastStatus;
 
   // While the booking is in SEARCHING we poll /driver/nearby every 6 s so the
   // customer sees the same wandering-vehicle pins they had on fare estimate.
@@ -246,6 +247,13 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
     final meta = _statusMeta(status);
     final serviceType = active['service_type'] as String?;
 
+    if (_lastStatus != status) {
+      if (status == 'arrived' || status == 'started') {
+        _sheetExpanded = false;
+      }
+      _lastStatus = status;
+    }
+
     _ensureRoute(pickup, drop);
 
     // Show wandering driver pins only while we're still hunting for a driver.
@@ -441,7 +449,25 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
               left: 12, right: 12,
               child: _NextStepStrip(step: _routeSteps.first),
             ),
-          _BottomCard(active: active, meta: meta, driver: driver),
+          _BottomCard(
+            active: active,
+            meta: meta,
+            driver: driver,
+            expanded: _sheetExpanded,
+            onToggle: () {
+              setState(() {
+                _sheetExpanded = !_sheetExpanded;
+              });
+            },
+            onVerticalDragEnd: (d) {
+              final v = d.primaryVelocity ?? 0;
+              if (v > 80 && _sheetExpanded) {
+                setState(() => _sheetExpanded = false);
+              } else if (v < -80 && !_sheetExpanded) {
+                setState(() => _sheetExpanded = true);
+              }
+            },
+          ),
         ],
       ),
     );
@@ -593,10 +619,23 @@ class _BottomCard extends StatelessWidget {
   final Map<String, dynamic> active;
   final ({String label, String hint, Color color, IconData icon}) meta;
   final Map<String, dynamic>? driver;
-  const _BottomCard({required this.active, required this.meta, required this.driver});
+  final bool expanded;
+  final VoidCallback onToggle;
+  final Function(DragEndDetails) onVerticalDragEnd;
+
+  const _BottomCard({
+    required this.active,
+    required this.meta,
+    required this.driver,
+    required this.expanded,
+    required this.onToggle,
+    required this.onVerticalDragEnd,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final amount = (active['final_amount'] ?? 0).toString();
+
     return Align(
       alignment: Alignment.bottomCenter,
       child: Container(
@@ -613,107 +652,184 @@ class _BottomCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Center(
-                  child: Container(
-                    width: 44,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: AppColors.divider,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // 1. Status Title & Hint
-                Text(
-                  meta.label,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 22,
-                    letterSpacing: -0.4,
-                  ),
-                ),
-                if (meta.hint.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    meta.hint,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                // 3. Ride Details Box
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceMuted,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.divider),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Ride details',
-                            style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          Text(
-                            'Ref: ${active['booking_ref'] ?? ''}',
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Meet at your pickup spot: ${active['pickup_address'] ?? ''}',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 13,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onToggle,
+                  onVerticalDragEnd: onVerticalDragEnd,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Center(
+                      child: Container(
+                        width: 44,
+                        height: 5,
                         decoration: BoxDecoration(
-                          color: AppColors.success.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
+                          color: AppColors.divider,
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Text(
-                          (active['payment_method'] ?? 'Cash').toString().toUpperCase(),
-                          style: const TextStyle(
-                            color: AppColors.success,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 10,
-                            letterSpacing: 0.5,
-                          ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Header (Status & Hint, with Amount if collapsed)
+                if (!expanded)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              meta.label,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 22,
+                                letterSpacing: -0.4,
+                              ),
+                            ),
+                            if (meta.hint.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                meta.hint,
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          gradient: AppColors.goldGradient,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.payments_rounded, color: Colors.black, size: 18),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Rs.$amount',
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
+                  )
+                else ...[
+                  Text(
+                    meta.label,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 22,
+                      letterSpacing: -0.4,
+                    ),
                   ),
-                ),
-                if (driver != null) ...[
-                  const SizedBox(height: 16),
-                  _DriverCard(d: driver!),
+                  if (meta.hint.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      meta.hint,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ],
-                const SizedBox(height: 16),
-                _ActionRow(active: active),
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOut,
+                  alignment: Alignment.topCenter,
+                  child: expanded
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 16),
+                            // 3. Ride Details Box
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceMuted,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: AppColors.divider),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'Ride details',
+                                        style: TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Ref: ${active['booking_ref'] ?? ''}',
+                                        style: const TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Meet at your pickup spot: ${active['pickup_address'] ?? ''}',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.success.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      (active['payment_method'] ?? 'Cash').toString().toUpperCase(),
+                                      style: const TextStyle(
+                                        color: AppColors.success,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 10,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (driver != null) ...[
+                              const SizedBox(height: 16),
+                              _DriverCard(d: driver!),
+                            ],
+                            const SizedBox(height: 16),
+                            _ActionRow(active: active),
+                          ],
+                        )
+                      : const SizedBox(width: double.infinity),
+                ),
               ],
             ),
           ),
