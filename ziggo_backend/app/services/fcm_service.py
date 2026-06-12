@@ -130,19 +130,20 @@ async def _send_to_token(
         android_channel = None
         ios_sound = "default"
 
-    # For new_ride_request, we make it a data-only message to allow custom background notification handling (looping sound)
-    is_data_only = (event == "new_ride_request")
+    # Always send a notification block so the OS displays the alert even when
+    # the app is KILLED — a data-only message is dropped in that state (the
+    # Dart isolate never runs). We ALSO mirror title/body into `data` so the
+    # foreground handler can render its own custom looping-sound notification
+    # while the app is open. Net effect:
+    #   foreground      -> Flutter shows it (looping insistent custom sound)
+    #   background/dead -> OS shows the notification block (single custom sound)
     payload_data = {k: str(v) for k, v in (data or {}).items()}
-    if is_data_only:
-        payload_data["title"] = title
-        payload_data["body"] = body
-        notification_block = None
-    else:
-        notification_block = messaging.Notification(title=title, body=body)
+    payload_data["title"] = title
+    payload_data["body"] = body
 
     msg = messaging.Message(
         token=token,
-        notification=notification_block,
+        notification=messaging.Notification(title=title, body=body),
         data=payload_data,
         android=messaging.AndroidConfig(
             priority="high" if urgent else "normal",
@@ -152,7 +153,7 @@ async def _send_to_token(
                 sound=android_sound,
                 # Channel id — once created, the channel's sound is fixed.
                 channel_id=android_channel,
-            ) if not is_data_only else None,
+            ),
         ),
         apns=messaging.APNSConfig(
             headers={"apns-priority": "10" if urgent else "5"},

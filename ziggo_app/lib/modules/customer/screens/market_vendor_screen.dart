@@ -305,7 +305,7 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
                 ),
                 const SizedBox(width: 12),
                 Transform.translate(
-                  offset: const Offset(0, -42),
+                  offset: const Offset(0, -14),
                   child: Container(
                     width: 76,
                     height: 76,

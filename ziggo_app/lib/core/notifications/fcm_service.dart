@@ -54,6 +54,17 @@ const String _generalAlertChannelDesc =
 /// top-level function in an isolated Dart isolate.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // The background isolate is a fresh Dart VM — Firebase must be re-initialised
+  // here or any Firebase call (and some plugin plumbing) fails on release.
+  try {
+    await Firebase.initializeApp();
+  } catch (_) {}
+
+  // Hybrid messages now carry a notification block, which the OS displays
+  // itself while the app is backgrounded / killed. Rendering our own here too
+  // would duplicate it — so only handle pure data-only payloads manually.
+  if (message.notification != null) return;
+
   final data = message.data;
   final event = data['event'];
   if (event == 'new_ride_request') {

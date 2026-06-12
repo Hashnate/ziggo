@@ -199,11 +199,18 @@ class _RestaurantSectionState extends State<_RestaurantSection> {
             .map((c) => c['id'])
             .toSet();
 
-        final matchedItems = allItems.where((it) {
+        var matchedItems = allItems.where((it) {
           final isCatMatch = matchingCatIds.contains(it['category_id']);
           final isNameMatch = it['name']?.toString().toLowerCase().contains(globalCatName) ?? false;
           return isCatMatch || isNameMatch;
         }).toList();
+
+        // The backend already tagged this restaurant with the category, so it
+        // genuinely serves it — never hide it just because no dish name happens
+        // to contain the category word. Fall back to its available menu.
+        if (matchedItems.isEmpty) {
+          matchedItems = allItems.where((it) => it['is_available'] != false).toList();
+        }
 
         if (matchedItems.isEmpty) return const SizedBox.shrink();
         final shown = matchedItems.take(3).toList();

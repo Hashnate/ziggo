@@ -224,7 +224,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
     final isOpenNow = r['is_open_now'] == true;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 42, 16, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
