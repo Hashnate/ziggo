@@ -44,7 +44,11 @@ Future<void> main() async {
     try {
       await dotenv.load(fileName: '.env');
     } catch (_) {
-      // ignore — runs with empty env
+      // .env is gitignored and CI ships it EMPTY (touch .env). flutter_dotenv
+      // throws on an empty/missing file and leaves itself UNINITIALISED, so any
+      // later dotenv.env read throws NotInitializedError and white-screens the
+      // app before runApp. Seed an empty map so every dotenv.env read is safe.
+      dotenv.testLoad(fileInput: '');
     }
     // On web, inject the Google Maps JS SDK now that we have the key. No-op on
     // mobile/desktop where the SDK comes from native config.
