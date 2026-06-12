@@ -51,12 +51,38 @@ const String _generalAlertChannelDesc =
     'Status updates and general notifications. Plays system default sound.';
 
 /// Required for background message handling on Android — Firebase invokes a
-/// top-level function in an isolated Dart isolate. The OS shows the system
-/// notification automatically using the payload, so we don't need to do
-/// anything here. Must be top-level + @pragma so it survives tree-shaking.
+/// top-level function in an isolated Dart isolate.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // No-op — OS displays the notification from the payload.
+  final data = message.data;
+  final event = data['event'];
+  if (event == 'new_ride_request') {
+    final title = data['title'] ?? 'New ride request';
+    final body = data['body'] ?? 'Tap to accept';
+
+    final local = FlutterLocalNotificationsPlugin();
+    const androidInit = AndroidInitializationSettings('@mipmap/launcher_icon');
+    await local.initialize(const InitializationSettings(android: androidInit));
+
+    await local.show(
+      message.messageId.hashCode,
+      title,
+      body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          'ziggo_ride_alerts_v5',
+          'Ride alerts',
+          channelDescription: 'New ride requests. Plays continuous custom sound.',
+          importance: Importance.max,
+          priority: Priority.high,
+          playSound: true,
+          sound: const RawResourceAndroidNotificationSound('ride_alert'),
+          additionalFlags: Int32List.fromList(<int>[4]),
+          enableVibration: true,
+        ),
+      ),
+    );
+  }
 }
 
 class FcmService {
@@ -315,15 +341,26 @@ class FcmService {
   /// while the app is open, so we render one ourselves with the same channel
   /// (and therefore the same sound) the OS would have used in background.
   Future<void> _onForegroundMessage(RemoteMessage message) async {
-    final notif = message.notification;
-    if (notif == null) return; // pure data-only payload — let the WS update the UI
-
-    if (kDebugMode) {
-      debugPrint('[fcm] foreground: ${notif.title} — ${notif.body}');
-    }
-
     final event = message.data['event'];
     final isRideRequest = event == 'new_ride_request';
+
+    String? title;
+    String? body;
+
+    if (isRideRequest) {
+      title = message.data['title'] ?? 'New ride request';
+      body = message.data['body'] ?? 'Tap to accept';
+    } else {
+      final notif = message.notification;
+      if (notif == null) return; // pure data-only payload — let the WS update the UI
+      title = notif.title;
+      body = notif.body;
+    }
+
+    if (kDebugMode) {
+      debugPrint('[fcm] foreground: $title — $body');
+    }
+
     final isFoodOrMarket = message.data['is_food'] == 'true' ||
         message.data['is_market'] == 'true' ||
         event == 'food_order_update' ||
@@ -368,8 +405,8 @@ class FcmService {
         // Unique notification id — use the FCM message hash so duplicates
         // dedupe naturally if the OS retries.
         message.messageId.hashCode,
-        notif.title,
-        notif.body,
+        title,
+        body,
         NotificationDetails(
           android: AndroidNotificationDetails(
             channelId,

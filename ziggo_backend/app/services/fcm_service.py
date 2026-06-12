@@ -130,10 +130,20 @@ async def _send_to_token(
         android_channel = None
         ios_sound = "default"
 
+    # For new_ride_request, we make it a data-only message to allow custom background notification handling (looping sound)
+    is_data_only = (event == "new_ride_request")
+    payload_data = {k: str(v) for k, v in (data or {}).items()}
+    if is_data_only:
+        payload_data["title"] = title
+        payload_data["body"] = body
+        notification_block = None
+    else:
+        notification_block = messaging.Notification(title=title, body=body)
+
     msg = messaging.Message(
         token=token,
-        notification=messaging.Notification(title=title, body=body),
-        data={k: str(v) for k, v in (data or {}).items()},
+        notification=notification_block,
+        data=payload_data,
         android=messaging.AndroidConfig(
             priority="high" if urgent else "normal",
             notification=messaging.AndroidNotification(
@@ -142,7 +152,7 @@ async def _send_to_token(
                 sound=android_sound,
                 # Channel id — once created, the channel's sound is fixed.
                 channel_id=android_channel,
-            ),
+            ) if not is_data_only else None,
         ),
         apns=messaging.APNSConfig(
             headers={"apns-priority": "10" if urgent else "5"},
