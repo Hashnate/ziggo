@@ -146,160 +146,164 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
               ),
             ),
           ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              margin: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 4)),
-                ],
-                border: Border.all(color: Colors.blueAccent, width: 3), // Emphasizing the bottom sheet similar to the UI markup
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: AppStyles.shadowSm,
+          SafeArea(
+            bottom: true,
+            top: false,
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: Container(
+                margin: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 4)),
+                  ],
+                  border: Border.all(color: Colors.blueAccent, width: 3), // Emphasizing the bottom sheet similar to the UI markup
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: AppStyles.shadowSm,
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.directions_car_rounded, size: 18),
+                                SizedBox(width: 6),
+                                Icon(Icons.access_time_rounded, size: 14),
+                                SizedBox(width: 8),
+                                Text('Later', style: TextStyle(fontWeight: FontWeight.w700)),
+                              ],
+                            ),
                           ),
-                          child: const Row(
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: AppStyles.shadowSm),
+                            child: const Icon(Icons.my_location_rounded, size: 20),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // Central Card inside the bottom sheet
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: AppStyles.shadowSm,
+                      ),
+                      child: Column(
+                        children: [
+                          // Trip Type Toggle Fake UI
+                          Row(
                             children: [
-                              Icon(Icons.directions_car_rounded, size: 18),
-                              SizedBox(width: 6),
-                              Icon(Icons.access_time_rounded, size: 14),
-                              SizedBox(width: 8),
-                              Text('Later', style: TextStyle(fontWeight: FontWeight.w700)),
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => _openSearch(tripType: 'one_way'),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.surfaceMuted,
+                                      borderRadius: const BorderRadius.only(topLeft: Radius.circular(16)),
+                                    ),
+                                    child: const Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.check_circle_rounded, size: 16),
+                                        SizedBox(width: 6),
+                                        Text('One way', style: TextStyle(fontWeight: FontWeight.w800)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => _openSearch(tripType: 'return'),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.only(topRight: Radius.circular(16)),
+                                    ),
+                                    child: const Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.radio_button_unchecked_rounded, size: 16, color: AppColors.textSecondary),
+                                        SizedBox(width: 6),
+                                        Text('Return trip*', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: AppStyles.shadowSm),
-                          child: const Icon(Icons.my_location_rounded, size: 20),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  
-                  // Central Card inside the bottom sheet
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: AppStyles.shadowSm,
-                    ),
-                    child: Column(
-                      children: [
-                        // Trip Type Toggle Fake UI
-                        Row(
-                          children: [
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () => _openSearch(tripType: 'one_way'),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.surfaceMuted,
-                                    borderRadius: const BorderRadius.only(topLeft: Radius.circular(16)),
-                                  ),
-                                  child: const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.check_circle_rounded, size: 16),
-                                      SizedBox(width: 6),
-                                      Text('One way', style: TextStyle(fontWeight: FontWeight.w800)),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () => _openSearch(tripType: 'return'),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.only(topRight: Radius.circular(16)),
-                                  ),
-                                  child: const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.radio_button_unchecked_rounded, size: 16, color: AppColors.textSecondary),
-                                      SizedBox(width: 6),
-                                      Text('Return trip*', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        
-                        // Locations
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(
-                            children: [
-                              Column(
-                                children: [
-                                  const Text('PICKUP', style: TextStyle(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.w900)),
-                                  Container(height: 20, width: 2, color: AppColors.divider),
-                                  const Text('DROP', style: TextStyle(color: AppColors.warning, fontSize: 10, fontWeight: FontWeight.w900)),
-                                ],
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
+                          
+                          // Locations
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                Column(
                                   children: [
-                                    GestureDetector(
-                                      onTap: () => _openSearch(focusDrop: false),
-                                      child: const Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text('Your location', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                                          Icon(Icons.favorite_border_rounded, size: 20),
-                                        ],
-                                      ),
-                                    ),
-                                    const Padding(
-                                      padding: EdgeInsets.symmetric(vertical: 8),
-                                      child: Divider(height: 1),
-                                    ),
-                                    GestureDetector(
-                                      onTap: () => _openSearch(focusDrop: true),
-                                      child: const Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text('Where are you going?', style: TextStyle(color: AppColors.textTertiary, fontWeight: FontWeight.w600, fontSize: 16)),
-                                          Icon(Icons.add_rounded, size: 24),
-                                        ],
-                                      ),
-                                    ),
+                                    const Text('PICKUP', style: TextStyle(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.w900)),
+                                    Container(height: 20, width: 2, color: AppColors.divider),
+                                    const Text('DROP', style: TextStyle(color: AppColors.warning, fontSize: 10, fontWeight: FontWeight.w900)),
                                   ],
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    children: [
+                                      GestureDetector(
+                                        onTap: () => _openSearch(focusDrop: false),
+                                        child: const Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text('Your location', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                                            Icon(Icons.favorite_border_rounded, size: 20),
+                                          ],
+                                        ),
+                                      ),
+                                      const Padding(
+                                        padding: EdgeInsets.symmetric(vertical: 8),
+                                        child: Divider(height: 1),
+                                      ),
+                                      GestureDetector(
+                                        onTap: () => _openSearch(focusDrop: true),
+                                        child: const Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text('Where are you going?', style: TextStyle(color: AppColors.textTertiary, fontWeight: FontWeight.w600, fontSize: 16)),
+                                            Icon(Icons.add_rounded, size: 24),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
+                    const SizedBox(height: 12),
+                  ],
+                ),
               ),
             ),
           ),

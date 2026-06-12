@@ -68,7 +68,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
     final picker = ImagePicker();
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
@@ -238,20 +238,20 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
     final yes = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: kDriverCard,
+        backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         icon: const Icon(Icons.logout_rounded, color: AppColors.error, size: 36),
-        title: const Text('Exit Registration?', textAlign: TextAlign.center, style: TextStyle(color: Colors.white)),
+        title: const Text('Exit Registration?', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textPrimary)),
         content: const Text(
           'You will be logged out. Are you sure you want to exit?',
           textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white70),
+          style: TextStyle(color: AppColors.textSecondary),
         ),
         actionsAlignment: MainAxisAlignment.center,
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(true),
@@ -272,7 +272,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
   @override
   Widget build(BuildContext context) {
     return Theme(
-      data: driverDarkTheme(context),
+      data: driverTheme(context),
       child: PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, result) async {
@@ -632,7 +632,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
       decoration: BoxDecoration(
         color: kDriverCard,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(color: AppColors.divider),
       ),
       child: child,
     );
@@ -692,7 +692,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: sel ? AppColors.primary : kDriverCardLight,
+                  color: sel ? AppColors.primary : AppColors.surfaceMuted,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -700,7 +700,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                   children: [
                     Icon(
                       t.$2,
-                      color: sel ? Colors.white : Colors.white70,
+                      color: sel ? Colors.white : AppColors.textSecondary,
                       size: 16,
                     ),
                     const SizedBox(width: 6),
@@ -709,7 +709,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                       style: TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 12,
-                        color: sel ? Colors.white : Colors.white70,
+                        color: sel ? Colors.white : AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -770,13 +770,13 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
           style: OutlinedButton.styleFrom(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            side: const BorderSide(color: Colors.white24),
+            side: const BorderSide(color: AppColors.divider),
           ),
           child: Text(file == null ? 'Upload' : 'Replace',
               style: const TextStyle(
                 fontWeight: FontWeight.w900,
                 fontSize: 11,
-                color: Colors.white,
+                color: AppColors.primary,
               )),
         ),
       ],

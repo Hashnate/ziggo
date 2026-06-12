@@ -18,6 +18,7 @@ import '../../customer/wallet_provider.dart';
 import 'payment_methods_screen.dart';
 import 'ride_tracking_screen.dart';
 import 'customer_shell.dart';
+import 'confirm_pickup_screen.dart';
 
 class VehicleSelectionScreen extends StatefulWidget {
   final Place pickup;
@@ -198,6 +199,15 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
 
   Future<void> _confirmBooking() async {
     if (_serviceType == null) return;
+    
+    final confirmedPlace = await Navigator.push<Place>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ConfirmPickupScreen(initialLocation: widget.pickup),
+      ),
+    );
+    if (confirmedPlace == null) return;
+
     HapticFeedback.mediumImpact();
     
     final booking = context.read<BookingProvider>();
@@ -208,8 +218,8 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       final actualServiceType = widget.isTruckMode ? 'truck' : _serviceType!;
       created = await booking.createBooking(
         serviceType: actualServiceType,
-        pickup: widget.pickup.location,
-        pickupAddress: widget.pickup.fullAddress,
+        pickup: confirmedPlace.location,
+        pickupAddress: confirmedPlace.fullAddress,
         drop: widget.drop.location,
         dropAddress: widget.drop.fullAddress,
         paymentMethod: _payment,
@@ -590,9 +600,11 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
                 boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 24, offset: const Offset(0, -6))],
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                   // Promotional banner
                   Container(
                     width: double.infinity,
@@ -732,7 +744,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                   
                   // Book Now Button
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
                     child: Row(
                       children: [
                         Expanded(
@@ -778,6 +790,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
               ),
             ),
           ),
+        ),
         ],
       ),
     );

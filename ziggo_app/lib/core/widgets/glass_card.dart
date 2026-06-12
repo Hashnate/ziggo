@@ -103,7 +103,7 @@ class _ShimmerHighlightState extends State<ShimmerHighlight>
           return SizedBox(
             height: widget.height,
             child: ShaderMask(
-              blendMode: BlendMode.srcATop,
+              blendMode: BlendMode.srcIn,
               shaderCallback: (rect) => LinearGradient(
                 begin: Alignment(-1 + 2 * t, -1),
                 end: Alignment(0 + 2 * t, 1),

@@ -9,10 +9,10 @@ import '../driver_provider.dart';
 import 'driver_documents_screen.dart';
 import 'driver_history_screen.dart';
 
-// Local dark tokens — mirror the driver home's Ziggo navy theme.
-const Color _kBg = Color(0xFF12151C);
-const Color _kCard = Color(0xFF1B1E25);
-const Color _kCardLight = Color(0xFF262A33);
+// Local light tokens — mirror the customer/user light theme.
+const Color _kBg = AppColors.background;
+const Color _kCard = AppColors.surface;
+const Color _kCardLight = AppColors.surfaceMuted;
 
 /// PickMe-style driver profile — blue gradient hero + dark body with the
 /// driver's stats, bio basics, and account actions.
@@ -220,18 +220,18 @@ class DriverProfileScreen extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: _kCardLight,
+                    color: AppColors.error.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.logout_rounded, color: Colors.white, size: 18),
+                      Icon(Icons.logout_rounded, color: AppColors.error, size: 18),
                       SizedBox(width: 8),
                       Text(
                         'Logout',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: AppColors.error,
                           fontWeight: FontWeight.w900,
                           fontSize: 15,
                         ),
@@ -282,7 +282,7 @@ class DriverProfileScreen extends StatelessWidget {
             Text(
               value,
               style: const TextStyle(
-                color: Colors.white,
+                color: AppColors.textPrimary,
                 fontWeight: FontWeight.w900,
                 fontSize: 20,
               ),
@@ -297,7 +297,7 @@ class DriverProfileScreen extends StatelessWidget {
         Text(
           label,
           style: const TextStyle(
-            color: Colors.white54,
+            color: AppColors.textSecondary,
             fontWeight: FontWeight.w700,
             fontSize: 12,
           ),
@@ -307,7 +307,7 @@ class DriverProfileScreen extends StatelessWidget {
   }
 
   Widget _statDivider() =>
-      Container(width: 1, height: 30, color: Colors.white12);
+      Container(width: 1, height: 30, color: AppColors.divider);
 
   Widget _banner(String text) {
     return Container(
@@ -326,7 +326,7 @@ class DriverProfileScreen extends StatelessWidget {
             child: Text(
               text,
               style: const TextStyle(
-                color: Colors.white,
+                color: AppColors.textPrimary,
                 fontWeight: FontWeight.w600,
                 fontSize: 12.5,
               ),
@@ -342,12 +342,12 @@ class DriverProfileScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 9),
       child: Row(
         children: [
-          Icon(icon, color: Colors.white38, size: 20),
+          Icon(icon, color: AppColors.textTertiary, size: 20),
           const SizedBox(width: 12),
           Text(
             '$label  ',
             style: const TextStyle(
-              color: Colors.white38,
+              color: AppColors.textSecondary,
               fontWeight: FontWeight.w600,
               fontSize: 13,
             ),
@@ -357,7 +357,7 @@ class DriverProfileScreen extends StatelessWidget {
               value,
               textAlign: TextAlign.right,
               style: const TextStyle(
-                color: Colors.white,
+                color: AppColors.textPrimary,
                 fontWeight: FontWeight.w800,
                 fontSize: 13.5,
               ),
@@ -384,17 +384,17 @@ class DriverProfileScreen extends StatelessWidget {
             decoration: BoxDecoration(
               color: _kCardLight,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white12),
+              border: Border.all(color: AppColors.divider),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, color: Colors.white, size: 19),
+                Icon(icon, color: AppColors.primary, size: 19),
                 const SizedBox(width: 10),
                 Text(
                   label,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                     fontWeight: FontWeight.w800,
                     fontSize: 14,
                   ),
@@ -406,7 +406,7 @@ class DriverProfileScreen extends StatelessWidget {
           Text(
             subtitle,
             style: const TextStyle(
-              color: Colors.white38,
+              color: AppColors.textSecondary,
               fontWeight: FontWeight.w600,
               fontSize: 11.5,
             ),
@@ -430,14 +430,14 @@ class DriverProfileScreen extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           child: Row(
             children: [
-              Icon(icon, color: Colors.white70, size: 22),
+              Icon(icon, color: AppColors.textSecondary, size: 22),
               const SizedBox(width: 14),
               Expanded(
                 child: RichText(
                   text: TextSpan(
                     text: title,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                       fontWeight: FontWeight.w800,
                       fontSize: 14,
                     ),
@@ -447,7 +447,7 @@ class DriverProfileScreen extends StatelessWidget {
                             TextSpan(
                               text: '  $trailing',
                               style: const TextStyle(
-                                color: Colors.white38,
+                                color: AppColors.textSecondary,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 12.5,
                               ),
@@ -457,7 +457,7 @@ class DriverProfileScreen extends StatelessWidget {
                 ),
               ),
               const Icon(Icons.chevron_right_rounded,
-                  color: Colors.white38, size: 22),
+                  color: AppColors.textTertiary, size: 22),
             ],
           ),
         ),
@@ -468,7 +468,7 @@ class DriverProfileScreen extends StatelessWidget {
   Widget _divider() => const Divider(
         height: 1,
         thickness: 1,
-        color: Colors.white10,
+        color: AppColors.divider,
         indent: 16,
         endIndent: 16,
       );
@@ -489,7 +489,7 @@ class DriverProfileScreen extends StatelessWidget {
   }) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: _kCard,
+      backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
@@ -506,7 +506,7 @@ class DriverProfileScreen extends StatelessWidget {
                   width: 44,
                   height: 5,
                   decoration: BoxDecoration(
-                    color: Colors.white24,
+                    color: AppColors.divider,
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
@@ -515,7 +515,7 @@ class DriverProfileScreen extends StatelessWidget {
               Text(
                 title,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: AppColors.textPrimary,
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
                 ),
@@ -531,7 +531,7 @@ class DriverProfileScreen extends StatelessWidget {
                         child: Text(
                           e.key.toUpperCase(),
                           style: const TextStyle(
-                            color: Colors.white38,
+                            color: AppColors.textSecondary,
                             fontWeight: FontWeight.w900,
                             fontSize: 10,
                             letterSpacing: 1.2,
@@ -542,7 +542,7 @@ class DriverProfileScreen extends StatelessWidget {
                         child: Text(
                           e.value,
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                             fontWeight: FontWeight.w800,
                             fontSize: 14,
                           ),
@@ -562,15 +562,15 @@ class DriverProfileScreen extends StatelessWidget {
     final yes = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: _kCard,
+        backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         icon: const Icon(Icons.logout_rounded, color: AppColors.error, size: 36),
         title: const Text('Log out?',
-            textAlign: TextAlign.center, style: TextStyle(color: Colors.white)),
+            textAlign: TextAlign.center, style: TextStyle(color: AppColors.textPrimary)),
         content: const Text(
           'You will go offline and stop receiving requests until you log back in.',
           textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white70),
+          style: TextStyle(color: AppColors.textSecondary),
         ),
         actionsAlignment: MainAxisAlignment.center,
         actions: [
