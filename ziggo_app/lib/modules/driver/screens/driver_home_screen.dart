@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 import '../../../core/notifications/fcm_service.dart';
 
@@ -2209,10 +2210,12 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
   late int _secondsLeft;
   Timer? _timer;
   bool _busy = false;
+  final AudioPlayer _alertPlayer = AudioPlayer();
 
   @override
   void initState() {
     super.initState();
+    _startAlertSound();
     _secondsLeft = (widget.request['expires_in_seconds'] as num?)?.toInt() ?? 30;
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) return;
@@ -2224,9 +2227,22 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
     });
   }
 
+  // Loop the ride-alert sound IN-APP for as long as the request sheet is open.
+  // This is independent of the FCM push / notification permission, so the
+  // driver always hears the alert while the app is in the foreground. The
+  // sheet closes on accept/decline/timeout/taken-by-other → dispose() stops it.
+  Future<void> _startAlertSound() async {
+    try {
+      await _alertPlayer.setReleaseMode(ReleaseMode.loop);
+      await _alertPlayer.play(AssetSource('sounds/ride_alert.mp3'));
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     _timer?.cancel();
+    _alertPlayer.stop();
+    _alertPlayer.dispose();
     super.dispose();
   }
 

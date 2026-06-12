@@ -366,18 +366,17 @@ class FcmService {
     final event = message.data['event'];
     final isRideRequest = event == 'new_ride_request';
 
-    String? title;
-    String? body;
+    // Ride requests in the foreground are alerted IN-APP: the WebSocket event
+    // pops the request sheet, which loops the ride-alert sound itself. Showing
+    // an FCM notification here as well would double the sound, so skip it. The
+    // OS still shows the alert when the app is backgrounded/killed (that path
+    // is handled by the system, not this foreground handler).
+    if (isRideRequest) return;
 
-    if (isRideRequest) {
-      title = message.data['title'] ?? 'New ride request';
-      body = message.data['body'] ?? 'Tap to accept';
-    } else {
-      final notif = message.notification;
-      if (notif == null) return; // pure data-only payload — let the WS update the UI
-      title = notif.title;
-      body = notif.body;
-    }
+    final notif = message.notification;
+    if (notif == null) return; // pure data-only payload — let the WS update the UI
+    final String? title = notif.title;
+    final String? body = notif.body;
 
     if (kDebugMode) {
       debugPrint('[fcm] foreground: $title — $body');
@@ -393,21 +392,11 @@ class FcmService {
     String channelName;
     String channelDesc;
     AndroidNotificationSound? androidSound;
-    bool insistent = false;
     Importance importance = Importance.defaultImportance;
     Priority priority = Priority.defaultPriority;
     String? iosSound;
 
-    if (isRideRequest) {
-      channelId = _rideAlertChannelId;
-      channelName = _rideAlertChannelName;
-      channelDesc = _rideAlertChannelDesc;
-      androidSound = const RawResourceAndroidNotificationSound('ride_alert');
-      insistent = true;
-      importance = Importance.max;
-      priority = Priority.high;
-      iosSound = 'ride_alert.caf';
-    } else if (isFoodOrMarket) {
+    if (isFoodOrMarket) {
       channelId = _foodAlertChannelId;
       channelName = _foodAlertChannelName;
       channelDesc = _foodAlertChannelDesc;
@@ -424,10 +413,8 @@ class FcmService {
 
     try {
       await _local.show(
-        // Ride alerts use a fixed id so they can be cancelled (to stop the
-        // looping sound) and so a new request replaces the old one. Other
-        // notifications use the FCM message hash so they dedupe / stack.
-        isRideRequest ? _rideAlertNotificationId : message.messageId.hashCode,
+        // FCM message hash as the id so these notifications dedupe / stack.
+        message.messageId.hashCode,
         title,
         body,
         NotificationDetails(
@@ -439,7 +426,6 @@ class FcmService {
             priority: priority,
             playSound: true,
             sound: androidSound,
-            additionalFlags: insistent ? Int32List.fromList(<int>[4]) : null,
             enableVibration: true,
             // Tap → opens the app (since we don't set a payload route)
           ),

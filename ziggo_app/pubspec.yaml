@@ -60,6 +60,12 @@ dependencies:
   mobile_scanner: ^6.0.0
   qr_flutter: ^4.1.0
 
+  # In-app alert sound. The driver's new-ride alert is played IN-APP (looping)
+  # the moment the request sheet appears, so it does NOT depend on the FCM
+  # notification firing / notification permission being granted — those only
+  # cover the backgrounded/killed case. Asset: assets/sounds/ride_alert.mp3.
+  audioplayers: ^6.1.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -80,4 +86,5 @@ flutter:
     - assets/images/
     - assets/images/marketplace/
     - assets/icons/
+    - assets/sounds/
     - .env
