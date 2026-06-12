@@ -119,11 +119,11 @@ async def _send_to_token(
     if urgent:
         if is_food:
             android_sound = "food_alert"
-            android_channel = "ziggo_food_alerts_v1"
+            android_channel = "ziggo_food_alerts_v2"
             ios_sound = "food_alert.caf"
         else:
             android_sound = "ride_alert"
-            android_channel = "ziggo_ride_alerts_v3"
+            android_channel = "ziggo_ride_alerts_v4"
             ios_sound = "ride_alert.caf"
     else:
         android_sound = "default"
