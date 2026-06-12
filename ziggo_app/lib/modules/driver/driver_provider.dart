@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/network/ws_client.dart';
+import '../../core/notifications/fcm_service.dart';
 
 class DriverProvider extends ChangeNotifier {
   final WsClient _ws = WsClient();
@@ -83,6 +84,7 @@ class DriverProvider extends ChangeNotifier {
           pending['market_order_id'] == data['market_order_id'];
       if (sameBooking || sameFood || sameMarket) {
         _pendingRequest = null;
+        FcmService.instance.cancelRideAlert();
         notifyListeners();
       }
     }
@@ -98,6 +100,7 @@ class DriverProvider extends ChangeNotifier {
             ? '/market/orders/${pending['market_order_id']}/accept'
             : '/bookings/$bookingId/accept';
     _pendingRequest = null;
+    FcmService.instance.cancelRideAlert();
     notifyListeners();
     try {
       final resp = await ApiClient.instance.dio.post(path);
@@ -128,6 +131,7 @@ class DriverProvider extends ChangeNotifier {
             ? '/market/orders/${pending['market_order_id']}/decline'
             : '/bookings/$bookingId/decline';
     _pendingRequest = null;
+    FcmService.instance.cancelRideAlert();
     notifyListeners();
     try {
       await ApiClient.instance.dio.post(path);

@@ -100,6 +100,7 @@ class _Root extends StatefulWidget {
 
 class _RootState extends State<_Root> {
   bool _splashed = false;
+  bool _fcmRegistered = false;
 
   @override
   void initState() {
@@ -121,6 +122,15 @@ class _RootState extends State<_Root> {
     if (auth.token != null && !booking.ws.isConnected) {
       booking.connectRealtime(auth.token!);
       booking.loadActive();
+    }
+    // Re-register the FCM token on every authenticated launch. A freshly built
+    // / reinstalled APK is issued a NEW Firebase token; when the session is
+    // restored from storage the OTP-verify path (which normally registers it)
+    // never runs, so the backend keeps pushing to the old, now-dead token and
+    // the device receives nothing. Idempotent and waits for FCM init; fire once.
+    if (auth.token != null && !_fcmRegistered) {
+      _fcmRegistered = true;
+      unawaited(FcmService.instance.registerWithBackend());
     }
     if (auth.role == 'driver') return const DriverHomeScreen();
     if (auth.role == 'restaurant_owner') return const RestaurantHomeScreen();

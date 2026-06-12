@@ -41,8 +41,16 @@ except Exception:
 _initialized: bool = False
 _init_error: Optional[str] = None
 # Error substrings that mean "this token is dead, stop trying" — used so we
-# can null the column and stop retrying on every event.
-_DEAD_TOKEN_CODES = ("UNREGISTERED", "registration-token-not-registered", "INVALID_ARGUMENT")
+# can null the column and stop retrying on every event. Matched case-INSENSITIVELY
+# against f"{type(e).__name__}: {e}", so these cover firebase-admin's exception
+# class names (UnregisteredError, SenderIdMismatchError) and message text alike.
+_DEAD_TOKEN_CODES = (
+    "unregistered",
+    "registration-token-not-registered",
+    "not found",
+    "senderidmismatch",
+    "invalid-registration-token",
+)
 
 
 def init() -> None:
@@ -201,7 +209,7 @@ async def send_to_user(
         print(f"[fcm] ok user_id={user_id} ({user.phone_number}) title={title!r}")
         return True
     # not ok
-    if err and any(c in err for c in _DEAD_TOKEN_CODES):
+    if err and any(c in err.lower() for c in _DEAD_TOKEN_CODES):
         await db.execute(
             update(User).where(User.id == user_id).values(notification_token=None)
         )

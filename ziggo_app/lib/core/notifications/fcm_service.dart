@@ -45,6 +45,13 @@ const String _foodAlertChannelName = 'Food and order alerts';
 const String _foodAlertChannelDesc =
     'Food and market order updates. Plays custom sound.';
 
+// Fixed notification id for the ride-alert so it can be cancelled later. The
+// ride alert plays an INSISTENT (looping) sound, which keeps ringing until the
+// notification is cancelled — so accept / decline / timeout must cancel THIS id
+// to stop the sound. A fixed id also means a new request replaces the old one
+// rather than stacking.
+const int _rideAlertNotificationId = 7001;
+
 const String _generalAlertChannelId = 'ziggo_general_alerts_v2';
 const String _generalAlertChannelName = 'General updates';
 const String _generalAlertChannelDesc =
@@ -76,7 +83,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     await local.initialize(const InitializationSettings(android: androidInit));
 
     await local.show(
-      message.messageId.hashCode,
+      _rideAlertNotificationId,
       title,
       body,
       NotificationDetails(
@@ -100,7 +107,7 @@ class FcmService {
   FcmService._();
   static final FcmService instance = FcmService._();
 
-  bool _initialised = false;
+  Future<void>? _initFuture;
   bool _firebaseAvailable = false;
   String? _cachedToken;
   StreamSubscription<RemoteMessage>? _foregroundSub;
@@ -111,11 +118,12 @@ class FcmService {
   bool get firebaseAvailable => _firebaseAvailable;
   String? get cachedToken => _cachedToken;
 
-  /// Call once during app startup, BEFORE runApp.
-  Future<void> init() async {
-    if (_initialised) return;
-    _initialised = true;
+  /// Call once during app startup. Idempotent — repeated calls return the same
+  /// in-flight (or completed) future, so callers can `await init()` to be sure
+  /// the device token has been fetched before registering it with the backend.
+  Future<void> init() => _initFuture ??= _init();
 
+  Future<void> _init() async {
     try {
       await Firebase.initializeApp();
       _firebaseAvailable = true;
@@ -309,6 +317,9 @@ class FcmService {
 
   /// Push the FCM token to the backend. Called after a successful login.
   Future<bool> registerWithBackend() async {
+    // Wait for init() to finish (it fetches the token) so a fast login right
+    // after launch doesn't no-op before Firebase is ready.
+    await init();
     if (!_firebaseAvailable) return false;
     try {
       _cachedToken ??= await FirebaseMessaging.instance.getToken();
@@ -413,9 +424,10 @@ class FcmService {
 
     try {
       await _local.show(
-        // Unique notification id — use the FCM message hash so duplicates
-        // dedupe naturally if the OS retries.
-        message.messageId.hashCode,
+        // Ride alerts use a fixed id so they can be cancelled (to stop the
+        // looping sound) and so a new request replaces the old one. Other
+        // notifications use the FCM message hash so they dedupe / stack.
+        isRideRequest ? _rideAlertNotificationId : message.messageId.hashCode,
         title,
         body,
         NotificationDetails(
@@ -442,6 +454,14 @@ class FcmService {
     } catch (e) {
       if (kDebugMode) debugPrint('[fcm] failed to show foreground notification: $e');
     }
+  }
+
+  /// Cancel the active ride-alert notification — call this the moment a request
+  /// is accepted, declined, or expires so the looping insistent sound stops.
+  Future<void> cancelRideAlert() async {
+    try {
+      await _local.cancel(_rideAlertNotificationId);
+    } catch (_) {}
   }
 
   Future<void> dispose() async {
