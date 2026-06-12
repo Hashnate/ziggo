@@ -38,7 +38,9 @@ class CustomerShellState extends State<CustomerShell> {
   void initState() {
     super.initState();
     _screens = [
-      const MarketHomeScreen(),
+      // Mart is opened as a full-screen route (see navbar onTap), so this slot
+      // is never shown — keep a placeholder to preserve the navbar's indices.
+      const SizedBox.shrink(),
       const FareEstimateScreen(),
       HomeScreen(onMenu: () => _scaffoldKey.currentState?.openDrawer()),
       const NotificationsScreen(),
@@ -141,7 +143,13 @@ class CustomerShellState extends State<CustomerShell> {
       ),
       bottomNavigationBar: CurvedNavbar(
         currentIndex: _index,
-        onTap: (i) => setState(() => _index = i),
+        onTap: (i) {
+          if (i == 0) {
+            _open(const MarketHomeScreen());
+          } else {
+            setState(() => _index = i);
+          }
+        },
       ),
     );
   }

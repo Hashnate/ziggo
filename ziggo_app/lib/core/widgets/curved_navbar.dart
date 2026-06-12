@@ -24,11 +24,14 @@ class CurvedNavbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-        child: SizedBox(
+    // The home-indicator inset (~34 on notch iPhones, ~0 on most Android).
+    // Use a trimmed version of it instead of SafeArea + a fixed pad, otherwise
+    // the two stack and leave a large empty gap below the bar on iPhone.
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
+    final bottomPad = bottomInset > 0 ? bottomInset - 12 : 14.0;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPad),
+      child: SizedBox(
           height: 78,
           child: Stack(
             clipBehavior: Clip.none,
@@ -107,8 +110,7 @@ class CurvedNavbar extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 }
 

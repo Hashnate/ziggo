@@ -304,31 +304,28 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Transform.translate(
-                  offset: const Offset(0, -14),
-                  child: Container(
-                    width: 76,
-                    height: 76,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: AppStyles.shadowMd,
-                      border: Border.all(color: Colors.white, width: 3),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(100),
-                      child: (widget.vendor['logo_url'] ?? widget.vendor['image_url']) != null
-                          ? Image.network(
-                              _resolveImg((widget.vendor['logo_url'] ?? widget.vendor['image_url']).toString())!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(
-                                  Icons.storefront_rounded,
-                                  color: AppColors.textTertiary,
-                                  size: 38),
-                            )
-                          : const Icon(Icons.storefront_rounded,
-                              color: AppColors.textTertiary, size: 38),
-                    ),
+                Container(
+                  width: 68,
+                  height: 68,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: AppStyles.shadowMd,
+                    border: Border.all(color: Colors.white, width: 3),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(100),
+                    child: (widget.vendor['logo_url'] ?? widget.vendor['image_url']) != null
+                        ? Image.network(
+                            _resolveImg((widget.vendor['logo_url'] ?? widget.vendor['image_url']).toString())!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(
+                                Icons.storefront_rounded,
+                                color: AppColors.textTertiary,
+                                size: 34),
+                          )
+                        : const Icon(Icons.storefront_rounded,
+                            color: AppColors.textTertiary, size: 34),
                   ),
                 ),
               ],
