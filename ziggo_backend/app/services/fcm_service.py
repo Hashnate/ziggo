@@ -86,8 +86,6 @@ def is_enabled() -> bool:
 # doesn't wake the phone unnecessarily.
 _URGENT_EVENTS = {
     "new_ride_request",
-    "booking_update",
-    "no_drivers_available",
     "food_order_update",
     "order_update",
     "market_order_update",
