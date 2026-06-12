@@ -30,69 +30,32 @@ import 'modules/restaurant/restaurant_provider.dart';
 import 'modules/restaurant/screens/restaurant_home_screen.dart';
 
 Future<void> main() async {
-  // TEMP DIAGNOSTIC (remove once the iOS white screen is fixed): turn any
-  // uncaught error into a visible red screen instead of a blank white one, so a
-  // release/TestFlight build is debuggable without a console.
-  ErrorWidget.builder =
-      (FlutterErrorDetails details) => _DiagError('build', details.exceptionAsString());
-
-  runZonedGuarded<Future<void>>(() async {
-    WidgetsFlutterBinding.ensureInitialized();
-    // Load .env into dotenv.env BEFORE anything reads it (MapsService etc.).
-    // If the file is missing we keep going with empty values rather than
-    // crashing the whole app — the maps will just no-op.
-    try {
-      await dotenv.load(fileName: '.env');
-    } catch (_) {
-      // .env is gitignored and CI ships it EMPTY (touch .env). flutter_dotenv
-      // throws on an empty/missing file and leaves itself UNINITIALISED, so any
-      // later dotenv.env read throws NotInitializedError and white-screens the
-      // app before runApp. Seed an empty map so every dotenv.env read is safe.
-      dotenv.testLoad(fileInput: '');
-    }
-    // On web, inject the Google Maps JS SDK now that we have the key. No-op on
-    // mobile/desktop where the SDK comes from native config.
-    injectGoogleMapsJs(dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '');
-    // Best-effort backend host discovery. This must NEVER prevent runApp:
-    // .timeout() only guards the *duration* — a thrown error (MissingPluginException,
-    // SharedPreferences, a failed probe) would otherwise crash main() before the
-    // first frame and leave the app stuck on the white launch screen. ApiConfig
-    // falls back to its default host, so screens still render and work.
-    try {
-      await ApiClient.init().timeout(const Duration(seconds: 4));
-    } catch (_) {}
-    runApp(const ZiggoApp());
-    // Initialise Firebase (FCM) AFTER the first frame. APNs/token retrieval must
-    // never gate runApp — on iOS getToken() blocks until APNs registration
-    // completes, which would white-screen the app. FcmService.init() guards its
-    // own failures internally.
-    unawaited(FcmService.instance.init());
-  }, (error, stack) {
-    // Any error escaping main() before the first frame lands here — show it.
-    runApp(_DiagError('startup', '$error'));
-  });
-}
-
-class _DiagError extends StatelessWidget {
-  final String phase;
-  final String message;
-  const _DiagError(this.phase, this.message);
-  @override
-  Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: Container(
-        color: const Color(0xFF7F1D1D),
-        alignment: Alignment.center,
-        padding: const EdgeInsets.all(24),
-        child: Text(
-          'ZIGGO_DIAG $phase error\n\n$message',
-          style: const TextStyle(color: Colors.white, fontSize: 14),
-          textAlign: TextAlign.center,
-        ),
-      ),
-    );
+  WidgetsFlutterBinding.ensureInitialized();
+  // Load .env into dotenv.env BEFORE anything reads it (MapsService etc.).
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (_) {
+    // .env is gitignored and CI ships it EMPTY (touch .env). flutter_dotenv
+    // throws on an empty/missing file and leaves itself UNINITIALISED, so any
+    // later dotenv.env read throws NotInitializedError and white-screens the
+    // app before runApp. Seed an empty map so every dotenv.env read is safe.
+    dotenv.testLoad(fileInput: '');
   }
+  // On web, inject the Google Maps JS SDK now that we have the key. No-op on
+  // mobile/desktop where the SDK comes from native config.
+  injectGoogleMapsJs(dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '');
+  // Best-effort backend host discovery. This must NEVER prevent runApp:
+  // .timeout() only guards the *duration*. ApiConfig falls back to its default
+  // host, so screens still render and work.
+  try {
+    await ApiClient.init().timeout(const Duration(seconds: 4));
+  } catch (_) {}
+  runApp(const ZiggoApp());
+  // Initialise Firebase (FCM) AFTER the first frame. APNs/token retrieval must
+  // never gate runApp — on iOS getToken() blocks until APNs registration
+  // completes, which would white-screen the app. FcmService.init() guards its
+  // own failures internally.
+  unawaited(FcmService.instance.init());
 }
 
 class ZiggoApp extends StatelessWidget {
