@@ -8,6 +8,7 @@ import '../../../app/app_styles.dart';
 import '../../../core/map/places.dart';
 import '../../../core/map/place_search_sheet.dart';
 import '../../../core/map/maps_service.dart';
+import '../../../core/network/api_client.dart';
 import '../booking_provider.dart';
 import 'ride_tracking_screen.dart';
 import 'qr_pay_scan_screen.dart';
@@ -152,26 +153,6 @@ class _ScanAndGoScreenState extends State<ScanAndGoScreen> {
             setStateSheet(() {
               bookingInProgress = true;
             });
-
-            final bookingProv = context.read<BookingProvider>();
-            final booking = await bookingProv.createBooking(
-              serviceType: vehicleType,
-              pickup: pickup!.location,
-              pickupAddress: pickup!.fullAddress,
-              drop: drop!.location,
-              dropAddress: drop!.fullAddress,
-              paymentMethod: paymentMethod,
-            );
-
-            // Re-route to standard matching endpoint for scan-and-go
-            try {
-              if (booking != null) {
-                // We must trigger scan-and-go assignment
-                final resp = await bookingProv.ws.client?.sink.add({
-                  'event': 'scan_and_go',
-                }); // WS or REST alternative. Let's hit the backend scan-and-go endpoint directly!
-              }
-            } catch (_) {}
 
             // Let's call the backend scan-and-go API directly from Provider/Dio instead!
             final bookingResponse = await _executeScanAndGo(

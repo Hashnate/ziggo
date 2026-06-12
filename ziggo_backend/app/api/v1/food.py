@@ -269,8 +269,12 @@ async def list_restaurants(
         if not is_open_now:
             continue
         distance_km = None
-        if has_origin and r.lat is not None and r.lng is not None:
+        if has_origin:
+            if r.lat is None or r.lng is None:
+                continue
             distance_km = haversine_km(lat, lng, float(r.lat), float(r.lng))
+            if distance_km > 10.0:
+                continue
         enriched.append(_restaurant_summary(r, is_open_now, distance_km))
 
     # Open first; then nearest-first when an origin was supplied, else by id.

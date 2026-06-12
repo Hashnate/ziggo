@@ -2319,7 +2319,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 14),
       decoration: BoxDecoration(
-        gradient: AppColors.blackGradient,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(32),
         boxShadow: AppStyles.shadowLg,
       ),
@@ -2337,7 +2337,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.2),
+                      color: AppColors.primary.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(100),
                     ),
                     child: Row(
@@ -2374,13 +2374,13 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                           color: _secondsLeft <= 10
                               ? AppColors.error
                               : AppColors.primary,
-                          backgroundColor: Colors.white12,
+                          backgroundColor: Colors.black12,
                         ),
                       ),
                       Text(
                         '$_secondsLeft',
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: AppColors.textPrimary,
                           fontWeight: FontWeight.w900,
                           fontSize: 12,
                         ),
@@ -2404,7 +2404,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                     child: Text(
                       initial,
                       style: const TextStyle(
-                        color: Colors.black,
+                        color: Colors.white,
                         fontWeight: FontWeight.w900,
                         fontSize: 18,
                       ),
@@ -2418,7 +2418,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                         Text(
                           customer,
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                             fontWeight: FontWeight.w900,
                             fontSize: 16,
                           ),
@@ -2426,7 +2426,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                         Text(
                           '${(r['service_type'] ?? '').toString().toUpperCase()} • $payment',
                           style: const TextStyle(
-                            color: Colors.white60,
+                            color: AppColors.textSecondary,
                             fontWeight: FontWeight.w700,
                             fontSize: 11,
                             letterSpacing: 0.5,
@@ -2450,7 +2450,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                       Text(
                         'You earn Rs.${earnings.toStringAsFixed(0)}',
                         style: const TextStyle(
-                          color: Colors.white60,
+                          color: AppColors.textSecondary,
                           fontWeight: FontWeight.w700,
                           fontSize: 10,
                         ),
@@ -2465,9 +2465,9 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.18),
+                    color: AppColors.primary.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.primary.withOpacity(0.4)),
+                    border: Border.all(color: AppColors.primary.withOpacity(0.2)),
                   ),
                   child: Row(
                     children: [
@@ -2495,7 +2495,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                color: Colors.white,
+                                color: AppColors.textPrimary,
                                 fontWeight: FontWeight.w900,
                                 fontSize: 13,
                                 letterSpacing: 0.2,
@@ -2504,7 +2504,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                             Text(
                               '${r['items_count'] ?? 0} item(s) • Order ${r['order_ref'] ?? ''}',
                               style: const TextStyle(
-                                color: Colors.white70,
+                                color: AppColors.textSecondary,
                                 fontWeight: FontWeight.w700,
                                 fontSize: 11,
                               ),
@@ -2517,7 +2517,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                    color: Colors.white60,
+                                    color: AppColors.textSecondary,
                                     fontStyle: FontStyle.italic,
                                     fontSize: 10,
                                   ),
@@ -2536,9 +2536,9 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.18),
+                    color: AppColors.primary.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.primary.withOpacity(0.4)),
+                    border: Border.all(color: AppColors.primary.withOpacity(0.2)),
                   ),
                   child: Row(
                     children: [
@@ -2565,7 +2565,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                               '${(r['parcel_type'] ?? 'parcel').toString().toUpperCase()}'
                               '${r['parcel_weight_kg'] != null ? ' • ${r['parcel_weight_kg']} kg' : ''}',
                               style: const TextStyle(
-                                color: Colors.white,
+                                color: AppColors.textPrimary,
                                 fontWeight: FontWeight.w900,
                                 fontSize: 12,
                                 letterSpacing: 0.4,
@@ -2577,7 +2577,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                                 'To: ${r['receiver_name'] ?? ''}'
                                 '${(r['receiver_phone'] ?? '').toString().isNotEmpty ? ' • ${r['receiver_phone']}' : ''}',
                                 style: const TextStyle(
-                                  color: Colors.white70,
+                                  color: AppColors.textSecondary,
                                   fontWeight: FontWeight.w700,
                                   fontSize: 11,
                                 ),
@@ -2588,7 +2588,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                                 child: Text(
                                   '“${r['parcel_instructions']}”',
                                   style: const TextStyle(
-                                    color: Colors.white60,
+                                    color: AppColors.textSecondary,
                                     fontSize: 11,
                                     fontStyle: FontStyle.italic,
                                   ),
@@ -2606,7 +2606,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.06),
+                  color: AppColors.surfaceMuted,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Column(
@@ -2628,7 +2628,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                               margin: const EdgeInsets.only(bottom: 2),
                               width: 2,
                               height: 4,
-                              color: Colors.white24,
+                              color: Colors.black12,
                             ),
                           ),
                         ),
@@ -2651,7 +2651,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                             margin: const EdgeInsets.only(bottom: 2),
                             width: 2,
                             height: 4,
-                            color: Colors.white24,
+                            color: Colors.black12,
                           ),
                         ),
                       ),
@@ -2691,13 +2691,13 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.08),
+                          color: AppColors.surfaceMuted,
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: const Text(
                           'DECLINE',
                           style: TextStyle(
-                            color: Colors.white70,
+                            color: AppColors.textSecondary,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 0.8,
                           ),
@@ -2729,19 +2729,19 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                                 width: 22,
                                 height: 22,
                                 child: CircularProgressIndicator(
-                                  color: Colors.black,
+                                  color: Colors.white,
                                   strokeWidth: 3,
                                 ),
                               )
                             : const Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.check_rounded, color: Colors.black, size: 18),
+                                  Icon(Icons.check_rounded, color: Colors.white, size: 18),
                                   SizedBox(width: 6),
                                   Text(
                                     'ACCEPT RIDE',
                                     style: TextStyle(
-                                      color: Colors.black,
+                                      color: Colors.white,
                                       fontWeight: FontWeight.w900,
                                       letterSpacing: 0.8,
                                     ),
@@ -2778,7 +2778,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
               Text(
                 label,
                 style: const TextStyle(
-                  color: Colors.white38,
+                  color: AppColors.textTertiary,
                   fontSize: 9,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 1.2,
@@ -2787,7 +2787,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
               Text(
                 value,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: AppColors.textPrimary,
                   fontWeight: FontWeight.w900,
                   fontSize: 13,
                 ),
@@ -2805,18 +2805,18 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
+        color: AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: Colors.white60, size: 14),
+          Icon(icon, color: AppColors.textSecondary, size: 14),
           const SizedBox(width: 6),
           Text(
             label,
             style: const TextStyle(
-              color: Colors.white,
+              color: AppColors.textPrimary,
               fontWeight: FontWeight.w900,
               fontSize: 12,
             ),

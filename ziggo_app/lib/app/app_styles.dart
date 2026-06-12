@@ -157,6 +157,8 @@ class GradientServiceTile extends StatelessWidget {
   final VoidCallback? onTap;
   final bool isNew;
   final String? badgeText;
+  final List<Color>? gradientColors;
+  final Color? iconColor;
 
   /// Optional 3D illustration asset (e.g. 'assets/icons/food.png'). When set,
   /// the tile renders the illustration free-floating instead of the flat icon
@@ -171,6 +173,8 @@ class GradientServiceTile extends StatelessWidget {
     this.isNew = false,
     this.badgeText,
     this.imageAsset,
+    this.gradientColors,
+    this.iconColor,
   });
 
   Widget _glyph() {
@@ -185,22 +189,22 @@ class GradientServiceTile extends StatelessWidget {
       width: 66,
       height: 66,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF1E3A8A), Color(0xFF131C3D)],
+          colors: gradientColors ?? const [Color(0xFF1E3A8A), Color(0xFF131C3D)],
         ),
         borderRadius: BorderRadius.circular(AppStyles.radiusMd),
         border: Border.all(color: Colors.white, width: 2.5),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryDark.withOpacity(0.32),
+            color: (gradientColors?.first ?? AppColors.primaryDark).withOpacity(0.32),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Icon(icon, color: Colors.white, size: 28),
+      child: Icon(icon, color: iconColor ?? Colors.white, size: 28),
     );
   }
 
