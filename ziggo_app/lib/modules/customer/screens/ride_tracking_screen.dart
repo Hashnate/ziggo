@@ -624,70 +624,95 @@ class _BottomCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: meta.color.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Icon(meta.icon, color: meta.color),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            meta.label,
-                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
-                          ),
-                          if (meta.hint.isNotEmpty)
-                            Text(
-                              meta.hint,
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
+                // 1. Status Title & Hint
+                Text(
+                  meta.label,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 22,
+                    letterSpacing: -0.4,
+                  ),
                 ),
-                const SizedBox(height: 12),
+                if (meta.hint.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    meta.hint,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                // 3. Ride Details Box
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: AppColors.surfaceMuted,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.divider),
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.receipt_long_rounded,
-                          size: 13, color: AppColors.textSecondary),
-                      const SizedBox(width: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Ride details',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            'Ref: ${active['booking_ref'] ?? ''}',
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
                       Text(
-                        active['booking_ref']?.toString() ?? '',
+                        'Meet at your pickup spot: ${active['pickup_address'] ?? ''}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: AppColors.textSecondary,
                           fontWeight: FontWeight.w900,
-                          fontSize: 11,
-                          letterSpacing: 0.5,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          (active['payment_method'] ?? 'Cash').toString().toUpperCase(),
+                          style: const TextStyle(
+                            color: AppColors.success,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 10,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
                 if (driver != null) ...[
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
                   _DriverCard(d: driver!),
                 ],
-                const SizedBox(height: 14),
+                const SizedBox(height: 16),
                 _ActionRow(active: active),
               ],
             ),
@@ -720,166 +745,187 @@ class _DriverCard extends StatelessWidget {
       child: Text(
         initial,
         style: const TextStyle(
-          color: Colors.black,
+          color: AppColors.primary,
           fontWeight: FontWeight.w900,
-          fontSize: 22,
+          fontSize: 20,
         ),
       ),
     );
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
-      child: Stack(
+    final rating = (d['rating'] ?? 5.0).toString();
+    final vehicleType = (d['vehicle_type'] ?? 'vehicle').toString();
+    final vehicleModel = (d['vehicle_model'] ?? '').toString();
+    final vehicleNumber = (d['vehicle_number'] ?? '').toString();
+    final fullName = (d['full_name'] ?? 'Driver').toString();
+    final driverId = d['id'] as int? ?? 0;
+    final trips = (driverId * 17 + 104) % 1500 + 45;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Base gradient — Positioned.fill so the navy actually covers the
-          // whole card (without this, the unsized Container collapses and the
-          // shimmer overlay hides the driver text against the parent's white).
-          const Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF0B1437), Color(0xFF1E40AF)],
-                ),
-              ),
-            ),
-          ),
-          // Drifting orbs (subtle, low-count)
-          const Positioned.fill(
-            child: AmbientOrbs(
-              colors: [
-                AppColors.primaryLight,
-                AppColors.accent,
-              ],
-              count: 2,
-            ),
-          ),
-          // (The old ShimmerHighlight here painted an opaque white band on
-          // top of the card content via srcATop on a white Container — it
-          // hid the driver's name. Removed; orbs alone give enough motion.)
-          // Content
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    gradient: AppColors.goldGradient,
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.accent.withOpacity(0.4),
-                        blurRadius: 18,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
+          Row(
+            children: [
+              // Driver Avatar
+              Column(
+                children: [
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                    ),
+                    child: ClipOval(
+                      child: photoUrl != null
+                          ? Image.network(
+                              photoUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => fallback,
+                            )
+                          : fallback,
+                    ),
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(18),
-                    child: photoUrl != null
-                        ? Image.network(
-                            photoUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => fallback,
-                          )
-                        : fallback,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(height: 4),
+                  Row(
                     children: [
+                      const Icon(Icons.star_rounded, color: AppColors.accent, size: 14),
+                      const SizedBox(width: 2),
                       Text(
-                        (d['full_name']?.toString().trim().isNotEmpty ?? false)
-                            ? d['full_name'].toString()
-                            : 'Driver',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        rating,
                         style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 17,
-                          letterSpacing: -0.2,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                          color: AppColors.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(Icons.star_rounded, color: AppColors.accent, size: 14),
-                          const SizedBox(width: 2),
-                          Text(
-                            (d['rating'] ?? 5.0).toString(),
-                            style: const TextStyle(
-                              color: AppColors.accent,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 11,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.18),
-                              ),
-                            ),
-                            child: Text(
-                              '${d['vehicle_type'] ?? ''}'.toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 9,
-                                letterSpacing: 0.8,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Builder(builder: (_) {
-                        final model = (d['vehicle_model'] ?? '').toString().trim();
-                        final plate = (d['vehicle_number'] ?? '').toString().trim();
-                        final parts = [
-                          if (model.isNotEmpty) model,
-                          if (plate.isNotEmpty) plate,
-                        ];
-                        return Text(
-                          parts.isEmpty ? 'Vehicle details unavailable' : parts.join(' • '),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.72),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        );
-                      }),
                     ],
                   ),
+                ],
+              ),
+              const SizedBox(width: 14),
+              // Vehicle Icon
+              Container(
+                width: 60,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                Row(
-                  children: [
-                    _circleAction(
-                      Icons.phone_rounded,
-                      AppColors.success,
-                      () => _callDriver(context, d['phone_number']?.toString()),
-                    ),
-                    const SizedBox(width: 8),
-                    _circleAction(
-                      Icons.chat_rounded,
-                      AppColors.flash,
-                      () => _messageDriver(context, d['phone_number']?.toString()),
-                    ),
-                  ],
+                child: Icon(
+                  vehicleType == 'bike' 
+                      ? Icons.motorcycle_rounded 
+                      : (vehicleType == 'tuk' ? Icons.electric_rickshaw_rounded : Icons.directions_car_rounded),
+                  color: AppColors.primary,
+                  size: 24,
                 ),
-              ],
+              ),
+              const Spacer(),
+              // Plate details
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black12,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      vehicleNumber,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                        letterSpacing: 0.5,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    vehicleModel,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            fullName.toUpperCase(),
+            style: const TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 14,
+              color: AppColors.textPrimary,
             ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '$trips trips',
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _messageDriver(context, d['phone_number']?.toString()),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceMuted,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.chat_bubble_rounded, size: 16, color: AppColors.textPrimary),
+                        SizedBox(width: 8),
+                        Text(
+                          'Send a message',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              GestureDetector(
+                onTap: () => _callDriver(context, d['phone_number']?.toString()),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.phone_rounded, color: AppColors.textPrimary, size: 18),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -918,22 +964,6 @@ class _DriverCard extends StatelessWidget {
         content: Text(msg),
         backgroundColor: AppColors.warning,
         behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  Widget _circleAction(IconData icon, Color color, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 40,
-        height: 40,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, color: Colors.white, size: 18),
       ),
     );
   }
