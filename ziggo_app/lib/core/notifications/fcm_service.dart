@@ -21,6 +21,7 @@
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -134,7 +135,7 @@ class FcmService {
               _generalAlertChannelId,
               _generalAlertChannelName,
               description: _generalAlertChannelDesc,
-              importance: Importance.default_,
+              importance: Importance.defaultImportance,
               playSound: true,
               enableVibration: true,
             ),
@@ -334,8 +335,8 @@ class FcmService {
     String channelDesc;
     AndroidNotificationSound? androidSound;
     bool insistent = false;
-    Importance importance = Importance.default_;
-    Priority priority = Priority.default_;
+    Importance importance = Importance.defaultImportance;
+    Priority priority = Priority.defaultPriority;
     String? iosSound;
 
     if (isRideRequest) {
@@ -378,7 +379,7 @@ class FcmService {
             priority: priority,
             playSound: true,
             sound: androidSound,
-            insistent: insistent,
+            additionalFlags: insistent ? Int32List.fromList(<int>[4]) : null,
             enableVibration: true,
             // Tap → opens the app (since we don't set a payload route)
           ),
