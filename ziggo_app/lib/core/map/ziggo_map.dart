@@ -348,7 +348,11 @@ class ZiggoMapController {
   bool get isReady => _c != null;
 
   Future<void> moveTo(LatLng target, {double zoom = 15}) async {
-    await _c?.animateCamera(gmaps.CameraUpdate.newLatLngZoom(_g(target), zoom));
+    try {
+      await _c?.animateCamera(gmaps.CameraUpdate.newLatLngZoom(_g(target), zoom));
+    } catch (e) {
+      debugPrint("ZiggoMapController.moveTo error: $e");
+    }
   }
 
   Future<void> fitBounds(List<LatLng> points, {double padding = 60}) async {
@@ -369,7 +373,11 @@ class ZiggoMapController {
       southwest: gmaps.LatLng(minLat, minLng),
       northeast: gmaps.LatLng(maxLat, maxLng),
     );
-    await _c?.animateCamera(gmaps.CameraUpdate.newLatLngBounds(bounds, padding));
+    try {
+      await _c?.animateCamera(gmaps.CameraUpdate.newLatLngBounds(bounds, padding));
+    } catch (e) {
+      debugPrint("ZiggoMapController.fitBounds error: $e");
+    }
   }
 
   void dispose() => _c = null;
@@ -462,6 +470,12 @@ class _ZiggoMapState extends State<ZiggoMap> {
   void initState() {
     super.initState();
     if (widget.showMyLocation) _ensureLocationPermission();
+  }
+
+  @override
+  void dispose() {
+    widget.controller?.dispose();
+    super.dispose();
   }
 
   Future<void> _ensureLabelIcon(String label, Color color) async {

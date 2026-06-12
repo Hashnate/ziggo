@@ -127,6 +127,7 @@
     <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
         <h3 class="font-black text-ziggo-ink mb-4">Members: <span id="membersCompany"></span></h3>
         <div id="membersList" class="max-h-60 overflow-y-auto mb-4 space-y-2"></div>
+        <div id="memberMsg" class="text-xs font-bold text-center py-2 rounded-lg mb-2" style="display:none"></div>
         <form id="addMemberForm" method="post" class="flex gap-2 mb-3">
             <input name="phone_number" placeholder="Phone number (07XXXXXXXX)" required
                    class="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-ziggo">
@@ -162,14 +163,24 @@
     }
 
     // Members modal
-    function openMembers(id, name) {
-        document.getElementById('membersCompany').textContent = name;
-        document.getElementById('addMemberForm').action = '/admin/corporate/' + id + '/members/add';
+    let currentCorpId = null;
+
+    function showMemberMsg(text, isError) {
+        const el = document.getElementById('memberMsg');
+        el.textContent = text;
+        el.className = 'text-xs font-bold text-center py-2 rounded-lg mb-2 ' +
+            (isError ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700');
+        el.style.display = 'block';
+    }
+    function hideMemberMsg() {
+        const el = document.getElementById('memberMsg');
+        el.style.display = 'none';
+        el.textContent = '';
+    }
+
+    function loadMembers(id) {
         const list = document.getElementById('membersList');
         list.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">Loading…</p>';
-        const m = document.getElementById('membersModal');
-        m.style.display = 'flex';
-        m.classList.remove('hidden');
         fetch('/admin/corporate/' + id + '/members')
             .then(r => r.json())
             .then(members => {
@@ -191,10 +202,53 @@
                 list.innerHTML = '<p class="text-xs text-red-400 text-center py-4">Failed to load members</p>';
             });
     }
+
+    function openMembers(id, name) {
+        currentCorpId = id;
+        document.getElementById('membersCompany').textContent = name;
+        document.getElementById('addMemberForm').action = '/admin/corporate/' + id + '/members/add';
+        document.querySelector('#addMemberForm input[name="phone_number"]').value = '';
+        hideMemberMsg();
+        const m = document.getElementById('membersModal');
+        m.style.display = 'flex';
+        m.classList.remove('hidden');
+        loadMembers(id);
+    }
     function closeMembers() {
         const m = document.getElementById('membersModal');
         m.style.display = 'none';
         m.classList.add('hidden');
     }
+
+    document.getElementById('addMemberForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const input = form.querySelector('input[name="phone_number"]');
+        const phone = input.value.trim();
+        hideMemberMsg();
+        if (!phone) { showMemberMsg('Please enter a phone number.', true); return; }
+        const btn = form.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        try {
+            const res = await fetch(form.action, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ phone_number: phone })
+            });
+            if (res.ok || res.redirected) {
+                input.value = '';
+                showMemberMsg('Member added successfully.', false);
+                if (currentCorpId !== null) loadMembers(currentCorpId);
+            } else {
+                let detail = 'Invalid number — no user found with this phone number.';
+                try { const j = await res.json(); if (j && j.detail) detail = j.detail; } catch (_) {}
+                showMemberMsg(detail, true);
+            }
+        } catch (_) {
+            showMemberMsg('Network error. Please try again.', true);
+        } finally {
+            btn.disabled = false;
+        }
+    });
 </script>
 {% endblock %}
