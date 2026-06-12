@@ -69,8 +69,14 @@ jobs:
         run: echo "BUILD_NUMBER=$(( ${{ github.run_number }} + 100 ))" >> "$GITHUB_ENV"
 
       - name: Build and export signed IPA
+        env:
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: |
-          touch .env
+          # Inject the Google Maps key (single key for Android/iOS/web) from the
+          # MAPS_API_KEY repo secret. .env carries it for Dart/web; Secrets.xcconfig
+          # feeds GMSServices.provideAPIKey so the iOS map view doesn't crash.
+          printf 'GOOGLE_MAPS_API_KEY=%s\n' "$MAPS_API_KEY" > .env
+          printf 'MAPS_API_KEY=%s\n' "$MAPS_API_KEY" > ios/Flutter/Secrets.xcconfig
 
           # Archive unsigned, then sign at export time from ExportOptions.plist.
           flutter build ipa --release --no-codesign --build-number="$BUILD_NUMBER"
