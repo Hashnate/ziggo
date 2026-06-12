@@ -39,6 +39,11 @@ const String _rideAlertChannelName = 'Ride alerts';
 const String _rideAlertChannelDesc =
     'New ride requests and ride status updates. Plays custom sound.';
 
+const String _foodAlertChannelId = 'ziggo_food_alerts_v1';
+const String _foodAlertChannelName = 'Food and order alerts';
+const String _foodAlertChannelDesc =
+    'Food and market order updates. Plays custom sound.';
+
 /// Required for background message handling on Android — Firebase invokes a
 /// top-level function in an isolated Dart isolate. The OS shows the system
 /// notification automatically using the payload, so we don't need to do
@@ -90,25 +95,36 @@ class FcmService {
         const InitializationSettings(android: androidInit, iOS: iosInit),
       );
 
-      // 2. Register the Android channel with the custom sound. This is what
-      //    makes the ride_alert.mp3 actually play — on Android 8+ the
-      //    channel's sound is what plays, NOT the FCM payload's sound.
+      // 2. Register the Android channels with their custom sounds.
       //    Idempotent — calling create on an existing channel is a no-op.
       if (Platform.isAndroid) {
-        await _local
+        final androidPlugin = _local
             .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin>()
-            ?.createNotificationChannel(
-              const AndroidNotificationChannel(
-                _rideAlertChannelId,
-                _rideAlertChannelName,
-                description: _rideAlertChannelDesc,
-                importance: Importance.max,
-                playSound: true,
-                sound: RawResourceAndroidNotificationSound('ride_alert'),
-                enableVibration: true,
-              ),
-            );
+                AndroidFlutterLocalNotificationsPlugin>();
+        if (androidPlugin != null) {
+          await androidPlugin.createNotificationChannel(
+            const AndroidNotificationChannel(
+              _rideAlertChannelId,
+              _rideAlertChannelName,
+              description: _rideAlertChannelDesc,
+              importance: Importance.max,
+              playSound: true,
+              sound: RawResourceAndroidNotificationSound('ride_alert'),
+              enableVibration: true,
+            ),
+          );
+          await androidPlugin.createNotificationChannel(
+            const AndroidNotificationChannel(
+              _foodAlertChannelId,
+              _foodAlertChannelName,
+              description: _foodAlertChannelDesc,
+              importance: Importance.max,
+              playSound: true,
+              sound: RawResourceAndroidNotificationSound('food_alert'),
+              enableVibration: true,
+            ),
+          );
+        }
       }
 
       // 3. Permissions
@@ -290,9 +306,17 @@ class FcmService {
       debugPrint('[fcm] foreground: ${notif.title} — ${notif.body}');
     }
 
-    // Show via flutter_local_notifications. The Android channel was already
-    // created in init() with the custom sound, so just referencing the
-    // channel id here is enough to make ride_alert.mp3 play.
+    final isFoodOrMarket = message.data['is_food'] == 'true' ||
+        message.data['is_market'] == 'true' ||
+        message.data['event'] == 'food_order_update' ||
+        message.data['event'] == 'order_update' ||
+        message.data['event'] == 'market_order_update';
+
+    final channelId = isFoodOrMarket ? _foodAlertChannelId : _rideAlertChannelId;
+    final channelName = isFoodOrMarket ? _foodAlertChannelName : _rideAlertChannelName;
+    final channelDesc = isFoodOrMarket ? _foodAlertChannelDesc : _rideAlertChannelDesc;
+    final soundName = isFoodOrMarket ? 'food_alert' : 'ride_alert';
+
     try {
       await _local.show(
         // Unique notification id — use the FCM message hash so duplicates
@@ -302,13 +326,13 @@ class FcmService {
         notif.body,
         NotificationDetails(
           android: AndroidNotificationDetails(
-            _rideAlertChannelId,
-            _rideAlertChannelName,
-            channelDescription: _rideAlertChannelDesc,
+            channelId,
+            channelName,
+            channelDescription: channelDesc,
             importance: Importance.max,
             priority: Priority.high,
             playSound: true,
-            sound: const RawResourceAndroidNotificationSound('ride_alert'),
+            sound: RawResourceAndroidNotificationSound(soundName),
             enableVibration: true,
             // Tap → opens the app (since we don't set a payload route)
           ),

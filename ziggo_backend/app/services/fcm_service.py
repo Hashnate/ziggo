@@ -110,7 +110,27 @@ async def _send_to_token(
     if not _initialized:
         return False, "not initialised"
 
-    urgent = (data or {}).get("event") in _URGENT_EVENTS
+    event = (data or {}).get("event")
+    urgent = event in _URGENT_EVENTS
+    is_food = event in {
+        "food_order_update",
+        "order_update",
+        "market_order_update",
+    }
+
+    if urgent:
+        if is_food:
+            android_sound = "food_alert"
+            android_channel = "ziggo_food_alerts_v1"
+            ios_sound = "food_alert.caf"
+        else:
+            android_sound = "ride_alert"
+            android_channel = "ziggo_ride_alerts_v3"
+            ios_sound = "ride_alert.caf"
+    else:
+        android_sound = "default"
+        android_channel = None
+        ios_sound = "default"
 
     msg = messaging.Message(
         token=token,
@@ -119,25 +139,18 @@ async def _send_to_token(
         android=messaging.AndroidConfig(
             priority="high" if urgent else "normal",
             notification=messaging.AndroidNotification(
-                # Urgent events play the bundled ride_alert.mp3 (lives at
-                # ziggo_app/android/app/src/main/res/raw/ride_alert.mp3 in the
-                # APK). Non-urgent ones use the OS default tone. Note:
+                # Urgent events play custom sounds.
                 # Android references res/raw assets WITHOUT extension.
-                sound="ride_alert" if urgent else "default",
-                # Channel id — Firebase auto-creates this channel on first
-                # delivery, using the sound from the payload as the channel's
-                # default. Once created, the channel's sound is fixed; to
-                # change later, bump the id (e.g. ziggo_ride_alerts_v3).
-                channel_id="ziggo_ride_alerts_v3" if urgent else None,
+                sound=android_sound,
+                # Channel id — once created, the channel's sound is fixed.
+                channel_id=android_channel,
             ),
         ),
         apns=messaging.APNSConfig(
             headers={"apns-priority": "10" if urgent else "5"},
             payload=messaging.APNSPayload(
                 aps=messaging.Aps(
-                    # iOS uses default sound until an .caf/.wav of ride_alert
-                    # is added to the Xcode project (Android-only for now).
-                    sound="ride_alert.caf" if urgent else "default",
+                    sound=ios_sound,
                     content_available=True,
                 ),
             ),
