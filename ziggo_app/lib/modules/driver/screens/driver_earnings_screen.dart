@@ -53,7 +53,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
   @override
   Widget build(BuildContext context) {
     return Theme(
-      data: driverDarkTheme(context),
+      data: driverTheme(context),
       child: _buildScaffold(context),
     );
   }
@@ -146,7 +146,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
             const Text(
               'LIFETIME BREAKDOWN',
               style: TextStyle(
-                color: Colors.white54,
+                color: AppColors.textSecondary,
                 fontWeight: FontWeight.w900,
                 fontSize: 11,
                 letterSpacing: 1.4,
@@ -164,7 +164,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
             const Text(
               'HOW YOUR FARE IS CALCULATED',
               style: TextStyle(
-                color: Colors.white54,
+                color: AppColors.textSecondary,
                 fontWeight: FontWeight.w900,
                 fontSize: 11,
                 letterSpacing: 1.4,
@@ -192,19 +192,19 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: kDriverCardLight,
+                  color: AppColors.primarySoft,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.receipt_long_rounded,
-                        color: Colors.white, size: 18),
+                        color: AppColors.primary, size: 18),
                     SizedBox(width: 8),
                     Text(
                       'View per-trip breakdowns',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: AppColors.primary,
                         fontWeight: FontWeight.w900,
                         fontSize: 14,
                       ),
@@ -225,7 +225,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
       decoration: BoxDecoration(
         color: kDriverCard,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -245,7 +245,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
             label,
             style: const TextStyle(
               fontSize: 11,
-              color: Colors.white54,
+              color: AppColors.textSecondary,
               fontWeight: FontWeight.w900,
               letterSpacing: 0.4,
             ),
@@ -254,7 +254,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
           Text(
             value,
             style: const TextStyle(
-              color: Colors.white,
+              color: AppColors.textPrimary,
               fontWeight: FontWeight.w900,
               fontSize: 18,
             ),
@@ -280,7 +280,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
       decoration: BoxDecoration(
         color: kDriverCard,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -294,7 +294,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                   const Text(
                     'TOTAL COLLECTED',
                     style: TextStyle(
-                      color: Colors.white54,
+                      color: AppColors.textSecondary,
                       fontWeight: FontWeight.w900,
                       fontSize: 10,
                       letterSpacing: 1.2,
@@ -304,7 +304,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                   Text(
                     'Rs.${collected.toStringAsFixed(2)}',
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                       fontWeight: FontWeight.w900,
                       fontSize: 26,
                       letterSpacing: -0.5,
@@ -316,19 +316,19 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
               Text(
                 '$trips trips',
                 style: const TextStyle(
-                  color: Colors.white38,
+                  color: AppColors.textSecondary,
                   fontWeight: FontWeight.w800,
                   fontSize: 12,
                 ),
               ),
             ],
           ),
-          const Divider(height: 24, color: Colors.white12),
+          const Divider(height: 24, color: AppColors.divider),
           _rateRow('Admin commission', 'Rs.${commission.toStringAsFixed(2)}',
               negative: true),
           _rateRow('Driver earnings', 'Rs.${earnings.toStringAsFixed(2)}',
               highlight: true),
-          const Divider(height: 24, color: Colors.white12),
+          const Divider(height: 24, color: AppColors.divider),
           _rateRow('Paid out', 'Rs.${paid.toStringAsFixed(2)}'),
           _rateRow('Pending payout', 'Rs.${pending.toStringAsFixed(2)}'),
         ],
@@ -342,11 +342,11 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
       decoration: BoxDecoration(
         color: kDriverCard,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Text(
         text,
-        style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
+        style: const TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -365,7 +365,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
       decoration: BoxDecoration(
         color: kDriverCard,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -407,7 +407,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
             'with a minimum fare floor. The app keeps a commission; '
             'the rest is yours.',
             style: TextStyle(
-              color: Colors.white60,
+              color: AppColors.textSecondary,
               fontWeight: FontWeight.w600,
               fontSize: 12,
               height: 1.4,
@@ -430,7 +430,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                 'Rs.${passDeduct.toStringAsFixed(2)}'),
           if (surge != 1.0)
             _rateRow('Surge multiplier', '×${surge.toStringAsFixed(2)}'),
-          const Divider(height: 22, color: Colors.white12),
+          const Divider(height: 22, color: AppColors.divider),
           _rateRow('App usage charge (commission)',
               '${platformPct.toStringAsFixed(0)}%',
               negative: true),
@@ -451,7 +451,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                     'EXAMPLE — ${(_d(example, 'distance_km')).toStringAsFixed(0)} km · '
                     '${(_d(example, 'duration_min')).toStringAsFixed(0)} min trip',
                     style: const TextStyle(
-                      color: Colors.white60,
+                      color: AppColors.textSecondary,
                       fontWeight: FontWeight.w900,
                       fontSize: 10,
                       letterSpacing: 1.0,
@@ -463,7 +463,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                   _rateRow('− App usage charge',
                       'Rs.${_d(example, 'platform_fee').toStringAsFixed(2)}',
                       negative: true),
-                  const Divider(height: 18, color: Colors.white12),
+                  const Divider(height: 18, color: AppColors.divider),
                   _rateRow('You earn',
                       'Rs.${_d(example, 'driver_earnings').toStringAsFixed(2)}',
                       highlight: true),
@@ -486,7 +486,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
           Text(
             label,
             style: TextStyle(
-              color: highlight ? Colors.white : Colors.white70,
+              color: highlight ? AppColors.textPrimary : AppColors.textSecondary,
               fontWeight: highlight ? FontWeight.w900 : FontWeight.w600,
               fontSize: 13,
             ),
@@ -496,7 +496,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
             style: TextStyle(
               color: negative
                   ? AppColors.error
-                  : (highlight ? kDriverGold : Colors.white),
+                  : (highlight ? kDriverGold : AppColors.textPrimary),
               fontWeight: FontWeight.w900,
               fontSize: 13,
             ),

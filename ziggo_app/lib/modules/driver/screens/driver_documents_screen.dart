@@ -124,7 +124,7 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
     final verifiedCount = _docs.where((d) => d['is_verified'] == true).length;
 
     return Theme(
-      data: driverDarkTheme(context),
+      data: driverTheme(context),
       child: _buildScaffold(missingCount, pendingCount, verifiedCount),
     );
   }
@@ -148,7 +148,7 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
-                      gradient: AppColors.blackGradient,
+                      color: AppColors.primarySoft,
                       borderRadius: BorderRadius.circular(22),
                     ),
                     child: Row(
@@ -161,7 +161,7 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
                             children: [
                               const Text('Upload your documents to go online',
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: AppColors.textPrimary,
                                     fontWeight: FontWeight.w900,
                                     fontSize: 15,
                                   )),
@@ -169,7 +169,7 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
                               Text(
                                 'Verified $verifiedCount · Pending $pendingCount · Missing $missingCount',
                                 style: const TextStyle(
-                                  color: Colors.white70,
+                                  color: AppColors.textSecondary,
                                   fontWeight: FontWeight.w700,
                                   fontSize: 11,
                                 ),
@@ -205,7 +205,7 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
       decoration: BoxDecoration(
         color: kDriverCard,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Row(
         children: [
@@ -266,7 +266,7 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                side: const BorderSide(color: Colors.white24),
+                side: const BorderSide(color: AppColors.divider),
               ),
               child: busy
                   ? const SizedBox(
@@ -277,7 +277,7 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
                       style: const TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 11,
-                        color: Colors.white,
+                        color: AppColors.primary,
                       )),
             ),
         ],

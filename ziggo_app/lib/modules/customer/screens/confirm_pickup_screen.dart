@@ -2,27 +2,25 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../../../app/app_colors.dart';
 import '../../../core/map/maps_service.dart';
 import '../../../core/map/places.dart';
 import '../../../core/map/ziggo_map.dart';
 
-class RentalPickupMapScreen extends StatefulWidget {
+class ConfirmPickupScreen extends StatefulWidget {
   final Place initialLocation;
 
-  const RentalPickupMapScreen({
+  const ConfirmPickupScreen({
     super.key,
     required this.initialLocation,
   });
 
   @override
-  State<RentalPickupMapScreen> createState() => _RentalPickupMapScreenState();
+  State<ConfirmPickupScreen> createState() => _ConfirmPickupScreenState();
 }
 
-class _RentalPickupMapScreenState extends State<RentalPickupMapScreen> {
+class _ConfirmPickupScreenState extends State<ConfirmPickupScreen> {
   final ZiggoMapController _mapController = ZiggoMapController();
   late Place _currentPlace;
-  bool _isMoving = false;
   bool _isResolving = false;
   Timer? _debounceTimer;
 
@@ -32,24 +30,36 @@ class _RentalPickupMapScreenState extends State<RentalPickupMapScreen> {
     _currentPlace = widget.initialLocation;
   }
 
-  void _onMapPositionChanged(LatLng center) {
-    if (!_isMoving) {
-      setState(() => _isMoving = true);
-    }
+  @override
+  void dispose() {
     _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+    super.dispose();
+  }
+
+  void _onMapPositionChanged(LatLng center) {
+    // Only update position coordinates immediately to keep marker centered
+    setState(() {
+      _currentPlace = Place(
+        _currentPlace.name,
+        _currentPlace.fullAddress,
+        center,
+      );
+    });
+
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 600), () {
       _resolveLocation(center);
     });
   }
 
   Future<void> _resolveLocation(LatLng center) async {
+    if (!mounted) return;
     setState(() {
-      _isMoving = false;
       _isResolving = true;
     });
 
     final address = await MapsService.instance.reverseGeocode(center);
-    
+
     if (!mounted) return;
 
     if (address != null) {
@@ -73,7 +83,9 @@ class _RentalPickupMapScreenState extends State<RentalPickupMapScreen> {
     final here = await MapsService.instance.currentLocationAsPlace();
     if (here != null && mounted) {
       _mapController.moveTo(here.location, zoom: 16);
-      setState(() => _currentPlace = here);
+      setState(() {
+        _currentPlace = here;
+      });
     }
   }
 
@@ -90,104 +102,85 @@ class _RentalPickupMapScreenState extends State<RentalPickupMapScreen> {
               zoom: 16,
               showMyLocation: true,
               onPositionChanged: _onMapPositionChanged,
-            ),
-          ),
-
-          // Center Pin (Fixed in center of screen)
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 40.0), // Adjust for pin tail
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0099FF), // Pickme blue
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text(
-                      'Pickup',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    width: 2,
-                    height: 20,
-                    color: Colors.black87,
-                  ),
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Colors.black87,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Top Back Button
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 10,
-            left: 20,
-            child: GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 10,
-                    ),
-                  ],
+              markers: [
+                ZiggoMarker(
+                  point: _currentPlace.location,
+                  icon: Icons.location_on,
+                  color: const Color(0xFF0099FF),
+                  label: 'Meet your driver here',
                 ),
-                child: const Icon(Icons.arrow_back_rounded, color: Colors.black87),
-              ),
+              ],
+              circles: [
+                ZiggoCircle(
+                  center: _currentPlace.location,
+                  radius: 80,
+                  fillColor: const Color(0xFF0099FF).withOpacity(0.12),
+                  strokeColor: const Color(0xFF0099FF).withOpacity(0.3),
+                  strokeWidth: 2,
+                ),
+              ],
             ),
           ),
 
-          // Bottom Info Sheet
+          // Floating Controls and Bottom Card
           Align(
             alignment: Alignment.bottomCenter,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // Current Location Button
+                // Floating back and locate-me buttons
                 Padding(
-                  padding: const EdgeInsets.only(right: 20.0, bottom: 20.0),
-                  child: GestureDetector(
-                    onTap: _moveToCurrentLocation,
-                    child: Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 10,
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Floating Back Button
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.15),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
                           ),
-                        ],
+                          child: const Icon(Icons.arrow_back_rounded, color: Colors.black87),
+                        ),
                       ),
-                      child: const Icon(Icons.my_location_rounded, color: Colors.black87),
-                    ),
+
+                      // Floating Locate-Me Button
+                      GestureDetector(
+                        onTap: _moveToCurrentLocation,
+                        child: Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.15),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(Icons.my_location_rounded, color: Colors.black87),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
 
-                // White Bottom Sheet
+                // White Info Card
                 Container(
                   width: double.infinity,
                   decoration: const BoxDecoration(
@@ -204,32 +197,45 @@ class _RentalPickupMapScreenState extends State<RentalPickupMapScreen> {
                   child: SafeArea(
                     top: false,
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
                       child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Handle bar
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       const Text(
-                        'Confirm pickup',
+                        'Confirm your pickup',
                         style: TextStyle(
-                          fontSize: 20,
+                          fontSize: 18,
                           fontWeight: FontWeight.w900,
                           color: Colors.black87,
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE6F0FA),
+                            padding: const EdgeInsets.all(10),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFE6F0FA),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
                               Icons.location_on_rounded,
-                              color: Color(0xFF3B5998),
-                              size: 20,
+                              color: Color(0xFF0099FF),
+                              size: 24,
                             ),
                           ),
                           const SizedBox(width: 16),
@@ -241,9 +247,11 @@ class _RentalPickupMapScreenState extends State<RentalPickupMapScreen> {
                                   _isResolving ? 'Locating...' : _currentPlace.name,
                                   style: const TextStyle(
                                     fontSize: 16,
-                                    fontWeight: FontWeight.w700,
+                                    fontWeight: FontWeight.w800,
                                     color: Colors.black87,
                                   ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
@@ -251,6 +259,7 @@ class _RentalPickupMapScreenState extends State<RentalPickupMapScreen> {
                                   style: const TextStyle(
                                     fontSize: 13,
                                     color: Colors.black54,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
@@ -263,22 +272,23 @@ class _RentalPickupMapScreenState extends State<RentalPickupMapScreen> {
                       const SizedBox(height: 24),
                       SizedBox(
                         width: double.infinity,
-                        height: 50,
+                        height: 52,
                         child: ElevatedButton(
                           onPressed: _isResolving ? null : _onConfirm,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2C3E50), // Dark blue/grey
+                            backgroundColor: const Color(0xFF0099FF), // Pickme blue
                             foregroundColor: Colors.white,
                             elevation: 0,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(25),
+                              borderRadius: BorderRadius.circular(26),
                             ),
                           ),
                           child: const Text(
-                            'Confirm',
+                            'CONFIRM PICKUP',
                             style: TextStyle(
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w900,
                               fontSize: 16,
+                              letterSpacing: 0.5,
                             ),
                           ),
                         ),

@@ -1,5 +1,4 @@
 import 'dart:ui' as ui;
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -326,6 +325,21 @@ class ZiggoPolyline {
   });
 }
 
+class ZiggoCircle {
+  final LatLng center;
+  final double radius;
+  final Color fillColor;
+  final Color strokeColor;
+  final int strokeWidth;
+  const ZiggoCircle({
+    required this.center,
+    required this.radius,
+    this.fillColor = const Color(0x220099FF),
+    this.strokeColor = const Color(0x660099FF),
+    this.strokeWidth = 2,
+  });
+}
+
 class ZiggoMapController {
   gmaps.GoogleMapController? _c;
 
@@ -407,6 +421,7 @@ class ZiggoMap extends StatefulWidget {
   final double zoom;
   final List<ZiggoMarker> markers;
   final List<ZiggoPolyline> polylines;
+  final List<ZiggoCircle> circles;
   final bool interactive;
   final bool showMyLocation;
   final bool darkMode;
@@ -420,6 +435,7 @@ class ZiggoMap extends StatefulWidget {
     this.zoom = 14,
     this.markers = const [],
     this.polylines = const [],
+    this.circles = const [],
     this.interactive = true,
     this.showMyLocation = false,
     this.darkMode = false,
@@ -572,6 +588,21 @@ class _ZiggoMapState extends State<ZiggoMap> {
       );
     }
 
+    final gCircles = <gmaps.Circle>{};
+    for (var i = 0; i < widget.circles.length; i++) {
+      final c = widget.circles[i];
+      gCircles.add(
+        gmaps.Circle(
+          circleId: gmaps.CircleId('c$i'),
+          center: _g(c.center),
+          radius: c.radius,
+          fillColor: c.fillColor,
+          strokeColor: c.strokeColor,
+          strokeWidth: c.strokeWidth,
+        ),
+      );
+    }
+
     final showMe = widget.showMyLocation && _locationGranted;
 
     return gmaps.GoogleMap(
@@ -580,6 +611,7 @@ class _ZiggoMapState extends State<ZiggoMap> {
       style: widget.darkMode ? kDarkMapStyle : null,
       markers: gMarkers,
       polylines: gPolylines,
+      circles: gCircles,
       myLocationEnabled: showMe,
       myLocationButtonEnabled: showMe,
       zoomControlsEnabled: false,

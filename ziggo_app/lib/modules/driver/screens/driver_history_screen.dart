@@ -60,7 +60,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Theme(
-      data: driverDarkTheme(context),
+      data: driverTheme(context),
       child: _buildScaffold(context),
     );
   }
@@ -84,7 +84,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      gradient: AppColors.blackGradient,
+                      color: AppColors.primarySoft,
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: AppStyles.shadowLg,
                     ),
@@ -132,7 +132,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                             Container(
                               width: 1,
                               height: 32,
-                              color: Colors.white12,
+                              color: AppColors.divider,
                             ),
                             Expanded(
                               child: _stat(
@@ -160,7 +160,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                               height: 96,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
-                                color: kDriverCardLight,
+                                color: AppColors.surfaceMuted,
                                 borderRadius: BorderRadius.circular(28),
                               ),
                               child: const Icon(Icons.history_rounded,
@@ -191,7 +191,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                           decoration: BoxDecoration(
                             color: kDriverCard,
                             borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: Colors.white10),
+                            border: Border.all(color: AppColors.divider),
                           ),
                           child: Column(
                             children: [
@@ -252,7 +252,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                   ],
                                 ),
                               ),
-                              const Divider(height: 1, color: Colors.white12),
+                              const Divider(height: 1, color: AppColors.divider),
                               Padding(
                                 padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
                                 child: Column(
@@ -299,7 +299,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                 ),
                               ),
                               if (isExpanded) ...[
-                                const Divider(height: 1, color: Colors.white12),
+                                const Divider(height: 1, color: AppColors.divider),
                                 Padding(
                                   padding: const EdgeInsets.all(14),
                                   child: Column(
@@ -346,7 +346,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                         isBold: true,
                                       ),
                                       const SizedBox(height: 6),
-                                      const Divider(height: 1, color: Colors.white12),
+                                      const Divider(height: 1, color: AppColors.divider),
                                       const SizedBox(height: 6),
                                       _breakdownRow(
                                         'App Usage Charges (Commission)',
@@ -366,7 +366,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                         isBold: true,
                                       ),
                                       const SizedBox(height: 6),
-                                      const Divider(height: 1, color: Colors.white12),
+                                      const Divider(height: 1, color: AppColors.divider),
                                       const SizedBox(height: 6),
                                       _breakdownRow(
                                         'Net Driver Earnings',
@@ -381,7 +381,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 14, vertical: 10),
                                 decoration: const BoxDecoration(
-                                  color: kDriverCardLight,
+                                  color: AppColors.surfaceMuted,
                                   borderRadius: BorderRadius.only(
                                     bottomLeft: Radius.circular(18),
                                     bottomRight: Radius.circular(18),
@@ -431,7 +431,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-              color: isBold ? Colors.white : Colors.white70,
+              color: isBold ? AppColors.textPrimary : AppColors.textSecondary,
             ),
           ),
           Text(
@@ -441,7 +441,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
               fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
               color: isNegative
                   ? AppColors.error
-                  : (isBold ? kDriverGold : Colors.white),
+                  : (isBold ? kDriverGold : AppColors.textPrimary),
             ),
           ),
         ],
@@ -469,7 +469,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
             Text(
               label,
               style: const TextStyle(
-                color: Colors.white60,
+                color: AppColors.textSecondary,
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
               ),

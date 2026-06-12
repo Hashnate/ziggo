@@ -25,9 +25,9 @@ import 'driver_earnings_screen.dart';
 import 'driver_profile_screen.dart';
 import 'driver_registration_screen.dart';
 
-// Ziggo dark driver UI tokens — deep navy brand surfaces + gold accent.
-const Color _kPanel = Color(0xFF111A33);       // deep navy (brand primaryDark tone)
-const Color _kPanelLight = Color(0xFF1B2A52);  // lighter navy for inset cards
+// Ziggo light driver UI tokens — clean light brand surfaces + gold accent.
+const Color _kPanel = AppColors.surface;       // clean white (matching surface)
+const Color _kPanelLight = AppColors.surfaceMuted;  // light grey for inset cards
 const Color _kGold = AppColors.accent;         // Ziggo gold accent (#FBBF24)
 
 class DriverHomeScreen extends StatefulWidget {
@@ -446,7 +446,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 center: loc,
                 zoom: 15,
                 showMyLocation: true,
-                darkMode: true,
+                darkMode: false,
                 markers: [
                   pinMarker(
                     point: loc,
@@ -555,7 +555,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: _kPanel,
-                border: Border.all(color: Colors.white24, width: 2),
+                border: Border.all(color: AppColors.divider, width: 2),
                 boxShadow: AppStyles.shadowSm,
               ),
               clipBehavior: Clip.antiAlias,
@@ -589,7 +589,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       const Text(
                         'LKR ',
                         style: TextStyle(
-                          color: Colors.white54,
+                          color: AppColors.textSecondary,
                           fontWeight: FontWeight.w800,
                           fontSize: 13,
                         ),
@@ -597,7 +597,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       Text(
                         earnings.toStringAsFixed(2),
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: AppColors.textPrimary,
                           fontWeight: FontWeight.w900,
                           fontSize: 17,
                         ),
@@ -608,12 +608,12 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: const [
-                      Icon(Icons.savings_rounded, color: _kGold, size: 12),
+                      Icon(Icons.savings_rounded, color: AppColors.primary, size: 12),
                       SizedBox(width: 4),
                       Text(
                         'Earnings',
                         style: TextStyle(
-                          color: Colors.white60,
+                          color: AppColors.textSecondary,
                           fontWeight: FontWeight.w700,
                           fontSize: 11,
                         ),
@@ -638,7 +638,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               ),
               child: Icon(
                 Icons.swap_horiz_rounded,
-                color: driver.isOnline ? _kGold : Colors.white,
+                color: driver.isOnline ? AppColors.primary : AppColors.textSecondary,
                 size: 24,
               ),
             ),
@@ -653,7 +653,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       child: Text(
         initial,
         style: const TextStyle(
-          color: Colors.white,
+          color: AppColors.primary,
           fontWeight: FontWeight.w900,
           fontSize: 20,
         ),
@@ -717,7 +717,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 child: Text(
                   online ? 'Online' : 'Go online',
                   style: TextStyle(
-                    color: online ? Colors.white : _kGold,
+                    color: online ? Colors.white : AppColors.primary,
                     fontWeight: FontWeight.w900,
                     fontSize: 17,
                   ),
@@ -740,7 +740,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 ),
                 child: Icon(
                   Icons.power_settings_new_rounded,
-                  color: online ? AppColors.success : const Color(0xFF24345E),
+                  color: online ? AppColors.success : AppColors.primary,
                   size: 24,
                 ),
               ),
@@ -792,7 +792,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       width: 44,
                       height: 5,
                       decoration: BoxDecoration(
-                        color: Colors.white24,
+                        color: AppColors.divider,
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
@@ -805,18 +805,18 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   const Text(
                     'One Day Incentives',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                       fontWeight: FontWeight.w900,
                       fontSize: 15,
                     ),
                   ),
                   const Spacer(),
-                  const Icon(Icons.access_time_rounded, color: _kGold, size: 15),
+                  const Icon(Icons.access_time_rounded, color: AppColors.primary, size: 15),
                   const SizedBox(width: 5),
                   const Text(
                     '14 hours',
                     style: TextStyle(
-                      color: Colors.white60,
+                      color: AppColors.textSecondary,
                       fontWeight: FontWeight.w700,
                       fontSize: 12,
                     ),
@@ -826,7 +826,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     expanded
                         ? Icons.keyboard_arrow_down_rounded
                         : Icons.keyboard_arrow_up_rounded,
-                    color: Colors.white38,
+                    color: AppColors.textTertiary,
                     size: 20,
                   ),
                 ],
@@ -843,7 +843,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                           Container(
                             padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
                             decoration: BoxDecoration(
-                              color: _kPanelLight,
+                              color: AppColors.surfaceMuted,
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: Column(
@@ -852,7 +852,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                                 const Text(
                                   '1. Complete 3 trips to earn an additional LKR 350.',
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: AppColors.textPrimary,
                                     fontWeight: FontWeight.w700,
                                     fontSize: 13,
                                     height: 1.3,
@@ -868,7 +868,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                             const Text(
                               'Shortcuts',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: AppColors.textPrimary,
                                 fontWeight: FontWeight.w900,
                                 fontSize: 14,
                               ),
@@ -926,7 +926,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   Container(
                     height: 8,
                     decoration: BoxDecoration(
-                      color: Colors.white12,
+                      color: AppColors.divider,
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
@@ -943,7 +943,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       child: Text(
                         '$rides/$goal',
                         style: const TextStyle(
-                          color: Colors.white70,
+                          color: AppColors.textSecondary,
                           fontWeight: FontWeight.w800,
                           fontSize: 11,
                         ),
@@ -970,7 +970,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               child: Text(
                 'Goal: 3 trips',
                 style: TextStyle(
-                  color: Colors.white38,
+                  color: AppColors.textTertiary,
                   fontWeight: FontWeight.w700,
                   fontSize: 10,
                 ),
@@ -993,18 +993,18 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white24),
+          border: Border.all(color: AppColors.divider),
         ),
         child: Row(
           children: [
-            Icon(icon, color: Colors.white70, size: 20),
+            Icon(icon, color: AppColors.primary, size: 20),
             const SizedBox(width: 12),
             Expanded(
               child: Center(
                 child: Text(
                   label,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                     fontWeight: FontWeight.w800,
                     fontSize: 14,
                   ),
@@ -1012,7 +1012,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               ),
             ),
             const Icon(Icons.chevron_right_rounded,
-                color: Colors.white38, size: 22),
+                color: AppColors.textTertiary, size: 22),
           ],
         ),
       ),
@@ -2975,7 +2975,7 @@ class _Drawer extends StatelessWidget {
             child: Text(
               'Version 1.0.0',
               style: TextStyle(
-                color: Colors.white38,
+                color: AppColors.textTertiary,
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
               ),
@@ -3010,12 +3010,12 @@ class _Drawer extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
           child: Row(
             children: [
-              Icon(icon, color: Colors.white, size: 24),
+              Icon(icon, color: AppColors.textPrimary, size: 24),
               const SizedBox(width: 18),
               Text(
                 label,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: AppColors.textPrimary,
                   fontWeight: FontWeight.w700,
                   fontSize: 15,
                 ),
@@ -3027,7 +3027,7 @@ class _Drawer extends StatelessWidget {
               const Spacer(),
               if (chevronDown)
                 const Icon(Icons.keyboard_arrow_down_rounded,
-                    color: Colors.white38, size: 22),
+                    color: AppColors.textTertiary, size: 22),
             ],
           ),
         ),
@@ -3089,7 +3089,7 @@ class _PendingApprovalScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Theme(
-      data: driverDarkTheme(context),
+      data: driverTheme(context),
       child: _buildScaffold(context),
     );
   }
@@ -3143,20 +3143,20 @@ class _PendingApprovalScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: kDriverCard,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white10),
+                  border: Border.all(color: AppColors.divider),
                 ),
                 child: Column(
                   children: [
                     _row('Name', profile['full_name']?.toString() ?? '-'),
-                    const Divider(height: 14),
+                    const Divider(height: 14, color: AppColors.divider),
                     _row('Phone', profile['phone_number']?.toString() ?? '-'),
-                    const Divider(height: 14),
+                    const Divider(height: 14, color: AppColors.divider),
                     _row('Vehicle',
                         '${profile['vehicle_model'] ?? ''} (${profile['vehicle_number'] ?? ''})'),
-                    const Divider(height: 14),
+                    const Divider(height: 14, color: AppColors.divider),
                     _row('Type',
                         (profile['vehicle_type'] ?? '').toString().toUpperCase()),
-                    const Divider(height: 14),
+                    const Divider(height: 14, color: AppColors.divider),
                     _row('License', profile['license_number']?.toString() ?? '-'),
                   ],
                 ),
@@ -3191,7 +3191,7 @@ class _PendingApprovalScreen extends StatelessWidget {
             k,
             style: const TextStyle(
               fontWeight: FontWeight.w900,
-              color: AppColors.textTertiary,
+              color: AppColors.textSecondary,
               fontSize: 11,
               letterSpacing: 1.2,
             ),
