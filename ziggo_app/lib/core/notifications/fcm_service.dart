@@ -37,12 +37,17 @@ import '../network/api_client.dart';
 const String _rideAlertChannelId = 'ziggo_ride_alerts_v3';
 const String _rideAlertChannelName = 'Ride alerts';
 const String _rideAlertChannelDesc =
-    'New ride requests and ride status updates. Plays custom sound.';
+    'New ride requests. Plays continuous custom sound.';
 
 const String _foodAlertChannelId = 'ziggo_food_alerts_v1';
 const String _foodAlertChannelName = 'Food and order alerts';
 const String _foodAlertChannelDesc =
     'Food and market order updates. Plays custom sound.';
+
+const String _generalAlertChannelId = 'ziggo_general_alerts_v1';
+const String _generalAlertChannelName = 'General updates';
+const String _generalAlertChannelDesc =
+    'Status updates and general notifications. Plays system default sound.';
 
 /// Required for background message handling on Android — Firebase invokes a
 /// top-level function in an isolated Dart isolate. The OS shows the system
@@ -95,7 +100,7 @@ class FcmService {
         const InitializationSettings(android: androidInit, iOS: iosInit),
       );
 
-      // 2. Register the Android channels with their custom sounds.
+      // 2. Register the Android channels.
       //    Idempotent — calling create on an existing channel is a no-op.
       if (Platform.isAndroid) {
         final androidPlugin = _local
@@ -121,6 +126,16 @@ class FcmService {
               importance: Importance.max,
               playSound: true,
               sound: RawResourceAndroidNotificationSound('food_alert'),
+              enableVibration: true,
+            ),
+          );
+          await androidPlugin.createNotificationChannel(
+            const AndroidNotificationChannel(
+              _generalAlertChannelId,
+              _generalAlertChannelName,
+              description: _generalAlertChannelDesc,
+              importance: Importance.default_,
+              playSound: true,
               enableVibration: true,
             ),
           );
@@ -306,16 +321,46 @@ class FcmService {
       debugPrint('[fcm] foreground: ${notif.title} — ${notif.body}');
     }
 
+    final event = message.data['event'];
+    final isRideRequest = event == 'new_ride_request';
     final isFoodOrMarket = message.data['is_food'] == 'true' ||
         message.data['is_market'] == 'true' ||
-        message.data['event'] == 'food_order_update' ||
-        message.data['event'] == 'order_update' ||
-        message.data['event'] == 'market_order_update';
+        event == 'food_order_update' ||
+        event == 'order_update' ||
+        event == 'market_order_update';
 
-    final channelId = isFoodOrMarket ? _foodAlertChannelId : _rideAlertChannelId;
-    final channelName = isFoodOrMarket ? _foodAlertChannelName : _rideAlertChannelName;
-    final channelDesc = isFoodOrMarket ? _foodAlertChannelDesc : _rideAlertChannelDesc;
-    final soundName = isFoodOrMarket ? 'food_alert' : 'ride_alert';
+    String channelId;
+    String channelName;
+    String channelDesc;
+    AndroidNotificationSound? androidSound;
+    bool insistent = false;
+    Importance importance = Importance.default_;
+    Priority priority = Priority.default_;
+    String? iosSound;
+
+    if (isRideRequest) {
+      channelId = _rideAlertChannelId;
+      channelName = _rideAlertChannelName;
+      channelDesc = _rideAlertChannelDesc;
+      androidSound = const RawResourceAndroidNotificationSound('ride_alert');
+      insistent = true;
+      importance = Importance.max;
+      priority = Priority.high;
+      iosSound = 'ride_alert.caf';
+    } else if (isFoodOrMarket) {
+      channelId = _foodAlertChannelId;
+      channelName = _foodAlertChannelName;
+      channelDesc = _foodAlertChannelDesc;
+      androidSound = const RawResourceAndroidNotificationSound('food_alert');
+      importance = Importance.max;
+      priority = Priority.high;
+      iosSound = 'food_alert.caf';
+    } else {
+      channelId = _generalAlertChannelId;
+      channelName = _generalAlertChannelName;
+      channelDesc = _generalAlertChannelDesc;
+      androidSound = null;
+    }
 
     try {
       await _local.show(
@@ -329,17 +374,19 @@ class FcmService {
             channelId,
             channelName,
             channelDescription: channelDesc,
-            importance: Importance.max,
-            priority: Priority.high,
+            importance: importance,
+            priority: priority,
             playSound: true,
-            sound: RawResourceAndroidNotificationSound(soundName),
+            sound: androidSound,
+            insistent: insistent,
             enableVibration: true,
             // Tap → opens the app (since we don't set a payload route)
           ),
-          iOS: const DarwinNotificationDetails(
+          iOS: DarwinNotificationDetails(
             presentAlert: true,
             presentBadge: true,
             presentSound: true,
+            sound: iosSound,
           ),
         ),
       );
