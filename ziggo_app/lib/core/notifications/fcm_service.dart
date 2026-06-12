@@ -35,12 +35,12 @@ import '../network/api_client.dart';
 // (see fcm_service.py `channel_id="ziggo_ride_alerts"`). Bumping this id
 // here forces Android to create a fresh channel (use this trick if you ever
 // swap the sound file — Android won't update an existing channel's sound).
-const String _rideAlertChannelId = 'ziggo_ride_alerts_v4';
+const String _rideAlertChannelId = 'ziggo_ride_alerts_v5';
 const String _rideAlertChannelName = 'Ride alerts';
 const String _rideAlertChannelDesc =
     'New ride requests. Plays continuous custom sound.';
 
-const String _foodAlertChannelId = 'ziggo_food_alerts_v2';
+const String _foodAlertChannelId = 'ziggo_food_alerts_v3';
 const String _foodAlertChannelName = 'Food and order alerts';
 const String _foodAlertChannelDesc =
     'Food and market order updates. Plays custom sound.';
