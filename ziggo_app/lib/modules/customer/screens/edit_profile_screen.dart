@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../app/app_colors.dart';
 import '../../../core/widgets/motion.dart';
 import '../../auth/auth_provider.dart';
+import 'additional_settings_screen.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -49,50 +50,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (mounted) Navigator.popUntil(context, (r) => r.isFirst);
   }
 
-  Future<void> _confirmDeleteAccount() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete your Ziggo account?'),
-        content: const Text(
-          'This will permanently remove your personal data (name, email, '
-          'photo, phone, push tokens). Past trip and payment records are '
-          'retained for Sri Lanka Inland Revenue compliance (6 years). '
-          'Any wallet balance is forfeit per Terms of Service. '
-          '\n\nThis cannot be undone.',
-          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Delete account'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true) return;
-    final msg = await context.read<AuthProvider>().deleteAccount();
-    if (!mounted) return;
-    if (msg != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(msg),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not delete account — please try again.'),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
+
 
   Future<void> _editName() async {
     final auth = context.read<AuthProvider>();
@@ -393,7 +351,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             icon: Icons.settings_outlined,
             title: 'Additional settings',
             trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary),
-            onTap: () {}, // Placeholder
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AdditionalSettingsScreen()),
+              );
+            },
           ),
           
           const SizedBox(height: 32),
@@ -418,8 +381,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 16),
-          _deleteAccountButton(),
           const SizedBox(height: 40),
         ]),
       ),
@@ -491,28 +452,5 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  Widget _deleteAccountButton() {
-    return GestureDetector(
-      onTap: _confirmDeleteAccount,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        alignment: Alignment.center,
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.no_accounts_rounded,
-                color: AppColors.error, size: 16),
-            SizedBox(width: 8),
-            Text('Delete my account',
-                style: TextStyle(
-                  color: AppColors.error,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 13,
-                  letterSpacing: 0.4,
-                )),
-          ],
-        ),
-      ),
-    );
-  }
+
 }

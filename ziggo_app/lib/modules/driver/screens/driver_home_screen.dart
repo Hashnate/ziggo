@@ -2233,10 +2233,15 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
   // booking_id is set for ride/parcel; food orders only carry food_order_id.
   // The provider's accept/decline routes by `is_food` flag and uses the right
   // path, so we just need an int that won't crash the call site.
-  int get _requestId =>
-      (widget.request['booking_id'] ?? 
-       widget.request['food_order_id'] ?? 
-       widget.request['market_order_id'] ?? 0) as int;
+  int get _requestId {
+    final raw = widget.request['booking_id'] ?? 
+                widget.request['food_order_id'] ?? 
+                widget.request['market_order_id'] ?? 0;
+    if (raw is int) return raw;
+    if (raw is String) return int.tryParse(raw) ?? 0;
+    if (raw is double) return raw.toInt();
+    return 0;
+  }
 
   bool get _isFood => widget.request['is_food'] == true;
 
@@ -2278,6 +2283,14 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
 
   @override
   Widget build(BuildContext context) {
+    final pending = context.watch<DriverProvider>().pendingRequest;
+    if (pending == null && !_busy) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.of(context).pop();
+      });
+      return const SizedBox.shrink();
+    }
+
     final r = widget.request;
     final distance = (r['distance_km'] as num?)?.toDouble() ?? 0;
     final duration = (r['duration_min'] as num?)?.toInt() ?? 0;

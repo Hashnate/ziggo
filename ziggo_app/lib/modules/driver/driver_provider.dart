@@ -97,6 +97,8 @@ class DriverProvider extends ChangeNotifier {
         : isMarket
             ? '/market/orders/${pending['market_order_id']}/accept'
             : '/bookings/$bookingId/accept';
+    _pendingRequest = null;
+    notifyListeners();
     try {
       final resp = await ApiClient.instance.dio.post(path);
       if (isFood) {
@@ -108,11 +110,9 @@ class DriverProvider extends ChangeNotifier {
       } else {
         _activeRide = Map<String, dynamic>.from(resp.data);
       }
-      _pendingRequest = null;
       notifyListeners();
       return true;
     } on DioException {
-      _pendingRequest = null;
       notifyListeners();
       return false;
     }
@@ -127,13 +127,13 @@ class DriverProvider extends ChangeNotifier {
         : isMarket
             ? '/market/orders/${pending['market_order_id']}/decline'
             : '/bookings/$bookingId/decline';
+    _pendingRequest = null;
+    notifyListeners();
     try {
       await ApiClient.instance.dio.post(path);
     } on DioException {
       // ignore
     }
-    _pendingRequest = null;
-    notifyListeners();
   }
 
   Future<void> loadActiveMarketOrder() async {

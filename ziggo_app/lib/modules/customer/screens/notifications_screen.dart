@@ -5,6 +5,13 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/widgets/motion.dart';
 import '../notifications_provider.dart';
+import '../booking_provider.dart';
+import 'ride_tracking_screen.dart';
+import 'ride_history_screen.dart';
+import 'food_tracking_screen.dart';
+import 'market_tracking_screen.dart';
+import 'promotions_screen.dart';
+import 'wallet_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -92,7 +99,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       return EntranceSlide(
                         delay: Duration(milliseconds: 45 * i),
                         child: GestureDetector(
-                        onTap: () => p.markRead(n['id'] as int),
+                        onTap: () => _onNotificationTap(context, n),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           margin: const EdgeInsets.only(bottom: 10),
@@ -180,6 +187,72 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ),
       ),
     );
+  }
+
+  void _onNotificationTap(BuildContext context, Map<String, dynamic> n) async {
+    final type = (n['type'] ?? '').toString();
+    final body = (n['body'] ?? '').toString();
+
+    // Mark as read
+    context.read<NotificationsProvider>().markRead(n['id'] as int);
+
+    // Extract reference from body (e.g. ZG62C3F4F7, FOA1B2C3D4, MK1A2B3C4D)
+    final match = RegExp(r'\b(ZG|CR|FL|RT|FO|MK|EV)[0-9A-Z]{8}\b').firstMatch(body);
+    final String? ref = match?.group(0);
+
+    if (ref != null) {
+      if (ref.startsWith('ZG') || ref.startsWith('CR') || ref.startsWith('FL') || ref.startsWith('RT')) {
+        // Ride/Courier/Flash/Rental
+        final bp = context.read<BookingProvider>();
+        await bp.loadActive();
+        if (context.mounted) {
+          if (bp.activeBooking != null && bp.activeBooking!['booking_ref'] == ref) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const RideTrackingScreen()),
+            );
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const RideHistoryScreen()),
+            );
+          }
+        }
+        return;
+      } else if (ref.startsWith('FO')) {
+        // Food Order
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => FoodTrackingScreen(orderRef: ref)),
+        );
+        return;
+      } else if (ref.startsWith('MK')) {
+        // Market Order
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => MarketTrackingScreen(orderRef: ref)),
+        );
+        return;
+      }
+    }
+
+    // Fallbacks based on notification type if no reference matched in body
+    if (type == 'promo') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const PromotionsScreen()),
+      );
+    } else if (type == 'payment') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const WalletScreen()),
+      );
+    } else if (type == 'ride_update') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const RideHistoryScreen()),
+      );
+    }
   }
 }
 
