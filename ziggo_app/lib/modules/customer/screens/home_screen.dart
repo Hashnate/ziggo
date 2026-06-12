@@ -863,6 +863,8 @@ class _ServicesGrid extends StatelessWidget {
               GradientServiceTile(
                 icon: Icons.qr_code_scanner_rounded,
                 label: 'Scan & Go',
+                gradientColors: const [Color(0xFFFBBF24), Color(0xFFFF7849)],
+                iconColor: Colors.white,
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(

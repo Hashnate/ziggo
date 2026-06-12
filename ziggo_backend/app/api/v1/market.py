@@ -79,10 +79,14 @@ async def list_vendors(
         if not is_open_now:
             continue
         distance_km = None
-        if has_origin and v.lat is not None and v.lng is not None:
+        if has_origin:
+            if v.lat is None or v.lng is None:
+                continue
             distance_km = round(
                 haversine_km(lat, lng, float(v.lat), float(v.lng)), 2
             )
+            if distance_km > 10.0:
+                continue
             # Hard radius block: hide stalls that can't deliver to this point.
             radius = float(delivery.vendor_radius_km(v.delivery_radius_km))
             if distance_km > radius:
