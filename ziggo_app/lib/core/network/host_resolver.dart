@@ -52,7 +52,7 @@ class HostResolver {
     try {
       final prefs = await SharedPreferences.getInstance();
       saved = prefs.getString(_prefsKey);
-      if (saved != null && (saved.contains(':8000') || saved.contains(':8030'))) {
+      if (saved != null && (saved.contains(':8000') || saved.contains(':8030') || saved.startsWith('http://187.127.152.141'))) {
         await prefs.remove(_prefsKey);
         saved = null;
       }
