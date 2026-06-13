@@ -547,3 +547,58 @@ async def upload_billing_proof(
     await db.refresh(d)
     return {"ok": True, "billing_proof_url": url}
 
+
+@router.post("/settle-commission")
+async def settle_commission(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("driver")),
+):
+    """Settle outstanding admin commission.
+    This records a driver payout offset in the DB, matching the pending earnings balance."""
+    d = await _get_driver(db, user)
+    from ...services.finance_service import get_driver_earnings_summary
+    summary = await get_driver_earnings_summary(db, d.id)
+    
+    commission = Decimal(str(summary["commission"]))
+    pending = Decimal(str(summary["pending"]))
+    
+    if commission <= 0 or pending <= 0:
+        raise HTTPException(status_code=400, detail="No commission or pending balance to settle")
+        
+    from ...models import DriverPayout
+    payout = DriverPayout(
+        driver_id=d.id,
+        user_id=d.user_id,
+        amount=pending,
+        description="Commission settled (Cash balance offset)",
+    )
+    db.add(payout)
+    await db.commit()
+    
+    return {"ok": True, "settled_amount": float(commission)}
+
+
+@router.get("/incentives")
+async def get_driver_incentives(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("driver")),
+):
+    """Get list of all active driver incentive tiers."""
+    from ...models import DriverIncentive
+    q = await db.execute(
+        select(DriverIncentive)
+        .where(DriverIncentive.is_active == True)
+        .order_by(DriverIncentive.trips_required)
+    )
+    rows = q.scalars().all()
+    return [
+        {
+            "id": r.id,
+            "title": r.title,
+            "limit_days": r.limit_days,
+            "trips_required": r.trips_required,
+            "reward_amount": float(r.reward_amount),
+        }
+        for r in rows
+    ]
+

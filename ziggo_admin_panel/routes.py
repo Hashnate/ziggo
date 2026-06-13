@@ -6345,3 +6345,89 @@ async def admin_restaurant_set_cuisine_categories(
     r.food_categories = list(chosen)
     await db.commit()
     return RedirectResponse(url=f"/admin/restaurants/{restaurant_id}", status_code=303)
+
+
+# ---------- Driver Incentives Management ----------
+@router.get("/incentives")
+async def admin_incentives(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import DriverIncentive
+    q = await db.execute(select(DriverIncentive).order_by(DriverIncentive.trips_required))
+    incentives = q.scalars().all()
+    return templates.TemplateResponse(
+        request,
+        "incentives.html",
+        {
+            "request": request,
+            "active_page": "incentives",
+            "incentives": incentives,
+        },
+    )
+
+
+@router.post("/incentives/new")
+async def admin_incentives_new(
+    title: str = Form(...),
+    limit_days: int = Form(...),
+    trips_required: int = Form(...),
+    reward_amount: float = Form(...),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import DriverIncentive
+    from decimal import Decimal
+    new_inc = DriverIncentive(
+        title=title.strip(),
+        limit_days=limit_days,
+        trips_required=trips_required,
+        reward_amount=Decimal(str(reward_amount)),
+        is_active=True,
+    )
+    db.add(new_inc)
+    await db.commit()
+    return RedirectResponse(url="/admin/incentives", status_code=303)
+
+
+@router.post("/incentives/{id}/edit")
+async def admin_incentives_edit(
+    id: int,
+    title: str = Form(...),
+    limit_days: int = Form(...),
+    trips_required: int = Form(...),
+    reward_amount: float = Form(...),
+    is_active: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import DriverIncentive
+    from decimal import Decimal
+    q = await db.execute(select(DriverIncentive).where(DriverIncentive.id == id))
+    inc = q.scalars().first()
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incentive not found")
+    inc.title = title.strip()
+    inc.limit_days = limit_days
+    inc.trips_required = trips_required
+    inc.reward_amount = Decimal(str(reward_amount))
+    inc.is_active = (is_active == "on")
+    await db.commit()
+    return RedirectResponse(url="/admin/incentives", status_code=303)
+
+
+@router.post("/incentives/{id}/delete")
+async def admin_incentives_delete(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import DriverIncentive
+    q = await db.execute(select(DriverIncentive).where(DriverIncentive.id == id))
+    inc = q.scalars().first()
+    if inc:
+        await db.delete(inc)
+        await db.commit()
+    return RedirectResponse(url="/admin/incentives", status_code=303)
+

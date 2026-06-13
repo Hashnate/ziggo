@@ -23,7 +23,7 @@ from sqlalchemy import inspect, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from ..database import Base
-from ..models import Event, EventTicketTier, EventOrder, EventOrderItem, FlashWeightTier, CorporateAccount, CorporateMember, DriverPayout, MarketAd  # noqa: F401 — ensures import for create_all
+from ..models import Event, EventTicketTier, EventOrder, EventOrderItem, FlashWeightTier, CorporateAccount, CorporateMember, DriverPayout, MarketAd, DriverIncentive  # noqa: F401 — ensures import for create_all
 
 # (table_name, column_name, column_ddl)
 PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
@@ -167,6 +167,7 @@ async def ensure_schema(engine: AsyncEngine) -> None:
         await _seed_flash_tiers(conn)
         await _seed_sample_events(conn)
         await _seed_food_home(conn)
+        await _seed_incentives(conn)
 
 
 async def _seed_flash_tiers(conn) -> None:
@@ -286,3 +287,20 @@ async def _seed_food_home(conn) -> None:
 
     if seeded:
         print(f"[schema_sync] Seeded food home: {', '.join(seeded)}")
+
+
+async def _seed_incentives(conn) -> None:
+    from ..models import DriverIncentive
+    existing = await conn.execute(select(DriverIncentive))
+    if existing.scalars().first() is not None:
+        return
+    
+    defaults = [
+        {"title": "One Day Incentives", "limit_days": 1, "trips_required": 3, "reward_amount": Decimal("350.00")},
+        {"title": "Weekday Incentives", "limit_days": 6, "trips_required": 100, "reward_amount": Decimal("3500.00")},
+        {"title": "Weekday Incentives", "limit_days": 6, "trips_required": 120, "reward_amount": Decimal("6000.00")},
+        {"title": "Weekday Incentives", "limit_days": 6, "trips_required": 225, "reward_amount": Decimal("20000.00")},
+    ]
+    for row in defaults:
+        await conn.execute(DriverIncentive.__table__.insert().values(**row, is_active=True))
+    print(f"[schema_sync] Seeded {len(defaults)} default driver incentive tiers")

@@ -298,3 +298,15 @@ class DriverPayout(Base):
     driver = relationship("Driver", foreign_keys=[driver_id])
     user = relationship("User", foreign_keys=[user_id])
 
+
+class DriverIncentive(Base):
+    __tablename__ = "driver_incentives"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(100), nullable=False)  # e.g., "One Day Incentives", "Weekday Incentives"
+    limit_days = Column(Integer, default=1)  # e.g., 1 day, 6 days
+    trips_required = Column(Integer, nullable=False)  # e.g., 3, 100, 120, 225
+    reward_amount = Column(DECIMAL(10, 2), nullable=False)  # e.g., 350, 3500, 6000, 20000
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
