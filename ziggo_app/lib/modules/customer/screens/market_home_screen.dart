@@ -16,6 +16,7 @@ import 'customer_shell.dart';
 import 'market_checkout_screen.dart';
 import 'market_favourites_screen.dart';
 import 'market_orders_screen.dart';
+import 'market_group_screen.dart';
 import 'market_vendor_screen.dart';
 
 class MarketHomeScreen extends StatefulWidget {
@@ -198,7 +199,7 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
                             delegate: SliverChildBuilderDelegate(
                               (_, i) => EntranceSlide(
                                 delay: Duration(milliseconds: 45 * i),
-                                child: _OutletCard(vendor: outlets[i]),
+                                child: MarketOutletCard(vendor: outlets[i]),
                               ),
                               childCount: outlets.length,
                             ),
@@ -646,7 +647,12 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
 
   Widget _pickCard(_PickItem p) {
     return GestureDetector(
-      onTap: () => _soon(p.label),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MarketGroupScreen(groupName: p.label),
+        ),
+      ),
       child: Container(
         height: 122,
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
@@ -1038,9 +1044,9 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
 // ====================================================================
 //  Outlet card — "Outlets near you"
 // ====================================================================
-class _OutletCard extends StatelessWidget {
+class MarketOutletCard extends StatelessWidget {
   final Map<String, dynamic> vendor;
-  const _OutletCard({required this.vendor});
+  const MarketOutletCard({required this.vendor});
 
   String? _resolveCover(String? path) {
     if (path == null || path.isEmpty) return null;
