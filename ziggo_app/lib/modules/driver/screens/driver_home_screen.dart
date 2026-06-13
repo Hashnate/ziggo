@@ -615,7 +615,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           ),
           const Spacer(),
           GestureDetector(
-            onTap: () => _scaffoldKey.currentState?.openDrawer(),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DriverEarningsScreen()),
+            ),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 7),
               decoration: BoxDecoration(
@@ -1000,20 +1003,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                                 MaterialPageRoute(
                                     builder: (_) => const DriverHistoryScreen()),
                               ),
-                            ),
-                            const SizedBox(height: 10),
-                            _shortcutButton(
-                              icon: Icons.directions_walk_rounded,
-                              label: 'Road pickup trip',
-                              onTap: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content:
-                                        Text('Road pickup trips are coming soon.'),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              },
                             ),
                           ],
                         ],
