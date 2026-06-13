@@ -48,12 +48,15 @@ class ApiClient {
               e.type == DioExceptionType.connectionTimeout;
           final alreadyRetried = e.requestOptions.extra['ziggo_retry'] == true;
           if (isConn && !alreadyRetried) {
-            await HostResolver.resolve(forceRefresh: true);
+            // Directly use the IP fallback — no DNS, no probing, instant.
+            final ipBase = '${HostResolver.fallbackHost}/api/v1';
             try {
               final req = e.requestOptions;
-              req.baseUrl = ApiConfig.baseUrl;
+              req.baseUrl = ipBase;
               req.extra['ziggo_retry'] = true;
               final r = await _dio.fetch(req);
+              // IP worked — cache it for future requests
+              HostResolver.override(HostResolver.fallbackHost);
               return handler.resolve(r);
             } catch (_) {}
           }

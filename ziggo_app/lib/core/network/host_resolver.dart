@@ -6,16 +6,11 @@ import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Discovers the Ziggo backend's reachable URL at runtime so the app keeps
-/// working even when the dev PC's LAN IP changes (router reboot, new Wi-Fi).
+/// Discovers the Ziggo backend's reachable URL at runtime.
 ///
-/// Resolution order:
-///   1. `--dart-define=API_HOST=http://x.x.x.x:8030` (explicit override)
-///   2. Last-known good host from SharedPreferences
-///   3. Parallel probe of common dev hosts (localhost, hard-coded LAN IP,
-///      Android emulator gateway 10.0.2.2)
-///   4. Scan the phone's current /24 subnet for any host serving `/health`
-///   5. Fall back to the hard-coded default (will surface a clear error)
+/// Production: uses the direct IP (DNS-free, works on all mobile carriers)
+/// as the guaranteed fallback. Prefers the domain if DNS resolves.
+/// Dev: override with `--dart-define=API_HOST=http://your-dev-pc:8030`.
 class HostResolver {
   HostResolver._();
 
@@ -23,10 +18,13 @@ class HostResolver {
   static const String _prefsKey = 'ziggo_api_host';
   static const String _envHost =
       String.fromEnvironment('API_HOST', defaultValue: '');
-  // Production server (nginx with SSL → backend container). Override at
-  // build time with `--dart-define=API_HOST=http://your-dev-pc:8030` when
-  // you want the app to hit a local dev backend instead.
-  static const String fallbackHost = 'https://ziggo.lk';
+
+  // Direct IP on port 80 (nginx) — guaranteed to work on ALL carriers
+  // because it bypasses DNS resolution entirely.
+  static const String fallbackHost = 'http://187.127.152.141';
+
+  // Preferred HTTPS domain — used when the phone's DNS can resolve it.
+  static const String _preferredHost = 'https://ziggo.lk';
 
   static String? _cached;
   static Future<String>? _inFlight;
@@ -44,17 +42,22 @@ class HostResolver {
   }
 
   static Future<String> _resolve() async {
+    // 1. Explicit override via --dart-define
     if (_envHost.isNotEmpty && await _probe(_envHost)) {
       return _save(_envHost);
     }
 
+    // 2. Previously-resolved host from SharedPreferences (skip stale entries)
     String? saved;
     try {
       final prefs = await SharedPreferences.getInstance();
       saved = prefs.getString(_prefsKey);
-      if (saved != null && (saved.contains(':8000') || saved.contains(':8030') || saved.startsWith('http://187.127.152.141'))) {
-        await prefs.remove(_prefsKey);
-        saved = null;
+      // Wipe stale entries: old port-based URLs or plain-HTTP remote hosts
+      if (saved != null) {
+        if (saved.contains(':8000') || saved.contains(':8030')) {
+          await prefs.remove(_prefsKey);
+          saved = null;
+        }
       }
     } catch (_) {}
     if (saved != null && saved.isNotEmpty && await _probe(saved)) {
@@ -62,18 +65,25 @@ class HostResolver {
       return saved;
     }
 
-    final defaults = <String>{
-      'http://localhost:$_port',
-      fallbackHost,
-      'http://187.127.152.141',
-      if (!kIsWeb) 'http://10.0.2.2:$_port',
-    }.toList();
-    final fromDefaults = await _probeMany(defaults);
-    if (fromDefaults != null) return _save(fromDefaults);
+    // 3. Probe production hosts — IP first (DNS-free, fastest), then domain
+    final prodHosts = <String>[
+      fallbackHost,     // http://187.127.152.141 — no DNS needed, always works
+      _preferredHost,   // https://ziggo.lk — preferred but needs DNS
+    ];
+    final prodResult = await _probeMany(prodHosts);
+    if (prodResult != null) return _save(prodResult);
 
-    final scanned = await _scanLocalSubnet();
-    if (scanned != null) return _save(scanned);
+    // 4. Dev-only: probe localhost / Android emulator gateway
+    if (!kIsWeb) {
+      final devHosts = <String>[
+        'http://localhost:$_port',
+        'http://10.0.2.2:$_port',
+      ];
+      final devResult = await _probeMany(devHosts);
+      if (devResult != null) return _save(devResult);
+    }
 
+    // 5. Last resort — use the IP directly (don't waste time scanning subnet)
     _cached = fallbackHost;
     return fallbackHost;
   }
@@ -91,10 +101,7 @@ class HostResolver {
     String host, {
     Duration? timeout,
   }) async {
-    final isLocal = _isLocalHost(host);
-    final effectiveTimeout = timeout ?? (isLocal
-        ? const Duration(milliseconds: 700)
-        : const Duration(milliseconds: 3000));
+    final effectiveTimeout = timeout ?? const Duration(milliseconds: 3000);
     try {
       final dio = Dio(BaseOptions(
         connectTimeout: effectiveTimeout,
@@ -131,58 +138,6 @@ class HostResolver {
       });
     }
     return completer.future;
-  }
-
-  static Future<String?> _scanLocalSubnet() async {
-    if (kIsWeb) return null;
-    try {
-      final interfaces = await NetworkInterface.list(
-        type: InternetAddressType.IPv4,
-        includeLoopback: false,
-        includeLinkLocal: false,
-      );
-      for (final iface in interfaces) {
-        for (final addr in iface.addresses) {
-          final ip = addr.address;
-          if (!_isPrivate(ip)) continue;
-          final parts = ip.split('.');
-          if (parts.length != 4) continue;
-          final prefix = '${parts[0]}.${parts[1]}.${parts[2]}';
-          final hosts = <String>[
-            for (var i = 1; i < 255; i++) 'http://$prefix.$i:$_port',
-          ];
-          for (var i = 0; i < hosts.length; i += 32) {
-            final end = (i + 32) > hosts.length ? hosts.length : (i + 32);
-            final chunk = hosts.sublist(i, end);
-            final found = await _probeMany(chunk);
-            if (found != null) return found;
-          }
-        }
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  static bool _isPrivate(String ip) {
-    if (ip.startsWith('192.168.')) return true;
-    if (ip.startsWith('10.')) return true;
-    if (ip.startsWith('172.')) {
-      final second = int.tryParse(ip.split('.')[1]) ?? -1;
-      return second >= 16 && second <= 31;
-    }
-    return false;
-  }
-
-  static bool _isLocalHost(String host) {
-    try {
-      final uri = Uri.tryParse(host);
-      if (uri == null) return false;
-      final h = uri.host;
-      if (h == 'localhost' || h == '127.0.0.1') return true;
-      return _isPrivate(h);
-    } catch (_) {
-      return false;
-    }
   }
 
   static Future<void> override(String host) async {

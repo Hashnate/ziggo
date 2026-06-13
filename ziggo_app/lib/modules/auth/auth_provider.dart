@@ -81,7 +81,8 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } on DioException catch (e) {
-      _lastError = _dioMessage(e);
+      final baseUrl = ApiClient.instance.dio.options.baseUrl;
+      _lastError = '${_dioMessage(e)} (URL: $baseUrl)';
       notifyListeners();
       return false;
     }
@@ -126,7 +127,8 @@ class AuthProvider extends ChangeNotifier {
 
       return true;
     } on DioException catch (e) {
-      _lastError = _dioMessage(e);
+      final baseUrl = ApiClient.instance.dio.options.baseUrl;
+      _lastError = '${_dioMessage(e)} (URL: $baseUrl)';
       _status = AuthStatus.error;
       notifyListeners();
       return false;
