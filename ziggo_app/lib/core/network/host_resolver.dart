@@ -83,13 +83,17 @@ class HostResolver {
 
   static Future<bool> _probe(
     String host, {
-    Duration timeout = const Duration(milliseconds: 700),
+    Duration? timeout,
   }) async {
+    final isLocal = _isLocalHost(host);
+    final effectiveTimeout = timeout ?? (isLocal
+        ? const Duration(milliseconds: 700)
+        : const Duration(milliseconds: 3000));
     try {
       final dio = Dio(BaseOptions(
-        connectTimeout: timeout,
-        receiveTimeout: timeout,
-        sendTimeout: timeout,
+        connectTimeout: effectiveTimeout,
+        receiveTimeout: effectiveTimeout,
+        sendTimeout: effectiveTimeout,
       ));
       final r = await dio.getUri(Uri.parse('$host/health'));
       return r.statusCode == 200;
@@ -154,6 +158,18 @@ class HostResolver {
       return second >= 16 && second <= 31;
     }
     return false;
+  }
+
+  static bool _isLocalHost(String host) {
+    try {
+      final uri = Uri.tryParse(host);
+      if (uri == null) return false;
+      final h = uri.host;
+      if (h == 'localhost' || h == '127.0.0.1') return true;
+      return _isPrivate(h);
+    } catch (_) {
+      return false;
+    }
   }
 
   static Future<void> override(String host) async {
