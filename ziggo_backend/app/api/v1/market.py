@@ -108,6 +108,7 @@ async def list_vendors(
                 "is_active": bool(v.is_active),
                 "is_open": bool(v.is_open) if v.is_open is not None else True,
                 "is_open_now": is_open_now,
+                "is_featured": bool(v.is_featured),
             }
         )
     if has_origin:
@@ -155,6 +156,7 @@ async def get_vendor(vendor_id: int, db: AsyncSession = Depends(get_db)):
         "closing_time": v.closing_time,
         "is_active": bool(v.is_active),
         "is_open": bool(v.is_open) if v.is_open is not None else True,
+        "is_featured": bool(v.is_featured),
     }
 
 
