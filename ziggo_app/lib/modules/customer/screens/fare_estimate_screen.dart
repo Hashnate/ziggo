@@ -14,7 +14,8 @@ import 'customer_shell.dart';
 import 'location_search_screen.dart';
 
 class FareEstimateScreen extends StatefulWidget {
-  const FareEstimateScreen({super.key});
+  final bool isTruckMode;
+  const FareEstimateScreen({super.key, this.isTruckMode = false});
 
   @override
   State<FareEstimateScreen> createState() => _FareEstimateScreenState();
@@ -25,6 +26,7 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
   Place? _currentLocation;
   List<Map<String, dynamic>> _nearbyDrivers = const [];
   Timer? _nearbyTimer;
+  DateTime? _scheduledTime;
 
   @override
   void initState() {
@@ -46,6 +48,88 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
     setState(() => _currentLocation = here);
     _mapController.moveTo(here.location, zoom: 16);
     _startNearbyDriverPolling();
+  }
+
+  Future<void> _moveToCurrentLocation() async {
+    final here = await MapsService.instance.currentLocationAsPlace();
+    if (!mounted || here == null) return;
+    setState(() => _currentLocation = here);
+    _mapController.moveTo(here.location, zoom: 16);
+  }
+
+  String _formatDateTime(DateTime dt) {
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final month = months[dt.month - 1];
+    final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+    final period = dt.hour >= 12 ? 'PM' : 'AM';
+    final minute = dt.minute.toString().padLeft(2, '0');
+    return "$month ${dt.day}, $hour:$minute $period";
+  }
+
+  Future<void> _handleLaterTap() async {
+    if (_scheduledTime != null) {
+      final action = await showModalBottomSheet<String>(
+        context: context,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 16),
+              Text(
+                'Scheduled Ride: ${_formatDateTime(_scheduledTime!)}',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.edit_calendar_rounded, color: AppColors.primary),
+                title: const Text('Change Date & Time'),
+                onTap: () => Navigator.pop(ctx, 'change'),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.cancel_outlined, color: AppColors.error),
+                title: const Text('Cancel Schedule'),
+                onTap: () => Navigator.pop(ctx, 'cancel'),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      );
+
+      if (action == 'cancel') {
+        setState(() => _scheduledTime = null);
+        return;
+      } else if (action != 'change') {
+        return;
+      }
+    }
+
+    final d = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 30)),
+    );
+    if (d == null || !mounted) return;
+    final t = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+    if (t == null || !mounted) return;
+
+    final selected = DateTime(d.year, d.month, d.day, t.hour, t.minute);
+    if (selected.isBefore(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cannot schedule in the past')),
+      );
+      return;
+    }
+
+    setState(() => _scheduledTime = selected);
   }
 
   void _startNearbyDriverPolling() {
@@ -92,6 +176,7 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
         builder: (_) => LocationSearchScreen(
           initialPickup: _currentLocation,
           initialTripType: tripType,
+          isTruckMode: widget.isTruckMode,
         ),
       ),
     );
@@ -111,20 +196,21 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
               showMyLocation: false, // We'll show a custom marker instead
               markers: [
                 for (final d in _nearbyDrivers)
-                  pinMarker(
-                    point: LatLng((d['lat'] as num).toDouble(), (d['lng'] as num).toDouble()),
-                    icon: Icons.local_taxi_rounded,
-                    color: AppColors.primary,
-                    size: 30,
-                    assetPath: 'assets/icons/top_car.png',
-                    rotation: (d['heading'] as num?)?.toDouble() ?? 0.0,
-                  ),
+                  if (!widget.isTruckMode || d['vehicle_type'] == 'truck')
+                    pinMarker(
+                       point: LatLng((d['lat'] as num).toDouble(), (d['lng'] as num).toDouble()),
+                       icon: widget.isTruckMode ? Icons.local_shipping_rounded : Icons.local_taxi_rounded,
+                       color: widget.isTruckMode ? AppColors.truck : AppColors.primary,
+                       size: 30,
+                       assetPath: widget.isTruckMode ? 'assets/icons/top_truck.png' : 'assets/icons/top_car.png',
+                       rotation: (d['heading'] as num?)?.toDouble() ?? 0.0,
+                    ),
                 if (_currentLocation != null)
                   pinMarker(
                     point: _currentLocation!.location,
                     icon: Icons.my_location_rounded,
                     color: AppColors.info,
-                    label: 'Meet your driver here',
+                    label: widget.isTruckMode ? 'Meet your truck here' : 'Meet your driver here',
                   ),
               ],
             ),
@@ -169,27 +255,36 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: AppStyles.shadowSm,
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(Icons.directions_car_rounded, size: 18),
-                                SizedBox(width: 6),
-                                Icon(Icons.access_time_rounded, size: 14),
-                                SizedBox(width: 8),
-                                Text('Later', style: TextStyle(fontWeight: FontWeight.w700)),
-                              ],
+                          GestureDetector(
+                            onTap: _handleLaterTap,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: AppStyles.shadowSm,
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(widget.isTruckMode ? Icons.local_shipping_rounded : Icons.directions_car_rounded, size: 18),
+                                  const SizedBox(width: 6),
+                                  const Icon(Icons.access_time_rounded, size: 14),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    _scheduledTime != null ? _formatDateTime(_scheduledTime!) : 'Later',
+                                    style: const TextStyle(fontWeight: FontWeight.w700),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: AppStyles.shadowSm),
-                            child: const Icon(Icons.my_location_rounded, size: 20),
+                          GestureDetector(
+                            onTap: _moveToCurrentLocation,
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: AppStyles.shadowSm),
+                              child: const Icon(Icons.my_location_rounded, size: 20),
+                            ),
                           ),
                         ],
                       ),
