@@ -1338,7 +1338,7 @@ class _Deal {
   final IconData icon;
   final List<Color> gradient;
 
-  /// Optional asset (e.g. 'assets/images/marketplace/deal_bogo.png').
+  /// Optional asset (e.g. 'assets/images/marketplace/deal_bag.png').
   /// When set it replaces the icon illustration. Add images here next phase.
   final String? image;
   const _Deal(this.title, this.subtitle, this.icon, this.gradient, {this.image});
@@ -1357,7 +1357,7 @@ const _kDeals = <_Deal>[
     'Double your delight!',
     Icons.shopping_bag_rounded,
     [Color(0xFF8B5CF6), Color(0xFFEC4899)],
-    image: 'assets/images/marketplace/deal_bogo.png',
+    image: 'assets/images/marketplace/deal_bag.png',
   ),
   _Deal(
     'Combo Deals!',
