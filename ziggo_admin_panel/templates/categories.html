@@ -47,7 +47,7 @@
                         <td class="px-6 py-4">
                             <div class="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden">
                                 {% if c.image_url %}
-                                <img src="{{ c.image_url }}" alt="{{ c.display_name or c.service_type }}" class="w-full h-full object-cover">
+                                <img src="{{ c.image_url }}" alt="{{ c.display_name or c.service_type }}" class="w-full h-full object-contain p-1">
                                 {% elif ns.tuk %}
                                 <svg viewBox="0 0 24 24" class="w-7 h-7 text-ziggo" fill="currentColor" aria-hidden="true"><path d="M20 14.05V12.73C20 12.26 19.84 11.8 19.54 11.44L15.6 6.72C15.22 6.26 14.66 6 14.06 6H4C2.9 6 2 6.9 2 8V15C2 16.1 2.9 17 4 17H4.05C4.28 18.14 5.29 19 6.5 19S8.72 18.14 8.95 17H17.05C17.28 18.14 18.29 19 19.5 19C20.88 19 22 17.88 22 16.5C22 15.29 21.14 14.28 20 14.05M3.5 8C3.5 7.73 3.73 7.5 4 7.5H7V12H3.5V8M6.5 17.5C5.95 17.5 5.5 17.05 5.5 16.5S5.95 15.5 6.5 15.5 7.5 15.95 7.5 16.5 7.05 17.5 6.5 17.5M13 15.5H9V14H11V12H9V7.5H13V15.5M15 8.34L18.05 12H15V8.34M19.5 17.5C18.95 17.5 18.5 17.05 18.5 16.5S18.95 15.5 19.5 15.5 20.5 15.95 20.5 16.5 20.05 17.5 19.5 17.5Z"/></svg>
                                 {% else %}
@@ -135,9 +135,42 @@
                     <input type="text" name="display_name" id="catName" required placeholder="e.g. Parcel Bike" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                 </div>
                 <div class="col-span-2">
-                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Image</label>
-                    <input type="file" name="image" accept="image/png,image/jpeg,image/webp" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white" onchange="previewCatImage(this)">
-                    <p class="text-[10px] text-ziggo-faint font-bold mt-1">JPG/PNG/WEBP, max 5 MB. Leave empty to keep current.</p>
+                    <label class="block text-xs font-black text-ziggo-muted mb-2 uppercase tracking-wider">Preset Vehicle Icon (Or Upload Custom Image Below)</label>
+                    <div class="grid grid-cols-5 gap-3 mb-3">
+                        <label class="cursor-pointer border-2 border-ziggo-line rounded-2xl p-2 flex flex-col items-center justify-center hover:border-ziggo hover:bg-gray-50/50 transition text-center select-none" data-preset="/static/img/bike.png">
+                            <input type="radio" name="preset_icon" value="/static/img/bike.png" class="hidden">
+                            <img src="/static/img/bike.png" class="w-10 h-10 object-contain mb-1">
+                            <span class="text-[10px] font-black text-ziggo-ink">Bike</span>
+                        </label>
+                        <label class="cursor-pointer border-2 border-ziggo-line rounded-2xl p-2 flex flex-col items-center justify-center hover:border-ziggo hover:bg-gray-50/50 transition text-center select-none" data-preset="/static/img/tuk.png">
+                            <input type="radio" name="preset_icon" value="/static/img/tuk.png" class="hidden">
+                            <img src="/static/img/tuk.png" class="w-10 h-10 object-contain mb-1">
+                            <span class="text-[10px] font-black text-ziggo-ink">Tuk</span>
+                        </label>
+                        <label class="cursor-pointer border-2 border-ziggo-line rounded-2xl p-2 flex flex-col items-center justify-center hover:border-ziggo hover:bg-gray-50/50 transition text-center select-none" data-preset="/static/img/car.png">
+                            <input type="radio" name="preset_icon" value="/static/img/car.png" class="hidden">
+                            <img src="/static/img/car.png" class="w-10 h-10 object-contain mb-1">
+                            <span class="text-[10px] font-black text-ziggo-ink">Car</span>
+                        </label>
+                        <label class="cursor-pointer border-2 border-ziggo-line rounded-2xl p-2 flex flex-col items-center justify-center hover:border-ziggo hover:bg-gray-50/50 transition text-center select-none" data-preset="/static/img/van-icon.png">
+                            <input type="radio" name="preset_icon" value="/static/img/van-icon.png" class="hidden">
+                            <img src="/static/img/van-icon.png" class="w-10 h-10 object-contain mb-1">
+                            <span class="text-[10px] font-black text-ziggo-ink">Van</span>
+                        </label>
+                        <label class="cursor-pointer border-2 border-ziggo-line rounded-2xl p-2 flex flex-col items-center justify-center hover:border-ziggo hover:bg-gray-50/50 transition text-center select-none" data-preset="/static/img/truck.png">
+                            <input type="radio" name="preset_icon" value="/static/img/truck.png" class="hidden">
+                            <img src="/static/img/truck.png" class="w-10 h-10 object-contain mb-1">
+                            <span class="text-[10px] font-black text-ziggo-ink">Truck</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="col-span-2">
+                    <label class="block text-xs font-black text-ziggo-muted mb-1.5 uppercase tracking-wider">Custom Image Upload</label>
+                    <div class="flex items-center gap-3">
+                        <input type="file" name="image" id="catImageInput" accept="image/png,image/jpeg,image/webp" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white text-xs" onchange="previewCatImage(this)">
+                        <button type="button" onclick="clearPresetSelection()" class="px-3.5 py-3 border border-ziggo-line rounded-xl text-xs font-bold text-ziggo-muted hover:bg-gray-50 flex-shrink-0">Reset Icon Choice</button>
+                    </div>
+                    <p class="text-[10px] text-ziggo-faint font-bold mt-1">JPG/PNG/WEBP, max 5 MB. Selecting a preset icon or custom upload overrides current image.</p>
                 </div>
                 <div class="col-span-2">
                     <div class="flex gap-6">
@@ -221,6 +254,39 @@
 </div>
 
 <script>
+function clearPresetSelection() {
+    document.querySelectorAll('label[data-preset]').forEach(item => {
+        item.classList.remove('border-ziggo', 'bg-blue-50/50');
+        item.classList.add('border-ziggo-line');
+        item.querySelector('input').checked = false;
+    });
+}
+
+// Preset Selection Highlighting
+document.querySelectorAll('label[data-preset]').forEach(el => {
+    el.addEventListener('click', function(e) {
+        // Reset styling and input checked state on all presets
+        document.querySelectorAll('label[data-preset]').forEach(item => {
+            item.classList.remove('border-ziggo', 'bg-blue-50/50');
+            item.classList.add('border-ziggo-line');
+            item.querySelector('input').checked = false;
+        });
+        
+        // Highlight and check this preset
+        this.classList.remove('border-ziggo-line');
+        this.classList.add('border-ziggo', 'bg-blue-50/50');
+        const radio = this.querySelector('input');
+        radio.checked = true;
+
+        // Clear the custom file input and new preview if a preset is chosen
+        document.getElementById('catImageInput').value = '';
+        document.getElementById('catNewImageCol').style.display = 'none';
+        
+        // Hide current image column when preset is selected
+        document.getElementById('catPrevImageCol').style.display = 'none';
+    });
+});
+
 function openCreateModal() {
     document.getElementById('catModalTitle').innerText = 'New category';
     document.getElementById('catSubmitText').innerText = 'Create category';
@@ -242,11 +308,12 @@ function openCreateModal() {
     document.getElementById('catActive').checked = true;
     
     // Reset image input and preview
-    document.getElementById('categoryForm').querySelector('input[type="file"]').value = '';
+    document.getElementById('catImageInput').value = '';
     document.getElementById('catPrevImageCol').style.display = 'none';
     document.getElementById('catNewImageCol').style.display = 'none';
     document.getElementById('catNewImage').innerHTML = '<i class="fas fa-image text-ziggo-faint text-3xl"></i>';
     
+    clearPresetSelection();
     showModal();
 }
 
@@ -270,16 +337,27 @@ function openEditModal(c) {
     document.getElementById('catPassengerDeductible').value = c.passenger_deductible || 0;
     document.getElementById('catActive').checked = !!c.is_active;
     
-    // Reset image input and set existing preview
-    document.getElementById('categoryForm').querySelector('input[type="file"]').value = '';
+    // Reset image input and new preview
+    document.getElementById('catImageInput').value = '';
     document.getElementById('catNewImageCol').style.display = 'none';
     document.getElementById('catNewImage').innerHTML = '<i class="fas fa-image text-ziggo-faint text-3xl"></i>';
     
+    clearPresetSelection();
+    
     const prevCol = document.getElementById('catPrevImageCol');
     const prevImg = document.getElementById('catPrevImage');
+    
     if (c.image_url) {
-        prevImg.innerHTML = '<img src="' + c.image_url + '" class="w-full h-full object-cover">';
-        prevCol.style.display = 'block';
+        const matchingPreset = document.querySelector(`label[data-preset="${c.image_url}"]`);
+        if (matchingPreset) {
+            matchingPreset.classList.remove('border-ziggo-line');
+            matchingPreset.classList.add('border-ziggo', 'bg-blue-50/50');
+            matchingPreset.querySelector('input').checked = true;
+            prevCol.style.display = 'none';
+        } else {
+            prevImg.innerHTML = '<img src="' + c.image_url + '" class="w-full h-full object-cover">';
+            prevCol.style.display = 'block';
+        }
     } else {
         prevImg.innerHTML = '<i class="fas fa-image text-ziggo-faint text-3xl"></i>';
         prevCol.style.display = 'none';
@@ -307,6 +385,9 @@ function previewCatImage(input) {
         previewCol.style.display = 'none';
         return;
     }
+    // Clear preset selection when user uploads custom image
+    clearPresetSelection();
+    
     const file = input.files[0];
     if (file.size > 5 * 1024 * 1024) {
         alert('Image must be under 5 MB');

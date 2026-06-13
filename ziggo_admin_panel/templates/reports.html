@@ -11,7 +11,7 @@
     <!-- KPI Grid -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="zi-kpi">
-            <div class="zi-kpi-ic"><i class="fas fa-hand-holding-usd" id="kpiIcon1"></i></div>
+            <div class="zi-kpi-ic"><i class="fas fa-coins" id="kpiIcon1"></i></div>
             <p class="zi-kpi-lbl" id="kpiLabel1">Admin Net (Commission)</p>
             <p class="zi-kpi-val"><span id="kpiVal1">0</span></p>
         </div>
@@ -357,7 +357,7 @@
             label1.textContent = 'Total Revenue';
             val1.textContent = `Rs. ${fmtMoney(d.totals.gross_total)}`;
 
-            icon2.className = 'fas fa-hand-holding-usd';
+            icon2.className = 'fas fa-coins';
             label2.textContent = 'Admin Commission';
             val2.textContent = `Rs. ${fmtMoney(d.totals.commission_total)}`;
 
@@ -375,7 +375,7 @@
             label1.textContent = sm.label;
             val1.textContent = `Rs. ${fmtMoney(d.totals.gross_total)}`;
 
-            icon2.className = 'fas fa-hand-holding-usd';
+            icon2.className = 'fas fa-coins';
             label2.textContent = 'Admin Commission';
             val2.textContent = `Rs. ${fmtMoney(d.totals.commission_total)}`;
 
@@ -390,7 +390,7 @@
                 : '0.0';
             val4.textContent = `${commRate}%`;
         } else if (type === 'earnings') {
-            icon1.className = 'fas fa-hand-holding-usd';
+            icon1.className = 'fas fa-coins';
             label1.textContent = 'Admin Commission';
             val1.textContent = `Rs. ${fmtMoney(d.totals.admin_net)}`;
 
@@ -438,7 +438,7 @@
             label4.textContent = 'Avg Fare';
             val4.textContent = `Rs. ${fmtMoney(d.totals.avg_fare)}`;
         } else {
-            icon1.className = 'fas fa-hand-holding-usd';
+            icon1.className = 'fas fa-coins';
             label1.textContent = 'Admin Net (Commission)';
             val1.textContent = `Rs. ${fmtMoney(d.totals.admin_net)}`;
 

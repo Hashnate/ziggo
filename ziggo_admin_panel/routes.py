@@ -2257,6 +2257,7 @@ async def admin_categories_new(
     passenger_deductible: float = Form(0),
     is_active: str = Form("on"),
     image: UploadFile | None = File(None),
+    preset_icon: str | None = Form(None),
     next: str = Form(""),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
@@ -2271,7 +2272,11 @@ async def admin_categories_new(
     if dup.scalars().first():
         raise HTTPException(status_code=400, detail=f"Category '{key}' already exists")
 
-    image_url = await _save_category_image(image)
+    if preset_icon:
+        image_url = preset_icon
+    else:
+        image_url = await _save_category_image(image)
+
     db.add(
         FareSetting(
             service_type=key,
@@ -2312,6 +2317,7 @@ async def admin_categories_edit(
     passenger_deductible: float = Form(0),
     is_active: str = Form(""),
     image: UploadFile | None = File(None),
+    preset_icon: str | None = Form(None),
     next: str = Form(""),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
@@ -2336,9 +2342,14 @@ async def admin_categories_edit(
     f.pickup_fee = Decimal(str(pickup_fee))
     f.boost = Decimal(str(boost))
     f.passenger_deductible = Decimal(str(passenger_deductible))
-    new_image = await _save_category_image(image)
-    if new_image:
-        f.image_url = new_image
+
+    if preset_icon:
+        f.image_url = preset_icon
+    else:
+        new_image = await _save_category_image(image)
+        if new_image:
+            f.image_url = new_image
+
     await db.commit()
     return RedirectResponse(url=_safe_admin_next(next, "/admin/categories"), status_code=303)
 
