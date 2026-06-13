@@ -229,6 +229,5 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     {'icon': Icons.local_offer, 'label': 'Exclusive promo codes'},
     {'icon': Icons.support_agent, 'label': '24/7 premium support'},
     {'icon': Icons.percent, 'label': 'Lower platform fees'},
-    {'icon': Icons.directions_car, 'label': 'Free ride cancellations'},
   ];
 }

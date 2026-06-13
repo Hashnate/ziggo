@@ -59,9 +59,10 @@ class CustomMarkerData {
   CustomMarkerData(this.bitmap, this.anchor);
 }
 
-Future<CustomMarkerData> _createCustomMarkerBitmap(String label, Color color) async {
+Future<CustomMarkerData> _createCustomMarkerBitmap(String label, Color color, double pixelRatio) async {
   final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
   final Canvas canvas = Canvas(pictureRecorder);
+  canvas.scale(pixelRatio);
   
   String pillText = '';
   String mainText = label;
@@ -199,8 +200,8 @@ Future<CustomMarkerData> _createCustomMarkerBitmap(String label, Color color) as
     );
 
     final ui.Image img = await pictureRecorder.endRecording().toImage(
-      width.toInt(),
-      height.toInt(),
+      (width * pixelRatio).toInt(),
+      (height * pixelRatio).toInt(),
     );
     final ByteData? byteData = await img.toByteData(format: ui.ImageByteFormat.png);
     final Uint8List uint8List = byteData!.buffer.asUint8List();
@@ -302,8 +303,8 @@ Future<CustomMarkerData> _createCustomMarkerBitmap(String label, Color color) as
   
   // 10. Render to image
   final ui.Image img = await pictureRecorder.endRecording().toImage(
-    width.toInt(),
-    height.toInt(),
+    (width * pixelRatio).toInt(),
+    (height * pixelRatio).toInt(),
   );
   final ByteData? byteData = await img.toByteData(format: ui.ImageByteFormat.png);
   final Uint8List uint8List = byteData!.buffer.asUint8List();
@@ -478,14 +479,14 @@ class _ZiggoMapState extends State<ZiggoMap> {
     super.dispose();
   }
 
-  Future<void> _ensureLabelIcon(String label, Color color) async {
-    final key = '$label-${color.value}';
+  Future<void> _ensureLabelIcon(String label, Color color, double pixelRatio) async {
+    final key = '$label-${color.value}-$pixelRatio';
     if (_customLabelCache.containsKey(key) || _loadingLabels.contains(key)) {
       return;
     }
     _loadingLabels.add(key);
     try {
-      final data = await _createCustomMarkerBitmap(label, color);
+      final data = await _createCustomMarkerBitmap(label, color, pixelRatio);
       _customLabelCache[key] = data.bitmap;
       _customLabelAnchors[key] = data.anchor;
       if (mounted) setState(() {});
@@ -545,6 +546,7 @@ class _ZiggoMapState extends State<ZiggoMap> {
 
   @override
   Widget build(BuildContext context) {
+    final double pixelRatio = MediaQuery.of(context).devicePixelRatio;
     final gMarkers = <gmaps.Marker>{};
     for (var i = 0; i < widget.markers.length; i++) {
       final m = widget.markers[i];
@@ -552,17 +554,17 @@ class _ZiggoMapState extends State<ZiggoMap> {
       Offset anchor = const Offset(0.5, 1.0);
       
       if (m.label != null) {
-        final key = '${m.label}-${m.color.value}';
+        final key = '${m.label}-${m.color.value}-$pixelRatio';
         final cached = _customLabelCache[key];
         if (cached != null) {
           icon = cached;
           anchor = _customLabelAnchors[key] ?? const Offset(0.5, 0.70);
         } else {
-          _ensureLabelIcon(m.label!, m.color);
+          _ensureLabelIcon(m.label!, m.color, pixelRatio);
           icon = gmaps.BitmapDescriptor.defaultMarkerWithHue(_hueFor(m.color));
         }
       } else if (m.assetPath != null) {
-        final targetWidth = (m.size * 1.5).round();
+        final targetWidth = (m.size * 1.5 * pixelRatio).round();
         final key = '${m.assetPath!}-$targetWidth';
         final cached = _iconCache[key];
         if (cached != null) {
@@ -627,7 +629,7 @@ class _ZiggoMapState extends State<ZiggoMap> {
       polylines: gPolylines,
       circles: gCircles,
       myLocationEnabled: showMe,
-      myLocationButtonEnabled: showMe,
+      myLocationButtonEnabled: false,
       zoomControlsEnabled: false,
       compassEnabled: false,
       mapToolbarEnabled: false,

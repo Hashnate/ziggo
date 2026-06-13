@@ -30,6 +30,8 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
   String? _routeKey;
   bool _sheetExpanded = true;
   String? _lastStatus;
+  LatLng? _lastCameraDriverLatLng;
+  String? _lastCameraStatus;
 
   // While the booking is in SEARCHING we poll /driver/nearby every 6 s so the
   // customer sees the same wandering-vehicle pins they had on fare estimate.
@@ -84,6 +86,26 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
           _routePoints = dir.points;
           _routeSteps = dir.steps;
         });
+      }
+    });
+  }
+
+  void _updateMapCamera(String? status, LatLng pickup, LatLng drop, LatLng? driverLatLng) {
+    if (driverLatLng == null) return;
+    if (_lastCameraStatus == status &&
+        _lastCameraDriverLatLng?.latitude == driverLatLng.latitude &&
+        _lastCameraDriverLatLng?.longitude == driverLatLng.longitude) {
+      return;
+    }
+    _lastCameraStatus = status;
+    _lastCameraDriverLatLng = driverLatLng;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (status == 'started') {
+        _mapController.fitBounds([driverLatLng, drop], padding: 80);
+      } else if (status == 'accepted' || status == 'arrived') {
+        _mapController.fitBounds([driverLatLng, pickup], padding: 80);
       }
     });
   }
@@ -255,6 +277,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
     }
 
     _ensureRoute(pickup, drop);
+    _updateMapCamera(status, pickup, drop, driverLatLng);
 
     // Show wandering driver pins only while we're still hunting for a driver.
     // Once accepted, the assigned driver's pin replaces them.
@@ -699,6 +722,8 @@ class _BottomCard extends StatelessWidget {
                                 ),
                               ),
                             ],
+                            if (active['status'] == 'searching')
+                              const _SearchingIndicator(),
                           ],
                         ),
                       ),
@@ -747,6 +772,8 @@ class _BottomCard extends StatelessWidget {
                       ),
                     ),
                   ],
+                  if (active['status'] == 'searching')
+                    const _SearchingIndicator(),
                 ],
                 AnimatedSize(
                   duration: const Duration(milliseconds: 220),
@@ -1273,6 +1300,27 @@ class _NextStepStrip extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SearchingIndicator extends StatelessWidget {
+  const _SearchingIndicator();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12, bottom: 4),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(100),
+        child: const SizedBox(
+          height: 4,
+          child: LinearProgressIndicator(
+            backgroundColor: AppColors.surfaceMuted,
+            color: AppColors.primary,
+          ),
+        ),
       ),
     );
   }

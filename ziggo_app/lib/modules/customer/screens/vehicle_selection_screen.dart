@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
@@ -15,7 +16,8 @@ import '../../customer/booking_provider.dart';
 import '../../customer/payment_methods_provider.dart';
 import '../../customer/promos_provider.dart';
 import '../../customer/wallet_provider.dart';
-import 'payment_methods_screen.dart';
+import 'payment_selection_screen.dart';
+import 'promotions_selection_screen.dart';
 import 'ride_tracking_screen.dart';
 import 'customer_shell.dart';
 import 'confirm_pickup_screen.dart';
@@ -58,6 +60,24 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
 
   List<Map<String, dynamic>> _nearbyDrivers = const [];
   Timer? _nearbyTimer;
+  List<String> _serviceTypes = [];
+
+  Future<void> _fetchActiveServices() async {
+    try {
+      final resp = await ApiClient.instance.dio.get('/public/categories');
+      if (resp.data is List) {
+        final list = List<Map<String, dynamic>>.from(resp.data as List);
+        setState(() {
+          _serviceTypes = list.map((item) => item['service_type'] as String).toList();
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching active services: $e");
+      setState(() {
+        _serviceTypes = ['tuk', 'bike', 'car', 'mini', 'van', 'truck'];
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -80,6 +100,15 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     super.dispose();
   }
 
+  Future<void> _animateToUserLocation() async {
+    try {
+      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      await _mapController.moveTo(LatLng(pos.latitude, pos.longitude), zoom: 15);
+    } catch (e) {
+      debugPrint("Error getting current location: $e");
+    }
+  }
+
   void _startNearbyDriverPolling() {
     _nearbyTimer?.cancel();
     _fetchNearbyDrivers();
@@ -98,7 +127,6 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
           'lat': pickup.latitude,
           'lng': pickup.longitude,
           'radius_km': 5,
-          if (_serviceType != null) 'vehicle_type': _serviceType,
         },
       );
       if (!mounted) return;
@@ -116,6 +144,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       case 'tuk': return Icons.electric_rickshaw_rounded;
       case 'car': return Icons.directions_car_filled_rounded;
       case 'van': return Icons.airport_shuttle_rounded;
+      case 'mini': return Icons.directions_car_filled_rounded;
       case 'truck': return Icons.local_shipping_rounded;
       default: return Icons.local_taxi_rounded;
     }
@@ -127,6 +156,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       case 'tuk': return AppColors.warning;
       case 'car': return AppColors.primary;
       case 'van': return AppColors.market;
+      case 'mini': return AppColors.primary;
       case 'truck': return AppColors.truck;
       default: return AppColors.primary;
     }
@@ -137,6 +167,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       case 'bike': return 'assets/icons/top_bike.png';
       case 'tuk': return 'assets/icons/top_tuk.png';
       case 'truck': return 'assets/icons/top_truck.png';
+      case 'mini': return 'assets/icons/top_car.png';
       case 'van':
       case 'car':
       default: return 'assets/icons/top_car.png';
@@ -152,7 +183,11 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     final booking = context.read<BookingProvider>();
     _estimates.clear();
     
-    final servicesToFetch = widget.isTruckMode ? ['truck'] : ['tuk', 'bike', 'car', 'van', 'truck'];
+    if (!widget.isTruckMode && _serviceTypes.isEmpty) {
+      await _fetchActiveServices();
+    }
+    
+    final servicesToFetch = widget.isTruckMode ? ['truck'] : _serviceTypes;
 
     for (final st in servicesToFetch) {
       final res = await booking.estimateFare(
@@ -191,7 +226,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       [widget.pickup.location, widget.drop.location],
       padding: 80,
     );
-
+ 
     final dir = await MapsService.instance.directions(widget.pickup.location, widget.drop.location);
     if (mounted && dir != null && dir.points.isNotEmpty) {
       setState(() => _routePoints = dir.points);
@@ -269,143 +304,33 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     );
   }
 
-  void _showPromoDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Add Promo Code'),
-        content: TextField(
-          controller: _promoController,
-          textCapitalization: TextCapitalization.characters,
-          decoration: const InputDecoration(hintText: 'Enter promo code'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('CANCEL'),
-          ),
-          TextButton(
-            onPressed: () {
-              _promo = _promoController.text.trim().toUpperCase();
-              Navigator.pop(ctx);
-              _recalculate();
-            },
-            child: const Text('APPLY'),
-          ),
-        ],
+  void _showPromoDialog() async {
+    final selected = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PromotionsSelectionScreen(currentPromo: _promo),
       ),
     );
+    if (selected != null && mounted) {
+      setState(() {
+        _promo = selected;
+      });
+      _recalculate();
+    }
   }
 
-  void _showPaymentPicker() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+  void _showPaymentPicker() async {
+    final selected = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PaymentSelectionScreen(currentPayment: _payment),
       ),
-      builder: (ctx) {
-        final cardsProvider = ctx.watch<PaymentMethodsProvider>();
-        final walletProvider = ctx.watch<WalletProvider>();
-        
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 44,
-                    height: 5,
-                    decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                const Text('Choose Payment Method', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-                const SizedBox(height: 16),
-                
-                ListTile(
-                  leading: const Icon(Icons.payments_rounded, color: AppColors.primary),
-                  title: const Text('Cash', style: TextStyle(fontWeight: FontWeight.bold)),
-                  trailing: _payment == 'cash' ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
-                  onTap: () {
-                    setState(() => _payment = 'cash');
-                    Navigator.pop(ctx);
-                  },
-                ),
-                const Divider(height: 1),
-                
-                ListTile(
-                  leading: const Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary),
-                  title: const Text('Ziggo Wallet', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('Balance: Rs.${walletProvider.balance.toStringAsFixed(2)}'),
-                  trailing: _payment == 'wallet' ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
-                  onTap: () {
-                    setState(() => _payment = 'wallet');
-                    Navigator.pop(ctx);
-                  },
-                ),
-                const Divider(height: 1),
-
-                if (cardsProvider.corporateProfile != null) ...[
-                  ListTile(
-                    leading: const Icon(Icons.business_rounded, color: AppColors.primary),
-                    title: Text('Corporate: ${cardsProvider.corporateProfile!['company_name']}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text('Status: ${(cardsProvider.corporateProfile!['status'] ?? 'active').toUpperCase()}'),
-                    trailing: _payment == 'corporate' ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
-                    onTap: () {
-                      setState(() => _payment = 'corporate');
-                      Navigator.pop(ctx);
-                    },
-                  ),
-                  const Divider(height: 1),
-                ],
-
-                if (cardsProvider.cards.isNotEmpty) ...[
-                  Padding(
-                    padding: const EdgeInsets.only(left: 16, top: 12, bottom: 4),
-                    child: Text(
-                      'SAVED CARDS',
-                      style: TextStyle(fontSize: 10, color: AppColors.textTertiary, fontWeight: FontWeight.bold, letterSpacing: 1.1),
-                    ),
-                  ),
-                  ...cardsProvider.cards.map((c) {
-                    final String cardNo = c['card_no'] ?? '';
-                    final String value = 'card_${c['id']}';
-                    return ListTile(
-                      leading: const Icon(Icons.credit_card_rounded, color: AppColors.primary),
-                      title: Text('${c['card_type']} ending in ${cardNo.substring(cardNo.length - 4)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      trailing: _payment == value ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
-                      onTap: () {
-                        setState(() => _payment = value);
-                        Navigator.pop(ctx);
-                      },
-                    );
-                  }),
-                  const Divider(height: 1),
-                ],
-
-                ListTile(
-                  leading: const Icon(Icons.add_rounded, color: AppColors.accent),
-                  title: const Text('Add new card', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.accent)),
-                  onTap: () async {
-                    Navigator.pop(ctx);
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const PaymentMethodsScreen()),
-                    );
-                    if (context.mounted) {
-                      context.read<PaymentMethodsProvider>().fetchCards();
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
+    if (selected != null && mounted) {
+      setState(() {
+        _payment = selected;
+      });
+    }
   }
 
   void _showNoteBottomSheet() {
@@ -415,6 +340,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -436,36 +362,37 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                     child: Container(
                       width: 44,
                       height: 5,
-                      decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(10)),
+                      decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)),
                     ),
                   ),
                   const SizedBox(height: 20),
                   const Text(
                     'Add note for driver',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: AppColors.textPrimary),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24, color: Colors.black),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   const Text(
                     'Send a special note to your driver',
-                    style: TextStyle(fontSize: 14, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                    style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: noteController,
                     maxLines: 3,
+                    style: const TextStyle(fontSize: 14),
                     decoration: InputDecoration(
                       hintText: "E.g., I'm standing next to the Kohuwala Sampath ATM. Wearing a red t-shirt",
-                      hintStyle: const TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.normal),
+                      hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13, fontWeight: FontWeight.normal),
                       filled: true,
-                      fillColor: Colors.grey.withOpacity(0.08),
+                      fillColor: Colors.grey.withOpacity(0.04),
                       contentPadding: const EdgeInsets.all(12),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey.withOpacity(0.2)),
+                        borderSide: BorderSide(color: Colors.grey.shade200),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey.withOpacity(0.2)),
+                        borderSide: BorderSide(color: Colors.grey.shade200),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -478,18 +405,10 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                   const SizedBox(height: 12),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.08),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.call_outlined, color: AppColors.textPrimary, size: 20),
-                    ),
+                    leading: const Icon(Icons.phone_outlined, color: Colors.black, size: 24),
                     title: const Text(
                       'Secondary mobile number',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black),
                     ),
                     subtitle: Text(
                       _secondaryPhone != null && _secondaryPhone!.isNotEmpty
@@ -499,13 +418,13 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                         fontSize: 12,
                         color: _secondaryPhone != null && _secondaryPhone!.isNotEmpty
                             ? AppColors.primary
-                            : AppColors.textSecondary,
+                            : Colors.grey.shade500,
                         fontWeight: _secondaryPhone != null && _secondaryPhone!.isNotEmpty
                             ? FontWeight.bold
                             : FontWeight.normal,
                       ),
                     ),
-                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: AppColors.textPrimary),
+                    trailing: const Icon(Icons.arrow_forward, size: 20, color: Colors.black),
                     onTap: () {
                       // Show phone input dialog
                       showDialog(
@@ -547,12 +466,12 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.info_rounded, color: Colors.blue, size: 18),
+                      const Icon(Icons.info_rounded, color: Colors.blueAccent, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'This is an optional message, your driver partner may or may not read your note. We suggest calling your driver partner to relay any important information',
-                          style: TextStyle(fontSize: 11, color: Colors.blue, height: 1.4, fontWeight: FontWeight.w500),
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600, height: 1.4, fontWeight: FontWeight.w500),
                         ),
                       ),
                     ],
@@ -569,12 +488,12 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                         Navigator.pop(ctx);
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.divider.withOpacity(0.3),
-                        foregroundColor: AppColors.textPrimary,
+                        backgroundColor: Colors.grey.shade200,
+                        foregroundColor: Colors.black,
                         elevation: 0,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
                       ),
-                      child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                      child: const Text('Done', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     ),
                   ),
                 ],
@@ -585,6 +504,8 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       },
     );
   }
+
+  bool _hidePromoBanner = false;
 
   @override
   Widget build(BuildContext context) {
@@ -634,6 +555,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
@@ -641,6 +563,14 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                       width: 44, height: 44,
                       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), boxShadow: AppStyles.shadowSm),
                       child: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: _animateToUserLocation,
+                    child: Container(
+                      width: 44, height: 44,
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), boxShadow: AppStyles.shadowSm),
+                      child: const Icon(Icons.gps_fixed_rounded, color: AppColors.textPrimary, size: 20),
                     ),
                   ),
                 ],
@@ -660,25 +590,29 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                  // Promotional banner
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: AppColors.success.withOpacity(0.1),
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                  // Promotional banner - only show when bike is selected and not dismissed
+                  if (_serviceType == 'bike' && !_hidePromoBanner)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withOpacity(0.1),
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.local_offer_rounded, color: AppColors.success, size: 16),
+                          const SizedBox(width: 8),
+                          const Text('You are saving 10% more on Bike.', style: TextStyle(color: AppColors.success, fontWeight: FontWeight.w700, fontSize: 13)),
+                          const Spacer(),
+                          GestureDetector(
+                            onTap: () => setState(() => _hidePromoBanner = true),
+                            child: Icon(Icons.close_rounded, color: AppColors.success.withOpacity(0.6), size: 18),
+                          ),
+                        ],
+                      ),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.local_offer_rounded, color: AppColors.success, size: 16),
-                        const SizedBox(width: 8),
-                        const Text('You are saving 10% more on Bike.', style: TextStyle(color: AppColors.success, fontWeight: FontWeight.w700, fontSize: 13)),
-                        const Spacer(),
-                        Icon(Icons.close_rounded, color: AppColors.success.withOpacity(0.6), size: 18),
-                      ],
-                    ),
-                  ),
                   const SizedBox(height: 16),
                   
                   // Vehicles horizontal list
@@ -692,7 +626,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         children: (widget.isTruckMode 
                             ? ['light', 'light_open', 'mover', 'mover_open'] 
-                            : ['tuk', 'bike', 'car', 'van', 'truck']
+                            : _serviceTypes
                           ).map((st) => _vehicleCard(st)).toList(),
                       ),
                     ),
@@ -879,13 +813,40 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       'bike': ('Bike', 'assets/icons/bike.png', 1),
       'tuk': ('Tuk', 'assets/icons/tuk.png', 3),
       'car': ('Flex', 'assets/icons/car.png', 4),
-      'van': ('Mini', 'assets/icons/taxi.png', 8),
+      'mini': ('Mini', 'assets/icons/car.png', 4),
+      'van': ('Mini van', 'assets/icons/taxi.png', 8),
       'truck': ('Truck', 'assets/icons/truck.png', 2),
       'light': ('Light', 'assets/icons/truck.png', 1),
       'light_open': ('Light Open', 'assets/icons/truck.png', 1),
       'mover': ('Mover', 'assets/icons/truck.png', 1),
       'mover_open': ('Mover Open', 'assets/icons/truck.png', 1),
-    }[st]!;
+    }[st];
+
+    final displayName = meta?.$1 ?? (st.isNotEmpty ? '${st[0].toUpperCase()}${st.substring(1)}' : st);
+    final assetIcon = meta?.$2 ?? 'assets/icons/taxi.png';
+    final capacity = meta?.$3 ?? 4;
+
+    // Find nearby drivers of this type to calculate pickup ETA
+    int etaMin;
+    final typeDrivers = _nearbyDrivers.where((d) => d['vehicle_type'] == st).toList();
+    if (typeDrivers.isNotEmpty) {
+      final minDist = typeDrivers.map((d) => d['distance_km'] as num).reduce((a, b) => a < b ? a : b).toDouble();
+      etaMin = (minDist / 25.0 * 60).round();
+      if (etaMin < 2) etaMin = 2;
+    } else {
+      etaMin = {
+        'bike': 3,
+        'tuk': 4,
+        'car': 6,
+        'mini': 7,
+        'van': 8,
+        'truck': 10,
+        'light': 8,
+        'light_open': 8,
+        'mover': 12,
+        'mover_open': 12,
+      }[st] ?? 5;
+    }
 
     return GestureDetector(
       onTap: () {
@@ -908,23 +869,23 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('In ${est['duration_min']} min', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+            Text('In $etaMin min', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
             const SizedBox(height: 8),
-            Image.asset(meta.$2, height: 32, fit: BoxFit.contain),
+            Image.asset(assetIcon, height: 32, fit: BoxFit.contain),
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Flexible(
                   child: Text(
-                    meta.$1, 
+                    displayName, 
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 const SizedBox(width: 4),
                 const Icon(Icons.person_rounded, size: 10, color: AppColors.textSecondary),
-                Text(' ${est['capacity'] ?? meta.$3}', style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                Text(' ${est['capacity'] ?? capacity}', style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
               ],
             ),
             const SizedBox(height: 4),

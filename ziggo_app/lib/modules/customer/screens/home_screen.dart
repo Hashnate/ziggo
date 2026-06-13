@@ -42,6 +42,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _autoRedirected = false;
 
   @override
   void initState() {
@@ -63,6 +64,15 @@ class _HomeScreenState extends State<HomeScreen> {
     final wallet = context.watch<WalletProvider>();
     final booking = context.watch<BookingProvider>();
     final active = booking.activeBooking;
+
+    if (active != null && !_autoRedirected) {
+      _autoRedirected = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _open(const RideTrackingScreen());
+      });
+    } else if (active == null) {
+      _autoRedirected = false;
+    }
 
     return Scaffold(
       key: _scaffoldKey,
@@ -833,7 +843,7 @@ class _ServicesGrid extends StatelessWidget {
                 label: 'Trucks',
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => LocationSearchScreen(isTruckMode: true)),
+                  MaterialPageRoute(builder: (_) => const FareEstimateScreen(isTruckMode: true)),
                 ),
               ),
               GradientServiceTile(
