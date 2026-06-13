@@ -49,14 +49,24 @@ async def create_and_send_otp(db: AsyncSession, phone_number: str) -> str:
 
     print(f"[OTP] {phone_number} -> {code} (expires in {OTP_TTL_MINUTES} min)")
 
-    # Fire-and-forget real-SMS via Notify.lk. No-op when env vars are empty,
-    # so DEV_MODE / local-dev behaviour is unchanged. Errors are swallowed —
-    # the code is still in the DB and the dev path still works.
+    # Fire-and-forget real-SMS via Notify.lk. No-op when env vars are empty.
+    # We query system settings here in the request scope, then fire the SMS call
+    # in the background so slow gateway APIs do not cause client-side connection timeouts.
+    from ..models import SystemSettings
     from . import notify_lk_service
+    import asyncio
     try:
-        await notify_lk_service.send_otp(db, phone_number, code)
+        ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+        ss = ss_q.scalars().first()
+        sms_enabled = ss.sms_notifications_enabled if ss else True
+        site_name = ss.site_name if (ss and ss.site_name) else "Ziggo"
+
+        if sms_enabled and notify_lk_service._enabled():
+            asyncio.create_task(notify_lk_service.send_otp(phone_number, code, site_name))
+        elif not sms_enabled:
+            print(f"[notify.lk] skip sending SMS: SMS notifications disabled in system settings")
     except Exception as e:
-        print(f"[OTP] notify.lk delivery skipped: {type(e).__name__}: {e}")
+        print(f"[OTP] notify.lk background dispatch skipped: {type(e).__name__}: {e}")
 
     return code
 
