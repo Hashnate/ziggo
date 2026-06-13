@@ -9,7 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// working even when the dev PC's LAN IP changes (router reboot, new Wi-Fi).
 ///
 /// Resolution order:
-///   1. `--dart-define=API_HOST=http://x.x.x.x:8000` (explicit override)
+///   1. `--dart-define=API_HOST=http://x.x.x.x:8030` (explicit override)
 ///   2. Last-known good host from SharedPreferences
 ///   3. Parallel probe of common dev hosts (localhost, hard-coded LAN IP,
 ///      Android emulator gateway 10.0.2.2)
@@ -18,12 +18,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 class HostResolver {
   HostResolver._();
 
-  static const int _port = 8000;
+  static const int _port = 8030;
   static const String _prefsKey = 'ziggo_api_host';
   static const String _envHost =
       String.fromEnvironment('API_HOST', defaultValue: '');
   // Production server (nginx on port 80 → backend container). Override at
-  // build time with `--dart-define=API_HOST=http://your-dev-pc:8000` when
+  // build time with `--dart-define=API_HOST=http://your-dev-pc:8030` when
   // you want the app to hit a local dev backend instead.
   static const String fallbackHost = 'http://187.127.152.141';
 
