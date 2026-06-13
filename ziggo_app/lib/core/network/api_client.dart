@@ -1,4 +1,7 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 
 import '../storage/token_storage.dart';
 import 'host_resolver.dart';
@@ -20,6 +23,13 @@ class ApiClient {
         contentType: 'application/json',
       ),
     );
+    if (!kIsWeb) {
+      (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
+        final client = HttpClient();
+        client.badCertificateCallback = (cert, host, port) => true;
+        return client;
+      };
+    }
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {

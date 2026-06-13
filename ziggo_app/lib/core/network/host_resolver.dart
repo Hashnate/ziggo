@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -100,6 +101,13 @@ class HostResolver {
         receiveTimeout: effectiveTimeout,
         sendTimeout: effectiveTimeout,
       ));
+      if (!kIsWeb) {
+        (dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
+          final client = HttpClient();
+          client.badCertificateCallback = (cert, host, port) => true;
+          return client;
+        };
+      }
       final r = await dio.getUri(Uri.parse('$host/health'));
       return r.statusCode == 200;
     } catch (_) {
