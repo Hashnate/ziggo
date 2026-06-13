@@ -102,6 +102,12 @@ async def calculate_fare(
     # Each stop is {"lat": float, "lng": float, "address": str?}.
     stops: Optional[list] = None,
 ) -> dict:
+    from ..models import SystemSettings
+    from datetime import datetime, timezone, timedelta
+    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    ss = ss_q.scalars().first()
+    sys_commission = float(ss.commission_rate) if (ss and ss.commission_rate is not None) else 15.0
+
     # Rental: short-circuit the distance-based math. Fare = hourly * hours,
     # promo discount still applies, platform-fee split still applies.
     if is_rental:
@@ -110,7 +116,7 @@ async def calculate_fare(
             select(FareSetting).where(FareSetting.service_type == service_type)
         )
         setting = setting_q.scalars().first()
-        platform_pct = float(setting.platform_fee_percent or 15) if setting else 15.0
+        platform_pct = float(setting.platform_fee_percent) if (setting and setting.platform_fee_percent is not None and float(setting.platform_fee_percent) > 0) else sys_commission
         hourly = float(RENTAL_HOURLY.get(service_type, RENTAL_HOURLY["car"]))
         fare = hourly * hours
 
@@ -160,7 +166,7 @@ async def calculate_fare(
             select(FareSetting).where(FareSetting.service_type == service_type)
         )
         setting = setting_q.scalars().first()
-        platform_pct = float(setting.platform_fee_percent or 15) if setting else 15.0
+        platform_pct = float(setting.platform_fee_percent) if (setting and setting.platform_fee_percent is not None and float(setting.platform_fee_percent) > 0) else sys_commission
 
         distance_km = haversine_km(pickup_lat, pickup_lng, drop_lat, drop_lng)
         weight_surcharge = 0.0
@@ -239,7 +245,7 @@ async def calculate_fare(
         per_km = float(setting.per_km_rate or 0)
         per_min = float(setting.per_minute_rate or 0)
         min_fare = float(setting.min_fare or 0)
-        platform_pct = float(setting.platform_fee_percent or 15)
+        platform_pct = float(setting.platform_fee_percent) if (setting.platform_fee_percent is not None and float(setting.platform_fee_percent) > 0) else sys_commission
         surge = float(setting.surge_multiplier or 1)
         pickup_fee_val = float(setting.pickup_fee or 0)
         boost_val = float(setting.boost or 0)
@@ -247,8 +253,28 @@ async def calculate_fare(
     else:
         d = DEFAULTS.get(service_type, DEFAULTS["car"])
         base, per_km, per_min, min_fare = d["base"], d["per_km"], d["per_min"], d["min"]
-        platform_pct, surge = 15.0, 1.0
+        platform_pct = sys_commission
+        surge = 1.0
         pickup_fee_val, boost_val, passenger_deductible_val = 0.0, 0.0, 0.0
+
+    # Dynamic surge pricing window check from SystemSettings
+    if ss:
+        start = ss.surge_start_hour
+        end = ss.surge_end_hour
+        mult = float(ss.surge_multiplier or 1.0)
+        
+        colombo_tz = timezone(timedelta(hours=5, minutes=30))
+        current_hour = datetime.now(colombo_tz).hour
+        
+        in_surge = False
+        if start is not None and end is not None:
+            if start <= end:
+                in_surge = start <= current_hour < end
+            else:
+                in_surge = current_hour >= start or current_hour < end
+                
+        if in_surge:
+            surge = mult
 
     raw = (base + pickup_fee_val + per_km * distance_km + per_min * duration_min) * surge
     fare_val = max(raw, min_fare)
@@ -257,9 +283,6 @@ async def calculate_fare(
     # BRD: CD-19 — per-stop fee compensates the driver for the detour.
     stop_fee_total = 0.0
     if clean_stops:
-        from ..models import SystemSettings
-        ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
-        ss = ss_q.scalars().first()
         per_stop = float(ss.multi_stop_fee_per_stop) if ss and ss.multi_stop_fee_per_stop is not None else 50.0
         stop_fee_total = per_stop * len(clean_stops)
         fare_val += stop_fee_total

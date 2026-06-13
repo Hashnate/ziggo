@@ -358,7 +358,7 @@
                  class="w-10 h-10 rounded-xl object-cover flex-shrink-0"
                  style="box-shadow: 0 8px 20px -8px rgba(30,58,138,0.45);">
             <div class="flex flex-col leading-tight">
-                <span class="font-display text-[18px] font-extrabold tracking-tight text-ziggo-ink leading-none">Ziggo</span>
+                <span id="sidebarSiteName" class="font-display text-[18px] font-extrabold tracking-tight text-ziggo-ink leading-none">Ziggo</span>
                 <span class="text-[9px] uppercase tracking-[0.22em] text-ziggo-faint font-semibold mt-1">Admin Suite</span>
             </div>
         </a>
@@ -461,7 +461,7 @@
                     A
                 </div>
                 <div class="flex-1 min-w-0">
-                    <p class="text-sm font-bold truncate text-ziggo-ink">Ziggo Admin</p>
+                    <p id="footerSiteName" class="text-sm font-bold truncate text-ziggo-ink">Ziggo Admin</p>
                     <p class="text-[11px] text-ziggo-muted truncate">admin@ziggo.com</p>
                 </div>
                 <a href="/admin/logout" class="text-ziggo-muted hover:text-ziggo p-2 rounded-lg hover:bg-ziggo-soft/40 transition" title="Logout">
@@ -500,7 +500,7 @@
                 </div>
                 <div class="hidden sm:flex items-center gap-2.5 pl-3 pr-1 py-1 rounded-xl border border-ziggo-line">
                     <div class="leading-tight text-right">
-                        <p class="text-[12px] font-bold text-ziggo-ink">Ziggo Admin</p>
+                        <p id="headerSiteName" class="text-[12px] font-bold text-ziggo-ink">Ziggo Admin</p>
                         <p class="text-[10px] text-ziggo-faint">Super admin</p>
                     </div>
                     <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-ziggo text-white text-xs font-bold zi-logo">A</div>
@@ -652,6 +652,15 @@
                 if (fav) fav.href = d.favicon_url;
                 var appleFav = document.querySelector('link[rel="apple-touch-icon"]');
                 if (appleFav) appleFav.href = d.favicon_url;
+              }
+              if (d.site_name) {
+                document.title = document.title.replace("Ziggo", d.site_name);
+                var sidebarEl = document.getElementById('sidebarSiteName');
+                if (sidebarEl) sidebarEl.textContent = d.site_name;
+                var footerEl = document.getElementById('footerSiteName');
+                if (footerEl) footerEl.textContent = d.site_name + " Admin";
+                var headerEl = document.getElementById('headerSiteName');
+                if (headerEl) headerEl.textContent = d.site_name + " Admin";
               }
             })
             .catch(function() {});

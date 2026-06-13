@@ -1081,6 +1081,57 @@ async def update_booking_status(
                 drv.today_earnings = (drv.today_earnings or Decimal(0)) + (b.driver_earnings or Decimal(0))
                 drv.today_rides = (drv.today_rides or 0) + 1
 
+                # Check driver incentives (daily bonus and cycle bonus) from SystemSettings
+                from ...models import SystemSettings, DriverPayout
+                ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+                ss = ss_q.scalars().first()
+                if ss:
+                    min_daily = int(ss.min_rides_daily_bonus) if ss.min_rides_daily_bonus is not None else 0
+                    daily_amt = Decimal(str(ss.daily_bonus_amount or 0))
+                    if min_daily > 0 and daily_amt > 0:
+                        if drv.today_rides == min_daily:
+                            drv.today_earnings += daily_amt
+                            drv.total_earnings += daily_amt
+                            db.add(DriverPayout(
+                                driver_id=drv.id,
+                                user_id=drv.user_id,
+                                amount=daily_amt,
+                                description=f"Daily Ride Bonus ({min_daily} rides reached)",
+                            ))
+                            db.add(Notification(
+                                user_id=drv.user_id,
+                                title="Daily Bonus Unlocked!",
+                                body=f"Congratulations! You completed {min_daily} rides today and earned a bonus of Rs.{daily_amt:,.2f}.",
+                                type="payment",
+                            ))
+
+                    cycle_rides = int(ss.commission_cycle_rides) if ss.commission_cycle_rides is not None else 0
+                    cycle_amt = Decimal(str(ss.commission_per_cycle or 0))
+                    if cycle_rides > 0 and cycle_amt > 0:
+                        # Count total completed bookings for this driver
+                        count_q = await db.execute(
+                            select(func.count(Booking.id)).where(
+                                Booking.driver_id == drv.id,
+                                Booking.status == BookingStatus.COMPLETED
+                            )
+                        )
+                        completed_count = (count_q.scalar() or 0)
+                        if completed_count > 0 and completed_count % cycle_rides == 0:
+                            drv.total_earnings += cycle_amt
+                            drv.today_earnings += cycle_amt
+                            db.add(DriverPayout(
+                                driver_id=drv.id,
+                                user_id=drv.user_id,
+                                amount=cycle_amt,
+                                description=f"Commission Cycle Bonus ({completed_count} rides reached)",
+                            ))
+                            db.add(Notification(
+                                user_id=drv.user_id,
+                                title="Commission Cycle Bonus!",
+                                body=f"Congratulations! You completed another cycle of {cycle_rides} rides and earned a bonus of Rs.{cycle_amt:,.2f}.",
+                                type="payment",
+                            ))
+
         # BRD: RW-01 — award loyalty points on completion (based on the cash
         # paid, i.e. final_amount AFTER any redemption discount).
         from ...services.loyalty_service import award_points as _award
@@ -1099,6 +1150,34 @@ async def update_booking_status(
         b.cancelled_at = now
         b.cancellation_reason = body.reason
         b.cancelled_by = user.role.value
+
+        # Charge cancellation fee if cancelled by customer
+        if b.cancelled_by == "customer":
+            from ...models import SystemSettings, WalletTransaction
+            ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+            ss = ss_q.scalars().first()
+            cancel_fee = ss.cancellation_fee if ss else Decimal(0)
+            if cancel_fee > 0:
+                cq = await db.execute(select(Customer).where(Customer.id == b.customer_id))
+                customer = cq.scalars().first()
+                if customer:
+                    customer.wallet_balance = (customer.wallet_balance or Decimal(0)) - cancel_fee
+                    db.add(WalletTransaction(
+                        user_id=customer.user_id,
+                        amount=cancel_fee,
+                        type="debit",
+                        description=f"Cancellation fee for booking {b.booking_ref}",
+                        reference_id=b.booking_ref,
+                        balance_after=customer.wallet_balance,
+                    ))
+                    # Notify customer of cancellation fee
+                    db.add(Notification(
+                        user_id=customer.user_id,
+                        title="Cancellation Fee Charged",
+                        body=f"A cancellation fee of Rs.{cancel_fee:,.2f} was deducted from your wallet for cancelling booking {b.booking_ref}.",
+                        type="payment",
+                    ))
+
         # BRD: RW-02 — refund any redeemed points if the trip never happened.
         if b.redeem_points and b.redeem_points > 0:
             cq = await db.execute(select(Customer).where(Customer.id == b.customer_id))

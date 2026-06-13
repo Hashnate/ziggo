@@ -6,6 +6,7 @@ export default function Login({ onLogin }) {
   const [pw, setPw] = useState('')
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+  const [showForgot, setShowForgot] = useState(false)
 
   async function submit(e) {
     e.preventDefault()
@@ -61,7 +62,10 @@ export default function Login({ onLogin }) {
               </div>
             </div>
             <div>
-              <label className="text-xs font-semibold text-ziggo-muted">Password</label>
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-semibold text-ziggo-muted">Password</label>
+                <button type="button" onClick={() => setShowForgot(true)} className="text-xs font-semibold text-ziggo hover:underline">Forgot password?</button>
+              </div>
               <div className="relative mt-1.5">
                 <i className="fas fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-ziggo-faint text-sm" />
                 <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} className="w-full pl-10 pr-3 py-3 bg-ziggo-canvas border border-transparent rounded-xl outline-none focus:border-ziggo focus:bg-white transition" placeholder="••••••••" />
@@ -73,6 +77,34 @@ export default function Login({ onLogin }) {
           </form>
         </div>
       </div>
+
+      {showForgot && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm transition-all duration-300" onClick={() => setShowForgot(false)}>
+          <div className="bg-white w-full max-w-sm rounded-3xl p-6 relative overflow-hidden shadow-2xl border border-slate-100" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-lg font-bold text-ziggo-ink flex items-center gap-2">
+                <i className="fas fa-key text-blue-500"></i> Password Help
+              </h3>
+              <button type="button" onClick={() => setShowForgot(false)} className="text-slate-400 hover:text-slate-600 transition">
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+            <div className="space-y-4 text-sm text-ziggo-muted leading-relaxed">
+              <p>For security, admin account credentials are managed via the system database.</p>
+              <div className="p-3 bg-ziggo-canvas rounded-xl border border-transparent">
+                <p className="text-[10px] uppercase tracking-wider text-ziggo-muted font-bold mb-1">Default Credentials</p>
+                <p className="font-mono text-xs text-ziggo-ink">Phone: 0700000000</p>
+                <p className="font-mono text-xs text-ziggo-ink">Password: admin123</p>
+              </div>
+              <p className="text-xs text-slate-400">If these credentials don't work, please contact your system administrator or refer to <code>README.md</code> / <code>seed.py</code>.</p>
+            </div>
+            <button type="button" onClick={() => setShowForgot(false)} className="mt-5 w-full py-3 bg-ziggo hover:bg-ziggo-light text-white rounded-xl text-xs font-bold transition shadow-glow">
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

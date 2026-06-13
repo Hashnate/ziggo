@@ -39,6 +39,7 @@ class User(Base):
     # gets pushes across roles + devices. ensure_schema auto-adds this column
     # on startup if it doesn't exist — no manual migration needed.
     notification_token = Column(String(255))
+    password = Column(String(100), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

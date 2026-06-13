@@ -134,6 +134,9 @@
                             <input id="remember-me" name="remember-me" type="checkbox" class="w-4 h-4 rounded bg-white/10 border-white/20 text-ziggo-light focus:ring-ziggo-light">
                             <span class="text-sm font-semibold text-slate-300">Remember me</span>
                         </label>
+                        <button type="button" id="forgotPw" class="text-sm font-semibold text-slate-400 hover:text-white transition">
+                            Forgot password?
+                        </button>
                     </div>
 
                     <button type="submit"
@@ -150,6 +153,58 @@
         </div>
     </div>
 
+    <!-- Forgot Password Modal -->
+    <div id="forgotPwModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden transition-all duration-300">
+        <div class="glass w-full max-w-sm rounded-3xl p-6 relative overflow-hidden card-in" style="box-shadow: 0 40px 90px -30px rgba(0,0,0,0.65);">
+            <div class="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+            <div class="flex justify-between items-start mb-4">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fas fa-key text-blue-400"></i> Reset Password
+                </h3>
+                <button type="button" id="closeForgotModal" class="text-slate-400 hover:text-white transition">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div id="forgotError" class="hidden mb-4 p-3 rounded-2xl bg-red-500/15 border border-red-400/30 text-red-300 text-xs font-semibold"></div>
+            <div id="forgotSuccess" class="hidden mb-4 p-3 rounded-2xl bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 text-xs font-semibold"></div>
+
+            <!-- Step 1: Send OTP -->
+            <div id="forgotStep1" class="space-y-4">
+                <p class="text-xs text-slate-300">Enter your registered Admin phone number to request an OTP code.</p>
+                <div>
+                    <label for="reset_phone" class="block text-[10px] font-black tracking-[0.18em] text-slate-400 uppercase mb-2">Phone number</label>
+                    <input type="tel" id="reset_phone" class="brand-field w-full px-4 py-3 rounded-xl text-xs font-semibold" placeholder="0700000000" maxlength="10">
+                </div>
+                <button type="button" id="btnSendOTP" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition">
+                    Send OTP
+                </button>
+            </div>
+
+            <!-- Step 2: Verify & Reset (hidden initially) -->
+            <div id="forgotStep2" class="space-y-4 hidden">
+                <p class="text-xs text-slate-300">An OTP code has been generated. Please enter it below along with your new password.</p>
+                
+                <!-- Helper for DEV_MODE -->
+                <div id="devOtpBox" class="p-2 bg-blue-500/10 border border-blue-400/20 rounded-xl text-blue-300 font-mono text-xs hidden">
+                    Developer OTP: <span id="devOtpVal" class="font-bold"></span>
+                </div>
+
+                <div>
+                    <label for="reset_otp" class="block text-[10px] font-black tracking-[0.18em] text-slate-400 uppercase mb-2">OTP Code</label>
+                    <input type="text" id="reset_otp" class="brand-field w-full px-4 py-3 rounded-xl text-xs font-semibold" placeholder="123456" maxlength="6">
+                </div>
+                <div>
+                    <label for="reset_password" class="block text-[10px] font-black tracking-[0.18em] text-slate-400 uppercase mb-2">New Password</label>
+                    <input type="password" id="reset_password" class="brand-field w-full px-4 py-3 rounded-xl text-xs font-semibold" placeholder="••••••••">
+                </div>
+                <button type="button" id="btnResetConfirm" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition">
+                    Reset Password
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         (function () {
             var btn = document.getElementById('togglePw');
@@ -162,6 +217,167 @@
                     btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
                 });
             }
+
+            // Forgot Password Modal toggle & Reset flow
+            var forgotBtn = document.getElementById('forgotPw');
+            var forgotModal = document.getElementById('forgotPwModal');
+            var closeBtn = document.getElementById('closeForgotModal');
+            
+            var forgotStep1 = document.getElementById('forgotStep1');
+            var forgotStep2 = document.getElementById('forgotStep2');
+            var forgotError = document.getElementById('forgotError');
+            var forgotSuccess = document.getElementById('forgotSuccess');
+            
+            var resetPhoneInput = document.getElementById('reset_phone');
+            var resetOtpInput = document.getElementById('reset_otp');
+            var resetPwInput = document.getElementById('reset_password');
+            
+            var btnSendOTP = document.getElementById('btnSendOTP');
+            var btnResetConfirm = document.getElementById('btnResetConfirm');
+            
+            var devOtpBox = document.getElementById('devOtpBox');
+            var devOtpVal = document.getElementById('devOtpVal');
+
+            if (forgotBtn && forgotModal) {
+                forgotBtn.addEventListener('click', function () {
+                    forgotModal.classList.remove('hidden');
+                    // Reset steps
+                    forgotStep1.classList.remove('hidden');
+                    forgotStep2.classList.add('hidden');
+                    forgotError.classList.add('hidden');
+                    forgotSuccess.classList.add('hidden');
+                    resetPhoneInput.value = document.getElementById('phone_number').value || '0700000000';
+                    resetOtpInput.value = '';
+                    resetPwInput.value = '';
+                });
+                
+                var hideModal = function() {
+                    forgotModal.classList.add('hidden');
+                };
+                if (closeBtn) closeBtn.addEventListener('click', hideModal);
+                forgotModal.addEventListener('click', function(e) {
+                    if (e.target === forgotModal) hideModal();
+                });
+
+                // Send OTP handler
+                btnSendOTP.addEventListener('click', async function() {
+                    forgotError.classList.add('hidden');
+                    var phoneVal = resetPhoneInput.value.trim();
+                    if (!phoneVal) {
+                        forgotError.textContent = "Please enter phone number";
+                        forgotError.classList.remove('hidden');
+                        return;
+                    }
+                    
+                    btnSendOTP.disabled = true;
+                    btnSendOTP.textContent = "Sending...";
+                    
+                    try {
+                        var formData = new FormData();
+                        formData.append('phone_number', phoneVal);
+                        
+                        var res = await fetch('/admin/forgot-password/send-otp', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        var data = await res.json();
+                        if (data.ok) {
+                            forgotStep1.classList.add('hidden');
+                            forgotStep2.classList.remove('hidden');
+                            if (data.dev_otp) {
+                                devOtpVal.textContent = data.dev_otp;
+                                devOtpBox.classList.remove('hidden');
+                            } else {
+                                devOtpBox.classList.add('hidden');
+                            }
+                        } else {
+                            forgotError.textContent = data.detail || "Failed to send OTP";
+                            forgotError.classList.remove('hidden');
+                        }
+                    } catch (e) {
+                        forgotError.textContent = "Connection error";
+                        forgotError.classList.remove('hidden');
+                    } finally {
+                        btnSendOTP.disabled = false;
+                        btnSendOTP.textContent = "Send OTP";
+                    }
+                });
+
+                // Reset Confirm handler
+                btnResetConfirm.addEventListener('click', async function() {
+                    forgotError.classList.add('hidden');
+                    var phoneVal = resetPhoneInput.value.trim();
+                    var otpVal = resetOtpInput.value.trim();
+                    var pwVal = resetPwInput.value.trim();
+                    
+                    if (!otpVal || !pwVal) {
+                        forgotError.textContent = "Please fill in OTP and new password";
+                        forgotError.classList.remove('hidden');
+                        return;
+                    }
+                    
+                    btnResetConfirm.disabled = true;
+                    btnResetConfirm.textContent = "Resetting...";
+                    
+                    try {
+                        var formData = new FormData();
+                        formData.append('phone_number', phoneVal);
+                        formData.append('otp', otpVal);
+                        formData.append('new_password', pwVal);
+                        
+                        var res = await fetch('/admin/forgot-password/reset', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        var data = await res.json();
+                        if (data.ok) {
+                            forgotStep2.classList.add('hidden');
+                            forgotSuccess.textContent = "Password reset successfully! Please login with your new password.";
+                            forgotSuccess.classList.remove('hidden');
+                            
+                            // Autofill the login password field
+                            var passwordField = document.getElementById('password');
+                            if (passwordField) {
+                                passwordField.value = pwVal;
+                            }
+                            
+                            setTimeout(hideModal, 2500);
+                        } else {
+                            forgotError.textContent = data.detail || "Failed to reset password";
+                            forgotError.classList.remove('hidden');
+                        }
+                    } catch (e) {
+                        forgotError.textContent = "Connection error";
+                        forgotError.classList.remove('hidden');
+                    } finally {
+                        btnResetConfirm.disabled = false;
+                        btnResetConfirm.textContent = "Reset Password";
+                    }
+                });
+            }
+
+            // Load custom branding assets
+            (function() {
+              fetch('/admin/branding-assets')
+                .then(function(r) { return r.ok ? r.json() : null; })
+                .then(function(d) {
+                  if (!d) return;
+                  if (d.logo_url) {
+                    var logoImg = document.querySelector('.w-20.h-20 img');
+                    if (logoImg) logoImg.src = d.logo_url;
+                  }
+                  if (d.site_name) {
+                    document.title = d.site_name + " Admin · Sign in";
+                    var welcomeText = document.querySelector('p.text-\\[10px\\]');
+                    if (welcomeText) welcomeText.textContent = "Welcome back to";
+                    var titleText = document.querySelector('h1.text-3xl');
+                    if (titleText) titleText.textContent = d.site_name;
+                    var footerText = document.querySelector('p.text-center.text-\\[11px\\]');
+                    if (footerText) footerText.textContent = "© " + d.site_name + " · Internal use only";
+                  }
+                })
+                .catch(function() {});
+            })();
         })();
     </script>
 </body>

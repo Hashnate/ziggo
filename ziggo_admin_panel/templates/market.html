@@ -185,12 +185,18 @@
                                         <button class="px-3 py-1.5 rounded-xl bg-green-600 text-white text-xs font-bold hover:bg-green-700 transition">Reactivate</button>
                                     </form>
                                 {% endif %}
+                                <button
+                                    onclick='openEditVendor({{ v.id }}, {{ v.name|tojson }}, {{ (v.category or "")|tojson }}, {{ (v.description or "")|tojson }}, {{ (v.address or "")|tojson }}, {{ (v.phone_number or "")|tojson }}, {{ (v.opening_time or "")|tojson }}, {{ (v.closing_time or "")|tojson }}, {{ (v.delivery_fee or 0)|float }}, {{ (v.eta_minutes or 40) }}, {{ (v.commission_percentage or 10)|float }}, {{ (v.priority_level or "standard")|tojson }}, {{ ("yes" if v.is_featured else "no")|tojson }}, {{ (v.bank_name or "")|tojson }}, {{ (v.account_holder_name or "")|tojson }}, {{ (v.account_number or "")|tojson }}, {{ (v.branch_name or "")|tojson }})'
+                                    class="px-3 py-1.5 rounded-xl bg-blue-50 text-blue-600 text-xs font-bold hover:bg-blue-600 hover:text-white transition inline-flex items-center gap-1">
+                                    <i class="fas fa-pen text-[10px]"></i> Edit
+                                </button>
                                 <a href="/admin/market/{{ v.id }}"
                                    class="bg-ziggo text-white px-3.5 py-2 rounded-xl text-xs font-semibold hover:bg-ziggo-light transition inline-flex items-center gap-1.5">
                                     Manage Products <i class="fas fa-arrow-right text-[10px]"></i>
                                 </a>
                             </div>
                         </td>
+
                     </tr>
                     {% else %}
                     <tr>
@@ -506,6 +512,105 @@
         </div>
     </form>
 </div>
+
+<!-- Edit Vendor Modal -->
+<div id="editVendorModal" class="modal-overlay">
+    <form id="editVendorForm" method="post" class="modal-container highlight-blue">
+        <div class="modal-header">
+            <div>
+                <h3 class="text-base font-black text-ziggo flex items-center gap-2"><i class="fas fa-pen-to-square text-blue-500"></i> Edit Vendor</h3>
+                <p class="text-xs text-gray-400 mt-0.5">Update the vendor details below</p>
+            </div>
+            <button type="button" onclick="closeEditVendorModal()" class="text-gray-400 hover:text-red-500 transition text-xl"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Vendor Name *</label>
+                    <input id="ev_name" name="name" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Category</label>
+                    <select id="ev_category" name="category" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white text-sm">
+                        <option value="Grocery">Grocery</option>
+                        <option value="Pharmacy">Pharmacy</option>
+                        <option value="Electronics">Electronics</option>
+                        <option value="Bakery">Bakery</option>
+                        <option value="Liquor">Liquor</option>
+                        <option value="Stationery">Stationery</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Phone Number</label>
+                    <input id="ev_phone" name="phone_number" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Address</label>
+                    <input id="ev_address" name="address" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Description</label>
+                    <input id="ev_description" name="description" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Opening Time</label>
+                    <input id="ev_opening" name="opening_time" type="time" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Closing Time</label>
+                    <input id="ev_closing" name="closing_time" type="time" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Delivery Fee (Rs.)</label>
+                    <input id="ev_delivery_fee" name="delivery_fee" type="number" step="0.01" min="0" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">ETA (minutes)</label>
+                    <input id="ev_eta" name="eta_minutes" type="number" min="5" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Commission (%)</label>
+                    <input id="ev_commission" name="commission_percentage" type="number" step="0.01" min="0" max="100" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Priority Level</label>
+                    <select id="ev_priority" name="priority_level" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white text-sm">
+                        <option value="standard">Standard</option>
+                        <option value="premium">Premium</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Featured Vendor</label>
+                    <select id="ev_featured" name="is_featured" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white text-sm">
+                        <option value="no">No</option>
+                        <option value="yes">Yes</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Bank Name</label>
+                    <input id="ev_bank" name="bank_name" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Account Holder</label>
+                    <input id="ev_account_holder" name="account_holder_name" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Account Number</label>
+                    <input id="ev_account_number" name="account_number" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Branch Name</label>
+                    <input id="ev_branch" name="branch_name" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" onclick="closeEditVendorModal()" class="px-5 py-2.5 border border-gray-200 rounded-xl font-bold text-gray-600 text-sm hover:bg-gray-50">Cancel</button>
+            <button type="submit" class="btn-gradient px-7 py-2.5 rounded-xl font-bold text-sm">Save Changes</button>
+        </div>
+    </form>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -531,11 +636,40 @@
         document.getElementById('addVendorModal').style.display = 'none';
     }
 
+    function closeEditVendorModal() {
+        document.getElementById('editVendorModal').style.display = 'none';
+    }
+
+    function openEditVendor(id, name, category, description, address, phone, opening, closing, delivery_fee, eta, commission, priority, featured, bank, account_holder, account_number, branch) {
+        document.getElementById('editVendorForm').action = '/admin/market/' + id + '/edit';
+        document.getElementById('ev_name').value = name || '';
+        document.getElementById('ev_category').value = category || 'Other';
+        document.getElementById('ev_description').value = description || '';
+        document.getElementById('ev_address').value = address || '';
+        document.getElementById('ev_phone').value = phone || '';
+        document.getElementById('ev_opening').value = opening || '';
+        document.getElementById('ev_closing').value = closing || '';
+        document.getElementById('ev_delivery_fee').value = delivery_fee || 0;
+        document.getElementById('ev_eta').value = eta || 40;
+        document.getElementById('ev_commission').value = commission || 10;
+        document.getElementById('ev_priority').value = priority || 'standard';
+        document.getElementById('ev_featured').value = featured || 'no';
+        document.getElementById('ev_bank').value = bank || '';
+        document.getElementById('ev_account_holder').value = account_holder || '';
+        document.getElementById('ev_account_number').value = account_number || '';
+        document.getElementById('ev_branch').value = branch || '';
+        document.getElementById('editVendorModal').style.display = 'flex';
+    }
+
     // Close on clicking overlay
     window.onclick = function(event) {
         var modal = document.getElementById('addVendorModal');
         if (event.target == modal) {
             closeModal();
+        }
+        var editModal = document.getElementById('editVendorModal');
+        if (event.target == editModal) {
+            closeEditVendorModal();
         }
     }
 

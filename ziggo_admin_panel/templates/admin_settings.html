@@ -44,7 +44,6 @@
                 <button type="button" class="settings-tab" data-tab="pricing"><i class="fas fa-dollar-sign"></i> Pricing</button>
                 <button type="button" class="settings-tab" data-tab="security"><i class="fas fa-shield-alt"></i> Security</button>
                 <button type="button" class="settings-tab" data-tab="notifications"><i class="fas fa-bell"></i> Notifications</button>
-                <button type="button" class="settings-tab" data-tab="incentives"><i class="fas fa-gift"></i> Driver Incentives</button>
                 <button type="button" class="settings-tab" data-tab="loyalty"><i class="fas fa-medal"></i> Loyalty &amp; Membership</button>
                 <button type="button" class="settings-tab" data-tab="trips"><i class="fas fa-map-pin"></i> Trip Stops &amp; Waiting</button>
                 <button type="button" class="settings-tab" data-tab="branding"><i class="fas fa-image"></i> Logo &amp; Favicon</button>
@@ -157,30 +156,6 @@
                     </div>
                 </section>
 
-                <!-- Driver Incentives -->
-                <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="incentives">
-                    <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
-                        <i class="fas fa-gift text-ziggo"></i> Driver Incentives
-                    </h3>
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-xs font-black text-ziggo-muted mb-1">Min Rides for Daily Bonus</label>
-                            <input type="number" min="0" name="min_rides_daily_bonus" value="{{ s.min_rides_daily_bonus or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-black text-ziggo-muted mb-1">Daily Bonus Amount (Rs.)</label>
-                            <input type="number" step="0.01" min="0" name="daily_bonus_amount" value="{{ s.daily_bonus_amount or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-black text-ziggo-muted mb-1">Commission Cycle (Rides)</label>
-                            <input type="number" min="0" name="commission_cycle_rides" value="{{ s.commission_cycle_rides or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-black text-ziggo-muted mb-1">Commission Per Cycle (Rs.)</label>
-                            <input type="number" step="0.01" min="0" name="commission_per_cycle" value="{{ s.commission_per_cycle or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                        </div>
-                    </div>
-                </section>
 
                 <!-- Loyalty & Membership -->
                 <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="loyalty">
@@ -250,11 +225,7 @@
                         <div>
                             <label class="block text-xs font-black text-ziggo-muted mb-2">Logo</label>
                             <div id="logoPreviewContainer" class="bg-gray-50 border border-ziggo-line rounded-2xl p-3 flex items-center justify-center h-24 mb-2">
-                                {% if s.logo_url %}
-                                    <img src="{{ s.logo_url }}" alt="Logo" class="max-h-full max-w-full object-contain">
-                                {% else %}
-                                    <span class="text-xs text-ziggo-faint font-bold">No logo uploaded</span>
-                                {% endif %}
+                                <img src="{{ s.logo_url or '/static/img/logo.jpeg' }}" alt="Logo" class="max-h-full max-w-full object-contain">
                             </div>
                             <input type="file" name="logo" id="logoInput" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="w-full text-xs">
                             <p class="text-[10px] text-ziggo-faint font-bold mt-1">JPG/PNG/WEBP/SVG, max 5 MB.</p>
@@ -262,11 +233,7 @@
                         <div>
                             <label class="block text-xs font-black text-ziggo-muted mb-2">Favicon</label>
                             <div id="faviconPreviewContainer" class="bg-gray-50 border border-ziggo-line rounded-2xl p-3 flex items-center justify-center h-24 mb-2">
-                                {% if s.favicon_url %}
-                                    <img src="{{ s.favicon_url }}" alt="Favicon" class="max-h-full max-w-full object-contain">
-                                {% else %}
-                                    <span class="text-xs text-ziggo-faint font-bold">No favicon uploaded</span>
-                                {% endif %}
+                                <img src="{{ s.favicon_url or '/static/img/logo.jpeg' }}" alt="Favicon" class="max-h-full max-w-full object-contain">
                             </div>
                             <input type="file" name="favicon" id="faviconInput" accept="image/png,image/x-icon,image/vnd.microsoft.icon,image/svg+xml" class="w-full text-xs">
                             <p class="text-[10px] text-ziggo-faint font-bold mt-1">ICO/PNG/SVG, max 5 MB.</p>

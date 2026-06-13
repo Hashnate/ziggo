@@ -195,6 +195,13 @@ async def send_to_user(
     if not _initialized:
         print(f"[fcm] skip user_id={user_id}: SDK not initialised")
         return False
+    from ..models import SystemSettings
+    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    ss = ss_q.scalars().first()
+    if ss and not ss.push_notifications_enabled:
+        print(f"[fcm] skip user_id={user_id}: push notifications disabled in system settings")
+        return False
+
     q = await db.execute(select(User).where(User.id == user_id))
     user = q.scalars().first()
     if user is None:

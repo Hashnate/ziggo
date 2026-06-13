@@ -48,7 +48,8 @@ async def rx_login(
         select(User).where(User.phone_number == phone_number, User.role == UserRole.ADMIN)
     )
     user = q.scalars().first()
-    if not user or password != "admin123":
+    expected = user.password if (user and user.password) else "admin123"
+    if not user or password != expected:
         return JSONResponse({"ok": False, "detail": "Invalid phone or password"}, status_code=401)
     resp = JSONResponse({"ok": True, "name": user.full_name or "Admin"})
     resp.set_cookie(

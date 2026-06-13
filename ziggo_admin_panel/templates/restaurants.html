@@ -3,6 +3,61 @@
 {% block title %}Restaurants | Ziggo Admin{% endblock %}
 {% block page_title %}Restaurant Management{% endblock %}
 
+{% block head %}
+<style>
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(8px);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+        padding: 1.5rem;
+    }
+    .modal-container {
+        background: #ffffff;
+        border-radius: 1.5rem;
+        box-shadow: 0 25px 50px -12px rgba(15,23,42,0.25);
+        width: 100%;
+        max-width: 48rem;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid #e2e8f0;
+        animation: modalFadeIn 0.25s cubic-bezier(0.16,1,0.3,1);
+        overflow: hidden;
+    }
+    @keyframes modalFadeIn {
+        from { opacity: 0; transform: translateY(10px) scale(0.98); }
+        to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .modal-header {
+        flex-shrink: 0;
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid #f1f5f9;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .modal-body {
+        padding: 1.5rem;
+        overflow-y: auto;
+        flex: 1;
+    }
+    .modal-footer {
+        flex-shrink: 0;
+        padding: 1rem 1.5rem;
+        border-top: 1px solid #f1f5f9;
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
     <div class="p-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-4">
@@ -91,6 +146,11 @@
                                     <button class="px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-bold hover:bg-green-600 hover:text-white transition">Approve</button>
                                 </form>
                             {% endif %}
+                            <button
+                                onclick='openEditRestaurant({{ r.id }}, {{ r.name|tojson }}, {{ (r.description or "")|tojson }}, {{ (r.cuisine or "")|tojson }}, {{ (r.address or "")|tojson }}, {{ (r.phone_number or "")|tojson }}, {{ (r.opening_time or "")|tojson }}, {{ (r.closing_time or "")|tojson }}, {{ (r.delivery_fee or 0)|float }}, {{ (r.eta_minutes or 30) }})'
+                                class="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-xs font-bold hover:bg-blue-600 hover:text-white transition inline-flex items-center gap-1">
+                                <i class="fas fa-pen text-[10px]"></i> Edit
+                            </button>
                             <a href="/admin/restaurants/{{ r.id }}" class="px-3 py-1.5 rounded-lg bg-ziggo-soft text-ziggo text-xs font-bold inline-flex items-center gap-1.5 hover:bg-ziggo hover:text-white transition">Manage →</a>
                         </div>
                     </td>
@@ -138,4 +198,89 @@
     </div>
     {% endif %}
 </div>
+
+<!-- Edit Restaurant Modal -->
+<div id="editRestaurantModal" class="modal-overlay">
+    <form id="editRestaurantForm" method="post" class="modal-container">
+        <div class="modal-header">
+            <div>
+                <h3 class="text-base font-black text-ziggo flex items-center gap-2"><i class="fas fa-pen-to-square text-blue-500"></i> Edit Restaurant</h3>
+                <p class="text-xs text-gray-400 mt-0.5">Update the restaurant details below</p>
+            </div>
+            <button type="button" onclick="closeEditRestaurant()" class="text-gray-400 hover:text-red-500 transition text-xl"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Restaurant Name *</label>
+                    <input id="edit_r_name" name="name" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Cuisine</label>
+                    <input id="edit_r_cuisine" name="cuisine" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Phone Number</label>
+                    <input id="edit_r_phone" name="phone_number" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Address</label>
+                    <input id="edit_r_address" name="address" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Description</label>
+                    <input id="edit_r_description" name="description" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Opening Time</label>
+                    <input id="edit_r_opening" name="opening_time" type="time" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Closing Time</label>
+                    <input id="edit_r_closing" name="closing_time" type="time" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Delivery Fee (Rs.)</label>
+                    <input id="edit_r_delivery_fee" name="delivery_fee" type="number" step="0.01" min="0" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">ETA (minutes)</label>
+                    <input id="edit_r_eta" name="eta_minutes" type="number" min="5" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" onclick="closeEditRestaurant()" class="px-5 py-2.5 border border-gray-200 rounded-xl font-bold text-gray-600 text-sm hover:bg-gray-50">Cancel</button>
+            <button type="submit" class="px-7 py-2.5 bg-ziggo text-white rounded-xl font-bold text-sm hover:bg-ziggo-light transition">Save Changes</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function openEditRestaurant(id, name, description, cuisine, address, phone, opening, closing, delivery_fee, eta) {
+        document.getElementById('editRestaurantForm').action = '/admin/restaurants/' + id + '/edit';
+        document.getElementById('edit_r_name').value = name || '';
+        document.getElementById('edit_r_description').value = description || '';
+        document.getElementById('edit_r_cuisine').value = cuisine || '';
+        document.getElementById('edit_r_address').value = address || '';
+        document.getElementById('edit_r_phone').value = phone || '';
+        document.getElementById('edit_r_opening').value = opening || '';
+        document.getElementById('edit_r_closing').value = closing || '';
+        document.getElementById('edit_r_delivery_fee').value = delivery_fee || 0;
+        document.getElementById('edit_r_eta').value = eta || 30;
+        document.getElementById('editRestaurantModal').style.display = 'flex';
+    }
+
+    function closeEditRestaurant() {
+        document.getElementById('editRestaurantModal').style.display = 'none';
+    }
+
+    window.addEventListener('click', function(e) {
+        if (e.target === document.getElementById('editRestaurantModal')) {
+            closeEditRestaurant();
+        }
+    });
+</script>
 {% endblock %}

@@ -11,6 +11,7 @@ API reference: https://notify.lk/api/v1/send-sms
 from __future__ import annotations
 
 import httpx
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 
@@ -40,17 +41,27 @@ def _normalize(phone: str) -> str:
     return p
 
 
-async def send_otp(phone_number: str, code: str) -> bool:
+async def send_otp(db: AsyncSession, phone_number: str, code: str) -> bool:
     """Fire-and-forget OTP send. Returns True on HTTP 200.
 
     Errors are logged but never raised — OTP delivery failure must not block
     the auth flow (the code is also returned via DEV_MODE / printed to logs).
     """
+    from ..models import SystemSettings
+    from sqlalchemy import select
+
+    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    ss = ss_q.scalars().first()
+    if ss and not ss.sms_notifications_enabled:
+        print(f"[notify.lk] skip sending SMS: SMS notifications disabled in system settings")
+        return False
+
     if not _enabled():
         return False
 
     to = _normalize(phone_number)
-    msg = f"Your Ziggo verification code is {code}. It expires in 5 minutes."
+    site_name = ss.site_name if (ss and ss.site_name) else "Ziggo"
+    msg = f"Your {site_name} verification code is {code}. It expires in 5 minutes."
     params = {
         "user_id": settings.NOTIFY_LK_USER_ID,
         "api_key": settings.NOTIFY_LK_API_KEY,

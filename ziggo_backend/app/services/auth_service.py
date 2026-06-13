@@ -54,7 +54,7 @@ async def create_and_send_otp(db: AsyncSession, phone_number: str) -> str:
     # the code is still in the DB and the dev path still works.
     from . import notify_lk_service
     try:
-        await notify_lk_service.send_otp(phone_number, code)
+        await notify_lk_service.send_otp(db, phone_number, code)
     except Exception as e:
         print(f"[OTP] notify.lk delivery skipped: {type(e).__name__}: {e}")
 

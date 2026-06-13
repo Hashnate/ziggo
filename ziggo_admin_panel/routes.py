@@ -209,6 +209,9 @@ async def current_admin(request: Request, db: AsyncSession = Depends(get_db)) ->
 
 
 # ---------- Auth ----------
+_FAILED_LOGIN_ATTEMPTS: dict[str, int] = {}
+
+
 @router.get("/login", response_class=HTMLResponse)
 async def admin_login_get(request: Request):
     return templates.TemplateResponse(request, "login.html", {"request": request, "error": None})
@@ -222,19 +225,33 @@ async def admin_login_post(
     db: AsyncSession = Depends(get_db),
 ):
     """Dev login: phone + 'admin123'. Seed script creates admin@0700000000 by default."""
+    s = await _get_or_create_settings(db)
+    max_attempts = s.max_login_attempts or 5
+    attempts = _FAILED_LOGIN_ATTEMPTS.get(phone_number, 0)
+    if attempts >= max_attempts:
+        return templates.TemplateResponse(
+            request, "login.html",
+            {"request": request, "error": "Account locked due to too many failed attempts. Contact support."},
+            status_code=403,
+        )
+
     q = await db.execute(
         select(User).where(User.phone_number == phone_number, User.role == UserRole.ADMIN)
     )
     user = q.scalars().first()
-    expected = "admin123"
+    expected = user.password if (user and user.password) else "admin123"
     if not user or password != expected:
+        _FAILED_LOGIN_ATTEMPTS[phone_number] = attempts + 1
         return templates.TemplateResponse(
             request, "login.html",
             {"request": request, "error": "Invalid credentials"},
             status_code=401,
         )
+    
+    _FAILED_LOGIN_ATTEMPTS[phone_number] = 0
     resp = RedirectResponse(url="/admin/dashboard", status_code=303)
-    resp.set_cookie(SESSION_COOKIE, _make_session(user.id), httponly=True, max_age=60 * 60 * 8)
+    timeout_mins = s.session_timeout_minutes or 30
+    resp.set_cookie(SESSION_COOKIE, _make_session(user.id), httponly=True, max_age=60 * timeout_mins)
     return resp
 
 
@@ -243,6 +260,56 @@ async def admin_logout():
     resp = RedirectResponse(url="/admin/login", status_code=303)
     resp.delete_cookie(SESSION_COOKIE)
     return resp
+
+
+@router.post("/forgot-password/send-otp")
+async def admin_forgot_password_send_otp(
+    phone_number: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services.auth_service import create_and_send_otp
+    q = await db.execute(
+        select(User).where(User.phone_number == phone_number, User.role == UserRole.ADMIN)
+    )
+    user = q.scalars().first()
+    if not user:
+        return {"ok": False, "detail": "Admin phone number not found"}
+    
+    code = await create_and_send_otp(db, phone_number)
+    return {
+        "ok": True,
+        "message": "OTP sent successfully",
+        "dev_otp": code if settings.DEV_MODE else None,
+    }
+
+
+@router.post("/forgot-password/reset")
+async def admin_forgot_password_reset(
+    phone_number: str = Form(...),
+    otp: str = Form(...),
+    new_password: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services.auth_service import verify_otp_code
+    s = await _get_or_create_settings(db)
+    min_len = s.min_password_length or 6
+    if len(new_password) < min_len:
+        return {"ok": False, "detail": f"Password must be at least {min_len} characters long"}
+
+    q = await db.execute(
+        select(User).where(User.phone_number == phone_number, User.role == UserRole.ADMIN)
+    )
+    user = q.scalars().first()
+    if not user:
+        return {"ok": False, "detail": "Admin phone number not found"}
+    
+    ok = await verify_otp_code(db, phone_number, otp)
+    if not ok:
+        return {"ok": False, "detail": "Invalid or expired OTP"}
+    
+    user.password = new_password
+    await db.commit()
+    return {"ok": True, "message": "Password reset successful"}
 
 
 # ---------- Pages ----------
@@ -2023,6 +2090,7 @@ async def admin_branding_assets(db: AsyncSession = Depends(get_db)):
     return {
         "logo_url": s.logo_url or "/static/img/logo.jpeg",
         "favicon_url": s.favicon_url or "/static/img/logo.jpeg",
+        "site_name": s.site_name or "Ziggo",
     }
 
 
@@ -2686,10 +2754,12 @@ async def admin_restaurants(
             "description": r.description,
             "cuisine": r.cuisine,
             "address": r.address,
+            "phone_number": r.phone_number,
             "rating": r.rating,
             "delivery_fee": r.delivery_fee,
             "opening_time": r.opening_time,
             "closing_time": r.closing_time,
+            "eta_minutes": r.eta_minutes,
             "is_active": r.is_active,
             "owner_id": r.owner_id,
             "owner_phone": owner_phone_by_id.get(r.owner_id or 0),
@@ -2718,6 +2788,48 @@ async def admin_restaurants(
         },
     )
 
+
+
+@router.post("/restaurants/{restaurant_id}/edit")
+async def admin_restaurant_edit(
+    restaurant_id: int,
+    name: str = Form(...),
+    description: str = Form(""),
+    cuisine: str = Form(""),
+    address: str = Form(""),
+    lat: float = Form(6.9271),
+    lng: float = Form(79.8612),
+    phone_number: str = Form(""),
+    image_url: str = Form(""),
+    opening_time: str = Form(""),
+    closing_time: str = Form(""),
+    delivery_fee: float = Form(150),
+    eta_minutes: int = Form(30),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from decimal import Decimal
+    from app.models import Restaurant
+
+    q = await db.execute(select(Restaurant).where(Restaurant.id == restaurant_id))
+    r = q.scalars().first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+
+    r.name = name.strip() or r.name
+    r.description = description.strip() or None
+    r.cuisine = cuisine.strip() or None
+    r.address = address.strip() or None
+    r.lat = Decimal(str(lat))
+    r.lng = Decimal(str(lng))
+    r.phone_number = phone_number.strip() or r.phone_number
+    r.image_url = image_url.strip() or r.image_url
+    r.opening_time = opening_time.strip() or r.opening_time
+    r.closing_time = closing_time.strip() or r.closing_time
+    r.delivery_fee = Decimal(str(delivery_fee))
+    r.eta_minutes = eta_minutes
+    await db.commit()
+    return RedirectResponse(url="/admin/restaurants", status_code=303)
 
 
 @router.post("/restaurants/{restaurant_id}/approve")
@@ -3436,6 +3548,60 @@ async def admin_market_add_product(
     return RedirectResponse(url=f"/admin/market/{vendor_id}", status_code=303)
 
 
+@router.post("/market/{vendor_id}/edit")
+async def admin_market_vendor_edit(
+    vendor_id: int,
+    name: str = Form(...),
+    category: str = Form(""),
+    description: str = Form(""),
+    address: str = Form(""),
+    phone_number: str = Form(""),
+    opening_time: str = Form(""),
+    closing_time: str = Form(""),
+    delivery_fee: float = Form(250),
+    eta_minutes: int = Form(40),
+    commission_percentage: float = Form(10.00),
+    priority_level: str = Form("standard"),
+    is_featured: str = Form("no"),
+    bank_name: str = Form(""),
+    account_holder_name: str = Form(""),
+    account_number: str = Form(""),
+    branch_name: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from decimal import Decimal
+    from app.models import MarketVendor
+
+    q = await db.execute(select(MarketVendor).where(MarketVendor.id == vendor_id))
+    v = q.scalars().first()
+    if not v:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    v.name = name.strip() or v.name
+    v.category = category.strip() or v.category
+    v.description = description.strip() or None
+    v.address = address.strip() or v.address
+    v.phone_number = phone_number.strip() or v.phone_number
+    v.opening_time = opening_time.strip() or v.opening_time
+    v.closing_time = closing_time.strip() or v.closing_time
+    v.delivery_fee = Decimal(str(delivery_fee))
+    v.eta_minutes = eta_minutes
+    v.commission_percentage = Decimal(str(commission_percentage))
+    v.priority_level = priority_level.strip() or v.priority_level
+    v.is_featured = is_featured == "yes"
+    if bank_name.strip():
+        v.bank_name = bank_name.strip()
+    if account_holder_name.strip():
+        v.account_holder_name = account_holder_name.strip()
+    if account_number.strip():
+        v.account_number = account_number.strip()
+    if branch_name.strip():
+        v.branch_name = branch_name.strip()
+    await db.commit()
+    return RedirectResponse(url="/admin/market", status_code=303)
+
+
 @router.post("/market/{vendor_id}/suspend")
 async def admin_market_suspend(
     vendor_id: int,
@@ -4114,6 +4280,127 @@ async def _reports_aggregate(db: AsyncSession, start_dt: datetime, end_dt_exclus
             ],
             "trend": trend,
             "rows": serialized_rows,
+        }
+
+    elif type in ("revenue_rides", "revenue_delivery", "revenue_food", "revenue_market"):
+        # ── Single-service revenue detail ──────────────────────────────────
+        from decimal import Decimal as D
+        from app.models import (
+            FoodOrder, FoodOrderStatus, MarketOrder, MarketOrderStatus,
+        )
+        PLATFORM_CUT = D("0.20")
+
+        rows_by_day = {}
+        days_list = []
+        cur = start_dt.date()
+        end_d = (end_dt_exclusive - timedelta(seconds=1)).date()
+        while cur <= end_d:
+            k = cur.isoformat()
+            rows_by_day[k] = {"date": k, "gmv": 0.0, "commission": 0.0, "orders": 0}
+            days_list.append(k)
+            cur = cur + timedelta(days=1)
+
+        if type == "revenue_rides":
+            bday = cast(Booking.booked_at, Date)
+            bq = await db.execute(
+                select(bday, Booking.final_amount, Booking.fare_amount, Booking.platform_fee)
+                .where(
+                    Booking.booked_at >= start_dt,
+                    Booking.booked_at < end_dt_exclusive,
+                    Booking.status == BookingStatus.COMPLETED,
+                    Booking.is_flash == False,  # noqa: E712
+                )
+            )
+            for day, final_amount, fare_amount, platform_fee in bq.all():
+                r = rows_by_day.get(day.isoformat())
+                if r is None:
+                    continue
+                amt = float(final_amount if final_amount is not None else (fare_amount or 0))
+                fee = float(platform_fee or 0)
+                r["gmv"] += amt
+                r["commission"] += fee
+                r["orders"] += 1
+
+        elif type == "revenue_delivery":
+            bday = cast(Booking.booked_at, Date)
+            bq = await db.execute(
+                select(bday, Booking.final_amount, Booking.fare_amount, Booking.platform_fee)
+                .where(
+                    Booking.booked_at >= start_dt,
+                    Booking.booked_at < end_dt_exclusive,
+                    Booking.status == BookingStatus.COMPLETED,
+                    Booking.is_flash == True,  # noqa: E712
+                )
+            )
+            for day, final_amount, fare_amount, platform_fee in bq.all():
+                r = rows_by_day.get(day.isoformat())
+                if r is None:
+                    continue
+                amt = float(final_amount if final_amount is not None else (fare_amount or 0))
+                fee = float(platform_fee or 0)
+                r["gmv"] += amt
+                r["commission"] += fee
+                r["orders"] += 1
+
+        elif type == "revenue_food":
+            food_bucket = cast(FoodOrder.created_at, Date).label("day")
+            fq = await db.execute(
+                select(food_bucket, FoodOrder.final_amount, FoodOrder.delivery_fee)
+                .where(
+                    FoodOrder.created_at >= start_dt,
+                    FoodOrder.created_at < end_dt_exclusive,
+                    FoodOrder.status == FoodOrderStatus.DELIVERED,
+                )
+            )
+            for day, final_amount, delivery_fee in fq.all():
+                r = rows_by_day.get(day.isoformat())
+                if r is None:
+                    continue
+                amt = float(final_amount or 0)
+                comm = float((D(str(delivery_fee or 0)) * PLATFORM_CUT).quantize(D("0.01")))
+                r["gmv"] += amt
+                r["commission"] += comm
+                r["orders"] += 1
+
+        elif type == "revenue_market":
+            market_bucket = cast(MarketOrder.created_at, Date).label("day")
+            mq = await db.execute(
+                select(market_bucket, MarketOrder.final_amount, MarketOrder.delivery_fee)
+                .where(
+                    MarketOrder.created_at >= start_dt,
+                    MarketOrder.created_at < end_dt_exclusive,
+                    MarketOrder.status == MarketOrderStatus.DELIVERED,
+                )
+            )
+            for day, final_amount, delivery_fee in mq.all():
+                r = rows_by_day.get(day.isoformat())
+                if r is None:
+                    continue
+                amt = float(final_amount or 0)
+                comm = float((D(str(delivery_fee or 0)) * PLATFORM_CUT).quantize(D("0.01")))
+                r["gmv"] += amt
+                r["commission"] += comm
+                r["orders"] += 1
+
+        # Build trend (chronological) and rows (newest-first)
+        trend = []
+        for k in days_list:
+            r = rows_by_day[k]
+            trend.append({"date": r["date"], "gmv": round(r["gmv"], 2), "commission": round(r["commission"], 2)})
+        rows_sorted = list(reversed(trend))
+
+        total_gmv = sum(r["gmv"] for r in trend)
+        total_comm = sum(r["commission"] for r in trend)
+        total_orders = sum(rows_by_day[k]["orders"] for k in days_list)
+
+        return {
+            "totals": {
+                "gross_total": round(total_gmv, 2),
+                "commission_total": round(total_comm, 2),
+                "total_orders": total_orders,
+            },
+            "trend": trend,
+            "rows": rows_sorted,
         }
 
     else:
