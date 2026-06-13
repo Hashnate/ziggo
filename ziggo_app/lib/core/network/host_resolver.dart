@@ -22,10 +22,10 @@ class HostResolver {
   static const String _prefsKey = 'ziggo_api_host';
   static const String _envHost =
       String.fromEnvironment('API_HOST', defaultValue: '');
-  // Production server (nginx on port 80 → backend container). Override at
+  // Production server (nginx with SSL → backend container). Override at
   // build time with `--dart-define=API_HOST=http://your-dev-pc:8030` when
   // you want the app to hit a local dev backend instead.
-  static const String fallbackHost = 'http://187.127.152.141';
+  static const String fallbackHost = 'https://ziggo.lk';
 
   static String? _cached;
   static Future<String>? _inFlight;
@@ -51,6 +51,10 @@ class HostResolver {
     try {
       final prefs = await SharedPreferences.getInstance();
       saved = prefs.getString(_prefsKey);
+      if (saved != null && saved.contains('187.127.152.141')) {
+        await prefs.remove(_prefsKey);
+        saved = null;
+      }
     } catch (_) {}
     if (saved != null && saved.isNotEmpty && await _probe(saved)) {
       _cached = saved;
