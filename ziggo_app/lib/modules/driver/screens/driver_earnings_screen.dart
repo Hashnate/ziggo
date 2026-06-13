@@ -47,6 +47,75 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
     }
   }
 
+  Future<void> _handleSettleCommission(double commissionAmount) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Settle Commission', textAlign: TextAlign.center),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary, size: 48),
+            const SizedBox(height: 16),
+            const Text(
+              'Confirm payment of admin commission?',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Rs.${commissionAmount.toStringAsFixed(2)}',
+              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: AppColors.primary),
+            ),
+          ],
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Pay Now'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _loading = true);
+    try {
+      await ApiClient.instance.dio.post('/driver/settle-commission');
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Commission of Rs.${commissionAmount.toStringAsFixed(2)} settled successfully.'),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (_) {
+      setState(() => _loading = false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to settle commission. Please try again.'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   double _d(Map<String, dynamic> m, String k) =>
       (m[k] as num?)?.toDouble() ?? 0;
 
@@ -331,6 +400,43 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
           const Divider(height: 24, color: AppColors.divider),
           _rateRow('Paid out', 'Rs.${paid.toStringAsFixed(2)}'),
           _rateRow('Pending payout', 'Rs.${pending.toStringAsFixed(2)}'),
+          if (pending > 0 && commission > 0) ...[
+            const SizedBox(height: 18),
+            GestureDetector(
+              onTap: () => _handleSettleCommission(commission),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.24),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.payment_rounded, color: Colors.white, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Settle Commission (Rs.${commission.toStringAsFixed(2)})',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -392,7 +498,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
               ),
               const Spacer(),
               Text(
-                'You keep ${driverShare.toStringAsFixed(0)}%',
+                'You keep ${driverShare.toStringAsFixed(1).replaceAll('.0', '')}%',
                 style: const TextStyle(
                   color: kDriverGold,
                   fontWeight: FontWeight.w900,
@@ -432,9 +538,9 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
             _rateRow('Surge multiplier', '×${surge.toStringAsFixed(2)}'),
           const Divider(height: 22, color: AppColors.divider),
           _rateRow('App usage charge (commission)',
-              '${platformPct.toStringAsFixed(0)}%',
+              '${platformPct.toStringAsFixed(1).replaceAll('.0', '')}%',
               negative: true),
-          _rateRow('Your share', '${driverShare.toStringAsFixed(0)}%',
+          _rateRow('Your share', '${driverShare.toStringAsFixed(1).replaceAll('.0', '')}%',
               highlight: true),
           if (example != null) ...[
             const SizedBox(height: 16),

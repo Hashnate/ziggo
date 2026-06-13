@@ -34,6 +34,9 @@ class DriverProvider extends ChangeNotifier {
   LatLng? _currentLocation;
   LatLng? get currentLocation => _currentLocation;
 
+  List<Map<String, dynamic>> _incentives = [];
+  List<Map<String, dynamic>> get incentives => _incentives;
+
   Timer? _locationTimer;
 
   Future<void> bootstrap(String token) async {
@@ -43,6 +46,7 @@ class DriverProvider extends ChangeNotifier {
     await loadActive();
     await loadActiveFoodOrder();
     await loadActiveMarketOrder();
+    await loadIncentives();
     await _pushLocationOnce();
   }
 
@@ -164,6 +168,7 @@ class DriverProvider extends ChangeNotifier {
       if (status == 'delivered' || status == 'cancelled') {
         _activeMarketOrder = null;
         await loadProfile();
+        await loadIncentives();
       } else {
         await loadActiveMarketOrder();
       }
@@ -259,6 +264,7 @@ class DriverProvider extends ChangeNotifier {
       if (status == 'delivered' || status == 'cancelled') {
         _activeFoodOrder = null;
         await loadProfile();
+        await loadIncentives();
       } else {
         await loadActiveFoodOrder();
       }
@@ -338,6 +344,7 @@ class DriverProvider extends ChangeNotifier {
       if (status == 'completed' || status == 'cancelled') {
         _activeRide = null;
         await loadProfile();
+        await loadIncentives();
       }
       notifyListeners();
     } on DioException {
@@ -353,6 +360,14 @@ class DriverProvider extends ChangeNotifier {
   void dismissPendingRequest() {
     _pendingRequest = null;
     notifyListeners();
+  }
+
+  Future<void> loadIncentives() async {
+    try {
+      final resp = await ApiClient.instance.dio.get('/driver/incentives');
+      _incentives = List<Map<String, dynamic>>.from(resp.data);
+      notifyListeners();
+    } catch (_) {}
   }
 
   @override

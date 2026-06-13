@@ -300,11 +300,23 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
 
-  void _centerOnDriver() {
+  Future<void> _centerOnDriver() async {
     if (!mounted) return;
-    final loc = context.read<DriverProvider>().currentLocation;
+    final driver = context.read<DriverProvider>();
+    final loc = driver.currentLocation;
     if (loc != null) {
       _mapController.moveTo(loc, zoom: 16);
+    } else {
+      await _ensureLocationReady();
+      try {
+        final pos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+        );
+        final newLoc = LatLng(pos.latitude, pos.longitude);
+        _mapController.moveTo(newLoc, zoom: 16);
+      } catch (_) {
+        // ignore
+      }
     }
   }
 
@@ -511,6 +523,38 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               alignment: Alignment.bottomCenter,
               child: _buildPickMeIdle(driver),
             ),
+          // GPS / Geolocator button to center/find driver location
+          Positioned(
+            right: 14,
+            bottom: (ride != null || food != null || market != null)
+                ? (ride != null
+                    ? (_activeRideExpanded ? 360.0 : 160.0)
+                    : 300.0)
+                : (_incentivesExpanded ? 360.0 : 160.0),
+            child: GestureDetector(
+              onTap: _centerOnDriver,
+              child: Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.12),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.my_location_rounded,
+                  color: AppColors.primary,
+                  size: 24,
+                ),
+              ),
+            ),
+          ),
           // BRD: speed display + mute toggle + incident-report quick action.
           // Only shown while on an active trip (mirrors the PickMe driving HUD).
           if (driver.isOnline && (ride != null || food != null || market != null))
@@ -752,12 +796,25 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
 
+  String _getRemainingText(int limitDays) {
+    if (limitDays <= 1) {
+      final hoursLeft = 24 - DateTime.now().hour;
+      return "$hoursLeft hours left";
+    } else {
+      return "$limitDays days left";
+    }
+  }
+
   Widget _incentivesPanel(DriverProvider driver) {
     final todayRides = (driver.profile?['today_rides'] as num?)?.toInt() ?? 0;
-    const goal = 3;
-    final progress = (todayRides / goal).clamp(0.0, 1.0);
-
+    final incentives = driver.incentives;
     final expanded = _incentivesExpanded;
+
+    final hasIncentives = incentives.isNotEmpty;
+    final mainTitle = hasIncentives ? (incentives.first['title'] ?? 'Incentives') : 'Driver Incentives';
+    final mainRemaining = hasIncentives
+        ? _getRemainingText((incentives.first['limit_days'] as num?)?.toInt() ?? 1)
+        : '';
 
     return Container(
       width: double.infinity,
@@ -803,26 +860,28 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  const Text(
-                    'One Day Incentives',
-                    style: TextStyle(
+                  Text(
+                    mainTitle,
+                    style: const TextStyle(
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.w900,
                       fontSize: 15,
                     ),
                   ),
                   const Spacer(),
-                  const Icon(Icons.access_time_rounded, color: AppColors.primary, size: 15),
-                  const SizedBox(width: 5),
-                  const Text(
-                    '14 hours',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
+                  if (mainRemaining.isNotEmpty) ...[
+                    const Icon(Icons.access_time_rounded, color: AppColors.primary, size: 15),
+                    const SizedBox(width: 5),
+                    Text(
+                      mainRemaining,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
+                    const SizedBox(width: 8),
+                  ],
                   Icon(
                     expanded
                         ? Icons.keyboard_arrow_down_rounded
@@ -841,29 +900,87 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceMuted,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  '1. Complete 3 trips to earn an additional LKR 350.',
-                                  style: TextStyle(
-                                    color: AppColors.textPrimary,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13,
-                                    height: 1.3,
+                          if (!hasIncentives)
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceMuted,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Text(
+                                'No active incentive milestones at the moment. Keep driving!',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                  height: 1.3,
+                                ),
+                              ),
+                            )
+                          else
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxHeight: 220),
+                              child: Scrollbar(
+                                child: SingleChildScrollView(
+                                  child: Column(
+                                    children: List.generate(incentives.length, (index) {
+                                      final inc = incentives[index];
+                                      final title = inc['title'] ?? 'Incentive';
+                                      final limitDays = (inc['limit_days'] as num?)?.toInt() ?? 1;
+                                      final trips = (inc['trips_required'] as num?)?.toInt() ?? 3;
+                                      final reward = (inc['reward_amount'] as num?)?.toDouble() ?? 350.0;
+                                      final currentTrips = todayRides;
+                                      final progressVal = (currentTrips / trips).clamp(0.0, 1.0);
+                                      final timeText = _getRemainingText(limitDays);
+
+                                      return Padding(
+                                        padding: EdgeInsets.only(bottom: index == incentives.length - 1 ? 0 : 12),
+                                        child: Container(
+                                          padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.surfaceMuted,
+                                            borderRadius: BorderRadius.circular(16),
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Expanded(
+                                                    child: Text(
+                                                      '${index + 1}. Complete $trips trips to earn an additional LKR ${reward.toStringAsFixed(0)}.',
+                                                      style: const TextStyle(
+                                                        color: AppColors.textPrimary,
+                                                        fontWeight: FontWeight.w700,
+                                                        fontSize: 13,
+                                                        height: 1.3,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    timeText,
+                                                    style: const TextStyle(
+                                                      color: AppColors.textSecondary,
+                                                      fontWeight: FontWeight.w700,
+                                                      fontSize: 11,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 16),
+                                              _incentiveProgress(currentTrips, trips, progressVal),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    }),
                                   ),
                                 ),
-                                const SizedBox(height: 16),
-                                _incentiveProgress(todayRides, goal, progress),
-                              ],
+                              ),
                             ),
-                          ),
                           if (driver.isOnline) ...[
                             const SizedBox(height: 18),
                             const Text(
@@ -1679,20 +1796,21 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final paymentMethod = (ride['payment_method'] ?? 'cash').toString().toLowerCase();
     final amount = (ride['final_amount'] as num?)?.toDouble() ?? 0.0;
 
-    final grossTotal = (ride['final_amount'] as num?)?.toDouble() ?? 0.0;
-    final appUsage = (ride['app_usage_charges'] as num?)?.toDouble() ?? (ride['platform_fee'] as num?)?.toDouble() ?? 0.0;
     final passDeductible = (ride['passenger_deductible'] as num?)?.toDouble() ?? 0.0;
+    final grossTotal = (ride['final_amount'] as num?)?.toDouble() ?? 0.0;
+    final tripFare = (ride['fare_amount'] as num?)?.toDouble() ?? (grossTotal - passDeductible);
+    final appUsage = (ride['app_usage_charges'] as num?)?.toDouble() ?? (ride['platform_fee'] as num?)?.toDouble() ?? 0.0;
     final totalDeductions = (ride['deductions'] as num?)?.toDouble() ?? (appUsage + passDeductible);
     final driverEarnings = (ride['driver_earnings'] as num?)?.toDouble() ?? (grossTotal - totalDeductions);
 
-    Widget buildItemizedRow(String label, String val, {bool isNegative = false, bool isBold = false}) {
+    Widget buildItemizedRow(String label, String val, {bool isNegative = false, bool isBold = false, Color? customColor}) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(label, style: TextStyle(fontSize: 12, color: isBold ? AppColors.textPrimary : AppColors.textSecondary, fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
-            Text(isNegative ? '-Rs.$val' : 'Rs.$val', style: TextStyle(fontSize: 12, color: isNegative ? AppColors.error : (isBold ? AppColors.primary : AppColors.textPrimary), fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+            Text(isNegative ? '-Rs.$val' : 'Rs.$val', style: TextStyle(fontSize: 12, color: customColor ?? (isNegative ? AppColors.error : (isBold ? AppColors.primary : AppColors.textPrimary)), fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
           ],
         ),
       );
@@ -1715,14 +1833,18 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               const SizedBox(height: 16),
               const Divider(height: 1),
               const SizedBox(height: 8),
+              buildItemizedRow('Trip Fare', tripFare.toStringAsFixed(2)),
+              if (passDeductible > 0)
+                buildItemizedRow('Passenger Deductibles', passDeductible.toStringAsFixed(2)),
               buildItemizedRow('Gross Total', grossTotal.toStringAsFixed(2), isBold: true),
+              const Divider(height: 8),
               buildItemizedRow('App Usage Charges', appUsage.toStringAsFixed(2), isNegative: true),
               if (passDeductible > 0)
-                buildItemizedRow('Passenger Deductible', passDeductible.toStringAsFixed(2), isNegative: true),
-              buildItemizedRow('Total Deductions', totalDeductions.toStringAsFixed(2), isNegative: true, isBold: true),
+                buildItemizedRow('Passenger Deductibles', passDeductible.toStringAsFixed(2), isNegative: true),
+              buildItemizedRow('Deduction', totalDeductions.toStringAsFixed(2), isNegative: true, isBold: true),
               const Divider(height: 1),
               const SizedBox(height: 8),
-              buildItemizedRow('Your Net Earnings', driverEarnings.toStringAsFixed(2), isBold: true),
+              buildItemizedRow('Your Earnings', driverEarnings.toStringAsFixed(2), isBold: true, customColor: AppColors.primary),
             ],
           ),
           actionsAlignment: MainAxisAlignment.center,
@@ -1761,14 +1883,18 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               const SizedBox(height: 16),
               const Divider(height: 1),
               const SizedBox(height: 8),
+              buildItemizedRow('Trip Fare', tripFare.toStringAsFixed(2)),
+              if (passDeductible > 0)
+                buildItemizedRow('Passenger Deductibles', passDeductible.toStringAsFixed(2)),
               buildItemizedRow('Gross Total', grossTotal.toStringAsFixed(2), isBold: true),
+              const Divider(height: 8),
               buildItemizedRow('App Usage Charges', appUsage.toStringAsFixed(2), isNegative: true),
               if (passDeductible > 0)
-                buildItemizedRow('Passenger Deductible', passDeductible.toStringAsFixed(2), isNegative: true),
-              buildItemizedRow('Total Deductions', totalDeductions.toStringAsFixed(2), isNegative: true, isBold: true),
+                buildItemizedRow('Passenger Deductibles', passDeductible.toStringAsFixed(2), isNegative: true),
+              buildItemizedRow('Deduction', totalDeductions.toStringAsFixed(2), isNegative: true, isBold: true),
               const Divider(height: 1),
               const SizedBox(height: 8),
-              buildItemizedRow('Your Net Earnings', driverEarnings.toStringAsFixed(2), isBold: true),
+              buildItemizedRow('Your Earnings', driverEarnings.toStringAsFixed(2), isBold: true, customColor: AppColors.primary),
             ],
           ),
           actionsAlignment: MainAxisAlignment.center,

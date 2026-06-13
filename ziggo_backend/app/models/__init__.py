@@ -25,6 +25,7 @@ from .misc import (
     EmergencyAlert,
     Incident,
     DriverPayout,
+    DriverIncentive,
 )
 from .food import (
     Restaurant,
@@ -78,6 +79,7 @@ __all__ = [
     "EmergencyAlert",
     "Incident",
     "DriverPayout",
+    "DriverIncentive",
     "Restaurant",
     "MenuCategory",
     "MenuItem",
