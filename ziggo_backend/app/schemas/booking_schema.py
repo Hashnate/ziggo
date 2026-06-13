@@ -144,6 +144,7 @@ class BookingResponse(BaseModel):
     cancellation_reason: Optional[str] = None
 
     customer_rating: Optional[int] = None
+    customer_feedback: Optional[str] = None
     driver: Optional[DriverMini] = None
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
