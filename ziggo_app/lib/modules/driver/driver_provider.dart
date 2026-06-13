@@ -352,6 +352,19 @@ class DriverProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> rateBooking({required int bookingId, required int rating, String? feedback}) async {
+    try {
+      await ApiClient.instance.dio.post(
+        '/bookings/$bookingId/rate',
+        data: {'rating': rating, if (feedback != null) 'feedback': feedback},
+      );
+      notifyListeners();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   void setPendingRequest(Map<String, dynamic> request) {
     _pendingRequest = request;
     notifyListeners();

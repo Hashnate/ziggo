@@ -1384,6 +1384,18 @@ async def rate_booking(
             raise HTTPException(status_code=403, detail="Not your booking")
         b.driver_rating = body.rating
         b.driver_feedback = body.feedback
+        # update customer aggregate rating
+        cq = await db.execute(select(Customer).where(Customer.id == b.customer_id))
+        cust = cq.scalars().first()
+        if cust and cust.user_id:
+            uq = await db.execute(select(User).where(User.id == cust.user_id))
+            cuser = uq.scalars().first()
+            if cuser:
+                prev = float(cuser.rating or 0)
+                total = cuser.total_rides or 0
+                new_total = total + 1
+                cuser.rating = Decimal(str(round((prev * total + body.rating) / new_total, 2)))
+                cuser.total_rides = new_total
 
     await db.commit()
     await db.refresh(b)

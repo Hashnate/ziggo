@@ -25,6 +25,7 @@ import 'driver_documents_screen.dart';
 import 'driver_earnings_screen.dart';
 import 'driver_profile_screen.dart';
 import 'driver_registration_screen.dart';
+import 'driver_rating_screen.dart';
 
 // Ziggo light driver UI tokens — clean light brand surfaces + gold accent.
 const Color _kPanel = AppColors.surface;       // clean white (matching surface)
@@ -1903,7 +1904,16 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       if (confirmed != true) return;
     }
     
-    driver.updateRideStatus('completed');
+    final bookingId = ride['id'] as int;
+    await driver.updateRideStatus('completed');
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DriverRatingScreen(bookingId: bookingId),
+        ),
+      );
+    }
   }
 
   Widget _parcelInfoBanner(Map<String, dynamic> ride) {
