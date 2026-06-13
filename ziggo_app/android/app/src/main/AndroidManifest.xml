@@ -6,7 +6,8 @@
     <application
         android:label="ziggo_app"
         android:name="${applicationName}"
-        android:icon="@mipmap/launcher_icon">
+        android:icon="@mipmap/launcher_icon"
+        android:usesCleartextTraffic="true">
         <meta-data android:name="com.google.android.geo.API_KEY" android:value="${MAPS_API_KEY}"/>
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"

@@ -51,7 +51,7 @@ class HostResolver {
     try {
       final prefs = await SharedPreferences.getInstance();
       saved = prefs.getString(_prefsKey);
-      if (saved != null && saved.contains('187.127.152.141')) {
+      if (saved != null && saved.contains(':8000')) {
         await prefs.remove(_prefsKey);
         saved = null;
       }
@@ -64,6 +64,7 @@ class HostResolver {
     final defaults = <String>{
       'http://localhost:$_port',
       fallbackHost,
+      'http://187.127.152.141',
       if (!kIsWeb) 'http://10.0.2.2:$_port',
     }.toList();
     final fromDefaults = await _probeMany(defaults);
