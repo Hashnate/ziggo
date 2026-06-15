@@ -71,6 +71,7 @@
         </div>
     </a>
 
+    {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
     <a href="/admin/finance" class="zi-stat block group">
         <div class="flex items-start justify-between gap-2">
             <div class="min-w-0">
@@ -85,10 +86,12 @@
             </div>
         </div>
     </a>
+    {% endif %}
 </div>
 
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
     <!-- Revenue Chart -->
+    {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
     <div class="lg:col-span-2 zi-card p-5">
         <div class="flex items-center justify-between mb-5">
             <div>
@@ -104,9 +107,10 @@
             <canvas id="revenueChart"></canvas>
         </div>
     </div>
+    {% endif %}
 
     <!-- Activity stream -->
-    <div class="zi-card p-5">
+    <div class="{% if request.state.admin and request.state.admin.admin_role == 'data_entry' %}lg:col-span-3{% endif %} zi-card p-5">
         <div class="flex items-center justify-between mb-3">
             <h3 class="text-lg font-black text-ziggo-ink">Today's activity</h3>
             <span class="zi-chip" style="background: #DCFCE7; color: #15803D;">Live</span>
@@ -203,75 +207,92 @@
         </div>
     </a>
 </div>
+
+{% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
+<div id="revenueChartData" class="hidden"
+     data-labels='{{ stats.revenue_chart_labels | tojson }}'
+     data-revenue='{{ stats.revenue_chart_data | tojson }}'>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    const ctx = document.getElementById('revenueChart').getContext('2d');
-    const grad = ctx.createLinearGradient(0, 0, 0, 300);
-    grad.addColorStop(0, 'rgba(37, 99, 235, 0.22)');
-    grad.addColorStop(1, 'rgba(37, 99, 235, 0.00)');
-    const drawChart = () => new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: {{ stats.revenue_chart_labels | tojson }},
-            datasets: [{
-                label: 'Revenue (Rs.)',
-                data: {{ stats.revenue_chart_data | tojson }},
-                borderColor: '#1E40AF',
-                backgroundColor: grad,
-                fill: true,
-                tension: 0.4,
-                borderWidth: 2.5,
-                pointBackgroundColor: '#fff',
-                pointBorderColor: '#1E40AF',
-                pointBorderWidth: 2,
-                pointRadius: 3,
-                pointHoverRadius: 6,
-                pointHoverBackgroundColor: '#1E40AF',
-                pointHoverBorderColor: '#fff'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    backgroundColor: '#0F172A',
-                    padding: 12,
-                    cornerRadius: 12,
-                    titleFont: { family: 'Sora', weight: '700' },
-                    bodyFont: { family: 'Sora', weight: '500' },
-                }
+    (function() {
+        const chartEl = document.getElementById('revenueChart');
+        const dataEl = document.getElementById('revenueChartData');
+        if (!chartEl || !dataEl) return;
+
+        const labels = JSON.parse(dataEl.getAttribute('data-labels') || '[]');
+        const revenueData = JSON.parse(dataEl.getAttribute('data-revenue') || '[]');
+
+        const ctx = chartEl.getContext('2d');
+        const grad = ctx.createLinearGradient(0, 0, 0, 300);
+        grad.addColorStop(0, 'rgba(37, 99, 235, 0.22)');
+        grad.addColorStop(1, 'rgba(37, 99, 235, 0.00)');
+
+        const drawChart = () => new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Revenue (Rs.)',
+                    data: revenueData,
+                    borderColor: '#1E40AF',
+                    backgroundColor: grad,
+                    fill: true,
+                    tension: 0.4,
+                    borderWidth: 2.5,
+                    pointBackgroundColor: '#fff',
+                    pointBorderColor: '#1E40AF',
+                    pointBorderWidth: 2,
+                    pointRadius: 3,
+                    pointHoverRadius: 6,
+                    pointHoverBackgroundColor: '#1E40AF',
+                    pointHoverBorderColor: '#fff'
+                }]
             },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: { color: 'rgba(15, 23, 42, 0.04)', drawBorder: false },
-                    ticks: { font: { family: 'Sora', weight: '500', size: 11 }, color: '#94A3B8' }
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#0F172A',
+                        padding: 12,
+                        cornerRadius: 12,
+                        titleFont: { family: 'Sora', weight: '700' },
+                        bodyFont: { family: 'Sora', weight: '500' },
+                    }
                 },
-                x: {
-                    grid: { display: false, drawBorder: false },
-                    ticks: { font: { family: 'Sora', weight: '500', size: 11 }, color: '#94A3B8', maxRotation: 0, autoSkip: true, maxTicksLimit: 12 }
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(15, 23, 42, 0.04)', drawBorder: false },
+                        ticks: { font: { family: 'Sora', weight: '500', size: 11 }, color: '#94A3B8' }
+                    },
+                    x: {
+                        grid: { display: false, drawBorder: false },
+                        ticks: { font: { family: 'Sora', weight: '500', size: 11 }, color: '#94A3B8', maxRotation: 0, autoSkip: true, maxTicksLimit: 12 }
+                    }
                 }
             }
+        });
+
+        // If there's no revenue in this period, show a clean empty state instead of a flat 0 line
+        if (!revenueData.some(function (v) { return v > 0; })) {
+            chartEl.parentElement.innerHTML =
+                '<div class="h-full flex flex-col items-center justify-center text-center px-4">' +
+                '<i class="fas fa-chart-line text-3xl text-ziggo-faint mb-3"></i>' +
+                '<p class="text-sm font-bold text-ziggo-ink">No revenue data for this period yet</p>' +
+                '<p class="text-xs text-ziggo-faint mt-1">Completed bookings will appear here.</p></div>';
+        } else if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(drawChart);
+        } else {
+            drawChart();
         }
-    });
-    // If there's no revenue in this period, show a clean empty state instead of a flat 0 line
-    const _revData = {{ stats.revenue_chart_data | tojson }};
-    if (!_revData.some(function (v) { return v > 0; })) {
-        document.getElementById('revenueChart').parentElement.innerHTML =
-            '<div class="h-full flex flex-col items-center justify-center text-center px-4">' +
-            '<i class="fas fa-chart-line text-3xl text-ziggo-faint mb-3"></i>' +
-            '<p class="text-sm font-bold text-ziggo-ink">No revenue data for this period yet</p>' +
-            '<p class="text-xs text-ziggo-faint mt-1">Completed bookings will appear here.</p></div>';
-    } else if (document.fonts && document.fonts.ready) {
-        document.fonts.ready.then(drawChart);
-    } else {
-        drawChart();
-    }
+    })();
 </script>
 {% endblock %}

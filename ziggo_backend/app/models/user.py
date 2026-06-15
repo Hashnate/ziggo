@@ -23,12 +23,19 @@ class UserRole(str, enum.Enum):
     MARKET_OWNER = "market_owner"
 
 
+class AdminRole(str, enum.Enum):
+    SUPERADMIN = "superadmin"
+    ADMIN = "admin"
+    DATA_ENTRY = "data_entry"
+
+
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
     phone_number = Column(String(20), unique=True, nullable=False, index=True)
     role = Column(SQLEnum(UserRole, name="user_role"), nullable=False)
+    admin_role = Column(String(30), nullable=True)
     full_name = Column(String(100))
     email = Column(String(120))
     profile_photo = Column(String(255))

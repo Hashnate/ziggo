@@ -66,6 +66,7 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("drivers", "current_heading", "NUMERIC(5, 2)"),
     ("users", "password", "VARCHAR(100)"),
     ("bookings", "otp", "VARCHAR(4)"),
+    ("users", "admin_role", "VARCHAR(30)"),
 )
 
 

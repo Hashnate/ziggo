@@ -35,20 +35,27 @@ from app.models import (
 CMB_LAT, CMB_LNG = 6.9271, 79.8612
 
 
-async def upsert_user(db, phone, role, full_name=None, email=None):
+async def upsert_user(db, phone, role, full_name=None, email=None, admin_role=None):
     q = await db.execute(select(User).where(User.phone_number == phone))
     u = q.scalars().first()
     if u:
+        if admin_role and u.admin_role != admin_role:
+            u.admin_role = admin_role
         return u
-    u = User(phone_number=phone, role=role, full_name=full_name, email=email, is_active=True)
+    u = User(phone_number=phone, role=role, full_name=full_name, email=email, admin_role=admin_role, is_active=True)
     db.add(u)
     await db.flush()
     return u
 
 
 async def seed_admin(db):
-    admin = await upsert_user(db, "0700000000", UserRole.ADMIN, full_name="Ziggo Admin", email="admin@ziggo.com")
-    return admin
+    superadmin = await upsert_user(db, "0700000000", UserRole.ADMIN, full_name="Ziggo Superadmin", email="superadmin@ziggo.com", admin_role="superadmin")
+    superadmin.password = "admin123"
+    admin = await upsert_user(db, "0700000001", UserRole.ADMIN, full_name="Ziggo Admin User", email="admin@ziggo.com", admin_role="admin")
+    admin.password = "admin123"
+    data_entry = await upsert_user(db, "0700000002", UserRole.ADMIN, full_name="Ziggo Data Entry", email="dataentry@ziggo.com", admin_role="data_entry")
+    data_entry.password = "admin123"
+    return superadmin
 
 
 async def seed_fare_settings(db):

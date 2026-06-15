@@ -194,6 +194,10 @@ class _AdminRedirect(Exception):
     """
 
 
+class _AdminForbidden(Exception):
+    """Raised by role checks when the authenticated admin lacks permissions."""
+
+
 async def current_admin(request: Request, db: AsyncSession = Depends(get_db)) -> User:
     token = request.cookies.get(SESSION_COOKIE)
     if not token:
@@ -205,6 +209,19 @@ async def current_admin(request: Request, db: AsyncSession = Depends(get_db)) ->
     admin = q.scalars().first()
     if not admin:
         raise _AdminRedirect()
+    request.state.admin = admin
+    return admin
+
+
+async def require_superadmin(request: Request, admin: User = Depends(current_admin)) -> User:
+    if (admin.admin_role or "admin") != "superadmin":
+        raise _AdminForbidden()
+    return admin
+
+
+async def require_superadmin_or_admin(request: Request, admin: User = Depends(current_admin)) -> User:
+    if (admin.admin_role or "admin") not in ("superadmin", "admin"):
+        raise _AdminForbidden()
     return admin
 
 
@@ -2025,7 +2042,7 @@ async def admin_courier(
 async def admin_fare_settings(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin),
 ):
     from app.models import FareSetting
 
@@ -2049,7 +2066,7 @@ async def admin_fare_settings_update(
     boost: float = Form(0),
     passenger_deductible: float = Form(0),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin),
 ):
     from app.models import FareSetting
     from decimal import Decimal
@@ -2099,7 +2116,7 @@ async def admin_branding_assets(db: AsyncSession = Depends(get_db)):
 async def admin_settings_get(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin),
 ):
     s = await _get_or_create_settings(db)
     return templates.TemplateResponse(
@@ -2163,7 +2180,7 @@ async def admin_settings_save(
     logo: UploadFile | None = File(None),
     favicon: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(current_admin),
+    admin: User = Depends(require_superadmin),
 ):
     from decimal import Decimal
 
@@ -6786,7 +6803,7 @@ async def admin_incentives_edit(
 async def admin_incentives_delete(
     id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     from app.models import DriverIncentive
     q = await db.execute(select(DriverIncentive).where(DriverIncentive.id == id))
@@ -6795,4 +6812,99 @@ async def admin_incentives_delete(
         await db.delete(inc)
         await db.commit()
     return RedirectResponse(url="/admin/incentives", status_code=303)
+
+
+@router.get("/forbidden", response_class=HTMLResponse)
+async def admin_forbidden(request: Request):
+    return templates.TemplateResponse(request, "forbidden.html", {"request": request})
+
+
+@router.get("/admins", response_class=HTMLResponse)
+async def admin_list_admins(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    q = await db.execute(select(User).where(User.role == UserRole.ADMIN).order_by(User.id.desc()))
+    admins = q.scalars().all()
+    return templates.TemplateResponse(
+        request, "admins.html",
+        {"request": request, "active_page": "settings", "admins": admins}
+    )
+
+
+@router.post("/admins/new")
+async def admin_create_admin(
+    phone_number: str = Form(...),
+    full_name: str = Form(...),
+    email: str = Form(...),
+    admin_role: str = Form(...),
+    password: str = Form("admin123"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    # check if phone number exists
+    existing = await db.execute(select(User).where(User.phone_number == phone_number))
+    if existing.scalars().first():
+        # Redirect back to admins page with error query parameter
+        import urllib.parse
+        return RedirectResponse(url=f"/admin/admins?error={urllib.parse.quote('Phone number already in use')}", status_code=303)
+
+    new_admin = User(
+        phone_number=phone_number,
+        role=UserRole.ADMIN,
+        admin_role=admin_role,
+        full_name=full_name,
+        email=email,
+        password=password,
+        is_active=True
+    )
+    db.add(new_admin)
+    await db.commit()
+    return RedirectResponse(url="/admin/admins", status_code=303)
+
+
+@router.post("/admins/{admin_id}/edit")
+async def admin_edit_admin(
+    admin_id: int,
+    full_name: str = Form(...),
+    email: str = Form(...),
+    admin_role: str = Form(...),
+    password: str = Form(None),
+    is_active: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    q = await db.execute(select(User).where(User.id == admin_id, User.role == UserRole.ADMIN))
+    admin = q.scalars().first()
+    if not admin:
+        raise HTTPException(status_code=404, detail="Admin user not found")
+
+    admin.full_name = full_name
+    admin.email = email
+    admin.admin_role = admin_role
+    admin.is_active = (is_active == "on" or is_active == "1")
+    if password and password.strip():
+        admin.password = password.strip()
+
+    await db.commit()
+    return RedirectResponse(url="/admin/admins", status_code=303)
+
+
+@router.post("/admins/{admin_id}/delete")
+async def admin_delete_admin(
+    admin_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_superadmin),
+):
+    if admin_id == current_user.id:
+        import urllib.parse
+        return RedirectResponse(url=f"/admin/admins?error={urllib.parse.quote('You cannot delete yourself')}", status_code=303)
+
+    q = await db.execute(select(User).where(User.id == admin_id, User.role == UserRole.ADMIN))
+    admin = q.scalars().first()
+    if admin:
+        await db.delete(admin)
+        await db.commit()
+    return RedirectResponse(url="/admin/admins", status_code=303)
 

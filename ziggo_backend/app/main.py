@@ -13,7 +13,7 @@ from .config import settings
 from .database import engine
 from .api.v1 import auth, customer, driver, admin, bookings, ws, event, food, market, market_vendor, misc, payments, restaurant, trip_share, public, corporate
 from ziggo_admin_panel import routes as admin_panel_routes
-from ziggo_admin_panel.routes import _AdminRedirect
+from ziggo_admin_panel.routes import _AdminRedirect, _AdminForbidden
 from .services.schema_sync import ensure_schema
 from .services.auto_cancel import auto_cancel_loop
 from .services import fcm_service
@@ -73,6 +73,14 @@ async def health():
 @app.exception_handler(_AdminRedirect)
 async def admin_redirect_handler(request: Request, exc: _AdminRedirect):
     return RedirectResponse(url="/admin/login", status_code=303)
+
+
+@app.exception_handler(_AdminForbidden)
+async def admin_forbidden_handler(request: Request, exc: _AdminForbidden):
+    if "json" in request.headers.get("accept", "") or request.url.path.startswith("/api/"):
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=403, content={"detail": "Access denied: Insufficient permissions"})
+    return RedirectResponse(url="/admin/forbidden", status_code=303)
 
 
 # JSON API

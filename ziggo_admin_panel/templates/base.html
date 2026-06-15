@@ -412,6 +412,7 @@
                 <i class="fas fa-percent"></i><span>Promotions</span>
             </a>
 
+            {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
             <p class="zi-nav-group">Finance</p>
             <a href="/admin/reports" class="sidebar-item {% if active_page == 'reports' %}active{% endif %}">
                 <i class="fas fa-chart-bar"></i><span>Reports</span>
@@ -428,6 +429,7 @@
             <a href="/admin/corporate" class="sidebar-item {% if active_page == 'corporate' %}active{% endif %}">
                 <i class="fas fa-building"></i><span>Corporate</span>
             </a>
+            {% endif %}
 
             <p class="zi-nav-group">Support &amp; Safety</p>
             <a href="/admin/emergencies" class="sidebar-item {% if active_page == 'emergencies' %}active{% endif %}">
@@ -450,9 +452,14 @@
             <a href="/admin/notifications" class="sidebar-item {% if active_page == 'notifications' %}active{% endif %}">
                 <i class="fas fa-bell"></i><span>Notifications</span>
             </a>
-            <a href="/admin/settings" class="sidebar-item {% if active_page == 'settings' %}active{% endif %}">
+            {% if not request.state.admin or request.state.admin.admin_role == 'superadmin' %}
+            <a href="/admin/settings" class="sidebar-item {% if active_page == 'settings' and not request.url.path.endswith('/admins') %}active{% endif %}">
                 <i class="fas fa-cog"></i><span>Settings</span>
             </a>
+            <a href="/admin/admins" class="sidebar-item {% if request.url.path.endswith('/admins') %}active{% endif %}">
+                <i class="fas fa-users-cog"></i><span>Manage Admins</span>
+            </a>
+            {% endif %}
         </nav>
 
         <div class="p-3">
