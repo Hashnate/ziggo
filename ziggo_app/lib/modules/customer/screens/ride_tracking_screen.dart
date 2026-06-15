@@ -25,6 +25,7 @@ class RideTrackingScreen extends StatefulWidget {
 class _RideTrackingScreenState extends State<RideTrackingScreen> {
   final ZiggoMapController _mapController = ZiggoMapController();
   bool _navigatedToRating = false;
+  bool _driverCancelled = false;
   List<LatLng> _routePoints = const [];
   List<DirectionStep> _routeSteps = const [];
   String? _routeKey;
@@ -245,6 +246,9 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
     final active = booking.activeBooking;
 
     if (active == null) {
+      if (_driverCancelled) {
+        return const Scaffold(body: SizedBox.shrink());
+      }
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
@@ -272,6 +276,18 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
     if (_lastStatus != status) {
       if (status == 'arrived' || status == 'started') {
         _sheetExpanded = false;
+      }
+      if (status == 'arrived' && active['otp'] != null) {
+        final otp = active['otp'].toString();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showArrivedOtpDialog(otp);
+        });
+      }
+      if (status == 'cancelled') {
+        _driverCancelled = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showDriverCancelledDialog();
+        });
       }
       _lastStatus = status;
     }
@@ -321,17 +337,18 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                 // Wandering nearby drivers (only while SEARCHING) — render
                 // first so pickup/drop pins paint on top.
                 for (final d in _nearbyDrivers)
-                  pinMarker(
-                    point: LatLng(
-                      (d['lat'] as num).toDouble(),
-                      (d['lng'] as num).toDouble(),
+                  if (active == null || active['service_type'] == null || d['vehicle_type'] == active['service_type'])
+                    pinMarker(
+                      point: LatLng(
+                        (d['lat'] as num).toDouble(),
+                        (d['lng'] as num).toDouble(),
+                      ),
+                      icon: Icons.local_taxi_rounded,
+                      color: AppColors.primary,
+                      size: 30,
+                      assetPath: _vehicleAsset(d['vehicle_type'] as String?),
+                      rotation: (d['heading'] as num?)?.toDouble() ?? 0.0,
                     ),
-                    icon: Icons.local_taxi_rounded,
-                    color: AppColors.primary,
-                    size: 30,
-                    assetPath: _vehicleAsset(d['vehicle_type'] as String?),
-                    rotation: (d['heading'] as num?)?.toDouble() ?? 0.0,
-                  ),
                 pinMarker(
                   point: pickup,
                   icon: Icons.my_location_rounded,
@@ -490,6 +507,136 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                 setState(() => _sheetExpanded = true);
               }
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDriverCancelledDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline_rounded, color: AppColors.error, size: 32),
+            SizedBox(width: 10),
+            Text(
+              'Ride Cancelled',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                color: AppColors.error,
+                fontSize: 20,
+              ),
+            ),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Unfortunately, the driver has cancelled your ride. Please try booking another ride.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                if (mounted) {
+                  Navigator.of(context).pop();
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: const Text(
+                'GO HOME',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 14,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showArrivedOtpDialog(String otp) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.check_circle_rounded, color: AppColors.success, size: 28),
+            SizedBox(width: 8),
+            Text('Driver Arrived!', style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Your driver is at the pickup point. Share this OTP with the driver to start your trip:',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 14, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                gradient: AppColors.primaryGradient,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                otp,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 36,
+                  letterSpacing: 6,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('GOT IT', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),

@@ -33,7 +33,11 @@ class BookingProvider extends ChangeNotifier {
       if (event == 'booking_update') {
         final bid = data['booking_id'];
         if (_activeBooking != null && _activeBooking!['id'] == bid) {
-          _activeBooking = {..._activeBooking!, 'status': data['status']};
+          _activeBooking = {
+            ..._activeBooking!,
+            'status': data['status'],
+            if (data['otp'] != null) 'otp': data['otp'],
+          };
           notifyListeners();
         }
         // Lazy refresh
