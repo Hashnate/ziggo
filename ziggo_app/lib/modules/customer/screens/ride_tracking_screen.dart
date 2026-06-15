@@ -1341,9 +1341,11 @@ class _ActionRow extends StatelessWidget {
                   trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
                   contentPadding: EdgeInsets.zero,
                   onTap: () async {
+                    final provider = context.read<BookingProvider>();
+                    final navigator = Navigator.of(context);
                     Navigator.pop(ctx);
-                    await context.read<BookingProvider>().cancelActive();
-                    if (context.mounted) Navigator.pop(context);
+                    navigator.pop();
+                    await provider.cancelActive(reason: r);
                   },
                 )),
                 const SizedBox(height: 10),
