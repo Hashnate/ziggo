@@ -3308,7 +3308,6 @@ class _Drawer extends StatelessWidget {
                 _drawerTile(
                   icon: Icons.insights_rounded,
                   label: 'My performance',
-                  chevronDown: true,
                   onTap: onHistory,
                 ),
                 _drawerTile(
