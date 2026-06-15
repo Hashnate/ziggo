@@ -2152,6 +2152,11 @@ async def admin_settings_save(
     multi_stop_free_minutes: int = Form(3),
     multi_stop_excess_per_minute: float = Form(5),
     multi_stop_fee_per_stop: float = Form(50),
+    # Peak Hours
+    peak_is_active: str = Form(""),
+    peak_start_hour: int = Form(17),
+    peak_end_hour: int = Form(20),
+    peak_extra_amount: float = Form(0.00),
     # Branding
     logo: UploadFile | None = File(None),
     favicon: UploadFile | None = File(None),
@@ -2193,6 +2198,47 @@ async def admin_settings_save(
     s.multi_stop_free_minutes = max(0, int(multi_stop_free_minutes))
     s.multi_stop_excess_per_minute = Decimal(str(multi_stop_excess_per_minute))
     s.multi_stop_fee_per_stop = Decimal(str(multi_stop_fee_per_stop))
+
+    # Peak Hours saving
+    peak_active = peak_is_active == "on" or peak_is_active == "1"
+    peak_changed = (
+        s.peak_is_active != peak_active or
+        s.peak_start_hour != max(0, min(23, int(peak_start_hour))) or
+        s.peak_end_hour != max(0, min(23, int(peak_end_hour))) or
+        s.peak_extra_amount != Decimal(str(peak_extra_amount))
+    )
+    s.peak_is_active = peak_active
+    s.peak_start_hour = max(0, min(23, int(peak_start_hour)))
+    s.peak_end_hour = max(0, min(23, int(peak_end_hour)))
+    s.peak_extra_amount = Decimal(str(peak_extra_amount))
+
+    # Notify drivers if peak hours are active and configuration changed
+    if peak_active and peak_changed:
+        from app.models import Driver
+        drivers_q = await db.execute(select(Driver.user_id))
+        driver_user_ids = [row[0] for row in drivers_q.all()]
+        title = "Peak Hours Surcharge Active!"
+        body = f"Get ready! An extra Rs. {float(s.peak_extra_amount):.2f} will be added to your rides from {s.peak_start_hour}:00 to {s.peak_end_hour}:00 Colombo time."
+        
+        # Save system notifications
+        from app.models import Notification
+        for uid in driver_user_ids:
+            db.add(Notification(
+                user_id=uid,
+                title=title,
+                body=body,
+                type="system",
+                data="{}"
+            ))
+        
+        # Push notifications in background
+        from app.services import fcm_service
+        async def send_pushes():
+            from app.database import AsyncSessionLocal
+            async with AsyncSessionLocal() as push_db:
+                await fcm_service.send_to_users(push_db, driver_user_ids, title, body, {"event": "peak_hours_active"})
+        import asyncio
+        asyncio.create_task(send_pushes())
 
     new_logo = await _save_branding_asset(logo, "Logo")
     if new_logo:

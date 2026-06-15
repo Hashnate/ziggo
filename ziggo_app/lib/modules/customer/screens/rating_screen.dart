@@ -15,7 +15,7 @@ class RatingScreen extends StatefulWidget {
 }
 
 class _RatingScreenState extends State<RatingScreen> with TickerProviderStateMixin {
-  int _stars = 5;
+  int _stars = 0;
   final _feedbackCtrl = TextEditingController();
   bool _busy = false;
 
@@ -40,6 +40,7 @@ class _RatingScreenState extends State<RatingScreen> with TickerProviderStateMix
   }
 
   Future<void> _submit() async {
+    if (_stars == 0) return;
     setState(() => _busy = true);
     final booking = context.read<BookingProvider>();
     bool ok = false;
@@ -185,23 +186,25 @@ class _RatingScreenState extends State<RatingScreen> with TickerProviderStateMix
                         );
                       }),
                     ),
-                    const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: _ratingColor.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(100),
-                      ),
-                      child: Text(
-                        _ratingLabel,
-                        style: TextStyle(
-                          color: _ratingColor,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 13,
-                          letterSpacing: 0.5,
+                    if (_stars > 0) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _ratingColor.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: Text(
+                          _ratingLabel,
+                          style: TextStyle(
+                            color: _ratingColor,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 13,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -243,7 +246,7 @@ class _RatingScreenState extends State<RatingScreen> with TickerProviderStateMix
                 icon: Icons.send_rounded,
                 gold: true,
                 busy: _busy,
-                onPressed: _submit,
+                onPressed: _stars == 0 ? null : _submit,
               ),
               const SizedBox(height: 12),
               TextButton(

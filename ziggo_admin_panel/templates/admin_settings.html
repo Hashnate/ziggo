@@ -111,6 +111,26 @@
                             <label class="block text-xs font-black text-ziggo-muted mb-1">Unreasonable Penalty – Rider (Rs.)</label>
                             <input type="number" step="0.01" min="0" name="rider_penalty" value="{{ s.rider_penalty or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                         </div>
+                        <hr class="border-ziggo-line my-4">
+                        <h4 class="text-sm font-black text-ziggo-ink mb-2">Peak Hours Settings</h4>
+                        <label class="flex items-center gap-3 cursor-pointer mb-3">
+                            <input type="checkbox" name="peak_is_active" {% if s.peak_is_active %}checked{% endif %} class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
+                            <span class="text-sm font-bold text-ziggo-ink">Enable Peak Hours Surcharge</span>
+                        </label>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-xs font-black text-ziggo-muted mb-1">Peak Start Hour (0–23)</label>
+                                <input type="number" min="0" max="23" name="peak_start_hour" value="{{ s.peak_start_hour if s.peak_start_hour is not none else 17 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-black text-ziggo-muted mb-1">Peak End Hour (0–23)</label>
+                                <input type="number" min="0" max="23" name="peak_end_hour" value="{{ s.peak_end_hour if s.peak_end_hour is not none else 20 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-black text-ziggo-muted mb-1">Peak Extra Amount (Rs.)</label>
+                                <input type="number" step="0.01" min="0" name="peak_extra_amount" value="{{ s.peak_extra_amount or 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                            </div>
+                        </div>
                     </div>
                 </section>
 

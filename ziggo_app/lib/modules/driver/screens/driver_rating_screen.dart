@@ -16,10 +16,6 @@ class DriverRatingScreen extends StatefulWidget {
 }
 
 class _DriverRatingScreenState extends State<DriverRatingScreen> with TickerProviderStateMixin {
-  int _stars = 5;
-  final _feedbackCtrl = TextEditingController();
-  bool _busy = false;
-
   late final AnimationController _checkController;
   late final Animation<double> _checkScale;
 
@@ -44,7 +40,6 @@ class _DriverRatingScreenState extends State<DriverRatingScreen> with TickerProv
   void dispose() {
     _pollingTimer?.cancel();
     _checkController.dispose();
-    _feedbackCtrl.dispose();
     super.dispose();
   }
 
@@ -76,79 +71,15 @@ class _DriverRatingScreenState extends State<DriverRatingScreen> with TickerProv
     });
   }
 
-  Future<void> _submit() async {
-    setState(() => _busy = true);
-    final driver = context.read<DriverProvider>();
-    bool ok = false;
-    String? caughtError;
-    try {
-      ok = await driver.rateBooking(
-        bookingId: widget.bookingId,
-        rating: _stars,
-        feedback: _feedbackCtrl.text.trim().isEmpty ? null : _feedbackCtrl.text.trim(),
-      );
-    } catch (e) {
-      caughtError = e.toString();
-    }
-    if (!mounted) return;
-    setState(() => _busy = false);
-    if (ok) {
-      Navigator.popUntil(context, (r) => r.isFirst);
-      return;
-    }
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        icon: const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 36),
-        title: const Text('Could not submit', textAlign: TextAlign.center),
-        content: Text(
-          caughtError ?? 'Failed to submit rating. Please try again.',
-          textAlign: TextAlign.center,
-        ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String get _ratingLabel {
-    switch (_stars) {
-      case 1:
-        return 'Terrible customer';
-      case 2:
-        return 'Bad behavior';
-      case 3:
-        return 'Okay passenger';
-      case 4:
-        return 'Good passenger';
-      case 5:
-        return 'Excellent customer';
-      default:
-        return '';
-    }
-  }
-
-  Color get _ratingColor {
-    if (_stars <= 2) return AppColors.error;
-    if (_stars == 3) return AppColors.warning;
-    return AppColors.success;
-  }
-
   Widget _buildCustomerReviewSection() {
     if (_loadingBooking && _bookingData == null) {
       return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 16),
+        padding: EdgeInsets.symmetric(vertical: 24),
         child: Center(
           child: SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(strokeWidth: 2),
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(strokeWidth: 2.5),
           ),
         ),
       );
@@ -159,30 +90,30 @@ class _DriverRatingScreenState extends State<DriverRatingScreen> with TickerProv
 
     if (rating == null) {
       return Container(
-        margin: const EdgeInsets.only(bottom: 20),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        margin: const EdgeInsets.only(bottom: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         decoration: BoxDecoration(
           color: AppColors.primary.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(color: AppColors.primary.withOpacity(0.15)),
         ),
         child: Row(
           children: [
             const SizedBox(
-              width: 16,
-              height: 16,
+              width: 18,
+              height: 18,
               child: CircularProgressIndicator(
-                strokeWidth: 1.5,
+                strokeWidth: 2.0,
                 valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Expanded(
               child: Text(
                 'Waiting for passenger\'s review...',
                 style: TextStyle(
                   color: AppColors.primary.withOpacity(0.8),
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -221,7 +152,7 @@ class _DriverRatingScreenState extends State<DriverRatingScreen> with TickerProv
 
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
@@ -234,7 +165,7 @@ class _DriverRatingScreenState extends State<DriverRatingScreen> with TickerProv
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: ratingColor.withOpacity(0.1),
                   shape: BoxShape.circle,
@@ -242,22 +173,22 @@ class _DriverRatingScreenState extends State<DriverRatingScreen> with TickerProv
                 child: Icon(
                   Icons.person_pin_rounded,
                   color: ratingColor,
-                  size: 20,
+                  size: 24,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               const Expanded(
                 child: Text(
                   'Passenger\'s Review for You',
                   style: TextStyle(
                     fontWeight: FontWeight.w900,
-                    fontSize: 14,
+                    fontSize: 15,
                     color: AppColors.textPrimary,
                   ),
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: ratingColor.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(100),
@@ -267,38 +198,38 @@ class _DriverRatingScreenState extends State<DriverRatingScreen> with TickerProv
                   style: TextStyle(
                     color: ratingColor,
                     fontWeight: FontWeight.w900,
-                    fontSize: 11,
+                    fontSize: 12,
                     letterSpacing: 0.5,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Row(
             children: List.generate(5, (i) {
               final filled = i < stars;
               return Icon(
                 filled ? Icons.star_rounded : Icons.star_outline_rounded,
                 color: filled ? ratingColor : AppColors.divider,
-                size: 24,
+                size: 28,
               );
             }),
           ),
           if (feedback != null && feedback.toString().trim().isNotEmpty) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 14),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: AppColors.background,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
               ),
               child: Text(
                 '"$feedback"',
                 style: const TextStyle(
                   color: AppColors.textSecondary,
-                  fontSize: 13,
+                  fontSize: 14,
                   fontStyle: FontStyle.italic,
                   fontWeight: FontWeight.w600,
                 ),
@@ -320,7 +251,7 @@ class _DriverRatingScreenState extends State<DriverRatingScreen> with TickerProv
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 28),
+              const SizedBox(height: 40),
               Center(
                 child: ScaleTransition(
                   scale: _checkScale,
@@ -357,117 +288,26 @@ class _DriverRatingScreenState extends State<DriverRatingScreen> with TickerProv
                   letterSpacing: -0.5,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               const Text(
-                'How was the passenger? Rate your experience.',
+                'Thank you for completing the ride safely. Here is the feedback left by your passenger.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: AppColors.textSecondary,
                   fontWeight: FontWeight.w600,
+                  fontSize: 14,
                 ),
+              ),
+              const SizedBox(height: 32),
+              _buildCustomerReviewSection(),
+              const SizedBox(height: 24),
+              PrimaryButton(
+                label: 'GO TO DASHBOARD',
+                icon: Icons.home_rounded,
+                gold: false,
+                onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
               ),
               const SizedBox(height: 24),
-              _buildCustomerReviewSection(),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(22),
-                  boxShadow: AppStyles.shadowSm,
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: List.generate(5, (i) {
-                        final filled = i < _stars;
-                        return GestureDetector(
-                          onTap: () => setState(() => _stars = i + 1),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            curve: Curves.easeOutBack,
-                            padding: const EdgeInsets.all(2),
-                            child: Icon(
-                              filled ? Icons.star_rounded : Icons.star_outline_rounded,
-                              color: filled ? AppColors.primary : AppColors.divider,
-                              size: filled ? 44 : 40,
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                    const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: _ratingColor.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(100),
-                      ),
-                      child: Text(
-                        _ratingLabel,
-                        style: TextStyle(
-                          color: _ratingColor,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 13,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Padding(
-                padding: EdgeInsets.only(left: 4, bottom: 8),
-                child: Text(
-                  'FEEDBACK (OPTIONAL)',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textTertiary,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.4,
-                  ),
-                ),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: AppColors.cardBorder),
-                ),
-                child: TextField(
-                  controller: _feedbackCtrl,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
-                    hintText: 'Any comments about the ride?',
-                    filled: false,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    contentPadding: EdgeInsets.all(16),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 28),
-              PrimaryButton(
-                label: 'SUBMIT REVIEW',
-                icon: Icons.send_rounded,
-                gold: false,
-                busy: _busy,
-                onPressed: _submit,
-              ),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
-                child: const Text(
-                  'Skip',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
             ],
           ),
         ),
