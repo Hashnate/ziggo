@@ -922,73 +922,60 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                                 ),
                               ),
                             )
-                          else
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxHeight: 220),
-                              child: Scrollbar(
-                                child: SingleChildScrollView(
-                                  child: Column(
-                                    children: List.generate(incentives.length, (index) {
-                                      final inc = incentives[index];
-                                      final title = inc['title'] ?? 'Incentive';
-                                      final limitDays = (inc['limit_days'] as num?)?.toInt() ?? 1;
-                                      final trips = (inc['trips_required'] as num?)?.toInt() ?? 3;
-                                      final reward = (inc['reward_amount'] as num?)?.toDouble() ?? 350.0;
-                                      final currentTrips = todayRides;
-                                      final progressVal = (currentTrips / trips).clamp(0.0, 1.0);
-                                      final timeText = _getRemainingText(limitDays);
+                          else ...[
+                            SizedBox(
+                              height: 150,
+                              child: PageView.builder(
+                                controller: PageController(initialPage: 0),
+                                itemCount: incentives.length,
+                                itemBuilder: (context, index) {
+                                  final inc = incentives[index];
+                                  final activeIndex = index + 1;
+                                  final activeTrips = (inc['trips_required'] as num).toInt();
+                                  final activeReward = (inc['reward_amount'] as num).toDouble();
+                                  final previousTrips = index > 0 ? (incentives[index - 1]['trips_required'] as num).toInt() : 0;
 
-                                      return Padding(
-                                        padding: EdgeInsets.only(bottom: index == incentives.length - 1 ? 0 : 12),
-                                        child: Container(
-                                          padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.surfaceMuted,
-                                            borderRadius: BorderRadius.circular(16),
-                                          ),
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Row(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Expanded(
-                                                    child: Text(
-                                                      '${index + 1}. Complete $trips trips to earn an additional LKR ${reward.toStringAsFixed(0)}.',
-                                                      style: const TextStyle(
-                                                        color: AppColors.textPrimary,
-                                                        fontWeight: FontWeight.w700,
-                                                        fontSize: 13,
-                                                        height: 1.3,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  Text(
-                                                    timeText,
-                                                    style: const TextStyle(
-                                                      color: AppColors.textSecondary,
-                                                      fontWeight: FontWeight.w700,
-                                                      fontSize: 11,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 16),
-                                              _incentiveProgress(currentTrips, trips, progressVal),
-                                            ],
+                                  // Calculate progress fraction for this specific tier
+                                  double progressFraction = 0.0;
+                                  if (todayRides >= activeTrips) {
+                                    progressFraction = 1.0;
+                                  } else if (todayRides > previousTrips) {
+                                    progressFraction = (todayRides - previousTrips) / (activeTrips - previousTrips);
+                                  }
+                                  progressFraction = progressFraction.clamp(0.0, 1.0);
+
+                                  return Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.surfaceMuted,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '$activeIndex. Complete $activeTrips trips to earn an additional LKR ${activeReward.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}.',
+                                          style: const TextStyle(
+                                            color: AppColors.textPrimary,
+                                            fontWeight: FontWeight.w900,
+                                            fontSize: 14,
+                                            height: 1.3,
                                           ),
                                         ),
-                                      );
-                                    }),
-                                  ),
-                                ),
+                                        const SizedBox(height: 20),
+                                        _unifiedIncentivesProgress(todayRides, previousTrips, activeTrips, progressFraction),
+                                      ],
+                                    ),
+                                  );
+                                },
                               ),
                             ),
+                          ],
                           if (driver.isOnline) ...[
                             const SizedBox(height: 18),
                             const Text(
-                              'Shortcuts',
+                               'Shortcuts',
                               style: TextStyle(
                                 color: AppColors.textPrimary,
                                 fontWeight: FontWeight.w900,
@@ -1017,71 +1004,141 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
 
-  Widget _incentiveProgress(int rides, int goal, double progress) {
+  Widget _unifiedIncentivesProgress(int todayRides, int start, int end, double progressFraction) {
     return LayoutBuilder(
-      builder: (context, c) {
-        final w = c.maxWidth;
-        final knobX = ((w - 22) * progress).clamp(0.0, w - 22);
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SizedBox(
-              height: 22,
-              child: Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.centerLeft,
-                children: [
+            Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.centerLeft,
+              children: [
+                // 1. Progress Bar Background Track with outline
+                Container(
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD1D5DB),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF4B5563), width: 1.5),
+                  ),
+                ),
+                // 2. Orange Filled Progress with outline
+                if (progressFraction > 0)
                   Container(
-                    height: 8,
+                    height: 24,
+                    width: width * progressFraction,
                     decoration: BoxDecoration(
-                      color: AppColors.divider,
-                      borderRadius: BorderRadius.circular(8),
+                      color: const Color(0xFFF97316),
+                      borderRadius: BorderRadius.horizontal(
+                        left: const Radius.circular(12),
+                        right: Radius.circular(progressFraction >= 1.0 ? 12 : 0),
+                      ),
+                      border: Border.all(color: const Color(0xFF4B5563), width: 1.5),
                     ),
                   ),
-                  Container(
-                    height: 8,
-                    width: (w * progress).clamp(0.0, w),
-                    decoration: BoxDecoration(
-                      color: _kGold,
-                      borderRadius: BorderRadius.circular(8),
+                // 3. Centered progress text inside the bar
+                Positioned.fill(
+                  child: Center(
+                    child: Text(
+                      '$todayRides/$end',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black54,
+                            offset: Offset(0, 1),
+                            blurRadius: 2,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  Positioned.fill(
-                    child: Center(
-                      child: Text(
-                        '$rides/$goal',
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 11,
+                ),
+                // 4. Milestone Markers (concentric circles on the track)
+                // Left marker (start) - only if start > 0
+                if (start > 0)
+                  Positioned(
+                    left: 0,
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFF4B5563), width: 2),
+                      ),
+                      alignment: Alignment.center,
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFF9CA3AF), width: 1.5),
                         ),
                       ),
                     ),
                   ),
-                  Positioned(
-                    left: knobX,
+                // Right marker (end)
+                Positioned(
+                  right: 0,
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFF4B5563), width: 2),
+                    ),
+                    alignment: Alignment.center,
                     child: Container(
-                      width: 22,
-                      height: 22,
+                      width: 12,
+                      height: 12,
                       decoration: BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
-                        border: Border.all(color: _kGold, width: 3),
+                        border: Border.all(color: const Color(0xFF9CA3AF), width: 1.5),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            // 5. Milestone labels below the circles
+            SizedBox(
+              height: 20,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  if (start > 0)
+                    Positioned(
+                      left: 0,
+                      child: Text(
+                        '$start',
+                        style: const TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                  Positioned(
+                    right: 0,
+                    child: Text(
+                      '$end',
+                      style: const TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 10,
                       ),
                     ),
                   ),
                 ],
-              ),
-            ),
-            const SizedBox(height: 6),
-            const Center(
-              child: Text(
-                'Goal: 3 trips',
-                style: TextStyle(
-                  color: AppColors.textTertiary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 10,
-                ),
               ),
             ),
           ],

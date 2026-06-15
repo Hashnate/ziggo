@@ -168,6 +168,11 @@ class SystemSettings(Base):
     multi_stop_free_minutes = Column(Integer, nullable=False, default=3)
     multi_stop_excess_per_minute = Column(DECIMAL(10, 2), nullable=False, default=5)
     multi_stop_fee_per_stop = Column(DECIMAL(10, 2), nullable=False, default=50)
+    # Peak Hours
+    peak_start_hour = Column(Integer, default=17)
+    peak_end_hour = Column(Integer, default=20)
+    peak_extra_amount = Column(DECIMAL(10, 2), default=0.00)
+    peak_is_active = Column(Boolean, nullable=False, default=False)
     # Branding
     logo_url = Column(String(255))
     favicon_url = Column(String(255))

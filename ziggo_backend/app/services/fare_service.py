@@ -280,6 +280,23 @@ async def calculate_fare(
     fare_val = max(raw, min_fare)
     fare_val += boost_val
 
+    # Peak hours surcharge check
+    peak_surcharge = 0.0
+    if ss and ss.peak_is_active:
+        colombo_tz = timezone(timedelta(hours=5, minutes=30))
+        current_hour = datetime.now(colombo_tz).hour
+        in_peak = False
+        start = ss.peak_start_hour
+        end = ss.peak_end_hour
+        if start is not None and end is not None:
+            if start <= end:
+                in_peak = start <= current_hour < end
+            else:
+                in_peak = current_hour >= start or current_hour < end
+        if in_peak:
+            peak_surcharge = float(ss.peak_extra_amount or 0.0)
+            fare_val += peak_surcharge
+
     # BRD: CD-19 — per-stop fee compensates the driver for the detour.
     stop_fee_total = 0.0
     if clean_stops:
@@ -333,6 +350,7 @@ async def calculate_fare(
         "promo_code": promo_applied,
         "surge_multiplier": surge,
         "flash_surcharge": round(flash_surcharge, 2),
+        "peak_surcharge": round(peak_surcharge, 2),
         # BRD: CD-19 — surface multi-stop snapshot so the UI can render it
         "stop_count": len(clean_stops),
         "stops_fee": round(stop_fee_total, 2),
