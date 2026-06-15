@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ziggo Feature Comparison Table</title>
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        h2 {
+            margin-top: 0;
+            color: #0f172a;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+        th, td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        th {
+            background-color: #f1f5f9;
+            color: #475569;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 0.05em;
+        }
+        tr:hover {
+            background-color: #f8fafc;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge-brd {
+            background-color: #e0f2fe;
+            color: #0369a1;
+        }
+        .badge-additional {
+            background-color: #fef3c7;
+            color: #d97706;
+        }
+        .badge-completed {
+            background-color: #dcfce7;
+            color: #15803d;
+        }
+        .req-id {
+            font-weight: bold;
+            color: #0f172a;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Ziggo Platform - BRD vs. Implementation Comparison Table</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Req ID</th>
+                    <th>Feature Description</th>
+                    <th>Nature</th>
+                    <th>Status</th>
+                    <th>Implementation Details / Scope</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="req-id">CD-01</td>
+                    <td>User registration (phone number + OTP, email/password)</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Mobile app auth module (`lib/modules/auth`), backend auth router (`app/api/v1/auth.py`)</td>
+                </tr>
+                <tr>
+                    <td class="req-id">CD-02</td>
+                    <td>Profile management (name, photo, contact details, saved places)</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Screen `edit_profile_screen.dart` and backend customer profile updates</td>
+                </tr>
+                <tr>
+                    <td class="req-id">CD-03</td>
+                    <td>Switch Passenger / Driver Mode using in-app toggle button</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Mode-toggle navigation state in `lib/modules/common` navigation logic</td>
+                </tr>
+                <tr>
+                    <td class="req-id">CD-04</td>
+                    <td>Set pickup & drop-off via GPS or map pin (Google Maps API)</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Managed via `choose_location_screen.dart` and `location_search_screen.dart` using Google Maps SDK</td>
+                </tr>
+                <tr>
+                    <td class="req-id">CD-05</td>
+                    <td>Choose vehicle type (for passengers) and fare estimate</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Implemented in `vehicle_selection_screen.dart` and `fare_estimate_screen.dart`</td>
+                </tr>
+                <tr>
+                    <td class="req-id">CD-06</td>
+                    <td>View upfront fare estimate and confirm ride booking</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Upfront pricing calculation loaded in `confirm_pickup_screen.dart`</td>
+                </tr>
+                <tr>
+                    <td class="req-id">CD-07</td>
+                    <td>Request a ride and match with nearest available driver</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Handled by match-making dispatch loops in the backend (`app/api/v1/bookings.py`)</td>
+                </tr>
+                <tr>
+                    <td class="req-id">CD-08</td>
+                    <td>Turn on/off availability (for drivers)</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Online availability toggle switch in `driver_home_screen.dart`</td>
+                </tr>
+                <tr>
+                    <td class="req-id">CD-09</td>
+                    <td>Accept or reject incoming ride requests (for drivers)</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Incoming ride request popups and accept/reject actions in `driver_home_screen.dart`</td>
+                </tr>
+                <tr>
+                    <td class="req-id">CD-10</td>
+                    <td>GPS navigation for pickups and drop-offs using Google Maps API</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>GPS navigation rendering using Google Maps SDK in `ride_tracking_screen.dart`</td>
+                </tr>
+                <tr>
+                    <td class="req-id">CD-11</td>
+                    <td>Collect payment (cash, card, or wallet) and confirm payment</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Trip completion slide triggers checkout / receipt screen in `driver_home_screen.dart`</td>
+                </tr>
+                <tr>
+                    <td class="req-id">CD-12</td>
+                    <td>Payment processing via PayHere (cash/card/wallet payments)</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Payment processing via PayHere supporting cash/card/wallet payments in `payhere_checkout_screen.dart`</td>
+                </tr>
+                <tr>
+                    <td class="req-id">CD-13</td>
+                    <td>View earnings and trip history (for drivers)</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Earnings summaries and trip history in `driver_earnings_screen.dart` and `driver_history_screen.dart`</td>
+                </tr>
+                <tr>
+                    <td class="req-id">CD-14</td>
+                    <td>In-app communication (call) with the other party</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>In-app voice call triggers integrated via `url_launcher` on ride tracking screens</td>
+                </tr>
+                <tr>
+                    <td class="req-id">CD-15</td>
+                    <td>Rate and review the other party after the trip</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Mutual ratings & feedback screens (`rating_screen.dart` and `driver_rating_screen.dart`)</td>
+                </tr>
+                <tr>
+                    <td class="req-id">CD-16</td>
+                    <td>View trip history and receipts (both customers and drivers)</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Ride history listing screens (`ride_history_screen.dart` and `driver_history_screen.dart`)</td>
+                </tr>
+                <tr>
+                    <td class="req-id">CD-17</td>
+                    <td>Emergency SOS button and share trip with contacts</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Emergency SOS triggers in active trip screens and backend `/trip_share` location sharing</td>
+                </tr>
+                <tr>
+                    <td class="req-id">CD-18</td>
+                    <td>Receive push notifications via Firebase for booking status, alerts</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Push notifications handler in `notifications_provider.dart` and Firebase subscription stubs</td>
+                </tr>
+                <tr>
+                    <td class="req-id">AD-01</td>
+                    <td>Secure admin login with role-based access control</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Admin login sessions via secure signed cookies in `routes.py` and RBAC logic checks</td>
+                </tr>
+                <tr>
+                    <td class="req-id">AD-02</td>
+                    <td>Dashboard showing active trips, online users, revenue, etc.</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Interactive dashboard in `dashboard.html` showing active counts, revenue, and Chart.js graphs</td>
+                </tr>
+                <tr>
+                    <td class="req-id">AD-03</td>
+                    <td>Manage customer/driver accounts (approve, suspend, delete)</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Accounts management in admin views (`drivers.html`, `customers.html`) and backend CRUD routers</td>
+                </tr>
+                <tr>
+                    <td class="req-id">AD-04</td>
+                    <td>Configure fare rules, promo codes, and discounts</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Fare settings configuration, promo manager in settings tabs (`routes.py` and settings models)</td>
+                </tr>
+                <tr>
+                    <td class="req-id">AD-05</td>
+                    <td>View and monitor all trips, including customer and driver actions</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Centralized trips monitor table (`trips.html`) and backend real-time monitoring</td>
+                </tr>
+                <tr>
+                    <td class="req-id">AD-06</td>
+                    <td>Manage complaints, disputes, and refunds</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Support ticket/dispute resolutions under complaints management views (`complaints.html`)</td>
+                </tr>
+                <tr>
+                    <td class="req-id">AD-07</td>
+                    <td>Reports and analytics for trips, revenue, driver performance</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Analytical suites and database metrics summary routing in admin pages</td>
+                </tr>
+                <tr>
+                    <td class="req-id">AD-08</td>
+                    <td>Manage commissions and driver payouts</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Commission setup, driver balance payouts interfaces in `/admin/payouts`</td>
+                </tr>
+                <tr>
+                    <td class="req-id">BE-01</td>
+                    <td>Authentication and authorization for all user roles (token-based)</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>JWT token-based authentication and dependency checks in `app/api/v1/auth.py`</td>
+                </tr>
+                <tr>
+                    <td class="req-id">BE-02</td>
+                    <td>Ride-matching engine — locate nearest available drivers and dispatch</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Match-making and location routing algorithm in backend bookings service</td>
+                </tr>
+                <tr>
+                    <td class="req-id">BE-03</td>
+                    <td>Real-time location tracking and updates using Google Maps API</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Real-time updates and location telemetry streamed via WebSockets `/ws` endpoints</td>
+                </tr>
+                <tr>
+                    <td class="req-id">BE-04</td>
+                    <td>Fare calculation engine — distance, time, vehicle type, surge</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Multi-factor pricing engine calculating base + distance + time + surge rates</td>
+                </tr>
+                <tr>
+                    <td class="req-id">BE-05</td>
+                    <td>Payment processing and wallet management through PayHere API</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Transactional database operations for wallets and PayHere callbacks in `/payments`</td>
+                </tr>
+                <tr>
+                    <td class="req-id">BE-06</td>
+                    <td>Trip lifecycle management (requested → accepted → ongoing → complete)</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Trip state machine managing booking lifecycles (`app/models/misc.py`)</td>
+                </tr>
+                <tr>
+                    <td class="req-id">BE-07</td>
+                    <td>Notifications service via Firebase for push alerts</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Firebase push notification worker with local console fallback logger</td>
+                </tr>
+                <tr>
+                    <td class="req-id">BE-08</td>
+                    <td>Ratings and reviews storage and aggregation</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Ratings and reviews aggregation, aggregate rating updates on database schemas</td>
+                </tr>
+                <tr>
+                    <td class="req-id">BE-09</td>
+                    <td>Commission and payout calculation</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Commission shares calculated dynamically on trip completion database triggers</td>
+                </tr>
+                <tr>
+                    <td class="req-id">BE-10</td>
+                    <td>Data storage for users, trips, vehicles, transactions</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>SQLAlchemy models mapping PostgreSQL database tables for all super app schemas</td>
+                </tr>
+                <tr>
+                    <td class="req-id">BE-11</td>
+                    <td>APIs consumed by Customer/Driver App and Admin Panel</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>RESTful endpoints in `app/api/v1/` serving JSON payloads to app/admin clients</td>
+                </tr>
+                <tr>
+                    <td class="req-id">BE-12</td>
+                    <td>Logging, audit trail, and error handling</td>
+                    <td><span class="badge badge-brd">BRD</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Audit logs, file-appended traceback handling, and centralized API error responses</td>
+                </tr>
+                <tr>
+                    <td class="req-id">Food Delivery</td>
+                    <td>Order meals from 10,000+ local restaurants</td>
+                    <td><span class="badge badge-additional">Additional</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Customer food checkout (`food_home_screen.dart`) and backend restaurant manager (`restaurant.py`)</td>
+                </tr>
+                <tr>
+                    <td class="req-id">Merchant Admin</td>
+                    <td>Restaurant Menu and Order manager</td>
+                    <td><span class="badge badge-additional">Additional</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Menu & orders control screens (`restaurant_home_screen.dart`, `restaurant_menu_screen.dart`)</td>
+                </tr>
+                <tr>
+                    <td class="req-id">Mart Grocery</td>
+                    <td>Local groceries, dark stores & pharmacy products</td>
+                    <td><span class="badge badge-additional">Additional</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Market catalog and cart checkouts (`market_home_screen.dart`, `market_checkout_screen.dart`)</td>
+                </tr>
+                <tr>
+                    <td class="req-id">Mart Vendor</td>
+                    <td>Store catalog stock and product manager</td>
+                    <td><span class="badge badge-additional">Additional</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Store inventory and stock manager screens (`market_vendor_home_screen.dart`)</td>
+                </tr>
+                <tr>
+                    <td class="req-id">Parcel Flash</td>
+                    <td>Same-day courier deliveries (Document/S/M/L)</td>
+                    <td><span class="badge badge-additional">Additional</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Same-day courier booking flow screens (`flash_home_screen.dart`, `flash_checkout_screen.dart`)</td>
+                </tr>
+                <tr>
+                    <td class="req-id">Truck Mover</td>
+                    <td>Moving Lorries with 1-3 helpers option + insurance</td>
+                    <td><span class="badge badge-additional">Additional</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Lorry variants select UI and helpers configurations screen (`vehicle_selection_screen.dart`)</td>
+                </tr>
+                <tr>
+                    <td class="req-id">Gold Pass</td>
+                    <td>Subscriptions offering free delivery (LKR 549/mo)</td>
+                    <td><span class="badge badge-additional">Additional</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Gold subscription checkout (`subscription_screen.dart`) and backend models (`misc.py`)</td>
+                </tr>
+                <tr>
+                    <td class="req-id">QR Scan & Go</td>
+                    <td>Pay local merchants/drivers via scan codes</td>
+                    <td><span class="badge badge-additional">Additional</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>QR payment camera scanner and confirmation screens (`qr_pay_scan_screen.dart`, `qr_pay_confirm_screen.dart`)</td>
+                </tr>
+                <tr>
+                    <td class="req-id">Incentives</td>
+                    <td>Driver quest incentives milestones</td>
+                    <td><span class="badge badge-additional">Additional</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Quests/incentives trackers widgets in `driver_earnings_screen.dart` and database milestones</td>
+                </tr>
+                <tr>
+                    <td class="req-id">Corporate accounts</td>
+                    <td>Ziggo for Business billing & Cost Centers</td>
+                    <td><span class="badge badge-additional">Additional</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Ziggo for Business billing profiles in `additional_settings_screen.dart` and backend `corporate.py` models</td>
+                </tr>
+                <tr>
+                    <td class="req-id">Admin CRUD</td>
+                    <td>Central Superadmin user management controls</td>
+                    <td><span class="badge badge-additional">Additional</span></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td>Central Superadmin controls over other admins lists (`admins.html`) and backend CRUD actions in `routes.py`</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
