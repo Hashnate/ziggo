@@ -711,9 +711,64 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   Widget _buildPickMeIdle(DriverProvider driver) {
+    final profile = driver.profile;
+    final isCurrentlyPeak = profile?['is_currently_peak'] == true;
+    final peakExtraAmount = (profile?['peak_extra_amount'] as num?)?.toDouble() ?? 0.0;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (isCurrentlyPeak && peakExtraAmount > 0) ...[
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 18),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFFF8C00), Color(0xFFFF4500)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFFF4500).withOpacity(0.35),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.bolt_rounded, color: Colors.white, size: 28),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Peak Hour Active!',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15,
+                        ),
+                      ),
+                      Text(
+                        'Earn an extra Rs. ${peakExtraAmount.toStringAsFixed(2)} per ride',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         _statusPill(driver),
         const SizedBox(height: 16),
         _incentivesPanel(driver),
