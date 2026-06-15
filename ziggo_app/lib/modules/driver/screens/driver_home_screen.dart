@@ -1709,6 +1709,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 onTap: () {
                   if (nextStatus == 'completed') {
                     _handleCompleteTrip(driver, ride);
+                  } else if (nextStatus == 'started') {
+                    _handleStartTrip(driver, ride);
                   } else {
                     driver.updateRideStatus(nextStatus);
                   }
@@ -1892,6 +1894,103 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         behavior: SnackBarBehavior.floating,
       ),
     );
+  }
+
+  Future<void> _handleStartTrip(
+      DriverProvider driver, Map<String, dynamic> ride) async {
+    final textController = TextEditingController();
+    String? errorText;
+
+    final otpConfirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Enter Start Trip OTP', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Ask the customer for the 4-digit OTP shown on their screen to start the trip.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: textController,
+                keyboardType: TextInputType.number,
+                maxLength: 4,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: 8, color: AppColors.textPrimary),
+                decoration: InputDecoration(
+                  counterText: '',
+                  errorText: errorText,
+                  errorStyle: const TextStyle(fontWeight: FontWeight.bold),
+                  filled: true,
+                  fillColor: AppColors.surfaceMuted,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                  ),
+                ),
+                onChanged: (_) {
+                  if (errorText != null) {
+                    setState(() => errorText = null);
+                  }
+                },
+              ),
+            ],
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton(
+              onPressed: () async {
+                final otp = textController.text.trim();
+                if (otp.length != 4) {
+                  setState(() => errorText = 'Enter 4 digits');
+                  return;
+                }
+                final success = await driver.updateRideStatus('started', otp: otp);
+                if (success) {
+                  Navigator.of(ctx).pop(true);
+                } else {
+                  setState(() => errorText = 'Invalid OTP. Please try again.');
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Start Trip', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (otpConfirmed == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.success,
+          content: Text('Trip started successfully!'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Future<void> _handleCompleteTrip(DriverProvider driver, Map<String, dynamic> ride) async {

@@ -332,13 +332,17 @@ class DriverProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<void> updateRideStatus(String status, {String? reason}) async {
-    if (_activeRide == null) return;
+  Future<bool> updateRideStatus(String status, {String? reason, String? otp}) async {
+    if (_activeRide == null) return false;
     final id = _activeRide!['id'];
     try {
       final resp = await ApiClient.instance.dio.patch(
         '/bookings/$id/status',
-        data: {'status': status, if (reason != null) 'reason': reason},
+        data: {
+          'status': status,
+          if (reason != null) 'reason': reason,
+          if (otp != null) 'otp': otp,
+        },
       );
       _activeRide = Map<String, dynamic>.from(resp.data);
       if (status == 'completed' || status == 'cancelled') {
@@ -347,8 +351,9 @@ class DriverProvider extends ChangeNotifier {
         await loadIncentives();
       }
       notifyListeners();
+      return true;
     } on DioException {
-      // ignore
+      return false;
     }
   }
 

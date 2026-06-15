@@ -116,6 +116,7 @@ class Booking(Base):
     # BRD: CD-17 / CD-31 — opaque token that lets emergency contacts view the
     # trip in real time via a public, no-auth URL. Generated on demand.
     share_token = Column(String(40), unique=True, index=True)
+    otp = Column(String(4), nullable=True)
 
     # BRD: PY-05 — corporate billing. When True the fare is debited from the
     # linked CorporateAccount.balance instead of the customer's personal wallet.
