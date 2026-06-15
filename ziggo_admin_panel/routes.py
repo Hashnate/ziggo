@@ -2091,6 +2091,7 @@ async def admin_branding_assets(db: AsyncSession = Depends(get_db)):
         "logo_url": s.logo_url or "/static/img/logo.jpeg",
         "favicon_url": s.favicon_url or "/static/img/logo.jpeg",
         "site_name": s.site_name or "Ziggo",
+        "admin_email": s.admin_email or "admin@ziggo.com",
     }
 
 
@@ -2109,6 +2110,7 @@ async def admin_settings_get(
             "active_page": "settings",
             "s": s,
             "saved": request.query_params.get("saved") == "1",
+            "error": request.query_params.get("error"),
         },
     )
 
@@ -2161,14 +2163,33 @@ async def admin_settings_save(
     logo: UploadFile | None = File(None),
     favicon: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    admin: User = Depends(current_admin),
 ):
     from decimal import Decimal
 
     s = await _get_or_create_settings(db)
     s.site_name = site_name.strip() or "Ziggo"
     s.admin_email = admin_email.strip()
-    s.contact_phone = contact_phone.strip()
+    
+    cleaned_phone = contact_phone.strip()
+    if cleaned_phone:
+        import re
+        if not re.match(r"^\d{10}$", cleaned_phone):
+            import urllib.parse
+            err_msg = "Contact phone must be a 10-digit login phone number (e.g. 0773095788)"
+            return RedirectResponse(url=f"/admin/settings?error={urllib.parse.quote(err_msg)}", status_code=303)
+        
+        # Check if another user already has this phone number
+        q_dup = await db.execute(select(User).where(User.phone_number == cleaned_phone, User.id != admin.id))
+        dup_user = q_dup.scalars().first()
+        if dup_user:
+            import urllib.parse
+            err_msg = f"Phone number {cleaned_phone} is already registered under another account (role: {dup_user.role.value}). Please use a different phone number."
+            return RedirectResponse(url=f"/admin/settings?error={urllib.parse.quote(err_msg)}", status_code=303)
+        
+        # Update admin's login phone number
+        admin.phone_number = cleaned_phone
+    s.contact_phone = cleaned_phone
     s.contact_email = contact_email.strip()
     s.address = address.strip()
     s.commission_rate = Decimal(str(commission_rate))

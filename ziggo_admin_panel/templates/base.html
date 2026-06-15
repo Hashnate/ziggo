@@ -462,7 +462,7 @@
                 </div>
                 <div class="flex-1 min-w-0">
                     <p id="footerSiteName" class="text-sm font-bold truncate text-ziggo-ink">Ziggo Admin</p>
-                    <p class="text-[11px] text-ziggo-muted truncate">admin@ziggo.com</p>
+                    <p id="footerAdminEmail" class="text-[11px] text-ziggo-muted truncate">admin@ziggo.com</p>
                 </div>
                 <a href="/admin/logout" class="text-ziggo-muted hover:text-ziggo p-2 rounded-lg hover:bg-ziggo-soft/40 transition" title="Logout">
                     <i class="fas fa-sign-out-alt"></i>
@@ -661,6 +661,10 @@
                 if (footerEl) footerEl.textContent = d.site_name + " Admin";
                 var headerEl = document.getElementById('headerSiteName');
                 if (headerEl) headerEl.textContent = d.site_name + " Admin";
+              }
+              if (d.admin_email) {
+                var footerEmailEl = document.getElementById('footerAdminEmail');
+                if (footerEmailEl) footerEmailEl.textContent = d.admin_email;
               }
             })
             .catch(function() {});
