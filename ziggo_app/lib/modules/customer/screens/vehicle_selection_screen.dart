@@ -521,14 +521,16 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
               showMyLocation: true,
               markers: [
                 for (final d in _nearbyDrivers)
-                  pinMarker(
-                    point: LatLng((d['lat'] as num).toDouble(), (d['lng'] as num).toDouble()),
-                    icon: _vehicleIcon(d['vehicle_type'] as String?),
-                    color: _vehicleColor(d['vehicle_type'] as String?),
-                    size: 30,
-                    assetPath: _vehicleAsset(d['vehicle_type'] as String?),
-                    rotation: (d['heading'] as num?)?.toDouble() ?? 0.0,
-                  ),
+                  if ((widget.isTruckMode && d['vehicle_type'] == 'truck') ||
+                      (!widget.isTruckMode && (_serviceType == null || d['vehicle_type'] == _serviceType)))
+                    pinMarker(
+                      point: LatLng((d['lat'] as num).toDouble(), (d['lng'] as num).toDouble()),
+                      icon: _vehicleIcon(d['vehicle_type'] as String?),
+                      color: _vehicleColor(d['vehicle_type'] as String?),
+                      size: 30,
+                      assetPath: _vehicleAsset(d['vehicle_type'] as String?),
+                      rotation: (d['heading'] as num?)?.toDouble() ?? 0.0,
+                    ),
                 pinMarker(
                   point: widget.pickup.location,
                   icon: Icons.my_location_rounded,
