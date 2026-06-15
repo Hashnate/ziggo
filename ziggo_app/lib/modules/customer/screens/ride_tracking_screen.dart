@@ -847,10 +847,51 @@ class _BottomCard extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            if (driver != null) ...[
-                              const SizedBox(height: 16),
-                              _DriverCard(d: driver!),
-                            ],
+                             if (active['status'] == 'arrived' && active['otp'] != null) ...[
+                               const SizedBox(height: 16),
+                               Container(
+                                 width: double.infinity,
+                                 padding: const EdgeInsets.symmetric(vertical: 16),
+                                 decoration: BoxDecoration(
+                                   gradient: AppColors.primaryGradient,
+                                   borderRadius: BorderRadius.circular(22),
+                                   boxShadow: [
+                                     BoxShadow(
+                                       color: AppColors.primary.withOpacity(0.25),
+                                       blurRadius: 12,
+                                       offset: const Offset(0, 5),
+                                     ),
+                                   ],
+                                 ),
+                                 child: Column(
+                                   children: [
+                                     const Text(
+                                       'SHARE THIS OTP WITH YOUR DRIVER',
+                                       style: TextStyle(
+                                         color: Colors.white70,
+                                         fontWeight: FontWeight.w900,
+                                         fontSize: 10,
+                                         letterSpacing: 1.2,
+                                       ),
+                                     ),
+                                     const SizedBox(height: 6),
+                                     Text(
+                                       active['otp'].toString(),
+                                       style: const TextStyle(
+                                         color: Colors.white,
+                                         fontWeight: FontWeight.w900,
+                                         fontSize: 34,
+                                         letterSpacing: 8,
+                                       ),
+                                     ),
+                                   ],
+                                 ),
+                               ),
+                             ],
+                             if (driver != null) ...[
+                               const SizedBox(height: 16),
+                               _DriverCard(d: driver!),
+                             ],
                             const SizedBox(height: 16),
                             _ActionRow(active: active),
                           ],

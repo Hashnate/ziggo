@@ -148,6 +148,7 @@ class BookingResponse(BaseModel):
     driver: Optional[DriverMini] = None
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
+    otp: Optional[str] = None
 
     # Flash parcel fields (only present when is_flash=True)
     is_flash: bool = False
@@ -181,6 +182,7 @@ class BookingResponse(BaseModel):
 class BookingStatusUpdate(BaseModel):
     status: BookingStatus
     reason: Optional[str] = None
+    otp: Optional[str] = None
 
 
 class BookingRateRequest(BaseModel):

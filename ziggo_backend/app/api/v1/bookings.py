@@ -106,6 +106,7 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
         driver=driver_obj,
         customer_name=customer_name,
         customer_phone=customer_phone,
+        otp=b.otp,
         is_flash=bool(b.is_flash),
         parcel_type=b.parcel_type,
         parcel_weight_kg=float(b.parcel_weight_kg) if b.parcel_weight_kg else None,
@@ -964,7 +965,11 @@ async def update_booking_status(
 
     if new_status == BookingStatus.ARRIVED:
         b.arrived_at = now
+        import random
+        b.otp = f"{random.randint(1000, 9999)}"
     elif new_status == BookingStatus.STARTED:
+        if b.otp and body.otp != b.otp:
+            raise HTTPException(status_code=400, detail="Invalid OTP code")
         b.started_at = now
     elif new_status == BookingStatus.COMPLETED:
         b.completed_at = now
@@ -1209,7 +1214,7 @@ async def update_booking_status(
             await manager.send(
                 c.user_id,
                 "booking_update",
-                {"booking_id": b.id, "status": b.status.value},
+                {"booking_id": b.id, "status": b.status.value, "otp": b.otp},
             )
             db.add(
                 Notification(

@@ -291,7 +291,9 @@ def _format(event: str, payload: dict) -> tuple[str, str]:
         if status == "accepted":
             return ("Driver assigned", "A driver has accepted your ride.")
         if status == "arrived":
-            return ("Driver has arrived", "Your driver is at the pickup point.")
+            otp = payload.get("otp", "")
+            otp_msg = f" Use OTP {otp} to start the trip." if otp else ""
+            return ("Driver has arrived", f"Your driver is at the pickup point.{otp_msg}")
         if status == "started":
             return ("Ride started", "Enjoy your trip!")
         if status == "completed":
