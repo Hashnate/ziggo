@@ -2118,7 +2118,10 @@ async def admin_settings_get(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_superadmin),
 ):
+    from app.models import DriverIncentive
     s = await _get_or_create_settings(db)
+    q = await db.execute(select(DriverIncentive).order_by(DriverIncentive.trips_required))
+    incentives = q.scalars().all()
     return templates.TemplateResponse(
         request,
         "admin_settings.html",
@@ -2126,6 +2129,7 @@ async def admin_settings_get(
             "request": request,
             "active_page": "settings",
             "s": s,
+            "incentives": incentives,
             "saved": request.query_params.get("saved") == "1",
             "error": request.query_params.get("error"),
         },
@@ -6736,18 +6740,7 @@ async def admin_incentives(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from app.models import DriverIncentive
-    q = await db.execute(select(DriverIncentive).order_by(DriverIncentive.trips_required))
-    incentives = q.scalars().all()
-    return templates.TemplateResponse(
-        request,
-        "incentives.html",
-        {
-            "request": request,
-            "active_page": "incentives",
-            "incentives": incentives,
-        },
-    )
+    return RedirectResponse(url="/admin/settings?tab=incentives", status_code=307)
 
 
 @router.post("/incentives/new")
@@ -6770,7 +6763,7 @@ async def admin_incentives_new(
     )
     db.add(new_inc)
     await db.commit()
-    return RedirectResponse(url="/admin/incentives", status_code=303)
+    return RedirectResponse(url="/admin/settings?tab=incentives", status_code=303)
 
 
 @router.post("/incentives/{id}/edit")
@@ -6796,7 +6789,7 @@ async def admin_incentives_edit(
     inc.reward_amount = Decimal(str(reward_amount))
     inc.is_active = (is_active == "on")
     await db.commit()
-    return RedirectResponse(url="/admin/incentives", status_code=303)
+    return RedirectResponse(url="/admin/settings?tab=incentives", status_code=303)
 
 
 @router.post("/incentives/{id}/delete")
@@ -6811,7 +6804,7 @@ async def admin_incentives_delete(
     if inc:
         await db.delete(inc)
         await db.commit()
-    return RedirectResponse(url="/admin/incentives", status_code=303)
+    return RedirectResponse(url="/admin/settings?tab=incentives", status_code=303)
 
 
 @router.get("/forbidden", response_class=HTMLResponse)

@@ -54,6 +54,7 @@
                 <button type="button" class="settings-tab" data-tab="loyalty"><i class="fas fa-medal"></i> Loyalty &amp; Membership</button>
                 <button type="button" class="settings-tab" data-tab="trips"><i class="fas fa-map-pin"></i> Trip Stops &amp; Waiting</button>
                 <button type="button" class="settings-tab" data-tab="branding"><i class="fas fa-image"></i> Logo &amp; Favicon</button>
+                <button type="button" class="settings-tab" data-tab="incentives"><i class="fas fa-gift"></i> Incentives</button>
             </aside>
 
             <!-- Right content -->
@@ -99,15 +100,15 @@
                             <input type="number" step="0.01" min="0" max="100" name="commission_rate" value="{{ s.commission_rate if s.commission_rate is not none else 15 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                         </div>
                         <div>
-                            <label class="block text-xs font-black text-ziggo-muted mb-1">Surge Start Hour (0–23)</label>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Busy Hours Start (0–23)</label>
                             <input type="number" min="0" max="23" name="surge_start_hour" value="{{ s.surge_start_hour if s.surge_start_hour is not none else 17 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                         </div>
                         <div>
-                            <label class="block text-xs font-black text-ziggo-muted mb-1">Surge End Hour (0–23)</label>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Busy Hours End (0–23)</label>
                             <input type="number" min="0" max="23" name="surge_end_hour" value="{{ s.surge_end_hour if s.surge_end_hour is not none else 20 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                         </div>
                         <div>
-                            <label class="block text-xs font-black text-ziggo-muted mb-1">Surge Multiplier</label>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Busy Hours Multiplier</label>
                             <input type="number" step="0.01" min="0.1" name="surge_multiplier" value="{{ s.surge_multiplier if s.surge_multiplier is not none else 1.5 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                         </div>
                         <div>
@@ -268,8 +269,83 @@
                     </div>
                 </section>
 
+                <!-- Incentives -->
+                <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="incentives">
+                    <div class="flex justify-between items-center mb-5">
+                        <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink">
+                            <i class="fas fa-gift text-ziggo"></i> Driver Incentives
+                        </h3>
+                        <button type="button" onclick="openCreateModal()" class="px-3.5 py-2 text-sm bg-ziggo text-white rounded-xl font-semibold shadow-brand hover:bg-ziggo-light transition flex items-center gap-1.5">
+                            <i class="fas fa-plus text-xs"></i> Add Incentive Tier
+                        </button>
+                    </div>
+
+                    <!-- Table -->
+                    <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="bg-gray-50 text-[11px] uppercase text-ziggo-muted font-black tracking-wider">
+                                    <tr>
+                                        <th class="px-6 py-4">Title</th>
+                                        <th class="px-6 py-4">Duration (Days)</th>
+                                        <th class="px-6 py-4">Trips Required</th>
+                                        <th class="px-6 py-4">Reward Amount</th>
+                                        <th class="px-6 py-4">Status</th>
+                                        <th class="px-6 py-4">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-ziggo-line">
+                                    {% for inc in incentives %}
+                                    <tr class="hover:bg-gray-50/50">
+                                        <td class="px-6 py-4 font-bold text-ziggo-ink">{{ inc.title }}</td>
+                                        <td class="px-6 py-4 text-sm text-ziggo-ink font-normal">
+                                            {{ inc.limit_days }} {% if inc.limit_days == 1 %}Day{% else %}Days{% endif %}
+                                        </td>
+                                        <td class="px-6 py-4 text-sm text-ziggo-ink font-normal">{{ inc.trips_required }}</td>
+                                        <td class="px-6 py-4 text-sm text-ziggo-ink font-semibold text-emerald-600">LKR {{ "%.2f"|format(inc.reward_amount or 0) }}</td>
+                                        <td class="px-6 py-4">
+                                            {% if inc.is_active %}
+                                            <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600">Active</span>
+                                            {% else %}
+                                            <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-gray-100 text-gray-500">Inactive</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex items-center gap-2">
+                                                <button type="button"
+                                                    onclick='openEditModal({{ {
+                                                        "id": inc.id,
+                                                        "title": inc.title,
+                                                        "limit_days": inc.limit_days,
+                                                        "trips_required": inc.trips_required,
+                                                        "reward_amount": (inc.reward_amount|float) if inc.reward_amount is not none else 0,
+                                                        "is_active": inc.is_active,
+                                                    }|tojson }})'
+                                                    class="px-3 py-1.5 bg-blue-50 text-ziggo border border-blue-100 rounded-lg text-xs font-bold hover:bg-blue-100 transition flex items-center gap-1.5">
+                                                    <i class="fas fa-edit"></i> Edit
+                                                </button>
+                                                <button type="button" onclick="confirmDelete({{ inc.id }})" title="Delete" class="px-2.5 py-1.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-lg text-xs font-bold hover:bg-rose-100 transition flex items-center">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="6" class="px-6 py-16 text-center">
+                                            <i class="fas fa-gift text-4xl text-ziggo-faint mb-3"></i>
+                                            <p class="text-ziggo-muted font-bold">No incentive milestones configured. Click <span class="text-ziggo">Add Incentive Tier</span> to create one.</p>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- Save (applies to every tab — all fields submit together) -->
-                <div class="flex items-center gap-3 pt-2">
+                <div class="flex items-center gap-3 pt-2" id="settingsSaveBar">
                     <button type="submit" class="px-8 py-4 bg-ziggo text-white rounded-2xl font-black shadow-brand hover:bg-ziggo-light transition flex items-center gap-2">
                         <i class="fas fa-save"></i> Save All Settings
                     </button>
@@ -283,6 +359,53 @@
         </div>
     </form>
 </div>
+
+<!-- Create / Edit Modal -->
+<div id="incentiveModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-[1100] p-4">
+    <div class="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+        <div class="p-6 border-b border-ziggo-line flex justify-between items-center bg-gray-50/50 flex-shrink-0">
+            <h3 class="text-xl font-black text-ziggo" id="incModalTitle">New Incentive Tier</h3>
+            <button type="button" onclick="closeModal()" class="text-ziggo-faint hover:text-ziggo-ink">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        <form id="incentiveForm" method="POST" class="p-8 space-y-5 overflow-y-auto">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Title</label>
+                    <input type="text" name="title" id="incTitle" required placeholder="e.g. One Day Incentives" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Duration (Days)</label>
+                    <input type="number" min="1" name="limit_days" id="incLimitDays" required placeholder="e.g. 1" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    <p class="text-[10px] text-ziggo-faint font-bold mt-1">Number of days to achieve the trips requirement (e.g. 1 day for daily, 6 days for weekday incentives).</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Trips Required</label>
+                    <input type="number" min="1" name="trips_required" id="incTripsRequired" required placeholder="e.g. 3" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Reward Amount (LKR)</label>
+                    <input type="number" step="0.01" min="0" name="reward_amount" id="incRewardAmount" required placeholder="e.g. 350.00" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div class="flex items-center pt-2">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="is_active" id="incActive" checked class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
+                        <span class="text-sm font-black text-ziggo-ink">Active</span>
+                    </label>
+                </div>
+            </div>
+            <div class="pt-4 flex justify-end gap-3 border-t border-ziggo-line">
+                <button type="button" onclick="closeModal()" class="px-6 py-3 border border-ziggo-line rounded-xl font-black text-ziggo-muted hover:bg-gray-50">Cancel</button>
+                <button type="submit" class="px-8 py-3 bg-ziggo text-white rounded-xl font-black hover:bg-ziggo-light shadow-brand">
+                    <span id="incSubmitText">Create Tier</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<form id="deleteIncentiveForm" method="POST" class="hidden"></form>
 {% endblock %}
 
 {% block scripts %}
@@ -293,13 +416,24 @@
         function show(name) {
             tabs.forEach(function (t) { t.classList.toggle('active', t.dataset.tab === name); });
             panels.forEach(function (p) { p.classList.toggle('active', p.dataset.panel === name); });
+            var saveBar = document.getElementById('settingsSaveBar');
+            if (saveBar) {
+                saveBar.style.display = (name === 'incentives') ? 'none' : 'flex';
+            }
             try { sessionStorage.setItem('ziSettingsTab', name); } catch (e) {}
         }
         tabs.forEach(function (t) { t.addEventListener('click', function () { show(this.dataset.tab); }); });
-        // Restore the last-opened tab (e.g. after Save reloads the page)
+        
+        // Restore the last-opened tab (checking query parameters first, then sessionStorage)
         var saved = null;
         try { saved = sessionStorage.getItem('ziSettingsTab'); } catch (e) {}
-        if (saved && document.querySelector('.settings-panel[data-panel="' + saved + '"]')) show(saved);
+        var urlParams = new URLSearchParams(window.location.search);
+        var tabParam = urlParams.get('tab');
+        if (tabParam && document.querySelector('.settings-panel[data-panel="' + tabParam + '"]')) {
+            show(tabParam);
+        } else if (saved && document.querySelector('.settings-panel[data-panel="' + saved + '"]')) {
+            show(saved);
+        }
 
         // Setup image preview helper
         function setupPreview(inputId, containerId) {
@@ -323,6 +457,64 @@
         }
         setupPreview('logoInput', 'logoPreviewContainer');
         setupPreview('faviconInput', 'faviconPreviewContainer');
+
+        // Modal Helpers
+        window.openCreateModal = function() {
+            document.getElementById('incModalTitle').innerText = 'New Incentive Tier';
+            document.getElementById('incSubmitText').innerText = 'Create Tier';
+            document.getElementById('incentiveForm').action = '/admin/incentives/new';
+            document.getElementById('incTitle').value = '';
+            document.getElementById('incLimitDays').value = 1;
+            document.getElementById('incTripsRequired').value = '';
+            document.getElementById('incRewardAmount').value = '';
+            document.getElementById('incActive').checked = true;
+            showModal();
+        };
+
+        window.openEditModal = function(inc) {
+            document.getElementById('incModalTitle').innerText = 'Edit Incentive Tier';
+            document.getElementById('incSubmitText').innerText = 'Save Changes';
+            document.getElementById('incentiveForm').action = '/admin/incentives/' + inc.id + '/edit';
+            document.getElementById('incTitle').value = inc.title;
+            document.getElementById('incLimitDays').value = inc.limit_days;
+            document.getElementById('incTripsRequired').value = inc.trips_required;
+            document.getElementById('incRewardAmount').value = inc.reward_amount;
+            document.getElementById('incActive').checked = !!inc.is_active;
+            showModal();
+        };
+
+        function showModal() {
+            const m = document.getElementById('incentiveModal');
+            if (m) {
+                m.classList.remove('hidden');
+                m.classList.add('flex');
+            }
+        }
+
+        window.closeModal = function() {
+            const m = document.getElementById('incentiveModal');
+            if (m) {
+                m.classList.add('hidden');
+                m.classList.remove('flex');
+            }
+        };
+
+        window.confirmDelete = function(id) {
+            if (confirm('Delete this incentive milestone permanently?')) {
+                var form = document.getElementById('deleteIncentiveForm');
+                if (form) {
+                    form.action = '/admin/incentives/' + id + '/delete';
+                    form.submit();
+                }
+            }
+        };
+
+        var incModal = document.getElementById('incentiveModal');
+        if (incModal) {
+            incModal.addEventListener('click', function(e) {
+                if (e.target === this) closeModal();
+            });
+        }
     })();
 </script>
 {% endblock %}
