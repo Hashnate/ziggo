@@ -67,6 +67,11 @@ class DriverProfileResponse(BaseModel):
     billing_proof_url: Optional[str] = None
     paid_payouts: Optional[float] = 0.0
     pending_payout: Optional[float] = 0.0
+    peak_is_active: Optional[bool] = False
+    peak_start_hour: Optional[int] = None
+    peak_end_hour: Optional[int] = None
+    peak_extra_amount: Optional[float] = 0.0
+    is_currently_peak: Optional[bool] = False
 
     class Config:
         from_attributes = True

@@ -48,7 +48,27 @@ def _is_complete(d: Driver) -> bool:
     )
 
 
-def _to_response(user: User, d: Driver, paid_payouts: float = 0.0, pending_payout: float = 0.0) -> DriverProfileResponse:
+def _to_response(user: User, d: Driver, paid_payouts: float = 0.0, pending_payout: float = 0.0, ss=None) -> DriverProfileResponse:
+    peak_active = False
+    is_curr_peak = False
+    start_h = None
+    end_h = None
+    extra_amt = 0.0
+    if ss:
+        peak_active = bool(ss.peak_is_active)
+        start_h = ss.peak_start_hour
+        end_h = ss.peak_end_hour
+        extra_amt = float(ss.peak_extra_amount or 0.0)
+        if peak_active:
+            from datetime import datetime, timezone, timedelta
+            colombo_tz = timezone(timedelta(hours=5, minutes=30))
+            current_hour = datetime.now(colombo_tz).hour
+            if start_h is not None and end_h is not None:
+                if start_h <= end_h:
+                    is_curr_peak = start_h <= current_hour < end_h
+                else:
+                    is_curr_peak = current_hour >= start_h or current_hour < end_h
+
     return DriverProfileResponse(
         id=d.id,
         full_name=user.full_name,
@@ -75,6 +95,11 @@ def _to_response(user: User, d: Driver, paid_payouts: float = 0.0, pending_payou
         billing_proof_url=d.billing_proof_url,
         paid_payouts=paid_payouts,
         pending_payout=pending_payout,
+        peak_is_active=peak_active,
+        peak_start_hour=start_h,
+        peak_end_hour=end_h,
+        peak_extra_amount=extra_amt,
+        is_currently_peak=is_curr_peak,
     )
 
 
@@ -128,7 +153,10 @@ async def get_my_driver_profile(
     d = await _get_driver(db, user)
     from ...services.finance_service import get_driver_payout_stats
     stats = await get_driver_payout_stats(db, d.id)
-    return _to_response(user, d, paid_payouts=stats["paid"], pending_payout=stats["pending"])
+    from ...models import SystemSettings
+    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    ss = ss_q.scalars().first()
+    return _to_response(user, d, paid_payouts=stats["paid"], pending_payout=stats["pending"], ss=ss)
 
 
 # Fallback rate card when no FareSetting row exists for the driver's vehicle.
