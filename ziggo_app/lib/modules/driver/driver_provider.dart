@@ -357,6 +357,27 @@ class DriverProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> updateBankDetails({
+    required String bankName,
+    required String accountHolderName,
+    required String accountNumber,
+    required String branchName,
+  }) async {
+    try {
+      final resp = await ApiClient.instance.dio.post('/driver/bank-details', data: {
+        'bank_name': bankName,
+        'account_holder_name': accountHolderName,
+        'account_number': accountNumber,
+        'branch_name': branchName,
+      });
+      _profile = Map<String, dynamic>.from(resp.data);
+      notifyListeners();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<bool> rateBooking({required int bookingId, required int rating, String? feedback}) async {
     try {
       await ApiClient.instance.dio.post(
@@ -386,6 +407,23 @@ class DriverProvider extends ChangeNotifier {
       _incentives = List<Map<String, dynamic>>.from(resp.data);
       notifyListeners();
     } catch (_) {}
+  }
+
+  Future<bool> updateProfilePhoto(String filePath) async {
+    try {
+      final photoForm = FormData.fromMap({
+        'photo': await MultipartFile.fromFile(filePath),
+      });
+      final resp = await ApiClient.instance.dio.post('/driver/profile-photo', data: photoForm);
+      if (resp.data != null && resp.data['profile_photo'] != null) {
+        _profile?['profile_photo'] = resp.data['profile_photo'];
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
   }
 
   @override

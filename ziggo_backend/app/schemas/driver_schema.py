@@ -73,5 +73,10 @@ class DriverProfileResponse(BaseModel):
     peak_extra_amount: Optional[float] = 0.0
     is_currently_peak: Optional[bool] = False
 
+    bank_name: Optional[str] = None
+    account_holder_name: Optional[str] = None
+    account_number: Optional[str] = None
+    branch_name: Optional[str] = None
+
     class Config:
         from_attributes = True

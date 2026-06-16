@@ -100,6 +100,10 @@ def _to_response(user: User, d: Driver, paid_payouts: float = 0.0, pending_payou
         peak_end_hour=end_h,
         peak_extra_amount=extra_amt,
         is_currently_peak=is_curr_peak,
+        bank_name=d.bank_name,
+        account_holder_name=d.account_holder_name,
+        account_number=d.account_number,
+        branch_name=d.branch_name,
     )
 
 
@@ -629,4 +633,36 @@ async def get_driver_incentives(
         }
         for r in rows
     ]
+
+
+from pydantic import BaseModel
+
+class DriverBankUpdateRequest(BaseModel):
+    bank_name: str
+    account_holder_name: str
+    account_number: str
+    branch_name: str
+
+@router.post("/bank-details", response_model=DriverProfileResponse)
+async def update_bank_details(
+    body: DriverBankUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("driver")),
+):
+    d = await _get_driver(db, user)
+    d.bank_name = body.bank_name.strip()
+    d.account_holder_name = body.account_holder_name.strip()
+    d.account_number = body.account_number.strip()
+    d.branch_name = body.branch_name.strip()
+    await db.commit()
+    await db.refresh(d)
+    await db.refresh(user)
+
+    from ...services.finance_service import get_driver_payout_stats
+    stats = await get_driver_payout_stats(db, d.id)
+    from ...models import SystemSettings
+    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    ss = ss_q.scalars().first()
+    return _to_response(user, d, paid_payouts=stats["paid"], pending_payout=stats["pending"], ss=ss)
+
 

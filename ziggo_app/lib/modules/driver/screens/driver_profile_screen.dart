@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../core/network/api_client.dart';
@@ -20,6 +21,119 @@ const Color _kCardLight = AppColors.surfaceMuted;
 /// driver's stats, bio basics, and account actions.
 class DriverProfileScreen extends StatelessWidget {
   const DriverProfileScreen({super.key});
+
+  Future<void> _pickAndUploadPhoto(BuildContext context) async {
+    final picker = ImagePicker();
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: AppColors.primary),
+              title: const Text('Take a photo', style: TextStyle(fontWeight: FontWeight.w900)),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: AppColors.primary),
+              title: const Text('Pick from gallery', style: TextStyle(fontWeight: FontWeight.w900)),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+    final picked = await picker.pickImage(source: source, imageQuality: 85);
+    if (picked == null) return;
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            ),
+            SizedBox(width: 12),
+            Text('Uploading profile photo...'),
+          ],
+        ),
+        duration: Duration(days: 1),
+      ),
+    );
+
+    final ok = await context.read<DriverProvider>().updateProfilePhoto(picked.path);
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile photo updated successfully!'), backgroundColor: AppColors.success),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to upload profile photo.'), backgroundColor: AppColors.error),
+      );
+    }
+  }
+
+  Future<void> _editPhone(BuildContext context) async {
+    final auth = context.read<AuthProvider>();
+    final ctrl = TextEditingController(text: auth.phoneNumber);
+    final newPhone = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Update Phone Number', style: TextStyle(fontWeight: FontWeight.w900)),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.phone,
+          decoration: const InputDecoration(labelText: 'Phone Number', hintText: 'e.g. 0755960594'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (newPhone != null && newPhone.trim().isNotEmpty && context.mounted) {
+      try {
+        await auth.updateProfile(phoneNumber: newPhone.trim());
+        if (context.mounted) {
+          await context.read<DriverProvider>().loadProfile();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Phone number updated successfully!'), backgroundColor: AppColors.success),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to update phone: $e'), backgroundColor: AppColors.error),
+          );
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,11 +171,7 @@ class DriverProfileScreen extends StatelessWidget {
               photoUrl: photoUrl,
               vehicleType: vehicleType,
               onBack: () => Navigator.pop(context),
-              onEditPhoto: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const DriverDocumentsScreen()),
-              ),
+              onEditPhoto: () => _pickAndUploadPhoto(context),
             ),
           ),
           SliverToBoxAdapter(
@@ -85,7 +195,8 @@ class DriverProfileScreen extends StatelessWidget {
               child: Column(
                 children: [
                   _infoRow(Icons.phone_rounded, 'Phone',
-                      phone.isEmpty ? '—' : phone),
+                      phone.isEmpty ? '—' : phone,
+                      onTap: () => _editPhone(context)),
                   _infoRow(Icons.language_rounded, 'Knows', 'English'),
                   _infoRow(Icons.directions_car_rounded, 'Vehicle',
                       vehicleNumber.isEmpty ? '—' : vehicleNumber),
@@ -319,33 +430,48 @@ class DriverProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _infoRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 9),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.textTertiary, size: 20),
-          const SizedBox(width: 12),
-          Text(
-            '$label  ',
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
+  Widget _infoRow(IconData icon, String label, String value, {VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.textTertiary, size: 20),
+            const SizedBox(width: 12),
+            Text(
+              '$label  ',
               style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w800,
-                fontSize: 13.5,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
               ),
             ),
-          ),
-        ],
+            Expanded(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Flexible(
+                    child: Text(
+                      value,
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13.5,
+                      ),
+                    ),
+                  ),
+                  if (onTap != null) ...[
+                    const SizedBox(width: 6),
+                    const Icon(Icons.edit_rounded, color: AppColors.primary, size: 14),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

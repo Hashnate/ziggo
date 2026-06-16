@@ -126,6 +126,10 @@ class Driver(Base):
     relative_contact = Column(String(20))
     relative_relationship = Column(String(50))
     billing_proof_url = Column(String(255))
+    bank_name = Column(String(100), nullable=True)
+    account_holder_name = Column(String(100), nullable=True)
+    account_number = Column(String(50), nullable=True)
+    branch_name = Column(String(100), nullable=True)
 
 
     user = relationship("User", back_populates="driver_profile")
