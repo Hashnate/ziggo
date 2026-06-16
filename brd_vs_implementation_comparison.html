@@ -1,1251 +1,1161 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ziggo Feature Implementation Audit</title>
-    <style>
-        body {
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            background-color: #f8fafc;
-            color: #1e293b;
-            margin: 0;
-            padding: 40px 20px;
-            display: flex;
-            justify-content: center;
-        }
-        .container {
-            max-width: 1300px;
-            width: 100%;
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-        }
-        h2 {
-            margin-top: 0;
-            color: #0f172a;
-            border-bottom: 2px solid #e2e8f0;
-            padding-bottom: 10px;
-            margin-bottom: 20px;
-            font-size: 24px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            text-align: left;
-            font-size: 13px;
-        }
-        th, td {
-            padding: 10px 14px;
-            border-bottom: 1px solid #e2e8f0;
-            vertical-align: top;
-        }
-        th {
-            background-color: #f1f5f9;
-            color: #475569;
-            font-weight: 700;
-            text-transform: uppercase;
-            font-size: 11px;
-            letter-spacing: 0.05em;
-        }
-        tr:hover {
-            background-color: #f8fafc;
-        }
-        .req-id {
-            font-weight: bold;
-            color: #1e3a8a;
-            white-space: nowrap;
-        }
-        .badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: bold;
-            text-transform: uppercase;
-            text-align: center;
-        }
-        .badge-completed {
-            background-color: #dcfce7;
-            color: #15803d;
-        }
-        .badge-partially {
-            background-color: #fef9c3;
-            color: #a16207;
-        }
-        .badge-missing {
-            background-color: #fee2e2;
-            color: #b91c1c;
-        }
-        .nature-brd {
-            color: #4f46e5;
-            font-weight: 600;
-        }
-        .nature-additional {
-            color: #db2777;
-            font-weight: 600;
-        }
-        .nature-br {
-            color: #0891b2;
-            font-weight: 600;
-        }
-        .nature-nfr {
-            color: #059669;
-            font-weight: 600;
-        }
-        a {
-            color: #2563eb;
-            text-decoration: none;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
-    </style>
+<meta charset="utf-8">
+<title>Ziggo BRD vs Implementation Comparison</title>
+<style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; padding: 20px; background-color: #f8f9fa; }
+    h1 { color: #1A3DB8; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    th, td { padding: 12px; text-align: left; border: 1px solid #dee2e6; }
+    th { background-color: #1A3DB8; color: white; }
+    tr:nth-child(even) { background-color: #f2f2f2; }
+    .status-completed { color: green; font-weight: bold; }
+    .status-partial { color: orange; font-weight: bold; }
+    .status-missing { color: red; font-weight: bold; }
+</style>
 </head>
 <body>
-    <div class="container">
-        <h2>Ziggo Feature Implementation Audit</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Req ID</th>
-                    <th>Feature Description</th>
-                    <th>Nature</th>
-                    <th>Status</th>
-                    <th>Implementation Details / Scope</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td class="req-id">CD-01</td>
-                    <td>User registration (phone number + OTP, email/password)</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-partially">Partially Completed</span></td>
-                    <td>Phone + OTP login is the primary flow in <a href="file:///var/www/ziggo/ziggo_backend/app/api/v1/auth.py">auth.py</a>. The admin account supports phone + password, but customer/driver registration is passwordless.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-02</td>
-                    <td>Profile management (name, photo, contact details, saved places)</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Implemented via <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/edit_profile_screen.dart">edit_profile_screen.dart</a> and <a href="file:///var/www/ziggo/ziggo_backend/app/api/v1/customer.py#L33">customer.py:L33</a> for profile updates; saved places in <a href="file:///var/www/ziggo/ziggo_backend/app/api/v1/customer.py#L87">customer.py:L87</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-03</td>
-                    <td>Ability to switch between Passenger Mode and Driver Mode using a button in the app.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Mode-toggle navigation state and active role checks are implemented in <a href="file:///var/www/ziggo/ziggo_app/lib/main.dart">main.dart</a> and role-routing in <a href="file:///var/www/ziggo/ziggo_backend/app/api/v1/auth.py#L75-L115">auth.py:L75-115</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-04</td>
-                    <td>Set pickup and drop-off locations via GPS or map pin (integrating Google Maps API).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Managed via <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/choose_location_screen.dart">choose_location_screen.dart</a> and <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/location_search_screen.dart">location_search_screen.dart</a> using OSM tiles.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-05</td>
-                    <td>Choose vehicle type (for passengers) and view fare estimate.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Implemented in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/vehicle_selection_screen.dart">vehicle_selection_screen.dart</a> and <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/fare_estimate_screen.dart">fare_estimate_screen.dart</a>. Calls `calculate_fare` in <a href="file:///var/www/ziggo/ziggo_backend/app/services/fare_service.py#L84">fare_service.py:L84</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-06</td>
-                    <td>View upfront fare estimate and confirm ride booking (for customers).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Price estimates load in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/confirm_pickup_screen.dart">confirm_pickup_screen.dart</a> and execute in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/booking_provider.dart">booking_provider.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-07</td>
-                    <td>Request a ride and match with the nearest available driver (for customers).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Dispatched by match-making loops in <a href="file:///var/www/ziggo/ziggo_backend/app/api/v1/bookings.py#L218">bookings.py:L218</a> calling <a href="file:///var/www/ziggo/ziggo_backend/app/services/matching_service.py#L28">matching_service.py:L28</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-08</td>
-                    <td>Turn on/off availability (for drivers).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Offline/online toggle switch in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/driver/screens/driver_home_screen.dart">driver_home_screen.dart</a> hits <a href="file:///var/www/ziggo/ziggo_backend/app/api/v1/driver.py#L359">driver.py:L359</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-09</td>
-                    <td>Accept or reject incoming ride requests (for drivers).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Handled via overlay sheets in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/driver/screens/driver_home_screen.dart">driver_home_screen.dart</a> hitting <a href="file:///var/www/ziggo/ziggo_backend/app/api/v1/bookings.py#L700">bookings.py:L700</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-10</td>
-                    <td>GPS navigation for pickups and drop-offs using Google Maps API, with turn-by-turn directions, picture-in-picture mini-map, speed display, mute, and incident reporting (for drivers).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-partially">Partially Completed</span></td>
-                    <td>Incident reporting complete in <a href="file:///var/www/ziggo/ziggo_backend/app/api/v1/driver.py#L482">driver.py:L482</a> and overlays render. Live route lines on <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/ride_tracking_screen.dart">ride_tracking_screen.dart</a>, but turn-by-turn directions, PiP, and speedometers are missing.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-11</td>
-                    <td>Collect payment (cash, card, or wallet) and confirm payment (for drivers).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Sliding trip completion card prompts checkout receipts and logs transactions on <a href="file:///var/www/ziggo/ziggo_app/lib/modules/driver/screens/driver_home_screen.dart">driver_home_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-12</td>
-                    <td>Payment processing via PayHere, supporting cash, card, and wallet for customers and drivers.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Integrated via <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/payhere_checkout_screen.dart">payhere_checkout_screen.dart</a> and transactional gateway stubs.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-13</td>
-                    <td>View earnings and trip history (for drivers).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Summaries and list widgets live in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/driver/screens/driver_earnings_screen.dart">driver_earnings_screen.dart</a> and <a href="file:///var/www/ziggo/ziggo_app/lib/modules/driver/screens/driver_history_screen.dart">driver_history_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-14</td>
-                    <td>In-app communication (call) with the other party (passenger or driver).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Integrated voice call routing via system dialer launcher on ride tracking screens.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-15</td>
-                    <td>Rate and review the other party after the trip.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Mutual rating scales and feedback fields are processed in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/rating_screen.dart">rating_screen.dart</a> and <a href="file:///var/www/ziggo/ziggo_app/lib/modules/driver/screens/driver_rating_screen.dart">driver_rating_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-16</td>
-                    <td>View trip history and receipts (for both customers and drivers).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Displayed in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/ride_history_screen.dart">ride_history_screen.dart</a> and <a href="file:///var/www/ziggo/ziggo_app/lib/modules/driver/screens/driver_history_screen.dart">driver_history_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-17</td>
-                    <td>Emergency SOS button and share trip with contacts.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Panic button triggers emergency records in DB (<a href="file:///var/www/ziggo/ziggo_backend/app/models/misc.py#L208">misc.py:L208</a>); `share_token` in <a href="file:///var/www/ziggo/ziggo_backend/app/models/booking.py#L118">booking.py:L118</a> handles live sharing.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-18</td>
-                    <td>Receive push notifications via Firebase for booking status, driver arrival, promotions, and updates.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Configured in <a href="file:///var/www/ziggo/ziggo_backend/app/services/fcm_service.py#L183">fcm_service.py:L183</a> with background pub/sub synchronization.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-19</td>
-                    <td>Multi-stop trips – add up to two intermediate stops with a configurable waiting allowance per stop (exceeding it triggers standard waiting charges).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-partially">Partially Completed</span></td>
-                    <td>Fully implemented in backend DB (<a href="file:///var/www/ziggo/ziggo_backend/app/models/booking.py#L137">booking.py:L137</a>) and provider; customer search UI <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/location_search_screen.dart#L386">location_search_screen.dart:L386</a> has &quot;Add Stop&quot; button disabled.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-20</td>
-                    <td>One-way or return-trip selection at booking.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>UI toggles in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/location_search_screen.dart#L263">location_search_screen.dart:L263</a> pass to the fare calculations where return-trip fares are multiplied by 1.8x.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-21</td>
-                    <td>Instant booking (Now) or scheduled booking (Later) with date and time picker.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Scheduled pick date/time picker is fully functional in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/rental_home_screen.dart#L216">rental_home_screen.dart:L216</a> and ride selection sheets.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-22</td>
-                    <td>Add note to driver and apply promo code at booking.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Promos and notes are captured at checkout and processed in the matching dispatch engine.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-23</td>
-                    <td>Saved Addresses with Home and Work shortcuts.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Managed under <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/saved_addresses_screen.dart">saved_addresses_screen.dart</a> and hits the database endpoints.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-24</td>
-                    <td>Help &amp; Support flow with last-five activity quick-access and category routing (Account &amp; payment, App issues, Using Ziggo Rides).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Interactive categories and chat surfaces live in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/support_screen.dart">support_screen.dart</a> and <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/support_chat_screen.dart">support_chat_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-25</td>
-                    <td>Notifications inbox with system, ride, and promotional alerts.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Alerts listing lives in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/notifications_screen.dart">notifications_screen.dart</a> fetching `/api/v1/customer/notifications`.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-26</td>
-                    <td>Activity history filtered by service category – Rides, Trucks, Food, Rentals, Delivery, Market, Courier, Events – with Ongoing, Completed, Complaint, and Cancelled tabs.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Filter tabs are supported in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/ride_history_screen.dart">ride_history_screen.dart</a>, separating Rides, Food, Market, Flash, etc.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-27</td>
-                    <td>Camera permission flow for in-app QR scanning (basic Scan &amp; Pay).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Camera scanning widgets are implemented in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/qr_pay_scan_screen.dart">qr_pay_scan_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-28</td>
-                    <td>Basic business account: add a corporate profile for business-billed bookings.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Corporate profile views are wired up in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/additional_settings_screen.dart">additional_settings_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-29</td>
-                    <td>About Us and app version display under the account menu.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Static text entries exist under settings and menus.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-30</td>
-                    <td>Invite a Friend referral flow from the Earn-with-Ziggo screen.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-missing">Missing / Planned</span></td>
-                    <td>Referral bonus database schemas are referenced in historical dumps, but no active python code in `ziggo_backend/app` or Flutter UI implements referral/invite mechanics.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-31</td>
-                    <td>ETA sharing – user can share their real-time estimated time of arrival with selected contacts directly from the active trip screen.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Enabled on the active trip screen by generating a `share_token` targeting the public `/trip/share/{token}` view.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-32</td>
-                    <td>Account deletion – user can permanently delete their Ziggo account from within the app settings, with a confirmation step and data-erasure notice.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Soft-delete endpoint <a href="file:///var/www/ziggo/ziggo_backend/app/api/v1/customer.py#L49">customer.py:L49</a> scrubs user details (PII) but retains transaction records for Inland Revenue auditing.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-33</td>
-                    <td>Automated complaint responses – minor and routine support complaints receive instant automated responses, with escalation to a live agent for complex issues.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Created in <a href="file:///var/www/ziggo/ziggo_backend/app/api/v1/misc.py#L282">misc.py:L282</a>. Creates a keyword-routed auto-reply message if matches occur (e.g. overcharges, accidents).</td>
-                </tr>
-                <tr>
-                    <td class="req-id">CD-34</td>
-                    <td>Simple profile completeness indicator – shows the user how complete their profile is and prompts them to fill missing fields.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Completeness percentage is calculated on backend via `compute_profile_completeness` (<a href="file:///var/www/ziggo/ziggo_backend/app/services/auth_service.py#L138">auth_service.py:L138</a>) and sent to client.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">RS-01</td>
-                    <td>Ride types available at booking: Car, Tuk, Bike (Moto), with vehicle availability shown as ETA (e.g., &quot;In 1 min&quot;).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Available selections in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/vehicle_selection_screen.dart">vehicle_selection_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">RS-02</td>
-                    <td>Flex (premium car) as a separate ride class with its own fare.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Implemented using the `&#x27;car&#x27;` vehicle class, which is mapped directly to the UI label `&#x27;Flex&#x27;` in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/vehicle_selection_screen.dart#L817">vehicle_selection_screen.dart:L817</a> and priced separately.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">RS-03</td>
-                    <td>Reserve / scheduled rides (Later) – pickup date and time scheduling.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Scheduled pick options are wired to dispatch queues.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">RS-04</td>
-                    <td>Long-distance / intercity rides – basic option for bookings between cities.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-missing">Missing / Planned</span></td>
-                    <td>No long-distance or city-to-city routing logic exists in the fare calculator or matching rules.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">RS-05</td>
-                    <td>Seniors rides – a ride variant for senior passengers (basic label, no special driver policies).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-missing">Missing / Planned</span></td>
-                    <td>Missing from the fare engine classes list and the frontend selection options.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">RS-06</td>
-                    <td>Teens rides – a ride variant for teen passengers (basic label, standard safeguards).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-missing">Missing / Planned</span></td>
-                    <td>Missing from the selection options and matching constraints.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">RS-07</td>
-                    <td>Per-ride loyalty points earning displayed at vehicle selection.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>The calculate fare response calculates and displays `points_earnable` next to the vehicle options (<a href="file:///var/www/ziggo/ziggo_backend/app/services/fare_service.py#L430">fare_service.py:L430</a>).</td>
-                </tr>
-                <tr>
-                    <td class="req-id">RS-08</td>
-                    <td>&quot;Meet your driver here&quot; pickup-point indicator on the map for high-density areas.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Renders static text instructions and map markers on `confirm_pickup_screen.dart`.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">RS-09</td>
-                    <td>AI-powered drop location suggestions – recommends destinations based on current location, time of day, and usage history.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-missing">Missing / Planned</span></td>
-                    <td>Suggestions lists in the search views are hardcoded static Colombo places (<a href="file:///var/www/ziggo/ziggo_app/lib/core/map/places.dart">places.dart</a>), not AI-derived.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">RT-01</td>
-                    <td>Hourly rental booking – user can book a vehicle for a set number of hours, with the driver waiting throughout.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Users can select 1-24 hour durations in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/rental_home_screen.dart">rental_home_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">RT-02</td>
-                    <td>Scheduled pickup – pickup date and time selection (Now or Schedule).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Date/Time selections load in `_buildTimeToggle()` in `rental_home_screen.dart`.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">RT-03</td>
-                    <td>Vehicle selection for rentals (Car, Van).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Users can choose between Mini, Car, Minivan, and Van in `_vehicles` (<a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/rental_home_screen.dart#L30">rental_home_screen.dart:L30</a>).</td>
-                </tr>
-                <tr>
-                    <td class="req-id">RT-04</td>
-                    <td>Transparent rental rate displayed before confirmation.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Rates are shown as &quot;Rs.X/hr&quot; on the vehicle cards. Fares calculate using the `is_rental` parameters in <a href="file:///var/www/ziggo/ziggo_backend/app/services/fare_service.py#L113">fare_service.py:L113</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">PD-01</td>
-                    <td>One-way trip selection.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Default trip mode on booking sheets.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">PD-02</td>
-                    <td>Return-trip selection with waiting handled at the drop location.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Selection works in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/location_search_screen.dart">location_search_screen.dart</a>. It doubles the legs distance and applies a 1.8x price multiplier in <a href="file:///var/www/ziggo/ziggo_backend/app/services/fare_service.py#L312">fare_service.py:L312</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">PD-03</td>
-                    <td>Pickup location selection via map, search, or saved address.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Selection hooks into stored customer addresses.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">PD-04</td>
-                    <td>Drop location selection via map, search, or saved address.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Integrated into location search UI.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">PD-05</td>
-                    <td>Pickup date and time scheduling (Now or Schedule).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Supported across ride/rental/delivery checkout pages.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">PD-06</td>
-                    <td>Instant booking (Now) – immediate dispatch.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Spawns in-memory nearest search matching.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">PD-07</td>
-                    <td>Scheduled booking – deferred dispatch at the user’s chosen time.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Queued and managed by background scheduler workers.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">PR-01</td>
-                    <td>Parcel delivery as a top-level service with Flash (same-day) and basic Courier sub-types.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Top-level selections route to Flash same-day or Courier island-wide courier services.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">PR-02</td>
-                    <td>Flash instant delivery – same-day, on-demand parcel pickup and drop.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Same-day checkout forms are fully complete in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/flash_home_screen.dart">flash_home_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">PR-03</td>
-                    <td>Basic courier delivery – standard parcel delivery for longer distances.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Sub-option in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/courier_home_screen.dart">courier_home_screen.dart</a> that prices parcels primarily by weight tiers (<a href="file:///var/www/ziggo/ziggo_backend/app/services/fare_service.py#L164">fare_service.py:L164</a>).</td>
-                </tr>
-                <tr>
-                    <td class="req-id">PR-04</td>
-                    <td>Send items – user dispatches a parcel from their location.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Pickup defaults to current position.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">PR-05</td>
-                    <td>Receive items – user requests pickup of a parcel addressed to them.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Users can swap pickup and drop locations to arrange delivery to their own location.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">PR-06</td>
-                    <td>Pickup and drop address capture with on-package address/contact-detail reminder.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Warning banner displayed in `courier_home_screen.dart:L143-167` (&quot;*Note: Make sure to write the drop address and contact details on the package box*&quot;).</td>
-                </tr>
-                <tr>
-                    <td class="req-id">PR-07</td>
-                    <td>Basic truck delivery for moving goods – a single truck option with real-time tracking.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Selected by choosing the `truck` vehicle type, which includes helper configurations in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/vehicle_selection_screen.dart">vehicle_selection_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">DV-01</td>
-                    <td>Food delivery – Rice &amp; Curry, Burgers, Shawarma, Desserts, Chinese, Indian, Kottu, Pizza.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Listings screen is implemented in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/food_home_screen.dart">food_home_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">DV-02</td>
-                    <td>Grocery delivery – Groceries, Fresh products, Dairy &amp; poultry.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Grocery chips are supported in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/market_home_screen.dart">market_home_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">DV-03</td>
-                    <td>Pharmaceutical and health-product delivery.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Managed as a Category inside the <a href="file:///var/www/ziggo/ziggo_backend/app/models/market.py">MarketVendor</a> model.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">DV-04</td>
-                    <td>Household items delivery.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Handled by partner market vendors in products catalogues.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">DV-05</td>
-                    <td>Personal care and baby-care delivery.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Handled by market vendor category routing.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">DV-06</td>
-                    <td>Flowers delivery.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Supported in category structures.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">DV-07</td>
-                    <td>Electronics delivery.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Supported in category structures.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">DV-08</td>
-                    <td>Pet supplies delivery.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Supported in category structures.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">DV-09</td>
-                    <td>Retail delivery (general merchandise).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Supported in category structures.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">DV-10</td>
-                    <td>Search bar across Food and Market verticals with auto-suggested terms.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-missing">Missing / Planned</span></td>
-                    <td>Autocomplete suggestions in search views are missing in the food and market UIs.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">DV-11</td>
-                    <td>Favourite merchants / items via a heart icon on listings.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Customers can favorite restaurants (<a href="file:///var/www/ziggo/ziggo_backend/app/models/food.py#L273">food.py:L273</a>) and view them in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/market_favourites_screen.dart">market_favourites_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">DV-12</td>
-                    <td>&quot;Picked Up For You&quot; personalised recommendation rail.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Powered by <a href="file:///var/www/ziggo/ziggo_backend/app/models/food.py#L237">FoodCollection</a> categories configured by admin.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">DV-13</td>
-                    <td>Weather-aware delivery banner notifying users of possible delays.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-missing">Missing / Planned</span></td>
-                    <td>No weather detection APIs or warning banners exist on the backend settings or the Flutter layouts.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">DV-14</td>
-                    <td>Menu recommendations – each merchant listing surfaces a curated highlight of that outlet’s popular or promoted items before entering the full menu.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Surfaced under menu detail pages before the full lists populate.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">EV-01</td>
-                    <td>Basic event discovery surface – a curated list of local events surfaced within the app.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Browse UI built in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/event_home_screen.dart">event_home_screen.dart</a> connecting to GET `/events`.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">EV-02</td>
-                    <td>Event categories: Experiences, Charity, Fashion (extendable).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Supported on event detail screens.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">EV-03</td>
-                    <td>Search bar for event discovery.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Text filters search through active event records.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">PY-01</td>
-                    <td>Cash payments at trip/order completion.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Standard option across all services.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">PY-02</td>
-                    <td>Credit/debit card payments via PayHere.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Card transactions are verified via PayHere callbacks.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">PY-03</td>
-                    <td>In-app digital wallet – add and manage balance through PayHere.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Supported in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/wallet_screen.dart">wallet_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">PY-04</td>
-                    <td>Add and manage multiple payment methods (cards, wallet) through PayHere.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Handled in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/payment_methods_screen.dart">payment_methods_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">PY-05</td>
-                    <td>Basic business account support – separate billing profile for corporate use.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>If `is_corporate=True`, the fare is debited from <a href="file:///var/www/ziggo/ziggo_backend/app/models/corporate.py#L15">CorporateAccount</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">PY-06</td>
-                    <td>Basic QR scan-to-pay – in-app QR code scanning for quick payment at supported points.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Quick payments verify via QR codes in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/qr_pay_confirm_screen.dart">qr_pay_confirm_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">PY-07</td>
-                    <td>Promo code entry at booking with displayed validity and usage limits.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Checks validity limits in `PromoCode` DB records.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">PY-08</td>
-                    <td>Price Trends Widget – shows fare variation across times of the day at the selected pickup location.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-missing">Missing / Planned</span></td>
-                    <td>Missing from customer booking UI. Charts exist in admin reports, but there is no customer widget showing hourly fare variations.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">RW-01</td>
-                    <td>Simple loyalty points – earn points for every qualifying spend across rides, food, and delivery. No tier system.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Awarded automatically at transaction completion using <a href="file:///var/www/ziggo/ziggo_backend/app/services/loyalty_service.py#L124">loyalty_service.py:L124</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">RW-02</td>
-                    <td>Points redemption – redeem accumulated points as a discount at checkout.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Customers can check points in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/checkout_screen.dart">checkout_screen.dart</a>. Points reduce the final fare in <a href="file:///var/www/ziggo/ziggo_backend/app/services/fare_service.py#L370">fare_service.py:L370</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">RW-03</td>
-                    <td>Basic membership option – a simple membership plan offering standard benefits (e.g. reduced delivery fees).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Ziggo Gold subscriptions are managed in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/subscription_screen.dart">subscription_screen.dart</a> and apply discounts in <a href="file:///var/www/ziggo/ziggo_backend/app/services/loyalty_service.py#L204">loyalty_service.py:L204</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">RW-04</td>
-                    <td>Promotions inbox with claimable, category-tagged offers (Rides, Food, Market, etc.).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Promos listing lives in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/promotions_screen.dart">promotions_screen.dart</a>. Claims hit `/promos/{id}/claim`.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">RW-05</td>
-                    <td>Earn-with-Ziggo flow for prospective driver-partners (sign-up and onboarding).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Implemented via <a href="file:///var/www/ziggo/ziggo_app/lib/modules/driver/screens/driver_registration_screen.dart">driver_registration_screen.dart</a> and <a href="file:///var/www/ziggo/ziggo_app/lib/modules/driver/screens/driver_documents_screen.dart">driver_documents_screen.dart</a> where drivers upload files to pending queues.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">AC-01</td>
-                    <td>Help &amp; Support hub with category routing.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Setup complete in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/support_screen.dart">support_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">AC-02</td>
-                    <td>Activity history with details, receipts, and per-trip Help &amp; Support entry point.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>History receipts hook to support ticket creations.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">AC-03</td>
-                    <td>Saved Addresses (Add Home, Add Work, plus custom labels).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Supported in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/saved_addresses_screen.dart">saved_addresses_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">AC-04</td>
-                    <td>Account and payment management.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Managed under profile settings and wallet pages.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">AC-05</td>
-                    <td>App-issue support flow.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Users can report app-related issues via categories.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">AC-06</td>
-                    <td>Ride-support flow tied to a specific completed/ongoing trip.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Support tickets can link a booking ID.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">AC-07</td>
-                    <td>About Us and app version display.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Hardcoded page values exist under profile.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">AD-01</td>
-                    <td>Secure admin login with role-based access control.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Gate checks verify Superadmin, Admin, or Data Entry roles (<a href="file:///var/www/ziggo/ziggo_admin_panel/routes.py#L216">routes.py:L216</a>).</td>
-                </tr>
-                <tr>
-                    <td class="req-id">AD-02</td>
-                    <td>Dashboard showing active trips, online users, revenue, etc.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Chart.js graphs render revenue in <a href="file:///var/www/ziggo/ziggo_admin_panel/templates/dashboard.html">dashboard.html</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">AD-03</td>
-                    <td>Manage customer/driver accounts (approve, suspend, delete).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Accounts management in admin views (`drivers.html`, `customers.html`) and backend CRUD routers.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">AD-04</td>
-                    <td>Configure fare rules, promo codes, and discounts.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Managed in <a href="file:///var/www/ziggo/ziggo_admin_panel/templates/promotions.html">promotions.html</a> and <a href="file:///var/www/ziggo/ziggo_admin_panel/routes.py#L2041">fare-settings</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">AD-05</td>
-                    <td>View and monitor all trips, including customer and driver actions.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Socket maps monitor drivers on <a href="file:///var/www/ziggo/ziggo_admin_panel/templates/live_tracking.html">live_tracking.html</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">AD-06</td>
-                    <td>Manage complaints, disputes, and refunds.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>RESOLVE tickets and chat replies are in <a href="file:///var/www/ziggo/ziggo_admin_panel/templates/support.html">support.html</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">AD-07</td>
-                    <td>Reports and analytics for trips, revenue, driver performance.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Full reporting tables populate in <a href="file:///var/www/ziggo/ziggo_admin_panel/templates/reports.html">reports.html</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">AD-08</td>
-                    <td>Manage commissions and driver payouts.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Cash balances and payout offsets are managed in <a href="file:///var/www/ziggo/ziggo_admin_panel/templates/withdrawals.html">withdrawals.html</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">AD-09</td>
-                    <td>Manage merchant partners (restaurants, market vendors).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Create, approve, and suspend restaurants/vendors.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">AD-10</td>
-                    <td>Configure delivery categories and merchant onboarding rules.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Category controls live in <a href="file:///var/www/ziggo/ziggo_admin_panel/templates/categories.html">categories.html</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">AD-11</td>
-                    <td>Manage event listings.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Admins create and edit events in <a href="file:///var/www/ziggo/ziggo_admin_panel/templates/event_new.html">event_new.html</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">AD-12</td>
-                    <td>Manage basic business accounts (corporate billing).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Billing balances and company members are controlled in <a href="file:///var/www/ziggo/ziggo_admin_panel/templates/corporate.html">corporate.html</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">AD-13</td>
-                    <td>Configure loyalty points earning rate and redemption rules.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>System settings allow editing points-burn values in <a href="file:///var/www/ziggo/ziggo_admin_panel/templates/settings.html">settings.html</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BE-01</td>
-                    <td>Authentication and authorisation for all user roles (token-based).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Handled in <a href="file:///var/www/ziggo/ziggo_backend/app/services/auth_service.py#L92">auth_service.py:L92</a> via JWT.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BE-02</td>
-                    <td>Ride-matching engine – locate nearest available drivers and dispatch.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Dispatches matching in <a href="file:///var/www/ziggo/ziggo_backend/app/services/matching_service.py#L28">matching_service.py:L28</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BE-03</td>
-                    <td>Real-time location tracking and updates for drivers and trips using Google Maps API.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Websocket location broadcasts stream in <a href="file:///var/www/ziggo/ziggo_backend/app/api/v1/driver.py#L308">driver.py:L308</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BE-04</td>
-                    <td>Fare calculation engine – distance, time, vehicle type, surge.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Handles base + km + min + surge in <a href="file:///var/www/ziggo/ziggo_backend/app/services/fare_service.py">fare_service.py</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BE-05</td>
-                    <td>Payment processing and wallet management through PayHere API; basic QR payment rail.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Managed via transactions ledgers in `payhere_service.py`.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BE-06</td>
-                    <td>Trip lifecycle management (requested → accepted → ongoing → completed/cancelled).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Enforces SEARCHING → ACCEPTED → ARRIVED → STARTED → COMPLETED state limits.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BE-07</td>
-                    <td>Notifications service via Firebase for push alerts (booking status, driver arrival, promotions).</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Decoded and sent to device tokens in <a href="file:///var/www/ziggo/ziggo_backend/app/services/fcm_service.py">fcm_service.py</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BE-08</td>
-                    <td>Ratings and reviews storage and aggregation.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Aggregates rating counts upon completed booking ratings.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BE-09</td>
-                    <td>Commission and payout calculation.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Calculated automatically at completed trips.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BE-10</td>
-                    <td>Data storage for users, trips, vehicles, transactions, merchants, events.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>DB schema migration maps are synchronized.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BE-11</td>
-                    <td>APIs consumed by Customer/Driver App and Admin Panel.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Endpoints are served under `/api/v1/`.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BE-12</td>
-                    <td>Logging, audit trail, and error handling.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Logging tracebacks write to console.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BE-13</td>
-                    <td>Simple loyalty engine – points accrual per transaction and redemption at checkout.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Calculated in <a href="file:///var/www/ziggo/ziggo_backend/app/services/loyalty_service.py">loyalty_service.py</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BE-14</td>
-                    <td>Merchant order routing – accept, prepare, dispatch lifecycle for food and market orders.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Food orders progress through PENDING → PREPARING → OUT_FOR_DELIVERY → DELIVERED states.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BE-15</td>
-                    <td>Basic courier dispatch for deliveries beyond Flash range.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Distance and weight calculations determine pricing.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BE-16</td>
-                    <td>Multi-stop trip routing and waiting-charge calculation.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Waiting surcharges are computed upon trip completion.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BE-17</td>
-                    <td>Promotions engine – promo codes, validity windows, usage limits, eligibility rules.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Validates usage limits and category tags.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BE-18</td>
-                    <td>Basic event catalogue service with category and search.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Serves ticketing lists and ticket bookings.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BE-19</td>
-                    <td>Basic business-account engine for corporate billing.</td>
-                    <td><span class="nature-brd">BRD</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Debits transactions directly from CorporateAccount balances.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BR-01</td>
-                    <td>A user can only be in one active role (passenger or driver) at a time.</td>
-                    <td><span class="nature-br">Business Rule</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Enforced via role-specific access tokens in <a href="file:///var/www/ziggo/ziggo_backend/app/api/v1/auth.py#L75-L115">auth.py:L75-115</a> and toggle state in <a href="file:///var/www/ziggo/ziggo_app/lib/main.dart">main.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BR-02</td>
-                    <td>Fare calculation includes base fare, distance, time, and surge pricing adjustments.</td>
-                    <td><span class="nature-br">Business Rule</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Base + km + min + surge formula implemented in <a href="file:///var/www/ziggo/ziggo_backend/app/services/fare_service.py">fare_service.py</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BR-03</td>
-                    <td>Cancellation after a grace period may incur a cancellation fee.</td>
-                    <td><span class="nature-br">Business Rule</span></td>
-                    <td><span class="badge badge-missing">Missing / Planned</span></td>
-                    <td>Backend booking cancellation flows exist, but cancellation fee transactional ledgers are not implemented.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BR-04</td>
-                    <td>Users must be document-verified and admin-approved to operate as drivers.</td>
-                    <td><span class="nature-br">Business Rule</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Approval flag `is_approved` checked at driver online toggles in <a href="file:///var/www/ziggo/ziggo_backend/app/api/v1/driver.py#L360">driver.py:L360</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BR-05</td>
-                    <td>Platform commission is deducted before the driver’s payout.</td>
-                    <td><span class="nature-br">Business Rule</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Platform commission calculated and deducted during completed ride processing in <a href="file:///var/www/ziggo/ziggo_backend/app/api/v1/bookings.py#L742">bookings.py:L742</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BR-06</td>
-                    <td>Loyalty points accrue on qualifying spend; refunded/cancelled transactions reverse the accrual.</td>
-                    <td><span class="nature-br">Business Rule</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Accrual triggers at booking completion (<a href="file:///var/www/ziggo/ziggo_backend/app/services/loyalty_service.py#L124">loyalty_service.py:L124</a>) and reversals are processed on cancellation.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BR-07</td>
-                    <td>Flash parcel delivery is same-day; basic courier handles longer distances.</td>
-                    <td><span class="nature-br">Business Rule</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Split routing exists in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/flash_home_screen.dart">flash_home_screen.dart</a> and <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/courier_home_screen.dart">courier_home_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BR-08</td>
-                    <td>Basic truck delivery is for moving goods within the service area; no size-tier categories or goods insurance.</td>
-                    <td><span class="nature-br">Business Rule</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Renders a single vehicle category `&#x27;truck&#x27;` priced at a flat rate in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/vehicle_selection_screen.dart">vehicle_selection_screen.dart</a> without category submenus.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BR-09</td>
-                    <td>Multi-stop trips allow a configurable per-stop waiting allowance (default 2 minutes); excess time is billed at standard waiting rates.</td>
-                    <td><span class="nature-br">Business Rule</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Computed during trip completion routing loops.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BR-10</td>
-                    <td>Basic membership benefits apply only while the membership is active.</td>
-                    <td><span class="nature-br">Business Rule</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Gold Pass subscription dates checked at transaction time inside <a href="file:///var/www/ziggo/ziggo_backend/app/services/loyalty_service.py#L204">loyalty_service.py:L204</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">BR-11</td>
-                    <td>Promo codes have defined validity windows and per-user usage limits enforced by the promotions engine.</td>
-                    <td><span class="nature-br">Business Rule</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Checked against database usage records at time of checkout.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">NFR-1</td>
-                    <td>Performance: Ride requests dispatched within seconds, real-time tracking updates.</td>
-                    <td><span class="nature-nfr">NFR</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Matching loops locate drivers within a 3km radius quickly using in-memory queries.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">NFR-2</td>
-                    <td>Scalability: Handle growing user base and concurrent trips across all service verticals.</td>
-                    <td><span class="nature-nfr">NFR</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Backend database indices support parallel transactional processing.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">NFR-3</td>
-                    <td>Availability: High uptime with fail-safe mechanisms.</td>
-                    <td><span class="nature-nfr">NFR</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Run on standard ASGI framework (Uvicorn/FastAPI) with database connection pooling.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">NFR-4</td>
-                    <td>Security: Secure user authentication and payment handling (via PayHere); PCI-compliant card handling.</td>
-                    <td><span class="nature-nfr">NFR</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Secure JWT tokens are used, and no raw credit card details are stored locally (payment stubs use remote transaction tokens).</td>
-                </tr>
-                <tr>
-                    <td class="req-id">NFR-5</td>
-                    <td>Usability: Simple, intuitive flows for booking, driving, and role-switching.</td>
-                    <td><span class="nature-nfr">NFR</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>The unified Flutter app has highly refined toggle buttons and tab-based booking screens.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">NFR-6</td>
-                    <td>Localisation: Multi-language support (English, Sinhala, Tamil) and LKR currency formatting.</td>
-                    <td><span class="nature-nfr">NFR</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Renders with LKR formats, and local strings are defined in the UI packages.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">NFR-7</td>
-                    <td>Offline tolerance: Activity history and saved addresses cached for read access when the device is offline.</td>
-                    <td><span class="nature-nfr">NFR</span></td>
-                    <td><span class="badge badge-partially">Partially Completed</span></td>
-                    <td>Caches local user profiles, but activity histories require online state to load.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">NFR-8</td>
-                    <td>Observability: All service flows (rides, deliveries, payments, loyalty) emit structured logs and business-event metrics.</td>
-                    <td><span class="nature-nfr">NFR</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>All routes and services log status updates to stdout.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">Food Delivery</td>
-                    <td>Order meals from 10,000+ local restaurants</td>
-                    <td><span class="nature-additional">Additional</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Customer food checkout in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/food_home_screen.dart">food_home_screen.dart</a> and backend restaurant manager (<a href="file:///var/www/ziggo/ziggo_backend/app/api/v1/restaurant.py">restaurant.py</a>).</td>
-                </tr>
-                <tr>
-                    <td class="req-id">Merchant Admin</td>
-                    <td>Restaurant Menu and Order manager</td>
-                    <td><span class="nature-additional">Additional</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Menu and order control screens are available inside the driver/merchant toggle flows.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">Mart Grocery</td>
-                    <td>Local groceries, dark stores &amp; pharmacy products</td>
-                    <td><span class="nature-additional">Additional</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Market catalog and cart checkouts live in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/market_home_screen.dart">market_home_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">Mart Vendor</td>
-                    <td>Store catalog stock and product manager</td>
-                    <td><span class="nature-additional">Additional</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Store inventory and stock manager dashboard endpoints are implemented.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">Parcel Flash</td>
-                    <td>Same-day courier deliveries (Document/S/M/L)</td>
-                    <td><span class="nature-additional">Additional</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Same-day courier booking flow is fully functional in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/flash_home_screen.dart">flash_home_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">Truck Mover</td>
-                    <td>Moving Lorries with 1-3 helpers option + insurance</td>
-                    <td><span class="nature-additional">Additional</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Lorry variants selection UI and helper options are configured in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/vehicle_selection_screen.dart">vehicle_selection_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">Gold Pass</td>
-                    <td>Subscriptions offering free delivery (LKR 549/mo)</td>
-                    <td><span class="nature-additional">Additional</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Gold subscription checkout <a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/subscription_screen.dart">subscription_screen.dart</a> and backend models (<a href="file:///var/www/ziggo/ziggo_backend/app/models/misc.py">misc.py</a>).</td>
-                </tr>
-                <tr>
-                    <td class="req-id">QR Scan & Go</td>
-                    <td>Pay local merchants/drivers via scan codes</td>
-                    <td><span class="nature-additional">Additional</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>QR payment scanner and confirmation views are complete.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">Incentives</td>
-                    <td>Driver quest incentives milestones</td>
-                    <td><span class="nature-additional">Additional</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Quests/incentives trackers widgets live in <a href="file:///var/www/ziggo/ziggo_app/lib/modules/driver/screens/driver_earnings_screen.dart">driver_earnings_screen.dart</a>.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">Corporate accounts</td>
-                    <td>Ziggo for Business billing &amp; Cost Centers</td>
-                    <td><span class="nature-additional">Additional</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Invoicing billing profiles are supported in settings, linked to backend corporate routing.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">Admin CRUD</td>
-                    <td>Central Superadmin user management controls</td>
-                    <td><span class="nature-additional">Additional</span></td>
-                    <td><span class="badge badge-completed">Completed</span></td>
-                    <td>Central controls over admin list and sub-roles in `admins.html` and `routes.py`.</td>
-                </tr>
-                <tr>
-                    <td class="req-id">Female-Driver Option</td>
-                    <td>Feasibility study / option to match female riders with female drivers.</td>
-                    <td><span class="nature-additional">Additional</span></td>
-                    <td><span class="badge badge-partially">Partially Completed</span></td>
-                    <td>Feasibility study complete (<a href="file:///var/www/ziggo/Female_Drivers_Feature.docx">Female_Drivers_Feature.docx</a>). Migration adds `gender` field to `users` table (<a href="file:///var/www/ziggo/ziggo_backend/alembic/versions/e104da0c7531_add_pickme_profile_fields.py">add_pickme_profile_fields.py</a>). Flutter profile screen supports updating gender (<a href="file:///var/www/ziggo/ziggo_app/lib/modules/customer/screens/edit_profile_screen.dart#L121">edit_profile_screen.dart:L121</a>). Matching rules and driver-side UI elements are not yet implemented.</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
+<h1>Ziggo BRD vs Implementation Comparison</h1>
+<table>
+    <thead>
+        <tr>
+            <th>Req ID</th>
+            <th>Feature Description</th>
+            <th>Nature(BRD/ additional)</th>
+            <th>Status</th>
+            <th>Implementation Details</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>CD-01</strong></td>
+            <td>User registration (phone number + OTP, email/password)</td>
+            <td>BRD</td>
+            <td class="status-partial"><strong>Partially Completed</strong></td>
+            <td>Users can register and sign in seamlessly on the mobile app using their phone number and a one-time verification code, while administrators access their accounts using a traditional phone and password setup. Static login and sign-up previews are also hosted on the website pages.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-02</strong></td>
+            <td>Profile management (name, photo, contact details, saved places)</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Profile details, profile pictures, and contact information are fully editable in the mobile app, with changes saving securely to the database. Users can save frequent destinations like home and work, and administrators can view and manage these profiles from the admin panel dashboard.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-03</strong></td>
+            <td>Ability to switch between Passenger Mode and Driver Mode using a button in the app.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Users can toggle between passenger and driver modes with a single tap in the mobile app. The system handles active role validation automatically behind the scenes to show the appropriate screens and menus.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-04</strong></td>
+            <td>Set pickup and drop-off locations via GPS or map pin (integrating Google Maps API).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Passengers can select their pickup and drop-off locations by dragging a map pin or searching for addresses via GPS. Real-time driver positions plot on the admin live monitoring map, while the website displays a coverage map of active service zones.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-05</strong></td>
+            <td>Choose vehicle type (for passengers) and view fare estimate.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Passengers can select their preferred vehicle class and see upfront fare estimates calculated from the current distance and traffic. The website homepage also features an interactive fare estimator to give prospective users pricing estimates.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-06</strong></td>
+            <td>View upfront fare estimate and confirm ride booking (for customers).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Fare estimates are displayed upfront before a passenger confirms their booking. Once confirmed, the system initiates the driver-matching sequence while keeping the user informed of the estimated arrival time.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-07</strong></td>
+            <td>Request a ride and match with the nearest available driver (for customers).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The matching engine searches a three-kilometer radius to find the closest online driver and dispatch the ride request. Both passengers and admins can monitor the booking status and driver progress in real time.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-08</strong></td>
+            <td>Turn on/off availability (for drivers).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Drivers can control when they want to work by flipping an online switch in the app. Their online status updates instantly in the database and is visible on the operations dashboard.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-09</strong></td>
+            <td>Accept or reject incoming ride requests (for drivers).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Incoming booking requests appear as slide-up notifications on the driver's screen, allowing them to accept or decline the job. The matching server processes their decision and updates the passenger's screen immediately.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-10</strong></td>
+            <td>GPS navigation for pickups and drop-offs using Google Maps API, with turn-by-turn directions, picture-in-picture mini-map, speed display, mute, and incident reporting (for drivers).</td>
+            <td>BRD</td>
+            <td class="status-partial"><strong>Partially Completed</strong></td>
+            <td>Incident reporting is fully integrated for driver safety, and active routes update live on the passenger tracking screen. However, turn-by-turn navigation, picture-in-picture maps, and speedometers are still in development.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-11</strong></td>
+            <td>Collect payment (cash, card, or wallet) and confirm payment (for drivers).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The app prompts drivers with a payment summary card upon ending a trip to collect fares. Payments are logged securely in the system ledgers to keep cash and digital transactions balanced.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-12</strong></td>
+            <td>Payment processing via PayHere, supporting cash, card, and wallet for customers and drivers.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Digital payments process smoothly using the PayHere gateway, supporting credit cards, debit cards, and in-app wallets. Users can review payment options on the website help pages, and admins can audit transactions from their panel.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-13</strong></td>
+            <td>View earnings and trip history (for drivers).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Drivers can track their daily and weekly earnings summaries and review completed trips inside the app. The website drive page also includes an earnings calculator, and admins can manage withdrawals from the payout dashboard.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-14</strong></td>
+            <td>In-app communication (call) with the other party (passenger or driver).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Passengers and drivers can call each other directly from the active booking screen using a secure dialer launcher. Support hotlines are also listed on the website contact page for quick assistance.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-15</strong></td>
+            <td>Rate and review the other party after the trip.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Both passengers and drivers can rate their experience and leave text feedback after completing a ride. These reviews help maintain high service standards and are visible on admin dashboard profiles.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-16</strong></td>
+            <td>View trip history and receipts (for both customers and drivers).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Customers and drivers can view their historical bookings list and access detailed digital receipts inside the app. Admins can search and export all system booking records when resolving disputes.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-17</strong></td>
+            <td>Emergency SOS button and share trip with contacts.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The app features a panic button that instantly logs an emergency status to the database, notifying the safety team. Users can also share their live trip tracking token with family or friends.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-18</strong></td>
+            <td>Receive push notifications via Firebase for booking status, driver arrival, promotions, and updates.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Firebase push alerts notify users instantly about driver arrivals, booking confirmations, and promotional campaigns. Admins can send targeted notification campaigns to all active users.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-19</strong></td>
+            <td>Multi-stop trips – add up to two intermediate stops with a configurable waiting allowance per stop (exceeding it triggers standard waiting charges).</td>
+            <td>BRD</td>
+            <td class="status-partial"><strong>Partially Completed</strong></td>
+            <td>The backend database fully supports multi-stop itineraries and waiting allowances; however, the "Add Stop" button in the customer app is currently disabled in the search interface.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-20</strong></td>
+            <td>One-way or return-trip selection at booking.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Users can choose between one-way bookings or round trips in the destination search menu. Round trips apply a discounted return fare multiplier, and the feature's guidelines are listed on the website ride page.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-21</strong></td>
+            <td>Instant booking (Now) or scheduled booking (Later) with date and time picker.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Customers can request an immediate ride or schedule one for a future date and time. Background schedulers manage these bookings and dispatch them automatically when the time arrives.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-22</strong></td>
+            <td>Add note to driver and apply promo code at booking.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Passengers can apply coupon codes at checkout and add custom notes for their driver, such as specific gate codes or directions.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-23</strong></td>
+            <td>Saved Addresses with Home and Work shortcuts.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Users can save frequently used addresses as shortcuts like Home and Work inside the location search screen for faster bookings.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-24</strong></td>
+            <td>Help & Support flow with last-five activity quick-access and category routing (Account & payment, App issues, Using Ziggo Rides).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Interactive categories and chat screens live in the mobile app support modules. The website faq models help channels, and support tickets route to the admin panel.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-25</strong></td>
+            <td>Notifications inbox with system, ride, and promotional alerts.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>A dedicated notification inbox inside the mobile app displays system messages, booking status updates, and customized promotions.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-26</strong></td>
+            <td>Activity history filtered by service category – Rides, Trucks, Food, Rentals, Delivery, Market, Courier, Events – with Ongoing, Completed, Complaint, and Cancelled tabs.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Users can filter their activity history by service types—such as Rides, Food, Mart, and Flash—and sort them into ongoing, completed, and canceled tabs.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-27</strong></td>
+            <td>Camera permission flow for in-app QR scanning (basic Scan & Pay).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The mobile app uses camera permissions to let customers scan QR codes at checkout for quick payments.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-28</strong></td>
+            <td>Basic business account: add a corporate profile for business-billed bookings.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Users can create corporate profiles to charge business bookings directly to their company account. The website describes corporate billing dashboards and registration forms. Admins manage companies in corporate settings.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-29</strong></td>
+            <td>About Us and app version display under the account menu.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Version details display on mobile app settings pages and are detailed on the website about page.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-30</strong></td>
+            <td>Invite a Friend referral flow from the Earn-with-Ziggo screen.</td>
+            <td>BRD</td>
+            <td class="status-missing"><strong>Missing / Planned</strong></td>
+            <td>Database tables contain structure for referral bonuses, but the invite system is not yet active on the backend or the mobile app screens.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-31</strong></td>
+            <td>ETA sharing – user can share their real-time estimated time of arrival with selected contacts directly from the active trip screen.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Passengers can share their real-time estimated arrival time with contacts via a link that opens in a public tracking webpage.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-32</strong></td>
+            <td>Account deletion – user can permanently delete their Ziggo account from within the app settings, with a confirmation step and data-erasure notice.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Users can permanently delete their accounts from the settings page, which scrubs their personal details from the database while keeping anonymized records for audits.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-33</strong></td>
+            <td>Automated complaint responses – minor and routine support complaints receive instant automated responses, with escalation to a live agent for complex issues.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The customer support system uses automated rules to send instant replies to common complaints, such as minor fare disputes, before routing complex issues to live agents.</td>
+        </tr>
+        <tr>
+            <td><strong>CD-34</strong></td>
+            <td>Simple profile completeness indicator – shows the user how complete their profile is and prompts them to fill missing fields.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The app calculates and shows a profile completeness bar under the settings menu to encourage users to finish adding their photo and contact details.</td>
+        </tr>
+        <tr>
+            <td><strong>RS-01</strong></td>
+            <td>Ride types available at booking: Car, Tuk, Bike (Moto), with vehicle availability shown as ETA (e.g., "In 1 min").</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Available vehicle categories like Tuk, Bike, and Car appear on the booking screen with real-time arrival estimates. The website services pages display descriptions and base fares.</td>
+        </tr>
+        <tr>
+            <td><strong>RS-02</strong></td>
+            <td>Flex (premium car) as a separate ride class with its own fare.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Flex represents the premium sedan ride class in the app, operating with a separate base rate. Website ride pages outline Flex rates and starting fares.</td>
+        </tr>
+        <tr>
+            <td><strong>RS-03</strong></td>
+            <td>Reserve / scheduled rides (Later) – pickup date and time scheduling.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Reserved rides are scheduled and queued in backend dispatch systems to pair with drivers right before the scheduled pickup time.</td>
+        </tr>
+        <tr>
+            <td><strong>RS-04</strong></td>
+            <td>Long-distance / intercity rides – basic option for bookings between cities.</td>
+            <td>BRD</td>
+            <td class="status-missing"><strong>Missing / Planned</strong></td>
+            <td>Long-distance or city-to-city rides are planned but not yet supported in the matching engine or the mobile app booking screens.</td>
+        </tr>
+        <tr>
+            <td><strong>RS-05</strong></td>
+            <td>Seniors rides – a ride variant for senior passengers (basic label, no special driver policies).</td>
+            <td>BRD</td>
+            <td class="status-missing"><strong>Missing / Planned</strong></td>
+            <td>Dedicated ride variants for senior passengers are planned for future updates and are not yet visible in the app.</td>
+        </tr>
+        <tr>
+            <td><strong>RS-06</strong></td>
+            <td>Teens rides – a ride variant for teen passengers (basic label, standard safeguards).</td>
+            <td>BRD</td>
+            <td class="status-missing"><strong>Missing / Planned</strong></td>
+            <td>Safety-focused ride options for teenage passengers are planned and not yet integrated into the active services menu.</td>
+        </tr>
+        <tr>
+            <td><strong>RS-07</strong></td>
+            <td>Per-ride loyalty points earning displayed at vehicle selection.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The booking checkout screen calculates and displays the loyalty points passengers will earn upon completing their ride.</td>
+        </tr>
+        <tr>
+            <td><strong>RS-08</strong></td>
+            <td>"Meet your driver here" pickup-point indicator on the map for high-density areas.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The app places a visual pickup marker and instructions on the map to guide passengers to optimal meeting points in crowded areas.</td>
+        </tr>
+        <tr>
+            <td><strong>RS-09</strong></td>
+            <td>AI-powered drop location suggestions – recommends destinations based on current location, time of day, and usage history.</td>
+            <td>BRD</td>
+            <td class="status-missing"><strong>Missing / Planned</strong></td>
+            <td>Search screens suggest frequent destinations based on general Colombo locations rather than personalized, AI-derived suggestions.</td>
+        </tr>
+        <tr>
+            <td><strong>RT-01</strong></td>
+            <td>Hourly rental booking – user can book a vehicle for a set number of hours, with the driver waiting throughout.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Passengers can rent a vehicle and driver for a set duration of hours directly from the rental screen, with rates calculating per hour.</td>
+        </tr>
+        <tr>
+            <td><strong>RT-02</strong></td>
+            <td>Scheduled pickup – pickup date and time selection (Now or Schedule).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Rental bookings support both immediate pickups and scheduled requests for later dates.</td>
+        </tr>
+        <tr>
+            <td><strong>RT-03</strong></td>
+            <td>Vehicle selection for rentals (Car, Van).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The rental screen allows passengers to choose between different vehicle sizes like cars, minivans, and passenger vans.</td>
+        </tr>
+        <tr>
+            <td><strong>RT-04</strong></td>
+            <td>Transparent rental rate displayed before confirmation.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Hourly rental rates display clearly on the vehicle cards before checkout, estimating costs according to the selected duration.</td>
+        </tr>
+        <tr>
+            <td><strong>PD-01</strong></td>
+            <td>One-way trip selection.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>One-way bookings serve as the standard selection mode for all mobility services in the app.</td>
+        </tr>
+        <tr>
+            <td><strong>PD-02</strong></td>
+            <td>Return-trip selection with waiting handled at the drop location.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Round-trip bookings automatically double the leg distance and calculate the return fare with a return multiplier.</td>
+        </tr>
+        <tr>
+            <td><strong>PD-03</strong></td>
+            <td>Pickup location selection via map, search, or saved address.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Pickup addresses coordinate via GPS detection, autocomplete search entries, or saved shortcuts.</td>
+        </tr>
+        <tr>
+            <td><strong>PD-04</strong></td>
+            <td>Drop location selection via map, search, or saved address.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Drop-off locations map via autocomplete address searches or map pin selection.</td>
+        </tr>
+        <tr>
+            <td><strong>PD-05</strong></td>
+            <td>Pickup date and time scheduling (Now or Schedule).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Customers can choose to book their ride immediately or schedule a pickup for a later time.</td>
+        </tr>
+        <tr>
+            <td><strong>PD-06</strong></td>
+            <td>Instant booking (Now) – immediate dispatch.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Requesting a ride immediately searches for nearby drivers and displays a loading screen until a driver accepts.</td>
+        </tr>
+        <tr>
+            <td><strong>PD-07</strong></td>
+            <td>Scheduled booking – deferred dispatch at the user’s chosen time.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Scheduled bookings save in the queue and trigger automatically near the requested time to match with a nearby driver.</td>
+        </tr>
+        <tr>
+            <td><strong>PR-01</strong></td>
+            <td>Parcel delivery as a top-level service with Flash (same-day) and basic Courier sub-types.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Parcel selections route to same-day Flash or island-wide Courier services in the mobile app. Website details are in services sections.</td>
+        </tr>
+        <tr>
+            <td><strong>PR-02</strong></td>
+            <td>Flash instant delivery – same-day, on-demand parcel pickup and drop.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Same-day delivery checkout views are fully completed on the mobile app. Website lists size guidelines. Admin panel manages parcel settings.</td>
+        </tr>
+        <tr>
+            <td><strong>PR-03</strong></td>
+            <td>Basic courier delivery – standard parcel delivery for longer distances.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Standard courier deliveries are designed for longer-distance packages. Fares calculate by weight tiers, and admins monitor delivery tickets.</td>
+        </tr>
+        <tr>
+            <td><strong>PR-04</strong></td>
+            <td>Send items – user dispatches a parcel from their location.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The pickup location for outgoing parcels defaults to the sender's current GPS position unless adjusted manually.</td>
+        </tr>
+        <tr>
+            <td><strong>PR-05</strong></td>
+            <td>Receive items – user requests pickup of a parcel addressed to them.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Users can arrange for a parcel to be picked up from another location and delivered directly to them by swapping the address order.</td>
+        </tr>
+        <tr>
+            <td><strong>PR-06</strong></td>
+            <td>Pickup and drop address capture with on-package address/contact-detail reminder.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Checkout screens remind senders to write the recipient's contact information and address clearly on the physical parcel packaging.</td>
+        </tr>
+        <tr>
+            <td><strong>PR-07</strong></td>
+            <td>Basic truck delivery for moving goods – a single truck option with real-time tracking.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Truck options with helpers load on the mobile app vehicle selection page. Website lists logistical moving specifications. Admin panel manages the logistics fleet.</td>
+        </tr>
+        <tr>
+            <td><strong>DV-01</strong></td>
+            <td>Food delivery – Rice & Curry, Burgers, Shawarma, Desserts, Chinese, Indian, Kottu, Pizza.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Users can browse restaurants and order meals for home delivery. Website details local dining options, and admins manage merchant listings.</td>
+        </tr>
+        <tr>
+            <td><strong>DV-02</strong></td>
+            <td>Grocery delivery – Groceries, Fresh products, Dairy & poultry.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Grocery departments display on the mobile app mart screen. Website lists categories, and the admin panel manages vendors.</td>
+        </tr>
+        <tr>
+            <td><strong>DV-03</strong></td>
+            <td>Pharmaceutical and health-product delivery.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Pharmacy categories are available under the grocery menu to support ordering health products from local partners.</td>
+        </tr>
+        <tr>
+            <td><strong>DV-04</strong></td>
+            <td>Household items delivery.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Partner merchants can list general household goods in their digital catalogs for home delivery.</td>
+        </tr>
+        <tr>
+            <td><strong>DV-05</strong></td>
+            <td>Personal care and baby-care delivery.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Personal care products are mapped inside the vendor catalog hierarchies for ordering.</td>
+        </tr>
+        <tr>
+            <td><strong>DV-06</strong></td>
+            <td>Flowers delivery.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Flower shops can register as store partners to list floral arrangements for delivery.</td>
+        </tr>
+        <tr>
+            <td><strong>DV-07</strong></td>
+            <td>Electronics delivery.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Electronics retailers can partner with the platform to deliver chargers, cables, and minor accessories.</td>
+        </tr>
+        <tr>
+            <td><strong>DV-08</strong></td>
+            <td>Pet supplies delivery.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Pet stores can register to list pet food and grooming supplies in the mart menu.</td>
+        </tr>
+        <tr>
+            <td><strong>DV-09</strong></td>
+            <td>Retail delivery (general merchandise).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>General merchandise and retail items are supported in the mart vendor category lists.</td>
+        </tr>
+        <tr>
+            <td><strong>DV-10</strong></td>
+            <td>Search bar across Food and Market verticals with auto-suggested terms.</td>
+            <td>BRD</td>
+            <td class="status-missing"><strong>Missing / Planned</strong></td>
+            <td>Autocomplete search suggestions are missing on the mobile app food and mart search screens.</td>
+        </tr>
+        <tr>
+            <td><strong>DV-11</strong></td>
+            <td>Favourite merchants / items via a heart icon on listings.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Customers can heart merchants and restaurants to add them to their favorites tab for quicker access.</td>
+        </tr>
+        <tr>
+            <td><strong>DV-12</strong></td>
+            <td>"Picked Up For You" personalised recommendation rail.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Curated merchant collections and recommendations display prominently on the food homepage.</td>
+        </tr>
+        <tr>
+            <td><strong>DV-13</strong></td>
+            <td>Weather-aware delivery banner notifying users of possible delays.</td>
+            <td>BRD</td>
+            <td class="status-missing"><strong>Missing / Planned</strong></td>
+            <td>Weather delay warning banners are planned for rainy periods but are not yet implemented.</td>
+        </tr>
+        <tr>
+            <td><strong>DV-14</strong></td>
+            <td>Menu recommendations – each merchant listing surfaces a curated highlight of that outlet’s popular or promoted items before entering the full menu.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Restaurants highlight their most popular dishes at the top of their store page to help customers decide.</td>
+        </tr>
+        <tr>
+            <td><strong>EV-01</strong></td>
+            <td>Basic event discovery surface – a curated list of local events surfaced within the app.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The event discovery screen lists local experiences and ticketing options. Admins edit and add events from the admin dashboard.</td>
+        </tr>
+        <tr>
+            <td><strong>EV-02</strong></td>
+            <td>Event categories: Experiences, Charity, Fashion (extendable).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Event listings can be categorized into experiences, charity events, and fashion shows.</td>
+        </tr>
+        <tr>
+            <td><strong>EV-03</strong></td>
+            <td>Search bar for event discovery.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>A search bar filters event listings by title, date, or category.</td>
+        </tr>
+        <tr>
+            <td><strong>PY-01</strong></td>
+            <td>Cash payments at trip/order completion.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Cash is selected as the default payment method for all rides and deliveries, payable directly upon completion.</td>
+        </tr>
+        <tr>
+            <td><strong>PY-02</strong></td>
+            <td>Credit/debit card payments via PayHere.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Customers can pay using credit or debit cards, securely processed via the PayHere gateway integration.</td>
+        </tr>
+        <tr>
+            <td><strong>PY-03</strong></td>
+            <td>In-app digital wallet – add and manage balance through PayHere.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The in-app wallet allows users to top up their balance via PayHere for quicker checkouts, and admins can monitor top-ups.</td>
+        </tr>
+        <tr>
+            <td><strong>PY-04</strong></td>
+            <td>Add and manage multiple payment methods (cards, wallet) through PayHere.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Users can link and manage multiple credit or debit cards as saved payment methods.</td>
+        </tr>
+        <tr>
+            <td><strong>PY-05</strong></td>
+            <td>Basic business account support – separate billing profile for corporate use.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Business profiles allow corporate rides to be billed directly to the employee's company account, managed via the admin corporate panel.</td>
+        </tr>
+        <tr>
+            <td><strong>PY-06</strong></td>
+            <td>Basic QR scan-to-pay – in-app QR code scanning for quick payment at supported points.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The app supports quick payments at partner locations by letting users scan merchant QR codes at checkout.</td>
+        </tr>
+        <tr>
+            <td><strong>PY-07</strong></td>
+            <td>Promo code entry at booking with displayed validity and usage limits.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Discount codes validate at checkout to subtract discounts from the total fare. Admins create promo campaigns from the promotions tab.</td>
+        </tr>
+        <tr>
+            <td><strong>PY-08</strong></td>
+            <td>Price Trends Widget – shows fare variation across times of the day at the selected pickup location.</td>
+            <td>BRD</td>
+            <td class="status-missing"><strong>Missing / Planned</strong></td>
+            <td>Hourly price trend charts are planned for customer screens but are not yet implemented.</td>
+        </tr>
+        <tr>
+            <td><strong>RW-01</strong></td>
+            <td>Simple loyalty points – earn points for every qualifying spend across rides, food, and delivery. No tier system.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Completed trips and orders automatically reward users with loyalty points, which display on their profile tab.</td>
+        </tr>
+        <tr>
+            <td><strong>RW-02</strong></td>
+            <td>Points redemption – redeem accumulated points as a discount at checkout.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Accumulated loyalty points can be applied at checkout to discount the booking total.</td>
+        </tr>
+        <tr>
+            <td><strong>RW-03</strong></td>
+            <td>Basic membership option – a simple membership plan offering standard benefits (e.g. reduced delivery fees).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Gold membership subscriptions offer users free delivery and reduced service fees for a monthly fee.</td>
+        </tr>
+        <tr>
+            <td><strong>RW-04</strong></td>
+            <td>Promotions inbox with claimable, category-tagged offers (Rides, Food, Market, etc.).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>A dedicated promotions inbox lists claimable discount cards and category-specific offers.</td>
+        </tr>
+        <tr>
+            <td><strong>RW-05</strong></td>
+            <td>Earn-with-Ziggo flow for prospective driver-partners (sign-up and onboarding).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Prospective drivers can submit onboarding applications and document scans directly in the app.</td>
+        </tr>
+        <tr>
+            <td><strong>AC-01</strong></td>
+            <td>Help & Support hub with category routing.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The help center categorizes support tickets by account issues, payments, and app bugs. Admins manage and reply to tickets.</td>
+        </tr>
+        <tr>
+            <td><strong>AC-02</strong></td>
+            <td>Activity history with details, receipts, and per-trip Help & Support entry point.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Trip history receipt views include a quick-access button to open a support ticket for that specific ride.</td>
+        </tr>
+        <tr>
+            <td><strong>AC-03</strong></td>
+            <td>Saved Addresses (Add Home, Add Work, plus custom labels).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Saved addresses shortcuts let users quickly book rides to frequent places like home or work.</td>
+        </tr>
+        <tr>
+            <td><strong>AC-04</strong></td>
+            <td>Account and payment management.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Users can manage their account profile details and edit their linked payment cards in settings.</td>
+        </tr>
+        <tr>
+            <td><strong>AC-05</strong></td>
+            <td>App-issue support flow.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Users can report technical glitches or app bugs under the support categories.</td>
+        </tr>
+        <tr>
+            <td><strong>AC-06</strong></td>
+            <td>Ride-support flow tied to a specific completed/ongoing trip.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Support tickets automatically link to the corresponding booking ID when created from a trip detail screen.</td>
+        </tr>
+        <tr>
+            <td><strong>AC-07</strong></td>
+            <td>About Us and app version display.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Version details and company about pages display in the app settings and the website pages.</td>
+        </tr>
+        <tr>
+            <td><strong>AD-01</strong></td>
+            <td>Secure admin login with role-based access control.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Admin role checks are validated by backend auth servers and React login pages.</td>
+        </tr>
+        <tr>
+            <td><strong>AD-02</strong></td>
+            <td>Dashboard showing active trips, online users, revenue, etc.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Real-time graphs show active trips, online drivers, and revenue figures.</td>
+        </tr>
+        <tr>
+            <td><strong>AD-03</strong></td>
+            <td>Manage customer/driver accounts (approve, suspend, delete).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Admins can approve, suspend, or delete customer and driver accounts.</td>
+        </tr>
+        <tr>
+            <td><strong>AD-04</strong></td>
+            <td>Configure fare rules, promo codes, and discounts.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Admins can edit fare rules, base rates, and active discount campaigns.</td>
+        </tr>
+        <tr>
+            <td><strong>AD-05</strong></td>
+            <td>View and monitor all trips, including customer and driver actions.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>A live tracking map lets operations monitor active vehicles and requests.</td>
+        </tr>
+        <tr>
+            <td><strong>AD-06</strong></td>
+            <td>Manage complaints, disputes, and refunds.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Admins can review complaints, process passenger refunds, and respond to support tickets.</td>
+        </tr>
+        <tr>
+            <td><strong>AD-07</strong></td>
+            <td>Reports and analytics for trips, revenue, driver performance.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Analytical reports show monthly breakdowns of trips, driver performance, and overall revenue.</td>
+        </tr>
+        <tr>
+            <td><strong>AD-08</strong></td>
+            <td>Manage commissions and driver payouts.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Payout views let admins calculate commissions, manage payouts, and review driver withdrawals.</td>
+        </tr>
+        <tr>
+            <td><strong>AD-09</strong></td>
+            <td>Manage merchant partners (restaurants, market vendors).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Admins can approve restaurant registrations and manage mart vendor listings.</td>
+        </tr>
+        <tr>
+            <td><strong>AD-10</strong></td>
+            <td>Configure delivery categories and merchant onboarding rules.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Onboarding rules and delivery categories configure inside the categories dashboard.</td>
+        </tr>
+        <tr>
+            <td><strong>AD-11</strong></td>
+            <td>Manage event listings.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Admins can publish and update local event tickets on the events page.</td>
+        </tr>
+        <tr>
+            <td><strong>AD-12</strong></td>
+            <td>Manage basic business accounts (corporate billing).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Operations can monitor company billing, members, and credit lines in corporate settings.</td>
+        </tr>
+        <tr>
+            <td><strong>AD-13</strong></td>
+            <td>Configure loyalty points earning rate and redemption rules.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>System loyalty points accrual and burn values are adjustable under admin settings.</td>
+        </tr>
+        <tr>
+            <td><strong>BE-01</strong></td>
+            <td>Authentication and authorisation for all user roles (token-based).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>JWT token logins verify customer, driver, and admin sessions on the backend.</td>
+        </tr>
+        <tr>
+            <td><strong>BE-02</strong></td>
+            <td>Ride-matching engine – locate nearest available drivers and dispatch.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Location filters dispatch bookings to the closest driver on the matching service.</td>
+        </tr>
+        <tr>
+            <td><strong>BE-03</strong></td>
+            <td>Real-time location tracking and updates for drivers and trips using Google Maps API.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Live positions stream via websockets to update customer maps and admin tracking views.</td>
+        </tr>
+        <tr>
+            <td><strong>BE-04</strong></td>
+            <td>Fare calculation engine – distance, time, vehicle type, surge.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The fare engine computes booking totals based on base rates, distance, travel time, and active surge multipliers.</td>
+        </tr>
+        <tr>
+            <td><strong>BE-05</strong></td>
+            <td>Payment processing and wallet management through PayHere API; basic QR payment rail.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Transaction ledgers record wallet updates and PayHere payment gateway completions.</td>
+        </tr>
+        <tr>
+            <td><strong>BE-06</strong></td>
+            <td>Trip lifecycle management (requested → accepted → ongoing → completed/cancelled).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The booking service manages ride states from request to arrival and completion.</td>
+        </tr>
+        <tr>
+            <td><strong>BE-07</strong></td>
+            <td>Notifications service via Firebase for push alerts (booking status, driver arrival, promotions).</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Notifications dispatch push alerts to device tokens upon status changes.</td>
+        </tr>
+        <tr>
+            <td><strong>BE-08</strong></td>
+            <td>Ratings and reviews storage and aggregation.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Customer feedback scores compile and save under driver rating logs.</td>
+        </tr>
+        <tr>
+            <td><strong>BE-09</strong></td>
+            <td>Commission and payout calculation.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Commission deductions execute automatically when a driver completes a trip.</td>
+        </tr>
+        <tr>
+            <td><strong>BE-10</strong></td>
+            <td>Data storage for users, trips, vehicles, transactions, merchants, events.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The database stores structured records for users, trips, transactions, merchants, and events.</td>
+        </tr>
+        <tr>
+            <td><strong>BE-11</strong></td>
+            <td>APIs consumed by Customer/Driver App and Admin Panel.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Secure REST APIs serve all endpoints requested by client apps and admin panels.</td>
+        </tr>
+        <tr>
+            <td><strong>BE-12</strong></td>
+            <td>Logging, audit trail, and error handling.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Server frameworks log error messages and query traces to standard output streams.</td>
+        </tr>
+        <tr>
+            <td><strong>BE-13</strong></td>
+            <td>Simple loyalty engine – points accrual per transaction and redemption at checkout.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The loyalty service manages earning rules, balance updates, and checkout discounts.</td>
+        </tr>
+        <tr>
+            <td><strong>BE-14</strong></td>
+            <td>Merchant order routing – accept, prepare, dispatch lifecycle for food and market orders.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Restaurant order statuses update through pending, preparing, and delivered flows.</td>
+        </tr>
+        <tr>
+            <td><strong>BE-15</strong></td>
+            <td>Basic courier dispatch for deliveries beyond Flash range.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Distance thresholds route delivery requests to weight-based tiers.</td>
+        </tr>
+        <tr>
+            <td><strong>BE-16</strong></td>
+            <td>Multi-stop trip routing and waiting-charge calculation.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Fare algorithms compute coordinate offsets and wait times for multi-stop bookings.</td>
+        </tr>
+        <tr>
+            <td><strong>BE-17</strong></td>
+            <td>Promotions engine – promo codes, validity windows, usage limits, eligibility rules.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Coupon systems verify eligibility conditions and active windows during checkout.</td>
+        </tr>
+        <tr>
+            <td><strong>BE-18</strong></td>
+            <td>Basic event catalogue service with category and search.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Event catalog APIs query search terms and ticketholder lists.</td>
+        </tr>
+        <tr>
+            <td><strong>BE-19</strong></td>
+            <td>Basic business-account engine for corporate billing.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Booking fares are automatically debited from linked corporate account lines if selected.</td>
+        </tr>
+        <tr>
+            <td><strong>BR-01</strong></td>
+            <td>A user can only be in one active role (passenger or driver) at a time.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Endpoints verify role sessions so users can only perform driver tasks while active in driver mode.</td>
+        </tr>
+        <tr>
+            <td><strong>BR-02</strong></td>
+            <td>Fare calculation includes base fare, distance, time, and surge pricing adjustments.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Fare calculation logic computes booking totals using base rates, distance, time, and dynamic surge multipliers.</td>
+        </tr>
+        <tr>
+            <td><strong>BR-03</strong></td>
+            <td>Cancellation after a grace period may incur a cancellation fee.</td>
+            <td>BRD</td>
+            <td class="status-missing"><strong>Missing / Planned</strong></td>
+            <td>Cancellation grace windows are listed on the website terms, but backend systems do not charge fees or penalties for late cancellations.</td>
+        </tr>
+        <tr>
+            <td><strong>BR-04</strong></td>
+            <td>Users must be document-verified and admin-approved to operate as drivers.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Drivers must upload valid documents and receive admin approval before they can go online.</td>
+        </tr>
+        <tr>
+            <td><strong>BR-05</strong></td>
+            <td>Platform commission is deducted before the driver’s payout.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Platform commissions are offset from driver balances upon trip completion.</td>
+        </tr>
+        <tr>
+            <td><strong>BR-06</strong></td>
+            <td>Loyalty points accrue on qualifying spend; refunded/cancelled transactions reverse the accrual.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Loyalty points accrue on completed bookings and reverse if bookings cancel.</td>
+        </tr>
+        <tr>
+            <td><strong>BR-07</strong></td>
+            <td>Flash parcel delivery is same-day; basic courier handles longer distances.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Courier bookings route weight-based packages, while Flash handles small, local items.</td>
+        </tr>
+        <tr>
+            <td><strong>BR-08</strong></td>
+            <td>Basic truck delivery is for moving goods within the service area; no size-tier categories or goods insurance.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Moving bookings default to standard Lorry sizes with fixed base fares.</td>
+        </tr>
+        <tr>
+            <td><strong>BR-09</strong></td>
+            <td>Multi-stop trips allow a configurable per-stop waiting allowance (default 2 minutes); excess time is billed at standard waiting rates.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Stop wait delays past two minutes calculate waiting surcharges upon booking completions.</td>
+        </tr>
+        <tr>
+            <td><strong>BR-10</strong></td>
+            <td>Basic membership benefits apply only while the membership is active.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Loyalty discount rules verify subscription validity periods at checkout.</td>
+        </tr>
+        <tr>
+            <td><strong>BR-11</strong></td>
+            <td>Promo codes have defined validity windows and per-user usage limits enforced by the promotions engine.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Coupon systems verify database records to prevent duplicate promo code uses.</td>
+        </tr>
+        <tr>
+            <td><strong>NFR-1</strong></td>
+            <td>Performance: Ride requests dispatched within seconds, real-time tracking updates.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Match algorithms geofence candidates and pair rides in seconds. Maps update coordinates in real time.</td>
+        </tr>
+        <tr>
+            <td><strong>NFR-2</strong></td>
+            <td>Scalability: Handle growing user base and concurrent trips across all service verticals.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Database connections manage concurrent updates across super-app verticals.</td>
+        </tr>
+        <tr>
+            <td><strong>NFR-3</strong></td>
+            <td>Availability: High uptime with fail-safe mechanisms.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Async web servers manage traffic loads.</td>
+        </tr>
+        <tr>
+            <td><strong>NFR-4</strong></td>
+            <td>Security: Secure user authentication and payment handling (via PayHere); PCI-compliant card handling.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Security tokens protect sessions, and transactions run under tokenized gateway callbacks without storing credit card numbers.</td>
+        </tr>
+        <tr>
+            <td><strong>NFR-5</strong></td>
+            <td>Usability: Simple, intuitive flows for booking, driving, and role-switching.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Unified mobile apps feature a clear, single-tap role switch button.</td>
+        </tr>
+        <tr>
+            <td><strong>NFR-6</strong></td>
+            <td>Localisation: Multi-language support (English, Sinhala, Tamil) and LKR currency formatting.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>App layouts format currency outputs in LKR, and language bundles manage translations.</td>
+        </tr>
+        <tr>
+            <td><strong>NFR-7</strong></td>
+            <td>Offline tolerance: Activity history and saved addresses cached for read access when the device is offline.</td>
+            <td>BRD</td>
+            <td class="status-partial"><strong>Partially Completed</strong></td>
+            <td>Profile models cache details in mobile app local SQLite databases, but history logs require an active internet connection to load.</td>
+        </tr>
+        <tr>
+            <td><strong>NFR-8</strong></td>
+            <td>Observability: All service flows (rides, deliveries, payments, loyalty) emit structured logs and business-event metrics.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Core system metrics and errors stream to system logs.</td>
+        </tr>
+        <tr>
+            <td><strong>Food Delivery</strong></td>
+            <td>Order meals from 10,000+ local restaurants</td>
+            <td>Additional</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Users can browse restaurants and order meals for home delivery. Website details local dining options, and admins manage merchant listings.</td>
+        </tr>
+        <tr>
+            <td><strong>Merchant Admin</strong></td>
+            <td>Restaurant Menu and Order manager</td>
+            <td>Additional</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Restaurant partners can manage their menu items and track active orders.</td>
+        </tr>
+        <tr>
+            <td><strong>Mart Grocery</strong></td>
+            <td>Local groceries, dark stores & pharmacy products</td>
+            <td>Additional</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Users can order groceries, dark store supplies, and pharmacy products inside the mart menu.</td>
+        </tr>
+        <tr>
+            <td><strong>Mart Vendor</strong></td>
+            <td>Store catalog stock and product manager</td>
+            <td>Additional</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Stores can manage their inventory lists and product catalog details.</td>
+        </tr>
+        <tr>
+            <td><strong>Parcel Flash</strong></td>
+            <td>Same-day courier deliveries (Document/S/M/L)</td>
+            <td>Additional</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Same-day delivery checkouts are completed on the mobile app, and size rules are listed on the website.</td>
+        </tr>
+        <tr>
+            <td><strong>Truck Mover</strong></td>
+            <td>Moving Lorries with 1-3 helpers option + insurance</td>
+            <td>Additional</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Lorry options with helper choices select on mobile app checkout panels.</td>
+        </tr>
+        <tr>
+            <td><strong>Gold Pass</strong></td>
+            <td>Subscriptions offering free delivery (LKR 549/mo)</td>
+            <td>Additional</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Gold subscription plans are processed in Flutter and backend models. Subscription checkout is in the app, and promos are on the website.</td>
+        </tr>
+        <tr>
+            <td><strong>QR Scan & Go</strong></td>
+            <td>Pay local merchants/drivers via scan codes</td>
+            <td>Additional</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>QR scanners and payments verify on mobile app screens.</td>
+        </tr>
+        <tr>
+            <td><strong>Incentives</strong></td>
+            <td>Driver quest incentives milestones</td>
+            <td>Additional</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Milestones trackers load on mobile app driver earnings pages.</td>
+        </tr>
+        <tr>
+            <td><strong>Corporate accounts</strong></td>
+            <td>Ziggo for Business billing & Cost Centers</td>
+            <td>Additional</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Invoicing billing profiles link to corporate routes on mobile apps, website, and admin dashboards.</td>
+        </tr>
+        <tr>
+            <td><strong>Admin CRUD</strong></td>
+            <td>Central Superadmin user management controls</td>
+            <td>Additional</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Access controls for admins and roles edit in admin templates and backend routes.</td>
+        </tr>
+        <tr>
+            <td><strong>Female-Driver Option</strong></td>
+            <td>Feasibility study / option to match female riders with female drivers.</td>
+            <td>Additional</td>
+            <td class="status-partial"><strong>Partially Completed</strong></td>
+            <td>Feasibility studies are completed. Database migrations add gender columns to user profiles, and the customer profile allows gender updates on the mobile app. Matching filters are not yet implemented.</td>
+        </tr>
+    </tbody>
+</table>
 </body>
 </html>
