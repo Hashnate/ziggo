@@ -50,8 +50,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   StreamSubscription<Position>? _speedSub;
   StreamSubscription<RemoteMessage>? _notificationSubscription;
   bool _isShowingRideRequest = false;
-  bool _incentivesExpanded = true;   // PickMe bottom panel collapse/expand
+  bool _incentivesExpanded = true;
   bool _activeRideExpanded = true;
+  int _activeIncentiveIndex = 0;
+  final PageController _incentivePageController = PageController(initialPage: 0);
+
 
   @override
   void initState() {
@@ -128,6 +131,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   void dispose() {
     _speedSub?.cancel();
     _notificationSubscription?.cancel();
+    _incentivePageController.dispose();
     super.dispose();
   }
 
@@ -979,10 +983,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                             )
                           else ...[
                             SizedBox(
-                              height: 150,
+                              height: 145,
                               child: PageView.builder(
-                                controller: PageController(initialPage: 0),
+                                controller: _incentivePageController,
                                 itemCount: incentives.length,
+                                onPageChanged: (index) {
+                                  setState(() {
+                                    _activeIncentiveIndex = index;
+                                  });
+                                },
                                 itemBuilder: (context, index) {
                                   final inc = incentives[index];
                                   final activeIndex = index + 1;
@@ -990,36 +999,39 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                                   final activeReward = (inc['reward_amount'] as num).toDouble();
                                   final previousTrips = index > 0 ? (incentives[index - 1]['trips_required'] as num).toInt() : 0;
 
-                                  // Calculate progress fraction for this specific tier
-                                  double progressFraction = 0.0;
-                                  if (todayRides >= activeTrips) {
-                                    progressFraction = 1.0;
-                                  } else if (todayRides > previousTrips) {
-                                    progressFraction = (todayRides - previousTrips) / (activeTrips - previousTrips);
-                                  }
-                                  progressFraction = progressFraction.clamp(0.0, 1.0);
-
                                   return Container(
                                     width: double.infinity,
-                                    padding: const EdgeInsets.all(16),
                                     decoration: BoxDecoration(
                                       color: AppColors.surfaceMuted,
-                                      borderRadius: BorderRadius.circular(20),
+                                      borderRadius: BorderRadius.horizontal(
+                                        left: Radius.circular(index == 0 ? 20 : 0),
+                                        right: Radius.circular(index == incentives.length - 1 ? 20 : 0),
+                                      ),
                                     ),
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(
-                                          '$activeIndex. Complete $activeTrips trips to earn an additional LKR ${activeReward.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}.',
-                                          style: const TextStyle(
-                                            color: AppColors.textPrimary,
-                                            fontWeight: FontWeight.w900,
-                                            fontSize: 14,
-                                            height: 1.3,
+                                        Padding(
+                                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                                          child: Text(
+                                            '$activeIndex. Complete $activeTrips trips to earn an additional LKR ${activeReward.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}.',
+                                            style: const TextStyle(
+                                              color: AppColors.textPrimary,
+                                              fontWeight: FontWeight.w900,
+                                              fontSize: 14,
+                                              height: 1.3,
+                                            ),
                                           ),
                                         ),
-                                        const SizedBox(height: 20),
-                                        _unifiedIncentivesProgress(todayRides, previousTrips, activeTrips, progressFraction),
+                                        const Spacer(),
+                                        _segmentProgress(
+                                          index: index,
+                                          totalSegments: incentives.length,
+                                          todayRides: todayRides,
+                                          startTrips: previousTrips,
+                                          endTrips: activeTrips,
+                                        ),
+                                        const SizedBox(height: 16),
                                       ],
                                     ),
                                   );
@@ -1059,45 +1071,73 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
 
-  Widget _unifiedIncentivesProgress(int todayRides, int start, int end, double progressFraction) {
+  Widget _segmentProgress({
+    required int index,
+    required int totalSegments,
+    required int todayRides,
+    required int startTrips,
+    required int endTrips,
+  }) {
+    // Calculate progress fraction for this segment
+    double fraction = 0.0;
+    if (todayRides >= endTrips) {
+      fraction = 1.0;
+    } else if (todayRides > startTrips) {
+      fraction = (todayRides - startTrips) / (endTrips - startTrips);
+    }
+    fraction = fraction.clamp(0.0, 1.0);
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Stack(
               clipBehavior: Clip.none,
-              alignment: Alignment.centerLeft,
               children: [
-                // 1. Progress Bar Background Track with outline
+                // 1. Track Background
                 Container(
                   height: 24,
                   decoration: BoxDecoration(
                     color: const Color(0xFFD1D5DB),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF4B5563), width: 1.5),
+                    borderRadius: BorderRadius.horizontal(
+                      left: Radius.circular(index == 0 ? 12 : 0),
+                      right: Radius.circular(index == totalSegments - 1 ? 12 : 0),
+                    ),
+                    border: Border(
+                      top: const BorderSide(color: Color(0xFF4B5563), width: 1.5),
+                      bottom: const BorderSide(color: Color(0xFF4B5563), width: 1.5),
+                      left: index == 0 ? const BorderSide(color: Color(0xFF4B5563), width: 1.5) : BorderSide.none,
+                      right: index == totalSegments - 1 ? const BorderSide(color: Color(0xFF4B5563), width: 1.5) : BorderSide.none,
+                    ),
                   ),
                 ),
-                // 2. Orange Filled Progress with outline
-                if (progressFraction > 0)
+                // 2. Orange Filled Progress
+                if (fraction > 0)
                   Container(
                     height: 24,
-                    width: width * progressFraction,
+                    width: width * fraction,
                     decoration: BoxDecoration(
                       color: const Color(0xFFF97316),
                       borderRadius: BorderRadius.horizontal(
-                        left: const Radius.circular(12),
-                        right: Radius.circular(progressFraction >= 1.0 ? 12 : 0),
+                        left: Radius.circular(index == 0 ? 12 : 0),
+                        right: Radius.circular(fraction >= 1.0 && index == totalSegments - 1 ? 12 : 0),
                       ),
-                      border: Border.all(color: const Color(0xFF4B5563), width: 1.5),
+                      border: Border(
+                        top: const BorderSide(color: Color(0xFF4B5563), width: 1.5),
+                        bottom: const BorderSide(color: Color(0xFF4B5563), width: 1.5),
+                        left: index == 0 ? const BorderSide(color: Color(0xFF4B5563), width: 1.5) : BorderSide.none,
+                        right: fraction >= 1.0 && index == totalSegments - 1
+                            ? const BorderSide(color: Color(0xFF4B5563), width: 1.5)
+                            : BorderSide.none,
+                      ),
                     ),
                   ),
-                // 3. Centered progress text inside the bar
+                // 3. Centered progress text inside the bar segment
                 Positioned.fill(
                   child: Center(
                     child: Text(
-                      '$todayRides/$end',
+                      '$todayRides/$endTrips',
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w900,
@@ -1114,10 +1154,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   ),
                 ),
                 // 4. Milestone Markers (concentric circles on the track)
-                // Left marker (start) - only if start > 0
-                if (start > 0)
+                // Left marker (only if index > 0)
+                if (index > 0)
                   Positioned(
-                    left: 0,
+                    left: -12,
+                    top: 0,
                     child: Container(
                       width: 24,
                       height: 24,
@@ -1131,16 +1172,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         width: 12,
                         height: 12,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: todayRides >= startTrips ? const Color(0xFFF97316) : Colors.white,
                           shape: BoxShape.circle,
                           border: Border.all(color: const Color(0xFF9CA3AF), width: 1.5),
                         ),
                       ),
                     ),
                   ),
-                // Right marker (end)
+                // Right marker
                 Positioned(
-                  right: 0,
+                  right: index == totalSegments - 1 ? 0 : -12,
+                  top: 0,
                   child: Container(
                     width: 24,
                     height: 24,
@@ -1154,7 +1196,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       width: 12,
                       height: 12,
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: todayRides >= endTrips ? const Color(0xFFF97316) : Colors.white,
                         shape: BoxShape.circle,
                         border: Border.all(color: const Color(0xFF9CA3AF), width: 1.5),
                       ),
@@ -1170,12 +1212,24 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  if (start > 0)
+                  if (index > 0)
                     Positioned(
-                      left: 0,
+                      left: -6,
                       child: Text(
-                        '$start',
+                        '$startTrips',
                         style: const TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 10,
+                        ),
+                      ),
+                    )
+                  else
+                    const Positioned(
+                      left: 6,
+                      child: Text(
+                        '0',
+                        style: TextStyle(
                           color: Color(0xFF6B7280),
                           fontWeight: FontWeight.w800,
                           fontSize: 10,
@@ -1183,9 +1237,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       ),
                     ),
                   Positioned(
-                    right: 0,
+                    right: index == totalSegments - 1 ? 8 : -6,
                     child: Text(
-                      '$end',
+                      '$endTrips',
                       style: const TextStyle(
                         color: Color(0xFF6B7280),
                         fontWeight: FontWeight.w800,
