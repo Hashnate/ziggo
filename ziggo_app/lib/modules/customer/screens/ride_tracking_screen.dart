@@ -566,7 +566,8 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
               onPressed: () {
                 Navigator.of(ctx).pop();
                 if (mounted) {
-                  Navigator.of(context).pop();
+                  context.read<BookingProvider>().clearActiveBookingLocally();
+                  Navigator.popUntil(context, (r) => r.isFirst);
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -1362,7 +1363,7 @@ class _ActionRow extends StatelessWidget {
                     
                     final bookingId = provider.activeBooking?['id'] as int?;
                     provider.clearActiveBookingLocally();
-                    navigator.pop();
+                    navigator.popUntil((r) => r.isFirst);
                     
                     if (bookingId != null) {
                       await provider.cancelActiveSilently(bookingId: bookingId, reason: r);

@@ -65,12 +65,18 @@ class _HomeScreenState extends State<HomeScreen> {
     final booking = context.watch<BookingProvider>();
     final active = booking.activeBooking;
 
-    if (active != null && !_autoRedirected) {
+    final isRideActive = active != null &&
+        (active['status'] == 'searching' ||
+         active['status'] == 'accepted' ||
+         active['status'] == 'arrived' ||
+         active['status'] == 'started');
+
+    if (isRideActive && !_autoRedirected) {
       _autoRedirected = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _open(const RideTrackingScreen());
       });
-    } else if (active == null) {
+    } else if (!isRideActive) {
       _autoRedirected = false;
     }
 
@@ -89,7 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onProfile: () => _open(const ProfileScreen()),
             ),
             const SizedBox(height: 20),
-            if (active != null)
+            if (isRideActive)
               _ActiveRideCard(
                 active: active,
                 onTap: () => _open(const RideTrackingScreen()),
