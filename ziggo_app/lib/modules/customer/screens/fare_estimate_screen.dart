@@ -27,6 +27,7 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
   List<Map<String, dynamic>> _nearbyDrivers = const [];
   Timer? _nearbyTimer;
   DateTime? _scheduledTime;
+  String _tripType = 'one_way';
 
   @override
   void initState() {
@@ -241,38 +242,58 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
                 margin: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(28),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 4)),
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8),
+                    ),
                   ],
-                  border: Border.all(color: Colors.blueAccent, width: 3), // Emphasizing the bottom sheet similar to the UI markup
+                  border: Border.all(color: AppColors.cardBorder, width: 1),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Top row with "Later" and "GPS" buttons
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           GestureDetector(
                             onTap: _handleLaterTap,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                               decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                                boxShadow: AppStyles.shadowSm,
+                                color: const Color(0xFFF3F3F3),
+                                borderRadius: BorderRadius.circular(100),
                               ),
                               child: Row(
                                 children: [
-                                  Icon(widget.isTruckMode ? Icons.local_shipping_rounded : Icons.directions_car_rounded, size: 18),
-                                  const SizedBox(width: 6),
-                                  const Icon(Icons.access_time_rounded, size: 14),
+                                  Icon(
+                                    widget.isTruckMode
+                                        ? Icons.local_shipping_rounded
+                                        : Icons.directions_car_filled_rounded,
+                                    size: 18,
+                                    color: Colors.black87,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Icon(
+                                    Icons.access_time_filled_rounded,
+                                    size: 14,
+                                    color: Colors.black87,
+                                  ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    _scheduledTime != null ? _formatDateTime(_scheduledTime!) : 'Later',
-                                    style: const TextStyle(fontWeight: FontWeight.w700),
+                                    _scheduledTime != null
+                                        ? _formatDateTime(_scheduledTime!)
+                                        : 'Later',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.black87,
+                                      fontSize: 13,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -281,122 +302,239 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
                           GestureDetector(
                             onTap: _moveToCurrentLocation,
                             child: Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: AppStyles.shadowSm),
-                              child: const Icon(Icons.my_location_rounded, size: 20),
+                              padding: const EdgeInsets.all(8),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFF3F3F3),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.my_location_rounded,
+                                size: 18,
+                                color: Colors.black87,
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    
-                    // Central Card inside the bottom sheet
+                    const SizedBox(height: 16),
+
+                    // Trip Type Toggle Row
                     Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      margin: const EdgeInsets.symmetric(horizontal: 20),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: AppStyles.shadowSm,
+                        color: AppColors.surfaceMuted,
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => _openSearch(tripType: 'one_way'),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: _tripType == 'one_way'
+                                      ? Colors.white
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: _tripType == 'one_way'
+                                      ? [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.05),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          )
+                                        ]
+                                      : null,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      _tripType == 'one_way'
+                                          ? Icons.check_circle_rounded
+                                          : Icons.radio_button_unchecked_rounded,
+                                      size: 16,
+                                      color: _tripType == 'one_way'
+                                          ? Colors.black87
+                                          : AppColors.textSecondary,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'One way',
+                                      style: TextStyle(
+                                        fontWeight: _tripType == 'one_way'
+                                            ? FontWeight.w800
+                                            : FontWeight.w600,
+                                        color: _tripType == 'one_way'
+                                            ? Colors.black87
+                                            : AppColors.textSecondary,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => _openSearch(tripType: 'return'),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: _tripType == 'return'
+                                      ? Colors.white
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: _tripType == 'return'
+                                      ? [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.05),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          )
+                                        ]
+                                      : null,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      _tripType == 'return'
+                                          ? Icons.check_circle_rounded
+                                          : Icons.radio_button_unchecked_rounded,
+                                      size: 16,
+                                      color: _tripType == 'return'
+                                          ? Colors.black87
+                                          : AppColors.textSecondary,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Return trip*',
+                                      style: TextStyle(
+                                        fontWeight: _tripType == 'return'
+                                            ? FontWeight.w800
+                                            : FontWeight.w600,
+                                        color: _tripType == 'return'
+                                            ? Colors.black87
+                                            : AppColors.textSecondary,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Pickup & Drop locations
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                       child: Column(
                         children: [
-                          // Trip Type Toggle Fake UI
                           Row(
                             children: [
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () => _openSearch(tripType: 'one_way'),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.surfaceMuted,
-                                      borderRadius: const BorderRadius.only(topLeft: Radius.circular(16)),
-                                    ),
-                                    child: const Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(Icons.check_circle_rounded, size: 16),
-                                        SizedBox(width: 6),
-                                        Text('One way', style: TextStyle(fontWeight: FontWeight.w800)),
-                                      ],
-                                    ),
+                              const SizedBox(
+                                width: 60,
+                                child: Text(
+                                  'PICKUP',
+                                  style: TextStyle(
+                                    color: AppColors.primary,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.5,
                                   ),
                                 ),
                               ),
                               Expanded(
                                 child: GestureDetector(
-                                  onTap: () => _openSearch(tripType: 'return'),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.only(topRight: Radius.circular(16)),
-                                    ),
-                                    child: const Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(Icons.radio_button_unchecked_rounded, size: 16, color: AppColors.textSecondary),
-                                        SizedBox(width: 6),
-                                        Text('Return trip*', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-                                      ],
-                                    ),
+                                  onTap: () => _openSearch(focusDrop: false),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          _currentLocation?.name ?? 'Your location',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 15,
+                                            color: Colors.black87,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const Icon(
+                                        Icons.favorite_border_rounded,
+                                        size: 20,
+                                        color: Colors.black87,
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
                             ],
                           ),
-                          
-                          // Locations
                           Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Row(
-                              children: [
-                                Column(
-                                  children: [
-                                    const Text('PICKUP', style: TextStyle(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.w900)),
-                                    Container(height: 20, width: 2, color: AppColors.divider),
-                                    const Text('DROP', style: TextStyle(color: AppColors.warning, fontSize: 10, fontWeight: FontWeight.w900)),
-                                  ],
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Divider(
+                              height: 1,
+                              color: AppColors.divider.withOpacity(0.8),
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              const SizedBox(
+                                width: 60,
+                                child: Text(
+                                  'DROP',
+                                  style: TextStyle(
+                                    color: AppColors.warning,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.5,
+                                  ),
                                 ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
+                              ),
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => _openSearch(focusDrop: true),
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      GestureDetector(
-                                        onTap: () => _openSearch(focusDrop: false),
-                                        child: const Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text('Your location', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                                            Icon(Icons.favorite_border_rounded, size: 20),
-                                          ],
+                                      Expanded(
+                                        child: Text(
+                                          'Where are you going?',
+                                          style: TextStyle(
+                                            color: AppColors.textTertiary,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 15,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
-                                      const Padding(
-                                        padding: EdgeInsets.symmetric(vertical: 8),
-                                        child: Divider(height: 1),
-                                      ),
-                                      GestureDetector(
-                                        onTap: () => _openSearch(focusDrop: true),
-                                        child: const Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text('Where are you going?', style: TextStyle(color: AppColors.textTertiary, fontWeight: FontWeight.w600, fontSize: 16)),
-                                            Icon(Icons.add_rounded, size: 24),
-                                          ],
-                                        ),
+                                      Icon(
+                                        Icons.add_rounded,
+                                        size: 24,
+                                        color: Colors.black87,
                                       ),
                                     ],
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                   ],
                 ),
               ),

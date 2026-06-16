@@ -13,6 +13,9 @@ import '../../../core/map/recent_places.dart';
 import '../../../core/map/ziggo_map.dart';
 import '../../customer/addresses_provider.dart';
 import 'vehicle_selection_screen.dart';
+import 'confirm_pickup_screen.dart';
+import 'saved_addresses_screen.dart';
+import 'map_location_selection_screen.dart';
 
 class LocationSearchScreen extends StatefulWidget {
   final Place? initialPickup;
@@ -152,7 +155,23 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
     _setPlace(here);
   }
   
-  void _setPlace(Place place) {
+  Future<void> _setPlace(Place place) async {
+    if (place.name == '__SET_ON_MAP__') {
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MapLocationSelectionScreen(
+            initialPickup: _pickup,
+            initialDrop: _drop,
+            initialTripType: _tripType,
+            isTruckMode: widget.isTruckMode,
+            startWithPickup: _isPickupFocused,
+          ),
+        ),
+      );
+      return;
+    }
     RecentPlaces.add(place);
     if (_isPickupFocused) {
       setState(() {
@@ -199,12 +218,12 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
           onPressed: () => Navigator.pop(context),
         ),
         title: GestureDetector(
@@ -212,8 +231,8 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(20),
+              color: const Color(0xFF103EC2),
+              borderRadius: BorderRadius.circular(100),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -222,7 +241,11 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                 const SizedBox(width: 8),
                 Text(
                   _friend != null ? 'Booking for ${_friend!.name}' : 'Book for a friend',
-                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
@@ -231,10 +254,14 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
         centerTitle: true,
         actions: [
           TextButton(
-            onPressed: () {},
+            onPressed: () => Navigator.pop(context),
             child: const Text(
               'Skip',
-              style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+              ),
             ),
           ),
         ],
@@ -243,17 +270,16 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
         children: [
           Container(
             color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Column(
               children: [
                 _tripTypeToggle(),
                 const SizedBox(height: 16),
                 _locationInputs(),
-                const SizedBox(height: 16),
               ],
             ),
           ),
-          Container(height: 8, color: AppColors.background),
+          Container(height: 8, color: const Color(0xFFF8FAFC)),
           Expanded(child: _body()),
         ],
       ),
@@ -262,9 +288,10 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
 
   Widget _tripTypeToggle() {
     return Container(
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
-        borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(100),
       ),
       child: Row(
         children: [
@@ -272,11 +299,19 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
             child: GestureDetector(
               onTap: () => setState(() => _tripType = 'one_way'),
               child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
                   color: _tripType == 'one_way' ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(AppStyles.radiusSm),
-                  boxShadow: _tripType == 'one_way' ? AppStyles.shadowSm : null,
+                  borderRadius: BorderRadius.circular(100),
+                  boxShadow: _tripType == 'one_way'
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
                 ),
                 alignment: Alignment.center,
                 child: Row(
@@ -284,16 +319,16 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                   children: [
                     Icon(
                       _tripType == 'one_way' ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                      size: 16,
-                      color: _tripType == 'one_way' ? AppColors.textPrimary : AppColors.textSecondary,
+                      size: 18,
+                      color: _tripType == 'one_way' ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 8),
                     Text(
                       'One way',
                       style: TextStyle(
-                        fontWeight: _tripType == 'one_way' ? FontWeight.w800 : FontWeight.w600,
-                        fontSize: 13,
-                        color: _tripType == 'one_way' ? AppColors.textPrimary : AppColors.textSecondary,
+                        fontWeight: _tripType == 'one_way' ? FontWeight.w700 : FontWeight.w500,
+                        fontSize: 14,
+                        color: _tripType == 'one_way' ? const Color(0xFF0F172A) : const Color(0xFF64748B),
                       ),
                     ),
                   ],
@@ -305,11 +340,19 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
             child: GestureDetector(
               onTap: () => setState(() => _tripType = 'return'),
               child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
                   color: _tripType == 'return' ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(AppStyles.radiusSm),
-                  boxShadow: _tripType == 'return' ? AppStyles.shadowSm : null,
+                  borderRadius: BorderRadius.circular(100),
+                  boxShadow: _tripType == 'return'
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
                 ),
                 alignment: Alignment.center,
                 child: Row(
@@ -317,16 +360,16 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                   children: [
                     Icon(
                       _tripType == 'return' ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                      size: 16,
-                      color: _tripType == 'return' ? AppColors.textPrimary : AppColors.textSecondary,
+                      size: 18,
+                      color: _tripType == 'return' ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 8),
                     Text(
                       'Return trip*',
                       style: TextStyle(
-                        fontWeight: _tripType == 'return' ? FontWeight.w800 : FontWeight.w600,
-                        fontSize: 13,
-                        color: _tripType == 'return' ? AppColors.textPrimary : AppColors.textSecondary,
+                        fontWeight: _tripType == 'return' ? FontWeight.w700 : FontWeight.w500,
+                        fontSize: 14,
+                        color: _tripType == 'return' ? const Color(0xFF0F172A) : const Color(0xFF64748B),
                       ),
                     ),
                   ],
@@ -340,56 +383,144 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
   }
 
   Widget _locationInputs() {
-    return Row(
+    final pickupFocused = _pickupFocus.hasFocus;
+    final dropFocused = _dropFocus.hasFocus;
+
+    return Column(
       children: [
-        Column(
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Text('PICKUP', style: TextStyle(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.w900)),
-            Container(height: 20, width: 2, color: AppColors.divider),
-            const Text('DROP', style: TextStyle(color: AppColors.primaryDark, fontSize: 10, fontWeight: FontWeight.w900)),
-          ],
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            children: [
-              TextField(
-                controller: _pickupController,
-                focusNode: _pickupFocus,
-                onChanged: _onSearchChanged,
-                decoration: InputDecoration(
-                  hintText: 'Your Location',
-                  hintStyle: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-                  border: InputBorder.none,
-                  suffixIcon: _pickupController.text.isNotEmpty ? IconButton(
-                    icon: const Icon(Icons.close_rounded, size: 20),
-                    onPressed: () {
-                      _pickupController.clear();
-                      setState(() => _pickup = null);
-                      _onSearchChanged('');
-                    },
-                  ) : null,
+            const SizedBox(
+              width: 50,
+              child: Text(
+                'PICKUP',
+                textAlign: TextAlign.end,
+                style: TextStyle(
+                  color: Color(0xFF103EC2),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
                 ),
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
               ),
-              const Divider(height: 1),
-              TextField(
-                controller: _dropController,
-                focusNode: _dropFocus,
-                onChanged: _onSearchChanged,
-                decoration: InputDecoration(
-                  hintText: 'Where are you going?',
-                  hintStyle: const TextStyle(color: AppColors.textTertiary, fontWeight: FontWeight.w600),
-                  border: InputBorder.none,
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.add_rounded, size: 24, color: AppColors.textPrimary),
-                    onPressed: () {}, // Add intermediate stop (omitted for now to match UI)
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  color: pickupFocused ? Colors.white : const Color(0xFFF2F4F8),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: pickupFocused ? const Color(0xFF103EC2) : Colors.transparent,
+                    width: 1.5,
                   ),
                 ),
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                padding: const EdgeInsets.only(left: 16, right: 8),
+                child: TextField(
+                  controller: _pickupController,
+                  focusNode: _pickupFocus,
+                  onChanged: _onSearchChanged,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                    color: Color(0xFF0F172A),
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Your Location',
+                    hintStyle: const TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontWeight: FontWeight.w500,
+                      fontSize: 16,
+                    ),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 13),
+                    suffixIcon: _pickupController.text.isNotEmpty
+                        ? GestureDetector(
+                            onTap: () {
+                              _pickupController.clear();
+                              setState(() => _pickup = null);
+                              _onSearchChanged('');
+                            },
+                            child: const Icon(
+                              Icons.close_rounded,
+                              size: 20,
+                              color: Color(0xFF0F172A),
+                            ),
+                          )
+                        : null,
+                  ),
+                ),
               ),
-            ],
-          ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const SizedBox(
+              width: 50,
+              child: Text(
+                'DROP',
+                textAlign: TextAlign.end,
+                style: TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  color: dropFocused ? Colors.white : const Color(0xFFF2F4F8),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: dropFocused ? const Color(0xFF103EC2) : Colors.transparent,
+                    width: 1.5,
+                  ),
+                ),
+                padding: const EdgeInsets.only(left: 16, right: 8),
+                child: TextField(
+                  controller: _dropController,
+                  focusNode: _dropFocus,
+                  onChanged: _onSearchChanged,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                    color: Color(0xFF0F172A),
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Where are you going?',
+                    hintStyle: const TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontWeight: FontWeight.w500,
+                      fontSize: 16,
+                    ),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 13),
+                    suffixIcon: const Icon(
+                      Icons.add_rounded,
+                      size: 24,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -404,23 +535,23 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
       return Container(
         color: Colors.white,
         child: ListView.separated(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           itemCount: _results.length,
-          separatorBuilder: (_, __) => const Divider(height: 1, indent: 40),
+          separatorBuilder: (_, __) => const Divider(height: 1),
           itemBuilder: (_, i) {
             final p = _results[i];
             return ListTile(
               onTap: _resolving ? null : () => _selectPrediction(p),
-              leading: const Icon(Icons.location_on_rounded, color: AppColors.textSecondary),
-              title: Text(p.mainText, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-              subtitle: p.secondaryText.isEmpty ? null : Text(p.secondaryText, style: const TextStyle(fontSize: 12)),
+              contentPadding: const EdgeInsets.symmetric(vertical: 4),
+              leading: const Icon(Icons.location_on_rounded, color: Color(0xFF64748B)),
+              title: Text(p.mainText, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+              subtitle: p.secondaryText.isEmpty ? null : Text(p.secondaryText, style: const TextStyle(fontSize: 12.5)),
             );
           },
         ),
       );
     }
 
-    // Default view: saved addresses, set location on map, etc.
     final addrProvider = context.watch<AddressesProvider>();
     final saved = addrProvider.items;
     final recents = RecentPlaces.items;
@@ -428,25 +559,27 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
     return Container(
       color: Colors.white,
       child: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         children: [
           if (_isPickupFocused)
             ListTile(
               onTap: _selectCurrentLocation,
-              leading: const Icon(Icons.my_location_rounded, color: AppColors.primary),
-              title: const Text('Your current location', style: TextStyle(fontWeight: FontWeight.w600)),
+              contentPadding: const EdgeInsets.symmetric(vertical: 4),
+              leading: const Icon(Icons.my_location_rounded, color: Color(0xFF103EC2)),
+              title: const Text('Your current location', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
             ),
           if (recents.isNotEmpty) ...[
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 16, 6),
+              padding: const EdgeInsets.symmetric(vertical: 12),
               child: Row(
                 children: [
                   const Text(
                     'RECENT',
                     style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.textTertiary,
-                      letterSpacing: 1.2,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF94A3B8),
+                      letterSpacing: 0.5,
                     ),
                   ),
                   const Spacer(),
@@ -458,32 +591,42 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                     child: const Text(
                       'Clear',
                       style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.primary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF103EC2),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-            for (final p in recents)
+            for (final p in recents) ...[
               ListTile(
                 onTap: _resolving ? null : () => _setPlace(p),
+                contentPadding: const EdgeInsets.symmetric(vertical: 4),
                 leading: Container(
-                  padding: const EdgeInsets.all(8),
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
                   decoration: const BoxDecoration(
-                    color: AppColors.surfaceMuted,
+                    color: Color(0xFFF1F5F9),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.history_rounded,
-                      color: AppColors.textSecondary, size: 20),
+                  child: const Icon(
+                    Icons.history_rounded,
+                    color: Color(0xFF103EC2),
+                    size: 20,
+                  ),
                 ),
                 title: Text(
                   p.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    color: Color(0xFF0F172A),
+                  ),
                 ),
                 subtitle: p.area.isEmpty
                     ? null
@@ -491,29 +634,78 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                         p.area,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w400,
+                          color: Color(0xFF64748B),
+                        ),
                       ),
               ),
-            const Divider(height: 1, indent: 56),
+              const Divider(height: 1, color: Color(0xFFEFF1F5)),
+            ],
           ],
           ListTile(
-            onTap: () {
-              // TODO: Implement saved addresses screen logic or expand
-            },
-            leading: const Icon(Icons.favorite_border_rounded, color: AppColors.textPrimary),
-            title: const Text('Saved Addresses', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-            trailing: const Icon(Icons.chevron_right_rounded),
-          ),
-          const Divider(height: 1, indent: 56),
-          ListTile(
             onTap: () async {
-              final p = await showPlaceSearch(context, title: 'Set location');
+              final p = await Navigator.push<Place?>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const SavedAddressesScreen(selectMode: true),
+                ),
+              );
               if (p != null && mounted) _setPlace(p);
             },
-            leading: const Icon(Icons.pin_drop_outlined, color: AppColors.textPrimary),
-            title: const Text('Set location on map', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+            leading: const Icon(
+              Icons.favorite_border_rounded,
+              color: Color(0xFF0F172A),
+              size: 24,
+            ),
+            title: const Text(
+              'Saved Addresses',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            trailing: const Icon(
+              Icons.chevron_right_rounded,
+              color: Color(0xFF0F172A),
+            ),
           ),
-          const SizedBox(height: 16),
+          const Divider(height: 1, color: Color(0xFFEFF1F5)),
+          ListTile(
+            onTap: () async {
+              if (!mounted) return;
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => MapLocationSelectionScreen(
+                    initialPickup: _pickup,
+                    initialDrop: _drop,
+                    initialTripType: _tripType,
+                    isTruckMode: widget.isTruckMode,
+                    startWithPickup: _isPickupFocused,
+                  ),
+                ),
+              );
+            },
+            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+            leading: const Icon(
+              Icons.location_on_outlined,
+              color: Color(0xFF0F172A),
+              size: 24,
+            ),
+            title: const Text(
+              'Set location on map',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+          ),
+          const Divider(height: 1, color: Color(0xFFEFF1F5)),
           ListTile(
             onTap: () async {
               final p = await showPlaceSearch(context, title: 'Add Home Address');
@@ -528,14 +720,36 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                 _setPlace(p);
               }
             },
+            contentPadding: const EdgeInsets.symmetric(vertical: 8),
             leading: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), shape: BoxShape.circle),
-              child: const Icon(Icons.home_outlined, color: AppColors.primary, size: 20),
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                color: Color(0xFFEFF3FF),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.home_outlined,
+                color: Color(0xFF103EC2),
+                size: 20,
+              ),
             ),
-            title: const Text('Add Home', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-            trailing: const Icon(Icons.add_rounded, color: AppColors.textSecondary),
+            title: const Text(
+              'Add Home',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            trailing: const Icon(
+              Icons.add_rounded,
+              color: Color(0xFF103EC2),
+              size: 24,
+            ),
           ),
+          const Divider(height: 1, color: Color(0xFFEFF1F5)),
           ListTile(
             onTap: () async {
               final p = await showPlaceSearch(context, title: 'Add Work Address');
@@ -550,37 +764,93 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                 _setPlace(p);
               }
             },
+            contentPadding: const EdgeInsets.symmetric(vertical: 8),
             leading: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), shape: BoxShape.circle),
-              child: const Icon(Icons.work_outline_rounded, color: AppColors.primary, size: 20),
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                color: Color(0xFFEFF3FF),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.work_outline_rounded,
+                color: Color(0xFF103EC2),
+                size: 20,
+              ),
             ),
-            title: const Text('Add Work', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-            trailing: const Icon(Icons.add_rounded, color: AppColors.textSecondary),
+            title: const Text(
+              'Add Work',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            trailing: const Icon(
+              Icons.add_rounded,
+              color: Color(0xFF103EC2),
+              size: 24,
+            ),
           ),
           if (saved.isNotEmpty) ...[
-            for (final a in saved)
+            const Divider(height: 1, color: Color(0xFFEFF1F5)),
+            for (final a in saved) ...[
               ListTile(
-                onTap: _resolving ? null : () {
-                  final lat = (a['lat'] as num).toDouble();
-                  final lng = (a['lng'] as num).toDouble();
-                  final address = a['address'].toString();
-                  _setPlace(Place(a['label']?.toString() ?? 'Saved Place', address, LatLng(lat, lng)));
-                },
+                onTap: _resolving
+                    ? null
+                    : () {
+                        final lat = (a['lat'] as num).toDouble();
+                        final lng = (a['lng'] as num).toDouble();
+                        final address = a['address'].toString();
+                        _setPlace(
+                          Place(
+                            a['label']?.toString() ?? 'Saved Place',
+                            address,
+                            LatLng(lat, lng),
+                          ),
+                        );
+                      },
+                contentPadding: const EdgeInsets.symmetric(vertical: 4),
                 leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), shape: BoxShape.circle),
-                  child: const Icon(Icons.history_rounded, color: AppColors.primary, size: 20),
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF1F5F9),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.history_rounded,
+                    color: Color(0xFF103EC2),
+                    size: 20,
+                  ),
                 ),
-                title: Text(a['label']?.toString() ?? 'Saved Place', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                title: Text(
+                  a['label']?.toString() ?? 'Saved Place',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
                 subtitle: Text(
                   a['address']?.toString() ?? '',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF64748B),
+                  ),
                 ),
-                trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
+                trailing: const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xFF64748B),
+                ),
               ),
+              const Divider(height: 1, color: Color(0xFFEFF1F5)),
+            ],
           ],
         ],
       ),

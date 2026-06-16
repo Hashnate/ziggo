@@ -362,63 +362,6 @@ class _ScanAndGoScreenState extends State<ScanAndGoScreen> {
     }
   }
 
-  void _showSimulateDialog() {
-    final controller = TextEditingController(
-      text: 'ziggo://scan-and-go?driver_id=1&name=John%20Doe&vehicle=WP%20CAB%201234&vehicle_type=car',
-    );
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text(
-          'Simulate Scan & Go QR',
-          style: TextStyle(fontWeight: FontWeight.w900),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Enter QR code payload string:',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: AppColors.surfaceMuted,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-                hintText: 'ziggo://scan-and-go?driver_id=1&name=John%20Doe...',
-              ),
-              style: const TextStyle(fontSize: 14),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _handlePayload(controller.text);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black,
-              foregroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Simulate Scan', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -471,11 +414,6 @@ class _ScanAndGoScreenState extends State<ScanAndGoScreen> {
                       'Camera unavailable or permission denied',
                       style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Use the simulator option below to test the Scan & Go flow',
-                      style: TextStyle(color: Colors.white38, fontSize: 12),
-                    ),
                   ],
                 ),
               );
@@ -520,28 +458,6 @@ class _ScanAndGoScreenState extends State<ScanAndGoScreen> {
                 const Text(
                   'Scan the driver\'s Scan & Go QR code',
                   style: TextStyle(color: Colors.white60, fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton.icon(
-                    onPressed: _showSimulateDialog,
-                    icon: const Icon(Icons.integration_instructions_rounded),
-                    label: const Text(
-                      'Simulate QR Scan (Emulator)',
-                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white.withOpacity(0.15),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: Colors.white.withOpacity(0.18)),
-                      ),
-                    ),
-                  ),
                 ),
               ],
             ),
