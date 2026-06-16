@@ -211,7 +211,7 @@ class _DriverRatingScreenState extends State<DriverRatingScreen> with TickerProv
               final filled = i < stars;
               return Icon(
                 filled ? Icons.star_rounded : Icons.star_outline_rounded,
-                color: filled ? ratingColor : AppColors.divider,
+                color: filled ? ratingColor : Colors.grey.shade300,
                 size: 28,
               );
             }),

@@ -179,7 +179,7 @@ class _RatingScreenState extends State<RatingScreen> with TickerProviderStateMix
                             padding: const EdgeInsets.all(2),
                             child: Icon(
                               filled ? Icons.star_rounded : Icons.star_outline_rounded,
-                              color: filled ? AppColors.primary : AppColors.divider,
+                              color: filled ? Colors.amber : Colors.grey.shade300,
                               size: filled ? 44 : 40,
                             ),
                           ),

@@ -196,16 +196,6 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
               zoom: 16,
               showMyLocation: false, // We'll show a custom marker instead
               markers: [
-                for (final d in _nearbyDrivers)
-                  if (!widget.isTruckMode || d['vehicle_type'] == 'truck')
-                    pinMarker(
-                       point: LatLng((d['lat'] as num).toDouble(), (d['lng'] as num).toDouble()),
-                       icon: widget.isTruckMode ? Icons.local_shipping_rounded : Icons.local_taxi_rounded,
-                       color: widget.isTruckMode ? AppColors.truck : AppColors.primary,
-                       size: 30,
-                       assetPath: widget.isTruckMode ? 'assets/icons/top_truck.png' : 'assets/icons/top_car.png',
-                       rotation: (d['heading'] as num?)?.toDouble() ?? 0.0,
-                    ),
                 if (_currentLocation != null)
                   pinMarker(
                     point: _currentLocation!.location,

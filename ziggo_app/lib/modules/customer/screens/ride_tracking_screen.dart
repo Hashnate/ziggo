@@ -26,6 +26,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
   final ZiggoMapController _mapController = ZiggoMapController();
   bool _navigatedToRating = false;
   bool _driverCancelled = false;
+  bool _userCancelled = false;
   List<LatLng> _routePoints = const [];
   List<DirectionStep> _routeSteps = const [];
   String? _routeKey;
@@ -284,10 +285,12 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
         });
       }
       if (status == 'cancelled') {
-        _driverCancelled = true;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _showDriverCancelledDialog();
-        });
+        if (!_userCancelled) {
+          _driverCancelled = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _showDriverCancelledDialog();
+          });
+        }
       }
       _lastStatus = status;
     }
@@ -506,6 +509,11 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
               } else if (v < -80 && !_sheetExpanded) {
                 setState(() => _sheetExpanded = true);
               }
+            },
+            onCancel: () {
+              setState(() {
+                _userCancelled = true;
+              });
             },
           ),
         ],
@@ -792,6 +800,7 @@ class _BottomCard extends StatelessWidget {
   final bool expanded;
   final VoidCallback onToggle;
   final Function(DragEndDetails) onVerticalDragEnd;
+  final VoidCallback? onCancel;
 
   const _BottomCard({
     required this.active,
@@ -800,6 +809,7 @@ class _BottomCard extends StatelessWidget {
     required this.expanded,
     required this.onToggle,
     required this.onVerticalDragEnd,
+    this.onCancel,
   });
 
   @override
@@ -1040,7 +1050,10 @@ class _BottomCard extends StatelessWidget {
                                _DriverCard(d: driver!),
                              ],
                             const SizedBox(height: 16),
-                            _ActionRow(active: active),
+                             _ActionRow(
+                               active: active,
+                               onCancel: onCancel,
+                             ),
                           ],
                         )
                       : const SizedBox(width: double.infinity),
@@ -1302,7 +1315,8 @@ class _DriverCard extends StatelessWidget {
 
 class _ActionRow extends StatelessWidget {
   final Map<String, dynamic> active;
-  const _ActionRow({required this.active});
+  final VoidCallback? onCancel;
+  const _ActionRow({required this.active, this.onCancel});
 
   void _showCancelDialog(BuildContext context) {
     showModalBottomSheet(
@@ -1344,8 +1358,15 @@ class _ActionRow extends StatelessWidget {
                     final provider = context.read<BookingProvider>();
                     final navigator = Navigator.of(context);
                     Navigator.pop(ctx);
+                    onCancel?.call();
+                    
+                    final bookingId = provider.activeBooking?['id'] as int?;
+                    provider.clearActiveBookingLocally();
                     navigator.pop();
-                    await provider.cancelActive(reason: r);
+                    
+                    if (bookingId != null) {
+                      await provider.cancelActiveSilently(bookingId: bookingId, reason: r);
+                    }
                   },
                 )),
                 const SizedBox(height: 10),
