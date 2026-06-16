@@ -141,6 +141,7 @@ class SystemSettings(Base):
     surge_end_hour = Column(Integer, default=20)
     surge_multiplier = Column(DECIMAL(3, 2), default=1.5)
     cancellation_fee = Column(DECIMAL(10, 2), default=0)
+    cancellation_grace_period_minutes = Column(Integer, default=3)
     rider_penalty = Column(DECIMAL(10, 2), default=0)
     # Security
     min_password_length = Column(Integer, default=6)

@@ -71,6 +71,7 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("drivers", "account_holder_name", "VARCHAR(100)"),
     ("drivers", "account_number", "VARCHAR(50)"),
     ("drivers", "branch_name", "VARCHAR(100)"),
+    ("system_settings", "cancellation_grace_period_minutes", "INTEGER NOT NULL DEFAULT 3"),
 )
 
 

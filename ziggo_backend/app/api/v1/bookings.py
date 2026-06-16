@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from typing import List, Optional
 import secrets
@@ -1156,32 +1156,35 @@ async def update_booking_status(
         b.cancellation_reason = body.reason
         b.cancelled_by = user.role.value
 
-        # Charge cancellation fee if cancelled by customer
+        # Charge cancellation fee if cancelled by customer after grace period
         if b.cancelled_by == "customer":
             from ...models import SystemSettings, WalletTransaction
             ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
             ss = ss_q.scalars().first()
-            cancel_fee = ss.cancellation_fee if ss else Decimal(0)
-            if cancel_fee > 0:
-                cq = await db.execute(select(Customer).where(Customer.id == b.customer_id))
-                customer = cq.scalars().first()
-                if customer:
-                    customer.wallet_balance = (customer.wallet_balance or Decimal(0)) - cancel_fee
-                    db.add(WalletTransaction(
-                        user_id=customer.user_id,
-                        amount=cancel_fee,
-                        type="debit",
-                        description=f"Cancellation fee for booking {b.booking_ref}",
-                        reference_id=b.booking_ref,
-                        balance_after=customer.wallet_balance,
-                    ))
-                    # Notify customer of cancellation fee
-                    db.add(Notification(
-                        user_id=customer.user_id,
-                        title="Cancellation Fee Charged",
-                        body=f"A cancellation fee of Rs.{cancel_fee:,.2f} was deducted from your wallet for cancelling booking {b.booking_ref}.",
-                        type="payment",
-                    ))
+            grace_period_mins = ss.cancellation_grace_period_minutes if (ss and ss.cancellation_grace_period_minutes is not None) else 3
+            elapsed = now - b.booked_at
+            if elapsed > timedelta(minutes=grace_period_mins):
+                cancel_fee = ss.cancellation_fee if ss else Decimal(0)
+                if cancel_fee > 0:
+                    cq = await db.execute(select(Customer).where(Customer.id == b.customer_id))
+                    customer = cq.scalars().first()
+                    if customer:
+                        customer.wallet_balance = (customer.wallet_balance or Decimal(0)) - cancel_fee
+                        db.add(WalletTransaction(
+                            user_id=customer.user_id,
+                            amount=cancel_fee,
+                            type="debit",
+                            description=f"Cancellation fee for booking {b.booking_ref}",
+                            reference_id=b.booking_ref,
+                            balance_after=customer.wallet_balance,
+                        ))
+                        # Notify customer of cancellation fee
+                        db.add(Notification(
+                            user_id=customer.user_id,
+                            title="Cancellation Fee Charged",
+                            body=f"A cancellation fee of Rs.{cancel_fee:,.2f} was deducted from your wallet for cancelling booking {b.booking_ref}.",
+                            type="payment",
+                        ))
 
         # BRD: RW-02 — refund any redeemed points if the trip never happened.
         if b.redeem_points and b.redeem_points > 0:

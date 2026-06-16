@@ -116,6 +116,10 @@
                             <input type="number" step="0.01" min="0" name="cancellation_fee" value="{{ s.cancellation_fee if s.cancellation_fee is not none else 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                         </div>
                         <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Cancellation Grace Period (Minutes)</label>
+                            <input type="number" min="0" name="cancellation_grace_period_minutes" value="{{ s.cancellation_grace_period_minutes if s.cancellation_grace_period_minutes is not none else 3 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
                             <label class="block text-xs font-black text-ziggo-muted mb-1">Unreasonable Penalty – Rider (Rs.)</label>
                             <input type="number" step="0.01" min="0" name="rider_penalty" value="{{ s.rider_penalty if s.rider_penalty is not none else 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                         </div>

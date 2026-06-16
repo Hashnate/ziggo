@@ -2150,6 +2150,7 @@ async def admin_settings_save(
     surge_end_hour: int = Form(20),
     surge_multiplier: float = Form(1.5),
     cancellation_fee: float = Form(0),
+    cancellation_grace_period_minutes: int = Form(3),
     rider_penalty: float = Form(0),
     # Security
     min_password_length: int = Form(6),
@@ -2218,6 +2219,7 @@ async def admin_settings_save(
     s.surge_end_hour = max(0, min(23, int(surge_end_hour)))
     s.surge_multiplier = Decimal(str(surge_multiplier))
     s.cancellation_fee = Decimal(str(cancellation_fee))
+    s.cancellation_grace_period_minutes = max(0, int(cancellation_grace_period_minutes))
     s.rider_penalty = Decimal(str(rider_penalty))
     s.min_password_length = max(1, int(min_password_length))
     s.session_timeout_minutes = max(1, int(session_timeout_minutes))
