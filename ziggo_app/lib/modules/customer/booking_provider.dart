@@ -34,19 +34,18 @@ class BookingProvider extends ChangeNotifier {
         final bid = data['booking_id'];
         if (_activeBooking != null && _activeBooking!['id'] == bid) {
           final newStatus = data['status'];
-          if (newStatus == 'cancelled' || newStatus == 'completed') {
-            _activeBooking = null;
-          } else {
-            _activeBooking = {
-              ..._activeBooking!,
-              'status': newStatus,
-              if (data['otp'] != null) 'otp': data['otp'],
-            };
-          }
+          _activeBooking = {
+            ..._activeBooking!,
+            'status': newStatus,
+            if (data['otp'] != null) 'otp': data['otp'],
+          };
           notifyListeners();
         }
         // Lazy refresh
-        loadActive();
+        final newStatus = data['status'];
+        if (newStatus != 'cancelled' && newStatus != 'completed') {
+          loadActive();
+        }
       } else if (event == 'driver_location_update') {
         final bid = data['booking_id'];
         if (_activeBooking != null && _activeBooking!['id'] == bid && _activeBooking!['driver'] != null) {

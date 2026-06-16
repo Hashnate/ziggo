@@ -250,7 +250,10 @@ class _RatingScreenState extends State<RatingScreen> with TickerProviderStateMix
               ),
               const SizedBox(height: 12),
               TextButton(
-                onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
+                onPressed: () {
+                  context.read<BookingProvider>().clearActiveBookingLocally();
+                  Navigator.popUntil(context, (r) => r.isFirst);
+                },
                 child: const Text(
                   'Skip for now',
                   style: TextStyle(
