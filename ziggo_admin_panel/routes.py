@@ -2118,10 +2118,12 @@ async def admin_settings_get(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_superadmin),
 ):
-    from app.models import DriverIncentive
+    from app.models import DriverIncentive, PeakHourSetting
     s = await _get_or_create_settings(db)
     q = await db.execute(select(DriverIncentive).order_by(DriverIncentive.trips_required))
     incentives = q.scalars().all()
+    peaks_q = await db.execute(select(PeakHourSetting).order_by(PeakHourSetting.id))
+    peaks = peaks_q.scalars().all()
     return templates.TemplateResponse(
         request,
         "admin_settings.html",
@@ -2130,10 +2132,12 @@ async def admin_settings_get(
             "active_page": "settings",
             "s": s,
             "incentives": incentives,
+            "peaks": peaks,
             "saved": request.query_params.get("saved") == "1",
             "error": request.query_params.get("error"),
         },
     )
+
 
 
 @router.post("/settings")
@@ -2177,10 +2181,24 @@ async def admin_settings_save(
     multi_stop_excess_per_minute: float = Form(5),
     multi_stop_fee_per_stop: float = Form(50),
     # Peak Hours
-    peak_is_active: str = Form(""),
-    peak_start_hour: int = Form(17),
-    peak_end_hour: int = Form(20),
-    peak_extra_amount: float = Form(0.00),
+    peak_start_hour_1: str = Form("07:00"),
+    peak_end_hour_1: str = Form("09:00"),
+    peak_extra_amount_1: float = Form(50.00),
+    peak_start_hour_2: str = Form("09:00"),
+    peak_end_hour_2: str = Form("11:00"),
+    peak_extra_amount_2: float = Form(50.00),
+    peak_start_hour_3: str = Form("12:00"),
+    peak_end_hour_3: str = Form("14:00"),
+    peak_extra_amount_3: float = Form(50.00),
+    peak_start_hour_4: str = Form("16:00"),
+    peak_end_hour_4: str = Form("18:00"),
+    peak_extra_amount_4: float = Form(50.00),
+    peak_start_hour_5: str = Form("18:00"),
+    peak_end_hour_5: str = Form("20:00"),
+    peak_extra_amount_5: float = Form(50.00),
+    peak_start_hour_6: str = Form("21:00"),
+    peak_end_hour_6: str = Form("23:00"),
+    peak_extra_amount_6: float = Form(50.00),
     # Branding
     logo: UploadFile | None = File(None),
     favicon: UploadFile | None = File(None),
@@ -2244,17 +2262,64 @@ async def admin_settings_save(
     s.multi_stop_fee_per_stop = Decimal(str(multi_stop_fee_per_stop))
 
     # Peak Hours saving
-    peak_active = peak_is_active == "on" or peak_is_active == "1"
-    peak_changed = (
-        s.peak_is_active != peak_active or
-        s.peak_start_hour != max(0, min(23, int(peak_start_hour))) or
-        s.peak_end_hour != max(0, min(23, int(peak_end_hour))) or
-        s.peak_extra_amount != Decimal(str(peak_extra_amount))
-    )
-    s.peak_is_active = peak_active
-    s.peak_start_hour = max(0, min(23, int(peak_start_hour)))
-    s.peak_end_hour = max(0, min(23, int(peak_end_hour)))
-    s.peak_extra_amount = Decimal(str(peak_extra_amount))
+    from app.models import PeakHourSetting
+    peaks_q = await db.execute(select(PeakHourSetting).order_by(PeakHourSetting.id))
+    peaks = peaks_q.scalars().all()
+    form_peaks = [
+        (peak_start_hour_1, peak_end_hour_1, peak_extra_amount_1),
+        (peak_start_hour_2, peak_end_hour_2, peak_extra_amount_2),
+        (peak_start_hour_3, peak_end_hour_3, peak_extra_amount_3),
+        (peak_start_hour_4, peak_end_hour_4, peak_extra_amount_4),
+        (peak_start_hour_5, peak_end_hour_5, peak_extra_amount_5),
+        (peak_start_hour_6, peak_end_hour_6, peak_extra_amount_6),
+    ]
+    peak_changed = False
+    for idx, (sh, eh, amt) in enumerate(form_peaks):
+        if idx < len(peaks):
+            import re
+            time_pat = re.compile(r"^\d{2}:\d{2}$")
+            
+            clean_sh = sh.strip() if isinstance(sh, str) else "09:00"
+            clean_eh = eh.strip() if isinstance(eh, str) else "11:00"
+            
+            if not time_pat.match(clean_sh):
+                try:
+                    clean_sh = f"{int(clean_sh):02d}:00"
+                except:
+                    clean_sh = "09:00"
+            if not time_pat.match(clean_eh):
+                try:
+                    clean_eh = f"{int(clean_eh):02d}:00"
+                except:
+                    clean_eh = "11:00"
+                    
+            try:
+                new_sh = int(clean_sh.split(":")[0])
+            except:
+                new_sh = 9
+            try:
+                new_eh = int(clean_eh.split(":")[0])
+            except:
+                new_eh = 11
+
+            new_amt = Decimal(str(amt))
+            if (peaks[idx].start_time != clean_sh or 
+                peaks[idx].end_time != clean_eh or 
+                peaks[idx].extra_amount != new_amt):
+                peak_changed = True
+            
+            peaks[idx].start_time = clean_sh
+            peaks[idx].end_time = clean_eh
+            peaks[idx].start_hour = new_sh
+            peaks[idx].end_hour = new_eh
+            peaks[idx].extra_amount = new_amt
+
+    peak_active = any(p.is_active for p in peaks)
+    if len(peaks) > 0:
+        s.peak_is_active = peak_active
+        s.peak_start_hour = peaks[0].start_hour
+        s.peak_end_hour = peaks[0].end_hour
+        s.peak_extra_amount = peaks[0].extra_amount
 
     # Notify drivers if peak hours are active and configuration changed
     if peak_active and peak_changed:
@@ -2262,7 +2327,7 @@ async def admin_settings_save(
         drivers_q = await db.execute(select(Driver.user_id))
         driver_user_ids = [row[0] for row in drivers_q.all()]
         title = "Peak Hours Surcharge Active!"
-        body = f"Get ready! An extra Rs. {float(s.peak_extra_amount):.2f} will be added to your rides from {s.peak_start_hour}:00 to {s.peak_end_hour}:00 Colombo time."
+        body = f"Get ready! Peak hours settings have been updated. Extra surcharges will apply during peak hours."
         
         # Save system notifications
         from app.models import Notification
@@ -2284,6 +2349,7 @@ async def admin_settings_save(
         import asyncio
         asyncio.create_task(send_pushes())
 
+
     new_logo = await _save_branding_asset(logo, "Logo")
     if new_logo:
         s.logo_url = new_logo
@@ -2292,7 +2358,24 @@ async def admin_settings_save(
         s.favicon_url = new_favicon
 
     await db.commit()
-    return RedirectResponse(url="/admin/settings?saved=1", status_code=303)
+    return RedirectResponse(url="/admin/settings?tab=pricing&saved=1", status_code=303)
+
+
+@router.post("/settings/peak-hours/{id}/toggle")
+async def admin_peak_hours_toggle(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    from app.models import PeakHourSetting
+    q = await db.execute(select(PeakHourSetting).where(PeakHourSetting.id == id))
+    p = q.scalars().first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Peak hour setting not found")
+    p.is_active = not bool(p.is_active)
+    await db.commit()
+    return RedirectResponse(url="/admin/settings?tab=pricing&saved=1", status_code=303)
+
 
 
 # ---------- Vehicle categories ----------

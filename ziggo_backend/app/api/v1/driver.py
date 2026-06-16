@@ -48,26 +48,41 @@ def _is_complete(d: Driver) -> bool:
     )
 
 
-def _to_response(user: User, d: Driver, paid_payouts: float = 0.0, pending_payout: float = 0.0, ss=None) -> DriverProfileResponse:
+def _to_response(user: User, d: Driver, paid_payouts: float = 0.0, pending_payout: float = 0.0, peaks: list = None) -> DriverProfileResponse:
     peak_active = False
     is_curr_peak = False
     start_h = None
     end_h = None
     extra_amt = 0.0
-    if ss:
-        peak_active = bool(ss.peak_is_active)
-        start_h = ss.peak_start_hour
-        end_h = ss.peak_end_hour
-        extra_amt = float(ss.peak_extra_amount or 0.0)
-        if peak_active:
-            from datetime import datetime, timezone, timedelta
-            colombo_tz = timezone(timedelta(hours=5, minutes=30))
-            current_hour = datetime.now(colombo_tz).hour
-            if start_h is not None and end_h is not None:
-                if start_h <= end_h:
-                    is_curr_peak = start_h <= current_hour < end_h
+    if peaks:
+        peak_active = any(p.is_active for p in peaks)
+        from datetime import datetime, timezone, timedelta
+        colombo_tz = timezone(timedelta(hours=5, minutes=30))
+        current_hour = datetime.now(colombo_tz).hour
+        active_peaks = [p for p in peaks if p.is_active]
+        curr_active_peaks = []
+        for ap in active_peaks:
+            in_peak = False
+            start = ap.start_hour
+            end = ap.end_hour
+            if start is not None and end is not None:
+                if start <= end:
+                    in_peak = start <= current_hour < end
                 else:
-                    is_curr_peak = current_hour >= start_h or current_hour < end_h
+                    in_peak = current_hour >= start or current_hour < end
+            if in_peak:
+                curr_active_peaks.append(ap)
+        
+        if curr_active_peaks:
+            is_curr_peak = True
+            start_h = curr_active_peaks[0].start_hour
+            end_h = curr_active_peaks[0].end_hour
+            extra_amt = float(curr_active_peaks[0].extra_amount or 0.0)
+        elif active_peaks:
+            start_h = active_peaks[0].start_hour
+            end_h = active_peaks[0].end_hour
+            extra_amt = float(active_peaks[0].extra_amount or 0.0)
+
 
     return DriverProfileResponse(
         id=d.id,
@@ -157,10 +172,11 @@ async def get_my_driver_profile(
     d = await _get_driver(db, user)
     from ...services.finance_service import get_driver_payout_stats
     stats = await get_driver_payout_stats(db, d.id)
-    from ...models import SystemSettings
-    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
-    ss = ss_q.scalars().first()
-    return _to_response(user, d, paid_payouts=stats["paid"], pending_payout=stats["pending"], ss=ss)
+    from ...models import PeakHourSetting
+    peaks_q = await db.execute(select(PeakHourSetting))
+    peaks = peaks_q.scalars().all()
+    return _to_response(user, d, paid_payouts=stats["paid"], pending_payout=stats["pending"], peaks=peaks)
+
 
 
 # Fallback rate card when no FareSetting row exists for the driver's vehicle.
@@ -660,9 +676,10 @@ async def update_bank_details(
 
     from ...services.finance_service import get_driver_payout_stats
     stats = await get_driver_payout_stats(db, d.id)
-    from ...models import SystemSettings
-    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
-    ss = ss_q.scalars().first()
-    return _to_response(user, d, paid_payouts=stats["paid"], pending_payout=stats["pending"], ss=ss)
+    from ...models import PeakHourSetting
+    peaks_q = await db.execute(select(PeakHourSetting))
+    peaks = peaks_q.scalars().all()
+    return _to_response(user, d, paid_payouts=stats["paid"], pending_payout=stats["pending"], peaks=peaks)
+
 
 

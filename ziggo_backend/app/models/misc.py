@@ -316,3 +316,16 @@ class DriverIncentive(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+
+class PeakHourSetting(Base):
+    __tablename__ = "peak_hour_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    start_hour = Column(Integer, nullable=True, default=9)
+    end_hour = Column(Integer, nullable=True, default=11)
+    start_time = Column(String(5), nullable=True, default="09:00")
+    end_time = Column(String(5), nullable=True, default="11:00")
+    extra_amount = Column(DECIMAL(10, 2), nullable=False, default=50.00)
+    is_active = Column(Boolean, nullable=False, default=True)
+
+

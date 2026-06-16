@@ -282,20 +282,25 @@ async def calculate_fare(
 
     # Peak hours surcharge check
     peak_surcharge = 0.0
-    if ss and ss.peak_is_active:
+    from ..models import PeakHourSetting
+    peak_q = await db.execute(select(PeakHourSetting).where(PeakHourSetting.is_active == True))
+    active_peaks = peak_q.scalars().all()
+    if active_peaks:
         colombo_tz = timezone(timedelta(hours=5, minutes=30))
-        current_hour = datetime.now(colombo_tz).hour
-        in_peak = False
-        start = ss.peak_start_hour
-        end = ss.peak_end_hour
-        if start is not None and end is not None:
-            if start <= end:
-                in_peak = start <= current_hour < end
-            else:
-                in_peak = current_hour >= start or current_hour < end
-        if in_peak:
-            peak_surcharge = float(ss.peak_extra_amount or 0.0)
-            fare_val += peak_surcharge
+        current_time_str = datetime.now(colombo_tz).strftime("%H:%M")
+        for ap in active_peaks:
+            in_peak = False
+            start = ap.start_time
+            end = ap.end_time
+            if start and end:
+                if start <= end:
+                    in_peak = start <= current_time_str < end
+                else:
+                    in_peak = current_time_str >= start or current_time_str < end
+            if in_peak:
+                peak_surcharge += float(ap.extra_amount or 0.0)
+        fare_val += peak_surcharge
+
 
     # BRD: CD-19 — per-stop fee compensates the driver for the detour.
     stop_fee_total = 0.0

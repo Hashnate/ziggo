@@ -23,7 +23,7 @@ from sqlalchemy import inspect, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from ..database import Base
-from ..models import Event, EventTicketTier, EventOrder, EventOrderItem, FlashWeightTier, CorporateAccount, CorporateMember, DriverPayout, MarketAd, DriverIncentive, ReferralBonus  # noqa: F401 — ensures import for create_all
+from ..models import Event, EventTicketTier, EventOrder, EventOrderItem, FlashWeightTier, CorporateAccount, CorporateMember, DriverPayout, MarketAd, DriverIncentive, ReferralBonus, PeakHourSetting  # noqa: F401 — ensures import for create_all
 
 # (table_name, column_name, column_ddl)
 PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
@@ -74,6 +74,8 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("system_settings", "cancellation_grace_period_minutes", "INTEGER NOT NULL DEFAULT 3"),
     ("users", "referral_code", "VARCHAR(16) UNIQUE"),
     ("users", "referred_by_user_id", "INTEGER"),
+    ("peak_hour_settings", "start_time", "VARCHAR(5)"),
+    ("peak_hour_settings", "end_time", "VARCHAR(5)"),
 )
 
 
@@ -178,6 +180,7 @@ async def ensure_schema(engine: AsyncEngine) -> None:
         await _seed_sample_events(conn)
         await _seed_food_home(conn)
         await _seed_incentives(conn)
+        await _seed_peak_hours(conn)
 
 
 async def _seed_flash_tiers(conn) -> None:
@@ -314,3 +317,43 @@ async def _seed_incentives(conn) -> None:
     for row in defaults:
         await conn.execute(DriverIncentive.__table__.insert().values(**row, is_active=True))
     print(f"[schema_sync] Seeded {len(defaults)} default driver incentive tiers")
+
+
+async def _seed_peak_hours(conn) -> None:
+    from ..models import PeakHourSetting
+    existing_q = await conn.execute(select(PeakHourSetting.id, PeakHourSetting.start_hour, PeakHourSetting.end_hour, PeakHourSetting.start_time, PeakHourSetting.end_time))
+    existing_rows = existing_q.all()
+    
+    if not existing_rows:
+        defaults = [
+            {"start_hour": 7, "end_hour": 9, "start_time": "07:00", "end_time": "09:00", "extra_amount": Decimal("50.00"), "is_active": True},
+            {"start_hour": 9, "end_hour": 11, "start_time": "09:00", "end_time": "11:00", "extra_amount": Decimal("50.00"), "is_active": True},
+            {"start_hour": 12, "end_hour": 14, "start_time": "12:00", "end_time": "14:00", "extra_amount": Decimal("50.00"), "is_active": False},
+            {"start_hour": 16, "end_hour": 18, "start_time": "16:00", "end_time": "18:00", "extra_amount": Decimal("50.00"), "is_active": False},
+            {"start_hour": 18, "end_hour": 20, "start_time": "18:00", "end_time": "20:00", "extra_amount": Decimal("50.00"), "is_active": False},
+            {"start_hour": 21, "end_hour": 23, "start_time": "21:00", "end_time": "23:00", "extra_amount": Decimal("50.00"), "is_active": False},
+        ]
+        for row in defaults:
+            await conn.execute(PeakHourSetting.__table__.insert().values(**row))
+        print(f"[schema_sync] Seeded {len(defaults)} default peak hour settings")
+    else:
+        # Backfill start_time/end_time for existing rows if they are null
+        for row in existing_rows:
+            updated = False
+            new_st = row.start_time
+            new_et = row.end_time
+            if row.start_time is None and row.start_hour is not None:
+                new_st = f"{row.start_hour:02d}:00"
+                updated = True
+            if row.end_time is None and row.end_hour is not None:
+                new_et = f"{row.end_hour:02d}:00"
+                updated = True
+            if updated:
+                await conn.execute(
+                    PeakHourSetting.__table__.update()
+                    .where(PeakHourSetting.id == row.id)
+                    .values(start_time=new_st, end_time=new_et)
+                )
+        print("[schema_sync] Backfilled start_time and end_time for existing peak hour settings")
+
+
