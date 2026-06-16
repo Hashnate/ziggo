@@ -111,7 +111,7 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
 
           return CustomScrollView(
             slivers: [
-              _appBar(),
+              SliverToBoxAdapter(child: _buildHeader()),
               SliverToBoxAdapter(child: _infoSheet()),
               if (!searching && categories.length > 1)
                 SliverPersistentHeader(
@@ -157,79 +157,150 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
     );
   }
 
-  // -------------------------------------------------------------- app bar
-  Widget _appBar() {
+  // -------------------------------------------------------------- header stack
+  Widget _buildHeader() {
     final cover = _resolveImg(widget.vendor['image_url']?.toString());
-    return SliverAppBar(
-      pinned: true,
-      expandedHeight: 196,
-      backgroundColor: AppColors.surface,
-      surfaceTintColor: AppColors.surface,
-      elevation: 1,
-      leading: _circleBtn(Icons.arrow_back_rounded, () => Navigator.pop(context)),
-      actions: [
-        _circleBtn(Icons.favorite_border_rounded, _favourite),
-        _circleBtn(Icons.qr_code_2_rounded,
-            () => _showPayQrCode(context, widget.vendor)),
-        const SizedBox(width: 6),
-      ],
-      flexibleSpace: FlexibleSpaceBar(
-        collapseMode: CollapseMode.parallax,
-        background: Stack(
-          fit: StackFit.expand,
-          children: [
-            cover == null
-                ? Container(
-                    decoration:
-                        const BoxDecoration(gradient: AppColors.primaryGradient),
-                    child: const Center(
-                      child: Icon(Icons.storefront_rounded,
-                          color: Colors.white, size: 54),
-                    ),
-                  )
-                : Image.network(
-                    cover,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      decoration: const BoxDecoration(
-                          gradient: AppColors.primaryGradient),
-                    ),
+    final logo = _resolveImg((widget.vendor['logo_url'] ?? widget.vendor['image_url'])?.toString());
+    final isOpenNow = widget.vendor['is_open_now'] != false;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // Cover Image
+        Container(
+          height: 200,
+          width: double.infinity,
+          color: AppColors.surfaceMuted,
+          child: cover == null
+              ? Container(
+                  decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
+                  child: const Center(
+                    child: Icon(Icons.storefront_rounded, color: Colors.white, size: 54),
                   ),
-            // subtle scrim so the white circle buttons read on any image
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withOpacity(0.18),
-                    Colors.transparent,
-                  ],
+                )
+              : Image.network(
+                  cover,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
+                  ),
+                ),
+        ),
+        // subtle scrim so the white circle buttons read on any image
+        Container(
+          height: 200,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withOpacity(0.18),
+                Colors.transparent,
+              ],
+            ),
+          ),
+        ),
+        // Action Buttons (Back & Icons)
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 10,
+          left: 16,
+          right: 16,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _circleBtn(Icons.arrow_back_rounded, () => Navigator.pop(context)),
+              Row(
+                children: [
+                  _circleBtn(Icons.favorite_border_rounded, _favourite),
+                  const SizedBox(width: 12),
+                  _circleBtn(Icons.qr_code_2_rounded,
+                      () => _showPayQrCode(context, widget.vendor)),
+                ],
+              ),
+            ],
+          ),
+        ),
+        // Logo & Open Badge (Overlapping)
+        Positioned(
+          bottom: -45,
+          right: 16,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 70,
+                height: 70,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: AppStyles.shadowSm,
+                  border: Border.all(color: Colors.white, width: 3),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(100),
+                  child: logo != null
+                      ? Image.network(
+                          logo,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(
+                              Icons.storefront_rounded,
+                              color: AppColors.textTertiary,
+                              size: 34),
+                        )
+                      : const Icon(Icons.storefront_rounded,
+                          color: AppColors.textTertiary, size: 34),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              _openBadge(isOpenNow),
+            ],
+          ),
         ),
+      ],
+    );
+  }
+
+  Widget _openBadge(bool isOpenNow) {
+    final color = isOpenNow ? AppColors.success : AppColors.error;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(100),
+        boxShadow: AppStyles.shadowSm,
+        border: Border.all(color: color.withOpacity(0.2), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            isOpenNow ? 'Open' : 'Closed',
+            style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 11),
+          ),
+        ],
       ),
     );
   }
 
   Widget _circleBtn(IconData icon, VoidCallback onTap) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 10, top: 4, bottom: 4),
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 38,
-          height: 38,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.92),
-            shape: BoxShape.circle,
-            boxShadow: AppStyles.shadowSm,
-          ),
-          child: Icon(icon, color: AppColors.textPrimary, size: 20),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 38,
+        height: 38,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.8),
+          shape: BoxShape.circle,
+          boxShadow: AppStyles.shadowSm,
         ),
+        child: Icon(icon, color: AppColors.textPrimary, size: 20),
       ),
     );
   }
@@ -251,130 +322,86 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
     final eta = widget.vendor['eta_minutes'];
     final fee = (widget.vendor['delivery_fee'] as num?)?.toDouble() ?? 0;
 
-    return Transform.translate(
-      offset: const Offset(0, -20),
-      child: Container(
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _vendorName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 24,
-                          letterSpacing: -0.5,
-                          height: 1.05,
-                        ),
-                      ),
-                      if (area.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            const Icon(Icons.location_on_rounded,
-                                size: 16, color: AppColors.primary),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                area,
-                                style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Container(
-                  width: 68,
-                  height: 68,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: AppStyles.shadowMd,
-                    border: Border.all(color: Colors.white, width: 3),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(100),
-                    child: (widget.vendor['logo_url'] ?? widget.vendor['image_url']) != null
-                        ? Image.network(
-                            _resolveImg((widget.vendor['logo_url'] ?? widget.vendor['image_url']).toString())!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(
-                                Icons.storefront_rounded,
-                                color: AppColors.textTertiary,
-                                size: 34),
-                          )
-                        : const Icon(Icons.storefront_rounded,
-                            color: AppColors.textTertiary, size: 34),
-                  ),
-                ),
-              ],
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 52, 20, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _vendorName,
+            style: const TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 24,
+              letterSpacing: -0.5,
+              height: 1.05,
             ),
-            const SizedBox(height: 10),
+          ),
+          if (area.isNotEmpty) ...[
+            const SizedBox(height: 6),
             Row(
               children: [
-                const Icon(Icons.thumb_up_alt_rounded,
-                    size: 15, color: AppColors.success),
+                const Icon(Icons.location_on_rounded,
+                    size: 16, color: AppColors.primary),
                 const SizedBox(width: 4),
-                Text(
-                  rating > 0 ? '${(rating * 20).toStringAsFixed(0)}% (500+)' : '96% (500+)',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 13,
-                    color: AppColors.success,
-                  ),
-                ),
-                _dot(),
-                const Icon(Icons.timer_rounded,
-                    size: 14, color: AppColors.textSecondary),
-                const SizedBox(width: 3),
-                Text(
-                  'Est: ${eta ?? 27}mins',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                _dot(),
-                const Icon(Icons.delivery_dining_rounded,
-                    size: 15, color: AppColors.textSecondary),
-                const SizedBox(width: 3),
-                Text(
-                  'Fee: LKR ${fee.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
+                Expanded(
+                  child: Text(
+                    area,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            _promoRow(),
-            const SizedBox(height: 4),
           ],
-        ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Icon(Icons.thumb_up_alt_rounded,
+                  size: 15, color: AppColors.success),
+              const SizedBox(width: 4),
+              Text(
+                rating > 0 ? '${(rating * 20).toStringAsFixed(0)}% (500+)' : '96% (500+)',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 13,
+                  color: AppColors.success,
+                ),
+              ),
+              _dot(),
+              const Icon(Icons.timer_rounded,
+                  size: 14, color: AppColors.textSecondary),
+              const SizedBox(width: 3),
+              Text(
+                'Est: ${eta ?? 27}mins',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              _dot(),
+              const Icon(Icons.delivery_dining_rounded,
+                  size: 15, color: AppColors.textSecondary),
+              const SizedBox(width: 3),
+              Text(
+                'Fee: LKR ${fee.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _promoRow(),
+          const SizedBox(height: 4),
+        ],
       ),
     );
   }

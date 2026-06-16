@@ -215,10 +215,15 @@ class _ChooseLocationScreenState extends State<ChooseLocationScreen> {
                     color: AppColors.textTertiary),
               ],
             ),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SavedAddressesScreen()),
-            ),
+            onTap: () async {
+              final p = await Navigator.push<Place?>(
+                context,
+                MaterialPageRoute(builder: (_) => const SavedAddressesScreen(selectMode: true)),
+              );
+              if (p != null && mounted) {
+                _return(p);
+              }
+            },
           ),
         ],
       ),

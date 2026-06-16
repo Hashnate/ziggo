@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
@@ -9,7 +10,8 @@ import '../../../core/widgets/motion.dart';
 import '../addresses_provider.dart';
 
 class SavedAddressesScreen extends StatefulWidget {
-  const SavedAddressesScreen({super.key});
+  final bool selectMode;
+  const SavedAddressesScreen({super.key, this.selectMode = false});
 
   @override
   State<SavedAddressesScreen> createState() => _SavedAddressesScreenState();
@@ -232,83 +234,100 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                   final style = _labelStyle(a['label']?.toString() ?? '');
                   return EntranceSlide(
                     delay: Duration(milliseconds: 45 * i),
-                    child: Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: AppColors.cardBorder),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            gradient: AppColors.serviceGradient(style.color),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Icon(style.icon, color: Colors.white, size: 22),
+                    child: GestureDetector(
+                      onTap: widget.selectMode
+                          ? () {
+                              final lat = (a['lat'] as num).toDouble();
+                              final lng = (a['lng'] as num).toDouble();
+                              final address = a['address'].toString();
+                              Navigator.pop(
+                                context,
+                                Place(
+                                  a['label']?.toString() ?? 'Saved Place',
+                                  address,
+                                  LatLng(lat, lng),
+                                ),
+                              );
+                            }
+                          : null,
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: AppColors.cardBorder),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                gradient: AppColors.serviceGradient(style.color),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Icon(style.icon, color: Colors.white, size: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    a['label']?.toString() ?? '',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 15,
-                                    ),
-                                  ),
-                                  if (a['is_default'] == true) ...[
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary,
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: const Text(
-                                        'DEFAULT',
-                                        style: TextStyle(
-                                          fontSize: 9,
+                                  Row(
+                                    children: [
+                                      Text(
+                                        a['label']?.toString() ?? '',
+                                        style: const TextStyle(
                                           fontWeight: FontWeight.w900,
-                                          letterSpacing: 0.6,
+                                          fontSize: 15,
                                         ),
                                       ),
+                                      if (a['is_default'] == true) ...[
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primary,
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Text(
+                                            'DEFAULT',
+                                            style: TextStyle(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w900,
+                                              letterSpacing: 0.6,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    a['address']?.toString() ?? '',
+                                    style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
                                     ),
-                                  ],
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ],
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                a['address']?.toString() ?? '',
-                                style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline_rounded,
+                                  color: AppColors.error),
+                              onPressed: () => p.remove(a['id'] as int),
+                            ),
+                          ],
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline_rounded,
-                              color: AppColors.error),
-                          onPressed: () => p.remove(a['id'] as int),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
                   );
                 },
               ),
