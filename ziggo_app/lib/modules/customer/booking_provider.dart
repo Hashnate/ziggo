@@ -33,11 +33,16 @@ class BookingProvider extends ChangeNotifier {
       if (event == 'booking_update') {
         final bid = data['booking_id'];
         if (_activeBooking != null && _activeBooking!['id'] == bid) {
-          _activeBooking = {
-            ..._activeBooking!,
-            'status': data['status'],
-            if (data['otp'] != null) 'otp': data['otp'],
-          };
+          final newStatus = data['status'];
+          if (newStatus == 'cancelled' || newStatus == 'completed') {
+            _activeBooking = null;
+          } else {
+            _activeBooking = {
+              ..._activeBooking!,
+              'status': newStatus,
+              if (data['otp'] != null) 'otp': data['otp'],
+            };
+          }
           notifyListeners();
         }
         // Lazy refresh
@@ -224,7 +229,11 @@ class BookingProvider extends ChangeNotifier {
         '/bookings/$bookingId/status',
         data: {'status': status, if (reason != null) 'reason': reason},
       );
-      _activeBooking = Map<String, dynamic>.from(resp.data);
+      if (status == 'cancelled' || status == 'completed') {
+        _activeBooking = null;
+      } else {
+        _activeBooking = Map<String, dynamic>.from(resp.data);
+      }
       notifyListeners();
       return _activeBooking;
     } on DioException catch (e) {
@@ -238,6 +247,20 @@ class BookingProvider extends ChangeNotifier {
     await updateStatus(_activeBooking!['id'] as int, 'cancelled', reason: reason);
     _activeBooking = null;
     notifyListeners();
+  }
+
+  void clearActiveBookingLocally() {
+    _activeBooking = null;
+    notifyListeners();
+  }
+
+  Future<void> cancelActiveSilently({required int bookingId, String reason = 'Cancelled by user'}) async {
+    try {
+      await ApiClient.instance.dio.patch(
+        '/bookings/$bookingId/status',
+        data: {'status': 'cancelled', 'reason': reason},
+      );
+    } catch (_) {}
   }
 
   Future<bool> rate({required int bookingId, required int rating, String? feedback}) async {
