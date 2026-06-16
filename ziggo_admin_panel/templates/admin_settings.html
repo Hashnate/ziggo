@@ -53,8 +53,8 @@
                 <button type="button" class="settings-tab" data-tab="notifications"><i class="fas fa-bell"></i> Notifications</button>
                 <button type="button" class="settings-tab" data-tab="loyalty"><i class="fas fa-medal"></i> Loyalty &amp; Membership</button>
                 <button type="button" class="settings-tab" data-tab="trips"><i class="fas fa-map-pin"></i> Trip Stops &amp; Waiting</button>
-                <button type="button" class="settings-tab" data-tab="branding"><i class="fas fa-image"></i> Logo &amp; Favicon</button>
                 <button type="button" class="settings-tab" data-tab="incentives"><i class="fas fa-gift"></i> Incentives</button>
+                <button type="button" class="settings-tab" data-tab="branding"><i class="fas fa-image"></i> Logo &amp; Favicon</button>
             </aside>
 
             <!-- Right content -->
@@ -244,31 +244,6 @@
                     </div>
                 </section>
 
-                <!-- Logo & Favicon -->
-                <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="branding">
-                    <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
-                        <i class="fas fa-image text-ziggo"></i> Logo &amp; Favicon
-                    </h3>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-black text-ziggo-muted mb-2">Logo</label>
-                            <div id="logoPreviewContainer" class="bg-gray-50 border border-ziggo-line rounded-2xl p-3 flex items-center justify-center h-24 mb-2">
-                                <img src="{{ s.logo_url or '/static/img/logo.jpeg' }}" alt="Logo" class="max-h-full max-w-full object-contain">
-                            </div>
-                            <input type="file" name="logo" id="logoInput" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="w-full text-xs">
-                            <p class="text-[10px] text-ziggo-faint font-bold mt-1">JPG/PNG/WEBP/SVG, max 5 MB.</p>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-black text-ziggo-muted mb-2">Favicon</label>
-                            <div id="faviconPreviewContainer" class="bg-gray-50 border border-ziggo-line rounded-2xl p-3 flex items-center justify-center h-24 mb-2">
-                                <img src="{{ s.favicon_url or '/static/img/logo.jpeg' }}" alt="Favicon" class="max-h-full max-w-full object-contain">
-                            </div>
-                            <input type="file" name="favicon" id="faviconInput" accept="image/png,image/x-icon,image/vnd.microsoft.icon,image/svg+xml" class="w-full text-xs">
-                            <p class="text-[10px] text-ziggo-faint font-bold mt-1">ICO/PNG/SVG, max 5 MB.</p>
-                        </div>
-                    </div>
-                </section>
-
                 <!-- Incentives -->
                 <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="incentives">
                     <div class="flex justify-between items-center mb-5">
@@ -320,7 +295,7 @@
                                                         "trips_required": inc.trips_required,
                                                         "reward_amount": (inc.reward_amount|float) if inc.reward_amount is not none else 0,
                                                         "is_active": inc.is_active,
-                                                    }|tojson }})'
+                                                     }|tojson }})'
                                                     class="px-3 py-1.5 bg-blue-50 text-ziggo border border-blue-100 rounded-lg text-xs font-bold hover:bg-blue-100 transition flex items-center gap-1.5">
                                                     <i class="fas fa-edit"></i> Edit
                                                 </button>
@@ -340,6 +315,31 @@
                                     {% endfor %}
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Logo & Favicon -->
+                <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="branding">
+                    <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                        <i class="fas fa-image text-ziggo"></i> Logo &amp; Favicon
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-2">Logo</label>
+                            <div id="logoPreviewContainer" class="bg-gray-50 border border-ziggo-line rounded-2xl p-3 flex items-center justify-center h-24 mb-2">
+                                <img src="{{ s.logo_url or '/static/img/logo.jpeg' }}" alt="Logo" class="max-h-full max-w-full object-contain">
+                            </div>
+                            <input type="file" name="logo" id="logoInput" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="w-full text-xs">
+                            <p class="text-[10px] text-ziggo-faint font-bold mt-1">JPG/PNG/WEBP/SVG, max 5 MB.</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-2">Favicon</label>
+                            <div id="faviconPreviewContainer" class="bg-gray-50 border border-ziggo-line rounded-2xl p-3 flex items-center justify-center h-24 mb-2">
+                                <img src="{{ s.favicon_url or '/static/img/logo.jpeg' }}" alt="Favicon" class="max-h-full max-w-full object-contain">
+                            </div>
+                            <input type="file" name="favicon" id="faviconInput" accept="image/png,image/x-icon,image/vnd.microsoft.icon,image/svg+xml" class="w-full text-xs">
+                            <p class="text-[10px] text-ziggo-faint font-bold mt-1">ICO/PNG/SVG, max 5 MB.</p>
                         </div>
                     </div>
                 </section>

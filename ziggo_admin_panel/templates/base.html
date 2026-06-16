@@ -505,7 +505,13 @@
                 <div class="hidden sm:flex items-center gap-2.5 pl-3 pr-1 py-1 rounded-xl border border-ziggo-line">
                     <div class="leading-tight text-right">
                         <p id="headerSiteName" class="text-[12px] font-bold text-ziggo-ink">Ziggo Admin</p>
-                        <p class="text-[10px] text-ziggo-faint">Super admin</p>
+                        {% if request.state.admin and request.state.admin.admin_role == 'superadmin' %}
+                        <p class="text-[10px] text-ziggo-faint">Superadmin</p>
+                        {% elif request.state.admin and request.state.admin.admin_role == 'data_entry' %}
+                        <p class="text-[10px] text-ziggo-faint">Data Entry</p>
+                        {% else %}
+                        <p class="text-[10px] text-ziggo-faint">Admin</p>
+                        {% endif %}
                     </div>
                     <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-ziggo text-white text-xs font-bold zi-logo">A</div>
                 </div>
