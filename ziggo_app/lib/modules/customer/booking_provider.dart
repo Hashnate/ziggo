@@ -214,6 +214,11 @@ class BookingProvider extends ChangeNotifier {
     try {
       final resp = await ApiClient.instance.dio.get('/bookings/active');
       if (resp.data == null || (resp.data is String && resp.data == '')) {
+        if (_activeBooking != null &&
+            (_activeBooking!['status'] == 'completed' ||
+             _activeBooking!['status'] == 'cancelled')) {
+          return;
+        }
         _activeBooking = null;
       } else {
         _activeBooking = Map<String, dynamic>.from(resp.data);
