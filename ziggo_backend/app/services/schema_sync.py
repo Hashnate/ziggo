@@ -67,6 +67,10 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("users", "password", "VARCHAR(100)"),
     ("bookings", "otp", "VARCHAR(4)"),
     ("users", "admin_role", "VARCHAR(30)"),
+    ("drivers", "bank_name", "VARCHAR(100)"),
+    ("drivers", "account_holder_name", "VARCHAR(100)"),
+    ("drivers", "account_number", "VARCHAR(50)"),
+    ("drivers", "branch_name", "VARCHAR(100)"),
 )
 
 

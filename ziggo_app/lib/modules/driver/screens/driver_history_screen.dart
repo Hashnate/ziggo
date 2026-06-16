@@ -305,6 +305,26 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
+                                      Text(
+                                        _formatServiceType(r['service_type']?.toString(), r),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 14,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      _breakdownRow(
+                                        'Duration',
+                                        _formatDuration(r),
+                                      ),
+                                      _breakdownRow(
+                                        'Distance',
+                                        _formatDistance(r),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      const Divider(height: 1, color: AppColors.divider),
+                                      const SizedBox(height: 10),
                                       const Text(
                                         'FARE BREAKDOWN',
                                         style: TextStyle(
@@ -418,6 +438,50 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
               ),
             ),
     );
+  }
+
+  String _formatServiceType(String? serviceType, Map<String, dynamic> r) {
+    if (serviceType == null) return 'Ride';
+    if (serviceType.toLowerCase() == 'food' || r['is_food'] == true) {
+      return 'Bike food';
+    }
+    if (serviceType.toLowerCase() == 'market' || r['is_market'] == true) {
+      return 'Market Delivery';
+    }
+    return serviceType[0].toUpperCase() + serviceType.substring(1);
+  }
+
+  String _formatDuration(Map<String, dynamic> r) {
+    final startedStr = r['started_at']?.toString();
+    final completedStr = r['completed_at']?.toString();
+    if (startedStr != null && completedStr != null) {
+      try {
+        final started = DateTime.parse(startedStr);
+        final completed = DateTime.parse(completedStr);
+        final diff = completed.difference(started);
+        final secs = diff.inMilliseconds / 1000.0;
+        if (secs < 60) {
+          return '${secs.toStringAsFixed(2)}s';
+        } else {
+          final mins = secs / 60.0;
+          return '${mins.toStringAsFixed(2)} min';
+        }
+      } catch (_) {}
+    }
+    final durationMin = r['duration_min'];
+    if (durationMin != null) {
+      return '$durationMin min';
+    }
+    return '0 min';
+  }
+
+  String _formatDistance(Map<String, dynamic> r) {
+    final raw = r['distance_km'];
+    final dist = raw is num ? raw : num.tryParse(raw?.toString() ?? '');
+    if (dist != null) {
+      return '${dist.toStringAsFixed(2)} km';
+    }
+    return '0.00 km';
   }
 
   Widget _breakdownRow(String label, String value, {bool isNegative = false, bool isBold = false}) {

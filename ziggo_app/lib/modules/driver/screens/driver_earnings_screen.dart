@@ -48,6 +48,16 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
   }
 
   Future<void> _handleSettleCommission(double commissionAmount) async {
+    final profile = context.read<DriverProvider>().profile;
+    final hasBank = profile != null &&
+        profile['bank_name'] != null &&
+        profile['bank_name'].toString().trim().isNotEmpty;
+
+    if (!hasBank) {
+      final connected = await _showConnectBankDialog();
+      if (connected != true) return;
+    }
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -114,6 +124,130 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
         ),
       );
     }
+  }
+
+  Future<bool?> _showConnectBankDialog() async {
+    final formKey = GlobalKey<FormState>();
+    final bankName = TextEditingController();
+    final accountHolder = TextEditingController();
+    final accountNumber = TextEditingController();
+    final branchName = TextEditingController();
+    bool busy = false;
+
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          backgroundColor: kDriverCard,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: Row(
+            children: const [
+              Icon(Icons.account_balance_rounded, color: AppColors.primary, size: 24),
+              SizedBox(width: 10),
+              Text('Connect Bank Account', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+            ],
+          ),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'To settle commission payouts, please connect your bank account details below.',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: bankName,
+                    decoration: const InputDecoration(
+                      labelText: 'Bank Name',
+                      hintText: 'e.g. Commercial Bank',
+                      prefixIcon: Icon(Icons.business_rounded, size: 18),
+                    ),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: accountHolder,
+                    decoration: const InputDecoration(
+                      labelText: 'Account Holder Name',
+                      hintText: 'e.g. A.B.C. Perera',
+                      prefixIcon: Icon(Icons.person_rounded, size: 18),
+                    ),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: accountNumber,
+                    decoration: const InputDecoration(
+                      labelText: 'Account Number',
+                      hintText: 'e.g. 1020304050',
+                      prefixIcon: Icon(Icons.tag_rounded, size: 18),
+                    ),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: branchName,
+                    decoration: const InputDecoration(
+                      labelText: 'Branch Name',
+                      hintText: 'e.g. Colombo Fort',
+                      prefixIcon: Icon(Icons.location_on_rounded, size: 18),
+                    ),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: busy ? null : () => Navigator.pop(ctx, false),
+              child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+            ),
+            ElevatedButton(
+              onPressed: busy
+                  ? null
+                  : () async {
+                      if (!formKey.currentState!.validate()) return;
+                      setState(() => busy = true);
+                      final ok = await context.read<DriverProvider>().updateBankDetails(
+                            bankName: bankName.text.trim(),
+                            accountHolderName: accountHolder.text.trim(),
+                            accountNumber: accountNumber.text.trim(),
+                            branchName: branchName.text.trim(),
+                          );
+                      setState(() => busy = false);
+                      if (ok) {
+                        Navigator.pop(ctx, true);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Failed to save bank details. Please try again.'),
+                            backgroundColor: AppColors.error,
+                          ),
+                        );
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: busy
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Save & Connect'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   double _d(Map<String, dynamic> m, String k) =>

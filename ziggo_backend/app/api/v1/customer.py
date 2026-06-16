@@ -36,8 +36,19 @@ async def update_profile(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_role("customer", "driver")),
 ):
-    for field, val in body.model_dump(exclude_unset=True).items():
-        setattr(user, field, val)
+    updates = body.model_dump(exclude_unset=True)
+    if "phone_number" in updates and updates["phone_number"]:
+        new_phone = updates["phone_number"].strip()
+        if new_phone != user.phone_number:
+            clash = (await db.execute(select(User).where(User.phone_number == new_phone))).scalars().first()
+            if clash:
+                raise HTTPException(status_code=409, detail="Phone number already in use by another account")
+            user.phone_number = new_phone
+
+    for field, val in updates.items():
+        if field != "phone_number":
+            setattr(user, field, val)
+
     await db.commit()
     await db.refresh(user)
     return user

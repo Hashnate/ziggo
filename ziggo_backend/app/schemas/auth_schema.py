@@ -33,6 +33,7 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     email: Optional[EmailStr] = None
     profile_photo: Optional[str] = None
+    phone_number: Optional[str] = None
 
 
 class ProfileCompleteness(BaseModel):

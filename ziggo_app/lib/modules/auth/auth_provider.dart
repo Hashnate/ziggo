@@ -177,6 +177,7 @@ class AuthProvider extends ChangeNotifier {
     String? gender,
     String? emergencyContact,
     String? profilePhoto,
+    String? phoneNumber,
   }) async {
     final body = <String, dynamic>{};
     if (fullName != null) body['full_name'] = fullName;
@@ -185,6 +186,7 @@ class AuthProvider extends ChangeNotifier {
     if (gender != null) body['gender'] = gender;
     if (emergencyContact != null) body['emergency_contact'] = emergencyContact;
     if (profilePhoto != null) body['profile_photo'] = profilePhoto;
+    if (phoneNumber != null) body['phone_number'] = phoneNumber;
     if (body.isEmpty) return;
     
     final resp = await ApiClient.instance.dio.patch('/customer/profile', data: body);
@@ -194,6 +196,7 @@ class AuthProvider extends ChangeNotifier {
     _gender = resp.data['gender'] as String? ?? gender ?? _gender;
     _emergencyContact = resp.data['emergency_contact'] as String? ?? emergencyContact ?? _emergencyContact;
     _profilePhoto = resp.data['profile_photo'] as String? ?? profilePhoto ?? _profilePhoto;
+    _phoneNumber = resp.data['phone_number'] as String? ?? phoneNumber ?? _phoneNumber;
     notifyListeners();
   }
 
