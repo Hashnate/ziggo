@@ -641,19 +641,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          const Text(
-            'Fare = Base + (Per km × distance) + (Per min × time), '
-            'with a minimum fare floor. The app keeps a commission; '
-            'the rest is yours.',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 6),
           _rateRow('Base fare', 'Rs.${_d(c, 'base_fare').toStringAsFixed(2)}'),
           _rateRow('Per kilometre',
               'Rs.${_d(c, 'per_km_rate').toStringAsFixed(2)}'),

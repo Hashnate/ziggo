@@ -101,7 +101,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                             'TOTAL EARNED',
                             style: TextStyle(
                               color: AppColors.primary,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.bold,
                               fontSize: 10,
                               letterSpacing: 1.4,
                             ),
@@ -112,7 +112,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                           'Rs.${_totalEarned.toStringAsFixed(0)}',
                           style: const TextStyle(
                             color: AppColors.primary,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.bold,
                             fontSize: 36,
                             letterSpacing: -1,
                             height: 1.1,
@@ -169,7 +169,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                             const SizedBox(height: 18),
                             const Text(
                               'No rides yet',
-                              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                             ),
                           ],
                         ),
@@ -217,7 +217,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                           Text(
                                             r['booking_ref']?.toString() ?? '',
                                             style: const TextStyle(
-                                              fontWeight: FontWeight.w900,
+                                              fontWeight: FontWeight.bold,
                                               fontSize: 14,
                                             ),
                                           ),
@@ -243,7 +243,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                         meta.label,
                                         style: TextStyle(
                                           color: meta.color,
-                                          fontWeight: FontWeight.w900,
+                                          fontWeight: FontWeight.bold,
                                           fontSize: 10,
                                           letterSpacing: 0.4,
                                         ),
@@ -308,9 +308,9 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                       Text(
                                         _formatServiceType(r['service_type']?.toString(), r),
                                         style: const TextStyle(
-                                          fontWeight: FontWeight.w900,
+                                          fontWeight: FontWeight.bold,
                                           fontSize: 14,
-                                          color: AppColors.primary,
+                                          color: AppColors.textPrimary,
                                         ),
                                       ),
                                       const SizedBox(height: 8),
@@ -328,9 +328,9 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                       const Text(
                                         'FARE BREAKDOWN',
                                         style: TextStyle(
-                                          color: AppColors.textTertiary,
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 10,
+                                          color: AppColors.textPrimary,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 11,
                                           letterSpacing: 1.2,
                                         ),
                                       ),
@@ -412,9 +412,9 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                     const Text(
                                       'YOU EARNED',
                                       style: TextStyle(
-                                        color: AppColors.textTertiary,
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 10,
+                                        color: AppColors.textPrimary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 11,
                                         letterSpacing: 1.2,
                                       ),
                                     ),
@@ -422,7 +422,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                     Text(
                                       'Rs.${((r['driver_earnings'] as num?) ?? (r['final_amount'] as num?) ?? 0).toStringAsFixed(0)}',
                                       style: const TextStyle(
-                                        fontWeight: FontWeight.w900,
+                                        fontWeight: FontWeight.bold,
                                         fontSize: 15,
                                       ),
                                     ),
@@ -526,7 +526,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
               value,
               style: TextStyle(
                 color: color,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.bold,
                 fontSize: 16,
               ),
             ),

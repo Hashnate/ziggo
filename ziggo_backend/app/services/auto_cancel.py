@@ -6,11 +6,11 @@ shouldn't be stuck on a "waiting" screen forever — so we sweep every 30 s and
 cancel anything older than `STALE_AFTER_SECONDS`. Wallet payments are
 refunded; cash orders are simply marked CANCELLED.
 """
+import os
 import asyncio
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from ..database import AsyncSessionLocal
 from ..models import (
@@ -19,6 +19,7 @@ from ..models import (
     FoodOrderStatus,
     Notification,
     WalletTransaction,
+    Driver,
 )
 from .ws_manager import manager
 
@@ -27,7 +28,49 @@ STALE_AFTER_SECONDS = 300
 TICK_SECONDS = 30
 
 
+async def _check_and_reset_daily_stats(db) -> None:
+    colombo_tz = timezone(timedelta(hours=5, minutes=30))
+    today_str = datetime.now(colombo_tz).strftime("%Y-%m-%d")
+    
+    file_path = "last_reset_date.txt"
+    
+    last_date = None
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, "r") as f:
+                last_date = f.read().strip()
+        except Exception:
+            pass
+            
+    if not last_date:
+        try:
+            with open(file_path, "w") as f:
+                f.write(today_str)
+        except Exception:
+            pass
+        return
+        
+    if last_date != today_str:
+        print(f"[daily_reset] Date changed from {last_date} to {today_str}. Resetting driver daily stats.")
+        await db.execute(
+            update(Driver).values(today_rides=0, today_earnings=Decimal("0.00"))
+        )
+        await db.commit()
+        
+        try:
+            with open(file_path, "w") as f:
+                f.write(today_str)
+        except Exception:
+            pass
+
+
 async def _run_once() -> None:
+    async with AsyncSessionLocal() as db:
+        try:
+            await _check_and_reset_daily_stats(db)
+        except Exception as e:
+            print(f"[auto_cancel] failed to check/reset daily stats: {e!r}")
+
     cutoff = datetime.now(timezone.utc) - timedelta(seconds=STALE_AFTER_SECONDS)
     async with AsyncSessionLocal() as db:
         q = await db.execute(
