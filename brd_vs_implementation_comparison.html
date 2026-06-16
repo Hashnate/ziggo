@@ -29,6 +29,90 @@
     </thead>
     <tbody>
         <tr>
+            <td><strong>BO-01</strong></td>
+            <td>Provide users a fast and reliable way to book rides or become drivers on-demand.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The platform provides an on-demand mobility service that matches riders with nearby drivers. Registration is fast, and active ride bookings complete reliably.</td>
+        </tr>
+        <tr>
+            <td><strong>BO-02</strong></td>
+            <td>Enable users to switch between customer and driver roles via a button within the app.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The mobile app includes a quick role toggle button that allows a single user account to act as either a passenger or driver depending on active mode selection.</td>
+        </tr>
+        <tr>
+            <td><strong>BO-03</strong></td>
+            <td>Match ride requests efficiently and minimise wait times for both drivers and customers.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>An automated dispatch engine filters available drivers in a radius to match bookings quickly and keep driver wait times low.</td>
+        </tr>
+        <tr>
+            <td><strong>BO-04</strong></td>
+            <td>Ensure safe and traceable trips with ratings and trip records for both customers and drivers.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The system logs trip records and coordinates securely, allowing riders and drivers to rate each other and review completed trip details.</td>
+        </tr>
+        <tr>
+            <td><strong>BO-05</strong></td>
+            <td>Allow operations to monitor the platform centrally via the Admin Panel.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>A central admin panel allows operators to oversee active rides, verify drivers, manage accounts, and monitor metrics.</td>
+        </tr>
+        <tr>
+            <td><strong>BO-06</strong></td>
+            <td>Support multiple payment methods (cash, digital wallet, credit/debit cards) through PayHere.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The platform supports digital payments through PayHere, in-app wallet balances, and direct cash payments at trip completion.</td>
+        </tr>
+        <tr>
+            <td><strong>BO-07</strong></td>
+            <td>Integrate Google Maps API for accurate location tracking, routing, and real-time ETA updates.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Map APIs are fully integrated to display maps, search addresses, calculate turn-by-turn route paths, and estimate real-time arrivals.</td>
+        </tr>
+        <tr>
+            <td><strong>BO-08</strong></td>
+            <td>Use Firebase for push notifications for ride status updates, promotions, and other relevant alerts.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The notification system triggers push alerts for booking confirmations, driver arrivals, and promotional alerts.</td>
+        </tr>
+        <tr>
+            <td><strong>BO-09</strong></td>
+            <td>Offer multi-service delivery (food, market, parcel Flash, basic truck) from a single app.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>The single super-app vertical supports ride-hailing, package deliveries, grocery shopping, restaurant orders, and moving trucks.</td>
+        </tr>
+        <tr>
+            <td><strong>BO-10</strong></td>
+            <td>Drive repeat use through a simple loyalty points system and promo codes.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Promos and checkout loyalty point rules drive user engagement by calculating and applying discounts to orders.</td>
+        </tr>
+        <tr>
+            <td><strong>BO-11</strong></td>
+            <td>Support basic business accounts for corporate ride and delivery bookings.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>Corporate profile configuration enables businesses to link employee profiles and charge bookings directly to company expense accounts.</td>
+        </tr>
+        <tr>
+            <td><strong>BO-12</strong></td>
+            <td>Surface third-party events to increase engagement.</td>
+            <td>BRD</td>
+            <td class="status-completed"><strong>Completed</strong></td>
+            <td>An event catalog allows users to discover local experiences and purchase tickets inside the mobile app.</td>
+        </tr>
+        <tr>
             <td><strong>CD-01</strong></td>
             <td>User registration (phone number + OTP, email/password)</td>
             <td>BRD</td>
@@ -265,454 +349,6 @@
             <td>BRD</td>
             <td class="status-completed"><strong>Completed</strong></td>
             <td>The app calculates and shows a profile completeness bar under the settings menu to encourage users to finish adding their photo and contact details.</td>
-        </tr>
-        <tr>
-            <td><strong>RS-01</strong></td>
-            <td>Ride types available at booking: Car, Tuk, Bike (Moto), with vehicle availability shown as ETA (e.g., "In 1 min").</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Available vehicle categories like Tuk, Bike, and Car appear on the booking screen with real-time arrival estimates. The website services pages display descriptions and base fares.</td>
-        </tr>
-        <tr>
-            <td><strong>RS-02</strong></td>
-            <td>Flex (premium car) as a separate ride class with its own fare.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Flex represents the premium sedan ride class in the app, operating with a separate base rate. Website ride pages outline Flex rates and starting fares.</td>
-        </tr>
-        <tr>
-            <td><strong>RS-03</strong></td>
-            <td>Reserve / scheduled rides (Later) – pickup date and time scheduling.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Reserved rides are scheduled and queued in backend dispatch systems to pair with drivers right before the scheduled pickup time.</td>
-        </tr>
-        <tr>
-            <td><strong>RS-04</strong></td>
-            <td>Long-distance / intercity rides – basic option for bookings between cities.</td>
-            <td>BRD</td>
-            <td class="status-missing"><strong>Missing / Planned</strong></td>
-            <td>Long-distance or city-to-city rides are planned but not yet supported in the matching engine or the mobile app booking screens.</td>
-        </tr>
-        <tr>
-            <td><strong>RS-05</strong></td>
-            <td>Seniors rides – a ride variant for senior passengers (basic label, no special driver policies).</td>
-            <td>BRD</td>
-            <td class="status-missing"><strong>Missing / Planned</strong></td>
-            <td>Dedicated ride variants for senior passengers are planned for future updates and are not yet visible in the app.</td>
-        </tr>
-        <tr>
-            <td><strong>RS-06</strong></td>
-            <td>Teens rides – a ride variant for teen passengers (basic label, standard safeguards).</td>
-            <td>BRD</td>
-            <td class="status-missing"><strong>Missing / Planned</strong></td>
-            <td>Safety-focused ride options for teenage passengers are planned and not yet integrated into the active services menu.</td>
-        </tr>
-        <tr>
-            <td><strong>RS-07</strong></td>
-            <td>Per-ride loyalty points earning displayed at vehicle selection.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>The booking checkout screen calculates and displays the loyalty points passengers will earn upon completing their ride.</td>
-        </tr>
-        <tr>
-            <td><strong>RS-08</strong></td>
-            <td>"Meet your driver here" pickup-point indicator on the map for high-density areas.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>The app places a visual pickup marker and instructions on the map to guide passengers to optimal meeting points in crowded areas.</td>
-        </tr>
-        <tr>
-            <td><strong>RS-09</strong></td>
-            <td>AI-powered drop location suggestions – recommends destinations based on current location, time of day, and usage history.</td>
-            <td>BRD</td>
-            <td class="status-missing"><strong>Missing / Planned</strong></td>
-            <td>Search screens suggest frequent destinations based on general Colombo locations rather than personalized, AI-derived suggestions.</td>
-        </tr>
-        <tr>
-            <td><strong>RT-01</strong></td>
-            <td>Hourly rental booking – user can book a vehicle for a set number of hours, with the driver waiting throughout.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Passengers can rent a vehicle and driver for a set duration of hours directly from the rental screen, with rates calculating per hour.</td>
-        </tr>
-        <tr>
-            <td><strong>RT-02</strong></td>
-            <td>Scheduled pickup – pickup date and time selection (Now or Schedule).</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Rental bookings support both immediate pickups and scheduled requests for later dates.</td>
-        </tr>
-        <tr>
-            <td><strong>RT-03</strong></td>
-            <td>Vehicle selection for rentals (Car, Van).</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>The rental screen allows passengers to choose between different vehicle sizes like cars, minivans, and passenger vans.</td>
-        </tr>
-        <tr>
-            <td><strong>RT-04</strong></td>
-            <td>Transparent rental rate displayed before confirmation.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Hourly rental rates display clearly on the vehicle cards before checkout, estimating costs according to the selected duration.</td>
-        </tr>
-        <tr>
-            <td><strong>PD-01</strong></td>
-            <td>One-way trip selection.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>One-way bookings serve as the standard selection mode for all mobility services in the app.</td>
-        </tr>
-        <tr>
-            <td><strong>PD-02</strong></td>
-            <td>Return-trip selection with waiting handled at the drop location.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Round-trip bookings automatically double the leg distance and calculate the return fare with a return multiplier.</td>
-        </tr>
-        <tr>
-            <td><strong>PD-03</strong></td>
-            <td>Pickup location selection via map, search, or saved address.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Pickup addresses coordinate via GPS detection, autocomplete search entries, or saved shortcuts.</td>
-        </tr>
-        <tr>
-            <td><strong>PD-04</strong></td>
-            <td>Drop location selection via map, search, or saved address.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Drop-off locations map via autocomplete address searches or map pin selection.</td>
-        </tr>
-        <tr>
-            <td><strong>PD-05</strong></td>
-            <td>Pickup date and time scheduling (Now or Schedule).</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Customers can choose to book their ride immediately or schedule a pickup for a later time.</td>
-        </tr>
-        <tr>
-            <td><strong>PD-06</strong></td>
-            <td>Instant booking (Now) – immediate dispatch.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Requesting a ride immediately searches for nearby drivers and displays a loading screen until a driver accepts.</td>
-        </tr>
-        <tr>
-            <td><strong>PD-07</strong></td>
-            <td>Scheduled booking – deferred dispatch at the user’s chosen time.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Scheduled bookings save in the queue and trigger automatically near the requested time to match with a nearby driver.</td>
-        </tr>
-        <tr>
-            <td><strong>PR-01</strong></td>
-            <td>Parcel delivery as a top-level service with Flash (same-day) and basic Courier sub-types.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Parcel selections route to same-day Flash or island-wide Courier services in the mobile app. Website details are in services sections.</td>
-        </tr>
-        <tr>
-            <td><strong>PR-02</strong></td>
-            <td>Flash instant delivery – same-day, on-demand parcel pickup and drop.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Same-day delivery checkout views are fully completed on the mobile app. Website lists size guidelines. Admin panel manages parcel settings.</td>
-        </tr>
-        <tr>
-            <td><strong>PR-03</strong></td>
-            <td>Basic courier delivery – standard parcel delivery for longer distances.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Standard courier deliveries are designed for longer-distance packages. Fares calculate by weight tiers, and admins monitor delivery tickets.</td>
-        </tr>
-        <tr>
-            <td><strong>PR-04</strong></td>
-            <td>Send items – user dispatches a parcel from their location.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>The pickup location for outgoing parcels defaults to the sender's current GPS position unless adjusted manually.</td>
-        </tr>
-        <tr>
-            <td><strong>PR-05</strong></td>
-            <td>Receive items – user requests pickup of a parcel addressed to them.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Users can arrange for a parcel to be picked up from another location and delivered directly to them by swapping the address order.</td>
-        </tr>
-        <tr>
-            <td><strong>PR-06</strong></td>
-            <td>Pickup and drop address capture with on-package address/contact-detail reminder.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Checkout screens remind senders to write the recipient's contact information and address clearly on the physical parcel packaging.</td>
-        </tr>
-        <tr>
-            <td><strong>PR-07</strong></td>
-            <td>Basic truck delivery for moving goods – a single truck option with real-time tracking.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Truck options with helpers load on the mobile app vehicle selection page. Website lists logistical moving specifications. Admin panel manages the logistics fleet.</td>
-        </tr>
-        <tr>
-            <td><strong>DV-01</strong></td>
-            <td>Food delivery – Rice & Curry, Burgers, Shawarma, Desserts, Chinese, Indian, Kottu, Pizza.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Users can browse restaurants and order meals for home delivery. Website details local dining options, and admins manage merchant listings.</td>
-        </tr>
-        <tr>
-            <td><strong>DV-02</strong></td>
-            <td>Grocery delivery – Groceries, Fresh products, Dairy & poultry.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Grocery departments display on the mobile app mart screen. Website lists categories, and the admin panel manages vendors.</td>
-        </tr>
-        <tr>
-            <td><strong>DV-03</strong></td>
-            <td>Pharmaceutical and health-product delivery.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Pharmacy categories are available under the grocery menu to support ordering health products from local partners.</td>
-        </tr>
-        <tr>
-            <td><strong>DV-04</strong></td>
-            <td>Household items delivery.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Partner merchants can list general household goods in their digital catalogs for home delivery.</td>
-        </tr>
-        <tr>
-            <td><strong>DV-05</strong></td>
-            <td>Personal care and baby-care delivery.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Personal care products are mapped inside the vendor catalog hierarchies for ordering.</td>
-        </tr>
-        <tr>
-            <td><strong>DV-06</strong></td>
-            <td>Flowers delivery.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Flower shops can register as store partners to list floral arrangements for delivery.</td>
-        </tr>
-        <tr>
-            <td><strong>DV-07</strong></td>
-            <td>Electronics delivery.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Electronics retailers can partner with the platform to deliver chargers, cables, and minor accessories.</td>
-        </tr>
-        <tr>
-            <td><strong>DV-08</strong></td>
-            <td>Pet supplies delivery.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Pet stores can register to list pet food and grooming supplies in the mart menu.</td>
-        </tr>
-        <tr>
-            <td><strong>DV-09</strong></td>
-            <td>Retail delivery (general merchandise).</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>General merchandise and retail items are supported in the mart vendor category lists.</td>
-        </tr>
-        <tr>
-            <td><strong>DV-10</strong></td>
-            <td>Search bar across Food and Market verticals with auto-suggested terms.</td>
-            <td>BRD</td>
-            <td class="status-missing"><strong>Missing / Planned</strong></td>
-            <td>Autocomplete search suggestions are missing on the mobile app food and mart search screens.</td>
-        </tr>
-        <tr>
-            <td><strong>DV-11</strong></td>
-            <td>Favourite merchants / items via a heart icon on listings.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Customers can heart merchants and restaurants to add them to their favorites tab for quicker access.</td>
-        </tr>
-        <tr>
-            <td><strong>DV-12</strong></td>
-            <td>"Picked Up For You" personalised recommendation rail.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Curated merchant collections and recommendations display prominently on the food homepage.</td>
-        </tr>
-        <tr>
-            <td><strong>DV-13</strong></td>
-            <td>Weather-aware delivery banner notifying users of possible delays.</td>
-            <td>BRD</td>
-            <td class="status-missing"><strong>Missing / Planned</strong></td>
-            <td>Weather delay warning banners are planned for rainy periods but are not yet implemented.</td>
-        </tr>
-        <tr>
-            <td><strong>DV-14</strong></td>
-            <td>Menu recommendations – each merchant listing surfaces a curated highlight of that outlet’s popular or promoted items before entering the full menu.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Restaurants highlight their most popular dishes at the top of their store page to help customers decide.</td>
-        </tr>
-        <tr>
-            <td><strong>EV-01</strong></td>
-            <td>Basic event discovery surface – a curated list of local events surfaced within the app.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>The event discovery screen lists local experiences and ticketing options. Admins edit and add events from the admin dashboard.</td>
-        </tr>
-        <tr>
-            <td><strong>EV-02</strong></td>
-            <td>Event categories: Experiences, Charity, Fashion (extendable).</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Event listings can be categorized into experiences, charity events, and fashion shows.</td>
-        </tr>
-        <tr>
-            <td><strong>EV-03</strong></td>
-            <td>Search bar for event discovery.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>A search bar filters event listings by title, date, or category.</td>
-        </tr>
-        <tr>
-            <td><strong>PY-01</strong></td>
-            <td>Cash payments at trip/order completion.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Cash is selected as the default payment method for all rides and deliveries, payable directly upon completion.</td>
-        </tr>
-        <tr>
-            <td><strong>PY-02</strong></td>
-            <td>Credit/debit card payments via PayHere.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Customers can pay using credit or debit cards, securely processed via the PayHere gateway integration.</td>
-        </tr>
-        <tr>
-            <td><strong>PY-03</strong></td>
-            <td>In-app digital wallet – add and manage balance through PayHere.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>The in-app wallet allows users to top up their balance via PayHere for quicker checkouts, and admins can monitor top-ups.</td>
-        </tr>
-        <tr>
-            <td><strong>PY-04</strong></td>
-            <td>Add and manage multiple payment methods (cards, wallet) through PayHere.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Users can link and manage multiple credit or debit cards as saved payment methods.</td>
-        </tr>
-        <tr>
-            <td><strong>PY-05</strong></td>
-            <td>Basic business account support – separate billing profile for corporate use.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Business profiles allow corporate rides to be billed directly to the employee's company account, managed via the admin corporate panel.</td>
-        </tr>
-        <tr>
-            <td><strong>PY-06</strong></td>
-            <td>Basic QR scan-to-pay – in-app QR code scanning for quick payment at supported points.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>The app supports quick payments at partner locations by letting users scan merchant QR codes at checkout.</td>
-        </tr>
-        <tr>
-            <td><strong>PY-07</strong></td>
-            <td>Promo code entry at booking with displayed validity and usage limits.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Discount codes validate at checkout to subtract discounts from the total fare. Admins create promo campaigns from the promotions tab.</td>
-        </tr>
-        <tr>
-            <td><strong>PY-08</strong></td>
-            <td>Price Trends Widget – shows fare variation across times of the day at the selected pickup location.</td>
-            <td>BRD</td>
-            <td class="status-missing"><strong>Missing / Planned</strong></td>
-            <td>Hourly price trend charts are planned for customer screens but are not yet implemented.</td>
-        </tr>
-        <tr>
-            <td><strong>RW-01</strong></td>
-            <td>Simple loyalty points – earn points for every qualifying spend across rides, food, and delivery. No tier system.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Completed trips and orders automatically reward users with loyalty points, which display on their profile tab.</td>
-        </tr>
-        <tr>
-            <td><strong>RW-02</strong></td>
-            <td>Points redemption – redeem accumulated points as a discount at checkout.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Accumulated loyalty points can be applied at checkout to discount the booking total.</td>
-        </tr>
-        <tr>
-            <td><strong>RW-03</strong></td>
-            <td>Basic membership option – a simple membership plan offering standard benefits (e.g. reduced delivery fees).</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Gold membership subscriptions offer users free delivery and reduced service fees for a monthly fee.</td>
-        </tr>
-        <tr>
-            <td><strong>RW-04</strong></td>
-            <td>Promotions inbox with claimable, category-tagged offers (Rides, Food, Market, etc.).</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>A dedicated promotions inbox lists claimable discount cards and category-specific offers.</td>
-        </tr>
-        <tr>
-            <td><strong>RW-05</strong></td>
-            <td>Earn-with-Ziggo flow for prospective driver-partners (sign-up and onboarding).</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Prospective drivers can submit onboarding applications and document scans directly in the app.</td>
-        </tr>
-        <tr>
-            <td><strong>AC-01</strong></td>
-            <td>Help & Support hub with category routing.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>The help center categorizes support tickets by account issues, payments, and app bugs. Admins manage and reply to tickets.</td>
-        </tr>
-        <tr>
-            <td><strong>AC-02</strong></td>
-            <td>Activity history with details, receipts, and per-trip Help & Support entry point.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Trip history receipt views include a quick-access button to open a support ticket for that specific ride.</td>
-        </tr>
-        <tr>
-            <td><strong>AC-03</strong></td>
-            <td>Saved Addresses (Add Home, Add Work, plus custom labels).</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Saved addresses shortcuts let users quickly book rides to frequent places like home or work.</td>
-        </tr>
-        <tr>
-            <td><strong>AC-04</strong></td>
-            <td>Account and payment management.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Users can manage their account profile details and edit their linked payment cards in settings.</td>
-        </tr>
-        <tr>
-            <td><strong>AC-05</strong></td>
-            <td>App-issue support flow.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Users can report technical glitches or app bugs under the support categories.</td>
-        </tr>
-        <tr>
-            <td><strong>AC-06</strong></td>
-            <td>Ride-support flow tied to a specific completed/ongoing trip.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Support tickets automatically link to the corresponding booking ID when created from a trip detail screen.</td>
-        </tr>
-        <tr>
-            <td><strong>AC-07</strong></td>
-            <td>About Us and app version display.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Version details and company about pages display in the app settings and the website pages.</td>
         </tr>
         <tr>
             <td><strong>AD-01</strong></td>
@@ -1016,141 +652,85 @@
             <td>Coupon systems verify database records to prevent duplicate promo code uses.</td>
         </tr>
         <tr>
-            <td><strong>NFR-1</strong></td>
-            <td>Performance: Ride requests dispatched within seconds, real-time tracking updates.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Match algorithms geofence candidates and pair rides in seconds. Maps update coordinates in real time.</td>
-        </tr>
-        <tr>
-            <td><strong>NFR-2</strong></td>
-            <td>Scalability: Handle growing user base and concurrent trips across all service verticals.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Database connections manage concurrent updates across super-app verticals.</td>
-        </tr>
-        <tr>
-            <td><strong>NFR-3</strong></td>
-            <td>Availability: High uptime with fail-safe mechanisms.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Async web servers manage traffic loads.</td>
-        </tr>
-        <tr>
-            <td><strong>NFR-4</strong></td>
-            <td>Security: Secure user authentication and payment handling (via PayHere); PCI-compliant card handling.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Security tokens protect sessions, and transactions run under tokenized gateway callbacks without storing credit card numbers.</td>
-        </tr>
-        <tr>
-            <td><strong>NFR-5</strong></td>
-            <td>Usability: Simple, intuitive flows for booking, driving, and role-switching.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Unified mobile apps feature a clear, single-tap role switch button.</td>
-        </tr>
-        <tr>
-            <td><strong>NFR-6</strong></td>
-            <td>Localisation: Multi-language support (English, Sinhala, Tamil) and LKR currency formatting.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>App layouts format currency outputs in LKR, and language bundles manage translations.</td>
-        </tr>
-        <tr>
-            <td><strong>NFR-7</strong></td>
-            <td>Offline tolerance: Activity history and saved addresses cached for read access when the device is offline.</td>
-            <td>BRD</td>
-            <td class="status-partial"><strong>Partially Completed</strong></td>
-            <td>Profile models cache details in mobile app local SQLite databases, but history logs require an active internet connection to load.</td>
-        </tr>
-        <tr>
-            <td><strong>NFR-8</strong></td>
-            <td>Observability: All service flows (rides, deliveries, payments, loyalty) emit structured logs and business-event metrics.</td>
-            <td>BRD</td>
-            <td class="status-completed"><strong>Completed</strong></td>
-            <td>Core system metrics and errors stream to system logs.</td>
-        </tr>
-        <tr>
-            <td><strong>Food Delivery</strong></td>
-            <td>Order meals from 10,000+ local restaurants</td>
+            <td><strong>ADD-01</strong></td>
+            <td><strong>Food Delivery</strong> - Order meals from 10,000+ local restaurants</td>
             <td>Additional</td>
             <td class="status-completed"><strong>Completed</strong></td>
             <td>Users can browse restaurants and order meals for home delivery. Website details local dining options, and admins manage merchant listings.</td>
         </tr>
         <tr>
-            <td><strong>Merchant Admin</strong></td>
-            <td>Restaurant Menu and Order manager</td>
+            <td><strong>ADD-02</strong></td>
+            <td><strong>Merchant Admin</strong> - Restaurant Menu and Order manager</td>
             <td>Additional</td>
             <td class="status-completed"><strong>Completed</strong></td>
             <td>Restaurant partners can manage their menu items and track active orders.</td>
         </tr>
         <tr>
-            <td><strong>Mart Grocery</strong></td>
-            <td>Local groceries, dark stores & pharmacy products</td>
+            <td><strong>ADD-03</strong></td>
+            <td><strong>Mart Grocery</strong> - Local groceries, dark stores & pharmacy products</td>
             <td>Additional</td>
             <td class="status-completed"><strong>Completed</strong></td>
             <td>Users can order groceries, dark store supplies, and pharmacy products inside the mart menu.</td>
         </tr>
         <tr>
-            <td><strong>Mart Vendor</strong></td>
-            <td>Store catalog stock and product manager</td>
+            <td><strong>ADD-04</strong></td>
+            <td><strong>Mart Vendor</strong> - Store catalog stock and product manager</td>
             <td>Additional</td>
             <td class="status-completed"><strong>Completed</strong></td>
             <td>Stores can manage their inventory lists and product catalog details.</td>
         </tr>
         <tr>
-            <td><strong>Parcel Flash</strong></td>
-            <td>Same-day courier deliveries (Document/S/M/L)</td>
+            <td><strong>ADD-05</strong></td>
+            <td><strong>Parcel Flash</strong> - Same-day courier deliveries (Document/S/M/L)</td>
             <td>Additional</td>
             <td class="status-completed"><strong>Completed</strong></td>
             <td>Same-day delivery checkouts are completed on the mobile app, and size rules are listed on the website.</td>
         </tr>
         <tr>
-            <td><strong>Truck Mover</strong></td>
-            <td>Moving Lorries with 1-3 helpers option + insurance</td>
+            <td><strong>ADD-06</strong></td>
+            <td><strong>Truck Mover</strong> - Moving Lorries with 1-3 helpers option + insurance</td>
             <td>Additional</td>
             <td class="status-completed"><strong>Completed</strong></td>
             <td>Lorry options with helper choices select on mobile app checkout panels.</td>
         </tr>
         <tr>
-            <td><strong>Gold Pass</strong></td>
-            <td>Subscriptions offering free delivery (LKR 549/mo)</td>
+            <td><strong>ADD-07</strong></td>
+            <td><strong>Gold Pass</strong> - Subscriptions offering free delivery (LKR 549/mo)</td>
             <td>Additional</td>
             <td class="status-completed"><strong>Completed</strong></td>
             <td>Gold subscription plans are processed in Flutter and backend models. Subscription checkout is in the app, and promos are on the website.</td>
         </tr>
         <tr>
-            <td><strong>QR Scan & Go</strong></td>
-            <td>Pay local merchants/drivers via scan codes</td>
+            <td><strong>ADD-08</strong></td>
+            <td><strong>QR Scan & Go</strong> - Pay local merchants/drivers via scan codes</td>
             <td>Additional</td>
             <td class="status-completed"><strong>Completed</strong></td>
             <td>QR scanners and payments verify on mobile app screens.</td>
         </tr>
         <tr>
-            <td><strong>Incentives</strong></td>
-            <td>Driver quest incentives milestones</td>
+            <td><strong>ADD-09</strong></td>
+            <td><strong>Incentives</strong> - Driver quest incentives milestones</td>
             <td>Additional</td>
             <td class="status-completed"><strong>Completed</strong></td>
             <td>Milestones trackers load on mobile app driver earnings pages.</td>
         </tr>
         <tr>
-            <td><strong>Corporate accounts</strong></td>
-            <td>Ziggo for Business billing & Cost Centers</td>
+            <td><strong>ADD-10</strong></td>
+            <td><strong>Corporate accounts</strong> - Ziggo for Business billing & Cost Centers</td>
             <td>Additional</td>
             <td class="status-completed"><strong>Completed</strong></td>
             <td>Invoicing billing profiles link to corporate routes on mobile apps, website, and admin dashboards.</td>
         </tr>
         <tr>
-            <td><strong>Admin CRUD</strong></td>
-            <td>Central Superadmin user management controls</td>
+            <td><strong>ADD-11</strong></td>
+            <td><strong>Admin CRUD</strong> - Central Superadmin user management controls</td>
             <td>Additional</td>
             <td class="status-completed"><strong>Completed</strong></td>
             <td>Access controls for admins and roles edit in admin templates and backend routes.</td>
         </tr>
         <tr>
-            <td><strong>Female-Driver Option</strong></td>
-            <td>Feasibility study / option to match female riders with female drivers.</td>
+            <td><strong>ADD-12</strong></td>
+            <td><strong>Female-Driver Option</strong> - Feasibility study / option to match female riders with female drivers.</td>
             <td>Additional</td>
             <td class="status-partial"><strong>Partially Completed</strong></td>
             <td>Feasibility studies are completed. Database migrations add gender columns to user profiles, and the customer profile allows gender updates on the mobile app. Matching filters are not yet implemented.</td>
