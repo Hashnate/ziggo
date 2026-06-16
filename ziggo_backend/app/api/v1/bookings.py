@@ -1151,6 +1151,10 @@ async def update_booking_status(
                 description=f"Earned on {b.booking_ref}",
             )
 
+        # CD-30 — process referral bonus on friend's first completed trip
+        from ...services.referral_service import process_referral_on_first_trip
+        await process_referral_on_first_trip(db, b)
+
     elif new_status == BookingStatus.CANCELLED:
         b.cancelled_at = now
         b.cancellation_reason = body.reason

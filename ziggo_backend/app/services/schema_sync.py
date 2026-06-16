@@ -23,7 +23,7 @@ from sqlalchemy import inspect, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from ..database import Base
-from ..models import Event, EventTicketTier, EventOrder, EventOrderItem, FlashWeightTier, CorporateAccount, CorporateMember, DriverPayout, MarketAd, DriverIncentive  # noqa: F401 — ensures import for create_all
+from ..models import Event, EventTicketTier, EventOrder, EventOrderItem, FlashWeightTier, CorporateAccount, CorporateMember, DriverPayout, MarketAd, DriverIncentive, ReferralBonus  # noqa: F401 — ensures import for create_all
 
 # (table_name, column_name, column_ddl)
 PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
@@ -72,6 +72,8 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("drivers", "account_number", "VARCHAR(50)"),
     ("drivers", "branch_name", "VARCHAR(100)"),
     ("system_settings", "cancellation_grace_period_minutes", "INTEGER NOT NULL DEFAULT 3"),
+    ("users", "referral_code", "VARCHAR(16) UNIQUE"),
+    ("users", "referred_by_user_id", "INTEGER"),
 )
 
 

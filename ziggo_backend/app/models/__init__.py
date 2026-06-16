@@ -8,6 +8,9 @@ from .user import (
     SavedAddress,
     OTPCode,
     CustomerCard,
+    ReferralBonus,
+    ReferralKind,
+    ReferralStatus,
 )
 from .booking import Booking, BookingStatus, BookingStop, Payment, PromoCode
 from .corporate import CorporateAccount, CorporateMember
@@ -61,6 +64,9 @@ __all__ = [
     "DriverDocument",
     "SavedAddress",
     "OTPCode",
+    "ReferralBonus",
+    "ReferralKind",
+    "ReferralStatus",
     "Booking",
     "BookingStatus",
     "BookingStop",

@@ -16,6 +16,7 @@ import 'support_screen.dart';
 import 'wallet_screen.dart';
 import 'payment_methods_screen.dart';
 import 'edit_profile_screen.dart';
+import 'earn_with_ziggo_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -115,6 +116,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _sectionLabel('PERKS & SUPPORT'),
           const SizedBox(height: 10),
           _menuCard(items: [
+            _MenuItem(
+              icon: Icons.share_rounded,
+              color: AppColors.primary,
+              label: 'Earn with Ziggo',
+              subtitle: 'Invite friends & get rewards',
+              onTap: () => _open(const EarnWithZiggoScreen()),
+            ),
             _MenuItem(
               icon: Icons.local_offer_rounded,
               color: AppColors.success,

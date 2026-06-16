@@ -22,6 +22,7 @@ import 'modules/customer/promos_provider.dart';
 import 'modules/customer/screens/customer_shell.dart';
 import 'modules/customer/wallet_provider.dart';
 import 'modules/customer/payment_methods_provider.dart';
+import 'modules/customer/referrals_provider.dart';
 import 'modules/driver/driver_provider.dart';
 import 'modules/driver/screens/driver_home_screen.dart';
 import 'modules/market_vendor/market_vendor_provider.dart';
@@ -77,6 +78,7 @@ class ZiggoApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => RestaurantProvider()),
         ChangeNotifierProvider(create: (_) => MarketVendorProvider()),
         ChangeNotifierProvider(create: (_) => PaymentMethodsProvider()..fetchCards()),
+        ChangeNotifierProvider(create: (_) => ReferralsProvider()),
       ],
       child: MaterialApp(
         title: 'Ziggo',

@@ -141,7 +141,17 @@ async def update_fcm_token(
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_me(user: User = Depends(get_current_user)):
+async def get_me(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    if not user.referral_code:
+        from ...models.user import generate_referral_code
+        user.referral_code = generate_referral_code()
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
     # BRD: CD-34 — attach profile completeness so the mobile widget can render.
     from ...services.auth_service import compute_profile_completeness
     return UserResponse(
@@ -154,5 +164,7 @@ async def get_me(user: User = Depends(get_current_user)):
         profile_photo=user.profile_photo,
         rating=float(user.rating) if user.rating is not None else None,
         total_rides=user.total_rides,
+        referral_code=user.referral_code,
+        referred_by_user_id=user.referred_by_user_id,
         profile_completeness=compute_profile_completeness(user),
     )

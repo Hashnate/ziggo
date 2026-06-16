@@ -45,8 +45,35 @@ async def update_profile(
                 raise HTTPException(status_code=409, detail="Phone number already in use by another account")
             user.phone_number = new_phone
 
+    if "referred_by_code" in updates and updates["referred_by_code"]:
+        code = updates["referred_by_code"].strip().upper()
+        if user.referred_by_user_id is not None:
+            raise HTTPException(status_code=400, detail="Referral code already applied")
+
+        referrer_q = await db.execute(select(User).where(User.referral_code == code))
+        referrer = referrer_q.scalars().first()
+        if not referrer:
+            raise HTTPException(status_code=400, detail="Invalid referral code")
+
+        if referrer.id == user.id:
+            raise HTTPException(status_code=400, detail="You cannot refer yourself")
+
+        user.referred_by_user_id = referrer.id
+
+        from ...models import ReferralBonus, ReferralKind, ReferralStatus
+        bonus = ReferralBonus(
+            referrer_user_id=referrer.id,
+            referred_user_id=user.id,
+            kind=ReferralKind.credit,
+            referrer_amount=Decimal("300.00"),
+            referred_amount=Decimal("300.00"),
+            status=ReferralStatus.pending,
+            trigger_description="Referral bonus — friend completed first order"
+        )
+        db.add(bonus)
+
     for field, val in updates.items():
-        if field != "phone_number":
+        if field not in ("phone_number", "referred_by_code"):
             setattr(user, field, val)
 
     await db.commit()
@@ -257,3 +284,58 @@ async def mark_notification_read(
     n.is_read = True
     await db.commit()
     return {"ok": True}
+
+
+@router.get("/referrals")
+async def get_referral_summary(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer", "driver")),
+):
+    from ...models import ReferralBonus, ReferralStatus
+    from sqlalchemy import select
+
+    if not user.referral_code:
+        from ...models.user import generate_referral_code
+        user.referral_code = generate_referral_code()
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+    q = await db.execute(
+        select(ReferralBonus)
+        .where(ReferralBonus.referrer_user_id == user.id)
+        .order_by(ReferralBonus.created_at.desc())
+    )
+    bonuses = q.scalars().all()
+
+    total_referred = len(bonuses)
+    earned_amount = sum((b.referrer_amount for b in bonuses if b.status == ReferralStatus.completed), Decimal("0.00"))
+    pending_amount = sum((b.referrer_amount for b in bonuses if b.status == ReferralStatus.pending), Decimal("0.00"))
+
+    friends = []
+    for b in bonuses:
+        referred_user = await db.get(User, b.referred_user_id)
+        name = referred_user.full_name or "New User"
+        phone = referred_user.phone_number
+        if phone and len(phone) >= 7:
+            phone_masked = phone[:3] + "****" + phone[-3:]
+        else:
+            phone_masked = phone or ""
+
+        friends.append({
+            "id": b.id,
+            "name": name,
+            "phone": phone_masked,
+            "status": b.status.value,
+            "amount": float(b.referrer_amount),
+            "created_at": b.created_at,
+            "paid_at": b.paid_at,
+        })
+
+    return {
+        "referral_code": user.referral_code,
+        "total_referred": total_referred,
+        "earned_amount": float(earned_amount),
+        "pending_amount": float(pending_amount),
+        "friends": friends
+    }

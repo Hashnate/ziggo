@@ -11,6 +11,8 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
+import secrets
+import string
 
 from ..database import Base
 
@@ -27,6 +29,22 @@ class AdminRole(str, enum.Enum):
     SUPERADMIN = "superadmin"
     ADMIN = "admin"
     DATA_ENTRY = "data_entry"
+
+
+class ReferralKind(str, enum.Enum):
+    credit = "credit"
+    points = "points"
+
+
+class ReferralStatus(str, enum.Enum):
+    pending = "pending"
+    completed = "completed"
+    failed = "failed"
+
+
+def generate_referral_code() -> str:
+    chars = string.ascii_uppercase + string.digits
+    return "ZG" + "".join(secrets.choice(chars) for _ in range(6))
 
 
 class User(Base):
@@ -49,12 +67,15 @@ class User(Base):
     password = Column(String(100), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    referral_code = Column(String(16), unique=True, nullable=True, default=generate_referral_code)
+    referred_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
     customer_profile = relationship("Customer", back_populates="user", uselist=False, cascade="all, delete-orphan")
     driver_profile = relationship("Driver", back_populates="user", uselist=False, cascade="all, delete-orphan")
     saved_addresses = relationship("SavedAddress", back_populates="user", cascade="all, delete-orphan")
     wallet_transactions = relationship("WalletTransaction", back_populates="user", cascade="all, delete-orphan")
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
+    referred_by = relationship("User", remote_side=[id], foreign_keys=[referred_by_user_id])
 
 
 class Customer(Base):
@@ -176,3 +197,21 @@ class OTPCode(Base):
     is_used = Column(Boolean, default=False)
     expires_at = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ReferralBonus(Base):
+    __tablename__ = "referral_bonuses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    referrer_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    referred_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    kind = Column(SQLEnum(ReferralKind, name="referral_kind"), nullable=False, default=ReferralKind.credit)
+    referrer_amount = Column(DECIMAL(10, 2), nullable=False)
+    referred_amount = Column(DECIMAL(10, 2), nullable=False)
+    status = Column(SQLEnum(ReferralStatus, name="referral_status"), nullable=False, default=ReferralStatus.pending)
+    trigger_description = Column(String(255))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    paid_at = Column(DateTime(timezone=True), nullable=True)
+
+    referrer = relationship("User", foreign_keys=[referrer_user_id], backref="referrals_sent")
+    referred = relationship("User", foreign_keys=[referred_user_id], backref="referrals_received")

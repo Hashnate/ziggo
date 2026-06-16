@@ -34,6 +34,7 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     profile_photo: Optional[str] = None
     phone_number: Optional[str] = None
+    referred_by_code: Optional[str] = None
 
 
 class ProfileCompleteness(BaseModel):
@@ -50,6 +51,8 @@ class UserResponse(UserBase):
     profile_photo: Optional[str] = None
     rating: Optional[float] = None
     total_rides: Optional[int] = None
+    referral_code: Optional[str] = None
+    referred_by_user_id: Optional[int] = None
     # BRD: CD-34 — populated server-side from the user record
     profile_completeness: Optional[ProfileCompleteness] = None
 

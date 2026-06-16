@@ -37,6 +37,8 @@ class AuthProvider extends ChangeNotifier {
   String? _gender;
   String? _emergencyContact;
   String? _profilePhoto;
+  String? _referralCode;
+  int? _referredByUserId;
 
   AuthStatus get status => _status;
   String? get token => _token;
@@ -47,6 +49,8 @@ class AuthProvider extends ChangeNotifier {
   String? get email => _email;
   String? get lastError => _lastError;
   String? get devOtp => _devOtp;
+  String? get referralCode => _referralCode;
+  int? get referredByUserId => _referredByUserId;
   /// True only for the first-ever OTP verification on this phone (signup).
   /// Used to route new users through the "Your details" screen before home.
   bool get isNewUser => _isNewUser;
@@ -149,6 +153,8 @@ class AuthProvider extends ChangeNotifier {
       _gender = resp.data['gender'] as String? ?? _gender;
       _emergencyContact = resp.data['emergency_contact'] as String? ?? _emergencyContact;
       _profilePhoto = resp.data['profile_photo'] as String? ?? _profilePhoto;
+      _referralCode = resp.data['referral_code'] as String? ?? _referralCode;
+      _referredByUserId = resp.data['referred_by_user_id'] as int? ?? _referredByUserId;
       _completeness = resp.data['profile_completeness'] is Map
           ? Map<String, dynamic>.from(resp.data['profile_completeness'] as Map)
           : null;
@@ -178,6 +184,7 @@ class AuthProvider extends ChangeNotifier {
     String? emergencyContact,
     String? profilePhoto,
     String? phoneNumber,
+    String? referredByCode,
   }) async {
     final body = <String, dynamic>{};
     if (fullName != null) body['full_name'] = fullName;
@@ -187,6 +194,9 @@ class AuthProvider extends ChangeNotifier {
     if (emergencyContact != null) body['emergency_contact'] = emergencyContact;
     if (profilePhoto != null) body['profile_photo'] = profilePhoto;
     if (phoneNumber != null) body['phone_number'] = phoneNumber;
+    if (referredByCode != null && referredByCode.trim().isNotEmpty) {
+      body['referred_by_code'] = referredByCode.trim().toUpperCase();
+    }
     if (body.isEmpty) return;
     
     final resp = await ApiClient.instance.dio.patch('/customer/profile', data: body);
@@ -197,6 +207,7 @@ class AuthProvider extends ChangeNotifier {
     _emergencyContact = resp.data['emergency_contact'] as String? ?? emergencyContact ?? _emergencyContact;
     _profilePhoto = resp.data['profile_photo'] as String? ?? profilePhoto ?? _profilePhoto;
     _phoneNumber = resp.data['phone_number'] as String? ?? phoneNumber ?? _phoneNumber;
+    _referredByUserId = resp.data['referred_by_user_id'] as int? ?? _referredByUserId;
     notifyListeners();
   }
 

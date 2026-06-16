@@ -20,14 +20,13 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
   late final TextEditingController _firstCtrl;
   late final TextEditingController _lastCtrl;
   late final TextEditingController _emailCtrl;
+  late final TextEditingController _referralCtrl;
   bool _busy = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    // Prefill from anything the backend already knows (e.g. a full_name stamped
-    // at signup from the Registration screen).
     final auth = context.read<AuthProvider>();
     final parts = (auth.fullName ?? '').trim().split(RegExp(r'\s+'));
     final first = parts.isNotEmpty ? parts.first : '';
@@ -35,6 +34,7 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
     _firstCtrl = TextEditingController(text: first);
     _lastCtrl = TextEditingController(text: last);
     _emailCtrl = TextEditingController(text: auth.email ?? '');
+    _referralCtrl = TextEditingController();
   }
 
   @override
@@ -42,6 +42,7 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
     _firstCtrl.dispose();
     _lastCtrl.dispose();
     _emailCtrl.dispose();
+    _referralCtrl.dispose();
     super.dispose();
   }
 
@@ -49,6 +50,7 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
     final first = _firstCtrl.text.trim();
     final last = _lastCtrl.text.trim();
     final email = _emailCtrl.text.trim();
+    final referral = _referralCtrl.text.trim();
     if (first.length < 2) {
       setState(() => _error = 'Please enter your first name');
       return;
@@ -74,17 +76,20 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
     final fullName = '$first $last';
     final auth = context.read<AuthProvider>();
     try {
-      await auth.updateProfile(fullName: fullName, email: email);
+      await auth.updateProfile(
+        fullName: fullName,
+        email: email,
+        referredByCode: referral.isNotEmpty ? referral : null,
+      );
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = 'Could not save your details. Please try again.';
+        _error = 'Could not save your details. Please check if the referral code is correct.';
       });
       return;
     }
     if (!mounted) return;
-    // Details saved — drop to _Root, which now routes to home.
     Navigator.popUntil(context, (r) => r.isFirst);
   }
 
@@ -159,6 +164,15 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
                   label: 'E-mail',
                   controller: _emailCtrl,
                   keyboardType: TextInputType.emailAddress,
+                ),
+              ),
+              const SizedBox(height: 14),
+              EntranceSlide(
+                delay: const Duration(milliseconds: 150),
+                child: _field(
+                  label: 'Referral Code (Optional)',
+                  controller: _referralCtrl,
+                  capitalize: true,
                 ),
               ),
               if (_error != null) ...[
