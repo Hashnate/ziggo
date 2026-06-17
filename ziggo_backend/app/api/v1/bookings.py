@@ -25,6 +25,7 @@ from ...models import (
 from ...schemas import (
     FareEstimateRequest,
     FareEstimateResponse,
+    BulkFareEstimateRequest,
     BookingCreate,
     BookingResponse,
     BookingStatusUpdate,
@@ -178,6 +179,47 @@ async def estimate_fare(
     fare.pop("hourly_rate", None)
     fare.pop("rental_hours", None)
     return FareEstimateResponse(service_type=req.service_type, **fare)
+
+
+@router.post("/estimate/bulk")
+async def estimate_fare_bulk(
+    req: BulkFareEstimateRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    customer = None
+    if (req.redeem_points or 0) > 0:
+        customer = await _get_customer(db, user)
+        
+    results = {}
+    for st in req.service_types:
+        try:
+            fare = await calculate_fare(
+                db,
+                st,
+                req.pickup_lat,
+                req.pickup_lng,
+                req.drop_lat,
+                req.drop_lng,
+                req.promo_code,
+                trip_type=req.trip_type,
+                is_flash=req.is_flash,
+                parcel_weight_kg=req.parcel_weight_kg,
+                is_rental=req.is_rental,
+                rental_hours=req.rental_hours,
+                is_courier=req.is_courier,
+                customer=customer,
+                redeem_points=req.redeem_points or 0,
+                stops=[s.model_dump() for s in (req.stops or [])],
+            )
+            fare.pop("hourly_rate", None)
+            fare.pop("rental_hours", None)
+            results[st] = fare
+        except Exception as e:
+            # Skip or log error for this specific service type
+            continue
+            
+    return results
 
 
 @router.post("", response_model=BookingResponse, status_code=201)
