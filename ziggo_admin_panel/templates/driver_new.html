@@ -12,6 +12,16 @@
         </div>
         {% endif %}
 
+        {# Metadata strip #}
+        <div class="flex items-center justify-between p-4 bg-ziggo-soft/40 rounded-2xl">
+            <div class="flex items-center gap-3 text-sm">
+                <span class="font-bold text-ziggo-muted">Create New Driver Account</span>
+            </div>
+            <a href="/admin/drivers" class="text-sm font-bold text-ziggo-muted hover:text-ziggo">
+                <i class="fas fa-arrow-left mr-1"></i> Back to drivers
+            </a>
+        </div>
+
         <div>
             <h3 class="text-lg font-black text-ziggo mb-4">Profile Photo</h3>
             <div class="flex items-center gap-5">
@@ -30,29 +40,12 @@
         </div>
 
         <div>
-            <h3 class="text-lg font-black text-ziggo mb-4">Billing Proof</h3>
-            <div class="flex items-center gap-5">
-                <div id="billingPreview" class="w-24 h-24 rounded-2xl bg-ziggo-soft/50 border-2 border-dashed border-ziggo-line flex items-center justify-center overflow-hidden">
-                    <i class="fas fa-file-invoice text-ziggo-faint text-3xl"></i>
-                </div>
-                <div class="flex-1">
-                    <label for="billing_proof" class="inline-flex items-center gap-2 cursor-pointer px-4 py-2.5 bg-ziggo-soft text-ziggo rounded-xl font-bold text-sm hover:bg-ziggo-soft/70 transition">
-                        <i class="fas fa-upload"></i>
-                        <span id="billingLabel">Choose billing proof</span>
-                    </label>
-                    <input id="billing_proof" name="billing_proof" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="previewBilling(this)">
-                    <p class="text-xs text-ziggo-faint font-bold mt-2">JPG, PNG or WEBP. Max 5 MB. Upload utility bill, bank statement, etc.</p>
-                </div>
-            </div>
-        </div>
-
-        <div>
             <h3 class="text-lg font-black text-ziggo mb-4">Personal Details</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Phone Number</label>
                     <input name="phone_number" required value="{{ form.phone_number or '' }}"
-                           type="tel" maxlength="10" minlength="10" pattern="\d{10}"
+                           type="tel" maxlength="13" minlength="10"
                            placeholder="0712345678"
                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                     <p class="text-[10px] text-amber-600 font-bold mt-1">⚠️ Changing this changes the driver's login</p>
@@ -153,134 +146,53 @@
                 <i class="fas fa-id-card text-ziggo"></i> KYC Documents
             </h4>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {% for doc in documents %}
                 <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
-                    <div id="nic_frontIconWrapper" class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
-                        <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
+                    <div id="{{ doc.kind }}IconWrapper" class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
+                        {% if doc.document_url %}
+                        <a href="{{ doc.document_url }}" target="_blank" class="w-full h-full flex items-center justify-center">
+                            {% if doc.document_url.endswith('.pdf') %}
+                            <i class="fas fa-file-pdf text-2xl text-rose-500 hover:opacity-80 transition"></i>
+                            {% else %}
+                            <img src="{{ doc.document_url }}" alt="{{ doc.label }}" class="w-full h-full object-cover hover:opacity-80 transition">
+                            {% endif %}
+                        </a>
+                        {% else %}
+                            {% if doc.kind == 'billing_proof' %}
+                            <i class="fas fa-file-invoice text-gray-300 text-xl"></i>
+                            {% else %}
+                            <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
+                            {% endif %}
+                        {% endif %}
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="font-black text-sm text-ziggo-ink">NIC Front</p>
-                        <p class="text-[11px] text-rose-500 font-bold" id="nic_frontStatus">Not uploaded yet</p>
+                        <p class="font-black text-sm text-ziggo-ink">{{ doc.label }}</p>
+                        {% if doc.document_url %}
+                        <p class="text-[11px] text-ziggo-muted truncate" id="{{ doc.kind }}Status">Uploaded {{ doc.uploaded_at.strftime("%Y-%m-%d") if doc.uploaded_at else '' }}</p>
+                        {% if doc.is_verified %}
+                        <span class="px-2 py-0.5 mt-1 inline-block text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700 rounded-full" id="{{ doc.kind }}VerifyBadge">Verified</span>
+                        {% else %}
+                        <span class="px-2 py-0.5 mt-1 inline-block text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-700 rounded-full" id="{{ doc.kind }}VerifyBadge">Pending review</span>
+                        {% endif %}
+                        {% else %}
+                        <p class="text-[11px] text-rose-500 font-bold" id="{{ doc.kind }}Status">Not uploaded yet</p>
+                        {% endif %}
                     </div>
-                    <div>
-                        <label for="doc_nic_front" class="cursor-pointer px-3 py-1.5 bg-ziggo-soft text-ziggo rounded-lg text-xs font-black hover:bg-ziggo-soft/70 transition whitespace-nowrap">
-                            <i class="fas fa-upload mr-1"></i> Upload
+                    <div class="flex flex-col gap-1.5 items-end">
+                        <label for="doc_{{ doc.kind }}" class="cursor-pointer px-3 py-1.5 bg-ziggo-soft text-ziggo rounded-lg text-xs font-black hover:bg-ziggo-soft/70 transition whitespace-nowrap">
+                            <i class="fas fa-upload mr-1"></i> {% if doc.document_url %}Replace{% else %}Upload{% endif %}
                         </label>
-                        <input id="doc_nic_front" name="doc_nic_front" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden" onchange="previewDoc(this, 'nic_front')">
+                        <input id="doc_{{ doc.kind }}" name="doc_{{ doc.kind }}" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden" onchange="previewDoc(this, '{{ doc.kind }}')">
                     </div>
                 </div>
-                <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
-                    <div id="nic_backIconWrapper" class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
-                        <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="font-black text-sm text-ziggo-ink">NIC Back</p>
-                        <p class="text-[11px] text-rose-500 font-bold" id="nic_backStatus">Not uploaded yet</p>
-                    </div>
-                    <div>
-                        <label for="doc_nic_back" class="cursor-pointer px-3 py-1.5 bg-ziggo-soft text-ziggo rounded-lg text-xs font-black hover:bg-ziggo-soft/70 transition whitespace-nowrap">
-                            <i class="fas fa-upload mr-1"></i> Upload
-                        </label>
-                        <input id="doc_nic_back" name="doc_nic_back" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden" onchange="previewDoc(this, 'nic_back')">
-                    </div>
-                </div>
-                <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
-                    <div id="license_frontIconWrapper" class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
-                        <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="font-black text-sm text-ziggo-ink">Driving License Front</p>
-                        <p class="text-[11px] text-rose-500 font-bold" id="license_frontStatus">Not uploaded yet</p>
-                    </div>
-                    <div>
-                        <label for="doc_license_front" class="cursor-pointer px-3 py-1.5 bg-ziggo-soft text-ziggo rounded-lg text-xs font-black hover:bg-ziggo-soft/70 transition whitespace-nowrap">
-                            <i class="fas fa-upload mr-1"></i> Upload
-                        </label>
-                        <input id="doc_license_front" name="doc_license_front" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden" onchange="previewDoc(this, 'license_front')">
-                    </div>
-                </div>
-                <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
-                    <div id="license_backIconWrapper" class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
-                        <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="font-black text-sm text-ziggo-ink">Driving License Back</p>
-                        <p class="text-[11px] text-rose-500 font-bold" id="license_backStatus">Not uploaded yet</p>
-                    </div>
-                    <div>
-                        <label for="doc_license_back" class="cursor-pointer px-3 py-1.5 bg-ziggo-soft text-ziggo rounded-lg text-xs font-black hover:bg-ziggo-soft/70 transition whitespace-nowrap">
-                            <i class="fas fa-upload mr-1"></i> Upload
-                        </label>
-                        <input id="doc_license_back" name="doc_license_back" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden" onchange="previewDoc(this, 'license_back')">
-                    </div>
-                </div>
-                <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
-                    <div id="vehicle_regIconWrapper" class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
-                        <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="font-black text-sm text-ziggo-ink">Vehicle Registration</p>
-                        <p class="text-[11px] text-rose-500 font-bold" id="vehicle_regStatus">Not uploaded yet</p>
-                    </div>
-                    <div>
-                        <label for="doc_vehicle_reg" class="cursor-pointer px-3 py-1.5 bg-ziggo-soft text-ziggo rounded-lg text-xs font-black hover:bg-ziggo-soft/70 transition whitespace-nowrap">
-                            <i class="fas fa-upload mr-1"></i> Upload
-                        </label>
-                        <input id="doc_vehicle_reg" name="doc_vehicle_reg" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden" onchange="previewDoc(this, 'vehicle_reg')">
-                    </div>
-                </div>
-                <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
-                    <div id="insuranceIconWrapper" class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
-                        <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="font-black text-sm text-ziggo-ink">Insurance</p>
-                        <p class="text-[11px] text-rose-500 font-bold" id="insuranceStatus">Not uploaded yet</p>
-                    </div>
-                    <div>
-                        <label for="doc_insurance" class="cursor-pointer px-3 py-1.5 bg-ziggo-soft text-ziggo rounded-lg text-xs font-black hover:bg-ziggo-soft/70 transition whitespace-nowrap">
-                            <i class="fas fa-upload mr-1"></i> Upload
-                        </label>
-                        <input id="doc_insurance" name="doc_insurance" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden" onchange="previewDoc(this, 'insurance')">
-                    </div>
-                </div>
-                <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
-                    <div id="year_licenseIconWrapper" class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
-                        <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="font-black text-sm text-ziggo-ink">Year License</p>
-                        <p class="text-[11px] text-rose-500 font-bold" id="year_licenseStatus">Not uploaded yet</p>
-                    </div>
-                    <div>
-                        <label for="doc_year_license" class="cursor-pointer px-3 py-1.5 bg-ziggo-soft text-ziggo rounded-lg text-xs font-black hover:bg-ziggo-soft/70 transition whitespace-nowrap">
-                            <i class="fas fa-upload mr-1"></i> Upload
-                        </label>
-                        <input id="doc_year_license" name="doc_year_license" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden" onchange="previewDoc(this, 'year_license')">
-                    </div>
-                </div>
-                <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
-                    <div id="eco_testIconWrapper" class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
-                        <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="font-black text-sm text-ziggo-ink">Eco Test Report</p>
-                        <p class="text-[11px] text-rose-500 font-bold" id="eco_testStatus">Not uploaded yet</p>
-                    </div>
-                    <div>
-                        <label for="doc_eco_test" class="cursor-pointer px-3 py-1.5 bg-ziggo-soft text-ziggo rounded-lg text-xs font-black hover:bg-ziggo-soft/70 transition whitespace-nowrap">
-                            <i class="fas fa-upload mr-1"></i> Upload
-                        </label>
-                        <input id="doc_eco_test" name="doc_eco_test" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden" onchange="previewDoc(this, 'eco_test')">
-                    </div>
-                </div>
-
+                {% endfor %}
             </div>
         </div>
 
         <div class="pt-6 border-t border-gray-100 flex justify-end gap-3">
-            <a href="/admin/drivers" class="px-6 py-3 bg-[#1e3a8a] text-white hover:bg-blue-800 rounded-xl font-bold">Cancel</a>
-            <button type="submit" class="px-8 py-3 bg-[#0f172a] text-white rounded-xl font-bold hover:bg-slate-800 flex items-center gap-2">
-                <i class="fas fa-save"></i> Save changes
+            <a href="/admin/drivers" class="px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50">Cancel</a>
+            <button type="submit" class="px-8 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light shadow-brand">
+                <i class="fas fa-save mr-2"></i> Save changes
             </button>
         </div>
     </form>
@@ -308,7 +220,6 @@ function previewPhoto(input) {
 function previewBilling(input) {
     const preview = document.getElementById('billingPreview');
     const label = document.getElementById('billingLabel');
-    
     if (!input.files || !input.files[0]) return;
     const file = input.files[0];
     if (file.size > 5 * 1024 * 1024) {
@@ -327,15 +238,19 @@ function previewBilling(input) {
 function previewDoc(input, kind) {
     const wrapper = document.getElementById(kind + 'IconWrapper');
     const status = document.getElementById(kind + 'Status');
+    const badge = document.getElementById(kind + 'VerifyBadge');
     if (!input.files || !input.files[0]) return;
     const file = input.files[0];
-    if (file.size > 8 * 1024 * 1024) {
-        alert('Document must be under 8 MB');
+    if (file.size > 25 * 1024 * 1024) {
+        alert('Document must be under 25 MB');
         input.value = '';
         return;
     }
     status.textContent = 'Ready to upload';
     status.className = 'text-[11px] text-amber-500 font-bold';
+    if (badge) {
+        badge.style.display = 'none';
+    }
     
     const ext = file.name.split('.').pop().toLowerCase();
     if (ext === 'pdf') {

@@ -613,9 +613,32 @@ async def admin_drivers_new_form(
     request: Request,
     _: User = Depends(current_admin),
 ):
+    docs = []
+    for kind, label in [
+        ("billing_proof", "Billing Proof"),
+        ("nic_front", "NIC Front"),
+        ("nic_back", "NIC Back"),
+        ("license_front", "Driving License Front"),
+        ("license_back", "Driving License Back"),
+        ("vehicle_reg", "Vehicle Registration"),
+        ("insurance", "Insurance"),
+        ("year_license", "Year License"),
+        ("eco_test", "Eco Test Report"),
+        ("vehicle_front", "Vehicle Photo — Front"),
+        ("vehicle_back", "Vehicle Photo — Back"),
+        ("vehicle_side", "Vehicle Photo — Side"),
+    ]:
+        docs.append({
+            "kind": kind,
+            "label": label,
+            "id": None,
+            "document_url": None,
+            "is_verified": False,
+            "uploaded_at": None,
+        })
     return templates.TemplateResponse(
         request, "driver_new.html",
-        {"request": request, "active_page": "drivers", "error": None, "form": {}},
+        {"request": request, "active_page": "drivers", "error": None, "form": {}, "documents": docs},
     )
 
 
@@ -637,6 +660,7 @@ async def admin_drivers_new_submit(
     relative_relationship: str = Form(""),
     profile_photo: UploadFile | None = File(None),
     billing_proof: UploadFile | None = File(None),
+    doc_billing_proof: UploadFile | None = File(None),
     doc_nic_front: UploadFile | None = File(None),
     doc_nic_back: UploadFile | None = File(None),
     doc_license_front: UploadFile | None = File(None),
@@ -645,6 +669,9 @@ async def admin_drivers_new_submit(
     doc_insurance: UploadFile | None = File(None),
     doc_year_license: UploadFile | None = File(None),
     doc_eco_test: UploadFile | None = File(None),
+    doc_vehicle_front: UploadFile | None = File(None),
+    doc_vehicle_back: UploadFile | None = File(None),
+    doc_vehicle_side: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -666,11 +693,35 @@ async def admin_drivers_new_submit(
         "relative_relationship": relative_relationship,
     }
 
+    # Construct docs list in case of error
+    docs = []
+    for kind, label in [
+        ("billing_proof", "Billing Proof"),
+        ("nic_front", "NIC Front"),
+        ("nic_back", "NIC Back"),
+        ("license_front", "Driving License Front"),
+        ("license_back", "Driving License Back"),
+        ("vehicle_reg", "Vehicle Registration"),
+        ("insurance", "Insurance"),
+        ("year_license", "Year License"),
+        ("eco_test", "Eco Test Report"),
+        ("vehicle_front", "Vehicle Photo — Front"),
+        ("vehicle_back", "Vehicle Photo — Back"),
+        ("vehicle_side", "Vehicle Photo — Side"),
+    ]:
+        docs.append({
+            "kind": kind,
+            "label": label,
+            "id": None,
+            "document_url": None,
+            "is_verified": False,
+            "uploaded_at": None,
+        })
 
     if vehicle_type not in {"bike", "tuk", "car", "van", "truck"}:
         return templates.TemplateResponse(
             request, "driver_new.html",
-            {"request": request, "active_page": "drivers", "error": "Invalid vehicle type", "form": form},
+            {"request": request, "active_page": "drivers", "error": "Invalid vehicle type", "form": form, "documents": docs},
             status_code=400,
         )
 
@@ -680,7 +731,7 @@ async def admin_drivers_new_submit(
     if existing:
         return templates.TemplateResponse(
             request, "driver_new.html",
-            {"request": request, "active_page": "drivers", "error": "Phone number already registered", "form": form},
+            {"request": request, "active_page": "drivers", "error": "Phone number already registered", "form": form, "documents": docs},
             status_code=409,
         )
 
@@ -692,7 +743,7 @@ async def admin_drivers_new_submit(
         if (await db.execute(select(Driver).where(field == value))).scalars().first():
             return templates.TemplateResponse(
                 request, "driver_new.html",
-                {"request": request, "active_page": "drivers", "error": f"{label} already in use", "form": form},
+                {"request": request, "active_page": "drivers", "error": f"{label} already in use", "form": form, "documents": docs},
                 status_code=409,
             )
 
@@ -748,11 +799,19 @@ async def admin_drivers_new_submit(
         db.add(doc)
 
     from app.models import DriverDocument
-    for kind in ("nic_front", "nic_back", "license_front", "license_back", "vehicle_reg", "insurance", "year_license", "eco_test"):
+    for kind in ("billing_proof", "nic_front", "nic_back", "license_front", "license_back", "vehicle_reg", "insurance", "year_license", "eco_test", "vehicle_front", "vehicle_back", "vehicle_side"):
+        # If kind is billing_proof and we already saved it from `billing_proof` parameter above, skip or let doc_billing_proof override
         file_input = locals().get(f"doc_{kind}")
         if file_input:
             url = await _save_uploaded_doc(file_input, kind)
             if url:
+                if kind == "billing_proof":
+                    driver.billing_proof_url = url
+                # check if doc already added above to avoid duplicate database inserts
+                existing_doc = None
+                if kind == "billing_proof" and billing_proof_url:
+                    # we already created it, so update the URL
+                    pass
                 doc = DriverDocument(
                     driver_id=driver.id,
                     document_type=kind,
