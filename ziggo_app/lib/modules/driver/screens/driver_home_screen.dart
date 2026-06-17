@@ -998,6 +998,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                                   final activeTrips = (inc['trips_required'] as num).toInt();
                                   final activeReward = (inc['reward_amount'] as num).toDouble();
                                   final previousTrips = index > 0 ? (incentives[index - 1]['trips_required'] as num).toInt() : 0;
+                                  final ridesCompleted = (inc['rides_completed'] as num?)?.toInt() ?? todayRides;
 
                                   return Container(
                                     width: double.infinity,
@@ -1027,7 +1028,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                                         _segmentProgress(
                                           index: index,
                                           totalSegments: incentives.length,
-                                          todayRides: todayRides,
+                                          ridesCompleted: ridesCompleted,
                                           startTrips: previousTrips,
                                           endTrips: activeTrips,
                                         ),
@@ -1074,16 +1075,16 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   Widget _segmentProgress({
     required int index,
     required int totalSegments,
-    required int todayRides,
+    required int ridesCompleted,
     required int startTrips,
     required int endTrips,
   }) {
     // Calculate progress fraction for this segment
     double fraction = 0.0;
-    if (todayRides >= endTrips) {
+    if (ridesCompleted >= endTrips) {
       fraction = 1.0;
-    } else if (todayRides > startTrips) {
-      fraction = (todayRides - startTrips) / (endTrips - startTrips);
+    } else if (ridesCompleted > startTrips) {
+      fraction = (ridesCompleted - startTrips) / (endTrips - startTrips);
     }
     fraction = fraction.clamp(0.0, 1.0);
 
@@ -1137,7 +1138,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 Positioned.fill(
                   child: Center(
                     child: Text(
-                      '$todayRides/$endTrips',
+                      '$ridesCompleted/$endTrips',
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w900,
@@ -1172,7 +1173,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         width: 12,
                         height: 12,
                         decoration: BoxDecoration(
-                          color: todayRides >= startTrips ? const Color(0xFFF97316) : Colors.white,
+                          color: ridesCompleted >= startTrips ? const Color(0xFFF97316) : Colors.white,
                           shape: BoxShape.circle,
                           border: Border.all(color: const Color(0xFF9CA3AF), width: 1.5),
                         ),
@@ -1196,7 +1197,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       width: 12,
                       height: 12,
                       decoration: BoxDecoration(
-                        color: todayRides >= endTrips ? const Color(0xFFF97316) : Colors.white,
+                        color: ridesCompleted >= endTrips ? const Color(0xFFF97316) : Colors.white,
                         shape: BoxShape.circle,
                         border: Border.all(color: const Color(0xFF9CA3AF), width: 1.5),
                       ),

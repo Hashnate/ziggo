@@ -657,23 +657,56 @@ async def get_driver_incentives(
     user: User = Depends(require_role("driver")),
 ):
     """Get list of all active driver incentive tiers."""
-    from ...models import DriverIncentive
+    from ...models import DriverIncentive, Driver, Booking, BookingStatus
+    from datetime import timedelta
+    from sqlalchemy import func
+
+    # Get the driver
+    dq = await db.execute(select(Driver).where(Driver.user_id == user.id))
+    drv = dq.scalars().first()
+    if not drv:
+        raise HTTPException(status_code=404, detail="Driver profile not found")
+
+    colombo_tz = timezone(timedelta(hours=5, minutes=30))
+    now_colombo = datetime.now(colombo_tz)
+    midnight_colombo = datetime(now_colombo.year, now_colombo.month, now_colombo.day, tzinfo=colombo_tz)
+
     q = await db.execute(
         select(DriverIncentive)
         .where(DriverIncentive.is_active == True)
         .order_by(DriverIncentive.trips_required)
     )
     rows = q.scalars().all()
-    return [
-        {
+
+    results = []
+    for r in rows:
+        limit_days = r.limit_days or 1
+        if limit_days <= 1:
+            # Use today_rides directly for 1-day incentives
+            rides_completed = drv.today_rides or 0
+        else:
+            # Calculate the start of the window in UTC
+            start_date_colombo = midnight_colombo - timedelta(days=limit_days - 1)
+            start_date_utc = start_date_colombo.astimezone(timezone.utc)
+            
+            count_q = await db.execute(
+                select(func.count(Booking.id)).where(
+                    Booking.driver_id == drv.id,
+                    Booking.status == BookingStatus.COMPLETED,
+                    Booking.completed_at >= start_date_utc
+                )
+            )
+            rides_completed = count_q.scalar() or 0
+
+        results.append({
             "id": r.id,
             "title": r.title,
             "limit_days": r.limit_days,
             "trips_required": r.trips_required,
             "reward_amount": float(r.reward_amount),
-        }
-        for r in rows
-    ]
+            "rides_completed": rides_completed,
+        })
+    return results
 
 
 from pydantic import BaseModel
