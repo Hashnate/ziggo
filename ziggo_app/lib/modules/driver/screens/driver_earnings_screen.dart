@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../core/network/api_client.dart';
+import '../../customer/payment_methods_provider.dart';
+import '../../customer/screens/payment_methods_screen.dart';
 import '../driver_provider.dart';
 import '../driver_theme.dart';
 import 'driver_history_screen.dart';
@@ -48,35 +50,149 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
   }
 
   Future<void> _handleSettleCommission(double commissionAmount) async {
-    final profile = context.read<DriverProvider>().profile;
-    final hasBank = profile != null &&
-        profile['bank_name'] != null &&
-        profile['bank_name'].toString().trim().isNotEmpty;
+    final provider = context.read<PaymentMethodsProvider>();
+    setState(() => _loading = true);
+    await provider.fetchCards();
+    setState(() => _loading = false);
 
-    if (!hasBank) {
-      final connected = await _showConnectBankDialog();
-      if (connected != true) return;
-    }
+    if (!mounted) return;
+
+    final selectedCard = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          final p = context.watch<PaymentMethodsProvider>();
+          return Container(
+            decoration: const BoxDecoration(
+              color: kDriverBg,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            padding: EdgeInsets.fromLTRB(16, 20, 16, 24 + MediaQuery.of(context).viewInsets.bottom),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.textTertiary.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Settle Commission Payment',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Amount due: Rs.${commissionAmount.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.error,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                if (p.cards.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 30),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: kDriverCard,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.cardBorder),
+                    ),
+                    child: const Column(
+                      children: [
+                        Icon(Icons.credit_card_rounded, color: AppColors.textTertiary, size: 40),
+                        SizedBox(height: 8),
+                        Text(
+                          'No cards added yet',
+                          style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  )
+                else ...[
+                  const Text(
+                    'SELECT A SAVED CARD',
+                    style: TextStyle(fontSize: 10, color: AppColors.textTertiary, fontWeight: FontWeight.w900, letterSpacing: 1.2),
+                  ),
+                  const SizedBox(height: 10),
+                  ...p.cards.map((c) {
+                    final String cardNo = c['card_no'] ?? '';
+                    final String last4 = cardNo.length > 4 ? cardNo.substring(cardNo.length - 4) : cardNo;
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      decoration: BoxDecoration(
+                        color: kDriverCard,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.divider),
+                      ),
+                      child: ListTile(
+                        leading: const Icon(Icons.credit_card_rounded, color: AppColors.primary),
+                        title: Text('${c['card_type'] ?? 'Card'} ending in $last4'),
+                        subtitle: Text('Expires: ${c['card_expiry']}'),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => Navigator.pop(ctx, c),
+                      ),
+                    );
+                  }),
+                ],
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const PaymentMethodsScreen()),
+                    );
+                    await provider.fetchCards();
+                    setSheetState(() {});
+                  },
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Add new card'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    if (selectedCard == null) return;
 
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Settle Commission', textAlign: TextAlign.center),
+        title: const Text('Confirm Payment', textAlign: TextAlign.center),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary, size: 48),
             const SizedBox(height: 16),
-            const Text(
-              'Confirm payment of admin commission?',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 8),
             Text(
-              'Rs.${commissionAmount.toStringAsFixed(2)}',
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: AppColors.primary),
+              'Confirm payment of Rs.${commissionAmount.toStringAsFixed(2)} from your card ending in ${selectedCard['card_no'].toString().substring(selectedCard['card_no'].toString().length - 4)}?',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -93,7 +209,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text('Pay Now'),
+            child: const Text('Confirm Pay'),
           ),
         ],
       ),
@@ -103,7 +219,10 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
 
     setState(() => _loading = true);
     try {
-      await ApiClient.instance.dio.post('/driver/settle-commission');
+      await ApiClient.instance.dio.post(
+        '/driver/settle-commission',
+        data: {'card_id': selectedCard['id']},
+      );
       await _load();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -534,8 +653,8 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
           const Divider(height: 24, color: AppColors.divider),
           _rateRow('Paid out', 'Rs.${paid.toStringAsFixed(2)}'),
           _rateRow('Pending payout', 'Rs.${pending.toStringAsFixed(2)}'),
-          if (pending > 0 && commission > 0) ...[
-            const SizedBox(height: 18),
+          if (commission > 0) ...[
+            const SizedBox(height: 14),
             GestureDetector(
               onTap: () => _handleSettleCommission(commission),
               child: Container(
@@ -543,11 +662,11 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: AppColors.primary,
+                  color: AppColors.error,
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withOpacity(0.24),
+                      color: AppColors.error.withOpacity(0.24),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -559,7 +678,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                     const Icon(Icons.payment_rounded, color: Colors.white, size: 18),
                     const SizedBox(width: 8),
                     Text(
-                      'Settle Commission (Rs.${commission.toStringAsFixed(2)})',
+                      'Settle Commission (-Rs.${commission.toStringAsFixed(2)})',
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w900,
@@ -568,6 +687,40 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                     ),
                   ],
                 ),
+              ),
+            ),
+          ],
+          if (pending >= 0) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.24),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Pending Payout (+Rs.${pending.toStringAsFixed(2)})',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
