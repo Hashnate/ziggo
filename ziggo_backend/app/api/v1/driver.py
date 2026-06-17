@@ -621,13 +621,17 @@ async def upload_billing_proof(
     return {"ok": True, "billing_proof_url": url}
 
 
+class SettleCommissionBody(BaseModel):
+    card_id: int | None = None
+
 @router.post("/settle-commission")
 async def settle_commission(
+    body: SettleCommissionBody = None,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_role("driver")),
 ):
     """Settle outstanding admin commission.
-    This records a driver payout offset in the DB, matching the pending earnings balance."""
+    If card_id is provided, charges the driver's card. Otherwise, does the cash balance offset payout."""
     d = await _get_driver(db, user)
     from ...services.finance_service import get_driver_earnings_summary
     summary = await get_driver_earnings_summary(db, d.id)
@@ -635,15 +639,51 @@ async def settle_commission(
     commission = Decimal(str(summary["commission"]))
     pending = Decimal(str(summary["pending"]))
     
-    if commission <= 0 or pending <= 0:
-        raise HTTPException(status_code=400, detail="No commission or pending balance to settle")
+    if commission <= 0:
+        raise HTTPException(status_code=400, detail="No commission to settle")
         
+    payout_amount = pending
+    description = "Commission settled (Cash balance offset)"
+    
+    if body and body.card_id is not None:
+        from ...models import Customer, CustomerCard
+        cq = await db.execute(select(Customer).where(Customer.user_id == user.id))
+        customer = cq.scalars().first()
+        if not customer:
+            raise HTTPException(status_code=404, detail="Customer/Payment profile not found")
+            
+        card_q = await db.execute(
+            select(CustomerCard).where(CustomerCard.id == body.card_id, CustomerCard.customer_id == customer.id)
+        )
+        card = card_q.scalars().first()
+        if not card:
+            raise HTTPException(status_code=404, detail="Selected card not found")
+            
+        from ...services.payhere_service import charge_tokenized_card
+        import secrets
+        order_id = "SC" + secrets.token_hex(6).upper()
+        res = await charge_tokenized_card(
+            customer_token=card.customer_token,
+            amount=commission,
+            order_id=order_id,
+            description=f"Admin Commission Settlement ({order_id})",
+        )
+        if not res.get("success"):
+            raise HTTPException(status_code=400, detail=res.get("message", "Payment failed"))
+            
+        payout_amount = commission
+        description = f"Commission settled (Card payment ref {order_id})"
+    else:
+        # Fallback/default offset settlement
+        if pending <= 0:
+            raise HTTPException(status_code=400, detail="No pending balance to offset commission")
+            
     from ...models import DriverPayout
     payout = DriverPayout(
         driver_id=d.id,
         user_id=d.user_id,
-        amount=pending,
-        description="Commission settled (Cash balance offset)",
+        amount=payout_amount,
+        description=description,
     )
     db.add(payout)
     await db.commit()

@@ -288,7 +288,7 @@ def settings_mode() -> str:
 async def payhere_preapprove(
     body: dict,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_role("customer")),
+    user: User = Depends(require_role("customer", "driver")),
 ):
     """Start a card pre-approval session. Body: {return_url?, cancel_url?}.
     Returns fields to be posted to PayHere pre-approve URL.
@@ -312,13 +312,16 @@ async def payhere_preapprove(
 @router.get("/methods")
 async def list_payment_methods(
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_role("customer")),
+    user: User = Depends(require_role("customer", "driver")),
 ):
     """List all saved cards for the customer."""
     cq = await db.execute(select(Customer).where(Customer.user_id == user.id))
     customer = cq.scalars().first()
     if not customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
+        customer = Customer(user_id=user.id)
+        db.add(customer)
+        await db.commit()
+        await db.refresh(customer)
 
     q = await db.execute(
         select(CustomerCard)
@@ -344,13 +347,16 @@ async def list_payment_methods(
 async def delete_payment_method(
     card_id: int,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_role("customer")),
+    user: User = Depends(require_role("customer", "driver")),
 ):
     """Delete a saved card."""
     cq = await db.execute(select(Customer).where(Customer.user_id == user.id))
     customer = cq.scalars().first()
     if not customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
+        customer = Customer(user_id=user.id)
+        db.add(customer)
+        await db.commit()
+        await db.refresh(customer)
 
     q = await db.execute(
         select(CustomerCard).where(CustomerCard.id == card_id, CustomerCard.customer_id == customer.id)
@@ -368,13 +374,16 @@ async def delete_payment_method(
 async def set_default_payment_method(
     card_id: int,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_role("customer")),
+    user: User = Depends(require_role("customer", "driver")),
 ):
     """Set a card as default."""
     cq = await db.execute(select(Customer).where(Customer.user_id == user.id))
     customer = cq.scalars().first()
     if not customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
+        customer = Customer(user_id=user.id)
+        db.add(customer)
+        await db.commit()
+        await db.refresh(customer)
 
     # Verify card exists and belongs to customer
     q = await db.execute(
@@ -399,13 +408,16 @@ async def set_default_payment_method(
 async def add_mock_card(
     body: dict = {},
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_role("customer")),
+    user: User = Depends(require_role("customer", "driver")),
 ):
     """Add a mock card for testing when PayHere is not configured."""
     cq = await db.execute(select(Customer).where(Customer.user_id == user.id))
     customer = cq.scalars().first()
     if not customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
+        customer = Customer(user_id=user.id)
+        db.add(customer)
+        await db.commit()
+        await db.refresh(customer)
 
     import secrets
     
