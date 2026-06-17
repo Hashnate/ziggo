@@ -860,25 +860,14 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
         : null;
 
     // Find nearby drivers of this type to calculate pickup ETA
-    int etaMin;
+    int? etaMin;
     final typeDrivers = _nearbyDrivers.where((d) => d['vehicle_type'] == st).toList();
     if (typeDrivers.isNotEmpty) {
       final minDist = typeDrivers.map((d) => d['distance_km'] as num).reduce((a, b) => a < b ? a : b).toDouble();
       etaMin = (minDist / 25.0 * 60).round();
       if (etaMin < 2) etaMin = 2;
     } else {
-      etaMin = {
-        'bike': 3,
-        'tuk': 4,
-        'car': 6,
-        'mini': 7,
-        'van': 8,
-        'truck': 10,
-        'light': 8,
-        'light_open': 8,
-        'mover': 12,
-        'mover_open': 12,
-      }[st] ?? 5;
+      etaMin = null;
     }
 
     return GestureDetector(
@@ -902,8 +891,10 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('In $etaMin min', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
-            const SizedBox(height: 6),
+            if (etaMin != null) ...[
+              Text('In $etaMin min', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+              const SizedBox(height: 6),
+            ],
             customImageUrl != null
                 ? Image.network(
                     customImageUrl,
