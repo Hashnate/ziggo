@@ -159,37 +159,6 @@
                 <i class="fas fa-id-card text-ziggo"></i> KYC Documents
             </h4>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {# Billing Proof — stored on driver.billing_proof_url, not a DriverDocument #}
-                <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
-                    <div id="billingPreview" class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
-                        {% if driver.billing_proof_url %}
-                        <a href="{{ driver.billing_proof_url }}" target="_blank" class="w-full h-full flex items-center justify-center">
-                            <img src="{{ driver.billing_proof_url }}" class="w-full h-full object-cover hover:opacity-80 transition">
-                        </a>
-                        {% else %}
-                        <i class="fas fa-file-invoice text-gray-300 text-xl"></i>
-                        {% endif %}
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="font-black text-sm text-ziggo-ink">Billing Proof</p>
-                        {% if driver.billing_proof_url %}
-                        <p class="text-[11px] text-ziggo-muted truncate" id="billingLabel">Uploaded</p>
-                        <label class="mt-1 inline-flex items-center gap-1 cursor-pointer text-[11px] font-bold text-red-500">
-                            <input name="remove_billing" type="checkbox" value="1" class="w-3.5 h-3.5 text-red-500 border-gray-300 rounded">
-                            Remove existing
-                        </label>
-                        {% else %}
-                        <p class="text-[11px] text-rose-500 font-bold" id="billingLabel">Not uploaded yet</p>
-                        {% endif %}
-                    </div>
-                    <div class="flex flex-col gap-1.5 items-end">
-                        <label for="billing_proof" class="cursor-pointer px-3 py-1.5 bg-ziggo-soft text-ziggo rounded-lg text-xs font-black hover:bg-ziggo-soft/70 transition whitespace-nowrap">
-                            <i class="fas fa-upload mr-1"></i> {% if driver.billing_proof_url %}Replace{% else %}Upload{% endif %}
-                        </label>
-                        <input id="billing_proof" name="billing_proof" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="previewBilling(this)">
-                    </div>
-                </div>
-
                 {% for doc in documents %}
                 <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
                     <div id="{{ doc.kind }}IconWrapper" class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
@@ -202,7 +171,11 @@
                             {% endif %}
                         </a>
                         {% else %}
-                        <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
+                            {% if doc.kind == 'billing_proof' %}
+                            <i class="fas fa-file-invoice text-gray-300 text-xl"></i>
+                            {% else %}
+                            <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
+                            {% endif %}
                         {% endif %}
                     </div>
                     <div class="flex-1 min-w-0">

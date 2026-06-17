@@ -61,6 +61,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
   List<Map<String, dynamic>> _nearbyDrivers = const [];
   Timer? _nearbyTimer;
   List<String> _serviceTypes = [];
+  Map<String, Map<String, dynamic>> _categoryData = {};
 
   Future<void> _fetchActiveServices() async {
     try {
@@ -69,12 +70,16 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
         final list = List<Map<String, dynamic>>.from(resp.data as List);
         setState(() {
           _serviceTypes = list.map((item) => item['service_type'] as String).toList();
+          _categoryData = {
+            for (var item in list) item['service_type'] as String: item
+          };
         });
       }
     } catch (e) {
       debugPrint("Error fetching active services: $e");
       setState(() {
         _serviceTypes = ['tuk', 'bike', 'car', 'mini', 'van', 'truck'];
+        _categoryData = {};
       });
     }
   }
@@ -825,9 +830,21 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       'mover_open': ('Mover Open', 'assets/icons/truck.png', 1),
     }[st];
 
-    final displayName = meta?.$1 ?? (st.isNotEmpty ? '${st[0].toUpperCase()}${st.substring(1)}' : st);
+    final category = _categoryData[st];
+    final customName = category?['name'] as String?;
+    final customImage = category?['image_url'] as String?;
+
+    final displayName = customName ?? meta?.$1 ?? (st.isNotEmpty ? '${st[0].toUpperCase()}${st.substring(1)}' : st);
     final assetIcon = meta?.$2 ?? 'assets/icons/taxi.png';
     final capacity = meta?.$3 ?? 4;
+
+    final customImageUrl = (customImage != null && customImage.isNotEmpty)
+        ? (customImage.startsWith('http') 
+            ? customImage 
+            : (customImage.startsWith('/') 
+                ? '${ApiConfig.baseHost}$customImage' 
+                : '${ApiConfig.baseHost}/$customImage'))
+        : null;
 
     // Find nearby drivers of this type to calculate pickup ETA
     int etaMin;
@@ -874,7 +891,14 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
           children: [
             Text('In $etaMin min', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
             const SizedBox(height: 8),
-            Image.asset(assetIcon, height: 32, fit: BoxFit.contain),
+            customImageUrl != null
+                ? Image.network(
+                    customImageUrl,
+                    height: 32,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => Image.asset(assetIcon, height: 32, fit: BoxFit.contain),
+                  )
+                : Image.asset(assetIcon, height: 32, fit: BoxFit.contain),
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,

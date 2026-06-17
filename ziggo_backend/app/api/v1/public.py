@@ -172,7 +172,11 @@ async def public_categories(db: AsyncSession = Depends(get_db)):
         )
     ).scalars().all()
     return [
-        {"service_type": r.service_type, "name": r.display_name or r.service_type}
+        {
+            "service_type": r.service_type,
+            "name": r.display_name or r.service_type,
+            "image_url": r.image_url,
+        }
         for r in rows
     ]
 
