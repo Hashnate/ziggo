@@ -1,6 +1,6 @@
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
-from typing import List, Optional
+from typing import Dict, List, Optional
 import secrets
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status, Query
@@ -181,7 +181,7 @@ async def estimate_fare(
     return FareEstimateResponse(service_type=req.service_type, **fare)
 
 
-@router.post("/estimate/bulk")
+@router.post("/estimate/bulk", response_model=Dict[str, FareEstimateResponse])
 async def estimate_fare_bulk(
     req: BulkFareEstimateRequest,
     db: AsyncSession = Depends(get_db),
@@ -214,6 +214,7 @@ async def estimate_fare_bulk(
             )
             fare.pop("hourly_rate", None)
             fare.pop("rental_hours", None)
+            fare["service_type"] = st
             results[st] = fare
         except Exception as e:
             # Skip or log error for this specific service type
