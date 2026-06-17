@@ -38,6 +38,7 @@ class DriverProvider extends ChangeNotifier {
   List<Map<String, dynamic>> get incentives => _incentives;
 
   Timer? _locationTimer;
+  Timer? _profileTimer;
 
   Future<void> bootstrap(String token) async {
     _ws.connect(token);
@@ -48,6 +49,15 @@ class DriverProvider extends ChangeNotifier {
     await loadActiveMarketOrder();
     await loadIncentives();
     await _pushLocationOnce();
+    _startProfileTimer();
+  }
+
+  void _startProfileTimer() {
+    _profileTimer?.cancel();
+    _profileTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      loadProfile();
+      loadIncentives();
+    });
   }
 
   void _onWsEvent(Map<String, dynamic> msg) {
@@ -429,6 +439,7 @@ class DriverProvider extends ChangeNotifier {
   @override
   void dispose() {
     _stopLocationStream();
+    _profileTimer?.cancel();
     _ws.dispose();
     super.dispose();
   }
