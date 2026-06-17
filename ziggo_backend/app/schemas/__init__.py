@@ -12,6 +12,7 @@ from .auth_schema import (
 from .booking_schema import (
     FareEstimateRequest,
     FareEstimateResponse,
+    BulkFareEstimateRequest,
     BookingCreate,
     BookingResponse,
     BookingStatusUpdate,
@@ -87,6 +88,7 @@ __all__ = [
     "OTPResponse",
     "FareEstimateRequest",
     "FareEstimateResponse",
+    "BulkFareEstimateRequest",
     "BookingCreate",
     "BookingResponse",
     "BookingStatusUpdate",
