@@ -1198,6 +1198,11 @@ async def update_booking_status(
         from ...services.referral_service import process_referral_on_first_trip
         await process_referral_on_first_trip(db, b)
 
+        # Check and deactivate driver if outstanding commission exceeds limit
+        if b.driver_id:
+            from ...services.finance_service import check_and_deactivate_driver
+            await check_and_deactivate_driver(db, b.driver_id)
+
     elif new_status == BookingStatus.CANCELLED:
         b.cancelled_at = now
         b.cancellation_reason = body.reason

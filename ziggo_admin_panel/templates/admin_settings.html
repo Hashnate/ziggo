@@ -100,6 +100,11 @@
                             <input type="number" step="0.01" min="0" max="100" name="commission_rate" value="{{ s.commission_rate if s.commission_rate is not none else 15 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                         </div>
                         <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Maximum Outstanding Commission Limit (Rs.)</label>
+                            <input type="number" step="0.01" min="0" name="max_settle_amount" value="{{ s.max_settle_amount if s.max_settle_amount is not none else 1000 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                            <p class="text-[10px] text-ziggo-faint font-bold mt-1">If the driver's outstanding unpaid commission exceeds this limit, their account is automatically deactivated.</p>
+                        </div>
+                        <div>
                             <label class="block text-xs font-black text-ziggo-muted mb-1">Busy Hours Start (0–23)</label>
                             <input type="number" min="0" max="23" name="surge_start_hour" value="{{ s.surge_start_hour if s.surge_start_hour is not none else 17 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                         </div>

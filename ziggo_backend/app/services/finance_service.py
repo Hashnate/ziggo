@@ -978,12 +978,117 @@ async def execute_driver_payout(db: AsyncSession, driver_id: int, amount: Decima
     await db.commit()
 
 
+async def get_driver_outstanding_commission(db: AsyncSession, driver_id: int) -> Decimal:
+    """Calculate unpaid outstanding commission driver owes platform from cash bookings/orders."""
+    from app.models import Booking, BookingStatus, FoodOrder, FoodOrderStatus, MarketOrder, MarketOrderStatus, DriverPayout
+    
+    # 1. Platform fee from completed cash bookings
+    bq = await db.execute(
+        select(Booking).where(
+            Booking.driver_id == driver_id,
+            Booking.status == BookingStatus.COMPLETED,
+            Booking.payment_method == "cash"
+        )
+    )
+    cash_bookings = bq.scalars().all()
+    cash_booking_commission = sum((_dec(b.platform_fee) for b in cash_bookings), Decimal("0"))
+    
+    # 2. Platform fee from completed cash food orders
+    fq = await db.execute(
+        select(FoodOrder).where(
+            FoodOrder.driver_id == driver_id,
+            FoodOrder.status == FoodOrderStatus.DELIVERED,
+            FoodOrder.payment_method == "cash"
+        )
+    )
+    cash_foods = fq.scalars().all()
+    cash_food_commission = Decimal("0")
+    for o in cash_foods:
+        df = _dec(o.delivery_fee)
+        cut = (df * _PLATFORM_DELIVERY_CUT).quantize(Decimal("0.01"))
+        cash_food_commission += cut
+        
+    # 3. Platform fee from completed cash market orders
+    mq = await db.execute(
+        select(MarketOrder).where(
+            MarketOrder.driver_id == driver_id,
+            MarketOrder.status == MarketOrderStatus.DELIVERED,
+            MarketOrder.payment_method == "cash"
+        )
+    )
+    cash_markets = mq.scalars().all()
+    cash_market_commission = Decimal("0")
+    for o in cash_markets:
+        df = _dec(o.delivery_fee)
+        cut = (df * _PLATFORM_DELIVERY_CUT).quantize(Decimal("0.01"))
+        cash_market_commission += cut
+        
+    total_owed = cash_booking_commission + cash_food_commission + cash_market_commission
+    
+    # 4. Total settled by driver (DriverPayout rows with settlement descriptions)
+    pq = await db.execute(
+        select(DriverPayout).where(
+            DriverPayout.driver_id == driver_id
+        )
+    )
+    payouts = pq.scalars().all()
+    total_settled = Decimal("0")
+    for p in payouts:
+        desc = (p.description or "").lower()
+        if "commission settled" in desc or "commission settlement" in desc:
+            total_settled += _dec(p.amount)
+            
+    outstanding = total_owed - total_settled
+    return max(Decimal("0"), outstanding)
+
+
+async def check_and_deactivate_driver(db: AsyncSession, driver_id: int) -> bool:
+    """Check driver's outstanding commission against system settings.
+    If they exceed the limit, change status to SUSPENDED and turn offline.
+    Otherwise, if they were SUSPENDED and are now below the limit, restore status to APPROVED.
+    """
+    from app.models import Driver, DriverStatus, SystemSettings
+    
+    dq = await db.execute(select(Driver).where(Driver.id == driver_id))
+    drv = dq.scalars().first()
+    if not drv:
+        return False
+        
+    outstanding = await get_driver_outstanding_commission(db, driver_id)
+    
+    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    ss = ss_q.scalars().first()
+    max_limit = Decimal("1000.00")
+    if ss and ss.max_settle_amount is not None:
+        max_limit = ss.max_settle_amount
+        
+    if outstanding > max_limit:
+        if drv.status != DriverStatus.SUSPENDED:
+            drv.status = DriverStatus.SUSPENDED
+            drv.is_online = False
+            await db.commit()
+            
+            # Publish to ws so admin map updates instantly
+            from app.services.ws_manager import manager
+            await manager.publish("admin_live", "driver_status_update", {
+                "id": drv.id,
+                "is_online": False,
+                "lat": float(drv.current_lat) if drv.current_lat is not None else None,
+                "lng": float(drv.current_lng) if drv.current_lng is not None else None,
+            })
+            print(f"[deactivation] Driver {driver_id} suspended. Outstanding: {outstanding}, Limit: {max_limit}")
+        return True
+    else:
+        if drv.status == DriverStatus.SUSPENDED:
+            drv.status = DriverStatus.APPROVED
+            await db.commit()
+            print(f"[reactivation] Driver {driver_id} reactivated. Outstanding: {outstanding}")
+        return False
+
+
 async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
-    """Lifetime money split for a single driver, for the in-app Earnings page:
-      - collected  : gross the driver handled (ride/flash fares + delivery fees)
-      - commission : the platform's share (app usage charge)
-      - earnings   : what the driver keeps (collected - commission)
-    Mirrors the admin finance maths so the two never disagree."""
+    """Lifetime money split for a single driver, for the in-app Earnings page.
+    Modified to return current outstanding commission under 'commission'."""
     from app.models import DriverPayout
 
     bq = await db.execute(
@@ -994,7 +1099,6 @@ async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
     )
     bookings = bq.scalars().all()
     ride_collected = sum((_dec(b.final_amount or b.total_amount) for b in bookings), Decimal("0"))
-    ride_commission = sum((_dec(b.platform_fee) for b in bookings), Decimal("0"))
     ride_earnings = sum((_dec(b.driver_earnings) for b in bookings), Decimal("0"))
     ride_count = len(bookings)
 
@@ -1014,18 +1118,15 @@ async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
     markets = mq.scalars().all()
 
     delivery_collected = Decimal("0")
-    delivery_commission = Decimal("0")
     delivery_earnings = Decimal("0")
     for o in [*foods, *markets]:
         df = _dec(o.delivery_fee)
         cut = (df * _PLATFORM_DELIVERY_CUT).quantize(Decimal("0.01"))
         delivery_collected += df
-        delivery_commission += cut
         delivery_earnings += df - cut
     delivery_count = len(foods) + len(markets)
 
     collected = ride_collected + delivery_collected
-    commission = ride_commission + delivery_commission
     earnings = ride_earnings + delivery_earnings
 
     pq = await db.execute(select(DriverPayout).where(DriverPayout.driver_id == driver_id))
@@ -1034,9 +1135,11 @@ async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
     if pending < 0:
         pending = Decimal("0")
 
+    outstanding = await get_driver_outstanding_commission(db, driver_id)
+
     return {
         "collected": float(collected),
-        "commission": float(commission),
+        "commission": float(outstanding),
         "earnings": float(earnings),
         "paid": float(paid),
         "pending": float(pending),
@@ -1048,22 +1151,18 @@ async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
 
 async def get_driver_payout_stats(db: AsyncSession, driver_id: int) -> dict:
     from app.models import DriverPayout, Booking, FoodOrder, MarketOrder
-    # Calculate lifetime earnings dynamically
-    # For rides:
     bq = await db.execute(
         select(Booking)
         .where(Booking.driver_id == driver_id, Booking.status == BookingStatus.COMPLETED)
     )
     ride_earn = sum((_dec(b.driver_earnings) for b in bq.scalars().all()), Decimal("0"))
 
-    # For food:
     fq = await db.execute(
         select(FoodOrder)
         .where(FoodOrder.driver_id == driver_id, FoodOrder.status == FoodOrderStatus.DELIVERED)
     )
     food_earn = sum(((_dec(o.delivery_fee) * (Decimal("1") - _PLATFORM_DELIVERY_CUT)).quantize(Decimal("0.01")) for o in fq.scalars().all()), Decimal("0"))
 
-    # For market:
     mq = await db.execute(
         select(MarketOrder)
         .where(MarketOrder.driver_id == driver_id, MarketOrder.status == MarketOrderStatus.DELIVERED)
@@ -1072,7 +1171,6 @@ async def get_driver_payout_stats(db: AsyncSession, driver_id: int) -> dict:
 
     total_earned = ride_earn + food_earn + market_earn
 
-    # Get sum of payouts
     pq = await db.execute(select(DriverPayout).where(DriverPayout.driver_id == driver_id))
     total_paid = sum((_dec(p.amount) for p in pq.scalars().all()), Decimal("0"))
 
@@ -1085,4 +1183,8 @@ async def get_driver_payout_stats(db: AsyncSession, driver_id: int) -> dict:
         "paid": float(total_paid),
         "pending": float(pending),
     }
+
+
+
+
 

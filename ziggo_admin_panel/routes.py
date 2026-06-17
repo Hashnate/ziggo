@@ -2214,6 +2214,7 @@ async def admin_settings_save(
     address: str = Form(""),
     # Pricing
     commission_rate: float = Form(15),
+    max_settle_amount: float = Form(1000.0),
     surge_start_hour: int = Form(17),
     surge_end_hour: int = Form(20),
     surge_multiplier: float = Form(1.5),
@@ -2297,6 +2298,7 @@ async def admin_settings_save(
     s.contact_email = contact_email.strip()
     s.address = address.strip()
     s.commission_rate = Decimal(str(commission_rate))
+    s.max_settle_amount = Decimal(str(max_settle_amount))
     s.surge_start_hour = max(0, min(23, int(surge_start_hour)))
     s.surge_end_hour = max(0, min(23, int(surge_end_hour)))
     s.surge_multiplier = Decimal(str(surge_multiplier))

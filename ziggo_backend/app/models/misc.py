@@ -169,6 +169,7 @@ class SystemSettings(Base):
     multi_stop_free_minutes = Column(Integer, nullable=False, default=3)
     multi_stop_excess_per_minute = Column(DECIMAL(10, 2), nullable=False, default=5)
     multi_stop_fee_per_stop = Column(DECIMAL(10, 2), nullable=False, default=50)
+    max_settle_amount = Column(DECIMAL(10, 2), default=1000.00)
     # Peak Hours
     peak_start_hour = Column(Integer, default=17)
     peak_end_hour = Column(Integer, default=20)

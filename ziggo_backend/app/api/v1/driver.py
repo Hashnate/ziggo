@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -394,6 +395,14 @@ async def toggle_online(
                 status_code=403,
                 detail="Your account is pending admin approval.",
             )
+        # Check outstanding commission to auto-deactivate/prevent going online
+        from ...services.finance_service import check_and_deactivate_driver
+        is_suspended = await check_and_deactivate_driver(db, d.id)
+        if is_suspended or d.status == DriverStatus.SUSPENDED:
+            raise HTTPException(
+                status_code=403,
+                detail="Your account is deactivated due to outstanding commission. Please settle it.",
+            )
     d.is_online = body.is_online
     await db.commit()
 
@@ -688,6 +697,10 @@ async def settle_commission(
     db.add(payout)
     await db.commit()
     
+    # Check outstanding commission to auto-reactivate if settled
+    from ...services.finance_service import check_and_deactivate_driver
+    await check_and_deactivate_driver(db, d.id)
+    
     return {"ok": True, "settled_amount": float(commission)}
 
 
@@ -747,9 +760,6 @@ async def get_driver_incentives(
             "rides_completed": rides_completed,
         })
     return results
-
-
-from pydantic import BaseModel
 
 class DriverBankUpdateRequest(BaseModel):
     bank_name: str
