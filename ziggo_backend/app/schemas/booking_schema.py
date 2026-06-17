@@ -34,6 +34,23 @@ class FareEstimateRequest(BaseModel):
     stops: List[StopRequest] = Field(default_factory=list)
 
 
+class BulkFareEstimateRequest(BaseModel):
+    service_types: List[str]
+    pickup_lat: float
+    pickup_lng: float
+    drop_lat: float
+    drop_lng: float
+    promo_code: Optional[str] = None
+    trip_type: str = "one_way"
+    is_flash: bool = False
+    parcel_weight_kg: Optional[float] = None
+    is_courier: bool = False
+    is_rental: bool = False
+    rental_hours: Optional[int] = Field(default=None, ge=1, le=24)
+    redeem_points: int = 0
+    stops: List[StopRequest] = Field(default_factory=list)
+
+
 class FareEstimateResponse(BaseModel):
     service_type: str
     distance_km: float

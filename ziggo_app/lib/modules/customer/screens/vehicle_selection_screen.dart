@@ -194,38 +194,51 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     
     final servicesToFetch = widget.isTruckMode ? ['truck'] : _serviceTypes;
 
-    for (final st in servicesToFetch) {
-      final res = await booking.estimateFare(
-        serviceType: st,
-        pickup: widget.pickup.location,
-        drop: widget.drop.location,
-        promoCode: _promo.isEmpty ? null : _promo,
-        tripType: widget.tripType,
-        stops: [],
-      );
-      if (res != null) {
-        if (widget.isTruckMode && st == 'truck') {
-          // Mock truck variations based on the base truck fare
-          final baseAmt = res['final_amount'] as num;
-          _estimates['light'] = {...res, 'final_amount': baseAmt * 1.0, 'capacity': 1, 'duration_min': res['duration_min']};
-          _estimates['light_open'] = {...res, 'final_amount': baseAmt * 1.0, 'capacity': 1, 'duration_min': res['duration_min']};
-          _estimates['mover'] = {...res, 'final_amount': baseAmt * 2.5, 'capacity': 1, 'duration_min': res['duration_min']};
-          _estimates['mover_open'] = {...res, 'final_amount': baseAmt * 2.5, 'capacity': 1, 'duration_min': res['duration_min']};
-          
-          if (_serviceType == null) {
-            _serviceType = 'light';
-          }
-        } else {
-          _estimates[st] = res;
-          if (_serviceType == null) {
-            _serviceType = st;
+    final bulkRes = await booking.estimateFaresBulk(
+      serviceTypes: servicesToFetch,
+      pickup: widget.pickup.location,
+      drop: widget.drop.location,
+      promoCode: _promo.isEmpty ? null : _promo,
+      tripType: widget.tripType,
+      stops: const [],
+    );
+
+    if (bulkRes != null) {
+      bulkRes.forEach((st, res) {
+        if (res is Map) {
+          final resMap = Map<String, dynamic>.from(res);
+          if (widget.isTruckMode && st == 'truck') {
+            // Mock truck variations based on the base truck fare
+            final baseAmt = resMap['final_amount'] as num;
+            _estimates['light'] = {...resMap, 'final_amount': baseAmt * 1.0, 'capacity': 1, 'duration_min': resMap['duration_min']};
+            _estimates['light_open'] = {...resMap, 'final_amount': baseAmt * 1.0, 'capacity': 1, 'duration_min': resMap['duration_min']};
+            _estimates['mover'] = {...resMap, 'final_amount': baseAmt * 2.5, 'capacity': 1, 'duration_min': resMap['duration_min']};
+            _estimates['mover_open'] = {...resMap, 'final_amount': baseAmt * 2.5, 'capacity': 1, 'duration_min': resMap['duration_min']};
+          } else {
+            _estimates[st] = resMap;
           }
         }
-      }
+      });
     }
     
     if (!mounted) return;
-    setState(() => _loadingEstimates = false);
+    setState(() {
+      _loadingEstimates = false;
+      if (_serviceType == null || !_estimates.containsKey(_serviceType)) {
+        if (widget.isTruckMode) {
+          if (_estimates.containsKey('light')) {
+            _serviceType = 'light';
+          }
+        } else {
+          for (final st in _serviceTypes) {
+            if (_estimates.containsKey(st)) {
+              _serviceType = st;
+              break;
+            }
+          }
+        }
+      }
+    });
     
     _mapController.fitBounds(
       [widget.pickup.location, widget.drop.location],
@@ -625,10 +638,10 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                   
                   // Vehicles horizontal list
                   if (_loadingEstimates)
-                    const SizedBox(height: 140, child: Center(child: CircularProgressIndicator()))
+                    const SizedBox(height: 146, child: Center(child: CircularProgressIndicator()))
                   else
                     SizedBox(
-                      height: 140,
+                      height: 146,
                       child: ListView(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -877,7 +890,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
         duration: const Duration(milliseconds: 200),
         width: widget.isTruckMode ? 115 : 100,
         margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
         decoration: BoxDecoration(
           color: selected ? AppColors.surfaceMuted : Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -890,7 +903,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text('In $etaMin min', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             customImageUrl != null
                 ? Image.network(
                     customImageUrl,
@@ -899,7 +912,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                     errorBuilder: (context, error, stackTrace) => Image.asset(assetIcon, height: 32, fit: BoxFit.contain),
                   )
                 : Image.asset(assetIcon, height: 32, fit: BoxFit.contain),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -915,8 +928,14 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                 Text(' ${est['capacity'] ?? capacity}', style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
               ],
             ),
-            const SizedBox(height: 4),
-            Text('LKR ${(est['final_amount'] as num).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
+            const SizedBox(height: 2),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                'LKR ${(est['final_amount'] as num).toStringAsFixed(2)}',
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+              ),
+            ),
           ],
         ),
       ),

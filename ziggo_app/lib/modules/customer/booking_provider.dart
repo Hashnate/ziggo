@@ -116,6 +116,60 @@ class BookingProvider extends ChangeNotifier {
     }
   }
 
+  Future<Map<String, dynamic>?> estimateFaresBulk({
+    required List<String> serviceTypes,
+    required LatLng pickup,
+    required LatLng drop,
+    String? promoCode,
+    String tripType = 'one_way',
+    bool isFlash = false,
+    double? parcelWeightKg,
+    bool isRental = false,
+    int? rentalHours,
+    bool isCourier = false,
+    int redeemPoints = 0,
+    List<Map<String, dynamic>> stops = const [],
+  }) async {
+    try {
+      final resp = await ApiClient.instance.dio.post(
+        '/bookings/estimate/bulk',
+        data: {
+          'service_types': serviceTypes,
+          'pickup_lat': pickup.latitude,
+          'pickup_lng': pickup.longitude,
+          'drop_lat': drop.latitude,
+          'drop_lng': drop.longitude,
+          'trip_type': tripType,
+          if (isFlash) 'is_flash': true,
+          if (isCourier) 'is_courier': true,
+          if (parcelWeightKg != null) 'parcel_weight_kg': parcelWeightKg,
+          if (isRental) 'is_rental': true,
+          if (rentalHours != null) 'rental_hours': rentalHours,
+          if (promoCode != null && promoCode.isNotEmpty) 'promo_code': promoCode,
+          if (redeemPoints > 0) 'redeem_points': redeemPoints,
+          if (stops.isNotEmpty) 'stops': stops,
+        },
+      );
+      if (resp.data is! Map) return null;
+      return Map<String, dynamic>.from(resp.data as Map);
+    } on DioException catch (e) {
+      final detail = e.response?.data;
+      if (detail is Map && detail['detail'] != null) {
+        _lastError = detail['detail'].toString();
+      } else {
+        _lastError = e.message ?? 'Network error';
+      }
+      if (kDebugMode) debugPrint('estimateFaresBulk error: $_lastError');
+      notifyListeners();
+      return null;
+    } catch (e, st) {
+      _lastError = 'Unexpected error: $e';
+      if (kDebugMode) debugPrint('estimateFaresBulk error: $e\n$st');
+      notifyListeners();
+      return null;
+    }
+  }
+
   Future<Map<String, dynamic>?> createBooking({
     required String serviceType,
     required LatLng pickup,
