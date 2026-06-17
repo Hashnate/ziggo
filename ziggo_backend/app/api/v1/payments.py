@@ -397,6 +397,7 @@ async def set_default_payment_method(
 
 @router.post("/methods/mock")
 async def add_mock_card(
+    body: dict = {},
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_role("customer")),
 ):
@@ -407,13 +408,35 @@ async def add_mock_card(
         raise HTTPException(status_code=404, detail="Customer not found")
 
     import secrets
-    card_no = f"411111XXXXXX{secrets.token_hex(2).upper()}"
+    
+    input_card_no = body.get("card_no") if body else None
+    input_card_expiry = body.get("card_expiry") if body else None
+    input_card_holder = body.get("card_holder_name") if body else None
+    input_card_type = body.get("card_type") if body else None
+
+    if input_card_no:
+        cleaned_no = "".join(filter(str.isdigit, input_card_no))
+        if len(cleaned_no) >= 12:
+            card_no = cleaned_no[:6] + "X" * (len(cleaned_no) - 10) + cleaned_no[-4:]
+        else:
+            card_no = cleaned_no
+    else:
+        card_no = f"411111XXXXXX{secrets.token_hex(2).upper()}"
+
+    if input_card_expiry:
+        card_expiry = "".join(filter(str.isdigit, input_card_expiry))
+    else:
+        card_expiry = "1228"
+
+    card_holder_name = input_card_holder or user.full_name or "Valued Customer"
+    card_type = (input_card_type or "VISA").upper()
+
     card = CustomerCard(
         customer_id=customer.id,
         card_no=card_no,
-        card_expiry="1228",
-        card_holder_name=user.full_name or "Valued Customer",
-        card_type="VISA",
+        card_expiry=card_expiry,
+        card_holder_name=card_holder_name,
+        card_type=card_type,
         customer_token=f"mock_token_{secrets.token_hex(8)}",
         is_default=True,
     )

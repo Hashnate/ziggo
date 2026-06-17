@@ -43,6 +43,34 @@ class PaymentMethodsProvider extends ChangeNotifier {
     }
   }
 
+  Future<String?> addCardManually({
+    required String cardNo,
+    required String cardExpiry,
+    required String cardHolderName,
+    required String cardType,
+  }) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      await ApiClient.instance.dio.post(
+        '/payments/methods/mock',
+        data: {
+          'card_no': cardNo,
+          'card_expiry': cardExpiry,
+          'card_holder_name': cardHolderName,
+          'card_type': cardType,
+        },
+      );
+      await fetchCards();
+      return null;
+    } on DioException catch (e) {
+      return e.response?.data?['detail']?.toString() ?? 'Failed to save card details';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<String?> addCardViaPayHere(BuildContext context) async {
     final enabled = await PayHereService.instance.isEnabled();
     if (!enabled) {
