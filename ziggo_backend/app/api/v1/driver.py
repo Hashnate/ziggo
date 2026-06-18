@@ -651,7 +651,7 @@ async def settle_commission(
     if commission <= 0:
         raise HTTPException(status_code=400, detail="No commission to settle")
         
-    payout_amount = pending
+    payout_amount = min(commission, pending)
     description = "Commission settled (Cash balance offset)"
     
     if body and body.card_id is not None:
