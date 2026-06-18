@@ -149,30 +149,51 @@ async def _send_to_token(
     payload_data["title"] = title
     payload_data["body"] = body
 
-    msg = messaging.Message(
-        token=token,
-        notification=messaging.Notification(title=title, body=body),
-        data=payload_data,
-        android=messaging.AndroidConfig(
-            priority="high" if urgent else "normal",
-            notification=messaging.AndroidNotification(
-                # Urgent events play custom sounds.
-                # Android references res/raw assets WITHOUT extension.
-                sound=android_sound,
-                # Channel id — once created, the channel's sound is fixed.
-                channel_id=android_channel,
+    if event == "new_ride_request":
+        # Data-only for Android to allow the background Dart handler to display the
+        # custom looping notification. iOS still gets a notification block via APNs.
+        msg = messaging.Message(
+            token=token,
+            data=payload_data,
+            android=messaging.AndroidConfig(
+                priority="high",
             ),
-        ),
-        apns=messaging.APNSConfig(
-            headers={"apns-priority": "10" if urgent else "5"},
-            payload=messaging.APNSPayload(
-                aps=messaging.Aps(
-                    sound=ios_sound,
-                    content_available=True,
+            apns=messaging.APNSConfig(
+                headers={"apns-priority": "10"},
+                payload=messaging.APNSPayload(
+                    aps=messaging.Aps(
+                        sound=ios_sound,
+                        content_available=True,
+                        alert=messaging.ApsAlert(title=title, body=body),
+                    ),
                 ),
             ),
-        ),
-    )
+        )
+    else:
+        msg = messaging.Message(
+            token=token,
+            notification=messaging.Notification(title=title, body=body),
+            data=payload_data,
+            android=messaging.AndroidConfig(
+                priority="high" if urgent else "normal",
+                notification=messaging.AndroidNotification(
+                    # Urgent events play custom sounds.
+                    # Android references res/raw assets WITHOUT extension.
+                    sound=android_sound,
+                    # Channel id — once created, the channel's sound is fixed.
+                    channel_id=android_channel,
+                ),
+            ),
+            apns=messaging.APNSConfig(
+                headers={"apns-priority": "10" if urgent else "5"},
+                payload=messaging.APNSPayload(
+                    aps=messaging.Aps(
+                        sound=ios_sound,
+                        content_available=True,
+                    ),
+                ),
+            ),
+        )
     try:
         await asyncio.to_thread(messaging.send, msg)
         return True, None
