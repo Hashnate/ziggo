@@ -535,6 +535,14 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                 ),
               ),
             ),
+            if (_summary != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                'DB: ${_summary?["debug_db_url"]} | Bookings: ${_summary?["debug_total_bookings_count"]} | Cash: ${_summary?["debug_cash_bookings_count"]} | Out: ${_summary?["debug_outstanding_raw"]}',
+                style: const TextStyle(fontSize: 9, color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ],
         ),
       ),
