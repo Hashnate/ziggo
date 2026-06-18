@@ -1137,29 +1137,6 @@ async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
 
     outstanding = await get_driver_outstanding_commission(db, driver_id)
 
-    # Query some bookings directly to see if any exist
-    all_bookings_q = await db.execute(select(Booking))
-    all_bookings = all_bookings_q.scalars().all()
-    # Filter bookings specifically for this driver
-    cash_bookings = [b for b in all_bookings if b.payment_method == "cash" and b.driver_id == driver_id and b.status == BookingStatus.COMPLETED]
-    
-    # Check the total settled
-    outstanding = await get_driver_outstanding_commission(db, driver_id)
-    
-    # Let's calculate total owed and total settled directly here for debug
-    cash_booking_commission = sum((_dec(b.platform_fee) for b in cash_bookings), Decimal("0"))
-    total_owed = cash_booking_commission
-    
-    pq_debug = await db.execute(select(DriverPayout).where(DriverPayout.driver_id == driver_id))
-    payouts_debug = pq_debug.scalars().all()
-    total_settled = Decimal("0")
-    payout_details = []
-    for p in payouts_debug:
-        desc = (p.description or "").lower()
-        payout_details.append(f"{p.amount}:{p.description}")
-        if "commission settled" in desc or "commission settlement" in desc or "commission offset" in desc:
-            total_settled += _dec(p.amount)
-
     return {
         "collected": float(collected),
         "commission": float(collected - earnings),
@@ -1170,12 +1147,6 @@ async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
         "trips": ride_count + delivery_count,
         "rides": ride_count,
         "deliveries": delivery_count,
-        "debug_db_url": str(db.bind.url) if db.bind else "no_bind",
-        "debug_total_bookings_count": len([b for b in all_bookings if b.driver_id == driver_id]),
-        "debug_cash_bookings_count": len(cash_bookings),
-        "debug_outstanding_raw": float(outstanding),
-        "debug_sample_fees": f"Owed: {float(total_owed)} | Settled: {float(total_settled)}",
-        "debug_sample_driver_earnings": ", ".join(payout_details[:3]),
     }
 
 
