@@ -1137,6 +1137,10 @@ async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
 
     outstanding = await get_driver_outstanding_commission(db, driver_id)
 
+    # Query some bookings directly to see if any exist
+    all_bookings_q = await db.execute(select(Booking))
+    all_bookings = all_bookings_q.scalars().all()
+    
     return {
         "collected": float(collected),
         "commission": float(collected - earnings),
@@ -1147,6 +1151,10 @@ async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
         "trips": ride_count + delivery_count,
         "rides": ride_count,
         "deliveries": delivery_count,
+        "debug_db_url": str(db.bind.url) if db.bind else "no_bind",
+        "debug_total_bookings_count": len(all_bookings),
+        "debug_cash_bookings_count": len([b for b in all_bookings if b.payment_method == "cash"]),
+        "debug_outstanding_raw": float(outstanding),
     }
 
 
