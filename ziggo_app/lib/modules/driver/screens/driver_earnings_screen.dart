@@ -592,6 +592,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
     }
     final collected = _d(s, 'collected');
     final commission = _d(s, 'commission');
+    final outstanding = _d(s, 'outstanding_commission');
     final earnings = _d(s, 'earnings');
     final paid = _d(s, 'paid');
     final pending = _d(s, 'pending');
@@ -653,10 +654,10 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
           const Divider(height: 24, color: AppColors.divider),
           _rateRow('Paid out', 'Rs.${paid.toStringAsFixed(2)}'),
           _rateRow('Pending payout', 'Rs.${pending.toStringAsFixed(2)}'),
-          if (commission > 0) ...[
+          if (outstanding > 0) ...[
             const SizedBox(height: 14),
             GestureDetector(
-              onTap: () => _handleSettleCommission(commission),
+              onTap: () => _handleSettleCommission(outstanding),
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -678,7 +679,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                     const Icon(Icons.payment_rounded, color: Colors.white, size: 18),
                     const SizedBox(width: 8),
                     Text(
-                      'Settle Commission (-Rs.${commission.toStringAsFixed(2)})',
+                      'Settle Commission (-Rs.${outstanding.toStringAsFixed(2)})',
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w900,

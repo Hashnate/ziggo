@@ -1139,7 +1139,8 @@ async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
 
     return {
         "collected": float(collected),
-        "commission": float(outstanding),
+        "commission": float(collected - earnings),
+        "outstanding_commission": float(outstanding),
         "earnings": float(earnings),
         "paid": float(paid),
         "pending": float(pending),
