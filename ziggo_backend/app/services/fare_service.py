@@ -6,7 +6,10 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from ..models import FareSetting, FlashWeightTier, PromoCode
+from shapely.geometry import Point, Polygon
+
+from ..models import FareSetting, FlashWeightTier, PromoCode, SurgeZone
+from ..api.v1.surge_zones import is_time_in_range
 
 # Fallback fare table (used if DB has no row yet for a service type)
 DEFAULTS = {
@@ -300,6 +303,26 @@ async def calculate_fare(
             if in_peak:
                 peak_surcharge += float(ap.extra_amount or 0.0)
         fare_val += peak_surcharge
+        
+    # Geographic Surge Zones check
+    zone_surcharge = 0.0
+    zone_q = await db.execute(select(SurgeZone).where(SurgeZone.is_active == True))
+    active_zones = zone_q.scalars().all()
+    if active_zones:
+        now_local = datetime.now()
+        pickup_point = Point(pickup_lng, pickup_lat)
+        for z in active_zones:
+            if is_time_in_range(z.start_time, z.end_time, now_local):
+                # Create a Shapely Polygon from the coordinates (lng, lat)
+                try:
+                    poly_coords = [(float(pt["lng"]), float(pt["lat"])) for pt in z.coordinates]
+                    if len(poly_coords) >= 3:
+                        poly = Polygon(poly_coords)
+                        if poly.contains(pickup_point):
+                            zone_surcharge += float(z.flat_extra_charge or 0.0)
+                except Exception:
+                    pass
+        fare_val += zone_surcharge
 
 
     # BRD: CD-19 — per-stop fee compensates the driver for the detour.
@@ -356,6 +379,7 @@ async def calculate_fare(
         "surge_multiplier": surge,
         "flash_surcharge": round(flash_surcharge, 2),
         "peak_surcharge": round(peak_surcharge, 2),
+        "zone_surcharge": round(zone_surcharge, 2),
         # BRD: CD-19 — surface multi-stop snapshot so the UI can render it
         "stop_count": len(clean_stops),
         "stops_fee": round(stop_fee_total, 2),

@@ -89,26 +89,45 @@ async def verify_otp_code(db: AsyncSession, phone_number: str, code: str) -> boo
     return True
 
 
+from fastapi import Depends, HTTPException, status, Request
+
 async def get_current_user(
+    request: Request,
     token: Optional[str] = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    if not token:
+    # First check for API Bearer token
+    if token:
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+            phone: Optional[str] = payload.get("sub")
+            if not phone:
+                raise JWTError("missing sub")
+            result = await db.execute(select(User).where(User.phone_number == phone))
+            user = result.scalars().first()
+        except JWTError:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+            
+    # Then fallback to admin UI cookie session
+    elif request.cookies.get("ziggo_admin"):
+        from itsdangerous import URLSafeSerializer, BadSignature
+        _serializer = URLSafeSerializer(settings.SECRET_KEY, salt="ziggo-admin")
+        cookie_token = request.cookies.get("ziggo_admin")
+        try:
+            data = _serializer.loads(cookie_token)
+            uid = int(data.get("uid"))
+            result = await db.execute(select(User).where(User.id == uid))
+            user = result.scalars().first()
+        except (BadSignature, ValueError, TypeError):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+            
+    else:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
-        phone: Optional[str] = payload.get("sub")
-        if not phone:
-            raise JWTError("missing sub")
-    except JWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
-    result = await db.execute(select(User).where(User.phone_number == phone))
-    user = result.scalars().first()
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     return user

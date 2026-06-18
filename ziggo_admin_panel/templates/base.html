@@ -408,6 +408,9 @@
             <a href="/admin/promotions" class="sidebar-item {% if active_page == 'promotions' %}active{% endif %}">
                 <i class="fas fa-percent"></i><span>Promotions</span>
             </a>
+            <a href="/admin/surge-zones" class="sidebar-item {% if active_page == 'surge_zones' %}active{% endif %}">
+                <i class="fas fa-map-marked-alt"></i><span>Surge Zones</span>
+            </a>
 
             {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
             <p class="zi-nav-group">Finance</p>

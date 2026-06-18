@@ -7,6 +7,7 @@ from sqlalchemy import (
     DECIMAL,
     ForeignKey,
     Text,
+    JSON,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -330,3 +331,16 @@ class PeakHourSetting(Base):
     is_active = Column(Boolean, nullable=False, default=True)
 
 
+class SurgeZone(Base):
+    """Geographic area (polygon) where peak hour/surge pricing applies."""
+    __tablename__ = "surge_zones"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    # Stored as a list of dicts: [{"lat": 6.9, "lng": 79.8}, ...]
+    coordinates = Column(JSON, nullable=False)
+    flat_extra_charge = Column(DECIMAL(10, 2), nullable=False, default=0.00)
+    start_time = Column(String(5), nullable=True)  # e.g., "17:00"
+    end_time = Column(String(5), nullable=True)    # e.g., "19:00"
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

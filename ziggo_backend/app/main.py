@@ -11,7 +11,7 @@ from fastapi.responses import RedirectResponse
 
 from .config import settings
 from .database import engine
-from .api.v1 import auth, customer, driver, admin, bookings, ws, event, food, market, market_vendor, misc, payments, restaurant, trip_share, public, corporate
+from .api.v1 import auth, customer, driver, admin, bookings, ws, event, food, market, market_vendor, misc, payments, restaurant, trip_share, public, corporate, surge_zones
 from ziggo_admin_panel import routes as admin_panel_routes
 from ziggo_admin_panel.routes import _AdminRedirect, _AdminForbidden
 from .services.schema_sync import ensure_schema
@@ -100,6 +100,7 @@ app.include_router(payments.router, prefix=f"{settings.API_V1_STR}/payments", ta
 app.include_router(trip_share.router, prefix=settings.API_V1_STR, tags=["trip_share"])
 app.include_router(ws.router, tags=["ws"])
 app.include_router(corporate.router, prefix=settings.API_V1_STR, tags=["corporate"])
+app.include_router(surge_zones.router, prefix=f"{settings.API_V1_STR}/surge-zones", tags=["surge_zones"])
 
 # Admin panel static + templates. The admin_panel package now lives as a
 # top-level sibling of `app/` (under /app/ziggo_admin_panel/). main.py is

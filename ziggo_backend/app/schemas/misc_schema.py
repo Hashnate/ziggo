@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 
@@ -81,3 +81,30 @@ class ComplaintMessageResponse(BaseModel):
 
 class GoldSubscribeRequest(BaseModel):
     months: int = 1  # 1, 3, 6, 12
+
+
+class SurgeZoneBase(BaseModel):
+    name: str
+    coordinates: List[Dict[str, float]] # e.g. [{"lat": 6.9, "lng": 79.8}]
+    flat_extra_charge: float
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    is_active: bool = True
+
+class SurgeZoneCreate(SurgeZoneBase):
+    pass
+
+class SurgeZoneUpdate(BaseModel):
+    name: Optional[str] = None
+    coordinates: Optional[List[Dict[str, float]]] = None
+    flat_extra_charge: Optional[float] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class SurgeZoneResponse(SurgeZoneBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

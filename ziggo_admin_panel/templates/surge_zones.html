@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+{% block title %}Surge Zones - Admin{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <h2 class="text-2xl font-bold">Geographic Surge Zones</h2>
+    <button class="zi-btn-primary" onclick="openZoneModal()">+ Create New Zone</button>
+</div>
+
+<div class="flex flex-col lg:flex-row gap-6">
+    <!-- Left List -->
+    <div class="w-full lg:w-5/12 flex flex-col">
+        <div class="zi-card overflow-hidden">
+            <div class="p-4 border-b border-gray-200">
+                <h5 class="font-bold text-lg m-0">Active Zones</h5>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="text-left px-4 py-2">Name</th>
+                            <th class="text-left px-4 py-2">Time</th>
+                            <th class="text-left px-4 py-2">Charge</th>
+                            <th class="text-left px-4 py-2">Status</th>
+                            <th class="text-center px-4 py-2">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for z in zones %}
+                        <tr class="hover:bg-gray-50 cursor-pointer border-b border-gray-100" onclick='viewZone({{ z.id }}, {{ z.name|tojson }}, {{ z.flat_extra_charge }}, {{ (z.start_time or "")|tojson }}, {{ (z.end_time or "")|tojson }}, {{ "true" if z.is_active else "false" }}, {{ z.coordinates|tojson }})'>
+                            <td class="px-4 py-3 font-semibold">{{ z.name }}</td>
+                            <td class="px-4 py-3">
+                                {% if z.start_time and z.end_time %}
+                                    {{ z.start_time }} - {{ z.end_time }}
+                                {% else %}
+                                    <span class="text-gray-400">Always</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 font-medium text-ziggo-light">Rs. {{ "%.2f"|format(z.flat_extra_charge) }}</td>
+                            <td class="px-4 py-3">
+                                {% if z.is_active %}
+                                    <span class="px-2 py-1 rounded-md text-xs font-bold bg-green-100 text-green-800">Active</span>
+                                {% else %}
+                                    <span class="px-2 py-1 rounded-md text-xs font-bold bg-gray-200 text-gray-700">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-center">
+                                <button class="px-3 py-1 border border-red-500 text-red-500 rounded hover:bg-red-50 text-sm font-medium" onclick="deleteZone(event, {{ z.id }})">Delete</button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-gray-400 py-8">No surge zones configured.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Right Map -->
+    <div class="w-full lg:w-7/12 flex flex-col">
+        <div class="zi-card relative h-[500px] overflow-hidden">
+            <div id="map" class="absolute inset-0"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Zone Modal -->
+<div id="zoneModal" class="hidden fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+  <form id="zoneForm" onsubmit="saveZone(event)" class="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="flex justify-between items-center p-5 border-b border-gray-200 shrink-0">
+        <h5 class="text-xl font-bold" id="zoneModalTitle">Create Surge Zone</h5>
+        <button type="button" class="text-gray-400 hover:text-gray-800" onclick="closeZoneModal()"><i class="fas fa-times text-xl"></i></button>
+      </div>
+      
+      <div class="p-6 overflow-y-auto flex-1 min-h-0">
+        <input type="hidden" id="zoneId">
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
+            <div class="md:col-span-3">
+                <label class="block text-sm font-semibold mb-1 text-gray-700">Zone Name</label>
+                <input type="text" class="w-full border border-gray-300 rounded-lg p-2" id="zoneName" required placeholder="e.g. Downtown Peak">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-semibold mb-1 text-gray-700">Extra Charge (Rs.)</label>
+                <input type="number" step="0.01" class="w-full border border-gray-300 rounded-lg p-2" id="zoneCharge" required value="0">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-semibold mb-1 text-gray-700">Start Time</label>
+                <input type="time" class="w-full border border-gray-300 rounded-lg p-2" id="zoneStart">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-semibold mb-1 text-gray-700">End Time</label>
+                <input type="time" class="w-full border border-gray-300 rounded-lg p-2" id="zoneEnd">
+            </div>
+        </div>
+        
+        <div class="mb-5 flex items-center">
+            <input type="checkbox" id="zoneActive" class="w-5 h-5 text-ziggo-light rounded" checked>
+            <label class="ml-2 font-medium text-gray-800" for="zoneActive">Zone is Active</label>
+        </div>
+            
+        <div>
+            <label class="block font-semibold mb-1 text-ziggo-light"><i class="fas fa-map-marked-alt"></i> Draw Zone Polygon</label>
+            <p class="text-gray-500 text-sm mb-3">Draw a polygon on the map below to define this zone. Complete the shape to save the coordinates.</p>
+            <div id="modalMap" class="w-full h-[300px] bg-gray-100 rounded-xl overflow-hidden border border-gray-200"></div>
+            <input type="hidden" id="zoneCoordinates" required>
+        </div>
+      </div>
+      
+      <div class="p-5 border-t border-gray-200 flex justify-end gap-3 bg-gray-50 shrink-0">
+        <button type="button" class="px-5 py-2 font-semibold text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-100" onclick="closeZoneModal()">Cancel</button>
+        <button type="submit" class="zi-btn-primary">Save Zone</button>
+      </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://maps.googleapis.com/maps/api/js?key={{ gmap_key }}&v=3.64&libraries=drawing"></script>
+<script>
+    let mainMap;
+    let modalMap;
+    let drawingManager;
+    let currentModalPolygon = null;
+
+    function initMainMap() {
+        const colombo = { lat: 6.9271, lng: 79.8612 };
+        mainMap = new google.maps.Map(document.getElementById("map"), {
+            zoom: 12,
+            center: colombo,
+            mapTypeId: 'terrain'
+        });
+        
+        const zones = {{ zones|tojson|safe }};
+        zones.forEach(z => {
+            if (!z.coordinates) return;
+            const color = z.is_active ? '#dc3545' : '#6c757d';
+            const poly = new google.maps.Polygon({
+                paths: z.coordinates,
+                strokeColor: color,
+                strokeOpacity: 0.8,
+                strokeWeight: 2,
+                fillColor: color,
+                fillOpacity: 0.35,
+                map: mainMap
+            });
+            poly.addListener('click', () => {
+                viewZone(z.id, z.name, z.flat_extra_charge, z.start_time, z.end_time, z.is_active, z.coordinates);
+            });
+        });
+    }
+
+    function initModalMap() {
+        if (modalMap) return;
+        try {
+            const colombo = { lat: 6.9271, lng: 79.8612 };
+            modalMap = new google.maps.Map(document.getElementById("modalMap"), {
+                zoom: 13,
+                center: colombo,
+                mapTypeId: 'roadmap'
+            });
+            
+            drawingManager = new google.maps.drawing.DrawingManager({
+                drawingMode: google.maps.drawing.OverlayType.POLYGON,
+                drawingControl: true,
+                drawingControlOptions: { position: google.maps.ControlPosition.TOP_CENTER, drawingModes: [google.maps.drawing.OverlayType.POLYGON] },
+                polygonOptions: { fillColor: '#dc3545', fillOpacity: 0.5, strokeWeight: 2, clickable: true, editable: true, zIndex: 1 }
+            });
+            drawingManager.setMap(modalMap);
+            
+            google.maps.event.addListener(drawingManager, 'polygoncomplete', function(polygon) {
+                if (currentModalPolygon) currentModalPolygon.setMap(null);
+                currentModalPolygon = polygon;
+                drawingManager.setDrawingMode(null);
+                updateCoordinatesInput(polygon);
+                polygon.getPaths().forEach(function(path, index){
+                    google.maps.event.addListener(path, 'insert_at', function(){ updateCoordinatesInput(polygon); });
+                    google.maps.event.addListener(path, 'remove_at', function(){ updateCoordinatesInput(polygon); });
+                    google.maps.event.addListener(path, 'set_at', function(){ updateCoordinatesInput(polygon); });
+                });
+            });
+        } catch (error) {
+            console.error("Error initializing modal map or drawing manager:", error);
+            alert("Error loading drawing tools: " + error.message);
+        }
+    }
+    
+    function updateCoordinatesInput(polygon) {
+        const vertices = polygon.getPath();
+        const coords = [];
+        for (let i = 0; i < vertices.getLength(); i++) {
+            const xy = vertices.getAt(i);
+            coords.push({ lat: xy.lat(), lng: xy.lng() });
+        }
+        document.getElementById('zoneCoordinates').value = JSON.stringify(coords);
+    }
+
+    window.openZoneModal = function() {
+        document.getElementById('zoneForm').reset();
+        document.getElementById('zoneId').value = '';
+        document.getElementById('zoneCoordinates').value = '';
+        document.getElementById('zoneModalTitle').innerText = 'Create Surge Zone';
+        if (currentModalPolygon) { currentModalPolygon.setMap(null); currentModalPolygon = null; }
+        document.getElementById('zoneModal').classList.remove('hidden');
+        setTimeout(() => { initModalMap(); if (drawingManager) drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON); }, 100);
+    };
+    
+    window.closeZoneModal = function() {
+        document.getElementById('zoneModal').classList.add('hidden');
+    }
+    
+    window.viewZone = function(id, name, charge, start, end, active, coords) {
+        document.getElementById('zoneId').value = id;
+        document.getElementById('zoneName').value = name;
+        document.getElementById('zoneCharge').value = charge;
+        document.getElementById('zoneStart').value = start;
+        document.getElementById('zoneEnd').value = end;
+        document.getElementById('zoneActive').checked = active;
+        document.getElementById('zoneCoordinates').value = JSON.stringify(coords);
+        document.getElementById('zoneModalTitle').innerText = 'Edit Surge Zone';
+        
+        document.getElementById('zoneModal').classList.remove('hidden');
+        
+        setTimeout(() => {
+            initModalMap();
+            if (currentModalPolygon) currentModalPolygon.setMap(null);
+            if (coords && coords.length > 0) {
+                currentModalPolygon = new google.maps.Polygon({ paths: coords, fillColor: '#dc3545', fillOpacity: 0.5, strokeWeight: 2, editable: true, map: modalMap });
+                const bounds = new google.maps.LatLngBounds();
+                coords.forEach(c => bounds.extend(new google.maps.LatLng(c.lat, c.lng)));
+                modalMap.fitBounds(bounds);
+                drawingManager.setDrawingMode(null);
+                currentModalPolygon.getPaths().forEach(function(path, index){
+                    google.maps.event.addListener(path, 'insert_at', function(){ updateCoordinatesInput(currentModalPolygon); });
+                    google.maps.event.addListener(path, 'remove_at', function(){ updateCoordinatesInput(currentModalPolygon); });
+                    google.maps.event.addListener(path, 'set_at', function(){ updateCoordinatesInput(currentModalPolygon); });
+                });
+            }
+        }, 100);
+    };
+
+    window.saveZone = async function(e) {
+        e.preventDefault();
+        const coordsStr = document.getElementById('zoneCoordinates').value;
+        if (!coordsStr || coordsStr === '[]') { alert('Please draw a polygon on the map to define the zone.'); return; }
+        
+        let coords = [];
+        try { coords = JSON.parse(coordsStr); } catch(err) { alert('Invalid polygon data'); return; }
+        
+        const payload = {
+            name: document.getElementById('zoneName').value,
+            flat_extra_charge: parseFloat(document.getElementById('zoneCharge').value),
+            start_time: document.getElementById('zoneStart').value || null,
+            end_time: document.getElementById('zoneEnd').value || null,
+            is_active: document.getElementById('zoneActive').checked,
+            coordinates: coords
+        };
+        
+        const id = document.getElementById('zoneId').value;
+        const method = id ? 'PUT' : 'POST';
+        const url = id ? `/api/v1/surge-zones/${id}` : '/api/v1/surge-zones';
+        
+        try {
+            const res = await fetch(url, { method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (res.ok) window.location.reload();
+            else alert('Error saving zone: ' + ((await res.json()).detail || 'Unknown error'));
+        } catch(err) { alert('Error saving zone'); }
+    };
+    
+    window.deleteZone = async function(e, id) {
+        e.stopPropagation();
+        if (!confirm('Are you sure you want to delete this zone?')) return;
+        try {
+            const res = await fetch(`/api/v1/surge-zones/${id}`, { method: 'DELETE' });
+            if (res.ok) window.location.reload();
+            else alert('Error deleting zone');
+        } catch(err) { alert('Error deleting zone'); }
+    };
+
+    window.addEventListener('load', initMainMap);
+</script>
+{% endblock %}

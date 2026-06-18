@@ -326,6 +326,19 @@ class ZiggoPolyline {
   });
 }
 
+class ZiggoPolygon {
+  final List<LatLng> points;
+  final Color fillColor;
+  final Color strokeColor;
+  final int strokeWidth;
+  const ZiggoPolygon({
+    required this.points,
+    this.fillColor = const Color(0x33DC3545),
+    this.strokeColor = const Color(0x88DC3545),
+    this.strokeWidth = 2,
+  });
+}
+
 class ZiggoCircle {
   final LatLng center;
   final double radius;
@@ -430,6 +443,7 @@ class ZiggoMap extends StatefulWidget {
   final double zoom;
   final List<ZiggoMarker> markers;
   final List<ZiggoPolyline> polylines;
+  final List<ZiggoPolygon> polygons;
   final List<ZiggoCircle> circles;
   final bool interactive;
   final bool showMyLocation;
@@ -444,6 +458,7 @@ class ZiggoMap extends StatefulWidget {
     this.zoom = 14,
     this.markers = const [],
     this.polylines = const [],
+    this.polygons = const [],
     this.circles = const [],
     this.interactive = true,
     this.showMyLocation = false,
@@ -604,6 +619,20 @@ class _ZiggoMapState extends State<ZiggoMap> {
       );
     }
 
+    final gPolygons = <gmaps.Polygon>{};
+    for (var i = 0; i < widget.polygons.length; i++) {
+      final p = widget.polygons[i];
+      gPolygons.add(
+        gmaps.Polygon(
+          polygonId: gmaps.PolygonId('poly$i'),
+          points: p.points.map(_g).toList(),
+          fillColor: p.fillColor,
+          strokeColor: p.strokeColor,
+          strokeWidth: p.strokeWidth,
+        ),
+      );
+    }
+
     final gCircles = <gmaps.Circle>{};
     for (var i = 0; i < widget.circles.length; i++) {
       final c = widget.circles[i];
@@ -627,6 +656,7 @@ class _ZiggoMapState extends State<ZiggoMap> {
       style: widget.darkMode ? kDarkMapStyle : null,
       markers: gMarkers,
       polylines: gPolylines,
+      polygons: gPolygons,
       circles: gCircles,
       myLocationEnabled: showMe,
       myLocationButtonEnabled: false,

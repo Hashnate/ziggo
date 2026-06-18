@@ -37,6 +37,9 @@ class DriverProvider extends ChangeNotifier {
   List<Map<String, dynamic>> _incentives = [];
   List<Map<String, dynamic>> get incentives => _incentives;
 
+  List<Map<String, dynamic>> _surgeZones = [];
+  List<Map<String, dynamic>> get surgeZones => _surgeZones;
+
   Timer? _locationTimer;
   Timer? _profileTimer;
 
@@ -48,6 +51,7 @@ class DriverProvider extends ChangeNotifier {
     await loadActiveFoodOrder();
     await loadActiveMarketOrder();
     await loadIncentives();
+    await loadSurgeZones();
     await _pushLocationOnce();
     _startProfileTimer();
 
@@ -61,6 +65,7 @@ class DriverProvider extends ChangeNotifier {
     _profileTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       loadProfile();
       loadIncentives();
+      loadSurgeZones();
     });
   }
 
@@ -419,6 +424,14 @@ class DriverProvider extends ChangeNotifier {
     try {
       final resp = await ApiClient.instance.dio.get('/driver/incentives');
       _incentives = List<Map<String, dynamic>>.from(resp.data);
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<void> loadSurgeZones() async {
+    try {
+      final resp = await ApiClient.instance.dio.get('/surge-zones/active');
+      _surgeZones = List<Map<String, dynamic>>.from(resp.data);
       notifyListeners();
     } catch (_) {}
   }

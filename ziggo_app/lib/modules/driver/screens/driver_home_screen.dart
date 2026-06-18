@@ -435,6 +435,16 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _showRideRequest(pending));
     }
 
+    final surgePolygons = driver.surgeZones.map((z) {
+      final coordsList = z['coordinates'] as List<dynamic>? ?? [];
+      final points = coordsList.map((c) {
+        final lat = (c['lat'] as num).toDouble();
+        final lng = (c['lng'] as num).toDouble();
+        return LatLng(lat, lng);
+      }).toList();
+      return ZiggoPolygon(points: points);
+    }).toList();
+
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: AppColors.background,
@@ -465,6 +475,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 zoom: 15,
                 showMyLocation: true,
                 darkMode: false,
+                polygons: surgePolygons,
                 markers: [
                   pinMarker(
                     point: loc,
@@ -2714,6 +2725,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
     final duration = (r['duration_min'] as num?)?.toInt() ?? 0;
     final fare = (r['fare'] as num?)?.toDouble() ?? 0;
     final earnings = (r['driver_earnings'] as num?)?.toDouble() ?? fare;
+    final zoneSurcharge = (r['zone_surcharge'] as num?)?.toDouble() ?? 0;
     final paymentMethodRaw = (r['payment_method'] ?? 'cash').toString().toUpperCase();
     final payment = paymentMethodRaw.startsWith('CARD') ? 'CARD' : paymentMethodRaw;
     final customer = (r['customer_name'] ?? 'Customer').toString();
@@ -2873,6 +2885,18 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                           fontSize: 10,
                         ),
                       ),
+                      if (zoneSurcharge > 0)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            '+ Rs.${zoneSurcharge.toStringAsFixed(0)} Zone Surge',
+                            style: const TextStyle(
+                              color: Color(0xFFFF8C00),
+                              fontWeight: FontWeight.w900,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ],

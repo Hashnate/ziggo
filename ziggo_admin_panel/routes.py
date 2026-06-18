@@ -6986,3 +6986,34 @@ async def admin_delete_admin(
         await db.commit()
     return RedirectResponse(url="/admin/admins", status_code=303)
 
+
+
+# --- SURGE ZONES UI ---
+from app.models import SurgeZone
+
+@router.get("/surge-zones", response_class=HTMLResponse)
+async def surge_zones_page(request: Request, db: AsyncSession = Depends(get_db), admin_user: User = Depends(current_admin)):
+    q = await db.execute(select(SurgeZone).order_by(desc(SurgeZone.id)))
+    zones_objs = q.scalars().all()
+    
+    zones = [
+        {
+            "id": z.id,
+            "name": z.name,
+            "flat_extra_charge": float(z.flat_extra_charge) if z.flat_extra_charge is not None else 0.0,
+            "start_time": z.start_time,
+            "end_time": z.end_time,
+            "is_active": z.is_active,
+            "coordinates": z.coordinates,
+        }
+        for z in zones_objs
+    ]
+
+    # Need GOOGLE_MAPS_API_KEY
+    gmap_key = settings.GOOGLE_MAPS_API_KEY or ""
+    return templates.TemplateResponse("surge_zones.html", {
+        "request": request,
+        "admin": admin_user,
+        "zones": zones,
+        "gmap_key": gmap_key,
+    })
