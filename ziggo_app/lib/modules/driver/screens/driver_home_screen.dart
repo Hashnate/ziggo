@@ -2613,6 +2613,10 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
       setState(() => _secondsLeft--);
       if (_secondsLeft <= 0) {
         t.cancel();
+        // Cancel the persistent full-screen notification — the 30 s window
+        // has elapsed so the sound/overlay must stop even if the driver never
+        // opened the app. The decline() call below handles the server-side dismiss.
+        FcmService.instance.cancelRideAlert();
         _decline();
       }
     });
@@ -2657,6 +2661,9 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
     HapticFeedback.mediumImpact();
     setState(() => _busy = true);
     _timer?.cancel();
+    // Cancel the persistent full-screen notification immediately so the
+    // looping sound and ongoing overlay stop the moment the driver accepts.
+    unawaited(FcmService.instance.cancelRideAlert());
     bool ok = false;
     try {
       ok = await context.read<DriverProvider>().acceptRide(_requestId);
@@ -2681,6 +2688,10 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
     if (_busy) return;
     setState(() => _busy = true);
     _timer?.cancel();
+    // Cancel the persistent full-screen notification so the overlay and
+    // looping sound stop when the driver explicitly declines or the
+    // 30-second window elapses.
+    unawaited(FcmService.instance.cancelRideAlert());
     try {
       await context.read<DriverProvider>().declineRide(_requestId);
     } finally {
