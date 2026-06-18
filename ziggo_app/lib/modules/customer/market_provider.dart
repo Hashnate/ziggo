@@ -20,6 +20,8 @@ class MarketProvider extends ChangeNotifier {
   /// and chosen drop location. Null until checkout fetches one.
   Map<String, dynamic>? _quote;
 
+  final Set<int> _favourites = {};
+
   List<Map<String, dynamic>> get vendors => _vendors;
   List<Map<String, dynamic>> get ads => _ads;
   bool get loading => _loading;
@@ -28,6 +30,18 @@ class MarketProvider extends ChangeNotifier {
   int? get activeVendorId => _activeVendorId;
   String? get pendingPromoCode => _pendingPromoCode;
   Map<String, dynamic>? get quote => _quote;
+  Set<int> get favourites => _favourites;
+
+  void toggleFavourite(int vendorId) {
+    if (_favourites.contains(vendorId)) {
+      _favourites.remove(vendorId);
+    } else {
+      _favourites.add(vendorId);
+    }
+    notifyListeners();
+  }
+
+  bool isFavourite(int vendorId) => _favourites.contains(vendorId);
 
   void setPromoCode(String? code) {
     final trimmed = code?.trim();

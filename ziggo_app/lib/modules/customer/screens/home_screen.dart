@@ -115,8 +115,6 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 26),
             _SectionHeader(
               title: 'Our Services',
-              actionLabel: 'View all',
-              onAction: () => _open(const FareEstimateScreen()),
             ),
             const SizedBox(height: 16),
             _ServicesGrid(

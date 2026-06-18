@@ -3,18 +3,19 @@ import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../core/widgets/motion.dart';
-import '../market_provider.dart';
-import 'market_home_screen.dart';
+import '../food_provider.dart';
+import 'food_home_screen.dart';
 
-class MarketFavouritesScreen extends StatelessWidget {
-  const MarketFavouritesScreen({super.key});
+class FoodFavouritesScreen extends StatelessWidget {
+  const FoodFavouritesScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<MarketProvider>();
-    final favIds = provider.favourites;
-    final allVendors = provider.vendors;
-    final favVendors = allVendors.where((v) => favIds.contains(v['id'])).toList();
+    final provider = context.watch<FoodProvider>();
+    
+    // We only show favorites from the loaded list of restaurants.
+    final list = provider.restaurants;
+    final favRestaurants = list.where((r) => provider.isFavorite(r['id'] as int)).toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -36,7 +37,7 @@ class MarketFavouritesScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: favVendors.isEmpty
+      body: favRestaurants.isEmpty
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 36),
@@ -48,7 +49,7 @@ class MarketFavouritesScreen extends StatelessWidget {
                       height: 150,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.07),
+                        color: AppColors.food.withOpacity(0.07),
                         shape: BoxShape.circle,
                       ),
                       child: Container(
@@ -60,12 +61,12 @@ class MarketFavouritesScreen extends StatelessWidget {
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.heart_broken_rounded,
-                            size: 42, color: AppColors.primary),
+                            size: 42, color: AppColors.food),
                       ),
                     ),
                     const SizedBox(height: 26),
                     const Text(
-                      'No favourite outlets added',
+                      'No favourite restaurants',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 17,
@@ -75,8 +76,8 @@ class MarketFavouritesScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'You can add favourite outlets by clicking the "Heart" icon '
-                      'on an outlet card or at the top of the outlet page.',
+                      'You can add favourite restaurants by clicking the "Heart" icon '
+                      'on a restaurant card or page.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
@@ -90,12 +91,12 @@ class MarketFavouritesScreen extends StatelessWidget {
               ),
             )
           : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-              itemCount: favVendors.length,
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+              itemCount: favRestaurants.length,
               itemBuilder: (context, i) {
                 return EntranceSlide(
                   delay: Duration(milliseconds: 45 * i),
-                  child: MarketOutletCard(vendor: favVendors[i]),
+                  child: RestaurantCard(restaurant: favRestaurants[i]),
                 );
               },
             ),

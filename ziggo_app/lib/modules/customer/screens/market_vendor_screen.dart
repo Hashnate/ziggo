@@ -211,7 +211,15 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
               _circleBtn(Icons.arrow_back_rounded, () => Navigator.pop(context)),
               Row(
                 children: [
-                  _circleBtn(Icons.favorite_border_rounded, _favourite),
+                  _circleBtn(
+                    context.watch<MarketProvider>().isFavourite(widget.vendor['id'] as int)
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    _favourite,
+                    iconColor: context.watch<MarketProvider>().isFavourite(widget.vendor['id'] as int)
+                        ? AppColors.error
+                        : AppColors.textPrimary,
+                  ),
                   const SizedBox(width: 12),
                   _circleBtn(Icons.qr_code_2_rounded,
                       () => _showPayQrCode(context, widget.vendor)),
@@ -288,7 +296,7 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
     );
   }
 
-  Widget _circleBtn(IconData icon, VoidCallback onTap) {
+  Widget _circleBtn(IconData icon, VoidCallback onTap, {Color? iconColor}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -300,19 +308,13 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
           shape: BoxShape.circle,
           boxShadow: AppStyles.shadowSm,
         ),
-        child: Icon(icon, color: AppColors.textPrimary, size: 20),
+        child: Icon(icon, color: iconColor ?? AppColors.textPrimary, size: 20),
       ),
     );
   }
 
   void _favourite() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Favourites coming soon'),
-        behavior: SnackBarBehavior.floating,
-        duration: Duration(milliseconds: 1300),
-      ),
-    );
+    context.read<MarketProvider>().toggleFavourite(widget.vendor['id'] as int);
   }
 
   // --------------------------------------------------------------- info

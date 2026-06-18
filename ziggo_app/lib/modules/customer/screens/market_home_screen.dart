@@ -1138,17 +1138,29 @@ class MarketOutletCard extends StatelessWidget {
                   Positioned(
                     right: 12,
                     top: 12,
-                    child: Container(
-                      width: 34,
-                      height: 34,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: AppStyles.shadowSm,
+                    child: GestureDetector(
+                      onTap: () {
+                        context.read<MarketProvider>().toggleFavourite(vendor['id'] as int);
+                      },
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: AppStyles.shadowSm,
+                        ),
+                        child: Icon(
+                          context.watch<MarketProvider>().isFavourite(vendor['id'] as int)
+                              ? Icons.favorite_rounded
+                              : Icons.favorite_border_rounded,
+                          size: 18, 
+                          color: context.watch<MarketProvider>().isFavourite(vendor['id'] as int)
+                              ? AppColors.error
+                              : AppColors.textSecondary,
+                        ),
                       ),
-                      child: const Icon(Icons.favorite_border_rounded,
-                          size: 18, color: AppColors.textSecondary),
                     ),
                   ),
                   if (!isOpenNow)

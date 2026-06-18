@@ -27,7 +27,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final p = context.read<NotificationsProvider>();
       await p.refresh();
-      await p.markAllAsRead();
     });
   }
 
