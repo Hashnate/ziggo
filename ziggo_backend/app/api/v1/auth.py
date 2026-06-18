@@ -103,6 +103,10 @@ async def verify_otp(request: OTPVerify, db: AsyncSession = Depends(get_db)):
                 elif request.role == UserRole.CUSTOMER and not user.customer_profile:
                     db.add(Customer(user_id=user.id))
 
+                # If switching to customer (passenger), ensure the driver profile goes offline
+                if request.role == UserRole.CUSTOMER and user.driver_profile:
+                    user.driver_profile.is_online = False
+
                 # Switch the user's active role
                 user.role = request.role
                 await db.commit()
