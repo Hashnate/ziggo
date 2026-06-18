@@ -645,7 +645,7 @@ async def settle_commission(
     from ...services.finance_service import get_driver_earnings_summary
     summary = await get_driver_earnings_summary(db, d.id)
     
-    commission = Decimal(str(summary["commission"]))
+    commission = Decimal(str(summary["outstanding_commission"]))
     pending = Decimal(str(summary["pending"]))
     
     if commission <= 0:
