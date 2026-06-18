@@ -13,6 +13,7 @@ import '../addresses_provider.dart';
 import '../food_provider.dart';
 import '../food_ui.dart';
 import 'category_restaurants_screen.dart';
+import 'food_favourites_screen.dart';
 import 'food_orders_screen.dart';
 import 'restaurant_detail_screen.dart';
 
@@ -55,7 +56,6 @@ class FoodHomeScreen extends StatefulWidget {
 
 class _FoodHomeScreenState extends State<FoodHomeScreen> {
   String _filter = '';
-  bool _favoritesOnly = false;
   final PageController _bannerController = PageController(viewportFraction: 0.93);
   Timer? _bannerTimer;
 
@@ -118,9 +118,6 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
     final p = context.watch<FoodProvider>();
 
     var list = p.restaurants;
-    if (_favoritesOnly) {
-      list = list.where((r) => p.isFavorite(r['id'] as int)).toList();
-    }
     final filtered = _filter.isEmpty
         ? list
         : list
@@ -150,7 +147,7 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
                 child: Text(
-                  _favoritesOnly ? 'Your favourites' : 'Outlets near you',
+                  'Outlets near you',
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
                 ),
               ),
@@ -200,11 +197,11 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
       centerTitle: false,
       actions: [
         IconButton(
-          icon: Icon(
-            _favoritesOnly ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-            color: _favoritesOnly ? AppColors.food : AppColors.textPrimary,
+          icon: const Icon(Icons.favorite_border_rounded, color: AppColors.textPrimary),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const FoodFavouritesScreen()),
           ),
-          onPressed: () => setState(() => _favoritesOnly = !_favoritesOnly),
         ),
         IconButton(
           icon: const Icon(Icons.receipt_long_rounded, color: AppColors.textPrimary),
@@ -710,7 +707,7 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
             ),
             const SizedBox(height: 18),
             Text(
-              _favoritesOnly ? 'No favourites yet' : 'No restaurants available',
+              'No restaurants available',
               style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
             ),
           ],

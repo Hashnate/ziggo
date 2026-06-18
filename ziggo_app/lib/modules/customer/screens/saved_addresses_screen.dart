@@ -217,8 +217,8 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addDialog,
-        backgroundColor: Colors.black,
-        foregroundColor: AppColors.primary,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
         icon: const Icon(Icons.add_rounded),
         label: const Text('ADD PLACE', style: TextStyle(fontWeight: FontWeight.w900)),
       ),

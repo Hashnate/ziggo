@@ -339,10 +339,10 @@ class _PromoCard extends StatelessWidget {
                 height: 40,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: Colors.black,
+                  color: AppColors.primary,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.copy_rounded, color: AppColors.primary, size: 18),
+                child: const Icon(Icons.copy_rounded, color: Colors.white, size: 18),
               ),
             ),
           ),
@@ -367,7 +367,7 @@ class _LoyaltyCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: AppColors.blackGradient,
+        gradient: AppColors.primaryGradient,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -376,10 +376,10 @@ class _LoyaltyCard extends StatelessWidget {
             width: 52, height: 52,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: AppColors.primary,
+              color: Colors.white,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Icon(Icons.stars_rounded, color: Colors.black, size: 26),
+            child: const Icon(Icons.stars_rounded, color: AppColors.primary, size: 26),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -436,9 +436,9 @@ class _CategoryChips extends StatelessWidget {
                       fontWeight: FontWeight.w900,
                       fontSize: 12,
                     ),
-                    selectedColor: Colors.black,
+                    selectedColor: AppColors.primary,
                     backgroundColor: Colors.white,
-                    side: BorderSide(color: selected ? Colors.black : AppColors.cardBorder),
+                    side: BorderSide(color: selected ? AppColors.primary : AppColors.cardBorder),
                   ),
                 );
               }).toList(),
