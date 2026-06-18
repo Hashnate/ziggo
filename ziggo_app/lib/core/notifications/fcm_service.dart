@@ -70,10 +70,12 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // Hybrid messages now carry a notification block, which the OS displays
   // itself while the app is backgrounded / killed. Rendering our own here too
   // would duplicate it — so only handle pure data-only payloads manually.
-  if (message.notification != null) return;
-
+  // EXCEPT for new_ride_request, which requires a custom looping insistent alarm
+  // that the OS default handler cannot provide.
   final data = message.data;
   final event = data['event'];
+  if (message.notification != null && event != 'new_ride_request') return;
+
   if (event == 'new_ride_request') {
     final title = data['title'] ?? 'New ride request';
     final body = data['body'] ?? 'Tap to accept';
