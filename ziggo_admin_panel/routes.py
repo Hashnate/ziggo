@@ -512,6 +512,8 @@ async def admin_drivers(
         .limit(limit)
     )
     drivers = q.scalars().all()
+    for drv in drivers:
+        drv.settlement_amount = float(await fin.get_driver_outstanding_commission(db, drv.id))
 
     online = (
         await db.execute(select(func.count(Driver.id)).where(Driver.is_online == True))  # noqa: E712
@@ -1572,133 +1574,6 @@ async def admin_notifications(
     )
 
 
-@router.get("/withdrawals", response_class=HTMLResponse)
-async def admin_withdrawals(
-    request: Request,
-    page: int = 1,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
-):
-    from app.models import Driver, WalletTransaction
-    from decimal import Decimal
-
-    limit = 50
-    offset = (page - 1) * limit
-
-    total = (await db.execute(select(func.count(Driver.id)))).scalar() or 0
-    total_pages = (total + limit - 1) // limit
-
-    q = await db.execute(
-        select(Driver)
-        .options(selectinload(Driver.user))
-        .offset(offset)
-        .limit(limit)
-    )
-    drivers = q.scalars().all()
-
-    payouts_q = await db.execute(
-        select(WalletTransaction.user_id, func.sum(WalletTransaction.amount))
-        .where(
-            WalletTransaction.type == "debit",
-            WalletTransaction.reference_id == "PAYOUT"
-        )
-        .group_by(WalletTransaction.user_id)
-    )
-    payout_map = {row[0]: row[1] for row in payouts_q.all()}
-
-    # Calculate global total pending
-    total_earnings_q = await db.execute(select(func.sum(Driver.total_earnings)))
-    sum_earned = total_earnings_q.scalar() or Decimal("0")
-    payout_sum_q = await db.execute(
-        select(func.sum(WalletTransaction.amount))
-        .where(
-            WalletTransaction.type == "debit",
-            WalletTransaction.reference_id == "PAYOUT"
-        )
-    )
-    sum_paid = payout_sum_q.scalar() or Decimal("0")
-    total_pending = max(Decimal("0"), sum_earned - sum_paid)
-
-    rows = []
-    for d in drivers:
-        if not d.user:
-            continue
-        earned = d.total_earnings or Decimal("0")
-        paid = payout_map.get(d.user_id, Decimal("0"))
-        pending = max(Decimal("0"), earned - paid)
-        rows.append({
-            "driver_id": d.id,
-            "name": d.user.full_name or "Driver #" + str(d.id),
-            "phone": d.user.phone_number or "—",
-            "vehicle_type": d.vehicle_type or "—",
-            "earned": earned,
-            "paid": paid,
-            "pending": pending,
-        })
-
-    history_q = await db.execute(
-        select(WalletTransaction)
-        .options(selectinload(WalletTransaction.user))
-        .where(
-            WalletTransaction.type == "debit",
-            WalletTransaction.reference_id == "PAYOUT"
-        )
-        .order_by(WalletTransaction.created_at.desc())
-        .limit(100)
-    )
-    history = history_q.scalars().all()
-
-    start_idx = (page - 1) * limit + 1 if total > 0 else 0
-    end_idx = min(page * limit, total)
-    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
-
-    return templates.TemplateResponse(
-        request, "withdrawals.html",
-        {
-            "request": request,
-            "active_page": "withdrawals",
-            "total_pending": total_pending,
-            "rows": rows,
-            "history": history,
-            "page": page,
-            "total_pages": total_pages,
-            "total_drivers": total,
-            "start_idx": start_idx,
-            "end_idx": end_idx,
-            "page_range": page_range,
-        },
-    )
-
-
-
-@router.post("/withdrawals/{driver_id}/pay")
-async def admin_withdrawals_pay(
-    driver_id: int,
-    amount: float = Form(...),
-    note: str = Form("Manual payout"),
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
-):
-    from app.models import Driver, WalletTransaction
-    from decimal import Decimal
-
-    q = await db.execute(select(Driver).where(Driver.id == driver_id))
-    d = q.scalars().first()
-    if not d:
-        raise HTTPException(status_code=404, detail="Driver not found")
-
-    db.add(
-        WalletTransaction(
-            user_id=d.user_id,
-            amount=Decimal(str(amount)),
-            type="debit",
-            description=note,
-            reference_id="PAYOUT",
-            balance_after=Decimal("0"),
-        )
-    )
-    await db.commit()
-    return RedirectResponse(url="/admin/withdrawals", status_code=303)
 
 
 @router.get("/payments", response_class=HTMLResponse)

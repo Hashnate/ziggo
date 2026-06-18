@@ -30,7 +30,7 @@
     </div>
 
     <!-- Totals -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Lifetime earnings</p>
             <p class="text-2xl font-black text-ziggo mt-1">Rs.{{ "{:,.0f}".format(t.lifetime_earnings) }}</p>
@@ -38,6 +38,10 @@
         <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Platform fees paid</p>
             <p class="text-2xl font-black text-amber-600 mt-1">Rs.{{ "{:,.0f}".format(t.lifetime_platform_paid) }}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Outstanding Settlement</p>
+            <p class="text-2xl font-black text-rose-600 mt-1">Rs.{{ "{:,.0f}".format(d.settlement_amount) }}</p>
         </div>
         <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Rides / Parcels</p>

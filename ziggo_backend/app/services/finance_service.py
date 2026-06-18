@@ -325,6 +325,7 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
                 if ts_aware >= month:
                     month_earn += earn
 
+        outstanding = await get_driver_outstanding_commission(db, d.id)
         rows.append({
             "driver_id": d.id,
             "user_id": d.user_id,
@@ -342,6 +343,7 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
             "food_deliveries": food_count,
             "market_deliveries": market_count,
             "last_location_update": d.last_location_update.isoformat() if d.last_location_update else None,
+            "settlement_amount": float(outstanding),
         })
 
     rows.sort(key=lambda r: r["total_earnings"], reverse=True)
@@ -420,6 +422,8 @@ async def driver_finance_detail(db: AsyncSession, driver_id: int) -> Optional[di
         0.0,
     )
 
+    outstanding = await get_driver_outstanding_commission(db, d.id)
+
     return {
         "driver": {
             "id": d.id,
@@ -434,6 +438,7 @@ async def driver_finance_detail(db: AsyncSession, driver_id: int) -> Optional[di
             "total_earnings": float(_dec(d.total_earnings)),
             "today_earnings": float(_dec(d.today_earnings)),
             "today_rides": int(d.today_rides or 0),
+            "settlement_amount": float(outstanding),
         },
         "totals": {
             "lifetime_earnings": float(completed_amt),
@@ -924,6 +929,7 @@ async def get_withdrawals_data(db: AsyncSession, page: int = 1, page_size: int =
             "earned": float(earned),
             "paid": float(paid),
             "pending": float(pending),
+            "settlement_amount": r.get("settlement_amount", 0.0),
         })
 
     # Pagination

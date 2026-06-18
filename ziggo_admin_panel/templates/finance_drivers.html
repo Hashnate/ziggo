@@ -22,6 +22,7 @@
                     <th class="px-4 py-3 text-left">Vehicle</th>
                     <th class="px-4 py-3 text-left">Status</th>
                     <th class="px-4 py-3 text-right">Total earnings</th>
+                    <th class="px-4 py-3 text-right">Settlement Owed</th>
                     <th class="px-4 py-3 text-right">This month</th>
                     <th class="px-4 py-3 text-right">This week</th>
                     <th class="px-4 py-3 text-right">Today</th>
@@ -47,6 +48,7 @@
                         </span>
                     </td>
                     <td class="px-4 py-3 text-right font-black text-ziggo">Rs.{{ "{:,.0f}".format(r.total_earnings) }}</td>
+                    <td class="px-4 py-3 text-right font-black {% if (r.settlement_amount or 0) > 0 %}text-amber-600{% else %}text-gray-400{% endif %}">Rs.{{ "{:,.0f}".format(r.settlement_amount or 0) }}</td>
                     <td class="px-4 py-3 text-right">Rs.{{ "{:,.0f}".format(r.this_month) }}</td>
                     <td class="px-4 py-3 text-right">Rs.{{ "{:,.0f}".format(r.this_week) }}</td>
                     <td class="px-4 py-3 text-right">Rs.{{ "{:,.0f}".format(r.today) }}</td>
@@ -56,7 +58,7 @@
                 </tr>
                 {% endfor %}
                 {% if not rows %}
-                <tr><td colspan="10" class="p-10 text-center text-gray-400 text-sm font-bold">No drivers yet.</td></tr>
+                <tr><td colspan="11" class="p-10 text-center text-gray-400 text-sm font-bold">No drivers yet.</td></tr>
                 {% endif %}
             </tbody>
         </table>

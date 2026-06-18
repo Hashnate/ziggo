@@ -52,6 +52,7 @@
                     <th class="px-6 py-3">Type</th>
                     <th class="px-6 py-3 text-right">Earned</th>
                     <th class="px-6 py-3 text-right">Paid out</th>
+                    <th class="px-6 py-3 text-right">Settlement Owed</th>
                     <th class="px-6 py-3 text-right">Pending</th>
                     <th class="px-6 py-3 text-right">Pay now</th>
                 </tr>
@@ -66,6 +67,7 @@
                     <td class="px-6 py-3 text-xs capitalize">{{ r.vehicle_type }}</td>
                     <td class="px-6 py-3 text-right text-sm font-normal">Rs.{{ "{:,.0f}".format(r.earned) }}</td>
                     <td class="px-6 py-3 text-right text-sm">Rs.{{ "{:,.0f}".format(r.paid) }}</td>
+                    <td class="px-6 py-3 text-right text-sm {% if r.settlement_amount > 0 %}text-rose-600 font-bold{% else %}text-gray-400{% endif %}">Rs.{{ "{:,.0f}".format(r.settlement_amount) }}</td>
                     <td class="px-6 py-3 text-right text-sm font-normal {% if r.pending > 0 %}text-amber-600{% else %}text-gray-400{% endif %}">
                         Rs.{{ "{:,.0f}".format(r.pending) }}
                     </td>
@@ -85,7 +87,7 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="6" class="px-6 py-10 text-center text-gray-400">No driver earnings yet</td></tr>
+                <tr><td colspan="7" class="px-6 py-10 text-center text-gray-400">No driver earnings yet</td></tr>
                 {% endfor %}
             </tbody>
         </table>
