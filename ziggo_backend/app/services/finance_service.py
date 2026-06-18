@@ -1143,6 +1143,13 @@ async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
 
     outstanding = await get_driver_outstanding_commission(db, driver_id)
 
+    from app.models import SystemSettings
+    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    ss = ss_q.scalars().first()
+    max_limit = 1000.0
+    if ss and ss.max_settle_amount is not None:
+        max_limit = float(ss.max_settle_amount)
+
     return {
         "collected": float(collected),
         "commission": float(collected - earnings),
@@ -1153,6 +1160,7 @@ async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
         "trips": ride_count + delivery_count,
         "rides": ride_count,
         "deliveries": delivery_count,
+        "max_settle_amount": max_limit,
     }
 
 

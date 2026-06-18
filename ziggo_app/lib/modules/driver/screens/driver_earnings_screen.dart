@@ -597,6 +597,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
     final paid = _d(s, 'paid');
     final pending = _d(s, 'pending');
     final trips = (s['trips'] as num?)?.toInt() ?? 0;
+    final maxSettle = s['max_settle_amount'] != null ? _d(s, 'max_settle_amount') : 1000.0;
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -725,6 +726,35 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
               ),
             ),
           ],
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+            decoration: BoxDecoration(
+              color: AppColors.divider.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.info_outline_rounded,
+                  color: AppColors.textTertiary,
+                  size: 15,
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    'Maximum settle commission amount is Rs.${maxSettle.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
