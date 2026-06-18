@@ -50,6 +50,10 @@ class DriverProvider extends ChangeNotifier {
     await loadIncentives();
     await _pushLocationOnce();
     _startProfileTimer();
+
+    if (_isOnline) {
+      await _startLocationStream();
+    }
   }
 
   void _startProfileTimer() {
