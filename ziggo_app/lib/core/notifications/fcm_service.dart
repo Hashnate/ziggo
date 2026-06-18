@@ -95,8 +95,16 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           priority: Priority.high,
           playSound: true,
           sound: const RawResourceAndroidNotificationSound('ride_alert'),
+          // FLAG_INSISTENT (4) — loops the sound until the notification is cancelled.
           additionalFlags: Int32List.fromList(<int>[4]),
           enableVibration: true,
+          // Call-style behaviour: pop a full-screen overlay over any other app
+          // (like an incoming phone call), keep it alive until the driver acts,
+          // and auto-cancel once the 30-second booking window has elapsed.
+          fullScreenIntent: true,
+          ongoing: true,
+          autoCancel: false,
+          timeoutAfter: 30000, // matches expires_in_seconds: 30 from backend
         ),
       ),
     );
