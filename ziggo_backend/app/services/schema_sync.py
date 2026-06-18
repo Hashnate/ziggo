@@ -182,6 +182,7 @@ async def ensure_schema(engine: AsyncEngine) -> None:
         await _seed_food_home(conn)
         await _seed_incentives(conn)
         await _seed_peak_hours(conn)
+        await _cleanup_bad_payouts(conn)
 
 
 async def _seed_flash_tiers(conn) -> None:
@@ -358,3 +359,12 @@ async def _seed_peak_hours(conn) -> None:
         print("[schema_sync] Backfilled start_time and end_time for existing peak hour settings")
 
 
+async def _cleanup_bad_payouts(conn) -> None:
+    from ..models import DriverPayout
+    # Clean up incorrect test payouts that are ledger entries rather than actual payments
+    res = await conn.execute(
+        DriverPayout.__table__.delete().where(
+            DriverPayout.description.ilike("%Commission settled (Cash balance offset)%")
+        )
+    )
+    print("[schema_sync] Cleaned up bad test commission payouts from DB")
