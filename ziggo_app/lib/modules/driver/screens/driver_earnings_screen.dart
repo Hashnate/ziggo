@@ -383,7 +383,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
   Widget _buildScaffold(BuildContext context) {
     final profile =
         context.watch<DriverProvider>().profile ?? const <String, dynamic>{};
-    final total = (profile['total_earnings'] as num?)?.toDouble() ?? 0;
+    final total = _summary != null ? _d(_summary!, 'earnings') : ((profile['total_earnings'] as num?)?.toDouble() ?? 0);
     final today = (profile['today_earnings'] as num?)?.toDouble() ?? 0;
     final trips = (profile['today_rides'] as num?)?.toInt() ?? 0;
     final paid = (profile['paid_payouts'] as num?)?.toDouble() ?? 0;

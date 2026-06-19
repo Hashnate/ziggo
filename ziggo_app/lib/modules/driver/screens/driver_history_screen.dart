@@ -43,6 +43,10 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
       .where((r) => r['status'] == 'completed')
       .fold(0.0, (s, r) => s + ((r['driver_earnings'] as num?)?.toDouble() ?? (r['final_amount'] as num?)?.toDouble() ?? 0));
 
+  double get _totalDueToCompany => _rides
+      .where((r) => r['status'] == 'completed')
+      .fold(0.0, (s, r) => s + ((r['app_usage_charges'] as num?)?.toDouble() ?? (r['platform_fee'] as num?)?.toDouble() ?? 0));
+
   int get _completedCount => _rides.where((r) => r['status'] == 'completed').length;
   int get _cancelledCount => _rides.where((r) => r['status'] == 'cancelled').length;
 
@@ -91,32 +95,74 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.18),
-                            borderRadius: BorderRadius.circular(100),
-                          ),
-                          child: const Text(
-                            'TOTAL EARNED',
-                            style: TextStyle(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 10,
-                              letterSpacing: 1.4,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary.withOpacity(0.18),
+                                    borderRadius: BorderRadius.circular(100),
+                                  ),
+                                  child: const Text(
+                                    'TOTAL EARNED',
+                                    style: TextStyle(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 10,
+                                      letterSpacing: 1.4,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  'Rs.${_totalEarned.toStringAsFixed(0)}',
+                                  style: const TextStyle(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 36,
+                                    letterSpacing: -1,
+                                    height: 1.1,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          'Rs.${_totalEarned.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 36,
-                            letterSpacing: -1,
-                            height: 1.1,
-                          ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.error.withOpacity(0.18),
+                                    borderRadius: BorderRadius.circular(100),
+                                  ),
+                                  child: const Text(
+                                    'DUE TO COMPANY',
+                                    style: TextStyle(
+                                      color: AppColors.error,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 10,
+                                      letterSpacing: 1.4,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  'Rs.${_totalDueToCompany.toStringAsFixed(0)}',
+                                  style: const TextStyle(
+                                    color: AppColors.error,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 24,
+                                    letterSpacing: -1,
+                                    height: 1.1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 14),
                         Row(
