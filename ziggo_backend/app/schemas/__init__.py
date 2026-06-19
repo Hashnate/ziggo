@@ -17,6 +17,7 @@ from .booking_schema import (
     BookingResponse,
     BookingStatusUpdate,
     BookingRateRequest,
+    BookingUpdateDestinationRequest,
 )
 from .customer_schema import (
     SavedAddressCreate,
@@ -96,6 +97,7 @@ __all__ = [
     "BookingResponse",
     "BookingStatusUpdate",
     "BookingRateRequest",
+    "BookingUpdateDestinationRequest",
     "SavedAddressCreate",
     "SavedAddressResponse",
     "WalletTopUp",
