@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
@@ -892,9 +893,14 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                 child: Column(
                   children: [
                     ListTile(
-                      onTap: () {
-                        // TODO: Implement phone book
-                        Navigator.pop(ctx);
+                      onTap: () async {
+                        if (await FlutterContacts.permissions.request(PermissionType.contacts)) {
+                          final contact = await FlutterContacts.native.showPicker(properties: {ContactProperty.phones});
+                          if (contact != null && contact.phones.isNotEmpty) {
+                            setState(() => _friend = (name: contact.displayName, phone: contact.phones.first.number));
+                          }
+                        }
+                        if (context.mounted) Navigator.pop(ctx);
                       },
                       leading: const Icon(Icons.contact_phone_outlined, color: AppColors.textPrimary),
                       title: const Text('Phone book', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),

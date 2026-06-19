@@ -9,6 +9,7 @@ import '../../../core/map/place_search_sheet.dart';
 import '../booking_provider.dart';
 import 'ride_tracking_screen.dart';
 import 'rental_pickup_map_screen.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 
 class RentalHomeScreen extends StatefulWidget {
   const RentalHomeScreen({super.key});
@@ -543,8 +544,14 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
                 child: Column(
                   children: [
                     ListTile(
-                      onTap: () {
-                        Navigator.pop(ctx);
+                      onTap: () async {
+                        if (await FlutterContacts.permissions.request(PermissionType.contacts)) {
+                          final contact = await FlutterContacts.native.showPicker(properties: {ContactProperty.phones});
+                          if (contact != null && contact.phones.isNotEmpty) {
+                            setState(() => _friend = (name: contact.displayName, phone: contact.phones.first.number));
+                          }
+                        }
+                        if (context.mounted) Navigator.pop(ctx);
                       },
                       leading: const Icon(Icons.contact_phone_outlined, color: AppColors.textPrimary),
                       title: const Text('Phone book', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),

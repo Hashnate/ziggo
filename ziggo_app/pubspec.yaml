@@ -65,6 +65,7 @@ dependencies:
   # notification firing / notification permission being granted — those only
   # cover the backgrounded/killed case. Asset: assets/sounds/ride_alert.mp3.
   audioplayers: ^6.1.0
+  flutter_contacts: ^2.1.0
 
 dev_dependencies:
   flutter_test:
