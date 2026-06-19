@@ -978,13 +978,105 @@ class _BottomCard extends StatelessWidget {
                                     ],
                                   ),
                                   const SizedBox(height: 6),
-                                  Text(
-                                    'Meet at your pickup spot: ${active['pickup_address'] ?? ''}',
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 13,
+                                  IntrinsicHeight(
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                                      children: [
+                                        SizedBox(
+                                          width: 50,
+                                          child: Column(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              const Text('PICKUP', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 10, color: AppColors.primary, letterSpacing: 0.5)),
+                                              if ((active['stops'] as List?)?.isNotEmpty == true)
+                                                for (int i = 0; i < (active['stops'] as List).length; i++)
+                                                  Text('STOP ${i + 1}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 10, color: AppColors.primary, letterSpacing: 0.5)),
+                                              const Text('DROP', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 10, color: AppColors.primary, letterSpacing: 0.5)),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        SizedBox(
+                                          width: 16,
+                                          child: Stack(
+                                            alignment: Alignment.topCenter,
+                                            children: [
+                                              // The continuous line
+                                              Positioned(
+                                                top: 6, bottom: 6,
+                                                child: Container(width: 2, color: AppColors.primary),
+                                              ),
+                                              // The dots
+                                              Column(
+                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                children: [
+                                                  Container(
+                                                    width: 12, height: 12,
+                                                    margin: const EdgeInsets.only(top: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.white,
+                                                      shape: BoxShape.circle,
+                                                      border: Border.all(color: AppColors.primary, width: 2.5),
+                                                    ),
+                                                  ),
+                                                  if ((active['stops'] as List?)?.isNotEmpty == true)
+                                                    for (int i = 0; i < (active['stops'] as List).length; i++)
+                                                      Container(
+                                                        width: 12, height: 12,
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.white,
+                                                          shape: BoxShape.circle,
+                                                          border: Border.all(color: AppColors.primary, width: 2.5),
+                                                        ),
+                                                      ),
+                                                  Container(
+                                                    width: 12, height: 12,
+                                                    margin: const EdgeInsets.only(bottom: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.white,
+                                                      shape: BoxShape.circle,
+                                                      border: Border.all(color: AppColors.primary, width: 2.5),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                active['pickup_address']?.toString() ?? '',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Colors.black87),
+                                              ),
+                                              if ((active['stops'] as List?)?.isNotEmpty == true)
+                                                for (final stop in (active['stops'] as List)) ...[
+                                                  const SizedBox(height: 12),
+                                                  Text(
+                                                    stop['address']?.toString() ?? '',
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textSecondary),
+                                                  ),
+                                                ],
+                                              const SizedBox(height: 12),
+                                              Text(
+                                                active['drop_address']?.toString() ?? '',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textSecondary),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                   const SizedBox(height: 10),
@@ -1593,24 +1685,30 @@ class _NextStepStrip extends StatelessWidget {
         ? '${(step.distanceM / 1000).toStringAsFixed(1)} km'
         : '${step.distanceM.toStringAsFixed(0)} m';
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.88),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: AppStyles.shadowLg,
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
           Container(
-            width: 36, height: 36,
+            width: 44, height: 44,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(10),
+              color: AppColors.primary.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(_iconFor(step.maneuver), color: Colors.black, size: 22),
+            child: Icon(_iconFor(step.maneuver), color: AppColors.primary, size: 24),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1620,17 +1718,18 @@ class _NextStepStrip extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: Colors.black87,
                     fontWeight: FontWeight.w900,
-                    fontSize: 13,
+                    fontSize: 14,
                   ),
                 ),
+                const SizedBox(height: 4),
                 Text(
                   'In $distanceTxt',
                   style: const TextStyle(
-                    color: Colors.white60,
+                    color: AppColors.textSecondary,
                     fontWeight: FontWeight.w700,
-                    fontSize: 11,
+                    fontSize: 12,
                   ),
                 ),
               ],

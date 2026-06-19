@@ -492,15 +492,31 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         (ride['pickup_lng'] as num).toDouble(),
                       ),
                       icon: Icons.my_location_rounded,
-                      color: AppColors.flash,
+                      color: AppColors.info,
+                      size: 30,
+                      label: 'Pickup | ${ride['pickup_address'] ?? ''}',
                     ),
+                    if ((ride['stops'] as List?)?.isNotEmpty == true)
+                      for (int i = 0; i < (ride['stops'] as List).length; i++)
+                        pinMarker(
+                          point: LatLng(
+                            (ride['stops'][i]['lat'] as num).toDouble(),
+                            (ride['stops'][i]['lng'] as num).toDouble(),
+                          ),
+                          icon: Icons.location_on_rounded,
+                          color: AppColors.warning,
+                          size: 30,
+                          label: 'Stop ${i + 1} | ${ride['stops'][i]['address'] ?? ''}',
+                        ),
                     pinMarker(
                       point: LatLng(
                         (ride['drop_lat'] as num).toDouble(),
                         (ride['drop_lng'] as num).toDouble(),
                       ),
                       icon: Icons.location_on_rounded,
-                      color: AppColors.error,
+                      color: AppColors.primaryDark,
+                      size: 30,
+                      label: 'Drop | ${ride['drop_address'] ?? ''}',
                     ),
                   ],
                   if (ride == null && food != null) ...[
@@ -544,7 +560,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             right: 14,
             bottom: (ride != null || food != null || market != null)
                 ? (ride != null
-                    ? (_activeRideExpanded ? 360.0 : 160.0)
+                    ? (_activeRideExpanded ? 460.0 : 160.0)
                     : 300.0)
                 : (_incentivesExpanded ? 360.0 : 160.0),
             child: GestureDetector(
@@ -606,106 +622,115 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-      child: Row(
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          GestureDetector(
-            onTap: () => _scaffoldKey.currentState?.openDrawer(),
-            child: Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _kPanel,
-                border: Border.all(color: AppColors.divider, width: 2),
-                boxShadow: AppStyles.shadowSm,
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _kPanel,
+                    border: Border.all(color: AppColors.divider, width: 2),
+                    boxShadow: AppStyles.shadowSm,
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: photoUrl != null
+                      ? Image.network(
+                          photoUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _avatarFallback(initial),
+                        )
+                      : _avatarFallback(initial),
+                ),
               ),
-              clipBehavior: Clip.antiAlias,
-              child: photoUrl != null
-                  ? Image.network(
-                      photoUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _avatarFallback(initial),
-                    )
-                  : _avatarFallback(initial),
-            ),
+            ],
           ),
-          const Spacer(),
-          GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const DriverEarningsScreen()),
-            ),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 7),
-              decoration: BoxDecoration(
-                color: _kPanel,
-                borderRadius: BorderRadius.circular(100),
-                boxShadow: AppStyles.shadowSm,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const DriverEarningsScreen()),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: _kPanel,
+                    borderRadius: BorderRadius.circular(100),
+                    boxShadow: AppStyles.shadowSm,
+                  ),
+                  child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
                     children: [
-                      const Text(
-                        'LKR ',
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13,
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          const Text(
+                            'LKR ',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                            ),
+                          ),
+                          Text(
+                            earnings.toStringAsFixed(2),
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 17,
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        earnings.toStringAsFixed(2),
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 17,
-                        ),
+                      const SizedBox(height: 1),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.savings_rounded, color: AppColors.primary, size: 12),
+                          SizedBox(width: 4),
+                          Text(
+                            'Earnings',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 1),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.savings_rounded, color: AppColors.primary, size: 12),
-                      SizedBox(width: 4),
-                      Text(
-                        'Earnings',
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () => _handleToggleOnline(!driver.isOnline),
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _kPanel,
+                    boxShadow: AppStyles.shadowSm,
                   ),
-                ],
+                  child: Icon(
+                    Icons.swap_horiz_rounded,
+                    color: driver.isOnline ? AppColors.primary : AppColors.textSecondary,
+                    size: 24,
+                  ),
+                ),
               ),
-            ),
-          ),
-          const Spacer(),
-          GestureDetector(
-            onTap: () => _handleToggleOnline(!driver.isOnline),
-            child: Container(
-              width: 48,
-              height: 48,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _kPanel,
-                boxShadow: AppStyles.shadowSm,
-              ),
-              child: Icon(
-                Icons.swap_horiz_rounded,
-                color: driver.isOnline ? AppColors.primary : AppColors.textSecondary,
-                size: 24,
-              ),
-            ),
+            ],
           ),
         ],
       ),
@@ -1659,80 +1684,104 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.my_location_rounded,
-                        color: AppColors.flash, size: 14),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        ride['pickup_address']?.toString() ?? '',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
-                      ),
-                    ),
-                  ],
-                ),
-                // BRD: CD-19 — intermediate stops between pickup and drop
-                for (final stop in (ride['stops'] as List? ?? const [])) ...[
-                  const SizedBox(height: 8),
-                  Row(
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Container(
-                        width: 14,
-                        height: 14,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: AppColors.warning.withOpacity(0.18),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '${stop['order_index'] ?? '·'}',
-                          style: const TextStyle(
-                            color: AppColors.warning,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w900,
-                          ),
+                      SizedBox(
+                        width: 50,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('PICKUP', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 10, color: AppColors.primary, letterSpacing: 0.5)),
+                            if ((ride['stops'] as List?)?.isNotEmpty == true)
+                              for (int i = 0; i < (ride['stops'] as List).length; i++)
+                                Text('STOP ${i + 1}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 10, color: AppColors.primary, letterSpacing: 0.5)),
+                            const Text('DROP', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 10, color: AppColors.primary, letterSpacing: 0.5)),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 16,
+                        child: Stack(
+                          alignment: Alignment.topCenter,
+                          children: [
+                            Positioned(
+                              top: 6, bottom: 6,
+                              child: Container(width: 2, color: AppColors.primary),
+                            ),
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Container(
+                                  width: 12, height: 12,
+                                  margin: const EdgeInsets.only(top: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: AppColors.primary, width: 2.5),
+                                  ),
+                                ),
+                                if ((ride['stops'] as List?)?.isNotEmpty == true)
+                                  for (int i = 0; i < (ride['stops'] as List).length; i++)
+                                    Container(
+                                      width: 12, height: 12,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: AppColors.primary, width: 2.5),
+                                      ),
+                                    ),
+                                Container(
+                                  width: 12, height: 12,
+                                  margin: const EdgeInsets.only(bottom: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: AppColors.primary, width: 2.5),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          (stop['address'] ?? '').toString().isEmpty
-                              ? 'Stop ${stop['order_index'] ?? ''}'
-                              : stop['address'].toString(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.warning,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              ride['pickup_address']?.toString() ?? '',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Colors.black87),
+                            ),
+                            if ((ride['stops'] as List?)?.isNotEmpty == true)
+                              for (final stop in (ride['stops'] as List)) ...[
+                                const SizedBox(height: 12),
+                                Text(
+                                  stop['address']?.toString() ?? '',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textSecondary),
+                                ),
+                              ],
+                            const SizedBox(height: 12),
+                            Text(
+                              ride['drop_address']?.toString() ?? '',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textSecondary),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                ],
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.location_on_rounded,
-                        color: AppColors.error, size: 14),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        ride['drop_address']?.toString() ?? '',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
               ],
             ),
@@ -1920,32 +1969,60 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Cancel this ride?', textAlign: TextAlign.center),
-        content: Text(
-          'Reason: $reason\n\nFrequent cancellations can affect your rating.',
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Cancel this ride?',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 12),
+              Text(
+                'Reason: $reason\n\nFrequent cancellations can affect your rating.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(false),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: AppColors.divider),
+                        ),
+                      ),
+                      child: const Text('Keep ride',
+                          style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w900)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        backgroundColor: AppColors.error,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Cancel ride',
+                          style: TextStyle(fontWeight: FontWeight.w900)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Keep ride',
-                style: TextStyle(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Cancel ride'),
-          ),
-        ],
       ),
     );
 

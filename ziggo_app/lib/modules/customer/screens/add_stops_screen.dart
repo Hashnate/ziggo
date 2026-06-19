@@ -276,12 +276,14 @@ class _AddStopsScreenState extends State<AddStopsScreen> {
                     controller: _mapController,
                     center: widget.pickup.location,
                     zoom: 15,
+                    showMyLocation: false,
                     markers: [
                       pinMarker(
                         point: widget.pickup.location,
                         icon: Icons.my_location_rounded,
-                        color: AppColors.primary,
+                        color: AppColors.info,
                         size: 30,
+                        label: 'Pickup | ${widget.pickup.name}',
                       ),
                       for (int i = 0; i < _validDestinations.length; i++)
                         pinMarker(
