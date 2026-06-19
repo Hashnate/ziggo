@@ -28,6 +28,7 @@ class VehicleSelectionScreen extends StatefulWidget {
   final String tripType;
   final ({String name, String phone})? friend;
   final bool isTruckMode;
+  final List<Place> stops;
 
   const VehicleSelectionScreen({
     super.key,
@@ -36,6 +37,7 @@ class VehicleSelectionScreen extends StatefulWidget {
     this.tripType = 'one_way',
     this.friend,
     this.isTruckMode = false,
+    this.stops = const [],
   });
 
   @override
@@ -200,7 +202,11 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       drop: widget.drop.location,
       promoCode: _promo.isEmpty ? null : _promo,
       tripType: widget.tripType,
-      stops: const [],
+      stops: widget.stops.map((s) => {
+        'lat': s.location.latitude,
+        'lng': s.location.longitude,
+        'address': s.name,
+      }).toList(),
     );
 
     if (bulkRes != null) {
@@ -240,14 +246,22 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       }
     });
     
-    _mapController.fitBounds(
-      [widget.pickup.location, widget.drop.location],
-      padding: 80,
-    );
+    final pointsToVisit = [widget.pickup.location, ...widget.stops.map((s) => s.location), widget.drop.location];
+    _mapController.fitBounds(pointsToVisit, padding: 80);
  
-    final dir = await MapsService.instance.directions(widget.pickup.location, widget.drop.location);
-    if (mounted && dir != null && dir.points.isNotEmpty) {
-      setState(() => _routePoints = dir.points);
+    List<LatLng> fullRoute = [];
+    for (int i = 0; i < pointsToVisit.length - 1; i++) {
+      final dir = await MapsService.instance.directions(pointsToVisit[i], pointsToVisit[i+1]);
+      if (dir != null && dir.points.isNotEmpty) {
+        fullRoute.addAll(dir.points);
+      } else {
+        fullRoute.add(pointsToVisit[i]);
+        fullRoute.add(pointsToVisit[i+1]);
+      }
+    }
+    
+    if (mounted && fullRoute.isNotEmpty) {
+      setState(() => _routePoints = fullRoute);
     }
   }
 
@@ -280,7 +294,11 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
         promoCode: _promo.isEmpty ? null : _promo,
         redeemPoints: _usePoints ? context.read<PromosProvider>().points : 0,
         tripType: widget.tripType,
-        stops: [],
+        stops: widget.stops.map((s) => {
+          'lat': s.location.latitude,
+          'lng': s.location.longitude,
+          'address': s.name,
+        }).toList(),
         friendName: _secondaryPhone != null && _secondaryPhone!.isNotEmpty ? 'Secondary' : widget.friend?.name,
         friendPhone: _secondaryPhone != null && _secondaryPhone!.isNotEmpty ? _secondaryPhone : widget.friend?.phone,
         receiverName: _secondaryPhone != null && _secondaryPhone!.isNotEmpty ? 'Secondary' : null,
@@ -562,10 +580,19 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                   color: AppColors.primaryDark,
                   label: 'Drop | ${widget.drop.name}',
                 ),
+                for (int i = 0; i < widget.stops.length; i++)
+                  pinMarker(
+                    point: widget.stops[i].location,
+                    icon: Icons.location_on_rounded,
+                    color: AppColors.warning,
+                    label: 'Stop ${i + 1}',
+                  ),
               ],
               polylines: [
                 ZiggoPolyline(
-                  points: _routePoints.isNotEmpty ? _routePoints : [widget.pickup.location, widget.drop.location],
+                  points: _routePoints.isNotEmpty 
+                      ? _routePoints 
+                      : [widget.pickup.location, ...widget.stops.map((s) => s.location), widget.drop.location],
                   strokeWidth: 4,
                   color: Colors.black,
                 ),

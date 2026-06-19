@@ -17,12 +17,14 @@ import 'vehicle_selection_screen.dart';
 import 'confirm_pickup_screen.dart';
 import 'saved_addresses_screen.dart';
 import 'map_location_selection_screen.dart';
+import 'add_stops_screen.dart';
 
 class LocationSearchScreen extends StatefulWidget {
   final Place? initialPickup;
   final Place? initialDrop;
   final String initialTripType;
   final bool isTruckMode;
+  final List<Place> initialStops;
 
   const LocationSearchScreen({
     super.key,
@@ -30,6 +32,7 @@ class LocationSearchScreen extends StatefulWidget {
     this.initialDrop,
     this.initialTripType = 'one_way',
     this.isTruckMode = false,
+    this.initialStops = const [],
   });
 
   @override
@@ -48,6 +51,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
   Place? _drop;
   String _tripType = 'one_way';
   ({String name, String phone})? _friend;
+  List<Place> _stops = [];
 
   List<PlacePrediction> _results = const [];
   bool _loading = false;
@@ -62,6 +66,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
     _pickup = widget.initialPickup;
     _drop = widget.initialDrop;
     _tripType = widget.initialTripType;
+    _stops = List.from(widget.initialStops);
 
     if (_pickup != null) {
       _pickupController.text = _pickup!.name;
@@ -211,6 +216,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
           tripType: _tripType,
           friend: _friend,
           isTruckMode: widget.isTruckMode,
+          stops: _stops,
         ),
       ),
     );
@@ -512,10 +518,33 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                     disabledBorder: InputBorder.none,
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(vertical: 13),
-                    suffixIcon: const Icon(
-                      Icons.add_rounded,
-                      size: 24,
-                      color: Color(0xFF0F172A),
+                    suffixIcon: GestureDetector(
+                      onTap: () async {
+                        if (_pickup == null) return;
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AddStopsScreen(
+                              pickup: _pickup!,
+                              initialStops: _stops,
+                              initialDrop: _drop,
+                            ),
+                          ),
+                        );
+                        if (result != null && result is Map && mounted) {
+                          setState(() {
+                            _stops = List<Place>.from(result['stops']);
+                            _drop = result['drop'] as Place;
+                            _dropController.text = _drop!.name;
+                          });
+                          _proceedToVehicleSelection();
+                        }
+                      },
+                      child: const Icon(
+                        Icons.add_rounded,
+                        size: 24,
+                        color: Color(0xFF0F172A),
+                      ),
                     ),
                   ),
                 ),
