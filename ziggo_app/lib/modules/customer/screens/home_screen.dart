@@ -123,8 +123,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onFlash: () => _open(const FlashDeliveryTypeScreen()),
               onMarket: () => _open(const MarketHomeScreen()),
             ),
-            const SizedBox(height: 24),
-            _GoldStrip(onTap: () => _open(const SubscriptionScreen())),
+
           ]),
         ),
       ),
@@ -162,8 +161,6 @@ class _Header extends StatelessWidget {
 
     return Row(
       children: [
-        _IconBubble(icon: Icons.menu_rounded, onTap: onMenu),
-        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -315,7 +312,7 @@ class _HeroCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  const ZiggoWordmark(onDark: true, size: 34),
+                  const ZiggoWordmark(onDark: true, size: 48),
                   const SizedBox(height: 8),
                   Text(
                     'Rides, food, market & parcels —\nall in one place.',
@@ -324,39 +321,6 @@ class _HeroCard extends StatelessWidget {
                       fontSize: 13.5,
                       height: 1.45,
                       fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  GestureDetector(
-                    onTap: onBook,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 13),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius:
-                            BorderRadius.circular(AppStyles.radiusMd),
-                        boxShadow: AppStyles.shadowSm,
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.bolt_rounded,
-                              color: AppColors.primary, size: 18),
-                          SizedBox(width: 6),
-                          Text(
-                            'Book a ride',
-                            style: TextStyle(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 14,
-                            ),
-                          ),
-                          SizedBox(width: 4),
-                          Icon(Icons.arrow_forward_rounded,
-                              color: AppColors.primary, size: 16),
-                        ],
-                      ),
                     ),
                   ),
                 ],
