@@ -53,6 +53,7 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
         .options(
             selectinload(Booking.driver).selectinload(Driver.user),
             selectinload(Booking.customer).selectinload(Customer.user),
+            selectinload(Booking.stops),
         )
         .where(Booking.id == booking.id)
     )
@@ -123,6 +124,15 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
         app_usage_charges=float(b.app_usage_charges) if b.app_usage_charges is not None else 0.0,
         deductions=float(b.deductions) if b.deductions is not None else 0.0,
         driver_earnings=float(b.driver_earnings) if b.driver_earnings is not None else 0.0,
+        stops=[
+            {
+                "order_index": s.order_index,
+                "lat": float(s.lat),
+                "lng": float(s.lng),
+                "address": s.address,
+            }
+            for s in (b.stops or [])
+        ],
     )
 
 

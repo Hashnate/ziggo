@@ -10,8 +10,10 @@ import '../../../core/map/maps_service.dart';
 import '../../../core/map/places.dart';
 import '../../../core/map/ziggo_map.dart';
 import '../../../core/network/api_client.dart';
+import 'add_stops_screen.dart';
 import 'customer_shell.dart';
 import 'location_search_screen.dart';
+import 'vehicle_selection_screen.dart';
 
 class FareEstimateScreen extends StatefulWidget {
   final bool isTruckMode;
@@ -28,6 +30,7 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
   Timer? _nearbyTimer;
   DateTime? _scheduledTime;
   String _tripType = 'one_way';
+  List<Place> _stops = [];
 
   @override
   void initState() {
@@ -178,9 +181,43 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
           initialPickup: _currentLocation,
           initialTripType: tripType,
           isTruckMode: widget.isTruckMode,
+          initialStops: _stops,
         ),
       ),
     );
+  }
+
+  Future<void> _openAddStops() async {
+    if (_currentLocation == null) return;
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddStopsScreen(
+          pickup: _currentLocation!,
+          initialStops: _stops,
+        ),
+      ),
+    );
+    
+    if (result != null && result is Map) {
+      if (!mounted) return;
+      setState(() {
+        _stops = List<Place>.from(result['stops']);
+      });
+      final drop = result['drop'] as Place;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => VehicleSelectionScreen(
+            pickup: _currentLocation!,
+            drop: drop,
+            tripType: _tripType,
+            isTruckMode: widget.isTruckMode,
+            stops: _stops,
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -478,6 +515,44 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
                               color: AppColors.divider.withOpacity(0.8),
                             ),
                           ),
+                          if (_stops.isNotEmpty)
+                            for (int i = 0; i < _stops.length; i++) ...[
+                              Row(
+                                children: [
+                                  SizedBox(
+                                    width: 60,
+                                    child: Text(
+                                      'STOP ${i + 1}',
+                                      style: const TextStyle(
+                                        color: AppColors.warning,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      _stops[i].name,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 15,
+                                        color: Colors.black87,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                child: Divider(
+                                  height: 1,
+                                  color: AppColors.divider.withOpacity(0.8),
+                                ),
+                              ),
+                            ],
                           Row(
                             children: [
                               const SizedBox(
@@ -493,13 +568,13 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
                                 ),
                               ),
                               Expanded(
-                                child: GestureDetector(
-                                  onTap: () => _openSearch(focusDrop: true),
-                                  child: const Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: GestureDetector(
+                                        onTap: () => _openSearch(focusDrop: true),
+                                        child: const Text(
                                           'Where are you going?',
                                           style: TextStyle(
                                             color: AppColors.textTertiary,
@@ -510,13 +585,16 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
-                                      Icon(
+                                    ),
+                                    GestureDetector(
+                                      onTap: _openAddStops,
+                                      child: const Icon(
                                         Icons.add_rounded,
                                         size: 24,
                                         color: Colors.black87,
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
