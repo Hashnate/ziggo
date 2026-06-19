@@ -136,7 +136,7 @@ class _SupportScreenState extends State<SupportScreen> {
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              gradient: AppColors.blackGradient,
+              gradient: AppColors.primaryGradient,
               borderRadius: BorderRadius.circular(22),
             ),
             child: Row(
@@ -146,11 +146,11 @@ class _SupportScreenState extends State<SupportScreen> {
                   height: 48,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: AppColors.primary,
+                    color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: const Icon(Icons.support_agent_rounded,
-                      color: Colors.black, size: 24),
+                      color: Colors.white, size: 24),
                 ),
                 const SizedBox(width: 14),
                 const Expanded(
@@ -205,10 +205,10 @@ class _SupportScreenState extends State<SupportScreen> {
                   duration: const Duration(milliseconds: 200),
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: selected ? Colors.black : Colors.white,
+                    color: selected ? AppColors.primary : Colors.white,
                     borderRadius: BorderRadius.circular(100),
                     border: Border.all(
-                      color: selected ? Colors.black : AppColors.cardBorder,
+                      color: selected ? AppColors.primary : AppColors.cardBorder,
                     ),
                   ),
                   child: Row(
@@ -268,6 +268,7 @@ class _SupportScreenState extends State<SupportScreen> {
             label: 'SUBMIT REPORT',
             icon: Icons.send_rounded,
             busy: _busy,
+            gold: true,
             onPressed: _submit,
           ),
           const SizedBox(height: 30),
