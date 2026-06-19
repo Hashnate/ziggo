@@ -224,6 +224,7 @@ class DriverProvider extends ChangeNotifier {
     required String relativeName,
     required String relativeContact,
     required String relativeRelationship,
+    String? referralCode,
   }) async {
     try {
       final resp = await ApiClient.instance.dio.post('/driver/register', data: {
@@ -238,6 +239,7 @@ class DriverProvider extends ChangeNotifier {
         'relative_name': relativeName,
         'relative_contact': relativeContact,
         'relative_relationship': relativeRelationship,
+        if (referralCode != null && referralCode.isNotEmpty) 'referral_code': referralCode,
       });
       _profile = Map<String, dynamic>.from(resp.data);
       notifyListeners();

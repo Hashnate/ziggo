@@ -31,6 +31,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
   final _relativeName = TextEditingController();
   final _relativeContact = TextEditingController();
   final _relativeRelationship = TextEditingController();
+  final _referralCode = TextEditingController();
 
   String _vehicleType = 'car';
   bool _busy = false;
@@ -109,6 +110,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
     _relativeName.dispose();
     _relativeContact.dispose();
     _relativeRelationship.dispose();
+    _referralCode.dispose();
     super.dispose();
   }
 
@@ -147,6 +149,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
           relativeName: _relativeName.text.trim(),
           relativeContact: _relativeContact.text.trim(),
           relativeRelationship: _relativeRelationship.text.trim(),
+          referralCode: _referralCode.text.trim(),
         );
 
     if (err != null) {
@@ -452,6 +455,8 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                               hint: '199012345678'),
                           const SizedBox(height: 10),
                           _field(_license, 'Driving License Number', Icons.credit_card_rounded),
+                          const SizedBox(height: 10),
+                          _field(_referralCode, 'Referral Code (Optional)', Icons.group_add_rounded, required: false, hint: 'E.g. D-1234'),
                         ],
                       ),
                     ),

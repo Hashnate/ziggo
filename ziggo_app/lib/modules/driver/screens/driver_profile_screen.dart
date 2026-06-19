@@ -247,11 +247,19 @@ class DriverProfileScreen extends StatelessWidget {
                       ),
                     ),
 
-                    _divider(),
                     _listTile(
                       icon: Icons.qr_code_rounded,
                       title: 'Show Scan & Go QR',
                       onTap: () => _showQrSheet(context, driverId, name, vehicleNumber, vehicleType),
+                    ),
+                    _divider(),
+                    _listTile(
+                      icon: Icons.group_add_rounded,
+                      title: 'Refer & Earn',
+                      onTap: () {
+                        final code = profile['referral_code']?.toString() ?? 'D-$driverId';
+                        _showReferralSheet(context, code);
+                      },
                     ),
                     _divider(),
                     _listTile(
@@ -756,6 +764,107 @@ class DriverProfileScreen extends StatelessWidget {
                   color: AppColors.textSecondary,
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static void _showReferralSheet(BuildContext context, String referralCode) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (ctx) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: AppColors.divider,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Icon(Icons.volunteer_activism_rounded, color: AppColors.primary, size: 48),
+              const SizedBox(height: 16),
+              const Text(
+                'Refer & Earn',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Share your referral code with friends.\nWhen they join and drive, you both earn a bonus!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.divider),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      referralCode,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Referral code $referralCode copied!'),
+                        backgroundColor: AppColors.success,
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.share_rounded),
+                  label: const Text('Share Code'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
                 ),
               ),
             ],
