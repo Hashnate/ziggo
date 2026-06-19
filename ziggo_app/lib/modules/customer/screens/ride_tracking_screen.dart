@@ -9,6 +9,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/map/maps_service.dart';
+import '../../../core/map/place_search_sheet.dart';
+import '../../../core/map/places.dart';
 import '../../../core/map/ziggo_map.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/widgets/glass_card.dart';
@@ -1050,7 +1052,56 @@ class _BottomCard extends StatelessWidget {
                                const SizedBox(height: 16),
                                _DriverCard(d: driver!),
                              ],
-                            const SizedBox(height: 16),
+                             if (active['status'] == 'started' || active['status'] == 'accepted') ...[
+                               const SizedBox(height: 16),
+                               GestureDetector(
+                                 onTap: () async {
+                                   final p = await showPlaceSearch(context, title: 'Change Destination');
+                                   if (p != null && context.mounted) {
+                                     final provider = context.read<BookingProvider>();
+                                     final ok = await provider.updateDestination(
+                                       active['id'] as int,
+                                       p.location,
+                                       p.name,
+                                     );
+                                     if (context.mounted) {
+                                       ScaffoldMessenger.of(context).showSnackBar(
+                                         SnackBar(
+                                           content: Text(ok ? 'Destination updated successfully' : 'Failed to update destination'),
+                                           backgroundColor: ok ? AppColors.success : AppColors.error,
+                                           behavior: SnackBarBehavior.floating,
+                                         ),
+                                       );
+                                     }
+                                   }
+                                 },
+                                 child: Container(
+                                   padding: const EdgeInsets.symmetric(vertical: 14),
+                                   alignment: Alignment.center,
+                                   decoration: BoxDecoration(
+                                     color: AppColors.surfaceMuted,
+                                     border: Border.all(color: AppColors.divider),
+                                     borderRadius: BorderRadius.circular(14),
+                                   ),
+                                   child: const Row(
+                                     mainAxisAlignment: MainAxisAlignment.center,
+                                     children: [
+                                       Icon(Icons.edit_location_alt_rounded, color: AppColors.textPrimary, size: 20),
+                                       SizedBox(width: 8),
+                                       Text(
+                                         'Add Stop / Change Destination',
+                                         style: TextStyle(
+                                           color: AppColors.textPrimary,
+                                           fontWeight: FontWeight.w800,
+                                           fontSize: 14,
+                                         ),
+                                       ),
+                                     ],
+                                   ),
+                                 ),
+                               ),
+                             ],
+                             const SizedBox(height: 16),
                              _ActionRow(
                                active: active,
                                onCancel: onCancel,
@@ -1103,7 +1154,9 @@ class _DriverCard extends StatelessWidget {
     final vehicleNumber = (d['vehicle_number'] ?? '').toString();
     final fullName = (d['full_name'] ?? 'Driver').toString();
     final driverId = d['id'] as int? ?? 0;
-    final trips = (driverId * 17 + 104) % 1500 + 45;
+    final trips = (d['completed_trips'] as num?)?.toInt() ?? 
+                  (d['total_trips'] as num?)?.toInt() ?? 
+                  (d['total_rides'] as num?)?.toInt() ?? 0;
 
     return Container(
       padding: const EdgeInsets.all(14),

@@ -205,3 +205,10 @@ class BookingStatusUpdate(BaseModel):
 class BookingRateRequest(BaseModel):
     rating: int = Field(ge=1, le=5)
     feedback: Optional[str] = None
+
+
+class BookingUpdateDestinationRequest(BaseModel):
+    drop_lat: float
+    drop_lng: float
+    drop_address: str
+    stops: List[StopRequest] = Field(default_factory=list)

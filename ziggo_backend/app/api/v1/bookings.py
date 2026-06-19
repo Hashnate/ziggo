@@ -30,6 +30,7 @@ from ...schemas import (
     BookingResponse,
     BookingStatusUpdate,
     BookingRateRequest,
+    BookingUpdateDestinationRequest,
 )
 from ...services.auth_service import get_current_user
 from ...services.fare_service import calculate_fare, to_decimal
@@ -1459,4 +1460,115 @@ async def rate_booking(
 
     await db.commit()
     await db.refresh(b)
+    return await _booking_to_response(db, b)
+
+
+@router.patch("/{booking_id}/destination", response_model=BookingResponse)
+async def update_booking_destination(
+    booking_id: int,
+    body: BookingUpdateDestinationRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    q = await db.execute(select(Booking).where(Booking.id == booking_id))
+    b = q.scalars().first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Booking not found")
+
+    if user.role == UserRole.CUSTOMER:
+        c = await _get_customer(db, user)
+        if b.customer_id != c.id:
+            raise HTTPException(status_code=403, detail="Not your booking")
+    else:
+        raise HTTPException(status_code=403, detail="Only customer can update destination")
+
+    if b.status not in (BookingStatus.ACCEPTED, BookingStatus.ARRIVED, BookingStatus.STARTED):
+        raise HTTPException(status_code=400, detail="Cannot update destination in current status")
+
+    fare = await calculate_fare(
+        db,
+        b.service_type,
+        float(b.pickup_lat),
+        float(b.pickup_lng),
+        body.drop_lat,
+        body.drop_lng,
+        b.promo_code,
+        trip_type=b.trip_type or "one_way",
+        is_flash=b.is_flash,
+        parcel_weight_kg=float(b.parcel_weight_kg) if b.parcel_weight_kg else None,
+        is_rental=b.is_rental,
+        rental_hours=b.rental_hours,
+        is_courier=b.is_courier,
+        customer=c,
+        redeem_points=int(b.redeem_points) if b.redeem_points else 0,
+        stops=[s.model_dump() for s in (body.stops or [])],
+    )
+
+    b.drop_lat = Decimal(str(body.drop_lat))
+    b.drop_lng = Decimal(str(body.drop_lng))
+    b.drop_address = body.drop_address
+
+    b.distance_km = to_decimal(fare["distance_km"])
+    b.duration_min = fare["duration_min"]
+    b.fare_amount = to_decimal(fare["fare_amount"])
+    b.discount_amount = to_decimal(fare["discount_amount"])
+    b.final_amount = to_decimal(fare["final_amount"])
+    b.platform_fee = to_decimal(fare["platform_fee"])
+    b.driver_earnings = to_decimal(fare["driver_earnings"])
+    b.pickup_fee = to_decimal(fare.get("pickup_fee", 0))
+    b.boost = to_decimal(fare.get("boost", 0))
+    b.passenger_deductible = to_decimal(fare.get("passenger_deductible", 0))
+    b.app_usage_charges = to_decimal(fare.get("app_usage_charges", 0))
+    b.deductions = to_decimal(fare.get("deductions", 0))
+
+    from ...models import BookingStop, SystemSettings
+    if body.stops:
+        await db.execute(BookingStop.__table__.delete().where(BookingStop.booking_id == b.id))
+        ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+        ss = ss_q.scalars().first()
+        free_secs = int((ss.multi_stop_free_minutes if ss else 3) or 3) * 60
+        excess_rate = ss.multi_stop_excess_per_minute if (ss and ss.multi_stop_excess_per_minute is not None) else Decimal("5")
+        for idx, stop in enumerate(body.stops, start=1):
+            db.add(BookingStop(
+                booking_id=b.id,
+                order_index=idx,
+                lat=Decimal(str(stop.lat)),
+                lng=Decimal(str(stop.lng)),
+                address=stop.address,
+                free_wait_seconds=free_secs,
+                excess_rate_per_minute=Decimal(str(excess_rate)),
+            ))
+        b.stop_count = len(body.stops)
+    else:
+        await db.execute(BookingStop.__table__.delete().where(BookingStop.booking_id == b.id))
+        b.stop_count = 0
+
+    await db.commit()
+    await db.refresh(b)
+
+    if b.driver_id:
+        dq = await db.execute(select(Driver).where(Driver.id == b.driver_id))
+        drv = dq.scalars().first()
+        if drv and drv.user_id:
+            await manager.send(
+                drv.user_id,
+                "destination_updated",
+                {
+                    "booking_id": b.id,
+                    "drop_lat": float(b.drop_lat),
+                    "drop_lng": float(b.drop_lng),
+                    "drop_address": b.drop_address,
+                    "final_amount": float(b.final_amount),
+                }
+            )
+            db.add(
+                Notification(
+                    user_id=drv.user_id,
+                    title="Destination Updated",
+                    body=f"Destination changed to {b.drop_address}. Fare updated.",
+                    type="ride_update",
+                )
+            )
+            await db.commit()
+
     return await _booking_to_response(db, b)

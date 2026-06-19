@@ -311,7 +311,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                           height: 48,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            color: Colors.black,
+                            color: Colors.white,
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: const Icon(Icons.directions_car_filled_rounded,
@@ -321,13 +321,13 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: Colors.black,
+                            color: Colors.white.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(100),
                           ),
                           child: const Text(
                             'DRIVER SIGNUP',
                             style: TextStyle(
-                              color: AppColors.primary,
+                              color: Colors.white,
                               fontSize: 10,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 1.4,
@@ -340,17 +340,17 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.12),
+                              color: Colors.white.withOpacity(0.15),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Row(
                               children: const [
-                                Icon(Icons.logout_rounded, color: Colors.black, size: 16),
+                                Icon(Icons.logout_rounded, color: Colors.white, size: 16),
                                 SizedBox(width: 4),
                                 Text(
                                   'Exit',
                                   style: TextStyle(
-                                    color: Colors.black,
+                                    color: Colors.white,
                                     fontSize: 12,
                                     fontWeight: FontWeight.w900,
                                   ),
@@ -365,7 +365,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                     const Text(
                       'Tell us about you\n& your vehicle',
                       style: TextStyle(
-                        color: Colors.black,
+                        color: Colors.white,
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
                         letterSpacing: -0.5,
@@ -376,7 +376,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                     const Text(
                       'Admin will review and approve your account.',
                       style: TextStyle(
-                        color: Colors.black87,
+                        color: Colors.white70,
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
