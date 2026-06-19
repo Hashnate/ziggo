@@ -632,6 +632,7 @@ async def upload_billing_proof(
 
 class SettleCommissionBody(BaseModel):
     card_id: int | None = None
+    amount: float | None = None
 
 @router.post("/settle-commission")
 async def settle_commission(
@@ -650,8 +651,14 @@ async def settle_commission(
     
     if commission <= 0:
         raise HTTPException(status_code=400, detail="No commission to settle")
-        
-    payout_amount = min(commission, pending)
+
+    settle_amount = commission
+    if body and body.amount is not None and body.amount > 0:
+        settle_amount = Decimal(str(body.amount))
+        if settle_amount > commission:
+            settle_amount = commission
+            
+    payout_amount = min(settle_amount, pending)
     description = "Commission settled (Cash balance offset)"
     
     if body and body.card_id is not None:
@@ -673,14 +680,14 @@ async def settle_commission(
         order_id = "SC" + secrets.token_hex(6).upper()
         res = await charge_tokenized_card(
             customer_token=card.customer_token,
-            amount=commission,
+            amount=settle_amount,
             order_id=order_id,
             description=f"Admin Commission Settlement ({order_id})",
         )
         if not res.get("success"):
             raise HTTPException(status_code=400, detail=res.get("message", "Payment failed"))
             
-        payout_amount = commission
+        payout_amount = settle_amount
         description = f"Commission settled (Card payment ref {order_id})"
     else:
         # Fallback/default offset settlement

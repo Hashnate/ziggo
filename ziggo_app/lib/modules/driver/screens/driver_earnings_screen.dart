@@ -57,6 +57,8 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
 
     if (!mounted) return;
 
+    double amountToPay = commissionAmount;
+
     final selectedCard = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
@@ -103,6 +105,33 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                     color: AppColors.error,
                   ),
                   textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: TextFormField(
+                    initialValue: commissionAmount.toStringAsFixed(2),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: 'Amount to pay (Rs.)',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.divider),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.divider),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.primary),
+                      ),
+                      prefixIcon: const Icon(Icons.payments_rounded, color: AppColors.textTertiary),
+                    ),
+                    onChanged: (val) {
+                      amountToPay = double.tryParse(val) ?? 0.0;
+                    },
+                  ),
                 ),
                 const SizedBox(height: 20),
                 if (p.cards.isEmpty)
@@ -190,7 +219,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
             const Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary, size: 48),
             const SizedBox(height: 16),
             Text(
-              'Confirm payment of Rs.${commissionAmount.toStringAsFixed(2)} from your card ending in ${selectedCard['card_no'].toString().substring(selectedCard['card_no'].toString().length - 4)}?',
+              'Confirm payment of Rs.${amountToPay.toStringAsFixed(2)} from your card ending in ${selectedCard['card_no'].toString().substring(selectedCard['card_no'].toString().length - 4)}?',
               textAlign: TextAlign.center,
               style: const TextStyle(color: AppColors.textSecondary),
             ),
@@ -221,13 +250,13 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
     try {
       await ApiClient.instance.dio.post(
         '/driver/settle-commission',
-        data: {'card_id': selectedCard['id']},
+        data: {'card_id': selectedCard['id'], 'amount': amountToPay},
       );
       await _load();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Commission of Rs.${commissionAmount.toStringAsFixed(2)} settled successfully.'),
+          content: Text('Commission of Rs.${amountToPay.toStringAsFixed(2)} settled successfully.'),
           backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,
         ),
