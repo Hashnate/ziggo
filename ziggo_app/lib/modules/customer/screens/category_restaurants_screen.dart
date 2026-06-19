@@ -374,7 +374,7 @@ class _CartBar extends StatelessWidget {
                 const Spacer(),
                 Text(
                   formatRs(food.cartTotal),
-                  style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w900, fontSize: 15),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15),
                 ),
                 const SizedBox(width: 10),
                 const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 18),

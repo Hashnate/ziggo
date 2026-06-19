@@ -123,33 +123,51 @@ class CustomerShellState extends State<CustomerShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: AppColors.background,
-      extendBody: true,
-      drawer: CustomerDrawer(
-        onProfile: () => _open(const ProfileScreen()),
-        onPlaces: () => _open(const SavedAddressesScreen()),
-        onTrips: () => _open(const RideHistoryScreen()),
-        onPromos: () => _open(const PromotionsScreen()),
-        onWallet: () => _open(const WalletScreen()),
-        onNotifications: () => _open(const NotificationsScreen()),
-        onSupport: () => _open(const SupportScreen()),
-        onGold: () => _open(const SubscriptionScreen()),
-      ),
-      body: IndexedStack(
-        index: _index,
-        children: _screens,
-      ),
-      bottomNavigationBar: CurvedNavbar(
-        currentIndex: _index,
-        onTap: (i) {
-          if (i == 0) {
-            _open(const MarketHomeScreen());
-          } else {
-            setState(() => _index = i);
-          }
-        },
+    return PopScope(
+      canPop: _index == 2,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_index != 2) {
+          setState(() => _index = 2);
+        }
+      },
+      child: Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: AppColors.background,
+        extendBody: true,
+        drawer: CustomerDrawer(
+          onProfile: () => _open(const ProfileScreen()),
+          onPlaces: () => _open(const SavedAddressesScreen()),
+          onTrips: () => _open(const RideHistoryScreen()),
+          onPromos: () => _open(const PromotionsScreen()),
+          onWallet: () => _open(const WalletScreen()),
+          onNotifications: () => _open(const NotificationsScreen()),
+          onSupport: () => _open(const SupportScreen()),
+          onGold: () => _open(const SubscriptionScreen()),
+        ),
+        body: IndexedStack(
+          index: _index,
+          children: _screens,
+        ),
+        bottomNavigationBar: CurvedNavbar(
+          currentIndex: _index,
+          onTap: (i) {
+            if (i == 2) {
+              setState(() => _index = 2);
+              return;
+            }
+            setState(() => _index = 2);
+            if (i == 0) {
+              _open(const MarketHomeScreen());
+            } else if (i == 1) {
+              _open(const FareEstimateScreen());
+            } else if (i == 3) {
+              _open(const NotificationsScreen());
+            } else if (i == 4) {
+              _open(const ProfileScreen());
+            }
+          },
+        ),
       ),
     );
   }
