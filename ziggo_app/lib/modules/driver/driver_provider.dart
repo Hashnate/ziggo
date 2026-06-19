@@ -88,7 +88,7 @@ class DriverProvider extends ChangeNotifier {
       // and market orders (is_market) all flow through this listener.
       _pendingRequest = data;
       notifyListeners();
-    } else if (event == 'booking_update') {
+    } else if (event == 'booking_update' || event == 'destination_updated') {
       loadActive();
     } else if (event == 'order_update') {
       loadActiveFoodOrder();

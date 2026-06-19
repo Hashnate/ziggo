@@ -409,6 +409,37 @@ class BookingProvider extends ChangeNotifier {
     }
   }
 
+  // ---- BRD: Change Destination ---------------------------------------
+  Future<bool> updateDestination(int bookingId, LatLng drop, String address) async {
+    _setBusy(true);
+    _lastError = null;
+    try {
+      final resp = await ApiClient.instance.dio.patch(
+        '/bookings/$bookingId/destination',
+        data: {
+          'drop_lat': drop.latitude,
+          'drop_lng': drop.longitude,
+          'drop_address': address,
+        },
+      );
+      _activeBooking = Map<String, dynamic>.from(resp.data as Map);
+      notifyListeners();
+      return true;
+    } on DioException catch (e) {
+      _lastError = e.response?.data?['detail']?.toString() ?? e.message;
+      if (kDebugMode) debugPrint('updateDestination DioException: $_lastError');
+      notifyListeners();
+      return false;
+    } catch (e, st) {
+      _lastError = 'Unexpected error: $e';
+      if (kDebugMode) debugPrint('updateDestination error: $e\n$st');
+      notifyListeners();
+      return false;
+    } finally {
+      _setBusy(false);
+    }
+  }
+
   // ---- BRD: CD-19 — driver-side stop transitions -----------------------
   Future<Map<String, dynamic>?> arriveAtStop(int bookingId, int orderIndex) async {
     try {

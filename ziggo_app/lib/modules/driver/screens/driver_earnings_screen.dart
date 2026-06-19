@@ -388,6 +388,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
     final trips = (profile['today_rides'] as num?)?.toInt() ?? 0;
     final paid = (profile['paid_payouts'] as num?)?.toDouble() ?? 0;
     final pending = (profile['pending_payout'] as num?)?.toDouble() ?? 0;
+    final outstanding = _summary != null ? _d(_summary!, 'outstanding_commission') : 0.0;
 
     return Scaffold(
       backgroundColor: kDriverBg,
@@ -399,7 +400,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 30),
+          padding: EdgeInsets.fromLTRB(16, 8, 16, 30 + MediaQuery.of(context).padding.bottom),
           children: [
             // Lifetime hero
             Container(
@@ -408,28 +409,65 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                 gradient: AppColors.primaryGradient,
                 borderRadius: BorderRadius.circular(22),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  const Text(
-                    'LIFETIME EARNINGS',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.4,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'LIFETIME EARNINGS',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Rs.${total.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 26,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.6,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Rs.${total.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 30,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.6,
+                  if (outstanding > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text(
+                            'COMMISSION DUE',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Rs.${outstanding.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -655,77 +693,87 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
           const Divider(height: 24, color: AppColors.divider),
           _rateRow('Paid out', 'Rs.${paid.toStringAsFixed(2)}'),
           _rateRow('Pending payout', 'Rs.${pending.toStringAsFixed(2)}'),
-          if (outstanding > 0) ...[
-            const SizedBox(height: 14),
-            GestureDetector(
-              onTap: () => _handleSettleCommission(outstanding),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.error,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.error.withOpacity(0.24),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.payment_rounded, color: Colors.white, size: 18),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Settle Commission (-Rs.${outstanding.toStringAsFixed(2)})',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 13,
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              if (outstanding > 0)
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => _handleSettleCommission(outstanding),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.error,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.error.withOpacity(0.24),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.payment_rounded, color: Colors.white, size: 16),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              'Settle (-Rs.${outstanding.toStringAsFixed(0)})',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 11,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-          if (pending >= 0) ...[
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withOpacity(0.24),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
                   ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 18),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Pending Payout (+Rs.${pending.toStringAsFixed(2)})',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 13,
+                ),
+              if (outstanding > 0 && pending >= 0) const SizedBox(width: 8),
+              if (pending >= 0)
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.24),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 16),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            'Pending (+Rs.${pending.toStringAsFixed(0)})',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 11,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
-          ],
+                ),
+            ],
+          ),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
@@ -818,7 +866,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
               Text(
                 'You keep ${driverShare.toStringAsFixed(1).replaceAll('.0', '')}%',
                 style: const TextStyle(
-                  color: kDriverGold,
+                  color: AppColors.success,
                   fontWeight: FontWeight.w900,
                   fontSize: 13,
                 ),
@@ -908,7 +956,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
             style: TextStyle(
               color: negative
                   ? AppColors.error
-                  : (highlight ? kDriverGold : AppColors.textPrimary),
+                  : (highlight ? AppColors.success : AppColors.textPrimary),
               fontWeight: FontWeight.w900,
               fontSize: 13,
             ),
