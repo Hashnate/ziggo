@@ -33,8 +33,8 @@ class Booking(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     booking_ref = Column(String(20), unique=True, index=True)
-    customer_id = Column(Integer, ForeignKey("customers.id"))
-    driver_id = Column(Integer, ForeignKey("drivers.id"), nullable=True)
+    customer_id = Column(Integer, ForeignKey("customers.id", ondelete="SET NULL"), nullable=True)
+    driver_id = Column(Integer, ForeignKey("drivers.id", ondelete="SET NULL"), nullable=True)
 
     pickup_lat = Column(DECIMAL(10, 7))
     pickup_lng = Column(DECIMAL(10, 7))
@@ -168,8 +168,8 @@ class Payment(Base):
     __tablename__ = "payments"
 
     id = Column(Integer, primary_key=True, index=True)
-    booking_id = Column(Integer, ForeignKey("bookings.id"))
-    customer_id = Column(Integer, ForeignKey("customers.id"))
+    booking_id = Column(Integer, ForeignKey("bookings.id", ondelete="SET NULL"), nullable=True)
+    customer_id = Column(Integer, ForeignKey("customers.id", ondelete="SET NULL"), nullable=True)
     amount = Column(DECIMAL(10, 2))
     payment_method = Column(String(20))
     transaction_id = Column(String(100))
