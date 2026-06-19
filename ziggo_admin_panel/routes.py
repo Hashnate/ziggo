@@ -5950,6 +5950,25 @@ async def admin_events(
     )
 
 
+EVENTS_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "events")
+os.makedirs(EVENTS_UPLOAD_DIR, exist_ok=True)
+
+async def _save_event_image(photo: UploadFile | None) -> str | None:
+    if photo is None or not getattr(photo, "filename", None):
+        return None
+    ext = os.path.splitext(photo.filename)[1].lower()
+    if ext not in ALLOWED_PHOTO_EXTS:
+        return None
+    data = await photo.read()
+    if len(data) == 0:
+        return None
+    import secrets
+    fname = f"{secrets.token_hex(8)}{ext}"
+    fpath = os.path.join(EVENTS_UPLOAD_DIR, fname)
+    with open(fpath, "wb") as f:
+        f.write(data)
+    return f"/static/uploads/events/{fname}"
+
 
 @router.get("/events/new", response_class=HTMLResponse)
 async def admin_events_new_form(
@@ -5970,7 +5989,7 @@ async def admin_events_new_submit(
     city: str = Form(""),
     category: str = Form(""),
     description: str = Form(""),
-    image_url: str = Form(""),
+    image: UploadFile | None = File(None),
     organizer_name: str = Form(""),
     organizer_phone: str = Form(""),
     starts_at: str = Form(...),
@@ -5996,7 +6015,7 @@ async def admin_events_new_submit(
 
     form = {
         "name": name, "venue": venue, "city": city, "category": category, "description": description,
-        "image_url": image_url, "organizer_name": organizer_name,
+        "organizer_name": organizer_name,
         "organizer_phone": organizer_phone, "starts_at": starts_at, "ends_at": ends_at,
     }
     sa = _parse_dt(starts_at)
@@ -6008,13 +6027,15 @@ async def admin_events_new_submit(
             status_code=400,
         )
 
+    saved_image_url = await _save_event_image(image)
+
     ev = _E(
         name=name.strip(),
         description=description.strip() or None,
         venue=venue.strip() or None,
         city=city.strip() or None,
         category=category.strip() or None,
-        image_url=image_url.strip() or None,
+        image_url=saved_image_url,
         organizer_name=organizer_name.strip() or None,
         organizer_phone=organizer_phone.strip() or None,
         starts_at=sa,
@@ -6037,6 +6058,141 @@ async def admin_events_new_submit(
             continue
         cap = int(t_cap) if t_cap.isdigit() else None
         db.add(_T(event_id=ev.id, name=t_name or "Regular", price=price, capacity=cap))
+
+    await db.commit()
+    return RedirectResponse(url="/admin/events", status_code=303)
+
+
+@router.get("/events/{event_id}/edit", response_class=HTMLResponse)
+async def admin_events_edit_form(
+    event_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import Event as _E
+    from sqlalchemy.orm import selectinload as _sel
+
+    q = await db.execute(select(_E).options(_sel(_E.tiers)).where(_E.id == event_id))
+    ev = q.scalars().first()
+    if not ev:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    form = {
+        "id": ev.id,
+        "name": ev.name,
+        "description": ev.description,
+        "venue": ev.venue,
+        "city": ev.city,
+        "category": ev.category,
+        "starts_at": ev.starts_at.strftime("%Y-%m-%dT%H:%M") if ev.starts_at else "",
+        "ends_at": ev.ends_at.strftime("%Y-%m-%dT%H:%M") if ev.ends_at else "",
+        "organizer_name": ev.organizer_name,
+        "organizer_phone": ev.organizer_phone,
+        "tiers": ev.tiers
+    }
+
+    return templates.TemplateResponse(
+        request, "event_edit.html",
+        {"request": request, "active_page": "events", "error": None, "form": form},
+    )
+
+
+@router.post("/events/{event_id}/edit")
+async def admin_events_edit_submit(
+    event_id: int,
+    request: Request,
+    name: str = Form(...),
+    venue: str = Form(""),
+    city: str = Form(""),
+    category: str = Form(""),
+    description: str = Form(""),
+    image: UploadFile | None = File(None),
+    organizer_name: str = Form(""),
+    organizer_phone: str = Form(""),
+    starts_at: str = Form(...),
+    ends_at: str = Form(""),
+    tier_ids: list[str] = Form(default=[]),
+    tier_names: list[str] = Form(default=[]),
+    tier_prices: list[str] = Form(default=[]),
+    tier_capacities: list[str] = Form(default=[]),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from decimal import Decimal as _D
+    from app.models import Event as _E, EventTicketTier as _T
+
+    def _parse_dt(s: str):
+        if not s: return None
+        try:
+            dt = datetime.fromisoformat(s)
+        except ValueError:
+            return None
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+    q = await db.execute(select(_E).where(_E.id == event_id))
+    ev = q.scalars().first()
+    if not ev:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    sa = _parse_dt(starts_at)
+    if sa is None:
+        form = {
+            "id": ev.id, "name": name, "venue": venue, "city": city, "category": category, "description": description,
+            "organizer_name": organizer_name, "organizer_phone": organizer_phone, "starts_at": starts_at, "ends_at": ends_at,
+            "tiers": []
+        }
+        return templates.TemplateResponse(
+            request, "event_edit.html",
+            {"request": request, "active_page": "events",
+             "error": "Start date/time required", "form": form},
+            status_code=400,
+        )
+
+    ev.name = name.strip()
+    ev.description = description.strip() or None
+    ev.venue = venue.strip() or None
+    ev.city = city.strip() or None
+    ev.category = category.strip() or None
+    ev.organizer_name = organizer_name.strip() or None
+    ev.organizer_phone = organizer_phone.strip() or None
+    ev.starts_at = sa
+    ev.ends_at = _parse_dt(ends_at)
+
+    saved_image_url = await _save_event_image(image)
+    if saved_image_url:
+        ev.image_url = saved_image_url
+
+    t_q = await db.execute(select(_T).where(_T.event_id == event_id))
+    existing_tiers = {str(t.id): t for t in t_q.scalars().all()}
+    seen_tier_ids = set()
+
+    for i in range(max(len(tier_names), len(tier_prices), len(tier_capacities))):
+        t_id_str = tier_ids[i].strip() if i < len(tier_ids) else ""
+        t_name = tier_names[i].strip() if i < len(tier_names) else ""
+        t_price = tier_prices[i].strip() if i < len(tier_prices) else ""
+        t_cap = tier_capacities[i].strip() if i < len(tier_capacities) else ""
+        
+        if not t_name and not t_price:
+            continue
+        try:
+            price = _D(t_price or "0")
+        except Exception:
+            continue
+        cap = int(t_cap) if t_cap.isdigit() else None
+
+        if t_id_str and t_id_str in existing_tiers:
+            t = existing_tiers[t_id_str]
+            t.name = t_name or "Regular"
+            t.price = price
+            t.capacity = cap
+            seen_tier_ids.add(t_id_str)
+        else:
+            db.add(_T(event_id=ev.id, name=t_name or "Regular", price=price, capacity=cap))
+
+    for t_id_str, t in existing_tiers.items():
+        if t_id_str not in seen_tier_ids:
+            await db.delete(t)
 
     await db.commit()
     return RedirectResponse(url="/admin/events", status_code=303)
