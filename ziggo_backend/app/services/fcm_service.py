@@ -307,6 +307,8 @@ def _format(event: str, payload: dict) -> tuple[str, str]:
     if event == "new_ride_request":
         ref = payload.get("booking_ref", "")
         return ("New ride request", f"Tap to accept — booking {ref}")
+    if event == "destination_updated":
+        return ("Trip Updated", "The customer has added a stop or changed the destination.")
     if event == "booking_update":
         status = payload.get("status", "")
         if status == "accepted":

@@ -1056,18 +1056,90 @@ class _BottomCard extends StatelessWidget {
                                const SizedBox(height: 16),
                                GestureDetector(
                                  onTap: () async {
-                                   final p = await showPlaceSearch(context, title: 'Change Destination');
+                                   final action = await showModalBottomSheet<String>(
+                                     context: context,
+                                     shape: const RoundedRectangleBorder(
+                                       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                                     ),
+                                     builder: (ctx) {
+                                       return SafeArea(
+                                         child: Padding(
+                                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                                           child: Column(
+                                             mainAxisSize: MainAxisSize.min,
+                                             crossAxisAlignment: CrossAxisAlignment.start,
+                                             children: [
+                                               Center(
+                                                 child: Container(
+                                                   width: 44, height: 5,
+                                                   decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(10)),
+                                                 ),
+                                               ),
+                                               const SizedBox(height: 24),
+                                               const Text('Update Trip', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                                               const SizedBox(height: 16),
+                                               ListTile(
+                                                 leading: const CircleAvatar(
+                                                   backgroundColor: AppColors.surfaceMuted,
+                                                   child: Icon(Icons.add_location_alt_rounded, color: AppColors.primary),
+                                                 ),
+                                                 title: const Text('Add a Stop', style: TextStyle(fontWeight: FontWeight.w700)),
+                                                 subtitle: const Text('Add an intermediate stop before your final destination', style: TextStyle(fontSize: 12)),
+                                                 onTap: () => Navigator.pop(ctx, 'add_stop'),
+                                               ),
+                                               ListTile(
+                                                 leading: const CircleAvatar(
+                                                   backgroundColor: AppColors.surfaceMuted,
+                                                   child: Icon(Icons.edit_location_alt_rounded, color: AppColors.primary),
+                                                 ),
+                                                 title: const Text('Change Destination', style: TextStyle(fontWeight: FontWeight.w700)),
+                                                 subtitle: const Text('Update your final drop-off location', style: TextStyle(fontSize: 12)),
+                                                 onTap: () => Navigator.pop(ctx, 'change_destination'),
+                                               ),
+                                             ],
+                                           ),
+                                         ),
+                                       );
+                                     },
+                                   );
+
+                                   if (action == null || !context.mounted) return;
+
+                                   final p = await showPlaceSearch(context, title: action == 'add_stop' ? 'Add a Stop' : 'Change Destination');
                                    if (p != null && context.mounted) {
                                      final provider = context.read<BookingProvider>();
-                                     final ok = await provider.updateDestination(
-                                       active['id'] as int,
-                                       p.location,
-                                       p.name,
-                                     );
+                                     
+                                     bool ok = false;
+                                     if (action == 'add_stop') {
+                                       final currentStops = (active['stops'] as List? ?? const [])
+                                           .map((e) => Map<String, dynamic>.from(e))
+                                           .toList();
+                                       currentStops.add({
+                                         'lat': p.location.latitude,
+                                         'lng': p.location.longitude,
+                                         'address': p.name,
+                                       });
+                                       ok = await provider.updateDestination(
+                                         active['id'] as int,
+                                         LatLng(double.parse(active['drop_lat'].toString()), double.parse(active['drop_lng'].toString())),
+                                         active['drop_address'].toString(),
+                                         stops: currentStops,
+                                       );
+                                     } else {
+                                       ok = await provider.updateDestination(
+                                         active['id'] as int,
+                                         p.location,
+                                         p.name,
+                                         stops: (active['stops'] as List? ?? const [])
+                                           .map((e) => Map<String, dynamic>.from(e))
+                                           .toList(),
+                                       );
+                                     }
+                                     
                                      if (context.mounted) {
                                        ScaffoldMessenger.of(context).showSnackBar(
                                          SnackBar(
-                                           content: Text(ok ? 'Destination updated successfully' : 'Failed to update destination'),
+                                           content: Text(ok ? 'Trip updated successfully' : 'Failed to update trip'),
                                            backgroundColor: ok ? AppColors.success : AppColors.error,
                                            behavior: SnackBarBehavior.floating,
                                          ),

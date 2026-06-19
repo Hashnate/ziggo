@@ -410,7 +410,7 @@ class BookingProvider extends ChangeNotifier {
   }
 
   // ---- BRD: Change Destination ---------------------------------------
-  Future<bool> updateDestination(int bookingId, LatLng drop, String address) async {
+  Future<bool> updateDestination(int bookingId, LatLng drop, String address, {List<Map<String, dynamic>> stops = const []}) async {
     _setBusy(true);
     _lastError = null;
     try {
@@ -420,6 +420,7 @@ class BookingProvider extends ChangeNotifier {
           'drop_lat': drop.latitude,
           'drop_lng': drop.longitude,
           'drop_address': address,
+          if (stops.isNotEmpty) 'stops': stops,
         },
       );
       _activeBooking = Map<String, dynamic>.from(resp.data as Map);
