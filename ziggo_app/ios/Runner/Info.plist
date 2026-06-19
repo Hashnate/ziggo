@@ -40,6 +40,8 @@
 	<string>We need access to your photo library to let you upload a profile picture.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>We need access to your microphone to record video with your camera.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>We need access to your contacts to allow you to easily share ride details with friends and family.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSAppTransportSecurity</key>
