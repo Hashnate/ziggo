@@ -33,7 +33,7 @@
                       class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">{{ form.description or '' }}</textarea>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
                 <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Venue</label>
                 <input name="venue" value="{{ form.venue or '' }}"
@@ -45,6 +45,16 @@
                 <input name="city" value="{{ form.city or '' }}"
                        placeholder="Colombo"
                        class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Category</label>
+                <select name="category" class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
+                    <option value="" {% if form.category == '' %}selected{% endif %}>None</option>
+                    <option value="Sports" {% if form.category == 'Sports' %}selected{% endif %}>Sports</option>
+                    <option value="Bank Offers" {% if form.category == 'Bank Offers' %}selected{% endif %}>Bank Offers</option>
+                    <option value="Experience" {% if form.category == 'Experience' %}selected{% endif %}>Experience</option>
+                    <option value="Charity" {% if form.category == 'Charity' %}selected{% endif %}>Charity</option>
+                </select>
             </div>
         </div>
 

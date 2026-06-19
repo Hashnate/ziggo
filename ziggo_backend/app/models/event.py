@@ -41,6 +41,7 @@ class Event(Base):
     image_url = Column(String(500))
     organizer_name = Column(String(100))
     organizer_phone = Column(String(20))
+    category = Column(String(50))  # e.g. "Sports", "Bank Offers", "Experience", "Charity"
     starts_at = Column(DateTime(timezone=True), nullable=False, index=True)
     ends_at = Column(DateTime(timezone=True))
     is_published = Column(Boolean, default=True, index=True)

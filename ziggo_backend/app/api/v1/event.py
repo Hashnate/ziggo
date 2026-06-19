@@ -95,6 +95,7 @@ def _serialize_event(e: Event, tiers_payload: list[dict] | None = None) -> dict:
         "description": e.description,
         "venue": e.venue,
         "city": e.city,
+        "category": e.category,
         "image_url": e.image_url,
         "organizer_name": e.organizer_name,
         "organizer_phone": e.organizer_phone,

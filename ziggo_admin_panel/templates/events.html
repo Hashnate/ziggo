@@ -54,6 +54,9 @@
                         <td class="px-6 py-3 text-sm">
                             <p class="font-bold">{{ e.venue or '—' }}</p>
                             <p class="text-xs text-gray-400">{{ e.city or '' }}</p>
+                            {% if e.category %}
+                            <p class="text-[10px] text-ziggo font-bold uppercase tracking-wider mt-1">{{ e.category }}</p>
+                            {% endif %}
                         </td>
                         <td class="px-6 py-3 text-sm">
                             {{ e.starts_at.strftime("%d %b %Y · %H:%M") if e.starts_at else '—' }}
