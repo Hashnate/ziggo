@@ -5968,6 +5968,7 @@ async def admin_events_new_submit(
     name: str = Form(...),
     venue: str = Form(""),
     city: str = Form(""),
+    category: str = Form(""),
     description: str = Form(""),
     image_url: str = Form(""),
     organizer_name: str = Form(""),
@@ -5994,7 +5995,7 @@ async def admin_events_new_submit(
         return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
     form = {
-        "name": name, "venue": venue, "city": city, "description": description,
+        "name": name, "venue": venue, "city": city, "category": category, "description": description,
         "image_url": image_url, "organizer_name": organizer_name,
         "organizer_phone": organizer_phone, "starts_at": starts_at, "ends_at": ends_at,
     }
@@ -6012,6 +6013,7 @@ async def admin_events_new_submit(
         description=description.strip() or None,
         venue=venue.strip() or None,
         city=city.strip() or None,
+        category=category.strip() or None,
         image_url=image_url.strip() or None,
         organizer_name=organizer_name.strip() or None,
         organizer_phone=organizer_phone.strip() or None,

@@ -357,7 +357,7 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
                   Text(v.$2, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: sel ? Colors.white : Colors.black)),
                   const SizedBox(height: 4),
                   Text(
-                    'Rs.${v.$5.toInt()}/hr',
+                    'Rs.${v.$5.toInt() * _hours}',
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: sel ? Colors.white70 : Colors.black45),
                   ),
                 ],
@@ -390,7 +390,12 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
               children: [
                 GestureDetector(
                   onTap: () {
-                    if (_hours > 1) setState(() => _hours--);
+                    if (_hours > 1) {
+                      setState(() {
+                        _hours--;
+                        if (_distance > 5) _distance -= 5;
+                      });
+                    }
                   },
                   child: Container(
                     width: 32,
@@ -404,7 +409,14 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
                   style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
                 ),
                 GestureDetector(
-                  onTap: () => setState(() => _hours++),
+                  onTap: () {
+                    if (_hours < 14) {
+                      setState(() {
+                        _hours++;
+                        if (_distance < 70) _distance += 5;
+                      });
+                    }
+                  },
                   child: Container(
                     width: 32,
                     height: 32,
@@ -434,22 +446,22 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
                   child: Slider(
                     value: _distance,
                     min: 5,
-                    max: 40,
-                    divisions: 7,
+                    max: 70,
+                    divisions: 13,
                     onChanged: (v) => setState(() => _distance = v),
                   ),
                 ),
                 // Custom 5Km Badge positioned manually for visual approximation
                 Positioned(
                   top: -15,
-                  left: 20 + ((_distance - 5) / 35) * (MediaQuery.of(context).size.width - 100),
+                  left: 20 + ((_distance - 5) / 65) * (MediaQuery.of(context).size.width - 100),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: const Color(0xFF2943A3),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text('${_distance.toInt()} h', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+                    child: Text('${_distance.toInt()} km', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
                   ),
                 ),
               ],
@@ -462,7 +474,7 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: const [
                 Text('5', style: TextStyle(color: Colors.black54, fontSize: 10)),
-                Text('40', style: TextStyle(color: Colors.black54, fontSize: 10)),
+                Text('70', style: TextStyle(color: Colors.black54, fontSize: 10)),
               ],
             ),
           ),

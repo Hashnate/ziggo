@@ -111,12 +111,18 @@ class _RatingScreenState extends State<RatingScreen> with TickerProviderStateMix
       body: Confetti(
         trigger: true,
         particleCount: 100,
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+        child: GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: SafeArea(
+            child: CustomScrollView(
+              slivers: [
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
               const SizedBox(height: 28),
               Center(
                 child: ScaleTransition(
@@ -262,7 +268,11 @@ class _RatingScreenState extends State<RatingScreen> with TickerProviderStateMix
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+                      const SizedBox(height: 12),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ),

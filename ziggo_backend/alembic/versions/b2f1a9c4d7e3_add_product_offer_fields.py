@@ -18,12 +18,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    with op.batch_alter_table('products', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('original_price', sa.DECIMAL(precision=10, scale=2), nullable=True))
-        batch_op.add_column(sa.Column('category', sa.String(length=100), nullable=True))
-        batch_op.add_column(
-            sa.Column('is_popular', sa.Boolean(), nullable=True, server_default=sa.false())
-        )
+    op.add_column('products', sa.Column('original_price', sa.DECIMAL(precision=10, scale=2), nullable=True))
+    op.add_column('products', sa.Column('category', sa.String(length=100), nullable=True))
+    op.add_column('products', sa.Column('is_popular', sa.Boolean(), nullable=True, server_default=sa.false()))
 
 
 def downgrade() -> None:

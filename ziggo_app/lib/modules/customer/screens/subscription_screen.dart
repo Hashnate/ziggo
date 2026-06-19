@@ -18,6 +18,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   Map<String, dynamic>? _status;
   bool _busy = false;
   int _months = 1;
+  String _payment = 'wallet';
 
   @override
   void initState() {
@@ -37,7 +38,27 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     }
   }
 
-  Future<void> _subscribe() async {
+  Future<void> _subscribe(int total) async {
+    final wallet = context.read<WalletProvider>();
+
+    if (_payment == 'payhere') {
+      final err = await wallet.topUpViaPayHere(context, total.toDouble());
+      if (!mounted) return;
+      if (err != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(err)),
+        );
+        return;
+      }
+    } else {
+      if (wallet.balance < total) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Insufficient wallet balance')),
+        );
+        return;
+      }
+    }
+
     setState(() => _busy = true);
     try {
       final resp = await ApiClient.instance.dio.post('/gold/subscribe', data: {'months': _months});
@@ -153,37 +174,54 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             ],
           ),
           const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white12,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.account_balance_wallet, color: AppColors.accent),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Pay from wallet',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      Text('Balance: Rs.${wallet.balance.toStringAsFixed(0)}',
-                          style: const TextStyle(color: Colors.white60, fontSize: 12)),
-                    ],
+          GestureDetector(
+            onTap: () => _showPaymentPicker(context),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white12,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _payment == 'wallet' ? Icons.account_balance_wallet : Icons.credit_card_rounded,
+                    color: AppColors.accent,
                   ),
-                ),
-                Text('Rs.$total',
-                    style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.w900, fontSize: 18)),
-              ],
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _payment == 'wallet' ? 'Pay from wallet' : 'Pay Online (PayHere)',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                        if (_payment == 'wallet')
+                          Text(
+                            'Balance: Rs.${wallet.balance.toStringAsFixed(0)}',
+                            style: const TextStyle(color: Colors.white60, fontSize: 12),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const Text(
+                    'CHANGE',
+                    style: TextStyle(
+                      color: AppColors.accent,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 24),
           SizedBox(
             height: 56,
             child: ElevatedButton(
-              onPressed: _busy ? null : _subscribe,
+              onPressed: _busy ? null : () => _subscribe(total),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 foregroundColor: Colors.black,
@@ -221,6 +259,66 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               )),
         ),
       ),
+    );
+  }
+
+  void _showPaymentPicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) {
+        final walletProvider = ctx.watch<WalletProvider>();
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[800],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Choose Payment Method',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: const Icon(Icons.account_balance_wallet_rounded, color: AppColors.accent),
+                  title: const Text('Ziggo Wallet', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text('Balance: Rs.${walletProvider.balance.toStringAsFixed(2)}'),
+                  trailing: _payment == 'wallet' ? const Icon(Icons.check_circle_rounded, color: AppColors.accent) : null,
+                  onTap: () {
+                    setState(() => _payment = 'wallet');
+                    Navigator.pop(ctx);
+                  },
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.credit_card_rounded, color: AppColors.accent),
+                  title: const Text('Online Payment', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Pay securely via PayHere'),
+                  trailing: _payment == 'payhere' ? const Icon(Icons.check_circle_rounded, color: AppColors.accent) : null,
+                  onTap: () {
+                    setState(() => _payment = 'payhere');
+                    Navigator.pop(ctx);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
