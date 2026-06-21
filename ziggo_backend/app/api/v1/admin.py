@@ -148,3 +148,39 @@ async def suspend_driver(
     d.status = DriverStatus.SUSPENDED
     await db.commit()
     return {"ok": True}
+
+
+@router.get("/referrals")
+async def get_all_referrals(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_role("admin")),
+):
+    from ...models import ReferralBonus, User
+    from sqlalchemy.orm import joinedload
+    q = await db.execute(
+        select(ReferralBonus)
+        .options(joinedload(ReferralBonus.referrer), joinedload(ReferralBonus.referred))
+        .order_by(ReferralBonus.created_at.desc())
+        .limit(500)
+    )
+    bonuses = q.scalars().all()
+    results = []
+    for b in bonuses:
+        results.append({
+            "id": b.id,
+            "referrer": {
+                "id": b.referrer.id if b.referrer else None,
+                "name": b.referrer.full_name if b.referrer else None,
+                "phone": b.referrer.phone_number if b.referrer else None,
+            },
+            "referred": {
+                "id": b.referred.id if b.referred else None,
+                "name": b.referred.full_name if b.referred else None,
+                "phone": b.referred.phone_number if b.referred else None,
+            },
+            "amount": float(b.referrer_amount),
+            "status": b.status.value,
+            "created_at": b.created_at,
+            "paid_at": b.paid_at,
+        })
+    return results

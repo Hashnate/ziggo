@@ -5,6 +5,7 @@
 # Sibling projects the backend doesn't need
 ziggo_app/
 ziggo Website/
+ziggo_admin_react/
 
 # Per-project ignores
 **/.git

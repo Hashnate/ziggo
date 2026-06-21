@@ -2,7 +2,10 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { api } from '../api'
 
 const NAV = [
-  { group: 'Overview', items: [{ to: '/', icon: 'fa-grip', label: 'Dashboard', end: true }] },
+  { group: 'Overview', items: [
+    { to: '/', icon: 'fa-grip', label: 'Dashboard', end: true },
+    { to: '/referrals', icon: 'fa-users', label: 'Referrals' },
+  ] },
   // Future groups (Operations, Finance, …) drop in as pages are built.
 ]
 

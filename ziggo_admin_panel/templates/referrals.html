@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Referrals - Ziggo Admin{% endblock %}
+{% block page_title %}Referrals{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+    <div class="flex items-center justify-between">
+        <h2 class="text-xl font-bold text-ziggo-ink">Referral History</h2>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-ziggo-line overflow-hidden">
+        <table class="w-full text-left">
+            <thead class="bg-ziggo-canvas/50 border-b border-ziggo-line">
+                <tr>
+                    <th class="px-6 py-4 text-[11px] uppercase tracking-wider text-ziggo-muted font-bold">Referrer</th>
+                    <th class="px-6 py-4 text-[11px] uppercase tracking-wider text-ziggo-muted font-bold">Referred User</th>
+                    <th class="px-6 py-4 text-[11px] uppercase tracking-wider text-ziggo-muted font-bold text-right">Bonus Amount</th>
+                    <th class="px-6 py-4 text-[11px] uppercase tracking-wider text-ziggo-muted font-bold">Status</th>
+                    <th class="px-6 py-4 text-[11px] uppercase tracking-wider text-ziggo-muted font-bold">Date</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-ziggo-line">
+                {% for b in bonuses %}
+                <tr class="hover:bg-ziggo-canvas/50 transition">
+                    <td class="px-6 py-4">
+                        <p class="font-bold text-ziggo-ink">{{ b.referrer.full_name or 'Unknown' }}</p>
+                        <p class="text-xs text-ziggo-muted">{{ b.referrer.phone_number or 'N/A' }}</p>
+                    </td>
+                    <td class="px-6 py-4">
+                        <p class="font-bold text-ziggo-ink">{{ b.referred.full_name or 'Unknown' }}</p>
+                        <p class="text-xs text-ziggo-muted">{{ b.referred.phone_number or 'N/A' }}</p>
+                    </td>
+                    <td class="px-6 py-4 text-right font-black text-emerald-600">
+                        Rs. {{ "%.2f"|format(b.referrer_amount) }}
+                    </td>
+                    <td class="px-6 py-4">
+                        {% if b.status.value == 'completed' %}
+                        <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700">
+                            Completed
+                        </span>
+                        {% else %}
+                        <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-700">
+                            Pending
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-ziggo-muted font-medium text-xs">
+                        {{ b.created_at.strftime('%b %d, %Y %I:%M %p') }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="px-6 py-12 text-center text-ziggo-muted font-bold">
+                        No referrals found.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

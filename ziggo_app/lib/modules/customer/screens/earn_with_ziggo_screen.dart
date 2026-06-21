@@ -109,8 +109,105 @@ class _EarnWithZiggoScreenState extends State<EarnWithZiggoScreen> {
         elevation: 0,
         title: const Text('Earn with Ziggo', style: TextStyle(fontWeight: FontWeight.w900)),
       ),
-      body: Center(
-        child: Text('Code: $code', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text('Your Referral Code', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(code, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppColors.primary, letterSpacing: 2)),
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.copy, color: AppColors.primary),
+                              onPressed: () => _copyToClipboard(code),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.share, color: AppColors.primary),
+                              onPressed: () => _shareCode(code),
+                            ),
+                          ],
+                        )
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(child: _statCard('Total Referred', r.totalReferred.toString(), Icons.people_rounded, AppColors.info)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _statCard('Earned (Rs)', r.earnedAmount.toStringAsFixed(0), Icons.payments_rounded, AppColors.success)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _statCard('Pending (Rs)', r.pendingAmount.toStringAsFixed(0), Icons.hourglass_top_rounded, AppColors.warning)),
+                    ],
+                  ),
+                  const SizedBox(height: 32),
+                  const Text('Referral History', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textPrimary)),
+                  const SizedBox(height: 16),
+                  if (r.friends.isEmpty)
+                    const Center(child: Padding(
+                      padding: EdgeInsets.all(32.0),
+                      child: Text('You haven\'t referred anyone yet. Share your code to start earning!', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary)),
+                    )),
+                  ...r.friends.map((friend) => Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.divider),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(friend['name'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                            const SizedBox(height: 4),
+                            Text(friend['phone'] ?? '', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text('Rs. ${(friend['amount'] as num?)?.toStringAsFixed(2) ?? '0.00'}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.success)),
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: friend['status'] == 'completed' ? AppColors.success.withOpacity(0.1) : AppColors.warning.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                (friend['status'] ?? 'pending').toString().toUpperCase(),
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: friend['status'] == 'completed' ? AppColors.success : AppColors.warning),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  )).toList(),
+                ],
+              ),
+            ),
+          )
+        ],
       ),
     );
     } catch (e, stack) {

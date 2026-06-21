@@ -1007,6 +1007,7 @@ async def update_booking_status(
     if not b:
         raise HTTPException(status_code=404, detail="Booking not found")
 
+    old_status = b.status
     new_status = body.status
     if new_status not in VALID_TRANSITIONS.get(b.status, set()):
         raise HTTPException(
@@ -1282,14 +1283,15 @@ async def update_booking_status(
                 "booking_update",
                 {"booking_id": b.id, "status": b.status.value, "otp": b.otp},
             )
-            db.add(
-                Notification(
-                    user_id=c.user_id,
-                    title=f"Ride {b.status.value.title()}",
-                    body=f"Booking {b.booking_ref} is now {b.status.value}",
-                    type="ride_update",
+            if not (b.status == BookingStatus.CANCELLED and b.cancelled_by == "customer"):
+                db.add(
+                    Notification(
+                        user_id=c.user_id,
+                        title=f"Ride {b.status.value.title()}",
+                        body=f"Booking {b.booking_ref} is now {b.status.value}",
+                        type="ride_update",
+                    )
                 )
-            )
     if b.driver_id:
         dq = await db.execute(select(Driver).where(Driver.id == b.driver_id))
         drv = dq.scalars().first()
@@ -1298,6 +1300,21 @@ async def update_booking_status(
                 drv.user_id,
                 "booking_update",
                 {"booking_id": b.id, "status": b.status.value},
+            )
+    elif old_status == BookingStatus.SEARCHING and new_status == BookingStatus.CANCELLED:
+        other_drivers = await find_all_nearby_drivers(
+            db,
+            float(b.pickup_lat),
+            float(b.pickup_lng),
+            None if (b.is_flash or b.is_courier) else b.service_type,
+            max_distance_km=15,
+            exclude_driver_id=None,
+        )
+        for od in other_drivers:
+            await manager.send(
+                od.user_id,
+                "ride_taken",
+                {"booking_id": b.id, "booking_ref": b.booking_ref},
             )
     await db.commit()
 

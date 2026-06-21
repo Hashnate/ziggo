@@ -11,6 +11,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../app/app_styles.dart';
 import 'driver_documents_screen.dart';
 import 'driver_history_screen.dart';
+import '../../customer/screens/earn_with_ziggo_screen.dart';
 
 // Local light tokens — mirror the customer/user light theme.
 const Color _kBg = AppColors.background;
@@ -257,8 +258,10 @@ class DriverProfileScreen extends StatelessWidget {
                       icon: Icons.group_add_rounded,
                       title: 'Refer & Earn',
                       onTap: () {
-                        final code = profile['referral_code']?.toString() ?? 'D-$driverId';
-                        _showReferralSheet(context, code);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const EarnWithZiggoScreen()),
+                        );
                       },
                     ),
                     _divider(),

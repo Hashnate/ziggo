@@ -7185,3 +7185,31 @@ async def surge_zones_page(request: Request, db: AsyncSession = Depends(get_db),
         "zones": zones,
         "gmap_key": gmap_key,
     })
+
+
+@router.get("/referrals", response_class=HTMLResponse)
+async def admin_referrals(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import ReferralBonus
+    from sqlalchemy.orm import joinedload
+    
+    q = await db.execute(
+        select(ReferralBonus)
+        .options(joinedload(ReferralBonus.referrer), joinedload(ReferralBonus.referred))
+        .order_by(ReferralBonus.created_at.desc())
+        .limit(500)
+    )
+    bonuses = q.scalars().all()
+    
+    return templates.TemplateResponse(
+        request, "referrals.html",
+        {
+            "request": request,
+            "active_page": "referrals",
+            "bonuses": bonuses,
+        },
+    )
+

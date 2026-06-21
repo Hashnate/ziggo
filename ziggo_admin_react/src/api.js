@@ -14,6 +14,7 @@ async function req(path, opts = {}) {
 export const api = {
   me: () => req('/me'),
   dashboard: () => req('/dashboard'),
+  referrals: () => req('/referrals'),
   login: (phone, password) => {
     const body = new URLSearchParams()
     body.append('phone_number', phone)
