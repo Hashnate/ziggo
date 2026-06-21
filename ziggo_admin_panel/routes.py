@@ -2428,6 +2428,8 @@ async def admin_categories_new(
     pickup_fee: float = Form(0),
     boost: float = Form(0),
     passenger_deductible: float = Form(0),
+    promo_message: str = Form(""),
+    discount_percentage: float = Form(0),
     is_active: str = Form("on"),
     image: UploadFile | None = File(None),
     preset_icon: str | None = Form(None),
@@ -2457,6 +2459,8 @@ async def admin_categories_new(
             image_url=image_url,
             capacity=int(capacity or 0),
             description=description.strip() or None,
+            promo_message=promo_message.strip() or None,
+            discount_percentage=Decimal(str(discount_percentage)),
             is_active=(is_active == "on"),
             base_fare=Decimal(str(base_fare)),
             per_km_rate=Decimal(str(per_km_rate)),
@@ -2488,6 +2492,8 @@ async def admin_categories_edit(
     pickup_fee: float = Form(0),
     boost: float = Form(0),
     passenger_deductible: float = Form(0),
+    promo_message: str = Form(""),
+    discount_percentage: float = Form(0),
     is_active: str = Form(""),
     image: UploadFile | None = File(None),
     preset_icon: str | None = Form(None),
@@ -2505,6 +2511,8 @@ async def admin_categories_edit(
     f.display_name = display_name.strip() or f.service_type.title()
     f.capacity = int(capacity or 0)
     f.description = description.strip() or None
+    f.promo_message = promo_message.strip() or None
+    f.discount_percentage = Decimal(str(discount_percentage))
     f.is_active = (is_active == "on")
     f.base_fare = Decimal(str(base_fare))
     f.per_km_rate = Decimal(str(per_km_rate))

@@ -121,6 +121,8 @@ class FareSetting(Base):
     pickup_fee = Column(DECIMAL(10, 2), default=0.00)
     boost = Column(DECIMAL(10, 2), default=0.00)
     passenger_deductible = Column(DECIMAL(10, 2), default=0.00)
+    promo_message = Column(String(255), nullable=True)
+    discount_percentage = Column(DECIMAL(5, 2), default=0.00)
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

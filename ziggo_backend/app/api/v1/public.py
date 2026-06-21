@@ -173,11 +173,14 @@ async def public_categories(db: AsyncSession = Depends(get_db)):
     ).scalars().all()
     return [
         {
-            "service_type": r.service_type,
-            "name": r.display_name or r.service_type,
-            "image_url": r.image_url,
+            "service_type": c.service_type,
+            "name": c.display_name or c.service_type,
+            "image_url": c.image_url,
+            "promo_message": c.promo_message,
+            "passenger_deductible": float(c.passenger_deductible) if c.passenger_deductible else 0.0,
+            "discount_percentage": float(c.discount_percentage) if c.discount_percentage else 0.0,
         }
-        for r in rows
+        for c in categories
     ]
 
 

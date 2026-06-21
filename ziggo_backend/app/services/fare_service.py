@@ -281,6 +281,14 @@ async def calculate_fare(
 
     raw = (base + pickup_fee_val + per_km * distance_km + per_min * duration_min) * surge
     fare_val = max(raw, min_fare)
+    
+    # Apply category discount percentage before applying anything else
+    if setting and setting.discount_percentage:
+        discount_pct = float(setting.discount_percentage)
+        if discount_pct > 0:
+            category_discount = fare_val * (discount_pct / 100.0)
+            fare_val = max(0.0, fare_val - category_discount)
+
     fare_val += boost_val
 
     # Peak hours surcharge check

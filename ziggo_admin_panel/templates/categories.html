@@ -78,6 +78,8 @@
                                         "image_url": c.image_url or "",
                                         "capacity": c.capacity or 0,
                                         "description": c.description or "",
+                                        "promo_message": c.promo_message or "",
+                                        "discount_percentage": (c.discount_percentage|float) if c.discount_percentage is not none else 0,
                                         "base_fare": (c.base_fare|float) if c.base_fare is not none else 0,
                                         "per_km_rate": (c.per_km_rate|float) if c.per_km_rate is not none else 0,
                                         "per_minute_rate": (c.per_minute_rate|float) if c.per_minute_rate is not none else 0,
@@ -192,6 +194,14 @@
                     <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Description</label>
                     <textarea name="description" id="catDesc" rows="2" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo"></textarea>
                 </div>
+                <div class="col-span-2">
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Promo Banner Message (Optional)</label>
+                    <input type="text" name="promo_message" id="catPromoMessage" placeholder="e.g. You are saving 10% more on Bike." class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div class="col-span-2">
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Discount Percentage (%)</label>
+                    <input type="number" step="0.01" min="0" max="100" name="discount_percentage" id="catDiscountPercentage" value="0" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
                 <div>
                     <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Capacity (persons)</label>
                     <input type="number" min="0" name="capacity" id="catCapacity" value="0" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
@@ -296,6 +306,7 @@ function openCreateModal() {
     document.getElementById('catName').value = '';
     document.getElementById('catCapacity').value = 0;
     document.getElementById('catDesc').value = '';
+    document.getElementById('catPromoMessage').value = '';
     document.getElementById('catBase').value = 0;
     document.getElementById('catPerKm').value = 0;
     document.getElementById('catPerMin').value = 0;
@@ -326,6 +337,8 @@ function openEditModal(c) {
     document.getElementById('catName').value = c.display_name || '';
     document.getElementById('catCapacity').value = c.capacity || 0;
     document.getElementById('catDesc').value = c.description || '';
+    document.getElementById('catPromoMessage').value = c.promo_message || '';
+    document.getElementById('catDiscountPercentage').value = c.discount_percentage || 0;
     document.getElementById('catBase').value = c.base_fare;
     document.getElementById('catPerKm').value = c.per_km_rate;
     document.getElementById('catPerMin').value = c.per_minute_rate;

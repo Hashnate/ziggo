@@ -638,8 +638,8 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                  // Promotional banner - only show when bike is selected and not dismissed
-                  if (_serviceType == 'bike' && !_hidePromoBanner)
+                  // Promotional banner - show when category has a promo message and not dismissed
+                  if (_serviceType != null && _categoryData[_serviceType]?['promo_message'] != null && _categoryData[_serviceType]?['promo_message'].toString().isNotEmpty == true && !_hidePromoBanner)
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
@@ -652,8 +652,13 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                         children: [
                           const Icon(Icons.local_offer_rounded, color: AppColors.success, size: 16),
                           const SizedBox(width: 8),
-                          const Text('You are saving 10% more on Bike.', style: TextStyle(color: AppColors.success, fontWeight: FontWeight.w700, fontSize: 13)),
-                          const Spacer(),
+                          Expanded(
+                            child: Text(
+                              _categoryData[_serviceType]?['promo_message']?.toString() ?? '',
+                              style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.w700, fontSize: 13),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
                           GestureDetector(
                             onTap: () => setState(() => _hidePromoBanner = true),
                             child: Icon(Icons.close_rounded, color: AppColors.success.withOpacity(0.6), size: 18),
