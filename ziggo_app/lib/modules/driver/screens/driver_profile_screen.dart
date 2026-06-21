@@ -314,7 +314,7 @@ class DriverProfileScreen extends StatelessWidget {
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+              padding: EdgeInsets.fromLTRB(16, 18, 16, 28 + MediaQuery.of(context).padding.bottom),
               child: GestureDetector(
                 onTap: () => _confirmLogout(context),
                 child: Container(
