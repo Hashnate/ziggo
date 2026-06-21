@@ -97,6 +97,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -155,7 +156,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                   style: const TextStyle(
                                     color: AppColors.error,
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 24,
+                                    fontSize: 36,
                                     letterSpacing: -1,
                                     height: 1.1,
                                   ),

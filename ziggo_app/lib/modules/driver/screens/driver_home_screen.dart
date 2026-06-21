@@ -1033,7 +1033,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                                   final activeIndex = index + 1;
                                   final activeTrips = (inc['trips_required'] as num).toInt();
                                   final activeReward = (inc['reward_amount'] as num).toDouble();
-                                  final previousTrips = index > 0 ? (incentives[index - 1]['trips_required'] as num).toInt() : 0;
+                                  final previousTrips = 0;
                                   final ridesCompleted = (inc['rides_completed'] as num?)?.toInt() ?? todayRides;
 
                                   return Container(
@@ -1137,16 +1137,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   height: 24,
                   decoration: BoxDecoration(
                     color: const Color(0xFFD1D5DB),
-                    borderRadius: BorderRadius.horizontal(
-                      left: Radius.circular(index == 0 ? 12 : 0),
-                      right: Radius.circular(index == totalSegments - 1 ? 12 : 0),
-                    ),
-                    border: Border(
-                      top: const BorderSide(color: Color(0xFF4B5563), width: 1.5),
-                      bottom: const BorderSide(color: Color(0xFF4B5563), width: 1.5),
-                      left: index == 0 ? const BorderSide(color: Color(0xFF4B5563), width: 1.5) : BorderSide.none,
-                      right: index == totalSegments - 1 ? const BorderSide(color: Color(0xFF4B5563), width: 1.5) : BorderSide.none,
-                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF4B5563), width: 1.5),
                   ),
                 ),
                 // 2. Orange Filled Progress
@@ -1157,14 +1149,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     decoration: BoxDecoration(
                       color: const Color(0xFFF97316),
                       borderRadius: BorderRadius.horizontal(
-                        left: Radius.circular(index == 0 ? 12 : 0),
-                        right: Radius.circular(fraction >= 1.0 && index == totalSegments - 1 ? 12 : 0),
+                        left: const Radius.circular(12),
+                        right: Radius.circular(fraction >= 1.0 ? 12 : 0),
                       ),
                       border: Border(
                         top: const BorderSide(color: Color(0xFF4B5563), width: 1.5),
                         bottom: const BorderSide(color: Color(0xFF4B5563), width: 1.5),
-                        left: index == 0 ? const BorderSide(color: Color(0xFF4B5563), width: 1.5) : BorderSide.none,
-                        right: fraction >= 1.0 && index == totalSegments - 1
+                        left: const BorderSide(color: Color(0xFF4B5563), width: 1.5),
+                        right: fraction >= 1.0
                             ? const BorderSide(color: Color(0xFF4B5563), width: 1.5)
                             : BorderSide.none,
                       ),
@@ -1191,34 +1183,33 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   ),
                 ),
                 // 4. Milestone Markers (concentric circles on the track)
-                // Left marker (only if index > 0)
-                if (index > 0)
-                  Positioned(
-                    left: -12,
-                    top: 0,
+                // Left marker
+                Positioned(
+                  left: -6,
+                  top: 0,
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFF4B5563), width: 2),
+                    ),
+                    alignment: Alignment.center,
                     child: Container(
-                      width: 24,
-                      height: 24,
+                      width: 12,
+                      height: 12,
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: ridesCompleted > 0 ? const Color(0xFFF97316) : Colors.white,
                         shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF4B5563), width: 2),
-                      ),
-                      alignment: Alignment.center,
-                      child: Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: ridesCompleted >= startTrips ? const Color(0xFFF97316) : Colors.white,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFF9CA3AF), width: 1.5),
-                        ),
+                        border: Border.all(color: const Color(0xFF9CA3AF), width: 1.5),
                       ),
                     ),
                   ),
+                ),
                 // Right marker
                 Positioned(
-                  right: index == totalSegments - 1 ? 0 : -12,
+                  right: -6,
                   top: 0,
                   child: Container(
                     width: 24,
@@ -1249,32 +1240,19 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  if (index > 0)
-                    Positioned(
-                      left: -6,
-                      child: Text(
-                        '$startTrips',
-                        style: const TextStyle(
-                          color: Color(0xFF6B7280),
-                          fontWeight: FontWeight.w800,
-                          fontSize: 10,
-                        ),
-                      ),
-                    )
-                  else
-                    const Positioned(
-                      left: 6,
-                      child: Text(
-                        '0',
-                        style: TextStyle(
-                          color: Color(0xFF6B7280),
-                          fontWeight: FontWeight.w800,
-                          fontSize: 10,
-                        ),
+                  Positioned(
+                    left: 0,
+                    child: Text(
+                      '0',
+                      style: const TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 10,
                       ),
                     ),
+                  ),
                   Positioned(
-                    right: index == totalSegments - 1 ? 8 : -6,
+                    right: 0,
                     child: Text(
                       '$endTrips',
                       style: const TextStyle(
