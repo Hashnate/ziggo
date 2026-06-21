@@ -197,6 +197,15 @@
                             <label class="block text-xs font-black text-ziggo-muted mb-1">Max Login Attempts</label>
                             <input type="number" min="1" name="max_login_attempts" value="{{ s.max_login_attempts or 5 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                         </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Password Reset Option</label>
+                            <select name="password_reset_option" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                                <option value="email" {% if s.password_reset_option == 'email' %}selected{% endif %}>Email Only</option>
+                                <option value="sms" {% if s.password_reset_option == 'sms' %}selected{% endif %}>SMS Only</option>
+                                <option value="both" {% if s.password_reset_option == 'both' %}selected{% endif %}>Email & SMS</option>
+                                <option value="none" {% if s.password_reset_option == 'none' %}selected{% endif %}>Disabled</option>
+                            </select>
+                        </div>
                     </div>
                 </section>
 

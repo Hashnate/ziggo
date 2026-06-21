@@ -2159,6 +2159,7 @@ async def admin_settings_save(
     min_password_length: int = Form(6),
     session_timeout_minutes: int = Form(30),
     max_login_attempts: int = Form(5),
+    password_reset_option: str = Form("email"),
     # Notifications (HTML checkboxes only submit when checked)
     email_notifications_enabled: str = Form(""),
     sms_notifications_enabled: str = Form(""),
@@ -2242,6 +2243,7 @@ async def admin_settings_save(
     s.min_password_length = max(1, int(min_password_length))
     s.session_timeout_minutes = max(1, int(session_timeout_minutes))
     s.max_login_attempts = max(1, int(max_login_attempts))
+    s.password_reset_option = password_reset_option
     s.email_notifications_enabled = email_notifications_enabled == "on"
     s.sms_notifications_enabled = sms_notifications_enabled == "on"
     s.push_notifications_enabled = push_notifications_enabled == "on"

@@ -150,6 +150,7 @@ class SystemSettings(Base):
     min_password_length = Column(Integer, default=6)
     session_timeout_minutes = Column(Integer, default=30)
     max_login_attempts = Column(Integer, default=5)
+    password_reset_option = Column(String(20), default="email")
     # Notifications
     email_notifications_enabled = Column(Boolean, nullable=False, default=True)
     sms_notifications_enabled = Column(Boolean, nullable=False, default=True)
