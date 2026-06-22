@@ -168,7 +168,7 @@ async def public_categories(db: AsyncSession = Depends(get_db)):
         await db.execute(
             select(FareSetting)
             .where(FareSetting.is_active == True)  # noqa: E712
-            .order_by(FareSetting.id)
+            .order_by(FareSetting.display_order, FareSetting.id)
         )
     ).scalars().all()
     return [

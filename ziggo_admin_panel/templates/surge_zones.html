@@ -27,8 +27,11 @@
                     </thead>
                     <tbody>
                         {% for z in zones %}
-                        <tr class="hover:bg-gray-50 cursor-pointer border-b border-gray-100" onclick='viewZone({{ z.id }}, {{ z.name|tojson }}, {{ z.flat_extra_charge }}, {{ (z.start_time or "")|tojson }}, {{ (z.end_time or "")|tojson }}, {{ "true" if z.is_active else "false" }}, {{ z.coordinates|tojson }})'>
-                            <td class="px-4 py-3 font-semibold">{{ z.name }}</td>
+                        <tr class="hover:bg-gray-50 cursor-pointer border-b border-gray-100" onclick='viewZone({{ z.id }}, {{ z.name|tojson }}, {{ z.flat_extra_charge }}, {{ (z.start_time or "")|tojson }}, {{ (z.end_time or "")|tojson }}, {{ "true" if z.is_active else "false" }}, {{ z.coordinates|tojson }}, {{ z.color|tojson }})'>
+                            <td class="px-4 py-3 font-semibold flex items-center gap-2">
+                                <span class="w-3.5 h-3.5 rounded-full border border-black/10 shadow-sm shrink-0" style="background-color: {{ z.color }};"></span>
+                                <span>{{ z.name }}</span>
+                            </td>
                             <td class="px-4 py-3">
                                 {% if z.start_time and z.end_time %}
                                     {{ z.start_time }} - {{ z.end_time }}
@@ -100,6 +103,27 @@
             </div>
         </div>
         
+        <div class="mb-5">
+            <label class="block text-sm font-semibold mb-2 text-gray-700">Zone Colour</label>
+            <div class="flex flex-wrap items-center gap-3">
+                <!-- Color input custom -->
+                <div class="relative w-10 h-10 rounded-lg border border-gray-300 overflow-hidden cursor-pointer shadow-sm">
+                    <input type="color" id="zoneColor" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full" value="#dc3545" oninput="onColorInputChange(this.value)">
+                    <div id="colorPreview" class="w-full h-full bg-[#dc3545]"></div>
+                </div>
+                <!-- Suggestions -->
+                <div class="flex items-center gap-2" id="colorSwatches">
+                    <button type="button" data-color="#dc3545" class="w-8 h-8 rounded-full border-2 border-white shadow-sm cursor-pointer transition-transform hover:scale-110" style="background-color: #dc3545;" onclick="selectSwatch('#dc3545')"></button>
+                    <button type="button" data-color="#4dabf7" class="w-8 h-8 rounded-full border-2 border-white shadow-sm cursor-pointer transition-transform hover:scale-110" style="background-color: #4dabf7;" onclick="selectSwatch('#4dabf7')"></button>
+                    <button type="button" data-color="#51cf66" class="w-8 h-8 rounded-full border-2 border-white shadow-sm cursor-pointer transition-transform hover:scale-110" style="background-color: #51cf66;" onclick="selectSwatch('#51cf66')"></button>
+                    <button type="button" data-color="#ffd43b" class="w-8 h-8 rounded-full border-2 border-white shadow-sm cursor-pointer transition-transform hover:scale-110" style="background-color: #ffd43b;" onclick="selectSwatch('#ffd43b')"></button>
+                    <button type="button" data-color="#cc5de8" class="w-8 h-8 rounded-full border-2 border-white shadow-sm cursor-pointer transition-transform hover:scale-110" style="background-color: #cc5de8;" onclick="selectSwatch('#cc5de8')"></button>
+                    <button type="button" data-color="#20c997" class="w-8 h-8 rounded-full border-2 border-white shadow-sm cursor-pointer transition-transform hover:scale-110" style="background-color: #20c997;" onclick="selectSwatch('#20c997')"></button>
+                    <button type="button" data-color="#f783ac" class="w-8 h-8 rounded-full border-2 border-white shadow-sm cursor-pointer transition-transform hover:scale-110" style="background-color: #f783ac;" onclick="selectSwatch('#f783ac')"></button>
+                </div>
+            </div>
+        </div>
+        
         <div class="mb-5 flex items-center">
             <input type="checkbox" id="zoneActive" class="w-5 h-5 text-ziggo-light rounded" checked>
             <label class="ml-2 font-medium text-gray-800" for="zoneActive">Zone is Active</label>
@@ -140,7 +164,7 @@
         const zones = {{ zones|tojson|safe }};
         zones.forEach(z => {
             if (!z.coordinates) return;
-            const color = z.is_active ? '#dc3545' : '#6c757d';
+            const color = z.is_active ? (z.color || '#dc3545') : '#6c757d';
             const poly = new google.maps.Polygon({
                 paths: z.coordinates,
                 strokeColor: color,
@@ -151,7 +175,7 @@
                 map: mainMap
             });
             poly.addListener('click', () => {
-                viewZone(z.id, z.name, z.flat_extra_charge, z.start_time, z.end_time, z.is_active, z.coordinates);
+                viewZone(z.id, z.name, z.flat_extra_charge, z.start_time, z.end_time, z.is_active, z.coordinates, z.color);
             });
         });
     }
@@ -166,11 +190,12 @@
                 mapTypeId: 'roadmap'
             });
             
+            const initialColor = document.getElementById('zoneColor').value || '#dc3545';
             drawingManager = new google.maps.drawing.DrawingManager({
                 drawingMode: google.maps.drawing.OverlayType.POLYGON,
                 drawingControl: true,
                 drawingControlOptions: { position: google.maps.ControlPosition.TOP_CENTER, drawingModes: [google.maps.drawing.OverlayType.POLYGON] },
-                polygonOptions: { fillColor: '#dc3545', fillOpacity: 0.5, strokeWeight: 2, clickable: true, editable: true, zIndex: 1 }
+                polygonOptions: { fillColor: initialColor, fillOpacity: 0.5, strokeColor: initialColor, strokeWeight: 2, clickable: true, editable: true, zIndex: 1 }
             });
             drawingManager.setMap(modalMap);
             
@@ -201,10 +226,56 @@
         document.getElementById('zoneCoordinates').value = JSON.stringify(coords);
     }
 
+    window.onColorInputChange = function(val) {
+        document.getElementById('colorPreview').style.backgroundColor = val;
+        highlightSwatch(val);
+        updatePolygonColor(val);
+    };
+
+    window.selectSwatch = function(color) {
+        document.getElementById('zoneColor').value = color;
+        document.getElementById('colorPreview').style.backgroundColor = color;
+        highlightSwatch(color);
+        updatePolygonColor(color);
+    };
+
+    window.highlightSwatch = function(color) {
+        const swatches = document.querySelectorAll('#colorSwatches button');
+        swatches.forEach(btn => {
+            if (btn.getAttribute('data-color').toLowerCase() === color.toLowerCase()) {
+                btn.classList.add('ring-2', 'ring-blue-500', 'ring-offset-2', 'scale-110');
+            } else {
+                btn.classList.remove('ring-2', 'ring-blue-500', 'ring-offset-2', 'scale-110');
+            }
+        });
+    };
+
+    function updatePolygonColor(color) {
+        if (drawingManager) {
+            drawingManager.setOptions({
+                polygonOptions: { fillColor: color, fillOpacity: 0.5, strokeColor: color, strokeWeight: 2, clickable: true, editable: true, zIndex: 1 }
+            });
+        }
+        if (currentModalPolygon) {
+            currentModalPolygon.setOptions({
+                fillColor: color,
+                strokeColor: color
+            });
+        }
+    }
+
     window.openZoneModal = function() {
         document.getElementById('zoneForm').reset();
         document.getElementById('zoneId').value = '';
         document.getElementById('zoneCoordinates').value = '';
+        document.getElementById('zoneColor').value = '#dc3545';
+        document.getElementById('colorPreview').style.backgroundColor = '#dc3545';
+        highlightSwatch('#dc3545');
+        if (drawingManager) {
+            drawingManager.setOptions({
+                polygonOptions: { fillColor: '#dc3545', fillOpacity: 0.5, strokeColor: '#dc3545', strokeWeight: 2, clickable: true, editable: true, zIndex: 1 }
+            });
+        }
         document.getElementById('zoneModalTitle').innerText = 'Create Surge Zone';
         if (currentModalPolygon) { currentModalPolygon.setMap(null); currentModalPolygon = null; }
         document.getElementById('zoneModal').classList.remove('hidden');
@@ -215,7 +286,7 @@
         document.getElementById('zoneModal').classList.add('hidden');
     }
     
-    window.viewZone = function(id, name, charge, start, end, active, coords) {
+    window.viewZone = function(id, name, charge, start, end, active, coords, color) {
         document.getElementById('zoneId').value = id;
         document.getElementById('zoneName').value = name;
         document.getElementById('zoneCharge').value = charge;
@@ -223,6 +294,12 @@
         document.getElementById('zoneEnd').value = end;
         document.getElementById('zoneActive').checked = active;
         document.getElementById('zoneCoordinates').value = JSON.stringify(coords);
+        
+        const activeColor = color || '#dc3545';
+        document.getElementById('zoneColor').value = activeColor;
+        document.getElementById('colorPreview').style.backgroundColor = activeColor;
+        highlightSwatch(activeColor);
+        
         document.getElementById('zoneModalTitle').innerText = 'Edit Surge Zone';
         
         document.getElementById('zoneModal').classList.remove('hidden');
@@ -230,8 +307,13 @@
         setTimeout(() => {
             initModalMap();
             if (currentModalPolygon) currentModalPolygon.setMap(null);
+            if (drawingManager) {
+                drawingManager.setOptions({
+                    polygonOptions: { fillColor: activeColor, fillOpacity: 0.5, strokeColor: activeColor, strokeWeight: 2, clickable: true, editable: true, zIndex: 1 }
+                });
+            }
             if (coords && coords.length > 0) {
-                currentModalPolygon = new google.maps.Polygon({ paths: coords, fillColor: '#dc3545', fillOpacity: 0.5, strokeWeight: 2, editable: true, map: modalMap });
+                currentModalPolygon = new google.maps.Polygon({ paths: coords, fillColor: activeColor, fillOpacity: 0.5, strokeColor: activeColor, strokeWeight: 2, editable: true, map: modalMap });
                 const bounds = new google.maps.LatLngBounds();
                 coords.forEach(c => bounds.extend(new google.maps.LatLng(c.lat, c.lng)));
                 modalMap.fitBounds(bounds);
@@ -259,7 +341,8 @@
             start_time: document.getElementById('zoneStart').value || null,
             end_time: document.getElementById('zoneEnd').value || null,
             is_active: document.getElementById('zoneActive').checked,
-            coordinates: coords
+            coordinates: coords,
+            color: document.getElementById('zoneColor').value
         };
         
         const id = document.getElementById('zoneId').value;

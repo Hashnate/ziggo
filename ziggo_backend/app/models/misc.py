@@ -123,6 +123,7 @@ class FareSetting(Base):
     passenger_deductible = Column(DECIMAL(10, 2), default=0.00)
     promo_message = Column(String(255), nullable=True)
     discount_percentage = Column(DECIMAL(5, 2), default=0.00)
+    display_order = Column(Integer, nullable=False, default=0)
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
@@ -346,4 +347,5 @@ class SurgeZone(Base):
     start_time = Column(String(5), nullable=True)  # e.g., "17:00"
     end_time = Column(String(5), nullable=True)    # e.g., "19:00"
     is_active = Column(Boolean, nullable=False, default=True)
+    color = Column(String(7), nullable=False, server_default="#dc3545")
     created_at = Column(DateTime(timezone=True), server_default=func.now())

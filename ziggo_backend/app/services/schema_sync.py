@@ -77,6 +77,7 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("users", "referred_by_user_id", "INTEGER"),
     ("peak_hour_settings", "start_time", "VARCHAR(5)"),
     ("peak_hour_settings", "end_time", "VARCHAR(5)"),
+    ("fare_settings", "display_order", "INTEGER NOT NULL DEFAULT 0"),
 )
 
 

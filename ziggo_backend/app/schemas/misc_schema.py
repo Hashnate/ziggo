@@ -90,6 +90,7 @@ class SurgeZoneBase(BaseModel):
     start_time: Optional[str] = None
     end_time: Optional[str] = None
     is_active: bool = True
+    color: str = "#dc3545"
 
 class SurgeZoneCreate(SurgeZoneBase):
     pass
@@ -101,6 +102,7 @@ class SurgeZoneUpdate(BaseModel):
     start_time: Optional[str] = None
     end_time: Optional[str] = None
     is_active: Optional[bool] = None
+    color: Optional[str] = None
 
 class SurgeZoneResponse(SurgeZoneBase):
     id: int

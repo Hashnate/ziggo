@@ -442,7 +442,20 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         final lng = (c['lng'] as num).toDouble();
         return LatLng(lat, lng);
       }).toList();
-      return ZiggoPolygon(points: points);
+      
+      final colorHex = z['color'] as String?;
+      Color fillColor = const Color(0x33DC3545);
+      Color strokeColor = const Color(0x88DC3545);
+      if (colorHex != null && colorHex.startsWith('#') && colorHex.length == 7) {
+        try {
+          final hexVal = int.parse(colorHex.substring(1), radix: 16);
+          fillColor = Color((hexVal & 0xFFFFFF) | 0x33000000);
+          strokeColor = Color((hexVal & 0xFFFFFF) | 0x88000000);
+        } catch (e) {
+          debugPrint("Error parsing surge zone color: $e");
+        }
+      }
+      return ZiggoPolygon(points: points, fillColor: fillColor, strokeColor: strokeColor);
     }).toList();
 
     return Scaffold(

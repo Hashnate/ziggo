@@ -2044,7 +2044,7 @@ async def admin_fare_settings(
 ):
     from app.models import FareSetting
 
-    q = await db.execute(select(FareSetting).order_by(FareSetting.id))
+    q = await db.execute(select(FareSetting).order_by(FareSetting.display_order, FareSetting.id))
     return templates.TemplateResponse(
         request, "settings.html",
         {"request": request, "active_page": "fare-settings", "fares": q.scalars().all()},
@@ -2389,7 +2389,7 @@ async def admin_categories(
 ):
     from app.models import FareSetting, Driver
 
-    q = await db.execute(select(FareSetting).order_by(FareSetting.id))
+    q = await db.execute(select(FareSetting).order_by(FareSetting.display_order, FareSetting.id))
     categories = q.scalars().all()
     # Per-category driver count, so admin sees impact before deleting
     counts_q = await db.execute(
@@ -2454,6 +2454,9 @@ async def admin_categories_new(
     else:
         image_url = await _save_category_image(image)
 
+    max_order_q = await db.execute(select(func.max(FareSetting.display_order)))
+    max_order = max_order_q.scalar() or 0
+
     db.add(
         FareSetting(
             service_type=key,
@@ -2473,6 +2476,7 @@ async def admin_categories_new(
             pickup_fee=Decimal(str(pickup_fee)),
             boost=Decimal(str(boost)),
             passenger_deductible=Decimal(str(passenger_deductible)),
+            display_order=max_order + 1,
         )
     )
     await db.commit()
@@ -2575,6 +2579,29 @@ async def admin_categories_delete(
     return RedirectResponse(url=_safe_admin_next(next, "/admin/categories"), status_code=303)
 
 
+from pydantic import BaseModel
+
+
+class ReorderCategoriesRequest(BaseModel):
+    order: list[int]
+
+
+@router.post("/categories/reorder")
+async def admin_categories_reorder(
+    payload: ReorderCategoriesRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import FareSetting
+    for index, category_id in enumerate(payload.order):
+        q = await db.execute(select(FareSetting).where(FareSetting.id == category_id))
+        f = q.scalars().first()
+        if f:
+            f.display_order = index
+    await db.commit()
+    return {"status": "success"}
+
+
 # ---------- Services (table view of vehicle categories) ----------
 @router.get("/services", response_class=HTMLResponse)
 async def admin_services(
@@ -2584,7 +2611,7 @@ async def admin_services(
 ):
     from app.models import FareSetting
 
-    q = await db.execute(select(FareSetting).order_by(FareSetting.id))
+    q = await db.execute(select(FareSetting).order_by(FareSetting.display_order, FareSetting.id))
     categories = q.scalars().all()
     counts_q = await db.execute(
         select(Driver.vehicle_type, func.count(Driver.id)).group_by(Driver.vehicle_type)
@@ -2662,7 +2689,7 @@ async def admin_vehicles(
     verified = by_status.get(DriverStatus.APPROVED.value, 0)
 
     cats_q = await db.execute(
-        select(FareSetting).where(FareSetting.is_active == True).order_by(FareSetting.id)  # noqa: E712
+        select(FareSetting).where(FareSetting.is_active == True).order_by(FareSetting.display_order, FareSetting.id)  # noqa: E712
     )
     categories = cats_q.scalars().all()
 
@@ -7173,6 +7200,7 @@ async def surge_zones_page(request: Request, db: AsyncSession = Depends(get_db),
             "end_time": z.end_time,
             "is_active": z.is_active,
             "coordinates": z.coordinates,
+            "color": z.color,
         }
         for z in zones_objs
     ]

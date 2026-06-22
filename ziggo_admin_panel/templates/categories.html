@@ -19,6 +19,7 @@
             <table class="w-full text-left">
                 <thead class="bg-gray-50 text-[11px] uppercase text-ziggo-muted font-black tracking-wider">
                     <tr>
+                        <th class="px-4 py-4 w-10"></th>
                         <th class="px-6 py-4">Icon</th>
                         <th class="px-6 py-4">Name</th>
                         <th class="px-6 py-4">Base Fare</th>
@@ -43,7 +44,10 @@
                     {% elif 'mart' in key or 'market' in key or 'grocery' in key %}{% set ns.icon = 'fa-store' %}
                     {% elif 'flash' in key or 'parcel' in key or 'delivery' in key or 'courier' in key %}{% set ns.icon = 'fa-box' %}
                     {% endif %}
-                    <tr class="hover:bg-gray-50/50">
+                    <tr class="hover:bg-gray-50/50 drag-row" data-id="{{ c.id }}">
+                        <td class="px-4 py-4 w-10 text-center cursor-grab active:cursor-grabbing text-gray-400 hover:text-ziggo drag-handle" draggable="true">
+                            <i class="fas fa-grip-vertical"></i>
+                        </td>
                         <td class="px-6 py-4">
                             <div class="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden">
                                 {% if c.image_url %}
@@ -104,7 +108,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="9" class="px-6 py-16 text-center">
+                        <td colspan="10" class="px-6 py-16 text-center">
                             <i class="fas fa-car text-4xl text-ziggo-faint mb-3"></i>
                             <p class="text-ziggo-muted font-bold">No vehicle categories yet. Click <span class="text-ziggo">Add Category</span> to create one.</p>
                         </td>
@@ -423,6 +427,114 @@ function confirmDelete(driverCount, name) {
     }
     return confirm("Delete '" + name + "' permanently?");
 }
+
+// HTML5 Drag and Drop Sorting for categories
+document.addEventListener('DOMContentLoaded', () => {
+    const tbody = document.querySelector('table tbody');
+    if (!tbody) return;
+
+    let dragEl = null;
+
+    tbody.querySelectorAll('.drag-handle').forEach(handle => {
+        const row = handle.closest('tr.drag-row');
+        if (!row) return;
+
+        handle.addEventListener('dragstart', (e) => {
+            dragEl = row;
+            row.classList.add('bg-blue-50/80', 'opacity-60');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', row.dataset.id);
+        });
+
+        handle.addEventListener('dragend', () => {
+            row.classList.remove('bg-blue-50/80', 'opacity-60');
+            tbody.querySelectorAll('tr.drag-row').forEach(r => r.classList.remove('bg-gray-50/50'));
+            saveNewOrder();
+        });
+    });
+
+    tbody.querySelectorAll('tr.drag-row').forEach(row => {
+        row.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            
+            const target = e.target.closest('tr.drag-row');
+            if (target && target !== dragEl && target.parentNode === tbody) {
+                const rect = target.getBoundingClientRect();
+                const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
+                tbody.insertBefore(dragEl, next ? target.nextSibling : target);
+            }
+        });
+
+        row.addEventListener('dragenter', (e) => {
+            const target = e.target.closest('tr.drag-row');
+            if (target && target !== dragEl) {
+                target.classList.add('bg-gray-50/50');
+            }
+        });
+
+        row.addEventListener('dragleave', (e) => {
+            const target = e.target.closest('tr.drag-row');
+            if (target && target !== dragEl) {
+                target.classList.remove('bg-gray-50/50');
+            }
+        });
+    });
+
+    function saveNewOrder() {
+        const rows = tbody.querySelectorAll('tr.drag-row');
+        const order = Array.from(rows).map(row => parseInt(row.dataset.id));
+        
+        showToast('Saving category order...', 'info');
+
+        fetch('/admin/categories/reorder', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ order: order })
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('Failed to save order');
+            return response.json();
+        })
+        .then(data => {
+            showToast('Order saved successfully!', 'success');
+        })
+        .catch(err => {
+            console.error(err);
+            showToast('Failed to save category order', 'error');
+        });
+    }
+
+    function showToast(message, type = 'info') {
+        let toast = document.getElementById('drag-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'drag-toast';
+            toast.className = 'fixed bottom-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg text-white font-bold transition-all duration-300 transform translate-y-10 opacity-0 flex items-center gap-2';
+            document.body.appendChild(toast);
+        }
+        
+        // Colors based on type
+        if (type === 'success') {
+            toast.className = 'fixed bottom-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg text-white font-semibold transition-all duration-300 transform translate-y-0 opacity-100 bg-emerald-500 flex items-center gap-2';
+            toast.innerHTML = '<i class="fas fa-check-circle"></i> ' + message;
+        } else if (type === 'error') {
+            toast.className = 'fixed bottom-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg text-white font-semibold transition-all duration-300 transform translate-y-0 opacity-100 bg-rose-500 flex items-center gap-2';
+            toast.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + message;
+        } else {
+            toast.className = 'fixed bottom-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg text-white font-semibold transition-all duration-300 transform translate-y-0 opacity-100 bg-blue-500 flex items-center gap-2';
+            toast.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + message;
+        }
+
+        if (type !== 'info') {
+            setTimeout(() => {
+                toast.className = 'fixed bottom-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg text-white font-semibold transition-all duration-300 transform translate-y-10 opacity-0 bg-blue-500 flex items-center gap-2';
+            }, 3000);
+        }
+    }
+});
 
 document.getElementById('categoryModal').addEventListener('click', function(e) {
     if (e.target === this) closeModal();

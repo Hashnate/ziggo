@@ -26,6 +26,7 @@ async def create_surge_zone(
         start_time=body.start_time,
         end_time=body.end_time,
         is_active=body.is_active,
+        color=body.color,
     )
     db.add(zone)
     await db.commit()
@@ -64,6 +65,8 @@ async def update_surge_zone(
         zone.end_time = body.end_time
     if body.is_active is not None:
         zone.is_active = body.is_active
+    if body.color is not None:
+        zone.color = body.color
         
     await db.commit()
     await db.refresh(zone)
