@@ -71,7 +71,8 @@ class _HomeScreenState extends State<HomeScreen> {
          active['status'] == 'arrived' ||
          active['status'] == 'started');
 
-    if (isRideActive && !_autoRedirected) {
+    final isCurrent = ModalRoute.of(context)?.isCurrent ?? false;
+    if (isRideActive && !_autoRedirected && isCurrent) {
       _autoRedirected = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _open(const RideTrackingScreen());

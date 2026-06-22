@@ -34,6 +34,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
   String? _routeKey;
   bool _sheetExpanded = true;
   String? _lastStatus;
+  bool _otpDialogShown = false;
   LatLng? _lastCameraDriverLatLng;
   String? _lastCameraStatus;
 
@@ -280,7 +281,11 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
       if (status == 'arrived' || status == 'started') {
         _sheetExpanded = false;
       }
-      if (status == 'arrived' && active['otp'] != null) {
+      if (status != 'arrived') {
+        _otpDialogShown = false;
+      }
+      if (status == 'arrived' && active['otp'] != null && !_otpDialogShown) {
+        _otpDialogShown = true;
         final otp = active['otp'].toString();
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _showArrivedOtpDialog(otp);

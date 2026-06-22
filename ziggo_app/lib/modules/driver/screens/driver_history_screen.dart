@@ -552,7 +552,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
               fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
               color: isNegative
                   ? AppColors.error
-                  : (isBold ? kDriverGold : AppColors.textPrimary),
+                  : (isBold ? AppColors.success : AppColors.textPrimary),
             ),
           ),
         ],
