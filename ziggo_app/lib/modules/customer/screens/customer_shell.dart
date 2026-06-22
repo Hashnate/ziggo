@@ -103,18 +103,18 @@ class CustomerShellState extends State<CustomerShell> {
         title: Text(title, textAlign: TextAlign.center),
         content: Text(message, textAlign: TextAlign.center),
         actionsAlignment: MainAxisAlignment.center,
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Not now'),
-          ),
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
+              shape: const StadiumBorder(),
+              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+              elevation: 0,
             ),
-            child: Text(actionLabel),
+            child: Text(actionLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),

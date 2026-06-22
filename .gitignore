@@ -38,6 +38,7 @@ ziggo.db-wal
 # Flutter
 ziggo_app/.dart_tool/
 ziggo_app/build/
+ziggo_app/build_old*/
 ziggo_app/.flutter-plugins
 ziggo_app/.flutter-plugins-dependencies
 ziggo_app/ios/Pods/
