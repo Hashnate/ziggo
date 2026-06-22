@@ -460,144 +460,176 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
                     ),
                     const SizedBox(height: 8),
 
-                    // Pickup & Drop locations
+                    // Pickup & Drop locations (Uber style)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                      child: Column(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
+                          // Left side: Vertical Timeline (Uber style)
+                          Column(
                             children: [
-                              const SizedBox(
-                                width: 60,
-                                child: Text(
-                                  'PICKUP',
-                                  style: TextStyle(
-                                    color: AppColors.primary,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.5,
+                              // Pickup dot
+                              SizedBox(
+                                height: 44,
+                                child: Center(
+                                  child: Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.black87,
+                                      shape: BoxShape.circle,
+                                    ),
                                   ),
                                 ),
                               ),
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () => _openSearch(focusDrop: false),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          _currentLocation?.name ?? 'Your location',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 15,
-                                            color: Colors.black87,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+                              Container(
+                                width: 2,
+                                height: 10,
+                                color: Colors.black12,
+                              ),
+                              // Stops dots
+                              if (_stops.isNotEmpty)
+                                for (int i = 0; i < _stops.length; i++) ...[
+                                  SizedBox(
+                                    height: 44,
+                                    child: Center(
+                                      child: Container(
+                                        width: 6,
+                                        height: 6,
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: Colors.black54, width: 1.5),
                                         ),
                                       ),
-                                      const Icon(
-                                        Icons.favorite_border_rounded,
-                                        size: 20,
-                                        color: Colors.black87,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Divider(
-                              height: 1,
-                              color: AppColors.divider.withOpacity(0.8),
-                            ),
-                          ),
-                          if (_stops.isNotEmpty)
-                            for (int i = 0; i < _stops.length; i++) ...[
-                              Row(
-                                children: [
-                                  SizedBox(
-                                    width: 60,
-                                    child: Text(
-                                      'STOP ${i + 1}',
-                                      style: const TextStyle(
-                                        color: AppColors.warning,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: 0.5,
-                                      ),
                                     ),
                                   ),
-                                  Expanded(
-                                    child: Text(
-                                      _stops[i].name,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 15,
-                                        color: Colors.black87,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
+                                  Container(
+                                    width: 2,
+                                    height: 10,
+                                    color: Colors.black12,
                                   ),
                                 ],
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                child: Divider(
-                                  height: 1,
-                                  color: AppColors.divider.withOpacity(0.8),
-                                ),
-                              ),
-                            ],
-                          Row(
-                            children: [
-                              const SizedBox(
-                                width: 60,
-                                child: Text(
-                                  'DROP',
-                                  style: TextStyle(
-                                    color: AppColors.warning,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.5,
+                              // Dropoff square
+                              SizedBox(
+                                height: 44,
+                                child: Center(
+                                  child: Container(
+                                    width: 8,
+                                    height: 8,
+                                    color: Colors.black87,
                                   ),
                                 ),
                               ),
-                              Expanded(
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: GestureDetector(
-                                        onTap: () => _openSearch(focusDrop: true),
-                                        child: const Text(
-                                          'Where are you going?',
-                                          style: TextStyle(
-                                            color: AppColors.textTertiary,
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 15,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ),
-                                    GestureDetector(
-                                      onTap: _openAddStops,
-                                      child: const Icon(
-                                        Icons.add_rounded,
-                                        size: 24,
-                                        color: Colors.black87,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
                             ],
+                          ),
+                          const SizedBox(width: 14),
+                          // Right side: Stacked address inputs in light grey boxes
+                          Expanded(
+                            child: Column(
+                              children: [
+                                // Pickup Container
+                                GestureDetector(
+                                  onTap: () => _openSearch(focusDrop: false),
+                                  child: Container(
+                                    height: 44,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF3F3F3),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            _currentLocation?.name ?? 'Your location',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 14,
+                                              color: Colors.black87,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const Icon(
+                                          Icons.favorite_border_rounded,
+                                          size: 18,
+                                          color: Colors.black54,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                // Stops Containers
+                                if (_stops.isNotEmpty)
+                                  for (int i = 0; i < _stops.length; i++) ...[
+                                    Container(
+                                      height: 44,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF3F3F3),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              _stops[i].name,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 14,
+                                                color: Colors.black87,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                  ],
+                                // Drop Container
+                                GestureDetector(
+                                  onTap: () => _openSearch(focusDrop: true),
+                                  child: Container(
+                                    height: 44,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF3F3F3),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            'Where are you going?',
+                                            style: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 14,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        GestureDetector(
+                                          onTap: _openAddStops,
+                                          child: const Icon(
+                                            Icons.add_rounded,
+                                            size: 22,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
