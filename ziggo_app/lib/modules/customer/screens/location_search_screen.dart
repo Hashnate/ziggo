@@ -470,12 +470,12 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const SizedBox(
+            SizedBox(
               width: 50,
               child: Text(
-                'DROP',
+                _tripType == 'return' ? 'STOP' : 'DROP',
                 textAlign: TextAlign.end,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Color(0xFF0F172A),
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
@@ -552,6 +552,51 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
             ),
           ],
         ),
+        if (_tripType == 'return') ...[
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const SizedBox(
+                width: 50,
+                child: Text(
+                  'DROP',
+                  textAlign: TextAlign.end,
+                  style: TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Container(
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF2F4F8),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.transparent,
+                      width: 1.5,
+                    ),
+                  ),
+                  padding: const EdgeInsets.only(left: 16, right: 8),
+                  alignment: Alignment.centerLeft,
+                  child: const Text(
+                    'Same as pickup',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }

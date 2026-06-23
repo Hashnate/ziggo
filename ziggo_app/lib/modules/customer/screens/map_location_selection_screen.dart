@@ -300,8 +300,15 @@ class _MapLocationSelectionScreenState extends State<MapLocationSelectionScreen>
                       Column(
                         children: [
                           const Text('PICKUP', style: TextStyle(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.w900)),
-                          Container(height: 20, width: 2, color: AppColors.divider),
-                          const Text('DROP', style: TextStyle(color: AppColors.warning, fontSize: 10, fontWeight: FontWeight.w900)),
+                          if (_tripType == 'return') ...[
+                            Container(height: 12, width: 2, color: AppColors.divider),
+                            const Text('STOP', style: TextStyle(color: Colors.orange, fontSize: 10, fontWeight: FontWeight.w900)),
+                            Container(height: 12, width: 2, color: AppColors.divider),
+                            const Text('DROP', style: TextStyle(color: AppColors.warning, fontSize: 10, fontWeight: FontWeight.w900)),
+                          ] else ...[
+                            Container(height: 20, width: 2, color: AppColors.divider),
+                            const Text('DROP', style: TextStyle(color: AppColors.warning, fontSize: 10, fontWeight: FontWeight.w900)),
+                          ],
                         ],
                       ),
                       const SizedBox(width: 16),
@@ -320,7 +327,7 @@ class _MapLocationSelectionScreenState extends State<MapLocationSelectionScreen>
                                 }
                               },
                               child: Text(
-                                _pickup?.name ?? 'Select Pickup Location',
+                                _pickup?.name ?? 'Your Location',
                                 style: TextStyle(
                                   fontWeight: _isSelectingPickup ? FontWeight.w900 : FontWeight.w600,
                                   color: _isSelectingPickup ? AppColors.textPrimary : AppColors.textSecondary,
@@ -345,7 +352,7 @@ class _MapLocationSelectionScreenState extends State<MapLocationSelectionScreen>
                                 }
                               },
                               child: Text(
-                                _drop?.name ?? 'Select Dropoff Location',
+                                _drop?.name ?? 'Where are you going?',
                                 style: TextStyle(
                                   fontWeight: !_isSelectingPickup ? FontWeight.w900 : FontWeight.w600,
                                   color: !_isSelectingPickup ? AppColors.textPrimary : AppColors.textSecondary,
@@ -355,6 +362,22 @@ class _MapLocationSelectionScreenState extends State<MapLocationSelectionScreen>
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            if (_tripType == 'return') ...[
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 6),
+                                child: Divider(height: 1),
+                              ),
+                              const Text(
+                                'Same as pickup',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                  fontSize: 14,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
                           ],
                         ),
                       ),
