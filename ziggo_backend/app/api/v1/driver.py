@@ -44,7 +44,6 @@ def _is_complete(d: Driver) -> bool:
             d.relative_name,
             d.relative_contact,
             d.relative_relationship,
-            d.billing_proof_url,
         ]
     )
 
@@ -108,7 +107,6 @@ def _to_response(user: User, d: Driver, paid_payouts: float = 0.0, pending_payou
         relative_name=d.relative_name,
         relative_contact=d.relative_contact,
         relative_relationship=d.relative_relationship,
-        billing_proof_url=d.billing_proof_url,
         paid_payouts=paid_payouts,
         pending_payout=pending_payout,
         peak_is_active=peak_active,
@@ -435,7 +433,7 @@ def _find_admin_panel_dir() -> str:
 _ADMIN_PANEL_DIR = _find_admin_panel_dir()
 _DOC_UPLOAD_DIR = os.path.join(_ADMIN_PANEL_DIR, "static", "uploads", "driver_docs")
 os.makedirs(_DOC_UPLOAD_DIR, exist_ok=True)
-_VALID_DOC_TYPES = {"billing_proof", "nic_front", "nic_back", "license_front", "license_back", "vehicle_reg", "insurance", "year_license", "eco_test", "vehicle_front", "vehicle_back", "vehicle_side"}
+_VALID_DOC_TYPES = {"nic_front", "nic_back", "license_front", "license_back", "vehicle_reg", "insurance", "year_license", "eco_test", "vehicle_front", "vehicle_back", "vehicle_side"}
 _ALLOWED_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".pdf"}
 _MAX_DOC_BYTES = 25 * 1024 * 1024  # 25 MB
 
@@ -542,7 +540,7 @@ async def list_my_documents(
     )
     by_type = {row.document_type: row for row in q.scalars().all()}
     out = []
-    for kind in ("billing_proof", "nic_front", "nic_back", "license_front", "license_back", "vehicle_reg", "insurance", "year_license", "eco_test", "vehicle_front", "vehicle_back", "vehicle_side"):
+    for kind in ("nic_front", "nic_back", "license_front", "license_back", "vehicle_reg", "insurance", "year_license", "eco_test", "vehicle_front", "vehicle_back", "vehicle_side"):
         row = by_type.get(kind)
         out.append({
             "document_type": kind,
@@ -589,45 +587,6 @@ async def upload_profile_photo(
     await db.refresh(user)
     return {"ok": True, "profile_photo": url}
 
-
-@router.post("/billing-proof")
-async def upload_billing_proof(
-    photo: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_role("driver")),
-):
-    """Driver uploads their billing proof."""
-    d = await _get_driver(db, user)
-    url = await _save_profile_photo(photo)
-    d.billing_proof_url = url
-
-    # Sync to DriverDocument for verification tracking
-    from ...models import DriverDocument
-    exq = await db.execute(
-        select(DriverDocument).where(
-            DriverDocument.driver_id == d.id,
-            DriverDocument.document_type == "billing_proof",
-        )
-    )
-    existing = exq.scalars().first()
-    if existing:
-        existing.document_url = url
-        existing.is_verified = False
-        existing.verified_by = None
-        existing.verified_at = None
-        existing.uploaded_at = datetime.now(timezone.utc)
-    else:
-        doc = DriverDocument(
-            driver_id=d.id,
-            document_type="billing_proof",
-            document_url=url,
-            is_verified=False,
-        )
-        db.add(doc)
-
-    await db.commit()
-    await db.refresh(d)
-    return {"ok": True, "billing_proof_url": url}
 
 
 class SettleCommissionBody(BaseModel):

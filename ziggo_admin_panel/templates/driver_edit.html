@@ -153,7 +153,7 @@
             </div>
         </div>
 
-        {# BRD: KYC document review — always shown; billing proof + per-kind document cards #}
+        {# BRD: KYC document review — always shown; per-kind document cards #}
         <div class="pt-6 border-t border-gray-100">
             <h4 class="font-black text-ziggo-ink mb-4 flex items-center gap-2">
                 <i class="fas fa-id-card text-ziggo"></i> KYC Documents
@@ -171,11 +171,7 @@
                             {% endif %}
                         </a>
                         {% else %}
-                            {% if doc.kind == 'billing_proof' %}
-                            <i class="fas fa-file-invoice text-gray-300 text-xl"></i>
-                            {% else %}
                             <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
-                            {% endif %}
                         {% endif %}
                     </div>
                     <div class="flex-1 min-w-0">
@@ -251,23 +247,7 @@ function previewPhoto(input) {
     label.textContent = 'Change photo';
 }
 
-function previewBilling(input) {
-    const preview = document.getElementById('billingPreview');
-    const label = document.getElementById('billingLabel');
-    if (!input.files || !input.files[0]) return;
-    const file = input.files[0];
-    if (file.size > 5 * 1024 * 1024) {
-        alert('Billing Proof must be under 5 MB');
-        input.value = '';
-        return;
-    }
-    const reader = new FileReader();
-    reader.onload = function (e) {
-        preview.innerHTML = '<a href="' + e.target.result + '" target="_blank" class="w-full h-full block"><img src="' + e.target.result + '" class="w-full h-full object-cover hover:opacity-80 transition"></a>';
-    };
-    reader.readAsDataURL(file);
-    label.textContent = 'Change file';
-}
+
 
 function previewDoc(input, kind) {
     const wrapper = document.getElementById(kind + 'IconWrapper');

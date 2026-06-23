@@ -617,7 +617,6 @@ async def admin_drivers_new_form(
 ):
     docs = []
     for kind, label in [
-        ("billing_proof", "Billing Proof"),
         ("nic_front", "NIC Front"),
         ("nic_back", "NIC Back"),
         ("license_front", "Driving License Front"),
@@ -661,8 +660,6 @@ async def admin_drivers_new_submit(
     relative_contact: str = Form(""),
     relative_relationship: str = Form(""),
     profile_photo: UploadFile | None = File(None),
-    billing_proof: UploadFile | None = File(None),
-    doc_billing_proof: UploadFile | None = File(None),
     doc_nic_front: UploadFile | None = File(None),
     doc_nic_back: UploadFile | None = File(None),
     doc_license_front: UploadFile | None = File(None),
@@ -698,7 +695,6 @@ async def admin_drivers_new_submit(
     # Construct docs list in case of error
     docs = []
     for kind, label in [
-        ("billing_proof", "Billing Proof"),
         ("nic_front", "NIC Front"),
         ("nic_back", "NIC Back"),
         ("license_front", "Driving License Front"),
@@ -753,7 +749,6 @@ async def admin_drivers_new_submit(
     from decimal import Decimal
 
     photo_url = await _save_uploaded_photo(profile_photo)
-    billing_proof_url = await _save_uploaded_photo(billing_proof)
 
     user = User(
         phone_number=phone_number,
@@ -786,34 +781,16 @@ async def admin_drivers_new_submit(
         relative_name=relative_name or None,
         relative_contact=relative_contact or None,
         relative_relationship=relative_relationship or None,
-        billing_proof_url=billing_proof_url or None,
     )
     db.add(driver)
     await db.flush()
 
-    if billing_proof_url:
-        doc = DriverDocument(
-            driver_id=driver.id,
-            document_type="billing_proof",
-            document_url=billing_proof_url,
-            is_verified=False,
-        )
-        db.add(doc)
-
     from app.models import DriverDocument
-    for kind in ("billing_proof", "nic_front", "nic_back", "license_front", "license_back", "vehicle_reg", "insurance", "year_license", "eco_test", "vehicle_front", "vehicle_back", "vehicle_side"):
-        # If kind is billing_proof and we already saved it from `billing_proof` parameter above, skip or let doc_billing_proof override
+    for kind in ("nic_front", "nic_back", "license_front", "license_back", "vehicle_reg", "insurance", "year_license", "eco_test", "vehicle_front", "vehicle_back", "vehicle_side"):
         file_input = locals().get(f"doc_{kind}")
         if file_input:
             url = await _save_uploaded_doc(file_input, kind)
             if url:
-                if kind == "billing_proof":
-                    driver.billing_proof_url = url
-                # check if doc already added above to avoid duplicate database inserts
-                existing_doc = None
-                if kind == "billing_proof" and billing_proof_url:
-                    # we already created it, so update the URL
-                    pass
                 doc = DriverDocument(
                     driver_id=driver.id,
                     document_type=kind,
@@ -849,25 +826,8 @@ async def admin_drivers_edit_form(
     )
     docs_by_kind = {row.document_type: row for row in dq.scalars().all()}
 
-    # Fallback/auto-create DriverDocument for billing_proof if it exists on Driver but not DriverDocument
-    if "billing_proof" not in docs_by_kind and d.billing_proof_url:
-        new_doc = DriverDocument(
-            driver_id=d.id,
-            document_type="billing_proof",
-            document_url=d.billing_proof_url,
-            is_verified=False,
-        )
-        db.add(new_doc)
-        await db.commit()
-        # Re-fetch
-        dq = await db.execute(
-            select(DriverDocument).where(DriverDocument.driver_id == d.id)
-        )
-        docs_by_kind = {row.document_type: row for row in dq.scalars().all()}
-
     docs = []
     for kind, label in [
-        ("billing_proof", "Billing Proof"),
         ("nic_front", "NIC Front"),
         ("nic_back", "NIC Back"),
         ("license_front", "Driving License Front"),
@@ -922,9 +882,6 @@ async def admin_drivers_edit_submit(
     relative_name: str = Form(""),
     relative_contact: str = Form(""),
     relative_relationship: str = Form(""),
-    billing_proof: UploadFile | None = File(None),
-    remove_billing: str = Form(""),
-    doc_billing_proof: UploadFile | None = File(None),
     doc_nic_front: UploadFile | None = File(None),
     doc_nic_back: UploadFile | None = File(None),
     doc_license_front: UploadFile | None = File(None),
@@ -1007,47 +964,6 @@ async def admin_drivers_edit_submit(
     d.relative_contact = relative_contact or None
     d.relative_relationship = relative_relationship or None
 
-    # Billing proof handling
-    new_billing_url = await _save_uploaded_photo(billing_proof)
-    if new_billing_url:
-        d.billing_proof_url = new_billing_url
-        # Sync to DriverDocument
-        from app.models import DriverDocument
-        exq = await db.execute(
-            select(DriverDocument).where(
-                DriverDocument.driver_id == d.id,
-                DriverDocument.document_type == "billing_proof",
-            )
-        )
-        existing = exq.scalars().first()
-        if existing:
-            existing.document_url = new_billing_url
-            existing.is_verified = False
-            existing.verified_by = None
-            existing.verified_at = None
-            existing.uploaded_at = datetime.now(timezone.utc)
-        else:
-            doc = DriverDocument(
-                driver_id=d.id,
-                document_type="billing_proof",
-                document_url=new_billing_url,
-                is_verified=False,
-            )
-            db.add(doc)
-    elif remove_billing:
-        d.billing_proof_url = None
-        # Remove from DriverDocument as well
-        from app.models import DriverDocument
-        exq = await db.execute(
-            select(DriverDocument).where(
-                DriverDocument.driver_id == d.id,
-                DriverDocument.document_type == "billing_proof",
-            )
-        )
-        existing = exq.scalars().first()
-        if existing:
-            await db.delete(existing)
-
     approved_now = bool(is_approved)
     if approved_now and not d.is_approved:
         d.is_approved = True
@@ -1059,13 +975,11 @@ async def admin_drivers_edit_submit(
         d.status = DriverStatus.SUSPENDED
 
     from app.models import DriverDocument
-    for kind in ("billing_proof", "nic_front", "nic_back", "license_front", "license_back", "vehicle_reg", "insurance", "year_license", "eco_test", "vehicle_front", "vehicle_back", "vehicle_side"):
+    for kind in ("nic_front", "nic_back", "license_front", "license_back", "vehicle_reg", "insurance", "year_license", "eco_test", "vehicle_front", "vehicle_back", "vehicle_side"):
         file_input = locals().get(f"doc_{kind}")
         if file_input:
             url = await _save_uploaded_doc(file_input, kind)
             if url:
-                if kind == "billing_proof":
-                    d.billing_proof_url = url
                 exq = await db.execute(
                     select(DriverDocument).where(
                         DriverDocument.driver_id == d.id,

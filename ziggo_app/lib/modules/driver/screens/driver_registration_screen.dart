@@ -49,7 +49,6 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
   File? _vehicleFrontDoc;
   File? _vehicleBackDoc;
   File? _vehicleSideDoc;
-  File? _billingProofDoc;
 
   static const _typeLabels = {
     'nic_front': 'NIC (front)',
@@ -122,10 +121,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
       setState(() => _error = 'Please select a Profile Photo');
       return;
     }
-    if (_billingProofDoc == null) {
-      setState(() => _error = 'Please upload your Billing Proof');
-      return;
-    }
+
     if (_nicFrontDoc == null || _nicBackDoc == null || _licenseFrontDoc == null || _licenseBackDoc == null || _vehicleRegDoc == null || _insuranceDoc == null || _yearLicenseDoc == null || _ecoTestDoc == null || _vehicleFrontDoc == null || _vehicleBackDoc == null || _vehicleSideDoc == null) {
       setState(() => _error = 'Please upload all required KYC documents');
       return;
@@ -170,13 +166,6 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
         'photo': await MultipartFile.fromFile(_profilePhoto!.path),
       });
       await ApiClient.instance.dio.post('/driver/profile-photo', data: photoForm);
-
-      // 2. Upload Billing Proof
-      if (mounted) setState(() => _uploadStatus = 'Uploading billing proof...');
-      final billingForm = FormData.fromMap({
-        'photo': await MultipartFile.fromFile(_billingProofDoc!.path),
-      });
-      await ApiClient.instance.dio.post('/driver/billing-proof', data: billingForm);
 
       // 3. Upload KYC Documents
       final docs = {
@@ -551,8 +540,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                           _docUploadRow('vehicle_back', 'Vehicle Photo (back)', _vehicleBackDoc, (file) => setState(() => _vehicleBackDoc = file)),
                           const Divider(height: 20),
                           _docUploadRow('vehicle_side', 'Vehicle Photo (side)', _vehicleSideDoc, (file) => setState(() => _vehicleSideDoc = file)),
-                          const Divider(height: 20),
-                          _docUploadRow('billing_proof', 'Billing Proof (Utility bill / Bank statement)', _billingProofDoc, (file) => setState(() => _billingProofDoc = file)),
+
                         ],
                       ),
                     ),
