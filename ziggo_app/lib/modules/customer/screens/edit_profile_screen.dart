@@ -363,12 +363,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           const SizedBox(height: 24),
           _sectionLabel('Your preferences'),
           _listTile(
-            icon: Icons.translate_rounded,
-            title: 'Language',
-            subtitle: 'English',
-            onTap: () {}, // Placeholder
-          ),
-          _listTile(
             icon: Icons.emergency_outlined,
             title: 'Add emergency contact(s)',
             subtitle: auth.emergencyContact != null && auth.emergencyContact!.isNotEmpty ? auth.emergencyContact : 'Add emergency contact(s)',
