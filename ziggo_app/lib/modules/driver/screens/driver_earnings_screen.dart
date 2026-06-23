@@ -929,42 +929,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
               negative: true),
           _rateRow('Your share', '${driverShare.toStringAsFixed(1).replaceAll('.0', '')}%',
               highlight: true),
-          if (example != null) ...[
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceMuted,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.divider),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'EXAMPLE — ${(_d(example, 'distance_km')).toStringAsFixed(0)} km · '
-                    '${(_d(example, 'duration_min')).toStringAsFixed(0)} min trip',
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 10,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  _rateRow('Gross fare',
-                      'Rs.${_d(example, 'gross_total').toStringAsFixed(2)}'),
-                  _rateRow('− App usage charge',
-                      'Rs.${_d(example, 'platform_fee').toStringAsFixed(2)}',
-                      negative: true),
-                  const Divider(height: 18, color: AppColors.divider),
-                  _rateRow('You earn',
-                      'Rs.${_d(example, 'driver_earnings').toStringAsFixed(2)}',
-                      highlight: true),
-                ],
-              ),
-            ),
-          ],
+
         ],
       ),
     );
