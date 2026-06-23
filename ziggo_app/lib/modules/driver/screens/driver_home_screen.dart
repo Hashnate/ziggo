@@ -923,9 +923,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final expanded = _incentivesExpanded;
 
     final hasIncentives = incentives.isNotEmpty;
-    final mainTitle = hasIncentives ? (incentives.first['title'] ?? 'Incentives') : 'Driver Incentives';
-    final mainRemaining = hasIncentives
-        ? _getRemainingText((incentives.first['limit_days'] as num?)?.toInt() ?? 1)
+    final activeInc = hasIncentives ? incentives[_activeIncentiveIndex] : null;
+    final mainTitle = activeInc != null ? (activeInc['title'] ?? 'Incentives') : 'Driver Incentives';
+    final mainRemaining = activeInc != null
+        ? _getRemainingText((activeInc['limit_days'] as num?)?.toInt() ?? 1)
         : '';
 
     return Container(
@@ -1204,18 +1205,20 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     width: 24,
                     height: 24,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: ridesCompleted > 0 ? const Color(0xFFF97316) : Colors.white,
                       shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFF4B5563), width: 2),
+                      border: Border.all(
+                        color: ridesCompleted > 0 ? const Color(0xFFF97316) : const Color(0xFF4B5563), 
+                        width: 2
+                      ),
                     ),
                     alignment: Alignment.center,
                     child: Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: ridesCompleted > 0 ? const Color(0xFFF97316) : Colors.white,
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
                         shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF9CA3AF), width: 1.5),
                       ),
                     ),
                   ),
@@ -1228,18 +1231,20 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     width: 24,
                     height: 24,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: ridesCompleted >= endTrips ? const Color(0xFFF97316) : Colors.white,
                       shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFF4B5563), width: 2),
+                      border: Border.all(
+                        color: ridesCompleted >= endTrips ? const Color(0xFFF97316) : const Color(0xFF4B5563), 
+                        width: 2
+                      ),
                     ),
                     alignment: Alignment.center,
                     child: Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: ridesCompleted >= endTrips ? const Color(0xFFF97316) : Colors.white,
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
                         shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF9CA3AF), width: 1.5),
                       ),
                     ),
                   ),
