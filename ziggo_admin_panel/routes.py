@@ -5702,6 +5702,20 @@ async def admin_finance_driver_detail(
     )
 
 
+@router.post("/finance/drivers/{driver_id}/pay_incentive")
+async def admin_finance_driver_pay_incentive(
+    driver_id: int,
+    amount: float = Form(...),
+    note: str = Form("Incentive Payment"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from decimal import Decimal
+    await fin.execute_driver_payout(db, driver_id, Decimal(str(amount)), note)
+    return RedirectResponse(url=f"/admin/finance/drivers/{driver_id}", status_code=303)
+
+
+
 @router.get("/finance/customers", response_class=HTMLResponse)
 async def admin_finance_customers(
     request: Request,
