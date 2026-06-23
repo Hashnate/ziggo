@@ -213,6 +213,19 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       bulkRes.forEach((st, res) {
         if (res is Map) {
           final resMap = Map<String, dynamic>.from(res);
+          
+          if (widget.tripType == 'return') {
+            if (resMap['final_amount'] != null) {
+              resMap['final_amount'] = (resMap['final_amount'] as num) * 2;
+            }
+            if (resMap['duration_min'] != null) {
+              resMap['duration_min'] = (resMap['duration_min'] as num) * 2;
+            }
+            if (resMap['distance_km'] != null) {
+              resMap['distance_km'] = (resMap['distance_km'] as num) * 2;
+            }
+          }
+
           if (widget.isTruckMode && st == 'truck') {
             // Mock truck variations based on the base truck fare
             final baseAmt = resMap['final_amount'] as num;
@@ -247,6 +260,9 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     });
     
     final pointsToVisit = [widget.pickup.location, ...widget.stops.map((s) => s.location), widget.drop.location];
+    if (widget.tripType == 'return') {
+      pointsToVisit.add(widget.pickup.location);
+    }
     _mapController.fitBounds(pointsToVisit, padding: 80);
  
     List<LatLng> fullRoute = [];
@@ -572,13 +588,13 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                   point: widget.pickup.location,
                   icon: Icons.my_location_rounded,
                   color: AppColors.info,
-                  label: 'Pickup | ${widget.pickup.name}',
+                  label: widget.tripType == 'return' ? 'Pickup / Drop | ${widget.pickup.name}' : 'Pickup | ${widget.pickup.name}',
                 ),
                 pinMarker(
                   point: widget.drop.location,
                   icon: Icons.location_on_rounded,
-                  color: AppColors.primaryDark,
-                  label: 'Drop | ${widget.drop.name}',
+                  color: widget.tripType == 'return' ? Colors.orange : AppColors.primaryDark,
+                  label: widget.tripType == 'return' ? 'Stop | ${widget.drop.name}' : 'Drop | ${widget.drop.name}',
                 ),
                 for (int i = 0; i < widget.stops.length; i++)
                   pinMarker(
@@ -592,7 +608,9 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                 ZiggoPolyline(
                   points: _routePoints.isNotEmpty 
                       ? _routePoints 
-                      : [widget.pickup.location, ...widget.stops.map((s) => s.location), widget.drop.location],
+                      : (widget.tripType == 'return' 
+                          ? [widget.pickup.location, ...widget.stops.map((s) => s.location), widget.drop.location, widget.pickup.location]
+                          : [widget.pickup.location, ...widget.stops.map((s) => s.location), widget.drop.location]),
                   strokeWidth: 4,
                   color: Colors.black,
                 ),
