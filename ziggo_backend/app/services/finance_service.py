@@ -283,7 +283,7 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
             earn = _dec(b.driver_earnings)
             total += earn
             ride_count += 1
-            ts = b.completed_at or b.created_at
+            ts = b.completed_at or b.booked_at
             if ts is not None:
                 ts_aware = ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
                 if ts_aware >= today:
@@ -385,7 +385,7 @@ async def driver_finance_detail(db: AsyncSession, driver_id: int) -> Optional[di
             "platform_fee": float(_dec(b.platform_fee)),
             "status": b.status.value if b.status else "",
             "payment": b.payment_method or "",
-            "when": (b.completed_at or b.created_at).isoformat() if (b.completed_at or b.created_at) else "",
+            "when": (b.completed_at or b.booked_at).isoformat() if (b.completed_at or b.booked_at) else "",
         })
     for o in foods:
         earn = (_dec(o.delivery_fee) * (Decimal("1") - _PLATFORM_DELIVERY_CUT)).quantize(Decimal("0.01"))
@@ -580,7 +580,7 @@ async def customer_finance_detail(db: AsyncSession, customer_id: int) -> Optiona
             "amount": float(_dec(b.final_amount or b.total_amount)),
             "status": b.status.value if b.status else "",
             "payment": b.payment_method or "",
-            "when": (b.completed_at or b.created_at).isoformat() if (b.completed_at or b.created_at) else "",
+            "when": (b.completed_at or b.booked_at).isoformat() if (b.completed_at or b.booked_at) else "",
         })
     for o in foods:
         timeline.append({
