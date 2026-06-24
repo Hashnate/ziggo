@@ -2086,35 +2086,57 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               ),
             ],
           ),
-          actionsAlignment: MainAxisAlignment.center,
+          actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold)),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton(
-              onPressed: () async {
-                final otp = textController.text.trim();
-                if (otp.length != 4) {
-                  setState(() => errorText = 'Enter 4 digits');
-                  return;
-                }
-                final success = await driver.updateRideStatus('started', otp: otp);
-                if (success) {
-                  Navigator.of(ctx).pop(true);
-                } else {
-                  setState(() => errorText = 'Invalid OTP. Please try again.');
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('Start Trip', style: TextStyle(fontWeight: FontWeight.bold)),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    style: TextButton.styleFrom(
+                      backgroundColor: AppColors.surfaceMuted,
+                      foregroundColor: AppColors.textPrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(100),
+                      ),
+                    ),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final otp = textController.text.trim();
+                      if (otp.length != 4) {
+                        setState(() => errorText = 'Enter 4 digits');
+                        return;
+                      }
+                      final success = await driver.updateRideStatus('started', otp: otp);
+                      if (success) {
+                        Navigator.of(ctx).pop(true);
+                      } else {
+                        setState(() => errorText = 'Invalid OTP. Please try again.');
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+                    ),
+                    child: const Text(
+                      'Start Trip',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
