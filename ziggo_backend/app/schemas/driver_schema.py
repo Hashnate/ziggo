@@ -25,6 +25,7 @@ class DriverRegisterRequest(BaseModel):
     relative_name: Optional[str] = None
     relative_contact: Optional[str] = None
     relative_relationship: Optional[str] = None
+    referral_code: Optional[str] = None
 
 
 class AdminDriverCreateRequest(BaseModel):

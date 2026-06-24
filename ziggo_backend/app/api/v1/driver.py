@@ -290,6 +290,28 @@ async def register_driver(
     if body.email:
         user.email = body.email
 
+    # Process referral code if provided and not already applied
+    if body.referral_code and user.referred_by_user_id is None:
+        referrer_q = await db.execute(select(User).where(User.referral_code == body.referral_code))
+        referrer = referrer_q.scalars().first()
+        if not referrer:
+            raise HTTPException(status_code=400, detail="Invalid referral code")
+        if referrer.id == user.id:
+            raise HTTPException(status_code=400, detail="You cannot refer yourself")
+
+        user.referred_by_user_id = referrer.id
+        from ...models import ReferralBonus, ReferralKind, ReferralStatus
+        bonus = ReferralBonus(
+            referrer_user_id=referrer.id,
+            referred_user_id=user.id,
+            kind=ReferralKind.credit,
+            referrer_amount=Decimal("300.00"),
+            referred_amount=Decimal("300.00"),
+            status=ReferralStatus.pending,
+            trigger_description="Referral bonus — driver completed first order"
+        )
+        db.add(bonus)
+
     # Uniqueness check for nic, license, vehicle_number (allow re-submit by same driver)
     for field, value in [
         (Driver.nic_number, body.nic_number),
