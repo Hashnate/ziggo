@@ -83,68 +83,7 @@ class _QrPayScanScreenState extends State<QrPayScanScreen> {
     }
   }
 
-  void _showSimulateDialog() {
-    final controller = TextEditingController(text: 'ziggopay://pay?type=restaurant&id=1');
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text(
-          'Simulate QR Scan',
-          style: TextStyle(fontWeight: FontWeight.w900),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Enter QR code payload string:',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: AppColors.surfaceMuted,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-                hintText: 'ziggopay://pay?type=restaurant&id=1',
-              ),
-              style: const TextStyle(fontSize: 14),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Demo options:\n'
-              '• KFC Colombo: ziggopay://pay?type=restaurant&id=1\n'
-              '• Keells Super: ziggopay://pay?type=market_vendor&id=1',
-              style: TextStyle(color: AppColors.textTertiary, fontSize: 11, height: 1.5),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _handlePayload(controller.text);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black,
-              foregroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Simulate Scan', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -253,28 +192,6 @@ class _QrPayScanScreenState extends State<QrPayScanScreen> {
                 const Text(
                   'Align QR code within the frame',
                   style: TextStyle(color: Colors.white60, fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton.icon(
-                    onPressed: _showSimulateDialog,
-                    icon: const Icon(Icons.integration_instructions_rounded),
-                    label: const Text(
-                      'Simulate QR Scan (Emulator)',
-                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white.withOpacity(0.15),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: Colors.white.withOpacity(0.18)),
-                      ),
-                    ),
-                  ),
                 ),
               ],
             ),
