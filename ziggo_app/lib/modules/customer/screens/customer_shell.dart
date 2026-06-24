@@ -135,16 +135,6 @@ class CustomerShellState extends State<CustomerShell> {
         key: _scaffoldKey,
         backgroundColor: AppColors.background,
         extendBody: true,
-        drawer: CustomerDrawer(
-          onProfile: () => _open(const ProfileScreen()),
-          onPlaces: () => _open(const SavedAddressesScreen()),
-          onTrips: () => _open(const RideHistoryScreen()),
-          onPromos: () => _open(const PromotionsScreen()),
-          onWallet: () => _open(const WalletScreen()),
-          onNotifications: () => _open(const NotificationsScreen()),
-          onSupport: () => _open(const SupportScreen()),
-          onGold: () => _open(const SubscriptionScreen()),
-        ),
         body: IndexedStack(
           index: _index,
           children: _screens,
