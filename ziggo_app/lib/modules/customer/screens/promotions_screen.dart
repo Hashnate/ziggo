@@ -148,8 +148,8 @@ class _PromoCard extends StatelessWidget {
         final d = DateTime.parse(validTo).toLocal();
         chips.add(_chip(
           'Until ${d.day} ${_months[d.month - 1]}',
-          bg: const Color(0x14F59E0B),
-          fg: AppColors.warning,
+          bg: const Color(0xFFFFF3E0),
+          fg: const Color(0xFFE65100),
         ));
       } catch (_) {}
     }
@@ -201,17 +201,17 @@ class _PromoCard extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.local_offer_rounded, size: 24, color: Colors.black),
+                const Icon(Icons.local_offer_rounded, size: 24, color: Colors.white),
                 const SizedBox(height: 6),
                 Text(value,
                     style: const TextStyle(
                       fontWeight: FontWeight.w900,
                       fontSize: 18,
-                      color: Colors.black,
+                      color: Colors.white,
                     )),
                 const Text('OFF',
                     style: TextStyle(
-                      color: Colors.black,
+                      color: Colors.white,
                       fontWeight: FontWeight.w900,
                       fontSize: 10,
                       letterSpacing: 1.5,
