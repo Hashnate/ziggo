@@ -282,6 +282,7 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
                 continue
             earn = _dec(b.driver_earnings)
             total += earn
+            
             ride_count += 1
             ts = b.completed_at or b.booked_at
             if ts is not None:

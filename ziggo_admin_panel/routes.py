@@ -2875,12 +2875,12 @@ async def admin_restaurants(
     result = await db.execute(q)
     restaurants = result.scalars().all()
 
-    # Join the owner's phone so the admin can identify who registered each one.
+    # Join the owner's phone and name so the admin can identify who registered each one.
     owner_ids = [r.owner_id for r in restaurants if r.owner_id]
-    owner_phone_by_id: dict[int, str] = {}
+    owner_info_by_id: dict[int, dict] = {}
     if owner_ids:
         u_q = await db.execute(select(User).where(User.id.in_(owner_ids)))
-        owner_phone_by_id = {u.id: u.phone_number for u in u_q.scalars().all()}
+        owner_info_by_id = {u.id: {"phone": u.phone_number, "name": u.full_name} for u in u_q.scalars().all()}
 
     rows = [
         {
@@ -2897,7 +2897,11 @@ async def admin_restaurants(
             "eta_minutes": r.eta_minutes,
             "is_active": r.is_active,
             "owner_id": r.owner_id,
-            "owner_phone": owner_phone_by_id.get(r.owner_id or 0),
+            "owner_phone": owner_info_by_id.get(r.owner_id or 0, {}).get("phone"),
+            "owner_full_name": owner_info_by_id.get(r.owner_id or 0, {}).get("name"),
+            "lat": r.lat,
+            "lng": r.lng,
+            "image_url": r.image_url,
         }
         for r in restaurants
     ]
@@ -2928,6 +2932,8 @@ async def admin_restaurants(
 @router.post("/restaurants/{restaurant_id}/edit")
 async def admin_restaurant_edit(
     restaurant_id: int,
+    owner_phone: str = Form(None),
+    owner_full_name: str = Form(""),
     name: str = Form(...),
     description: str = Form(""),
     cuisine: str = Form(""),
@@ -2944,12 +2950,53 @@ async def admin_restaurant_edit(
     _: User = Depends(current_admin),
 ):
     from decimal import Decimal
-    from app.models import Restaurant
+    from app.models import Restaurant, UserRole, User
 
     q = await db.execute(select(Restaurant).where(Restaurant.id == restaurant_id))
     r = q.scalars().first()
     if not r:
         raise HTTPException(status_code=404, detail="Restaurant not found")
+
+    if owner_phone:
+        phone = owner_phone.strip()
+        if len(phone) != 10 or not phone.isdigit():
+            raise HTTPException(status_code=400, detail="Owner phone must be exactly 10 digits.")
+        
+        # Locate or create the owner user.
+        uq = await db.execute(select(User).where(User.phone_number == phone))
+        owner = uq.scalars().first()
+        if owner is None:
+            owner = User(
+                phone_number=phone,
+                role=UserRole.RESTAURANT_OWNER,
+                full_name=owner_full_name.strip() or None,
+                is_active=True,
+            )
+            db.add(owner)
+            await db.flush()
+        else:
+            if owner_full_name.strip():
+                owner.full_name = owner_full_name.strip()
+                
+            existing = await db.execute(
+                select(Restaurant).where(Restaurant.owner_id == owner.id, Restaurant.id != restaurant_id)
+            )
+            if existing.scalars().first() is not None:
+                raise HTTPException(status_code=400, detail=f"User {phone} already owns a different restaurant.")
+            
+            from app.models import MarketVendor as _MV
+            has_market = (
+                await db.execute(
+                    select(_MV).where(_MV.owner_id == owner.id)
+                )
+            ).scalars().first()
+            if (
+                owner.role in (UserRole.CUSTOMER, UserRole.MARKET_OWNER)
+                and not has_market
+            ):
+                owner.role = UserRole.RESTAURANT_OWNER
+
+        r.owner_id = owner.id
 
     r.name = name.strip() or r.name
     r.description = description.strip() or None

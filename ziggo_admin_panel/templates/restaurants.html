@@ -147,7 +147,7 @@
                                 </form>
                             {% endif %}
                             <button
-                                onclick='openEditRestaurant({{ r.id }}, {{ r.name|tojson }}, {{ (r.description or "")|tojson }}, {{ (r.cuisine or "")|tojson }}, {{ (r.address or "")|tojson }}, {{ (r.phone_number or "")|tojson }}, {{ (r.opening_time or "")|tojson }}, {{ (r.closing_time or "")|tojson }}, {{ (r.delivery_fee or 0)|float }}, {{ (r.eta_minutes or 30) }})'
+                                onclick='openEditRestaurant({{ r.id }}, {{ r.name|tojson }}, {{ (r.description or "")|tojson }}, {{ (r.cuisine or "")|tojson }}, {{ (r.address or "")|tojson }}, {{ (r.phone_number or "")|tojson }}, {{ (r.opening_time or "")|tojson }}, {{ (r.closing_time or "")|tojson }}, {{ (r.delivery_fee or 0)|float }}, {{ (r.eta_minutes or 30) }}, {{ (r.owner_phone or "")|tojson }}, {{ (r.owner_full_name or "")|tojson }}, {{ (r.lat or 6.9271)|float }}, {{ (r.lng or 79.8612)|float }}, {{ (r.image_url or "")|tojson }})'
                                 class="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-xs font-bold hover:bg-blue-600 hover:text-white transition inline-flex items-center gap-1">
                                 <i class="fas fa-pen text-[10px]"></i> Edit
                             </button>
@@ -211,6 +211,14 @@
         </div>
         <div class="modal-body">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Owner phone (10 digits)</label>
+                    <input id="edit_r_owner_phone" name="owner_phone" pattern="\d{10}" placeholder="0712345678" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Owner full name</label>
+                    <input id="edit_r_owner_name" name="owner_full_name" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
                 <div class="md:col-span-2">
                     <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Restaurant Name *</label>
                     <input id="edit_r_name" name="name" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
@@ -227,9 +235,21 @@
                     <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Address</label>
                     <input id="edit_r_address" name="address" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
                 </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Latitude</label>
+                    <input id="edit_r_lat" name="lat" type="number" step="0.0000001" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Longitude</label>
+                    <input id="edit_r_lng" name="lng" type="number" step="0.0000001" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
                 <div class="md:col-span-2">
                     <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Description</label>
                     <input id="edit_r_description" name="description" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Image URL (optional)</label>
+                    <input id="edit_r_image_url" name="image_url" placeholder="https://…" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Opening Time</label>
@@ -259,7 +279,7 @@
 
 {% block scripts %}
 <script>
-    function openEditRestaurant(id, name, description, cuisine, address, phone, opening, closing, delivery_fee, eta) {
+    function openEditRestaurant(id, name, description, cuisine, address, phone, opening, closing, delivery_fee, eta, owner_phone, owner_name, lat, lng, image_url) {
         document.getElementById('editRestaurantForm').action = '/admin/restaurants/' + id + '/edit';
         document.getElementById('edit_r_name').value = name || '';
         document.getElementById('edit_r_description').value = description || '';
@@ -270,6 +290,11 @@
         document.getElementById('edit_r_closing').value = closing || '';
         document.getElementById('edit_r_delivery_fee').value = delivery_fee || 0;
         document.getElementById('edit_r_eta').value = eta || 30;
+        document.getElementById('edit_r_owner_phone').value = owner_phone || '';
+        document.getElementById('edit_r_owner_name').value = owner_name || '';
+        document.getElementById('edit_r_lat').value = lat || 6.9271;
+        document.getElementById('edit_r_lng').value = lng || 79.8612;
+        document.getElementById('edit_r_image_url').value = image_url || '';
         document.getElementById('editRestaurantModal').style.display = 'flex';
     }
 
