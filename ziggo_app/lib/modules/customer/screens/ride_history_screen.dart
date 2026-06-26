@@ -15,6 +15,7 @@ class RideHistoryScreen extends StatefulWidget {
 
 class _RideHistoryScreenState extends State<RideHistoryScreen> {
   late Future<List<Map<String, dynamic>>> _future;
+  int? _expandedId;
 
   @override
   void initState() {
@@ -88,18 +89,25 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                 final status = (r['status'] ?? '').toString();
                 final meta = _statusMeta(status);
                 final serviceType = (r['service_type'] ?? 'car').toString();
+                final isExpanded = _expandedId == r['id'];
 
                 return EntranceSlide(
                   delay: Duration(milliseconds: 45 * i),
-                  child: Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppColors.cardBorder),
-                  ),
-                  child: Column(
-                    children: [
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _expandedId = isExpanded ? null : r['id'];
+                      });
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.cardBorder),
+                      ),
+                      child: Column(
+                        children: [
                       // Header
                       Padding(
                         padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
@@ -195,6 +203,25 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                           ],
                         ),
                       ),
+                      if (isExpanded) ...[
+                        const Divider(height: 1, color: AppColors.divider),
+                        Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _breakdownRow(
+                                'Duration',
+                                _formatDuration(r),
+                              ),
+                              _breakdownRow(
+                                'Distance',
+                                _formatDistance(r),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       // Footer
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -230,6 +257,7 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                     ],
                   ),
                 ),
+                ),
                 );
               },
             );
@@ -258,6 +286,75 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  String _formatDuration(Map<String, dynamic> r) {
+    final startedStr = r['started_at']?.toString();
+    final completedStr = r['completed_at']?.toString();
+    if (startedStr != null && completedStr != null) {
+      try {
+        final started = DateTime.parse(startedStr);
+        final completed = DateTime.parse(completedStr);
+        final diff = completed.difference(started);
+        final secs = diff.inMilliseconds / 1000.0;
+        if (secs < 60) {
+          return '${secs.toStringAsFixed(2)}s';
+        } else {
+          final mins = secs / 60.0;
+          return '${mins.toStringAsFixed(2)} min';
+        }
+      } catch (_) {}
+    }
+    final durationMinRaw = r['duration_min'];
+    if (durationMinRaw != null) {
+      final val = (durationMinRaw is num) ? durationMinRaw.toDouble() : double.tryParse(durationMinRaw.toString());
+      if (val != null) {
+        if (val > 300) {
+          // If value is > 300, it's almost certainly in seconds from the backend
+          return '${(val / 60).round()} min';
+        }
+        return '${val.round()} min';
+      }
+    }
+    return '0 min';
+  }
+
+  String _formatDistance(Map<String, dynamic> r) {
+    final raw = r['distance_km'];
+    final dist = raw is num ? raw : num.tryParse(raw?.toString() ?? '');
+    if (dist != null) {
+      return '${dist.toStringAsFixed(2)} km';
+    }
+    return '0.00 km';
+  }
+
+  Widget _breakdownRow(String label, String value, {bool isNegative = false, bool isBold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isBold ? FontWeight.w900 : FontWeight.w600,
+              color: isBold ? AppColors.textPrimary : AppColors.textSecondary,
+            ),
+          ),
+          Text(
+            isNegative ? '-$value' : value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isBold ? FontWeight.w900 : FontWeight.w600,
+              color: isNegative
+                  ? AppColors.error
+                  : (isBold ? AppColors.success : AppColors.textPrimary),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
