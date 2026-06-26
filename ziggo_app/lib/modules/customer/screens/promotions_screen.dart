@@ -417,49 +417,50 @@ class _CategoryChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: _cats.map((c) {
-                final selected = provider.category == c.$1;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: ChoiceChip(
-                    label: Text(c.$2),
-                    selected: selected,
-                    onSelected: (_) => provider.category = c.$1,
-                    labelStyle: TextStyle(
-                      color: selected ? Colors.white : AppColors.textPrimary,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 12,
-                    ),
-                    selectedColor: AppColors.primary,
-                    backgroundColor: Colors.white,
-                    side: BorderSide(color: selected ? AppColors.primary : AppColors.cardBorder),
-                  ),
-                );
-              }).toList(),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          ..._cats.map((c) {
+            final selected = provider.category == c.$1;
+            return Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: ChoiceChip(
+                label: Text(c.$2),
+                selected: selected,
+                onSelected: (_) => provider.category = c.$1,
+                labelStyle: TextStyle(
+                  color: selected ? Colors.white : AppColors.textPrimary,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12,
+                ),
+                selectedColor: AppColors.primary,
+                backgroundColor: Colors.white,
+                side: BorderSide(color: selected ? AppColors.primary : AppColors.cardBorder),
+              ),
+            );
+          }),
+          Container(
+            height: 24,
+            width: 1,
+            color: AppColors.divider,
+            margin: const EdgeInsets.only(left: 2, right: 8),
+          ),
+          FilterChip(
+            label: const Text('Saved'),
+            selected: provider.onlyClaimed,
+            onSelected: (v) => provider.onlyClaimed = v,
+            labelStyle: TextStyle(
+              color: provider.onlyClaimed ? Colors.white : AppColors.textPrimary,
+              fontWeight: FontWeight.w900,
+              fontSize: 12,
             ),
+            selectedColor: AppColors.success,
+            backgroundColor: Colors.white,
+            side: BorderSide(color: provider.onlyClaimed ? AppColors.success : AppColors.cardBorder),
           ),
-        ),
-        const SizedBox(width: 8),
-        FilterChip(
-          label: const Text('Saved'),
-          selected: provider.onlyClaimed,
-          onSelected: (v) => provider.onlyClaimed = v,
-          labelStyle: TextStyle(
-            color: provider.onlyClaimed ? Colors.white : AppColors.textPrimary,
-            fontWeight: FontWeight.w900,
-            fontSize: 12,
-          ),
-          selectedColor: AppColors.success,
-          backgroundColor: Colors.white,
-          side: BorderSide(color: provider.onlyClaimed ? AppColors.success : AppColors.cardBorder),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
