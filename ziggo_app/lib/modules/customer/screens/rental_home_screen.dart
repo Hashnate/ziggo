@@ -10,6 +10,7 @@ import '../booking_provider.dart';
 import 'ride_tracking_screen.dart';
 import 'rental_pickup_map_screen.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
+import 'rental_confirm_booking_screen.dart';
 
 class RentalHomeScreen extends StatefulWidget {
   const RentalHomeScreen({super.key});
@@ -20,11 +21,16 @@ class RentalHomeScreen extends StatefulWidget {
 
 class _RentalHomeScreenState extends State<RentalHomeScreen> {
   Place? _pickup;
+  Place? _drop;
   bool _isNow = true;
   String _vehicleType = 'car';
   int _hours = 1;
   double _distance = 5;
   ({String name, String phone})? _friend;
+  
+  bool _isCalculated = false;
+  int? _calculatedMinutes;
+  double? _calculatedDistanceKm;
 
   bool _busy = false;
 
@@ -82,56 +88,112 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
       await _selectPickup();
       if (_pickup == null) return;
     }
-    _book();
-  }
-
-  Future<void> _book() async {
-    setState(() => _busy = true);
-    final created = await context.read<BookingProvider>().createBooking(
-          serviceType: _vehicleType,
-          pickup: _pickup!.location,
-          pickupAddress: _pickup!.fullAddress,
-          drop: _pickup!.location,
-          dropAddress: _pickup!.fullAddress,
-          paymentMethod: 'cash',
-          isRental: true,
-          rentalHours: _hours,
-        );
-    if (!mounted) return;
-    setState(() => _busy = false);
     
-    if (created == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(context.read<BookingProvider>().lastError ?? 'Could not book'),
-          backgroundColor: AppColors.error,
+    final confirmedPlace = await Navigator.push<Place>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RentalPickupMapScreen(initialLocation: _pickup!),
+      ),
+    );
+
+    if (confirmedPlace != null) {
+      if (!mounted) return;
+      setState(() => _pickup = confirmedPlace);
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => RentalConfirmBookingScreen(
+            pickup: _pickup!,
+            drop: _drop,
+            vehicleType: _vehicleType,
+            hours: _hours,
+            distance: _distance,
+          ),
         ),
       );
-      return;
+    }
+  }
+
+  Future<void> _calculatePackage() async {
+    if (_pickup == null) {
+      await _selectPickup();
+      if (_pickup == null) return;
     }
 
-    Navigator.pushReplacement(
+    final startLoc = _pickup!;
+    final p = await showPlaceSearch(
       context,
-      MaterialPageRoute(builder: (_) => const RideTrackingScreen()),
+      title: 'Choose Drop Location',
+      near: startLoc.location,
+      allowCurrentLocation: false,
+      allowSetOnMap: true,
     );
+
+    if (p == null || !mounted) return;
+
+    Place dropPlace = p;
+    if (p.name == '__SET_ON_MAP__') {
+      final confirmedPlace = await Navigator.push<Place>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => RentalPickupMapScreen(initialLocation: startLoc),
+        ),
+      );
+      if (confirmedPlace != null) {
+        dropPlace = confirmedPlace;
+      } else {
+        return;
+      }
+    }
+
+    setState(() => _busy = true);
+    final result = await MapsService.instance.directions(startLoc.location, dropPlace.location);
+    if (!mounted) return;
+    setState(() => _busy = false);
+
+    if (result != null) {
+      setState(() {
+        _drop = dropPlace;
+        _calculatedDistanceKm = result.distanceKm;
+        _calculatedMinutes = result.durationMin;
+        
+        int suggestedHrs = (result.durationMin / 60).ceil();
+        if (suggestedHrs < 1) suggestedHrs = 1;
+        if (suggestedHrs > 14) suggestedHrs = 14;
+        
+        double suggestedDist = (result.distanceKm / 5).ceil() * 5.0;
+        if (suggestedDist < 5) suggestedDist = 5;
+        if (suggestedDist > 70) suggestedDist = 70;
+
+        _hours = suggestedHrs;
+        _distance = suggestedDist;
+        _isCalculated = true;
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not calculate route. Try again.')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surface,
         elevation: 0,
+        scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Hourly Packages',
           style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.w900,
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w800,
             fontSize: 18,
           ),
         ),
@@ -141,16 +203,16 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
             child: GestureDetector(
               onTap: () => _showBookForFriendSheet(context),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.black26),
+                  color: AppColors.surfaceMuted,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.person_outline_rounded, color: Colors.black87, size: 18),
+                    const Icon(Icons.person_outline_rounded, color: AppColors.primary, size: 18),
                     const SizedBox(width: 6),
-                    Text(_friend?.name ?? 'For Me', style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600)),
+                    Text(_friend?.name ?? 'For Me', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 13)),
                   ],
                 ),
               ),
@@ -162,16 +224,18 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
         children: [
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               children: [
-                const Text('Pickup date & time', style: TextStyle(color: Colors.black54, fontSize: 13, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
                 _buildTimeToggle(),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 _buildPickupField(),
                 const SizedBox(height: 24),
+                const Text('Choose Vehicle', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 12),
                 _buildVehiclePicker(),
                 const SizedBox(height: 24),
+                const Text('Duration & Distance', style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 12),
                 _buildDurationDistanceBox(),
               ],
             ),
@@ -181,30 +245,33 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 16,
                   offset: const Offset(0, -4),
                 ),
               ],
             ),
             child: SafeArea(
-              child: SizedBox(
+              child: Container(
                 width: double.infinity,
-                height: 50,
+                height: 54,
+                decoration: BoxDecoration(
+                  gradient: AppColors.primaryGradient,
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 child: ElevatedButton(
                   onPressed: _busy ? null : _onNext,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   child: _busy 
                       ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Text('BOOK NOW', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                      : const Text('Next', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Colors.white)),
                 ),
               ),
             ),
@@ -217,10 +284,10 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
   Widget _buildTimeToggle() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFE6F0FA), // light blue
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF2943A3).withOpacity(0.3)),
+        color: AppColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(12),
       ),
+      padding: const EdgeInsets.all(4),
       child: Row(
         children: [
           Expanded(
@@ -229,19 +296,22 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: _isNow ? const Color(0xFFE6F0FA) : Colors.white,
-                  borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
+                  color: _isNow ? AppColors.surface : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: _isNow ? [
+                    BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
+                  ] : [],
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      _isNow ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                      color: _isNow ? const Color(0xFF2943A3) : Colors.black38,
+                      Icons.schedule_rounded,
+                      color: _isNow ? AppColors.primary : AppColors.textTertiary,
                       size: 18,
                     ),
                     const SizedBox(width: 8),
-                    const Text('Now', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black87)),
+                    Text('Book Now', style: TextStyle(fontWeight: FontWeight.w700, color: _isNow ? AppColors.primary : AppColors.textSecondary)),
                   ],
                 ),
               ),
@@ -268,20 +338,22 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: !_isNow ? const Color(0xFFE6F0FA) : Colors.white,
-                  borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
-                  border: const Border(left: BorderSide(color: Colors.black12)),
+                  color: !_isNow ? AppColors.surface : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: !_isNow ? [
+                    BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
+                  ] : [],
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      !_isNow ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                      color: !_isNow ? const Color(0xFF2943A3) : Colors.black38,
+                      Icons.edit_calendar_rounded,
+                      color: !_isNow ? AppColors.primary : AppColors.textTertiary,
                       size: 18,
                     ),
                     const SizedBox(width: 8),
-                    const Text('Schedule', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black87)),
+                    Text('Schedule Later', style: TextStyle(fontWeight: FontWeight.w700, color: !_isNow ? AppColors.primary : AppColors.textSecondary)),
                   ],
                 ),
               ),
@@ -296,35 +368,42 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
     return GestureDetector(
       onTap: _selectPickup,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: Colors.black12),
-          borderRadius: BorderRadius.circular(24), // Pill shape
+          color: AppColors.surface,
+          border: Border.all(color: AppColors.cardBorder),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2)),
+          ]
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                color: Color(0xFFE6F0FA),
-                shape: BoxShape.circle,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.primarySoft,
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.my_location_rounded, color: Color(0xFF2943A3), size: 16),
+              child: const Icon(Icons.my_location_rounded, color: AppColors.primary, size: 20),
             ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('PICKUP', style: TextStyle(color: Colors.black45, fontWeight: FontWeight.w700, fontSize: 10)),
-                Text(
-                  _pickup?.name ?? 'Your Location',
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-                ),
-              ],
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Pickup Location', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600, fontSize: 12)),
+                  const SizedBox(height: 4),
+                  Text(
+                    _pickup?.name ?? 'Set your location',
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: AppColors.textPrimary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
-            const Spacer(),
-            const Icon(Icons.edit_rounded, color: Colors.black38, size: 18),
+            const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textTertiary, size: 16),
           ],
         ),
       ),
@@ -341,25 +420,29 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
           return GestureDetector(
             onTap: () => setState(() => _vehicleType = v.$1),
             child: Container(
+              width: 100,
               margin: const EdgeInsets.only(right: 12),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(vertical: 16),
               decoration: BoxDecoration(
-                color: sel ? Colors.black : Colors.white,
+                color: sel ? AppColors.primarySoft : AppColors.surface,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: sel ? Colors.black : Colors.black12,
-                  width: 1,
+                  color: sel ? AppColors.primary : AppColors.cardBorder,
+                  width: sel ? 2 : 1,
                 ),
+                boxShadow: sel ? [] : [
+                  BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2))
+                ],
               ),
               child: Column(
                 children: [
-                  Icon(v.$3, size: 36, color: sel ? Colors.white : const Color(0xFF334A52)),
-                  const SizedBox(height: 8),
-                  Text(v.$2, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: sel ? Colors.white : Colors.black)),
+                  Icon(v.$3, size: 36, color: sel ? AppColors.primary : AppColors.textSecondary),
+                  const SizedBox(height: 12),
+                  Text(v.$2, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: sel ? AppColors.primary : AppColors.textPrimary)),
                   const SizedBox(height: 4),
                   Text(
                     'Rs.${v.$5.toInt() * _hours}',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: sel ? Colors.white70 : Colors.black45),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: sel ? AppColors.primary.withOpacity(0.8) : AppColors.textSecondary),
                   ),
                 ],
               ),
@@ -373,76 +456,92 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
   Widget _buildDurationDistanceBox() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF3F4F6),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.cardBorder),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2)),
+        ]
       ),
       child: Column(
         children: [
           // Hours Selector
-          Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-            ),
+          Padding(
+            padding: const EdgeInsets.all(20),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                GestureDetector(
-                  onTap: () {
-                    if (_hours > 1) {
-                      setState(() {
-                        _hours--;
-                        if (_distance > 5) _distance -= 5;
-                      });
-                    }
-                  },
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(8)),
-                    child: const Icon(Icons.remove, color: Colors.black26),
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Duration', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600, fontSize: 13)),
+                    const SizedBox(height: 4),
+                    Text('${_hours} Hours', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.textPrimary)),
+                  ],
                 ),
-                Text(
-                  '${_hours} hr',
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    if (_hours < 14) {
-                      setState(() {
-                        _hours++;
-                        if (_distance < 70) _distance += 5;
-                      });
-                    }
-                  },
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(color: const Color(0xFF2943A3), borderRadius: BorderRadius.circular(8)),
-                    child: const Icon(Icons.add, color: Colors.white),
-                  ),
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () {
+                        if (_hours > 1) {
+                          setState(() {
+                            _hours--;
+                            if (_distance > 5) _distance -= 5;
+                          });
+                        }
+                      },
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceMuted, 
+                          borderRadius: BorderRadius.circular(12)
+                        ),
+                        child: const Icon(Icons.remove_rounded, color: AppColors.textPrimary),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      onTap: () {
+                        if (_hours < 14) {
+                          setState(() {
+                            _hours++;
+                            if (_distance < 70) _distance += 5;
+                          });
+                        }
+                      },
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppColors.primarySoft, 
+                          borderRadius: BorderRadius.circular(12)
+                        ),
+                        child: const Icon(Icons.add_rounded, color: AppColors.primary),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
           
+          const Divider(height: 1, color: AppColors.divider),
+          
           // Slider 
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            padding: const EdgeInsets.only(top: 20, left: 16, right: 16, bottom: 8),
             child: Stack(
               clipBehavior: Clip.none,
               children: [
                 SliderTheme(
                   data: SliderThemeData(
-                    activeTrackColor: const Color(0xFF2943A3),
-                    inactiveTrackColor: Colors.black12,
-                    thumbColor: const Color(0xFF2943A3),
-                    trackHeight: 4,
-                    overlayColor: const Color(0xFF2943A3).withOpacity(0.1),
-                    valueIndicatorColor: const Color(0xFF2943A3),
+                    activeTrackColor: AppColors.primary,
+                    inactiveTrackColor: AppColors.surfaceMuted,
+                    thumbColor: AppColors.primary,
+                    trackHeight: 6,
+                    overlayColor: AppColors.primary.withOpacity(0.1),
+                    valueIndicatorColor: AppColors.primary,
                   ),
                   child: Slider(
                     value: _distance,
@@ -452,17 +551,16 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
                     onChanged: (v) => setState(() => _distance = v),
                   ),
                 ),
-                // Custom 5Km Badge positioned manually for visual approximation
                 Positioned(
-                  top: -15,
+                  top: -12,
                   left: 20 + ((_distance - 5) / 65) * (MediaQuery.of(context).size.width - 100),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF2943A3),
+                      color: AppColors.primaryDark,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text('${_distance.toInt()} km', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+                    child: Text('${_distance.toInt()} km', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
                   ),
                 ),
               ],
@@ -470,42 +568,176 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
           ),
           
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            padding: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 20.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: const [
-                Text('5', style: TextStyle(color: Colors.black54, fontSize: 10)),
-                Text('70', style: TextStyle(color: Colors.black54, fontSize: 10)),
+                Text('5 km', style: TextStyle(color: AppColors.textTertiary, fontSize: 12, fontWeight: FontWeight.w600)),
+                Text('70 km', style: TextStyle(color: AppColors.textTertiary, fontSize: 12, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
-          const SizedBox(height: 12),
 
           // Bottom Banner
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: const BoxDecoration(
-              color: Color(0xFFE6F0FA), // Light blue banner
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
+          if (_isCalculated)
+            _buildCalculatedSummary()
+          else
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              decoration: const BoxDecoration(
+                color: AppColors.primarySoft,
+                borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text("Not sure about hours?", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primaryDark)),
+                  GestureDetector(
+                    onTap: _calculatePackage,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text("Help me calculate", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text("Don't know hours/distance?", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87)),
-                GestureDetector(
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Calculate feature coming soon')),
-                    );
-                  },
-                  child: const Text("Calculate", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.black87, decoration: TextDecoration.underline)),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
+    );
+  }
+
+  Widget _buildCalculatedSummary() {
+    return Column(
+      children: [
+        const Divider(height: 1, color: AppColors.divider),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          decoration: const BoxDecoration(
+            color: AppColors.primarySoft,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("Suggested package based on calculated time and distance", style: TextStyle(fontSize: 12, color: AppColors.primaryDark, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(6)),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.access_time_rounded, size: 14, color: Colors.white),
+                        const SizedBox(width: 4),
+                        Text('${_calculatedMinutes} mins', style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(6)),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.route_outlined, size: 14, color: Colors.white),
+                        const SizedBox(width: 4),
+                        Text('${_calculatedDistanceKm?.toStringAsFixed(1)} km', style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: const BoxDecoration(
+            color: Colors.transparent,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildLocationRow(Icons.my_location_rounded, AppColors.primary, 'Pickup', _pickup?.fullAddress ?? _pickup?.name ?? ''),
+              const SizedBox(height: 16),
+              _buildLocationRow(Icons.location_on_rounded, AppColors.error, 'Drop', _drop?.fullAddress ?? _drop?.name ?? ''),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: _calculatePackage,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColors.primary),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        alignment: Alignment.center,
+                        child: const Text('Edit Drop', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 13)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _isCalculated = false;
+                          _drop = null;
+                          _calculatedMinutes = null;
+                          _calculatedDistanceKm = null;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceMuted,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        alignment: Alignment.center,
+                        child: const Text('Clear', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w700, fontSize: 13)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLocationRow(IconData icon, Color color, String title, String address) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+          child: Icon(icon, size: 14, color: color),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: AppColors.textPrimary)),
+              const SizedBox(height: 2),
+              Text(address, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
