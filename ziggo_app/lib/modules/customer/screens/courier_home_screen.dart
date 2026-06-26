@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../core/map/places.dart';
-import 'choose_location_screen.dart';
-import 'flash_drop_details_screen.dart';
-import 'flash_checkout_screen.dart';
+import 'courier_location_details_screen.dart';
+import 'courier_package_details_screen.dart';
 
 /// PickMe-style Courier step 1: pick up + drop locations only. Item type,
 /// weight, payment and receiver-pays are collected on the later steps
@@ -20,29 +19,45 @@ class CourierHomeScreen extends StatefulWidget {
 class _CourierHomeScreenState extends State<CourierHomeScreen> {
   Place? _pickup;
   Place? _drop;
+  String _senderName = '';
+  String _senderPhone = '';
   String _receiverName = '';
   String _receiverPhone = '';
-  String _notes = '';
 
   Future<void> _selectPickup() async {
-    final Place? result = await Navigator.push(
+    final dynamic result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const ChooseLocationScreen()),
+      MaterialPageRoute(builder: (_) => CourierLocationDetailsScreen(
+        isPickup: true,
+        initialLocation: _pickup,
+        initialName: _senderName,
+        initialPhone: _senderPhone,
+      )),
     );
-    if (result != null) setState(() => _pickup = result);
+    if (result != null && result is Map<String, dynamic>) {
+      setState(() {
+        _pickup = result['place'];
+        _senderName = result['name'] ?? '';
+        _senderPhone = result['phone'] ?? '';
+      });
+    }
   }
 
   Future<void> _selectDrop() async {
     final dynamic result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => FlashDropDetailsScreen(initialDrop: _drop)),
+      MaterialPageRoute(builder: (_) => CourierLocationDetailsScreen(
+        isPickup: false,
+        initialLocation: _drop,
+        initialName: _receiverName,
+        initialPhone: _receiverPhone,
+      )),
     );
     if (result != null && result is Map<String, dynamic>) {
       setState(() {
         _drop = result['place'];
         _receiverName = result['name'] ?? '';
         _receiverPhone = result['phone'] ?? '';
-        _notes = result['notes'] ?? '';
       });
     }
   }
@@ -52,15 +67,17 @@ class _CourierHomeScreenState extends State<CourierHomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => FlashCheckoutScreen(
-          pickup: _pickup!,
-          drop: _drop!,
-          itemType: 'Parcel',
-          whoPays: 'Sender',
-          receiverName: _receiverName,
-          receiverPhone: _receiverPhone,
-          notes: _notes,
-          isCourier: true,
+        builder: (_) => CourierPackageDetailsScreen(
+          pickupDetails: {
+            'place': _pickup,
+            'name': _senderName,
+            'phone': _senderPhone,
+          },
+          dropDetails: {
+            'place': _drop,
+            'name': _receiverName,
+            'phone': _receiverPhone,
+          },
         ),
       ),
     );
@@ -130,7 +147,7 @@ class _CourierHomeScreenState extends State<CourierHomeScreen> {
                         isPickup: false,
                         title: 'Drop:',
                         location: _drop,
-                        accent: AppColors.warning,
+                        accent: AppColors.primary,
                         onTap: _selectDrop,
                       ),
                     ],
@@ -286,7 +303,7 @@ class _StepProgress extends StatelessWidget {
               height: 5,
               margin: EdgeInsets.only(right: i == totalSteps - 1 ? 0 : 3),
               decoration: BoxDecoration(
-                color: done ? AppColors.warning : const Color(0xFFD9D9D9),
+                color: done ? AppColors.primary : const Color(0xFFD9D9D9),
                 borderRadius: BorderRadius.circular(3),
               ),
             ),
