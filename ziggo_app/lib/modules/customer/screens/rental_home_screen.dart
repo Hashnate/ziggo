@@ -26,6 +26,8 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
   String _vehicleType = 'car';
   int _hours = 1;
   double _distance = 5;
+  DateTime? _scheduledDate;
+  TimeOfDay? _scheduledTime;
   ({String name, String phone})? _friend;
   
   bool _isCalculated = false;
@@ -109,6 +111,9 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
             vehicleType: _vehicleType,
             hours: _hours,
             distance: _distance,
+            isNow: _isNow,
+            scheduledDate: _scheduledDate,
+            scheduledTime: _scheduledTime,
           ),
         ),
       );
@@ -292,7 +297,11 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
         children: [
           Expanded(
             child: GestureDetector(
-              onTap: () => setState(() => _isNow = true),
+              onTap: () => setState(() {
+                _isNow = true;
+                _scheduledDate = null;
+                _scheduledTime = null;
+              }),
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
@@ -332,7 +341,11 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
                   initialTime: TimeOfDay.now(),
                 );
                 if (t != null && mounted) {
-                  setState(() => _isNow = false);
+                  setState(() {
+                    _isNow = false;
+                    _scheduledDate = d;
+                    _scheduledTime = t;
+                  });
                 }
               },
               child: Container(
