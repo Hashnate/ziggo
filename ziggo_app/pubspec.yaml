@@ -66,6 +66,8 @@ dependencies:
   # cover the backgrounded/killed case. Asset: assets/sounds/ride_alert.mp3.
   audioplayers: ^6.1.0
   flutter_contacts: ^2.1.0
+  pdf: ^3.12.0
+  printing: ^5.14.3
 
 dev_dependencies:
   flutter_test:
