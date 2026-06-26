@@ -515,9 +515,16 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
         }
       } catch (_) {}
     }
-    final durationMin = r['duration_min'];
-    if (durationMin != null) {
-      return '$durationMin min';
+    final durationMinRaw = r['duration_min'];
+    if (durationMinRaw != null) {
+      final val = (durationMinRaw is num) ? durationMinRaw.toDouble() : double.tryParse(durationMinRaw.toString());
+      if (val != null) {
+        if (val > 300) {
+          // If value is > 300, it's almost certainly in seconds from the backend
+          return '${(val / 60).round()} min';
+        }
+        return '${val.round()} min';
+      }
     }
     return '0 min';
   }
