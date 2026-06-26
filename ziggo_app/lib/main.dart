@@ -134,7 +134,7 @@ class _RootState extends State<_Root> {
       _fcmRegistered = true;
       unawaited(FcmService.instance.registerWithBackend());
     }
-    if (auth.role == 'driver') return const DriverHomeScreen();
+    if (auth.role == 'driver' && !auth.isCustomerMode) return const DriverHomeScreen();
     if (auth.role == 'restaurant_owner') return const RestaurantHomeScreen();
     if (auth.role == 'market_owner') return const MarketVendorHomeScreen();
     return const CustomerShell();

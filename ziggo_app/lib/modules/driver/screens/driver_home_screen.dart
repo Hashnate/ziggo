@@ -726,7 +726,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               ),
               const SizedBox(width: 8),
               GestureDetector(
-                onTap: () => _handleToggleOnline(!driver.isOnline),
+                onTap: () => context.read<AuthProvider>().toggleCustomerMode(),
                 child: Container(
                   width: 48,
                   height: 48,
@@ -736,9 +736,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     color: _kPanel,
                     boxShadow: AppStyles.shadowSm,
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.swap_horiz_rounded,
-                    color: driver.isOnline ? AppColors.primary : AppColors.textSecondary,
+                    color: AppColors.textSecondary,
                     size: 24,
                   ),
                 ),
