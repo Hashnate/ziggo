@@ -179,6 +179,13 @@ class _Header extends StatelessWidget {
             ],
           ),
         ),
+        if (auth.role == 'driver') ...[
+          _IconBubble(
+            icon: Icons.swap_horiz_rounded,
+            onTap: () => auth.toggleCustomerMode(),
+          ),
+          const SizedBox(width: 10),
+        ],
         _IconBubble(
           icon: Icons.notifications_none_rounded,
           onTap: onNotifications,

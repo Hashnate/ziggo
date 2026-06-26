@@ -59,6 +59,14 @@ class AuthProvider extends ChangeNotifier {
   String? get emergencyContact => _emergencyContact;
   String? get profilePhoto => _profilePhoto;
 
+  bool _isCustomerMode = false;
+  bool get isCustomerMode => _isCustomerMode;
+
+  void toggleCustomerMode() {
+    _isCustomerMode = !_isCustomerMode;
+    notifyListeners();
+  }
+
   Future<void> bootstrap() async {
     final t = await TokenStorage.getToken();
     final r = await TokenStorage.getRole();

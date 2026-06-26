@@ -225,12 +225,12 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
+          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
         title: GestureDetector(
@@ -238,18 +238,18 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFF103EC2),
+              color: AppColors.primary,
               borderRadius: BorderRadius.circular(100),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.person_outline_rounded, color: Colors.white, size: 18),
+                const Icon(Icons.person_outline_rounded, color: AppColors.surface, size: 18),
                 const SizedBox(width: 8),
                 Text(
                   _friend != null ? 'Booking for ${_friend!.name}' : 'Book for a friend',
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: AppColors.surface,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
@@ -265,7 +265,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
             child: const Text(
               'Skip',
               style: TextStyle(
-                color: Color(0xFF64748B),
+                color: AppColors.textSecondary,
                 fontWeight: FontWeight.w600,
                 fontSize: 15,
               ),
@@ -276,7 +276,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
       body: Column(
         children: [
           Container(
-            color: Colors.white,
+            color: AppColors.surface,
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Column(
               children: [
@@ -286,7 +286,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
               ],
             ),
           ),
-          Container(height: 8, color: const Color(0xFFF8FAFC)),
+          Container(height: 8, color: AppColors.background),
           Expanded(child: _body()),
         ],
       ),
@@ -297,7 +297,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
+        color: AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(100),
       ),
       child: Row(
@@ -308,7 +308,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
-                  color: _tripType == 'one_way' ? Colors.white : Colors.transparent,
+                  color: _tripType == 'one_way' ? AppColors.surface : Colors.transparent,
                   borderRadius: BorderRadius.circular(100),
                   boxShadow: _tripType == 'one_way'
                       ? [
@@ -327,7 +327,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                     Icon(
                       _tripType == 'one_way' ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
                       size: 18,
-                      color: _tripType == 'one_way' ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+                      color: _tripType == 'one_way' ? AppColors.textPrimary : AppColors.textTertiary,
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -335,7 +335,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                       style: TextStyle(
                         fontWeight: _tripType == 'one_way' ? FontWeight.w700 : FontWeight.w500,
                         fontSize: 14,
-                        color: _tripType == 'one_way' ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+                        color: _tripType == 'one_way' ? AppColors.textPrimary : AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -349,7 +349,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
-                  color: _tripType == 'return' ? Colors.white : Colors.transparent,
+                  color: _tripType == 'return' ? AppColors.surface : Colors.transparent,
                   borderRadius: BorderRadius.circular(100),
                   boxShadow: _tripType == 'return'
                       ? [
@@ -368,7 +368,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                     Icon(
                       _tripType == 'return' ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
                       size: 18,
-                      color: _tripType == 'return' ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+                      color: _tripType == 'return' ? AppColors.textPrimary : AppColors.textTertiary,
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -376,7 +376,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                       style: TextStyle(
                         fontWeight: _tripType == 'return' ? FontWeight.w700 : FontWeight.w500,
                         fontSize: 14,
-                        color: _tripType == 'return' ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+                        color: _tripType == 'return' ? AppColors.textPrimary : AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -404,7 +404,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                 'PICKUP',
                 textAlign: TextAlign.end,
                 style: TextStyle(
-                  color: Color(0xFF103EC2),
+                  color: AppColors.primary,
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.5,
@@ -416,10 +416,10 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
               child: Container(
                 height: 48,
                 decoration: BoxDecoration(
-                  color: pickupFocused ? Colors.white : const Color(0xFFF2F4F8),
+                  color: pickupFocused ? AppColors.surface : AppColors.surfaceMuted,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: pickupFocused ? const Color(0xFF103EC2) : Colors.transparent,
+                    color: pickupFocused ? AppColors.primary : Colors.transparent,
                     width: 1.5,
                   ),
                 ),
@@ -431,12 +431,12 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 16,
-                    color: Color(0xFF0F172A),
+                    color: AppColors.textPrimary,
                   ),
                   decoration: InputDecoration(
                     hintText: 'Your Location',
                     hintStyle: const TextStyle(
-                      color: Color(0xFF94A3B8),
+                      color: AppColors.textTertiary,
                       fontWeight: FontWeight.w500,
                       fontSize: 16,
                     ),
@@ -456,7 +456,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                             child: const Icon(
                               Icons.close_rounded,
                               size: 20,
-                              color: Color(0xFF0F172A),
+                              color: AppColors.textPrimary,
                             ),
                           )
                         : null,
@@ -476,7 +476,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                 _tripType == 'return' ? 'STOP' : 'DROP',
                 textAlign: TextAlign.end,
                 style: const TextStyle(
-                  color: Color(0xFF0F172A),
+                  color: AppColors.textPrimary,
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.5,
@@ -488,10 +488,10 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
               child: Container(
                 height: 48,
                 decoration: BoxDecoration(
-                  color: dropFocused ? Colors.white : const Color(0xFFF2F4F8),
+                  color: dropFocused ? AppColors.surface : AppColors.surfaceMuted,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: dropFocused ? const Color(0xFF103EC2) : Colors.transparent,
+                    color: dropFocused ? AppColors.primary : Colors.transparent,
                     width: 1.5,
                   ),
                 ),
@@ -503,12 +503,12 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 16,
-                    color: Color(0xFF0F172A),
+                    color: AppColors.textPrimary,
                   ),
                   decoration: InputDecoration(
                     hintText: 'Where are you going?',
                     hintStyle: const TextStyle(
-                      color: Color(0xFF94A3B8),
+                      color: AppColors.textTertiary,
                       fontWeight: FontWeight.w500,
                       fontSize: 16,
                     ),
@@ -543,7 +543,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                       child: const Icon(
                         Icons.add_rounded,
                         size: 24,
-                        color: Color(0xFF0F172A),
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ),
@@ -563,7 +563,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                   'DROP',
                   textAlign: TextAlign.end,
                   style: TextStyle(
-                    color: Color(0xFF0F172A),
+                    color: AppColors.textPrimary,
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.5,
@@ -575,7 +575,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                 child: Container(
                   height: 48,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF2F4F8),
+                    color: AppColors.surfaceMuted,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: Colors.transparent,
@@ -589,7 +589,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 16,
-                      color: Color(0xFF0F172A),
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ),
@@ -608,7 +608,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
 
     if (_results.isNotEmpty) {
       return Container(
-        color: Colors.white,
+        color: AppColors.surface,
         child: ListView.separated(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           itemCount: _results.length,
@@ -618,7 +618,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
             return ListTile(
               onTap: _resolving ? null : () => _selectPrediction(p),
               contentPadding: const EdgeInsets.symmetric(vertical: 4),
-              leading: const Icon(Icons.location_on_rounded, color: Color(0xFF64748B)),
+              leading: const Icon(Icons.location_on_rounded, color: AppColors.textSecondary),
               title: Text(p.mainText, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
               subtitle: p.secondaryText.isEmpty ? null : Text(p.secondaryText, style: const TextStyle(fontSize: 12.5)),
             );
@@ -632,7 +632,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
     final recents = RecentPlaces.items;
 
     return Container(
-      color: Colors.white,
+      color: AppColors.surface,
       child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         children: [
@@ -640,7 +640,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
             ListTile(
               onTap: _selectCurrentLocation,
               contentPadding: const EdgeInsets.symmetric(vertical: 4),
-              leading: const Icon(Icons.my_location_rounded, color: Color(0xFF103EC2)),
+              leading: const Icon(Icons.my_location_rounded, color: AppColors.primary),
               title: const Text('Your current location', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
             ),
           if (recents.isNotEmpty) ...[
@@ -653,7 +653,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF94A3B8),
+                      color: AppColors.textTertiary,
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -668,7 +668,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF103EC2),
+                        color: AppColors.primary,
                       ),
                     ),
                   ),
@@ -684,12 +684,12 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                   height: 40,
                   alignment: Alignment.center,
                   decoration: const BoxDecoration(
-                    color: Color(0xFFF1F5F9),
+                    color: AppColors.surfaceMuted,
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
                     Icons.history_rounded,
-                    color: Color(0xFF103EC2),
+                    color: AppColors.primary,
                     size: 20,
                   ),
                 ),
@@ -700,7 +700,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 16,
-                    color: Color(0xFF0F172A),
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 subtitle: p.area.isEmpty
@@ -712,11 +712,11 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w400,
-                          color: Color(0xFF64748B),
+                          color: AppColors.textSecondary,
                         ),
                       ),
               ),
-              const Divider(height: 1, color: Color(0xFFEFF1F5)),
+              const Divider(height: 1, color: AppColors.divider),
             ],
           ],
           ListTile(
@@ -732,7 +732,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
             contentPadding: const EdgeInsets.symmetric(vertical: 8),
             leading: const Icon(
               Icons.favorite_border_rounded,
-              color: Color(0xFF0F172A),
+              color: AppColors.textPrimary,
               size: 24,
             ),
             title: const Text(
@@ -740,15 +740,15 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 16,
-                color: Color(0xFF0F172A),
+                color: AppColors.textPrimary,
               ),
             ),
             trailing: const Icon(
               Icons.chevron_right_rounded,
-              color: Color(0xFF0F172A),
+              color: AppColors.textPrimary,
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFEFF1F5)),
+          const Divider(height: 1, color: AppColors.divider),
           ListTile(
             onTap: () async {
               if (!mounted) return;
@@ -768,7 +768,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
             contentPadding: const EdgeInsets.symmetric(vertical: 8),
             leading: const Icon(
               Icons.location_on_outlined,
-              color: Color(0xFF0F172A),
+              color: AppColors.textPrimary,
               size: 24,
             ),
             title: const Text(
@@ -776,11 +776,11 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 16,
-                color: Color(0xFF0F172A),
+                color: AppColors.textPrimary,
               ),
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFEFF1F5)),
+          const Divider(height: 1, color: AppColors.divider),
           ListTile(
             onTap: () async {
               final p = await showPlaceSearch(context, title: 'Add Home Address');
@@ -801,12 +801,12 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
               height: 40,
               alignment: Alignment.center,
               decoration: const BoxDecoration(
-                color: Color(0xFFEFF3FF),
+                color: AppColors.primarySoft,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.home_outlined,
-                color: Color(0xFF103EC2),
+                color: AppColors.primary,
                 size: 20,
               ),
             ),
@@ -815,16 +815,16 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 16,
-                color: Color(0xFF0F172A),
+                color: AppColors.textPrimary,
               ),
             ),
             trailing: const Icon(
               Icons.add_rounded,
-              color: Color(0xFF103EC2),
+              color: AppColors.primary,
               size: 24,
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFEFF1F5)),
+          const Divider(height: 1, color: AppColors.divider),
           ListTile(
             onTap: () async {
               final p = await showPlaceSearch(context, title: 'Add Work Address');
@@ -845,12 +845,12 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
               height: 40,
               alignment: Alignment.center,
               decoration: const BoxDecoration(
-                color: Color(0xFFEFF3FF),
+                color: AppColors.primarySoft,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.work_outline_rounded,
-                color: Color(0xFF103EC2),
+                color: AppColors.primary,
                 size: 20,
               ),
             ),
@@ -859,17 +859,17 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 16,
-                color: Color(0xFF0F172A),
+                color: AppColors.textPrimary,
               ),
             ),
             trailing: const Icon(
               Icons.add_rounded,
-              color: Color(0xFF103EC2),
+              color: AppColors.primary,
               size: 24,
             ),
           ),
           if (saved.isNotEmpty) ...[
-            const Divider(height: 1, color: Color(0xFFEFF1F5)),
+            const Divider(height: 1, color: AppColors.divider),
             for (final a in saved) ...[
               ListTile(
                 onTap: _resolving
@@ -892,12 +892,12 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                   height: 40,
                   alignment: Alignment.center,
                   decoration: const BoxDecoration(
-                    color: Color(0xFFF1F5F9),
+                    color: AppColors.surfaceMuted,
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
                     Icons.history_rounded,
-                    color: Color(0xFF103EC2),
+                    color: AppColors.primary,
                     size: 20,
                   ),
                 ),
@@ -906,7 +906,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 16,
-                    color: Color(0xFF0F172A),
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 subtitle: Text(
@@ -916,15 +916,15 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w400,
-                    color: Color(0xFF64748B),
+                    color: AppColors.textSecondary,
                   ),
                 ),
                 trailing: const Icon(
                   Icons.chevron_right_rounded,
-                  color: Color(0xFF64748B),
+                  color: AppColors.textSecondary,
                 ),
               ),
-              const Divider(height: 1, color: Color(0xFFEFF1F5)),
+              const Divider(height: 1, color: AppColors.divider),
             ],
           ],
         ],
@@ -935,7 +935,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
   void _showBookForFriendSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
