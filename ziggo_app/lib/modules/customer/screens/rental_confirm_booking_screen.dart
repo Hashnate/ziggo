@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
@@ -15,6 +16,9 @@ class RentalConfirmBookingScreen extends StatefulWidget {
   final String vehicleType;
   final int hours;
   final double distance;
+  final bool isNow;
+  final DateTime? scheduledDate;
+  final TimeOfDay? scheduledTime;
 
   const RentalConfirmBookingScreen({
     super.key,
@@ -23,6 +27,9 @@ class RentalConfirmBookingScreen extends StatefulWidget {
     required this.vehicleType,
     required this.hours,
     required this.distance,
+    this.isNow = true,
+    this.scheduledDate,
+    this.scheduledTime,
   });
 
   @override
@@ -207,10 +214,10 @@ class _RentalConfirmBookingScreenState extends State<RentalConfirmBookingScreen>
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text('Pickup Date', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: AppColors.textSecondary)),
-                              SizedBox(height: 6),
-                              Text('Today', style: TextStyle(color: AppColors.textPrimary, fontSize: 15, fontWeight: FontWeight.w800)),
+                            children: [
+                              const Text('Pickup Date', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: AppColors.textSecondary)),
+                              const SizedBox(height: 6),
+                              Text(widget.isNow ? 'Today' : (widget.scheduledDate != null ? DateFormat('MMM dd, yyyy').format(widget.scheduledDate!) : 'Today'), style: const TextStyle(color: AppColors.textPrimary, fontSize: 15, fontWeight: FontWeight.w800)),
                             ],
                           ),
                         ),
@@ -229,10 +236,10 @@ class _RentalConfirmBookingScreenState extends State<RentalConfirmBookingScreen>
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text('Pickup Time', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: AppColors.textSecondary)),
-                              SizedBox(height: 6),
-                              Text('Now', style: TextStyle(color: AppColors.textPrimary, fontSize: 15, fontWeight: FontWeight.w800)),
+                            children: [
+                              const Text('Pickup Time', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: AppColors.textSecondary)),
+                              const SizedBox(height: 6),
+                              Text(widget.isNow ? 'Now' : (widget.scheduledTime != null ? widget.scheduledTime!.format(context) : 'Now'), style: const TextStyle(color: AppColors.textPrimary, fontSize: 15, fontWeight: FontWeight.w800)),
                             ],
                           ),
                         ),
