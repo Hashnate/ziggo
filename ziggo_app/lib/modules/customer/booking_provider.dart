@@ -75,6 +75,7 @@ class BookingProvider extends ChangeNotifier {
     int redeemPoints = 0,
     // BRD: CD-19 — intermediate stops, each {lat,lng,address}
     List<Map<String, dynamic>> stops = const [],
+    List<Map<String, dynamic>> packages = const [],
   }) async {
     try {
       final resp = await ApiClient.instance.dio.post(
@@ -94,6 +95,7 @@ class BookingProvider extends ChangeNotifier {
           if (promoCode != null && promoCode.isNotEmpty) 'promo_code': promoCode,
           if (redeemPoints > 0) 'redeem_points': redeemPoints,
           if (stops.isNotEmpty) 'stops': stops,
+          if (packages.isNotEmpty) 'packages': packages,
         },
       );
       if (resp.data is! Map) return null;
@@ -129,6 +131,7 @@ class BookingProvider extends ChangeNotifier {
     bool isCourier = false,
     int redeemPoints = 0,
     List<Map<String, dynamic>> stops = const [],
+    List<Map<String, dynamic>> packages = const [],
   }) async {
     try {
       final resp = await ApiClient.instance.dio.post(
@@ -148,6 +151,7 @@ class BookingProvider extends ChangeNotifier {
           if (promoCode != null && promoCode.isNotEmpty) 'promo_code': promoCode,
           if (redeemPoints > 0) 'redeem_points': redeemPoints,
           if (stops.isNotEmpty) 'stops': stops,
+          if (packages.isNotEmpty) 'packages': packages,
         },
       );
       if (resp.data is! Map) return null;
@@ -197,6 +201,7 @@ class BookingProvider extends ChangeNotifier {
     int redeemPoints = 0,
     // BRD: CD-19 — intermediate stops
     List<Map<String, dynamic>> stops = const [],
+    List<Map<String, dynamic>> packages = const [],
   }) async {
     _setBusy(true);
     _lastError = null;
@@ -227,6 +232,7 @@ class BookingProvider extends ChangeNotifier {
             if (isCourier) 'is_courier': true,
             if (parcelType != null) 'parcel_type': parcelType,
             if (parcelWeightKg != null) 'parcel_weight_kg': parcelWeightKg,
+            if (packages.isNotEmpty) 'packages': packages,
           },
           if (isRental) ...{
             'is_rental': true,

@@ -164,69 +164,61 @@ class _ChooseLocationScreenState extends State<ChooseLocationScreen> {
   }
 
   Widget _actionCard(int savedCount) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppStyles.radiusMd),
-        border: Border.all(color: AppColors.cardBorder),
-        boxShadow: AppStyles.shadowSm,
-      ),
-      child: Column(
-        children: [
-          _actionRow(
-            icon: Icons.my_location_rounded,
-            label: 'Your current location',
-            trailing: _locating
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2.4, color: AppColors.primary),
-                  )
-                : const Icon(Icons.chevron_right_rounded,
-                    color: AppColors.textTertiary),
-            onTap: _locating ? null : _useCurrent,
-          ),
-          const Divider(height: 1, color: AppColors.divider, indent: 56),
-          _actionRow(
-            icon: Icons.pin_drop_rounded,
-            label: 'Set on map',
-            trailing: const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textTertiary),
-            onTap: _search,
-          ),
-          const Divider(height: 1, color: AppColors.divider, indent: 56),
-          _actionRow(
-            icon: Icons.favorite_border_rounded,
-            label: 'Saved Addresses',
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '$savedCount',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 14,
-                  ),
+    return Column(
+      children: [
+        _actionRow(
+          icon: Icons.my_location_rounded,
+          label: 'Your current location',
+          trailing: _locating
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2.4, color: AppColors.primary),
+                )
+              : const Icon(Icons.chevron_right_rounded,
+                  color: AppColors.textTertiary),
+          onTap: _locating ? null : _useCurrent,
+        ),
+        const Divider(height: 1, color: AppColors.divider),
+        _actionRow(
+          icon: Icons.pin_drop_rounded,
+          label: 'Set on map',
+          trailing: const Icon(Icons.chevron_right_rounded,
+              color: AppColors.textTertiary),
+          onTap: _search,
+        ),
+        const Divider(height: 1, color: AppColors.divider),
+        _actionRow(
+          icon: Icons.favorite_border_rounded,
+          label: 'Saved Addresses',
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '$savedCount',
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 14,
                 ),
-                const SizedBox(width: 6),
-                const Icon(Icons.chevron_right_rounded,
-                    color: AppColors.textTertiary),
-              ],
-            ),
-            onTap: () async {
-              final p = await Navigator.push<Place?>(
-                context,
-                MaterialPageRoute(builder: (_) => const SavedAddressesScreen(selectMode: true)),
-              );
-              if (p != null && mounted) {
-                _return(p);
-              }
-            },
+              ),
+              const SizedBox(width: 6),
+              const Icon(Icons.chevron_right_rounded,
+                  color: AppColors.textTertiary),
+            ],
           ),
-        ],
-      ),
+          onTap: () async {
+            final p = await Navigator.push<Place?>(
+              context,
+              MaterialPageRoute(builder: (_) => const SavedAddressesScreen(selectMode: true)),
+            );
+            if (p != null && mounted) {
+              _return(p);
+            }
+          },
+        ),
+      ],
     );
   }
 
@@ -240,17 +232,26 @@ class _ChooseLocationScreenState extends State<ChooseLocationScreen> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppStyles.radiusMd),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        padding: const EdgeInsets.symmetric(vertical: 16),
         child: Row(
           children: [
-            Icon(icon, color: AppColors.primary, size: 24),
-            const SizedBox(width: 16),
+            Container(
+              width: 44,
+              height: 44,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                color: AppColors.surfaceMuted,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: AppColors.primary, size: 22),
+            ),
+            const SizedBox(width: 14),
             Expanded(
               child: Text(
                 label,
                 style: const TextStyle(
                   fontWeight: FontWeight.w800,
-                  fontSize: 15,
+                  fontSize: 15.5,
                   color: AppColors.textPrimary,
                 ),
               ),
@@ -279,10 +280,10 @@ class _ChooseLocationScreenState extends State<ChooseLocationScreen> {
               height: 44,
               alignment: Alignment.center,
               decoration: const BoxDecoration(
-                color: AppColors.accent,
+                color: AppColors.primarySoft,
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: Colors.white, size: 22),
+              child: Icon(icon, color: AppColors.primary, size: 22),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -329,15 +330,15 @@ class _ChooseLocationScreenState extends State<ChooseLocationScreen> {
         child: Row(
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: 44,
+              height: 44,
               alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.accent.withOpacity(0.12),
+              decoration: const BoxDecoration(
+                color: AppColors.surfaceMuted,
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.history_rounded,
-                  color: AppColors.accent, size: 20),
+                  color: AppColors.primary, size: 22),
             ),
             const SizedBox(width: 14),
             Expanded(

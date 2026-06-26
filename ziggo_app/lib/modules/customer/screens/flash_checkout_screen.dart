@@ -315,6 +315,11 @@ class _FlashCheckoutScreenState extends State<FlashCheckoutScreen> {
                       ],
                       const SizedBox(height: 24),
 
+                      _sectionHeader('DELIVERY DETAILS'),
+                      const SizedBox(height: 12),
+                      _buildDeliverySummary(),
+                      const SizedBox(height: 24),
+
                       _sectionHeader('PARCEL WEIGHT'),
                       const SizedBox(height: 12),
                       _buildWeightPicker(),
@@ -849,6 +854,50 @@ class _FlashCheckoutScreenState extends State<FlashCheckoutScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildDeliverySummary() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _summaryRow(Icons.person_outline_rounded, 'Receiver', '${widget.receiverName} • ${widget.receiverPhone}'),
+            const Divider(height: 24),
+            _summaryRow(Icons.inventory_2_outlined, 'Item', '${widget.itemType} • Pays: ${widget.whoPays}'),
+            if (widget.notes.isNotEmpty) ...[
+              const Divider(height: 24),
+              _summaryRow(Icons.notes_rounded, 'Notes', widget.notes),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _summaryRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: AppColors.primary),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textTertiary)),
+              Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
