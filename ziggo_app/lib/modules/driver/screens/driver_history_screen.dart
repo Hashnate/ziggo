@@ -1,5 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
@@ -440,6 +444,23 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                         'Rs.${((r['driver_earnings'] as num?) ?? (r['final_amount'] as num?) ?? 0).toStringAsFixed(2)}',
                                         isBold: true,
                                       ),
+                                      const SizedBox(height: 16),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: OutlinedButton.icon(
+                                          onPressed: () => _downloadInvoice(r),
+                                          icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
+                                          label: const Text('Download Invoice PDF'),
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: AppColors.primary,
+                                            side: const BorderSide(color: AppColors.primary),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(vertical: 12),
+                                          ),
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -595,6 +616,194 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
           ],
         ),
       ],
+    );
+  }
+
+  Future<void> _downloadInvoice(Map<String, dynamic> r) async {
+    final pdf = pw.Document();
+
+    final fmt = NumberFormat.currency(symbol: 'Rs.', decimalDigits: 2);
+    final bookingRef = r['booking_ref']?.toString() ?? 'Invoice';
+    final date = r['booked_at']?.toString().substring(0, 16) ?? '';
+    final pickup = r['pickup_address']?.toString() ?? '';
+    final drop = r['drop_address']?.toString() ?? '';
+    final amount = fmt.format((r['driver_earnings'] as num?)?.toDouble() ?? (r['final_amount'] as num?)?.toDouble() ?? 0);
+    final serviceType = _formatServiceType(r['service_type']?.toString(), r);
+    final duration = _formatDuration(r);
+    final distance = _formatDistance(r);
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Header(
+                level: 0,
+                child: pw.Text('ZIGGO DRIVER INVOICE', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
+              ),
+              pw.SizedBox(height: 20),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Booking Ref: $bookingRef', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  pw.Text('Date: $date'),
+                ],
+              ),
+              pw.SizedBox(height: 10),
+              pw.Text('Service: $serviceType'),
+              pw.SizedBox(height: 30),
+              pw.Text('Trip Details', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              pw.Divider(),
+              pw.SizedBox(height: 10),
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Expanded(
+                    flex: 1,
+                    child: pw.Text('Pickup:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  ),
+                  pw.Expanded(
+                    flex: 3,
+                    child: pw.Text(pickup),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 10),
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Expanded(
+                    flex: 1,
+                    child: pw.Text('Dropoff:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  ),
+                  pw.Expanded(
+                    flex: 3,
+                    child: pw.Text(drop),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 30),
+              pw.Text('Summary', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              pw.Divider(),
+              pw.SizedBox(height: 10),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Duration:'),
+                  pw.Text(duration),
+                ],
+              ),
+              pw.SizedBox(height: 10),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Distance:'),
+                  pw.Text(distance),
+                ],
+              ),
+              pw.SizedBox(height: 20),
+              pw.Text('FARE BREAKDOWN', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+              pw.Divider(),
+              pw.SizedBox(height: 10),
+              _pdfBreakdownRow(
+                'Trip Fare / Base Fare',
+                'Rs.${((r['fare_amount'] as num?) ?? 0).toStringAsFixed(2)}',
+              ),
+              if (((r['pickup_fee'] as num?) ?? 0) > 0)
+                _pdfBreakdownRow(
+                  '  • Included Pickup Fee',
+                  'Rs.${((r['pickup_fee'] as num?) ?? 0).toStringAsFixed(2)}',
+                ),
+              if (((r['boost'] as num?) ?? 0) > 0)
+                _pdfBreakdownRow(
+                  'Boost Incentive (100% to you)',
+                  'Rs.${((r['boost'] as num?) ?? 0).toStringAsFixed(2)}',
+                ),
+              if (((r['passenger_deductible'] as num?) ?? 0) > 0)
+                _pdfBreakdownRow(
+                  'Passenger Deductible (Added)',
+                  'Rs.${((r['passenger_deductible'] as num?) ?? 0).toStringAsFixed(2)}',
+                ),
+              if (((r['discount_amount'] as num?) ?? 0) > 0)
+                _pdfBreakdownRow(
+                  'Promo / Redemption Discount',
+                  'Rs.${((r['discount_amount'] as num?) ?? 0).toStringAsFixed(2)}',
+                  isNegative: true,
+                ),
+              _pdfBreakdownRow(
+                'Gross Total',
+                'Rs.${((r['final_amount'] as num?) ?? 0).toStringAsFixed(2)}',
+                isBold: true,
+              ),
+              pw.SizedBox(height: 10),
+              _pdfBreakdownRow(
+                'App Usage Charges (Commission)',
+                'Rs.${((r['app_usage_charges'] as num?) ?? (r['platform_fee'] as num?) ?? 0).toStringAsFixed(2)}',
+                isNegative: true,
+              ),
+              if (((r['passenger_deductible'] as num?) ?? 0) > 0)
+                _pdfBreakdownRow(
+                  'Passenger Deductible (Deducted)',
+                  'Rs.${((r['passenger_deductible'] as num?) ?? 0).toStringAsFixed(2)}',
+                  isNegative: true,
+                ),
+              _pdfBreakdownRow(
+                'Total Deductions',
+                'Rs.${((r['deductions'] as num?) ?? 0).toStringAsFixed(2)}',
+                isNegative: true,
+                isBold: true,
+              ),
+              pw.SizedBox(height: 10),
+              pw.Divider(thickness: 2),
+              pw.SizedBox(height: 10),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Net Driver Earnings:', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                  pw.Text(amount, style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.green800)),
+                ],
+              ),
+              pw.Spacer(),
+              pw.Center(
+                child: pw.Text('Thank you for driving with Ziggo!', style: pw.TextStyle(color: PdfColors.grey700, fontStyle: pw.FontStyle.italic)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    await Printing.sharePdf(bytes: await pdf.save(), filename: 'ziggo_driver_invoice_$bookingRef.pdf');
+  }
+
+  pw.Widget _pdfBreakdownRow(String label, String value, {bool isNegative = false, bool isBold = false}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 4),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text(
+            label,
+            style: pw.TextStyle(
+              fontSize: 12,
+              fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+              color: isBold ? PdfColors.black : PdfColors.grey800,
+            ),
+          ),
+          pw.Text(
+            isNegative ? '-$value' : value,
+            style: pw.TextStyle(
+              fontSize: 12,
+              fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+              color: isNegative
+                  ? PdfColors.red800
+                  : (isBold ? PdfColors.green800 : PdfColors.black),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
