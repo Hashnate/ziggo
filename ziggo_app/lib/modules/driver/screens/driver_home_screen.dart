@@ -3500,6 +3500,14 @@ class _Drawer extends StatelessWidget {
                   label: 'KYC documents',
                   onTap: onDocuments,
                 ),
+                _drawerTile(
+                  icon: Icons.swap_horiz_rounded,
+                  label: 'Switch to User',
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.read<AuthProvider>().toggleCustomerMode();
+                  },
+                ),
               ],
             ),
           ),
