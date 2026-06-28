@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:flutter/services.dart' show rootBundle;
 
 import '../../../app/app_colors.dart';
 import '../../../core/widgets/motion.dart';
@@ -412,6 +413,9 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
   Future<void> _downloadInvoice(Map<String, dynamic> r) async {
     final pdf = pw.Document();
 
+    final imageBytes = await rootBundle.load('assets/images/ziggo.png');
+    final logoImage = pw.MemoryImage(imageBytes.buffer.asUint8List());
+
     final fmt = NumberFormat.currency(symbol: 'Rs.', decimalDigits: 0);
     final bookingRef = r['booking_ref']?.toString() ?? 'Invoice';
     final date = r['booked_at']?.toString().substring(0, 16) ?? '';
@@ -429,6 +433,10 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
+              pw.Center(
+                child: pw.Image(logoImage, height: 60),
+              ),
+              pw.SizedBox(height: 20),
               pw.Header(
                 level: 0,
                 child: pw.Text('ZIGGO INVOICE', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
