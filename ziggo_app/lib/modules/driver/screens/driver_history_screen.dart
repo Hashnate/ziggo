@@ -11,6 +11,7 @@ import '../../../app/app_styles.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/widgets/motion.dart';
 import '../driver_theme.dart';
+import 'driver_ride_details_screen.dart';
 
 class DriverHistoryScreen extends StatefulWidget {
   const DriverHistoryScreen({super.key});
@@ -22,7 +23,6 @@ class DriverHistoryScreen extends StatefulWidget {
 class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
   List<Map<String, dynamic>> _rides = [];
   bool _loading = true;
-  int? _expandedId;
 
   @override
   void initState() {
@@ -46,32 +46,57 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
 
   double get _totalEarned => _rides
       .where((r) => r['status'] == 'completed')
-      .fold(0.0, (s, r) => s + ((r['driver_earnings'] as num?)?.toDouble() ?? (r['final_amount'] as num?)?.toDouble() ?? 0));
+      .fold(
+        0.0,
+        (s, r) =>
+            s +
+            ((r['driver_earnings'] as num?)?.toDouble() ??
+                (r['final_amount'] as num?)?.toDouble() ??
+                0),
+      );
 
   double get _totalDueToCompany => _rides
       .where((r) => r['status'] == 'completed')
-      .fold(0.0, (s, r) => s + ((r['app_usage_charges'] as num?)?.toDouble() ?? (r['platform_fee'] as num?)?.toDouble() ?? 0));
+      .fold(
+        0.0,
+        (s, r) =>
+            s +
+            ((r['app_usage_charges'] as num?)?.toDouble() ??
+                (r['platform_fee'] as num?)?.toDouble() ??
+                0),
+      );
 
-  int get _completedCount => _rides.where((r) => r['status'] == 'completed').length;
-  int get _cancelledCount => _rides.where((r) => r['status'] == 'cancelled').length;
+  int get _completedCount =>
+      _rides.where((r) => r['status'] == 'completed').length;
+  int get _cancelledCount =>
+      _rides.where((r) => r['status'] == 'cancelled').length;
 
   ({Color color, IconData icon, String label}) _statusMeta(String s) {
     switch (s) {
       case 'completed':
-        return (color: AppColors.success, icon: Icons.check_circle_rounded, label: 'Completed');
+        return (
+          color: AppColors.success,
+          icon: Icons.check_circle_rounded,
+          label: 'Completed',
+        );
       case 'cancelled':
-        return (color: AppColors.error, icon: Icons.cancel_rounded, label: 'Cancelled');
+        return (
+          color: AppColors.error,
+          icon: Icons.cancel_rounded,
+          label: 'Cancelled',
+        );
       default:
-        return (color: AppColors.warning, icon: Icons.directions_car_rounded, label: 'Active');
+        return (
+          color: AppColors.warning,
+          icon: Icons.directions_car_rounded,
+          label: 'Active',
+        );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: driverTheme(context),
-      child: _buildScaffold(context),
-    );
+    return Theme(data: driverTheme(context), child: _buildScaffold(context));
   }
 
   Widget _buildScaffold(BuildContext context) {
@@ -108,7 +133,10 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: AppColors.primary.withOpacity(0.18),
                                     borderRadius: BorderRadius.circular(100),
@@ -140,7 +168,10 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: AppColors.error.withOpacity(0.18),
                                     borderRadius: BorderRadius.circular(100),
@@ -215,13 +246,19 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                 color: AppColors.surfaceMuted,
                                 borderRadius: BorderRadius.circular(28),
                               ),
-                              child: const Icon(Icons.history_rounded,
-                                  size: 44, color: AppColors.textTertiary),
+                              child: const Icon(
+                                Icons.history_rounded,
+                                size: 44,
+                                color: AppColors.textTertiary,
+                              ),
                             ),
                             const SizedBox(height: 18),
                             const Text(
                               'No rides yet',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
                             ),
                           ],
                         ),
@@ -231,12 +268,15 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                     ..._rides.map((r) {
                       final status = (r['status'] ?? '').toString();
                       final meta = _statusMeta(status);
-                      final isExpanded = _expandedId == r['id'];
                       return GestureDetector(
                         onTap: () {
-                          setState(() {
-                            _expandedId = isExpanded ? null : r['id'];
-                          });
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  DriverRideDetailsScreen(rideData: r),
+                            ),
+                          );
                         },
                         child: Container(
                           margin: const EdgeInsets.only(bottom: 10),
@@ -248,7 +288,12 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                           child: Column(
                             children: [
                               Padding(
-                                padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+                                padding: const EdgeInsets.fromLTRB(
+                                  14,
+                                  14,
+                                  14,
+                                  10,
+                                ),
                                 child: Row(
                                   children: [
                                     Container(
@@ -259,12 +304,17 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                         color: meta.color.withOpacity(0.12),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
-                                      child: Icon(meta.icon, color: meta.color, size: 18),
+                                      child: Icon(
+                                        meta.icon,
+                                        color: meta.color,
+                                        size: 18,
+                                      ),
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             r['booking_ref']?.toString() ?? '',
@@ -274,7 +324,10 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                             ),
                                           ),
                                           Text(
-                                            r['booked_at']?.toString().substring(0, 16) ?? '',
+                                            r['booked_at']
+                                                    ?.toString()
+                                                    .substring(0, 16) ??
+                                                '',
                                             style: const TextStyle(
                                               fontSize: 11,
                                               color: AppColors.textTertiary,
@@ -286,10 +339,14 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                     ),
                                     Container(
                                       padding: const EdgeInsets.symmetric(
-                                          horizontal: 10, vertical: 4),
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: meta.color.withOpacity(0.12),
-                                        borderRadius: BorderRadius.circular(100),
+                                        borderRadius: BorderRadius.circular(
+                                          100,
+                                        ),
                                       ),
                                       child: Text(
                                         meta.label,
@@ -304,20 +361,32 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                   ],
                                 ),
                               ),
-                              const Divider(height: 1, color: AppColors.divider),
+                              const Divider(
+                                height: 1,
+                                color: AppColors.divider,
+                              ),
                               Padding(
-                                padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+                                padding: const EdgeInsets.fromLTRB(
+                                  14,
+                                  12,
+                                  14,
+                                  4,
+                                ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
                                       children: [
-                                        const Icon(Icons.my_location_rounded,
-                                            color: AppColors.flash, size: 13),
+                                        const Icon(
+                                          Icons.my_location_rounded,
+                                          color: AppColors.flash,
+                                          size: 13,
+                                        ),
                                         const SizedBox(width: 6),
                                         Expanded(
                                           child: Text(
-                                            r['pickup_address']?.toString() ?? '',
+                                            r['pickup_address']?.toString() ??
+                                                '',
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                             style: const TextStyle(
@@ -331,8 +400,11 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                     const SizedBox(height: 4),
                                     Row(
                                       children: [
-                                        const Icon(Icons.location_on_rounded,
-                                            color: AppColors.error, size: 13),
+                                        const Icon(
+                                          Icons.location_on_rounded,
+                                          color: AppColors.error,
+                                          size: 13,
+                                        ),
                                         const SizedBox(width: 6),
                                         Expanded(
                                           child: Text(
@@ -350,125 +422,12 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                   ],
                                 ),
                               ),
-                              if (isExpanded) ...[
-                                const Divider(height: 1, color: AppColors.divider),
-                                Padding(
-                                  padding: const EdgeInsets.all(14),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        _formatServiceType(r['service_type']?.toString(), r),
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14,
-                                          color: AppColors.textPrimary,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      _breakdownRow(
-                                        'Duration',
-                                        _formatDuration(r),
-                                      ),
-                                      _breakdownRow(
-                                        'Distance',
-                                        _formatDistance(r),
-                                      ),
-                                      const SizedBox(height: 10),
-                                      const Divider(height: 1, color: AppColors.divider),
-                                      const SizedBox(height: 10),
-                                      const Text(
-                                        'FARE BREAKDOWN',
-                                        style: TextStyle(
-                                          color: AppColors.textPrimary,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 11,
-                                          letterSpacing: 1.2,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      _breakdownRow(
-                                        'Trip Fare / Base Fare',
-                                        'Rs.${((r['fare_amount'] as num?) ?? 0).toStringAsFixed(2)}',
-                                      ),
-                                      if (((r['pickup_fee'] as num?) ?? 0) > 0)
-                                        _breakdownRow(
-                                          '  • Included Pickup Fee',
-                                          'Rs.${((r['pickup_fee'] as num?) ?? 0).toStringAsFixed(2)}',
-                                        ),
-                                      if (((r['boost'] as num?) ?? 0) > 0)
-                                        _breakdownRow(
-                                          'Boost Incentive (100% to you)',
-                                          'Rs.${((r['boost'] as num?) ?? 0).toStringAsFixed(2)}',
-                                        ),
-                                      if (((r['passenger_deductible'] as num?) ?? 0) > 0)
-                                        _breakdownRow(
-                                          'Passenger Deductible (Added)',
-                                          'Rs.${((r['passenger_deductible'] as num?) ?? 0).toStringAsFixed(2)}',
-                                        ),
-                                      if (((r['discount_amount'] as num?) ?? 0) > 0)
-                                        _breakdownRow(
-                                          'Promo / Redemption Discount',
-                                          'Rs.${((r['discount_amount'] as num?) ?? 0).toStringAsFixed(2)}',
-                                          isNegative: true,
-                                        ),
-                                      _breakdownRow(
-                                        'Gross Total',
-                                        'Rs.${((r['final_amount'] as num?) ?? 0).toStringAsFixed(2)}',
-                                        isBold: true,
-                                      ),
-                                      const SizedBox(height: 6),
-                                      const Divider(height: 1, color: AppColors.divider),
-                                      const SizedBox(height: 6),
-                                      _breakdownRow(
-                                        'App Usage Charges (Commission)',
-                                        'Rs.${((r['app_usage_charges'] as num?) ?? (r['platform_fee'] as num?) ?? 0).toStringAsFixed(2)}',
-                                        isNegative: true,
-                                      ),
-                                      if (((r['passenger_deductible'] as num?) ?? 0) > 0)
-                                        _breakdownRow(
-                                          'Passenger Deductible (Deducted)',
-                                          'Rs.${((r['passenger_deductible'] as num?) ?? 0).toStringAsFixed(2)}',
-                                          isNegative: true,
-                                        ),
-                                      _breakdownRow(
-                                        'Total Deductions',
-                                        'Rs.${((r['deductions'] as num?) ?? 0).toStringAsFixed(2)}',
-                                        isNegative: true,
-                                        isBold: true,
-                                      ),
-                                      const SizedBox(height: 6),
-                                      const Divider(height: 1, color: AppColors.divider),
-                                      const SizedBox(height: 6),
-                                      _breakdownRow(
-                                        'Net Driver Earnings',
-                                        'Rs.${((r['driver_earnings'] as num?) ?? (r['final_amount'] as num?) ?? 0).toStringAsFixed(2)}',
-                                        isBold: true,
-                                      ),
-                                      const SizedBox(height: 16),
-                                      SizedBox(
-                                        width: double.infinity,
-                                        child: OutlinedButton.icon(
-                                          onPressed: () => _downloadInvoice(r),
-                                          icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
-                                          label: const Text('Download Invoice PDF'),
-                                          style: OutlinedButton.styleFrom(
-                                            foregroundColor: AppColors.primary,
-                                            side: const BorderSide(color: AppColors.primary),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                            padding: const EdgeInsets.symmetric(vertical: 12),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 10),
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
                                 decoration: const BoxDecoration(
                                   color: AppColors.surfaceMuted,
                                   borderRadius: BorderRadius.only(
@@ -539,7 +498,9 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
     }
     final durationMinRaw = r['duration_min'];
     if (durationMinRaw != null) {
-      final val = (durationMinRaw is num) ? durationMinRaw.toDouble() : double.tryParse(durationMinRaw.toString());
+      final val = (durationMinRaw is num)
+          ? durationMinRaw.toDouble()
+          : double.tryParse(durationMinRaw.toString());
       if (val != null) {
         if (val > 300) {
           // If value is > 300, it's almost certainly in seconds from the backend
@@ -560,7 +521,12 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
     return '0.00 km';
   }
 
-  Widget _breakdownRow(String label, String value, {bool isNegative = false, bool isBold = false}) {
+  Widget _breakdownRow(
+    String label,
+    String value, {
+    bool isNegative = false,
+    bool isBold = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -631,7 +597,11 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
     final date = r['booked_at']?.toString().substring(0, 16) ?? '';
     final pickup = r['pickup_address']?.toString() ?? '';
     final drop = r['drop_address']?.toString() ?? '';
-    final amount = fmt.format((r['driver_earnings'] as num?)?.toDouble() ?? (r['final_amount'] as num?)?.toDouble() ?? 0);
+    final amount = fmt.format(
+      (r['driver_earnings'] as num?)?.toDouble() ??
+          (r['final_amount'] as num?)?.toDouble() ??
+          0,
+    );
     final serviceType = _formatServiceType(r['service_type']?.toString(), r);
     final duration = _formatDuration(r);
     final distance = _formatDistance(r);
@@ -643,26 +613,40 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Center(
-                child: pw.Image(logoImage, height: 60),
-              ),
+              pw.Center(child: pw.Image(logoImage, height: 60)),
               pw.SizedBox(height: 20),
               pw.Header(
                 level: 0,
-                child: pw.Text('ZIGGO DRIVER INVOICE', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
+                child: pw.Text(
+                  'ZIGGO DRIVER INVOICE',
+                  style: pw.TextStyle(
+                    fontSize: 24,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.blue900,
+                  ),
+                ),
               ),
               pw.SizedBox(height: 20),
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('Booking Ref: $bookingRef', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  pw.Text(
+                    'Booking Ref: $bookingRef',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                  ),
                   pw.Text('Date: $date'),
                 ],
               ),
               pw.SizedBox(height: 10),
               pw.Text('Service: $serviceType'),
               pw.SizedBox(height: 30),
-              pw.Text('Trip Details', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              pw.Text(
+                'Trip Details',
+                style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
               pw.Divider(),
               pw.SizedBox(height: 10),
               pw.Row(
@@ -670,12 +654,12 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                 children: [
                   pw.Expanded(
                     flex: 1,
-                    child: pw.Text('Pickup:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    child: pw.Text(
+                      'Pickup:',
+                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                    ),
                   ),
-                  pw.Expanded(
-                    flex: 3,
-                    child: pw.Text(pickup),
-                  ),
+                  pw.Expanded(flex: 3, child: pw.Text(pickup)),
                 ],
               ),
               pw.SizedBox(height: 10),
@@ -684,35 +668,41 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                 children: [
                   pw.Expanded(
                     flex: 1,
-                    child: pw.Text('Dropoff:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    child: pw.Text(
+                      'Dropoff:',
+                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                    ),
                   ),
-                  pw.Expanded(
-                    flex: 3,
-                    child: pw.Text(drop),
-                  ),
+                  pw.Expanded(flex: 3, child: pw.Text(drop)),
                 ],
               ),
               pw.SizedBox(height: 30),
-              pw.Text('Summary', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              pw.Text(
+                'Summary',
+                style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
               pw.Divider(),
               pw.SizedBox(height: 10),
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('Duration:'),
-                  pw.Text(duration),
-                ],
+                children: [pw.Text('Duration:'), pw.Text(duration)],
               ),
               pw.SizedBox(height: 10),
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('Distance:'),
-                  pw.Text(distance),
-                ],
+                children: [pw.Text('Distance:'), pw.Text(distance)],
               ),
               pw.SizedBox(height: 20),
-              pw.Text('FARE BREAKDOWN', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+              pw.Text(
+                'FARE BREAKDOWN',
+                style: pw.TextStyle(
+                  fontSize: 14,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
               pw.Divider(),
               pw.SizedBox(height: 10),
               _pdfBreakdownRow(
@@ -769,13 +759,32 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('Net Driver Earnings:', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
-                  pw.Text(amount, style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.green800)),
+                  pw.Text(
+                    'Net Driver Earnings:',
+                    style: pw.TextStyle(
+                      fontSize: 16,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  pw.Text(
+                    amount,
+                    style: pw.TextStyle(
+                      fontSize: 16,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.green800,
+                    ),
+                  ),
                 ],
               ),
               pw.Spacer(),
               pw.Center(
-                child: pw.Text('Thank you for driving with Ziggo!', style: pw.TextStyle(color: PdfColors.grey700, fontStyle: pw.FontStyle.italic)),
+                child: pw.Text(
+                  'Thank you for driving with Ziggo!',
+                  style: pw.TextStyle(
+                    color: PdfColors.grey700,
+                    fontStyle: pw.FontStyle.italic,
+                  ),
+                ),
               ),
             ],
           );
@@ -783,10 +792,18 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
       ),
     );
 
-    await Printing.sharePdf(bytes: await pdf.save(), filename: 'ziggo_driver_invoice_$bookingRef.pdf');
+    await Printing.sharePdf(
+      bytes: await pdf.save(),
+      filename: 'ziggo_driver_invoice_$bookingRef.pdf',
+    );
   }
 
-  pw.Widget _pdfBreakdownRow(String label, String value, {bool isNegative = false, bool isBold = false}) {
+  pw.Widget _pdfBreakdownRow(
+    String label,
+    String value, {
+    bool isNegative = false,
+    bool isBold = false,
+  }) {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(vertical: 4),
       child: pw.Row(

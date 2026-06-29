@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import '../../../app/app_colors.dart';
+import '../../../app/app_styles.dart';
+
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../../core/network/api_client.dart';
 
-const _gold = Color(0xFFFFD54F);
 
 String _money(num v) => 'LKR ${NumberFormat('#,##0').format(v)}';
 
@@ -43,22 +45,22 @@ class _OfferChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF2563EB).withOpacity(0.04),
-        borderRadius: BorderRadius.circular(8),
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(AppStyles.radiusSm),
         border: Border.all(
-          color: const Color(0xFF2563EB).withOpacity(0.3),
+          color: const Color(0xFF3B82F6).withOpacity(0.3),
           width: 1,
         ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.sell_rounded, size: 14, color: Color(0xFF2563EB)),
+          const Icon(Icons.local_offer_rounded, size: 14, color: Color(0xFF3B82F6)),
           const SizedBox(width: 4),
           Text(
             label,
             style: const TextStyle(
-              color: Color(0xFF2563EB),
+              color: Color(0xFF3B82F6),
               fontWeight: FontWeight.w700,
               fontSize: 11,
             ),
@@ -108,13 +110,13 @@ class _EventCartScreenState extends State<EventCartScreen> {
     final ev = widget.event;
     final startsAt = DateTime.tryParse(ev['starts_at']?.toString() ?? '')?.toLocal();
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.background,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
-        title: const Text('Cart',
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 18)),
+        iconTheme: IconThemeData(color: AppColors.textPrimary),
+        title: Text('Cart',
+            style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w900, fontSize: 18)),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -130,8 +132,8 @@ class _EventCartScreenState extends State<EventCartScreen> {
             ],
           ),
           const SizedBox(height: 20),
-          const Text('Available Tickets',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black)),
+          Text('Available Tickets',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textPrimary)),
           const SizedBox(height: 12),
           for (final t in _tiers) _tierCard(t),
         ],
@@ -142,42 +144,74 @@ class _EventCartScreenState extends State<EventCartScreen> {
 
   Widget _eventStrip(Map<String, dynamic> ev, DateTime? startsAt) {
     final image = ev['image_url']?.toString();
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: SizedBox(
-            width: 56,
-            height: 56,
-            child: image != null && image.isNotEmpty
-                ? Image.network(image, fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(color: Colors.grey.shade200))
-                : Container(color: Colors.grey.shade200),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 16, offset: const Offset(0, 8)),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 4)),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: SizedBox(
+                width: 76,
+                height: 76,
+                child: image != null && image.isNotEmpty
+                    ? Image.network(image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: Colors.grey.shade200))
+                    : Container(color: Colors.grey.shade200),
+              ),
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(ev['name']?.toString() ?? '',
-                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
-                  maxLines: 2, overflow: TextOverflow.ellipsis),
-              const SizedBox(height: 4),
-              if (startsAt != null)
-                Text('${DateFormat('d MMM').format(startsAt)}  •  ${DateFormat('h:mm a').format(startsAt)} onwards',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w600)),
-              if ((ev['venue']?.toString() ?? '').isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(ev['venue'].toString(),
-                      style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w600)),
-                ),
-            ],
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(ev['name']?.toString() ?? '',
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppColors.textPrimary, letterSpacing: -0.3),
+                    maxLines: 2, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 8),
+                if (startsAt != null)
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_month_rounded, size: 14, color: AppColors.primary),
+                      const SizedBox(width: 6),
+                      Text('${DateFormat('d MMM').format(startsAt)}  •  ${DateFormat('h:mm a').format(startsAt)}',
+                          style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                if ((ev['venue']?.toString() ?? '').isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.place_rounded, size: 14, color: AppColors.primary),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(ev['venue'].toString(),
+                              style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w700),
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -186,12 +220,24 @@ class _EventCartScreenState extends State<EventCartScreen> {
     final available = _tierAvailable(t);
     final qty = _qty[id] ?? 0;
     final window = _tierWindowLabel(t);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+    final isSelected = qty > 0;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF6F7F9),
-        borderRadius: BorderRadius.circular(14),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isSelected ? AppColors.primary : Colors.grey.shade200,
+          width: isSelected ? 2 : 1,
+        ),
+        boxShadow: [
+          if (isSelected)
+            BoxShadow(color: AppColors.primary.withOpacity(0.2), blurRadius: 16, offset: const Offset(0, 4))
+          else
+            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 2)),
+        ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -202,29 +248,29 @@ class _EventCartScreenState extends State<EventCartScreen> {
               children: [
                 if (!available)
                   Container(
-                    margin: const EdgeInsets.only(bottom: 6),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFF7849),
+                      color: AppColors.error.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: const Text('Not Available',
-                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
+                        style: TextStyle(color: AppColors.error, fontSize: 11, fontWeight: FontWeight.w800)),
                   ),
                 Text(t['name']?.toString() ?? '',
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.black)),
-                const SizedBox(height: 2),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.textPrimary, letterSpacing: -0.2)),
+                const SizedBox(height: 4),
                 Text(_money(_tierPrice(t)),
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.black87)),
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primary)),
                 if (window != null) ...[
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
                   Text(window,
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey)),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey)),
                 ],
               ],
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           if (!available)
             Opacity(
               opacity: 0.5,
@@ -252,24 +298,27 @@ class _EventCartScreenState extends State<EventCartScreen> {
 
   Widget _addButton({VoidCallback? onTap}) {
     return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(10),
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(99),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(99),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.grey.shade300),
+            gradient: AppColors.primaryGradient,
+            borderRadius: BorderRadius.circular(99),
+            boxShadow: [
+              BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4)),
+            ],
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
-            children: [
+            children: const [
               Text('ADD',
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Colors.black)),
-              SizedBox(width: 4),
-              Icon(Icons.add_rounded, size: 16, color: Color(0xFFFF7849)),
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Colors.white)),
+              SizedBox(width: 6),
+              Icon(Icons.add_rounded, size: 18, color: Colors.white),
             ],
           ),
         ),
@@ -280,22 +329,24 @@ class _EventCartScreenState extends State<EventCartScreen> {
   Widget _stepper({required int qty, required VoidCallback onRemove, required VoidCallback onAdd}) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _gold, width: 1.5),
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(99),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
             visualDensity: VisualDensity.compact,
-            icon: const Icon(Icons.remove_rounded, size: 18, color: Color(0xFFFF7849)),
+            icon: const Icon(Icons.remove_rounded, size: 20, color: Colors.white),
             onPressed: onRemove,
           ),
-          Text('$qty', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+          SizedBox(
+            width: 24,
+            child: Text('$qty', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.white)),
+          ),
           IconButton(
             visualDensity: VisualDensity.compact,
-            icon: const Icon(Icons.add_rounded, size: 18, color: Color(0xFFFF7849)),
+            icon: const Icon(Icons.add_rounded, size: 20, color: Colors.white),
             onPressed: onAdd,
           ),
         ],
@@ -308,7 +359,7 @@ class _EventCartScreenState extends State<EventCartScreen> {
       child: Container(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surface,
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, -4))],
         ),
         child: Row(
@@ -321,7 +372,7 @@ class _EventCartScreenState extends State<EventCartScreen> {
                   const Text('Subtotal',
                       style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w700)),
                   Text(_moneyDecimal(_subtotal),
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.black)),
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.textPrimary)),
                 ],
               ),
             ),
@@ -342,8 +393,8 @@ class _EventCartScreenState extends State<EventCartScreen> {
               },
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(0, 0),
-                backgroundColor: _gold,
-                foregroundColor: Colors.black,
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
@@ -465,23 +516,25 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFFF1F2F4),
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
-        title: const Text('Summary',
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 18)),
+        iconTheme: IconThemeData(color: AppColors.textPrimary),
+        title: Text('Summary',
+            style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w900, fontSize: 18)),
       ),
       body: Column(
         children: [
           Container(
             width: double.infinity,
-            color: Colors.black,
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: const BoxDecoration(
+              gradient: AppColors.primaryGradient,
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 14),
             child: Text.rich(
               TextSpan(
                 text: 'Complete booking in ',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+                style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13),
                 children: [
                   TextSpan(text: '$_timerLabel mins',
-                      style: const TextStyle(fontWeight: FontWeight.w900)),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
                 ],
               ),
               textAlign: TextAlign.center,
@@ -491,11 +544,11 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                _card(child: _eventStrip(ev, startsAt)),
-                const SizedBox(height: 12),
-                _card(child: _breakdown()),
-                const SizedBox(height: 12),
-                _card(child: _paymentSection()),
+                _eventStrip(ev, startsAt),
+                const SizedBox(height: 16),
+                _ticketStubBreakdown(),
+                const SizedBox(height: 16),
+                _paymentCard(),
               ],
             ),
           ),
@@ -505,99 +558,163 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
     );
   }
 
-  Widget _card({required Widget child}) {
+  Widget _eventStrip(Map<String, dynamic> ev, DateTime? startsAt) {
+    final image = ev['image_url']?.toString();
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 16, offset: const Offset(0, 8)),
+        ],
       ),
-      child: child,
-    );
-  }
-
-  Widget _eventStrip(Map<String, dynamic> ev, DateTime? startsAt) {
-    final image = ev['image_url']?.toString();
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: SizedBox(
-            width: 56,
-            height: 56,
-            child: image != null && image.isNotEmpty
-                ? Image.network(image, fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(color: Colors.grey.shade200))
-                : Container(color: Colors.grey.shade200),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 4)),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: SizedBox(
+                width: 76,
+                height: 76,
+                child: image != null && image.isNotEmpty
+                    ? Image.network(image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: Colors.grey.shade200))
+                    : Container(color: Colors.grey.shade200),
+              ),
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(ev['name']?.toString() ?? '',
-                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
-                  maxLines: 2, overflow: TextOverflow.ellipsis),
-              const SizedBox(height: 4),
-              if (startsAt != null)
-                Text('${DateFormat('d MMM').format(startsAt)}  •  ${DateFormat('h:mm a').format(startsAt)} onwards',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w600)),
-              if ((ev['venue']?.toString() ?? '').isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(ev['venue'].toString(),
-                      style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w600)),
-                ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _breakdown() {
-    return Column(
-      children: [
-        for (final t in widget.selected)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Row(
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEDEEF0),
-                    borderRadius: BorderRadius.circular(6),
+                Text(ev['name']?.toString() ?? '',
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppColors.textPrimary, letterSpacing: -0.3),
+                    maxLines: 2, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 8),
+                if (startsAt != null)
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_month_rounded, size: 14, color: AppColors.primary),
+                      const SizedBox(width: 6),
+                      Text('${DateFormat('d MMM').format(startsAt)}  •  ${DateFormat('h:mm a').format(startsAt)}',
+                          style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w700)),
+                    ],
                   ),
-                  child: Text('${t['quantity']}x',
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(t['name']?.toString() ?? '',
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                ),
-                Text(NumberFormat('#,##0.00').format(_tierPrice(t) * (t['quantity'] as int)),
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                if ((ev['venue']?.toString() ?? '').isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.place_rounded, size: 14, color: AppColors.primary),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(ev['venue'].toString(),
+                              style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w700),
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),
-        const Divider(height: 20),
-        _row('Subtotal', NumberFormat('#,##0.00').format(_subtotal)),
-        const SizedBox(height: 6),
-        _row('Convenience Fee', '+${NumberFormat('#,##0.00').format(_convenienceFee)}', info: true),
-        const Divider(height: 20),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text('Total (LKR)', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
-            Text(NumberFormat('#,##0.00').format(_total),
-                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-          ],
-        ),
-      ],
+        ],
+      ),
+    );
+  }
+
+  Widget _ticketStubBreakdown() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 16, offset: const Offset(0, 8)),
+        ],
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                for (final t in widget.selected)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text('${t['quantity']}x',
+                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: AppColors.primary)),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(t['name']?.toString() ?? '',
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                        ),
+                        Text(NumberFormat('#,##0.00').format(_tierPrice(t) * (t['quantity'] as int)),
+                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                _row('Subtotal', NumberFormat('#,##0.00').format(_subtotal)),
+                const SizedBox(height: 8),
+                _row('Convenience Fee', '+${NumberFormat('#,##0.00').format(_convenienceFee)}', info: true),
+              ],
+            ),
+          ),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                height: 20,
+                child: Row(
+                  children: [
+                    Container(width: 10, height: 20, decoration: const BoxDecoration(color: Color(0xFFF1F2F4), borderRadius: BorderRadius.horizontal(right: Radius.circular(20)))),
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final count = (constraints.constrainWidth() / 8).floor();
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: List.generate(count, (_) => const SizedBox(width: 4, height: 2, child: DecoratedBox(decoration: BoxDecoration(color: Colors.grey)))),
+                          );
+                        },
+                      ),
+                    ),
+                    Container(width: 10, height: 20, decoration: const BoxDecoration(color: Color(0xFFF1F2F4), borderRadius: BorderRadius.horizontal(left: Radius.circular(20)))),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Total (LKR)', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                Text(NumberFormat('#,##0.00').format(_total),
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppColors.primary)),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -607,7 +724,7 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
       children: [
         Row(
           children: [
-            Text(label, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600, fontSize: 13)),
+            Text(label, style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w700, fontSize: 13)),
             if (info) ...[
               const SizedBox(width: 4),
               const Icon(Icons.info_outline_rounded, size: 14, color: Colors.grey),
@@ -619,81 +736,116 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
     );
   }
 
-  Widget _paymentSection() {
+  Widget _paymentCard() {
     final isWallet = _paymentMethod == 'wallet';
-    return Column(
-      children: [
-        Row(
-          children: [
-            Icon(isWallet ? Icons.account_balance_wallet_rounded : Icons.payments_rounded,
-                color: isWallet ? const Color(0xFF22C55E) : const Color(0xFF16A34A)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(isWallet ? 'Ziggo Wallet' : 'Cash',
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
-                  if (!isWallet)
-                    const Text('Payment method is not available',
-                        style: TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ),
-            TextButton(
-              onPressed: _pickPayment,
-              child: const Text('Change',
-                  style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.w800)),
-            ),
-          ],
-        ),
-        const Divider(height: 16),
-        InkWell(
-          onTap: _enterPromo,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 16, offset: const Offset(0, 8)),
+        ],
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.local_offer_rounded, color: Colors.black54),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Promo', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
-                          Text(
-                            _promoCode == null || _promoCode!.isEmpty
-                                ? '4 promotions available'
-                                : 'Applied: $_promoCode',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF16A34A),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(Icons.chevron_right_rounded, color: Colors.grey),
-                  ],
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF22C55E).withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(isWallet ? Icons.account_balance_wallet_rounded : Icons.payments_rounded,
+                      color: const Color(0xFF22C55E), size: 20),
                 ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 8,
-                  children: const [
-                    _OfferChip(label: 'NTB Offer'),
-                    _OfferChip(label: 'Save Up to 5000'),
-                  ],
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(isWallet ? 'Ziggo Wallet' : 'Cash',
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                      if (!isWallet)
+                        const Text('Payment method is not available',
+                            style: TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
+                TextButton(
+                  onPressed: _pickPayment,
+                  style: TextButton.styleFrom(
+                    backgroundColor: AppColors.primary.withOpacity(0.1),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    minimumSize: const Size(0, 0),
+                  ),
+                  child: const Text('Change',
+                      style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w900, fontSize: 13)),
                 ),
               ],
             ),
           ),
-        ),
-      ],
+          const Divider(height: 1, color: Color(0xFFF1F2F4)),
+          InkWell(
+            onTap: _enterPromo,
+            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.local_offer_rounded, color: Colors.black54, size: 20),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Promo Code', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                            Text(
+                              _promoCode == null || _promoCode!.isEmpty
+                                  ? '4 promotions available'
+                                  : 'Applied: $_promoCode',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: _promoCode == null || _promoCode!.isEmpty
+                                    ? const Color(0xFF22C55E)
+                                    : AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    children: const [
+                      _OfferChip(label: 'NTB Offer'),
+                      _OfferChip(label: 'Save Up to 5000'),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -711,10 +863,10 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
                 style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
             const SizedBox(height: 8),
             ListTile(
-              leading: const Icon(Icons.payments_rounded, color: Color(0xFF16A34A)),
+              leading: Icon(Icons.payments_rounded, color: AppColors.textPrimary),
               title: const Text('Cash', style: TextStyle(fontWeight: FontWeight.w800)),
               trailing: _paymentMethod == 'cash'
-                  ? const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A))
+                  ? Icon(Icons.check_circle_rounded, color: AppColors.textPrimary)
                   : null,
               onTap: () {
                 setState(() => _paymentMethod = 'cash');
@@ -725,7 +877,7 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
               leading: const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF22C55E)),
               title: const Text('Ziggo Wallet', style: TextStyle(fontWeight: FontWeight.w800)),
               trailing: _paymentMethod == 'wallet'
-                  ? const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A))
+                  ? Icon(Icons.check_circle_rounded, color: AppColors.textPrimary)
                   : null,
               onTap: () {
                 setState(() => _paymentMethod = 'wallet');
@@ -768,8 +920,13 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
   Widget _purchaseBar() {
     return SafeArea(
       child: Container(
-        color: Colors.white,
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, -8)),
+          ],
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -779,42 +936,52 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
                 Checkbox(
                   value: _agreed,
                   onChanged: (v) => setState(() => _agreed = v ?? false),
-                  activeColor: const Color(0xFF16A34A),
+                  activeColor: AppColors.primary,
+                  checkColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                 ),
-                const Expanded(
+                Expanded(
                   child: Text.rich(
                     TextSpan(
                       text: 'I agree to the terms and conditions of the ',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                       children: [
-                        TextSpan(
-                          text: 'PickMe',
-                          style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.w700),
+                        const TextSpan(
+                          text: 'Ziggo',
+                          style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700),
                         ),
-                        TextSpan(text: ' and the '),
-                        TextSpan(
+                        const TextSpan(text: ' and the '),
+                        const TextSpan(
                           text: 'Event',
-                          style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.w700),
+                          style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700),
                         ),
-                        TextSpan(text: '.'),
+                        const TextSpan(text: '.'),
                       ],
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            SizedBox(
+            const SizedBox(height: 12),
+            Container(
               width: double.infinity,
+              decoration: BoxDecoration(
+                gradient: _agreed && !_busy ? AppColors.primaryGradient : null,
+                color: _agreed && !_busy ? null : Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(99),
+                boxShadow: _agreed && !_busy
+                    ? [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 16, offset: const Offset(0, 8))]
+                    : null,
+              ),
               child: ElevatedButton(
                 onPressed: _agreed && !_busy ? _purchase : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF16A34A),
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
                   foregroundColor: Colors.white,
-                  disabledBackgroundColor: const Color(0xFFA5C2B0),
-                  disabledForegroundColor: Colors.white.withOpacity(0.9),
+                  disabledForegroundColor: Colors.white,
                   elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 20),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
                 ),
                 child: _busy
@@ -851,14 +1018,14 @@ class EventTicketScreen extends StatelessWidget {
     final paid = order['payment_status']?.toString() == 'paid';
 
     return Scaffold(
-      backgroundColor: _gold,
+      backgroundColor: AppColors.primary,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
-            icon: const Icon(Icons.close_rounded, color: Colors.black),
+            icon: const Icon(Icons.close_rounded, color: Colors.white),
             onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
           ),
         ],
@@ -872,22 +1039,22 @@ class EventTicketScreen extends StatelessWidget {
               Container(
                 width: 72,
                 height: 72,
-                decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
-                child: const Icon(Icons.check_rounded, color: Colors.white, size: 40),
+                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                child: const Icon(Icons.check_rounded, color: AppColors.primary, size: 40),
               ),
               const SizedBox(height: 20),
               Text(paid ? 'Payment Successful!' : 'Booking Confirmed!',
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.black)),
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white)),
               const SizedBox(height: 6),
               Text(paid ? 'Here is your digital ticket. Have fun!' : 'Pay with cash at the venue. See you there!',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87)),
+                  style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
               const SizedBox(height: 28),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppColors.surface,
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 10))],
                 ),
@@ -922,7 +1089,7 @@ class EventTicketScreen extends StatelessWidget {
                           children: [
                             Text('${it['quantity']}x ${it['tier_name']}',
                                 style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-                            const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 16),
+                            Icon(Icons.check_circle_rounded, color: AppColors.textPrimary, size: 16),
                           ],
                         ),
                       ),
@@ -943,12 +1110,12 @@ class EventTicketScreen extends StatelessWidget {
                 child: OutlinedButton(
                   onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.black, width: 2),
+                    side: BorderSide(color: AppColors.textPrimary, width: 2),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
-                  child: const Text('BACK TO HOME',
-                      style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900)),
+                  child: Text('BACK TO HOME',
+                      style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w900)),
                 ),
               ),
             ],

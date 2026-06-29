@@ -752,7 +752,12 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
 
   Widget _dealCard(_Deal d) {
     return GestureDetector(
-      onTap: () => _soon(d.title.replaceAll('\n', ' ')),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MarketGroupScreen(groupName: d.title.replaceAll('\n', ' ')),
+        ),
+      ),
       child: Container(
         width: 166,
         decoration: BoxDecoration(
