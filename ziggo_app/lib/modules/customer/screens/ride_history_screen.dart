@@ -9,6 +9,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import '../../../app/app_colors.dart';
 import '../../../core/widgets/motion.dart';
 import '../booking_provider.dart';
+import 'ride_details_screen.dart';
 
 class RideHistoryScreen extends StatefulWidget {
   const RideHistoryScreen({super.key});
@@ -19,7 +20,6 @@ class RideHistoryScreen extends StatefulWidget {
 
 class _RideHistoryScreenState extends State<RideHistoryScreen> {
   late Future<List<Map<String, dynamic>>> _future;
-  int? _expandedId;
 
   @override
   void initState() {
@@ -93,15 +93,16 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                 final status = (r['status'] ?? '').toString();
                 final meta = _statusMeta(status);
                 final serviceType = (r['service_type'] ?? 'car').toString();
-                final isExpanded = _expandedId == r['id'];
-
                 return EntranceSlide(
                   delay: Duration(milliseconds: 45 * i),
                   child: GestureDetector(
                     onTap: () {
-                      setState(() {
-                        _expandedId = isExpanded ? null : r['id'];
-                      });
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => RideDetailsScreen(rideData: r),
+                        ),
+                      );
                     },
                     child: Container(
                       margin: const EdgeInsets.only(bottom: 12),
@@ -207,42 +208,6 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                           ],
                         ),
                       ),
-                      if (isExpanded) ...[
-                        const Divider(height: 1, color: AppColors.divider),
-                        Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _breakdownRow(
-                                'Duration',
-                                _formatDuration(r),
-                              ),
-                              _breakdownRow(
-                                'Distance',
-                                _formatDistance(r),
-                              ),
-                              const SizedBox(height: 16),
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton.icon(
-                                  onPressed: () => _downloadInvoice(r),
-                                  icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
-                                  label: const Text('Download Invoice PDF'),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: AppColors.primary,
-                                    side: const BorderSide(color: AppColors.primary),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
                       // Footer
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),

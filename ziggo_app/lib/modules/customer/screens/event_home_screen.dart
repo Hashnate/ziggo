@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -57,39 +58,7 @@ class _EventHomeScreenState extends State<EventHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        elevation: 0,
-        title: const Text(
-          'Events',
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-            fontSize: 18,
-          ),
-        ),
-        iconTheme: const IconThemeData(color: Colors.white),
-        actions: [
-          IconButton(
-            icon: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
-              child: const Icon(Icons.help_outline_rounded, size: 20),
-            ),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
-              child: const Icon(Icons.confirmation_number_outlined, size: 20),
-            ),
-            onPressed: () {},
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
+      backgroundColor: AppColors.background,
       body: _loading
           ? _skeleton()
           : _error != null
@@ -159,176 +128,166 @@ class _EventHomeScreenState extends State<EventHomeScreen> {
 
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          // Black Header + Search Bar
-          Container(
-            color: Colors.black,
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => EventSearchScreen(allEvents: _events ?? [])),
-                );
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                height: 48,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
+      child: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            backgroundColor: AppColors.primary,
+            expandedHeight: 180,
+            pinned: true,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Container(
+                decoration: const BoxDecoration(
+                  gradient: AppColors.primaryGradient,
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.search_rounded, color: Colors.grey, size: 22),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Not sure what to do? 🤔 Let your curiosity guide you. 🧭',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 13, fontWeight: FontWeight.w500),
-                        overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            title: const Text(
+              'Discover Events',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                fontSize: 22,
+                letterSpacing: -0.5,
+              ),
+            ),
+            iconTheme: const IconThemeData(color: Colors.white),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.help_outline_rounded),
+                onPressed: () {},
+              ),
+              IconButton(
+                icon: const Icon(Icons.confirmation_number_outlined),
+                onPressed: () {},
+              ),
+              const SizedBox(width: 8),
+            ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(64),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(99),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => EventSearchScreen(allEvents: _events ?? [])),
+                        );
+                      },
+                      child: Container(
+                        height: 52,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(99),
+                          border: Border.all(color: Colors.white.withOpacity(0.2)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.search_rounded, color: Colors.white, size: 22),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Not sure what to do? 🤔 Let your curiosity guide you.',
+                                style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 13, fontWeight: FontWeight.w600),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
 
-          // Featured Carousel (mocking with first event or a static banner if empty)
-          Container(
-            color: Colors.black,
-            height: 220,
-            width: double.infinity,
-            child: events.isNotEmpty
-                ? _FeaturedEventHero(event: events.first)
-                : Container(
-                    color: Colors.grey[900],
-                    child: const Center(child: Text('No featured event', style: TextStyle(color: Colors.white54))),
-                  ),
-          ),
-
-          // Categories
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      SliverToBoxAdapter(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Category', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black)),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _CategoryTile(title: 'Sports', icon: Icons.sports_soccer_rounded, isSelected: false, onTap: () => _openCategory('Sports', Icons.sports_soccer_rounded)),
-                    _CategoryTile(title: 'Bank Offers', icon: Icons.credit_card_rounded, isSelected: false, onTap: () => _openCategory('Bank Offers', Icons.credit_card_rounded)),
-                    _CategoryTile(title: 'Experience', icon: Icons.local_activity_rounded, isSelected: false, onTap: () => _openCategory('Experience', Icons.local_activity_rounded)),
-                    _CategoryTile(title: 'Charity', icon: Icons.favorite_rounded, isSelected: false, onTap: () => _openCategory('Charity', Icons.favorite_rounded)),
-                  ],
+                if (events.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 180,
+                    child: PageView(
+                      controller: PageController(viewportFraction: 0.93),
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: _FeaturedEventHero(event: events.first),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 6),
+                          child: _PromoBanner(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 180,
+                    child: PageView(
+                      controller: PageController(viewportFraction: 0.93),
+                      children: const [
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 6),
+                          child: _PromoBanner(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                // Categories
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Category', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textPrimary)),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _CategoryTile(title: 'Sports', icon: Icons.sports_soccer_rounded, isSelected: false, onTap: () => _openCategory('Sports', Icons.sports_soccer_rounded)),
+                          _CategoryTile(title: 'Offers', icon: Icons.credit_card_rounded, isSelected: false, onTap: () => _openCategory('Bank Offers', Icons.credit_card_rounded)),
+                          _CategoryTile(title: 'Experience', icon: Icons.local_activity_rounded, isSelected: false, onTap: () => _openCategory('Experience', Icons.local_activity_rounded)),
+                          _CategoryTile(title: 'Charity', icon: Icons.favorite_rounded, isSelected: false, onTap: () => _openCategory('Charity', Icons.favorite_rounded)),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(height: 32),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('All Events', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textPrimary)),
+                  ),
+                ),
+                const SizedBox(height: 16),
               ],
             ),
           ),
-
-          // Promo Banner
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              height: 110,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFFD54F), Color(0xFFFFB300)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                boxShadow: AppStyles.shadowSm,
-              ),
-              child: Stack(
-                children: [
-                  Positioned(
-                    left: 16,
-                    top: 16,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          color: Colors.white,
-                          child: const Text('GOT AN', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.black)),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          color: Colors.red,
-                          child: const Text('EVENT', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 24, color: Colors.white)),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          color: Colors.white,
-                          child: const Text('COMING UP?', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.black)),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Positioned(
-                    right: 16,
-                    top: 24,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        const Text('REACH MORE FANS &\nFILL MORE SEATS, WITH', textAlign: TextAlign.right, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
-                        const SizedBox(height: 6),
-                        const Text('Ziggo Events', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-                        const SizedBox(height: 4),
-                        const Text('Reach us: events@ziggo.lk', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFF57F17),
-                        borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
-                      ),
-                      child: const Text(
-                        'MUSIC | NIGHTLIFE | SPORTS | EXHIBITIONS & MORE',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.black),
-                      ),
-                    ),
-                  )
-                ],
-              ),
-            ),
-          ),
-
-          // All Events Section
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 32, 16, 16),
-            child: const Text('All Events', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black)),
-          ),
-
-          // Events List
+          
           if (events.isEmpty)
-            const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No events available')))
+            const SliverToBoxAdapter(
+              child: Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No events available'))),
+            )
           else
-            Container(
-              color: Colors.white,
-              child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                physics: const NeverScrollableScrollPhysics(),
-                shrinkWrap: true,
-                itemCount: events.length,
-                itemBuilder: (_, i) => _EventCard(event: events[i]),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (_, i) => _EventCard(event: events[i]),
+                  childCount: events.length,
+                ),
               ),
             ),
         ],
@@ -344,36 +303,43 @@ class _FeaturedEventHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final image = event['image_url']?.toString();
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        if (image != null && image.isNotEmpty)
-          Image.network(image, fit: BoxFit.cover)
-        else
-          Container(color: Colors.grey[800]),
-        Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.black.withOpacity(0.8), Colors.transparent, Colors.black.withOpacity(0.9)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppStyles.radiusLg),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (image != null && image.isNotEmpty)
+            Image.network(image, fit: BoxFit.cover)
+          else
+            Container(color: Colors.grey[800]),
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.black.withOpacity(0.4), Colors.transparent, Colors.black.withOpacity(0.9)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
             ),
           ),
-        ),
-        Positioned(
-          bottom: 16,
-          left: 16,
-          right: 16,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text('EXCLUSIVE TICKETING PARTNER', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
-              const SizedBox(width: 8),
-              const Text('Ziggo Events', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)),
-            ],
-          ),
-        )
-      ],
+          Positioned(
+            bottom: 16,
+            left: 16,
+            right: 16,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('FEATURED EVENT', style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.0)),
+                const SizedBox(height: 4),
+                Text(event['name']?.toString() ?? 'Special Event', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900), maxLines: 1, overflow: TextOverflow.ellipsis),
+              ],
+            ),
+          )
+        ],
+      ),
     );
   }
 }
@@ -390,26 +356,40 @@ class _CategoryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: 76,
-        height: 90,
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFFFD54F).withOpacity(0.2) : const Color(0xFFF3F4F6),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? const Color(0xFFFFD54F) : Colors.transparent,
-            width: 2,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isSelected ? AppColors.primary : Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: isSelected ? AppColors.primary.withOpacity(0.4) : Colors.black.withOpacity(0.05),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                )
+              ],
+            ),
+            child: Icon(
+              icon,
+              size: 26,
+              color: isSelected ? Colors.white : AppColors.primary,
+            ),
           ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 28, color: isSelected ? Colors.black : Colors.black87),
-            const SizedBox(height: 12),
-            Text(title, textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: isSelected ? Colors.black : Colors.black87)),
-          ],
-        ),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -440,102 +420,79 @@ class _EventCard extends StatelessWidget {
       ),
       child: Container(
         margin: const EdgeInsets.only(bottom: 24),
+        height: 240,
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(24),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 16, offset: const Offset(0, 8)),
+            BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 20, offset: const Offset(0, 10)),
           ],
         ),
         clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            AspectRatio(
-              aspectRatio: 1, // PickMe's event card is highly square
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  image != null && image.isNotEmpty
-                      ? Image.network(
-                          image,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _imageFallback(),
-                        )
-                      : _imageFallback(),
-                  // "Hottest Pick" border frame mock
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFFF57F17), width: 6),
-                      ),
+            image != null && image.isNotEmpty
+                ? Image.network(image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _imageFallback())
+                : _imageFallback(),
+            Positioned(
+              bottom: 12,
+              left: 12,
+              right: 12,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.85),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withOpacity(0.5)),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name.toUpperCase(),
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.black,
-                      letterSpacing: 0.5,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              dateLabel.isEmpty ? 'Date TBD' : dateLabel.split('·').first.trim(),
-                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            if (venue != null && venue.isNotEmpty) ...[
-                              const SizedBox(height: 2),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
                               Text(
-                                venue,
-                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey),
+                                name.toUpperCase(),
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.textPrimary, letterSpacing: -0.2),
+                                maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
+                              const SizedBox(height: 4),
+                              Text(
+                                dateLabel.isEmpty ? 'Date TBD' : dateLabel.split('·').first.trim(),
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.primary),
+                              ),
+                              if (venue != null && venue.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  venue,
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
                             ],
-                            const SizedBox(height: 6),
-                            Text(
-                              from != null ? 'LKR ${from.toStringAsFixed(0)} upwards' : 'Price TBD',
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Colors.black),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFD54F),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          'View More',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 12,
                           ),
                         ),
-                      ),
-                    ],
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              from != null ? 'LKR ${from.toStringAsFixed(0)}' : 'TBD',
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.textPrimary),
+                            ),
+                            const Text('upwards', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey)),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ],
+                ),
               ),
             ),
           ],
@@ -645,38 +602,26 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     final hasTiers = ev['tiers'] is List && (ev['tiers'] as List).isNotEmpty;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
+      extendBodyBehindAppBar: true,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 250,
+            expandedHeight: 350,
             pinned: true,
-            backgroundColor: Colors.black,
+            backgroundColor: Colors.transparent,
             iconTheme: const IconThemeData(color: Colors.white),
             flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                name,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 16,
-                  shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
-                ),
-              ),
               background: Stack(
                 fit: StackFit.expand,
                 children: [
                   image != null && image.isNotEmpty
-                      ? Image.network(
-                          image,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _imageFallback(),
-                        )
+                      ? Image.network(image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _imageFallback())
                       : _imageFallback(),
                   Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Colors.black.withOpacity(0.6), Colors.transparent, Colors.black.withOpacity(0.8)],
+                        colors: [Colors.black.withOpacity(0.4), Colors.transparent, AppColors.background],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                       ),
@@ -688,71 +633,76 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.black,
-                      letterSpacing: -0.4,
-                    ),
-                  ),
-                  if (fromPrice != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'LKR ${fromPrice.toStringAsFixed(0)} upwards',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black54),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  Row(
-                    children: const [
-                      _OfferChip(label: 'NTB Offer'),
-                      SizedBox(width: 12),
-                      _OfferChip(label: 'Save Up to 5000'),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF6F7F9),
-                      borderRadius: BorderRadius.circular(14),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 10)),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppColors.textPrimary, letterSpacing: -0.5),
+                        ),
+                        if (fromPrice != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'LKR ${fromPrice.toStringAsFixed(0)} upwards',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.primary),
+                          ),
+                        ],
+                        const SizedBox(height: 20),
+                        Row(
+                          children: const [
+                            _OfferChip(label: 'NTB Offer'),
+                            SizedBox(width: 12),
+                            _OfferChip(label: 'Save Up to 5000'),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  Container(
+                    margin: const EdgeInsets.only(top: 20),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, 10)),
+                      ],
                     ),
                     child: Column(
                       children: [
                         if (startsAt != null)
-                          _iconRow(
-                            Icons.calendar_today_rounded,
-                            '${DateFormat('d MMM').format(startsAt)}   |   ${DateFormat('h:mm a').format(startsAt)} onwards',
-                          ),
+                          _iconRow(Icons.calendar_month_rounded, '${DateFormat('d MMM').format(startsAt)}   |   ${DateFormat('h:mm a').format(startsAt)} onwards'),
                         if (startsAt != null && venue != null)
-                          const Divider(height: 24),
+                          const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1)),
                         if (venue != null)
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(Icons.place_rounded, size: 16, color: AppColors.textSecondary),
-                              const SizedBox(width: 8),
+                              const Icon(Icons.place_rounded, size: 20, color: AppColors.primary),
+                              const SizedBox(width: 16),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      '$venue${city != null ? " · $city" : ""}',
-                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.black87),
-                                    ),
-                                    const SizedBox(height: 2),
+                                    Text('$venue${city != null ? " · $city" : ""}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                                    const SizedBox(height: 4),
                                     GestureDetector(
                                       onTap: _openMaps,
-                                      child: const Text(
-                                        'Open Venue in Maps  ›',
-                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFFF57F17)),
-                                      ),
+                                      child: const Text('Open Venue in Maps', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.primary, decoration: TextDecoration.underline)),
                                     ),
                                   ],
                                 ),
@@ -762,68 +712,70 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       ],
                     ),
                   ),
+                  
                   if (description != null && description.isNotEmpty) ...[
-                    const SizedBox(height: 24),
-                    const Text('About Event', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black)),
-                    const SizedBox(height: 10),
+                    const Text('About Event', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.textPrimary)),
+                    const SizedBox(height: 12),
                     AnimatedSize(
                       duration: const Duration(milliseconds: 180),
                       alignment: Alignment.topCenter,
                       child: Text(
                         description,
-                        maxLines: _aboutExpanded ? null : 3,
+                        maxLines: _aboutExpanded ? null : 4,
                         overflow: _aboutExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 14, height: 1.5, fontWeight: FontWeight.w600, color: Colors.black87),
+                        style: TextStyle(fontSize: 15, height: 1.6, fontWeight: FontWeight.w500, color: Colors.grey.shade800),
                       ),
                     ),
                     GestureDetector(
                       onTap: () => setState(() => _aboutExpanded = !_aboutExpanded),
                       child: Padding(
-                        padding: const EdgeInsets.only(top: 6),
+                        padding: const EdgeInsets.only(top: 8, bottom: 24),
                         child: Text(
                           _aboutExpanded ? 'Read less' : 'Read more',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFFF57F17),
-                            decoration: TextDecoration.underline,
-                          ),
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.primary),
                         ),
                       ),
                     ),
                   ],
-                  const SizedBox(height: 100), // padding for bottom bar
+                  const SizedBox(height: 120),
                 ],
               ),
             ),
           ),
         ],
       ),
-      bottomNavigationBar: hasTiers
-          ? SafeArea(
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, -4)),
-                  ],
-                ),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => EventCartScreen(event: ev)),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: hasTiers
+          ? Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(99),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.8),
+                      borderRadius: BorderRadius.circular(99),
+                      border: Border.all(color: Colors.white.withOpacity(0.5)),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 10)),
+                      ],
                     ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFFD54F),
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => EventCartScreen(event: ev))),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
+                        ),
+                        child: const Text('Buy Now', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                      ),
                     ),
-                    child: const Text('Buy Now', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
                   ),
                 ),
               ),
@@ -835,15 +787,19 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   Widget _iconRow(IconData icon, String text) {
     return Row(
       children: [
-        Icon(icon, size: 14, color: AppColors.textSecondary),
-        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), shape: BoxShape.circle),
+          child: Icon(icon, size: 16, color: AppColors.primary),
+        ),
+        const SizedBox(width: 16),
         Expanded(
           child: Text(
             text,
             style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textSecondary,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
             ),
           ),
         ),
@@ -908,11 +864,11 @@ class _EventSearchScreenState extends State<EventSearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surface,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
         titleSpacing: 0,
         title: Container(
           height: 44,
@@ -940,7 +896,7 @@ class _EventSearchScreenState extends State<EventSearchScreen> {
                     isDense: true,
                     contentPadding: EdgeInsets.symmetric(vertical: 12),
                   ),
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black),
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                 ),
               ),
               if (_searchController.text.isNotEmpty)
@@ -999,7 +955,7 @@ class _EventSearchScreenState extends State<EventSearchScreen> {
             const SizedBox(height: 32),
             const Text(
               "Let's find your next favorite event!",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textPrimary),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -1026,7 +982,7 @@ class _EventSearchScreenState extends State<EventSearchScreen> {
             const SizedBox(height: 24),
             const Text(
               "No events found",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textPrimary),
             ),
             const SizedBox(height: 12),
             Text(
@@ -1064,12 +1020,12 @@ class EventCategoryScreen extends StatelessWidget {
     }).toList();
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surface,
       appBar: AppBar(
         backgroundColor: const Color(0xFFF3F4F6),
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
-        title: Text(categoryName, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 18)),
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
+        title: Text(categoryName, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w900, fontSize: 18)),
         centerTitle: true,
       ),
       body: Column(
@@ -1102,7 +1058,7 @@ class EventCategoryScreen extends StatelessWidget {
                         children: [
                           Icon(Icons.event_busy_rounded, size: 64, color: Colors.grey.shade400),
                           const SizedBox(height: 16),
-                          const Text("No events found", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.black)),
+                          const Text("No events found", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textPrimary)),
                           const SizedBox(height: 8),
                           Text("There are no upcoming events in the $categoryName category right now.", textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, color: Colors.grey)),
                         ],
@@ -1124,7 +1080,7 @@ class EventCategoryScreen extends StatelessWidget {
 }
 
 /// Decorative bank/promo offer pill shown on the event detail page
-/// (dashed outline, matching the PickMe "NTB Offer" / "Save Up to" chips).
+/// (dashed outline, matching the Ziggo "NTB Offer" / "Save Up to" chips).
 class _OfferChip extends StatelessWidget {
   final String label;
   const _OfferChip({required this.label});
@@ -1135,24 +1091,24 @@ class _OfferChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFF2563EB).withOpacity(0.04),
+          color: Colors.black.withOpacity(0.04),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: const Color(0xFF2563EB).withOpacity(0.4),
+            color: Colors.black.withOpacity(0.4),
             width: 1,
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.sell_rounded, size: 16, color: Color(0xFF2563EB)),
+            const Icon(Icons.sell_rounded, size: 16, color: AppColors.textPrimary),
             const SizedBox(width: 6),
             Flexible(
               child: Text(
                 label,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: Color(0xFF2563EB),
+                  color: AppColors.textPrimary,
                   fontWeight: FontWeight.w800,
                   fontSize: 12,
                 ),
@@ -1160,6 +1116,84 @@ class _OfferChip extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PromoBanner extends StatelessWidget {
+  const _PromoBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppStyles.radiusLg),
+        gradient: LinearGradient(
+          colors: [AppColors.primary.withOpacity(0.8), AppColors.primary],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: AppStyles.shadowSm,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          Positioned(
+            left: 16,
+            top: 16,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  color: Colors.white,
+                  child: const Text('GOT AN', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.textPrimary)),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  color: AppColors.textPrimary,
+                  child: const Text('EVENT', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: Colors.white)),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  color: Colors.white,
+                  child: const Text('COMING UP?', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.textPrimary)),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            right: 16,
+            top: 24,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const Text('REACH MORE FANS &\nFILL MORE SEATS, WITH', textAlign: TextAlign.right, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white)),
+                const SizedBox(height: 6),
+                const Text('Ziggo Events', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white)),
+                const SizedBox(height: 4),
+                const Text('events@ziggo.lk', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white70)),
+              ],
+            ),
+          ),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.2),
+              ),
+              child: const Text(
+                'MUSIC | NIGHTLIFE | SPORTS | EXHIBITIONS & MORE',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.white),
+              ),
+            ),
+          )
+        ],
       ),
     );
   }
