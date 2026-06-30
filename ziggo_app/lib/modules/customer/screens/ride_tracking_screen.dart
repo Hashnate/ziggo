@@ -1323,9 +1323,27 @@ class _DriverCard extends StatelessWidget {
     final vehicleNumber = (d['vehicle_number'] ?? '').toString();
     final fullName = (d['full_name'] ?? 'Driver').toString();
     final driverId = d['id'] as int? ?? 0;
-    final trips = (d['completed_trips'] as num?)?.toInt() ?? 
-                  (d['total_trips'] as num?)?.toInt() ?? 
-                  (d['total_rides'] as num?)?.toInt() ?? 0;
+    final profile = d['profile'] as Map<String, dynamic>?;
+
+    int parseTrips(dynamic val) {
+      if (val == null) return -1;
+      if (val is num) return val.toInt();
+      if (val is String) return int.tryParse(val.toString()) ?? -1;
+      return -1;
+    }
+
+    int trips = 0;
+    final keys = ['completed_trips', 'total_trips', 'total_rides', 'trips', 'rides', 'rides_completed', 'trips_completed', 'rides_count', 'completed_rides'];
+    for (final k in keys) {
+      final v = parseTrips(d[k]);
+      if (v >= 0) { trips = v; break; }
+    }
+    if (trips == 0 && profile != null) {
+      for (final k in keys..add('today_rides')) {
+        final v = parseTrips(profile[k]);
+        if (v >= 0) { trips = v; break; }
+      }
+    }
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1379,21 +1397,36 @@ class _DriverCard extends StatelessWidget {
               ),
               const SizedBox(width: 14),
               // Vehicle Icon
-              Container(
-                width: 60,
-                height: 40,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceMuted,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  vehicleType == 'bike' 
-                      ? Icons.motorcycle_rounded 
-                      : (vehicleType == 'tuk' ? Icons.electric_rickshaw_rounded : Icons.directions_car_rounded),
-                  color: AppColors.primary,
-                  size: 24,
-                ),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 60,
+                    height: 40,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceMuted,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4.0),
+                      child: Image.asset(
+                        'assets/icons/${vehicleType == 'van' ? 'car' : (['bike', 'car', 'tuk', 'truck'].contains(vehicleType) ? vehicleType : 'car')}.png',
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    vehicleType.toUpperCase(),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.primary,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
               ),
               const Spacer(),
               // Plate details
@@ -1438,15 +1471,17 @@ class _DriverCard extends StatelessWidget {
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            '$trips trips',
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
+          if (trips > 0) ...[
+            const SizedBox(height: 2),
+            Text(
+              '$trips trips',
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
             ),
-          ),
+          ],
           const SizedBox(height: 12),
           Row(
             children: [
