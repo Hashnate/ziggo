@@ -7071,7 +7071,7 @@ async def admin_forbidden(request: Request):
 async def admin_list_admins(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_superadmin),
+    current_user: User = Depends(require_superadmin_or_admin),
 ):
     q = await db.execute(select(User).where(User.role == UserRole.ADMIN).order_by(User.id.desc()))
     admins = q.scalars().all()
@@ -7089,8 +7089,13 @@ async def admin_create_admin(
     admin_role: str = Form(...),
     password: str = Form("admin123"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_superadmin),
+    current_user: User = Depends(require_superadmin_or_admin),
 ):
+    # Non-superadmins cannot assign the superadmin role
+    if (current_user.admin_role or "admin") != "superadmin":
+        if admin_role == "superadmin":
+            raise _AdminForbidden()
+
     # check if phone number exists
     existing = await db.execute(select(User).where(User.phone_number == phone_number))
     if existing.scalars().first():
@@ -7121,12 +7126,17 @@ async def admin_edit_admin(
     password: str = Form(None),
     is_active: str = Form(""),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_superadmin),
+    current_user: User = Depends(require_superadmin_or_admin),
 ):
     q = await db.execute(select(User).where(User.id == admin_id, User.role == UserRole.ADMIN))
     admin = q.scalars().first()
     if not admin:
         raise HTTPException(status_code=404, detail="Admin user not found")
+
+    # Non-superadmins cannot modify a superadmin or assign/change role to superadmin
+    if (current_user.admin_role or "admin") != "superadmin":
+        if (admin.admin_role or "admin") == "superadmin" or admin_role == "superadmin":
+            raise _AdminForbidden()
 
     admin.full_name = full_name
     admin.email = email
@@ -7143,7 +7153,7 @@ async def admin_edit_admin(
 async def admin_delete_admin(
     admin_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_superadmin),
+    current_user: User = Depends(require_superadmin_or_admin),
 ):
     if admin_id == current_user.id:
         import urllib.parse
@@ -7152,6 +7162,10 @@ async def admin_delete_admin(
     q = await db.execute(select(User).where(User.id == admin_id, User.role == UserRole.ADMIN))
     admin = q.scalars().first()
     if admin:
+        # Non-superadmins cannot delete a superadmin account
+        if (current_user.admin_role or "admin") != "superadmin":
+            if (admin.admin_role or "admin") == "superadmin":
+                raise _AdminForbidden()
         await db.delete(admin)
         await db.commit()
     return RedirectResponse(url="/admin/admins", status_code=303)
