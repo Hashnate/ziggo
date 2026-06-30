@@ -124,6 +124,7 @@ class DriverMini(BaseModel):
     current_lng: Optional[float] = None
     current_heading: Optional[float] = None
     profile_photo: Optional[str] = None
+    vehicle_photo_url: Optional[str] = None
     completed_trips: Optional[int] = None
 
     class Config:
