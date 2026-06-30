@@ -73,6 +73,7 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
             "current_lng": float(b.driver.current_lng) if b.driver.current_lng else None,
             "current_heading": float(b.driver.current_heading) if b.driver.current_heading is not None else 0.0,
             "profile_photo": b.driver.user.profile_photo if b.driver.user else None,
+            "completed_trips": b.driver.user.total_rides if b.driver.user else 0,
         }
 
     customer_name = b.customer.user.full_name if b.customer and b.customer.user else None

@@ -941,10 +941,14 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (etaMin != null) ...[
-              Text('In $etaMin min', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
-              const SizedBox(height: 6),
-            ],
+            Opacity(
+              opacity: etaMin != null ? 1.0 : 0.0,
+              child: Text(
+                'In ${etaMin ?? 0} min',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+              ),
+            ),
+            const SizedBox(height: 6),
             customImageUrl != null
                 ? Image.network(
                     customImageUrl,
