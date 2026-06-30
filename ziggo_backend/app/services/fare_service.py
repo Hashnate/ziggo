@@ -104,6 +104,8 @@ async def calculate_fare(
     # BRD: CD-19 / BE-16 / BR-9 — intermediate stops
     # Each stop is {"lat": float, "lng": float, "address": str?}.
     stops: Optional[list] = None,
+    driver_accepted_lat: Optional[float] = None,
+    driver_accepted_lng: Optional[float] = None,
 ) -> dict:
     from ..models import SystemSettings
     from datetime import datetime, timezone, timedelta
@@ -147,6 +149,7 @@ async def calculate_fare(
 
         rental_dict = {
             "distance_km": 0.0,
+            "pickup_distance_km": 0.0,
             "duration_min": hours * 60,
             "fare_amount": round(fare, 2),
             "discount_amount": round(discount, 2),
@@ -202,7 +205,8 @@ async def calculate_fare(
 
         courier_dict = {
             "distance_km": round(distance_km, 2),
-            "duration_min": eta_days * 24 * 60,
+            "pickup_distance_km": 0.0,
+            "duration_min": round(eta_days * 24 * 60),
             "fare_amount": round(fare, 2),
             "discount_amount": round(discount, 2),
             "final_amount": round(final, 2),
@@ -250,7 +254,6 @@ async def calculate_fare(
         min_fare = float(setting.min_fare or 0)
         platform_pct = float(setting.platform_fee_percent) if (setting.platform_fee_percent is not None and float(setting.platform_fee_percent) > 0) else sys_commission
         surge = float(setting.surge_multiplier or 1)
-        pickup_fee_val = float(setting.pickup_fee or 0)
         boost_val = float(setting.boost or 0)
         passenger_deductible_val = float(setting.passenger_deductible or 0)
     else:
@@ -258,7 +261,14 @@ async def calculate_fare(
         base, per_km, per_min, min_fare = d["base"], d["per_km"], d["per_min"], d["min"]
         platform_pct = sys_commission
         surge = 1.0
-        pickup_fee_val, boost_val, passenger_deductible_val = 0.0, 0.0, 0.0
+        boost_val, passenger_deductible_val = 0.0, 0.0
+
+    pickup_distance_km = 0.0
+    if driver_accepted_lat is not None and driver_accepted_lng is not None:
+        pickup_distance_km = haversine_km(driver_accepted_lat, driver_accepted_lng, pickup_lat, pickup_lng)
+    
+    # Recalculate pickup fee as distance * per_km rate
+    pickup_fee_val = pickup_distance_km * per_km
 
     # Dynamic surge pricing window check from SystemSettings
     if ss:
@@ -375,9 +385,10 @@ async def calculate_fare(
     deductions = app_usage_charges + passenger_deductible_val
     driver_earnings = gross_total - deductions
 
-    base_dict = {
+    fare_dict = {
         "distance_km": round(distance_km, 2),
-        "duration_min": duration_min,
+        "pickup_distance_km": round(pickup_distance_km, 2),
+        "duration_min": round(duration_min),
         "fare_amount": round(fare_val, 2),
         "discount_amount": round(discount, 2),
         "final_amount": round(gross_total, 2),
@@ -398,7 +409,7 @@ async def calculate_fare(
         "app_usage_charges": round(app_usage_charges, 2),
         "deductions": round(deductions, 2),
     }
-    return await _enrich_with_loyalty(db, base_dict, customer, redeem_points)
+    return await _enrich_with_loyalty(db, fare_dict, customer, redeem_points)
 
 def to_decimal(x: float) -> Decimal:
     return Decimal(str(round(x, 2)))

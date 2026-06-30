@@ -799,6 +799,58 @@ async def accept_booking(
     b.driver_id = driver.id
     b.status = BookingStatus.ACCEPTED
     b.accepted_at = now
+    
+    if driver.current_lat is not None and driver.current_lng is not None:
+        b.driver_accepted_lat = Decimal(str(driver.current_lat))
+        b.driver_accepted_lng = Decimal(str(driver.current_lng))
+
+    from ...models import BookingStop
+    sq = await db.execute(select(BookingStop).where(BookingStop.booking_id == b.id))
+    booking_stops = sq.scalars().all()
+    stops_list = []
+    for s in booking_stops:
+        stops_list.append({
+            "lat": float(s.lat),
+            "lng": float(s.lng),
+            "address": s.address,
+        })
+
+    # Recalculate fare now that we have driver coordinates for pickup fee
+    fare = await calculate_fare(
+        db,
+        b.service_type,
+        float(b.pickup_lat),
+        float(b.pickup_lng),
+        float(b.drop_lat) if b.drop_lat else 0.0,
+        float(b.drop_lng) if b.drop_lng else 0.0,
+        b.promo_code,
+        trip_type=b.trip_type or "one_way",
+        is_flash=b.is_flash,
+        parcel_weight_kg=float(b.parcel_weight_kg) if b.parcel_weight_kg else None,
+        is_rental=b.is_rental,
+        rental_hours=b.rental_hours,
+        is_courier=b.is_courier,
+        customer=None, # Not modifying loyalty here
+        redeem_points=int(b.redeem_points) if b.redeem_points else 0,
+        stops=stops_list,
+        driver_accepted_lat=float(b.driver_accepted_lat) if b.driver_accepted_lat else None,
+        driver_accepted_lng=float(b.driver_accepted_lng) if b.driver_accepted_lng else None,
+    )
+    
+    b.distance_km = to_decimal(fare["distance_km"])
+    b.duration_min = fare["duration_min"]
+    b.fare_amount = to_decimal(fare["fare_amount"])
+    b.discount_amount = to_decimal(fare["discount_amount"])
+    b.final_amount = to_decimal(fare["final_amount"])
+    b.platform_fee = to_decimal(fare["platform_fee"])
+    b.driver_earnings = to_decimal(fare["driver_earnings"])
+    b.pickup_distance_km = to_decimal(fare.get("pickup_distance_km", 0))
+    b.pickup_fee = to_decimal(fare.get("pickup_fee", 0))
+    b.boost = to_decimal(fare.get("boost", 0))
+    b.passenger_deductible = to_decimal(fare.get("passenger_deductible", 0))
+    b.app_usage_charges = to_decimal(fare.get("app_usage_charges", 0))
+    b.deductions = to_decimal(fare.get("deductions", 0))
+
     await db.commit()
     await db.refresh(b)
 
@@ -1529,6 +1581,8 @@ async def update_booking_destination(
         customer=c,
         redeem_points=int(b.redeem_points) if b.redeem_points else 0,
         stops=[s.model_dump() for s in (body.stops or [])],
+        driver_accepted_lat=float(b.driver_accepted_lat) if b.driver_accepted_lat else None,
+        driver_accepted_lng=float(b.driver_accepted_lng) if b.driver_accepted_lng else None,
     )
 
     b.drop_lat = Decimal(str(body.drop_lat))
@@ -1542,6 +1596,7 @@ async def update_booking_destination(
     b.final_amount = to_decimal(fare["final_amount"])
     b.platform_fee = to_decimal(fare["platform_fee"])
     b.driver_earnings = to_decimal(fare["driver_earnings"])
+    b.pickup_distance_km = to_decimal(fare.get("pickup_distance_km", 0))
     b.pickup_fee = to_decimal(fare.get("pickup_fee", 0))
     b.boost = to_decimal(fare.get("boost", 0))
     b.passenger_deductible = to_decimal(fare.get("passenger_deductible", 0))

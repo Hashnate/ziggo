@@ -653,10 +653,12 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: photoUrl != null
-                      ? Image.network(
-                          photoUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _avatarFallback(initial),
+                      ? ClipOval(
+                          child: Image.network(
+                            photoUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _avatarFallback(initial),
+                          ),
                         )
                       : _avatarFallback(initial),
                 ),
@@ -2157,6 +2159,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   Future<void> _handleCompleteTrip(DriverProvider driver, Map<String, dynamic> ride) async {
     final paymentMethod = (ride['payment_method'] ?? 'cash').toString().toLowerCase();
     final amount = (ride['final_amount'] as num?)?.toDouble() ?? 0.0;
+    final pickupFee = (ride['pickup_fee'] as num?)?.toDouble() ?? 0.0;
 
     final passDeductible = (ride['passenger_deductible'] as num?)?.toDouble() ?? 0.0;
     final grossTotal = (ride['final_amount'] as num?)?.toDouble() ?? 0.0;
@@ -2196,6 +2199,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               const Divider(height: 1),
               const SizedBox(height: 8),
               buildItemizedRow('Trip Fare', tripFare.toStringAsFixed(2)),
+              if (pickupFee > 0)
+                buildItemizedRow('Pickup Fee (included)', pickupFee.toStringAsFixed(2)),
               if (passDeductible > 0)
                 buildItemizedRow('Passenger Deductibles', passDeductible.toStringAsFixed(2)),
               buildItemizedRow('Gross Total', grossTotal.toStringAsFixed(2), isBold: true),
@@ -2246,6 +2251,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               const Divider(height: 1),
               const SizedBox(height: 8),
               buildItemizedRow('Trip Fare', tripFare.toStringAsFixed(2)),
+              if (pickupFee > 0)
+                buildItemizedRow('Pickup Fee (included)', pickupFee.toStringAsFixed(2)),
               if (passDeductible > 0)
                 buildItemizedRow('Passenger Deductibles', passDeductible.toStringAsFixed(2)),
               buildItemizedRow('Gross Total', grossTotal.toStringAsFixed(2), isBold: true),
@@ -3408,12 +3415,14 @@ class _Drawer extends StatelessWidget {
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: photoUrl != null
-                      ? Image.network(
-                          photoUrl,
-                          width: 56,
-                          height: 56,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _drawerInitial(initial),
+                      ? ClipOval(
+                          child: Image.network(
+                            photoUrl,
+                            width: 56,
+                            height: 56,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _drawerInitial(initial),
+                          ),
                         )
                       : _drawerInitial(initial),
                 ),
