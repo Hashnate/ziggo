@@ -87,7 +87,7 @@ async def overview(db: AsyncSession) -> dict:
     for b in bookings:
         is_flash = bool(getattr(b, "is_flash", False))
         if b.status == BookingStatus.COMPLETED:
-            amt = _dec(b.final_amount or b.total_amount)
+            amt = _dec(b.final_amount or b.fare_amount)
             fee = _dec(b.platform_fee)
             drv = _dec(b.driver_earnings)
             if is_flash:
@@ -382,7 +382,7 @@ async def driver_finance_detail(db: AsyncSession, driver_id: int) -> Optional[di
             "kind": "Flash parcel" if getattr(b, "is_flash", False) else "Ride",
             "ref": b.booking_ref,
             "amount": float(_dec(b.driver_earnings)),
-            "customer_paid": float(_dec(b.final_amount or b.total_amount)),
+            "customer_paid": float(_dec(b.final_amount or b.fare_amount)),
             "platform_fee": float(_dec(b.platform_fee)),
             "status": b.status.value if b.status else "",
             "payment": b.payment_method or "",
@@ -499,13 +499,13 @@ async def customer_finance_table(db: AsyncSession) -> list[dict]:
         m_list = by_cust_m.get(c.id, [])
 
         ride_spend = sum(
-            (_dec(b.final_amount or b.total_amount)
+            (_dec(b.final_amount or b.fare_amount)
              for b in b_list
              if b.status == BookingStatus.COMPLETED and not getattr(b, "is_flash", False)),
             Decimal("0"),
         )
         flash_spend = sum(
-            (_dec(b.final_amount or b.total_amount)
+            (_dec(b.final_amount or b.fare_amount)
              for b in b_list
              if b.status == BookingStatus.COMPLETED and getattr(b, "is_flash", False)),
             Decimal("0"),
@@ -578,7 +578,7 @@ async def customer_finance_detail(db: AsyncSession, customer_id: int) -> Optiona
         timeline.append({
             "kind": "Flash parcel" if getattr(b, "is_flash", False) else "Ride",
             "ref": b.booking_ref,
-            "amount": float(_dec(b.final_amount or b.total_amount)),
+            "amount": float(_dec(b.final_amount or b.fare_amount)),
             "status": b.status.value if b.status else "",
             "payment": b.payment_method or "",
             "when": (b.completed_at or b.booked_at).isoformat() if (b.completed_at or b.booked_at) else "",
@@ -1105,7 +1105,7 @@ async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
         )
     )
     bookings = bq.scalars().all()
-    ride_collected = sum((_dec(b.final_amount or b.total_amount) for b in bookings), Decimal("0"))
+    ride_collected = sum((_dec(b.final_amount or b.fare_amount) for b in bookings), Decimal("0"))
     ride_earnings = sum((_dec(b.driver_earnings) for b in bookings), Decimal("0"))
     ride_count = len(bookings)
 
