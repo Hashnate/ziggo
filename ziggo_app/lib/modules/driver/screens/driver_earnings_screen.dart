@@ -550,27 +550,6 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
             else
               _breakdownCard(_summary),
             const SizedBox(height: 24),
-            const Text(
-              'HOW YOUR FARE IS CALCULATED',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w900,
-                fontSize: 11,
-                letterSpacing: 1.4,
-              ),
-            ),
-            const SizedBox(height: 10),
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 30),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (_fareCard == null)
-              _infoCard(
-                  'Could not load your rate card. Pull down to retry.')
-            else
-              _fareCardView(_fareCard!),
-            const SizedBox(height: 16),
             GestureDetector(
               onTap: () => Navigator.push(
                 context,
