@@ -249,6 +249,22 @@ function openEditModal(admin) {
     document.getElementById('editAdminRole').value = admin.admin_role;
     document.getElementById('editIsActive').checked = admin.is_active;
 
+    // Handle permanent superadmin role UI restrictions
+    var roleSelect = document.getElementById('editAdminRole');
+    if (admin.admin_role === 'superadmin') {
+        for (var i = 0; i < roleSelect.options.length; i++) {
+            if (roleSelect.options[i].value !== 'superadmin') {
+                roleSelect.options[i].disabled = true;
+            } else {
+                roleSelect.options[i].disabled = false;
+            }
+        }
+    } else {
+        for (var i = 0; i < roleSelect.options.length; i++) {
+            roleSelect.options[i].disabled = false;
+        }
+    }
+
     document.getElementById('editModal').classList.remove('hidden');
     document.getElementById('editModal').classList.add('flex');
 }

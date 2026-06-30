@@ -7138,6 +7138,14 @@ async def admin_edit_admin(
         if (admin.admin_role or "admin") == "superadmin" or admin_role == "superadmin":
             raise _AdminForbidden()
 
+    # A superadmin's role is permanent and cannot be changed to another role
+    if (admin.admin_role or "admin") == "superadmin" and admin_role != "superadmin":
+        import urllib.parse
+        return RedirectResponse(
+            url=f"/admin/admins?error={urllib.parse.quote('Superadmin role is permanent and cannot be changed')}",
+            status_code=303
+        )
+
     admin.full_name = full_name
     admin.email = email
     admin.admin_role = admin_role
