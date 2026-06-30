@@ -2331,6 +2331,7 @@ def _safe_admin_next(next_url: str, default: str) -> str:
     return default
 
 
+
 @router.post("/categories/new")
 async def admin_categories_new(
     service_type: str = Form(...),
@@ -2348,6 +2349,7 @@ async def admin_categories_new(
     passenger_deductible: float = Form(0),
     promo_message: str = Form(""),
     discount_percentage: float = Form(0),
+    search_radius_km: int | None = Form(None),
     is_active: str = Form("on"),
     image: UploadFile | None = File(None),
     preset_icon: str | None = Form(None),
@@ -2392,6 +2394,7 @@ async def admin_categories_new(
             pickup_fee=Decimal(str(pickup_fee)),
             boost=Decimal(str(boost)),
             passenger_deductible=Decimal(str(passenger_deductible)),
+            search_radius_km=search_radius_km,
             display_order=max_order + 1,
         )
     )
@@ -2416,6 +2419,7 @@ async def admin_categories_edit(
     passenger_deductible: float = Form(0),
     promo_message: str = Form(""),
     discount_percentage: float = Form(0),
+    search_radius_km: int | None = Form(None),
     is_active: str = Form(""),
     image: UploadFile | None = File(None),
     preset_icon: str | None = Form(None),
@@ -2445,6 +2449,7 @@ async def admin_categories_edit(
     f.pickup_fee = Decimal(str(pickup_fee))
     f.boost = Decimal(str(boost))
     f.passenger_deductible = Decimal(str(passenger_deductible))
+    f.search_radius_km = search_radius_km
 
     if preset_icon:
         f.image_url = preset_icon

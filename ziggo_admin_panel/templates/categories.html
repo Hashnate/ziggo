@@ -27,6 +27,7 @@
                         <th class="px-6 py-4">Per Min</th>
                         <th class="px-6 py-4">Min Fare</th>
                         <th class="px-6 py-4">Capacity</th>
+                        <th class="px-6 py-4">Search Radius</th>
                         <th class="px-6 py-4">Status</th>
                         <th class="px-6 py-4">Actions</th>
                     </tr>
@@ -65,6 +66,13 @@
                         <td class="px-6 py-4 text-sm text-ziggo-ink font-normal">Rs.{{ "%.2f"|format(c.per_minute_rate or 0) }}</td>
                         <td class="px-6 py-4 text-sm text-ziggo-ink font-normal">Rs.{{ "%.2f"|format(c.min_fare or 0) }}</td>
                         <td class="px-6 py-4 text-sm text-ziggo-muted">{{ c.capacity or 0 }}</td>
+                        <td class="px-6 py-4 text-sm text-ziggo-muted">
+                            {% if c.search_radius_km %}
+                            {{ c.search_radius_km }} km
+                            {% else %}
+                            <span class="text-gray-400 italic">Default</span>
+                            {% endif %}
+                        </td>
                         <td class="px-6 py-4">
                             {% if c.is_active %}
                             <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600">Active</span>
@@ -93,6 +101,7 @@
                                         "pickup_fee": (c.pickup_fee|float) if c.pickup_fee is not none else 0,
                                         "boost": (c.boost|float) if c.boost is not none else 0,
                                         "passenger_deductible": (c.passenger_deductible|float) if c.passenger_deductible is not none else 0,
+                                        "search_radius_km": c.search_radius_km or "",
                                         "is_active": c.is_active,
                                     }|tojson }})'
                                     class="px-3 py-1.5 bg-blue-50 text-ziggo border border-blue-100 rounded-lg text-xs font-bold hover:bg-blue-100 transition flex items-center gap-1.5">
@@ -206,6 +215,10 @@
                     <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Discount Percentage (%)</label>
                     <input type="number" step="0.01" min="0" max="100" name="discount_percentage" id="catDiscountPercentage" value="0" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                 </div>
+                <div class="col-span-2">
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Driver Search Radius (km)</label>
+                    <input type="number" min="1" name="search_radius_km" id="catSearchRadius" placeholder="e.g. 15 (Optional - falls back to system settings)" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
                 <div>
                     <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Capacity (persons)</label>
                     <input type="number" min="0" name="capacity" id="catCapacity" value="0" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
@@ -309,6 +322,7 @@ function openCreateModal() {
     document.getElementById('catKey').disabled = false;
     document.getElementById('catName').value = '';
     document.getElementById('catCapacity').value = 0;
+    document.getElementById('catSearchRadius').value = '';
     document.getElementById('catDesc').value = '';
     document.getElementById('catPromoMessage').value = '';
     document.getElementById('catBase').value = 0;
@@ -340,6 +354,7 @@ function openEditModal(c) {
     document.getElementById('catKey').disabled = true;
     document.getElementById('catName').value = c.display_name || '';
     document.getElementById('catCapacity').value = c.capacity || 0;
+    document.getElementById('catSearchRadius').value = c.search_radius_km || '';
     document.getElementById('catDesc').value = c.description || '';
     document.getElementById('catPromoMessage').value = c.promo_message || '';
     document.getElementById('catDiscountPercentage').value = c.discount_percentage || 0;

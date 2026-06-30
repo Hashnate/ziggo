@@ -21,6 +21,7 @@ from ...models import (
     Notification,
     CustomerCard,
     Payment,
+    SystemSettings,
 )
 from ...schemas import (
     FareEstimateRequest,
@@ -43,6 +44,22 @@ router = APIRouter()
 
 def _gen_ref() -> str:
     return "ZG" + secrets.token_hex(4).upper()
+
+
+async def get_search_radius_for_service(db: AsyncSession, service_type: Optional[str]) -> int:
+    if service_type:
+        from ...models import FareSetting
+        q = await db.execute(select(FareSetting).where(FareSetting.service_type == service_type))
+        fs = q.scalars().first()
+        if fs and fs.search_radius_km is not None and fs.search_radius_km > 0:
+            return fs.search_radius_km
+
+    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    ss = ss_q.scalars().first()
+    if ss and ss.driver_search_radius_km is not None:
+        return ss.driver_search_radius_km
+
+    return 15
 
 
 async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingResponse:
@@ -451,9 +468,9 @@ async def create_booking(
     # Flash parcels broadcast to ANY nearby courier — vehicle type is just a
     # fare/surcharge hint, not a hard requirement (a tuk can carry a doc, a van
     # can carry a small parcel). Rides keep the strict vehicle-type filter.
-    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
-    ss = ss_q.scalars().first()
-    max_radius = ss.driver_search_radius_km if ss and ss.driver_search_radius_km else 15
+    dispatch_vehicle = None if (req.is_flash or req.is_courier) else req.service_type
+
+    max_radius = await get_search_radius_for_service(db, dispatch_vehicle)
 
     nearby = await find_all_nearby_drivers(
         db, req.pickup_lat, req.pickup_lng, dispatch_vehicle, max_distance_km=max_radius
@@ -888,12 +905,14 @@ async def accept_booking(
     # the same proximity query as create_booking to approximate "who was pinged".
     # Mirror create_booking: flash parcels were broadcast to ALL vehicle types,
     # so the dismissal needs to reach the same audience.
+    dispatch_vehicle = None if (b.is_flash or b.is_courier) else b.service_type
+    max_radius = await get_search_radius_for_service(db, dispatch_vehicle)
     other_drivers = await find_all_nearby_drivers(
         db,
         float(b.pickup_lat),
         float(b.pickup_lng),
-        None if (b.is_flash or b.is_courier) else b.service_type,
-        max_distance_km=15,
+        dispatch_vehicle,
+        max_distance_km=max_radius,
         exclude_driver_id=driver.id,
     )
     for od in other_drivers:
@@ -1223,7 +1242,7 @@ async def update_booking_status(
                 drv.today_rides = (drv.today_rides or 0) + 1
 
                 # Check driver incentives (daily bonus and cycle bonus) from SystemSettings
-                from ...models import SystemSettings, DriverPayout
+                from ...models import DriverPayout
                 ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
                 ss = ss_q.scalars().first()
                 if ss:
@@ -1303,7 +1322,7 @@ async def update_booking_status(
 
         # Charge cancellation fee if cancelled by customer after grace period
         if b.cancelled_by == "customer":
-            from ...models import SystemSettings, WalletTransaction
+            from ...models import WalletTransaction
             ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
             ss = ss_q.scalars().first()
             grace_period_mins = ss.cancellation_grace_period_minutes if (ss and ss.cancellation_grace_period_minutes is not None) else 3
@@ -1382,15 +1401,14 @@ async def update_booking_status(
                 "booking_update",
                 {"booking_id": b.id, "status": b.status.value},
             )
-        ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
-        ss = ss_q.scalars().first()
-        max_radius = ss.driver_search_radius_km if ss and ss.driver_search_radius_km else 15
+        dispatch_vehicle = None if (b.is_flash or b.is_courier) else b.service_type
+        max_radius = await get_search_radius_for_service(db, dispatch_vehicle)
 
         other_drivers = await find_all_nearby_drivers(
             db,
             float(b.pickup_lat),
             float(b.pickup_lng),
-            None if (b.is_flash or b.is_courier) else b.service_type,
+            dispatch_vehicle,
             max_distance_km=max_radius,
             exclude_driver_id=None,
         )
