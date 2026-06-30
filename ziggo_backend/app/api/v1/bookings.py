@@ -61,6 +61,15 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
 
     driver_obj = None
     if b.driver:
+        from sqlalchemy import func
+        trip_count_q = await db.execute(
+            select(func.count(Booking.id)).where(
+                Booking.driver_id == b.driver.id,
+                Booking.status == "completed"
+            )
+        )
+        actual_trips = trip_count_q.scalar() or 0
+
         driver_obj = {
             "id": b.driver.id,
             "full_name": b.driver.user.full_name if b.driver.user else None,
@@ -73,7 +82,7 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
             "current_lng": float(b.driver.current_lng) if b.driver.current_lng else None,
             "current_heading": float(b.driver.current_heading) if b.driver.current_heading is not None else 0.0,
             "profile_photo": b.driver.user.profile_photo if b.driver.user else None,
-            "completed_trips": b.driver.user.total_rides if b.driver.user else 0,
+            "completed_trips": actual_trips,
         }
 
     customer_name = b.customer.user.full_name if b.customer and b.customer.user else None
