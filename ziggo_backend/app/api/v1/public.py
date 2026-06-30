@@ -179,6 +179,7 @@ async def public_categories(db: AsyncSession = Depends(get_db)):
             "promo_message": c.promo_message,
             "passenger_deductible": float(c.passenger_deductible) if c.passenger_deductible else 0.0,
             "discount_percentage": float(c.discount_percentage) if c.discount_percentage else 0.0,
+            "capacity": c.capacity if c.capacity is not None else 0,
         }
         for c in rows
     ]

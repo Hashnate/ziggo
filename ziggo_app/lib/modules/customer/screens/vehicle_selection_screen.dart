@@ -899,7 +899,9 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
 
     final displayName = customName ?? meta?.$1 ?? (st.isNotEmpty ? '${st[0].toUpperCase()}${st.substring(1)}' : st);
     final assetIcon = meta?.$2 ?? 'assets/icons/taxi.png';
-    final capacity = meta?.$3 ?? 4;
+    
+    final customCapacity = category?['capacity'] as int?;
+    final capacity = (customCapacity != null && customCapacity > 0) ? customCapacity : (meta?.$3 ?? 4);
 
     final customImageUrl = (customImage != null && customImage.isNotEmpty)
         ? (customImage.startsWith('http') 

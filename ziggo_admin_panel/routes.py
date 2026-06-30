@@ -6496,6 +6496,47 @@ async def admin_corporate_members_json(
     ]
 
 
+@router.post("/corporate/{account_id}/edit")
+async def admin_corporate_edit(
+    account_id: int,
+    request: Request,
+    company_name: str = Form(...),
+    billing_email: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import CorporateAccount
+    company_name = company_name.strip()
+    billing_email = billing_email.strip() or None
+    if not company_name:
+        raise HTTPException(status_code=400, detail="Company name cannot be empty")
+    aq = await db.execute(select(CorporateAccount).where(CorporateAccount.id == account_id))
+    acct = aq.scalars().first()
+    if not acct:
+        raise HTTPException(status_code=404, detail="Corporate account not found")
+    acct.company_name = company_name
+    acct.billing_email = billing_email
+    await db.commit()
+    return RedirectResponse(url="/admin/corporate", status_code=303)
+
+
+@router.post("/corporate/{account_id}/delete")
+async def admin_corporate_delete(
+    account_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import CorporateAccount
+    aq = await db.execute(select(CorporateAccount).where(CorporateAccount.id == account_id))
+    acct = aq.scalars().first()
+    if not acct:
+        raise HTTPException(status_code=404, detail="Corporate account not found")
+    await db.delete(acct)
+    await db.commit()
+    return RedirectResponse(url="/admin/corporate", status_code=303)
+
+
 # ===========================================================================
 # Food Home layout — banners / categories / collections / deals
 # (drives the customer Food home screen via GET /api/v1/food/home)
