@@ -1332,13 +1332,13 @@ class _DriverCard extends StatelessWidget {
       return -1;
     }
 
-    int trips = 0;
+    int trips = -1;
     final keys = ['completed_trips', 'total_trips', 'total_rides', 'trips', 'rides', 'rides_completed', 'trips_completed', 'rides_count', 'completed_rides'];
     for (final k in keys) {
       final v = parseTrips(d[k]);
       if (v >= 0) { trips = v; break; }
     }
-    if (trips == 0 && profile != null) {
+    if (trips < 0 && profile != null) {
       for (final k in keys..add('today_rides')) {
         final v = parseTrips(profile[k]);
         if (v >= 0) { trips = v; break; }
@@ -1471,7 +1471,7 @@ class _DriverCard extends StatelessWidget {
               color: AppColors.textPrimary,
             ),
           ),
-          if (trips > 0) ...[
+          if (trips >= 0) ...[
             const SizedBox(height: 2),
             Text(
               '$trips trips',
@@ -1479,6 +1479,17 @@ class _DriverCard extends StatelessWidget {
                 color: AppColors.textSecondary,
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 2),
+            Text(
+              'Backend not reloaded! Missing completed_trips key. Keys present: ${d.keys.join(", ")}',
+              maxLines: 10,
+              style: const TextStyle(
+                color: Colors.red,
+                fontWeight: FontWeight.bold,
+                fontSize: 10,
               ),
             ),
           ],
