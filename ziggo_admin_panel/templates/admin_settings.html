@@ -129,6 +129,13 @@
                             <input type="number" step="0.01" min="0" name="rider_penalty" value="{{ s.rider_penalty if s.rider_penalty is not none else 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                         </div>
                         <hr class="border-ziggo-line my-4">
+                        <h4 class="text-sm font-black text-ziggo-ink mb-3">Driver Search Settings</h4>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Driver Search Radius (km)</label>
+                            <input type="number" min="1" name="driver_search_radius_km" value="{{ s.driver_search_radius_km if s.driver_search_radius_km is not none else 15 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                            <p class="text-[10px] text-ziggo-faint font-bold mt-1">Maximum distance to search for available drivers when a booking is created.</p>
+                        </div>
+                        <hr class="border-ziggo-line my-4">
                         <h4 class="text-sm font-black text-ziggo-ink mb-3">Peak Hours Settings</h4>
                         
                         <div class="bg-white rounded-2xl border border-ziggo-line overflow-hidden shadow-soft-sm mb-4">

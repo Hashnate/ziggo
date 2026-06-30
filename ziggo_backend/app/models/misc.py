@@ -147,6 +147,8 @@ class SystemSettings(Base):
     cancellation_fee = Column(DECIMAL(10, 2), default=0)
     cancellation_grace_period_minutes = Column(Integer, default=3)
     rider_penalty = Column(DECIMAL(10, 2), default=0)
+    # Search Radius
+    driver_search_radius_km = Column(Integer, default=15)
     # Security
     min_password_length = Column(Integer, default=6)
     session_timeout_minutes = Column(Integer, default=30)

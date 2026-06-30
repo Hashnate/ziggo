@@ -451,9 +451,12 @@ async def create_booking(
     # Flash parcels broadcast to ANY nearby courier — vehicle type is just a
     # fare/surcharge hint, not a hard requirement (a tuk can carry a doc, a van
     # can carry a small parcel). Rides keep the strict vehicle-type filter.
-    dispatch_vehicle = None if (req.is_flash or req.is_courier) else req.service_type
+    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    ss = ss_q.scalars().first()
+    max_radius = ss.driver_search_radius_km if ss and ss.driver_search_radius_km else 15
+
     nearby = await find_all_nearby_drivers(
-        db, req.pickup_lat, req.pickup_lng, dispatch_vehicle, max_distance_km=15
+        db, req.pickup_lat, req.pickup_lng, dispatch_vehicle, max_distance_km=max_radius
     )
     if booking.is_courier:
         n_title = "New courier delivery"
@@ -1379,13 +1382,16 @@ async def update_booking_status(
                 "booking_update",
                 {"booking_id": b.id, "status": b.status.value},
             )
-    elif old_status == BookingStatus.SEARCHING and new_status == BookingStatus.CANCELLED:
+        ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+        ss = ss_q.scalars().first()
+        max_radius = ss.driver_search_radius_km if ss and ss.driver_search_radius_km else 15
+
         other_drivers = await find_all_nearby_drivers(
             db,
             float(b.pickup_lat),
             float(b.pickup_lng),
             None if (b.is_flash or b.is_courier) else b.service_type,
-            max_distance_km=15,
+            max_distance_km=max_radius,
             exclude_driver_id=None,
         )
         for od in other_drivers:
