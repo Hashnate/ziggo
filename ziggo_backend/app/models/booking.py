@@ -42,6 +42,9 @@ class Booking(Base):
     drop_lat = Column(DECIMAL(10, 7))
     drop_lng = Column(DECIMAL(10, 7))
     drop_address = Column(Text)
+    
+    driver_accepted_lat = Column(DECIMAL(10, 7))
+    driver_accepted_lng = Column(DECIMAL(10, 7))
 
     service_type = Column(String(20))  # bike, tuk, car, van, truck, delivery
     trip_type = Column(String(20), default="one_way", nullable=False)  # one_way | return
@@ -65,6 +68,7 @@ class Booking(Base):
     final_amount = Column(DECIMAL(10, 2))
     platform_fee = Column(DECIMAL(10, 2))
     driver_earnings = Column(DECIMAL(10, 2))
+    pickup_distance_km = Column(DECIMAL(8, 2), default=0.00)
     pickup_fee = Column(DECIMAL(10, 2), default=0.00)
     boost = Column(DECIMAL(10, 2), default=0.00)
     passenger_deductible = Column(DECIMAL(10, 2), default=0.00)

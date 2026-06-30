@@ -362,6 +362,8 @@ class DriverRideDetailsScreen extends StatelessWidget {
                   
                   // Top section
                   _breakdownRow('Trip fare', fmt.format((rideData['fare_amount'] as num?) ?? 0)),
+                  if (((rideData['pickup_fee'] as num?) ?? 0) > 0)
+                    _breakdownRow('Pickup fee (included)', fmt.format((rideData['pickup_fee'] as num?) ?? 0)),
                   _breakdownRow('Passenger deductibles', fmt.format((rideData['passenger_deductible'] as num?) ?? 0)),
                   
                   const Divider(height: 24),
