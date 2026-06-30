@@ -71,6 +71,7 @@ class Booking(Base):
     pickup_distance_km = Column(DECIMAL(8, 2), default=0.00)
     pickup_fee = Column(DECIMAL(10, 2), default=0.00)
     boost = Column(DECIMAL(10, 2), default=0.00)
+    peak_surcharge = Column(DECIMAL(10, 2), default=0.00)
     passenger_deductible = Column(DECIMAL(10, 2), default=0.00)
     app_usage_charges = Column(DECIMAL(10, 2), default=0.00)
     deductions = Column(DECIMAL(10, 2), default=0.00)

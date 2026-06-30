@@ -364,10 +364,12 @@ class DriverRideDetailsScreen extends StatelessWidget {
                   _breakdownRow('Trip fare', fmt.format((rideData['fare_amount'] as num?) ?? 0)),
                   if (((rideData['pickup_fee'] as num?) ?? 0) > 0)
                     _breakdownRow('Pickup fee (included)', fmt.format((rideData['pickup_fee'] as num?) ?? 0)),
+                  if (((rideData['peak_surcharge'] as num?) ?? 0) > 0)
+                    _breakdownRow('Peak hours extra earnings', fmt.format((rideData['peak_surcharge'] as num?) ?? 0)),
                   _breakdownRow('Passenger deductibles', fmt.format((rideData['passenger_deductible'] as num?) ?? 0)),
                   
                   const Divider(height: 24),
-                  _breakdownRow('Gross total', fmt.format(((rideData['fare_amount'] as num?) ?? 0) + ((rideData['passenger_deductible'] as num?) ?? 0)), isBold: true),
+                  _breakdownRow('Gross total', fmt.format(((rideData['fare_amount'] as num?) ?? 0) + ((rideData['passenger_deductible'] as num?) ?? 0) + ((rideData['peak_surcharge'] as num?) ?? 0)), isBold: true),
                   const SizedBox(height: 16),
                   
                   // Deductions section
