@@ -1306,6 +1306,15 @@ class _DriverCard extends StatelessWidget {
                 : '${ApiConfig.baseHost}/$photo'))
         : null;
 
+    final vPhoto = d['vehicle_photo_url']?.toString();
+    final vehiclePhotoUrl = (vPhoto != null && vPhoto.isNotEmpty)
+        ? (vPhoto.startsWith('http') 
+            ? vPhoto 
+            : (vPhoto.startsWith('/') 
+                ? '${ApiConfig.baseHost}$vPhoto' 
+                : '${ApiConfig.baseHost}/$vPhoto'))
+        : null;
+
     final fallback = Center(
       child: Text(
         initial,
@@ -1408,12 +1417,29 @@ class _DriverCard extends StatelessWidget {
                       color: AppColors.surfaceMuted,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(4.0),
-                      child: Image.asset(
-                        'assets/icons/${vehicleType == 'van' ? 'car' : (['bike', 'car', 'tuk', 'truck'].contains(vehicleType) ? vehicleType : 'car')}.png',
-                        fit: BoxFit.contain,
-                      ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: vehiclePhotoUrl != null
+                          ? Image.network(
+                              vehiclePhotoUrl,
+                              fit: BoxFit.cover,
+                              width: 60,
+                              height: 40,
+                              errorBuilder: (context, error, stackTrace) => Padding(
+                                padding: const EdgeInsets.all(4.0),
+                                child: Image.asset(
+                                  'assets/icons/${vehicleType == 'van' ? 'car' : (['bike', 'car', 'tuk', 'truck'].contains(vehicleType) ? vehicleType : 'car')}.png',
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            )
+                          : Padding(
+                              padding: const EdgeInsets.all(4.0),
+                              child: Image.asset(
+                                'assets/icons/${vehicleType == 'van' ? 'car' : (['bike', 'car', 'tuk', 'truck'].contains(vehicleType) ? vehicleType : 'car')}.png',
+                                fit: BoxFit.contain,
+                              ),
+                            ),
                     ),
                   ),
                   const SizedBox(height: 4),
