@@ -7,6 +7,7 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/widgets/motion.dart';
 import '../market_provider.dart';
+import 'market_home_screen.dart';
 
 class MarketTrackingScreen extends StatefulWidget {
   final String orderRef;
@@ -101,7 +102,11 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Order cancelled successfully.')),
           );
-          _refresh();
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const MarketHomeScreen()),
+            (route) => route.isFirst,
+          );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(context.read<MarketProvider>().error ?? 'Failed to cancel order.')),

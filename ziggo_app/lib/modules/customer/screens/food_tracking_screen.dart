@@ -8,6 +8,7 @@ import '../../../app/app_styles.dart';
 import '../../../core/widgets/motion.dart';
 import '../food_provider.dart';
 import '../food_ui.dart';
+import 'food_home_screen.dart';
 
 class FoodTrackingScreen extends StatefulWidget {
   final String orderRef;
@@ -92,7 +93,11 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Order cancelled successfully.')),
           );
-          _refresh();
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const FoodHomeScreen()),
+            (route) => route.isFirst,
+          );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(context.read<FoodProvider>().error ?? 'Failed to cancel order.')),
