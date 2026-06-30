@@ -1377,15 +1377,16 @@ class _DriverCard extends StatelessWidget {
                       shape: BoxShape.circle,
                       border: Border.all(color: AppColors.primary.withOpacity(0.2)),
                     ),
-                    child: ClipOval(
-                      child: photoUrl != null
-                          ? Image.network(
-                              photoUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => fallback,
-                            )
-                          : fallback,
-                    ),
+                    child: photoUrl != null
+                        ? CircleAvatar(
+                            radius: 24,
+                            backgroundColor: AppColors.primary.withOpacity(0.1),
+                            backgroundImage: NetworkImage(photoUrl),
+                            onBackgroundImageError: (exception, stackTrace) {
+                              debugPrint('Error loading driver photo: $exception');
+                            },
+                          )
+                        : fallback,
                   ),
                   const SizedBox(height: 4),
                   Row(

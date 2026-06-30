@@ -653,12 +653,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: photoUrl != null
-                      ? ClipOval(
-                          child: Image.network(
-                            photoUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _avatarFallback(initial),
-                          ),
+                      ? CircleAvatar(
+                          radius: 22,
+                          backgroundColor: AppColors.primaryLight,
+                          backgroundImage: NetworkImage(photoUrl),
+                          onBackgroundImageError: (exception, stackTrace) {
+                            debugPrint('Error loading avatar: $exception');
+                          },
                         )
                       : _avatarFallback(initial),
                 ),
@@ -3578,22 +3579,34 @@ class _Drawer extends StatelessWidget {
             children: [
               Icon(icon, color: AppColors.textPrimary, size: 24),
               const SizedBox(width: 18),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15,
+              Expanded(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                    if (accent) ...[
+                      const SizedBox(width: 8),
+                      const Icon(Icons.auto_awesome, color: AppColors.primaryLight, size: 14),
+                    ],
+                  ],
                 ),
               ),
-              if (accent) ...[
+              if (chevronDown) ...[
                 const SizedBox(width: 8),
-                const Icon(Icons.auto_awesome, color: AppColors.primaryLight, size: 14),
-              ],
-              const Spacer(),
-              if (chevronDown)
                 const Icon(Icons.keyboard_arrow_down_rounded,
                     color: AppColors.textTertiary, size: 22),
+              ],
             ],
           ),
         ),

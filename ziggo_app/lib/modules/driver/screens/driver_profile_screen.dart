@@ -985,22 +985,31 @@ class _Header extends StatelessWidget {
           const SizedBox(height: 6),
           Stack(
             children: [
-              Container(
-                width: 108,
-                height: 108,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white,
-                  border: Border.all(color: Colors.white, width: 3),
+              CircleAvatar(
+                radius: 54, // 108 / 2
+                backgroundColor: Colors.white,
+                child: CircleAvatar(
+                  radius: 51, // 54 - 3 (border width)
+                  backgroundColor: AppColors.primaryLight,
+                  backgroundImage: photoUrl != null && photoUrl!.isNotEmpty
+                      ? NetworkImage(photoUrl!)
+                      : null,
+                  onBackgroundImageError: photoUrl != null
+                      ? (exception, stackTrace) {
+                          debugPrint('Error loading profile photo: $exception');
+                        }
+                      : null,
+                  child: photoUrl == null || photoUrl!.isEmpty
+                      ? Text(
+                          initial,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 32,
+                          ),
+                        )
+                      : null,
                 ),
-                clipBehavior: Clip.antiAlias,
-                child: photoUrl != null
-                    ? Image.network(
-                        photoUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _fallback(),
-                      )
-                    : _fallback(),
               ),
               Positioned(
                 right: 0,
