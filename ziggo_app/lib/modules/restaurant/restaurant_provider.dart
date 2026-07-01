@@ -8,6 +8,7 @@ import '../../core/network/api_client.dart';
 import '../../core/network/ws_client.dart';
 import '../../core/payments/payhere_service.dart';
 import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 /// State + API for the restaurant-owner portal.
 class RestaurantProvider extends ChangeNotifier {
@@ -73,7 +74,7 @@ class RestaurantProvider extends ChangeNotifier {
     final event = msg['event'];
     if (event == 'new_food_order') {
       HapticFeedback.heavyImpact();
-      SystemSound.play(SystemSoundType.alert);
+      AudioPlayer().play(AssetSource('sounds/ride_alert.mp3'));
       newOrderPing.value = newOrderPing.value + 1;
       loadOrders();
       loadTodayStats();

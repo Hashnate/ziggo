@@ -816,7 +816,6 @@ class _ActionBar extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            flex: 2,
             child: _BarBtn(
               label: 'MARK READY',
               icon: Icons.shopping_bag_rounded,
@@ -872,15 +871,13 @@ class _BarBtn extends StatelessWidget {
       height: 56,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppStyles.radiusMd),
-        boxShadow: outlined
-            ? AppStyles.shadowSm
-            : [
-                BoxShadow(
-                  color: color.withOpacity(0.35),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-              ],
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(outlined ? 0.15 : 0.35),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: ElevatedButton(
         onPressed: busy ? null : onPressed,
@@ -914,8 +911,8 @@ class _BarBtn extends StatelessWidget {
                       label,
                       style: const TextStyle(
                         fontWeight: FontWeight.w900,
-                        fontSize: 14,
-                        letterSpacing: 0.5,
+                        fontSize: 15,
+                        letterSpacing: 0.3,
                       ),
                     ),
                   ],
