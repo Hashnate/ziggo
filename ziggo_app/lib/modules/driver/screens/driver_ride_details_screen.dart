@@ -134,7 +134,21 @@ class DriverRideDetailsScreen extends StatelessWidget {
     final bookedAt = rideData['booked_at']?.toString();
 
     // For Driver, the highlight is Net Driver Earnings
-    final driverEarnings = (rideData['driver_earnings'] as num?)?.toDouble() ?? (rideData['final_amount'] as num?)?.toDouble() ?? 0.0;
+    final isFood = rideData['is_food'] == true || serviceType.toLowerCase() == 'food';
+    final isMarket = rideData['is_market'] == true || serviceType.toLowerCase() == 'market';
+    final paymentMethod = (rideData['payment_method'] ?? 'cash').toString().toLowerCase();
+    final paymentLabel = paymentMethod == 'cash' ? 'cash' : 'non cash';
+
+    final pickupFee = (rideData['pickup_fee'] as num?)?.toDouble() ?? 0.0;
+    final boost = (rideData['boost'] as num?)?.toDouble() ?? 0.0;
+    final grossTotal = (rideData['fare_amount'] as num?)?.toDouble() ?? 0.0;
+    final distanceFare = grossTotal - pickupFee - boost;
+    final appUsage = (rideData['app_usage_charges'] as num?)?.toDouble() ?? (rideData['platform_fee'] as num?)?.toDouble() ?? 0.0;
+    final totalDeductions = (rideData['deductions'] as num?)?.toDouble() ?? appUsage;
+    final orderValue = (rideData['final_amount'] as num?)?.toDouble() ?? 0.0;
+    final itemsPrice = (rideData['items_price'] as num?)?.toDouble() ?? (orderValue - grossTotal);
+
+    final driverEarnings = (rideData['driver_earnings'] as num?)?.toDouble() ?? (rideData['final_amount'] as num?)?.toDouble() ?? (grossTotal - totalDeductions);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -277,20 +291,62 @@ class DriverRideDetailsScreen extends StatelessWidget {
                     decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(12)),
                     child: Column(
                       children: [
-                        Icon(_vehicleIcon(serviceType), size: 24, color: Colors.black54),
-                        if (serviceType.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            '${serviceType[0].toUpperCase()}${serviceType.substring(1)}',
-                            style: const TextStyle(fontSize: 11, color: Colors.black54, fontWeight: FontWeight.w600),
-                          ),
-                        ]
+                        Icon(_vehicleIcon(isFood || isMarket ? 'bike' : serviceType), size: 24, color: Colors.black54),
+                        Builder(
+                          builder: (context) {
+                            String serviceLabel = serviceType;
+                            if (isFood) {
+                              serviceLabel = 'Bike food';
+                            } else if (isMarket) {
+                              serviceLabel = 'Market Delivery';
+                            } else if (serviceLabel.isNotEmpty) {
+                              serviceLabel = '${serviceLabel[0].toUpperCase()}${serviceLabel.substring(1)}';
+                            }
+                            return serviceLabel.isNotEmpty
+                                ? Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Text(
+                                      serviceLabel,
+                                      style: const TextStyle(fontSize: 11, color: Colors.black54, fontWeight: FontWeight.w600),
+                                    ),
+                                  )
+                                : const SizedBox.shrink();
+                          },
+                        ),
                       ],
                     ),
                   ),
                 ],
               ),
             ),
+
+            if (isFood || isMarket) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 20, offset: const Offset(0, 4)),
+                  ],
+                  border: Border.all(color: Colors.grey.shade100),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      isFood ? 'Bike food' : 'Market Delivery',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black87),
+                    ),
+                    Text(
+                      '${isFood ? 'Food plus' : 'Market plus'} • $paymentLabel',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black54),
+                    ),
+                  ],
+                ),
+              ),
+            ],
 
             const SizedBox(height: 16),
 
@@ -360,28 +416,47 @@ class DriverRideDetailsScreen extends StatelessWidget {
                   const Text('FARE BREAKDOWN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black54, letterSpacing: 1.2)),
                   const SizedBox(height: 12),
                   
-                  // Top section
-                  _breakdownRow('Trip fare', fmt.format((rideData['fare_amount'] as num?) ?? 0)),
-                  if (((rideData['pickup_fee'] as num?) ?? 0) > 0)
-                    _breakdownRow('Pickup fee (included)', fmt.format((rideData['pickup_fee'] as num?) ?? 0)),
-                  if (((rideData['peak_surcharge'] as num?) ?? 0) > 0)
-                    _breakdownRow('Peak hours extra earnings', fmt.format((rideData['peak_surcharge'] as num?) ?? 0)),
-                  _breakdownRow('Passenger deductibles', fmt.format((rideData['passenger_deductible'] as num?) ?? 0)),
-                  
-                  const Divider(height: 24),
-                  _breakdownRow('Gross total', fmt.format(((rideData['fare_amount'] as num?) ?? 0) + ((rideData['passenger_deductible'] as num?) ?? 0) + ((rideData['peak_surcharge'] as num?) ?? 0)), isBold: true),
-                  const SizedBox(height: 16),
-                  
-                  // Deductions section
-                  _breakdownRow('App usage charges', fmt.format((rideData['app_usage_charges'] as num?) ?? (rideData['platform_fee'] as num?) ?? 0), isNegative: true),
-                  _breakdownRow('Passenger deductibles', fmt.format((rideData['passenger_deductible'] as num?) ?? 0), isNegative: true),
-                  
-                  const Divider(height: 24),
-                  _breakdownRow('Deduction', fmt.format((((rideData['app_usage_charges'] as num?) ?? (rideData['platform_fee'] as num?) ?? 0) + ((rideData['passenger_deductible'] as num?) ?? 0))), isBold: true, isNegative: true),
-                  const SizedBox(height: 16),
+                  if (isFood || isMarket) ...[
+                    // Food/Market Earnings summary
+                    _breakdownRow('Pickup fee', fmt.format(pickupFee)),
+                    _breakdownRow('Distance', fmt.format(distanceFare)),
+                    _breakdownRow('Boost', fmt.format(boost)),
+                    
+                    const Divider(height: 24),
+                    _breakdownRow('Gross Total', fmt.format(grossTotal), isBold: true),
+                    const SizedBox(height: 16),
+                    
+                    _breakdownRow('Apps Usage charges', fmt.format(appUsage), isNegative: true),
+                    _breakdownRow('Deductions', fmt.format(totalDeductions), isBold: true, isNegative: true),
+                    const SizedBox(height: 16),
 
-                  // Final earnings
-                  _breakdownRow('Your earnings', fmt.format(driverEarnings), isBold: true),
+                    _breakdownRow('Your earnings', fmt.format(driverEarnings), isBold: true),
+                    
+                    const Divider(height: 24),
+                    _breakdownRow('Order value', fmt.format(orderValue)),
+                    _breakdownRow(isFood ? 'Food' : 'Market Items', fmt.format(itemsPrice)),
+                  ] else ...[
+                    // Standard ride breakdown
+                    _breakdownRow('Trip fare', fmt.format((rideData['fare_amount'] as num?) ?? 0)),
+                    if (((rideData['pickup_fee'] as num?) ?? 0) > 0)
+                      _breakdownRow('Pickup fee (included)', fmt.format((rideData['pickup_fee'] as num?) ?? 0)),
+                    if (((rideData['peak_surcharge'] as num?) ?? 0) > 0)
+                      _breakdownRow('Peak hours extra earnings', fmt.format((rideData['peak_surcharge'] as num?) ?? 0)),
+                    _breakdownRow('Passenger deductibles', fmt.format((rideData['passenger_deductible'] as num?) ?? 0)),
+                    
+                    const Divider(height: 24),
+                    _breakdownRow('Gross total', fmt.format(((rideData['fare_amount'] as num?) ?? 0) + ((rideData['passenger_deductible'] as num?) ?? 0) + ((rideData['peak_surcharge'] as num?) ?? 0)), isBold: true),
+                    const SizedBox(height: 16),
+                    
+                    _breakdownRow('App usage charges', fmt.format((rideData['app_usage_charges'] as num?) ?? (rideData['platform_fee'] as num?) ?? 0), isNegative: true),
+                    _breakdownRow('Passenger deductibles', fmt.format((rideData['passenger_deductible'] as num?) ?? 0), isNegative: true),
+                    
+                    const Divider(height: 24),
+                    _breakdownRow('Deduction', fmt.format((((rideData['app_usage_charges'] as num?) ?? (rideData['platform_fee'] as num?) ?? 0) + ((rideData['passenger_deductible'] as num?) ?? 0))), isBold: true, isNegative: true),
+                    const SizedBox(height: 16),
+
+                    _breakdownRow('Your earnings', fmt.format(driverEarnings), isBold: true),
+                  ],
                 ],
               ),
             ),

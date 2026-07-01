@@ -278,7 +278,10 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
     final serviceType = active['service_type'] as String?;
 
     if (_lastStatus != status) {
-      if (status == 'arrived' || status == 'started') {
+      if (status == 'arrived') {
+        _sheetExpanded = true;
+      }
+      if (status == 'started') {
         _sheetExpanded = false;
       }
       if (status != 'arrived') {
@@ -286,10 +289,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
       }
       if (status == 'arrived' && active['otp'] != null && !_otpDialogShown) {
         _otpDialogShown = true;
-        final otp = active['otp'].toString();
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _showArrivedOtpDialog(otp);
-        });
+        // Don't show popup dialog anymore, show inline in the sheet instead
       }
       if (status == 'cancelled') {
         if (!_userCancelled) {
@@ -948,6 +948,50 @@ class _BottomCard extends StatelessWidget {
                       ? Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            if ((active['status'] == 'accepted' || active['status'] == 'arrived') && active['otp'] != null) ...[
+                              const SizedBox(height: 14),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2563EB),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      'Share PIN',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                    Row(
+                                      children: active['otp'].toString().split('').map((digit) => Container(
+                                        margin: const EdgeInsets.only(left: 6),
+                                        width: 28,
+                                        height: 32,
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF1E3A8A),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          digit,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      )).toList(),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 16),
                             // 3. Ride Details Box
                             Container(
@@ -1104,47 +1148,6 @@ class _BottomCard extends StatelessWidget {
                                 ],
                               ),
                             ),
-                             if (active['status'] == 'arrived' && active['otp'] != null) ...[
-                               const SizedBox(height: 16),
-                               Container(
-                                 width: double.infinity,
-                                 padding: const EdgeInsets.symmetric(vertical: 16),
-                                 decoration: BoxDecoration(
-                                   gradient: AppColors.primaryGradient,
-                                   borderRadius: BorderRadius.circular(22),
-                                   boxShadow: [
-                                     BoxShadow(
-                                       color: AppColors.primary.withOpacity(0.25),
-                                       blurRadius: 12,
-                                       offset: const Offset(0, 5),
-                                     ),
-                                   ],
-                                 ),
-                                 child: Column(
-                                   children: [
-                                     const Text(
-                                       'SHARE THIS OTP WITH YOUR DRIVER',
-                                       style: TextStyle(
-                                         color: Colors.white70,
-                                         fontWeight: FontWeight.w900,
-                                         fontSize: 10,
-                                         letterSpacing: 1.2,
-                                       ),
-                                     ),
-                                     const SizedBox(height: 6),
-                                     Text(
-                                       active['otp'].toString(),
-                                       style: const TextStyle(
-                                         color: Colors.white,
-                                         fontWeight: FontWeight.w900,
-                                         fontSize: 34,
-                                         letterSpacing: 8,
-                                       ),
-                                     ),
-                                   ],
-                                 ),
-                               ),
-                             ],
                              if (driver != null) ...[
                                const SizedBox(height: 16),
                                _DriverCard(d: driver!),
@@ -1333,6 +1336,10 @@ class _DriverCard extends StatelessWidget {
     final fullName = (d['full_name'] ?? 'Driver').toString();
     final driverId = d['id'] as int? ?? 0;
     final profile = d['profile'] as Map<String, dynamic>?;
+    final rawColor = (d['vehicle_color'] ?? profile?['vehicle_color'] ?? '').toString().trim();
+    final vehicleColor = rawColor.isNotEmpty 
+        ? '${rawColor[0].toUpperCase()}${rawColor.substring(1)}'
+        : '';
 
     int parseTrips(dynamic val) {
       if (val == null) return -1;
@@ -1478,7 +1485,7 @@ class _DriverCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    vehicleModel,
+                    vehicleColor.isNotEmpty ? '$vehicleColor $vehicleModel' : vehicleModel,
                     style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontWeight: FontWeight.w700,
