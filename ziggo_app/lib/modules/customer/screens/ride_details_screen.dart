@@ -610,7 +610,7 @@ class RideDetailsScreen extends StatelessWidget {
               child: Column(
                 children: [
                   Image.asset(
-                    'assets/images/ziggo.png',
+                    'assets/images/light.png',
                     height: 60,
                     fit: BoxFit.contain,
                   ),
