@@ -385,50 +385,46 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.my_location_rounded,
-                                          color: AppColors.flash,
-                                          size: 13,
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Expanded(
-                                          child: Text(
-                                            r['pickup_address']?.toString() ??
-                                                '',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
+                                    Builder(builder: (context) {
+                                      final stopsList = (r['stops'] as List?) ?? [];
+                                      final allPoints = <String>[
+                                        r['pickup_address']?.toString() ?? '',
+                                        for (final s in stopsList) s['address']?.toString() ?? '',
+                                        r['drop_address']?.toString() ?? '',
+                                      ];
+
+                                      return Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          for (int i = 0; i < allPoints.length; i++) ...[
+                                            if (i > 0) const SizedBox(height: 4),
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                  i == 0 
+                                                      ? Icons.my_location_rounded
+                                                      : (i == allPoints.length - 1 ? Icons.location_on_rounded : Icons.radio_button_checked_rounded),
+                                                  color: i == 0 ? AppColors.flash : (i == allPoints.length - 1 ? AppColors.error : Colors.orange),
+                                                  size: 13,
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Expanded(
+                                                  child: Text(
+                                                    allPoints[i],
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.location_on_rounded,
-                                          color: AppColors.error,
-                                          size: 13,
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Expanded(
-                                          child: Text(
-                                            r['drop_address']?.toString() ?? '',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                          ]
+                                        ],
+                                      );
+                                    }),
                                   ],
                                 ),
                               ),

@@ -51,6 +51,7 @@ class _FlashCheckoutScreenState extends State<FlashCheckoutScreen> {
   bool _busy = false;
   String? _error;
   List<LatLng> _routePoints = const [];
+  final ValueNotifier<double> _sheetExtent = ValueNotifier(0.62);
 
   @override
   void initState() {
@@ -209,12 +210,8 @@ class _FlashCheckoutScreenState extends State<FlashCheckoutScreen> {
       backgroundColor: AppColors.background,
       body: Stack(
         children: [
-          // 1. Map Background (top half)
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: MediaQuery.of(context).size.height * 0.45,
+          // 1. Map Background (top half -> full height)
+          Positioned.fill(
             child: ZiggoMap(
               controller: _mapController,
               center: widget.pickup.location,
@@ -265,11 +262,27 @@ class _FlashCheckoutScreenState extends State<FlashCheckoutScreen> {
           ),
 
           // 3. Scrollable Content Sheet
-          Positioned.fill(
-            child: ListView(
-              padding: EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.38),
-              children: [
-                Container(
+          NotificationListener<DraggableScrollableNotification>(
+            onNotification: (notification) {
+              if (mounted) {
+                _sheetExtent.value = notification.extent;
+              }
+              return false;
+            },
+            child: Builder(
+              builder: (context) {
+                // Calculate minChildSize to show handle (approx 40px) + bottom bar (approx 120px) = 160px
+                final double screenHeight = MediaQuery.of(context).size.height;
+                final double minSize = (160.0 / screenHeight).clamp(0.1, 0.4);
+
+                return DraggableScrollableSheet(
+                  initialChildSize: 0.62,
+                  minChildSize: minSize,
+                  maxChildSize: 0.9,
+                  snap: true,
+                  snapSizes: [minSize, 0.62, 0.9],
+                  builder: (context, scrollController) {
+                return Container(
                   decoration: const BoxDecoration(
                     color: AppColors.background,
                     borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
@@ -281,16 +294,17 @@ class _FlashCheckoutScreenState extends State<FlashCheckoutScreen> {
                       ),
                     ],
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: ListView(
+                    controller: scrollController,
+                    padding: const EdgeInsets.only(top: 0),
                     children: [
                       const SizedBox(height: 12),
                       Center(
                         child: Container(
                           width: 40,
-                          height: 4,
+                          height: 5,
                           decoration: BoxDecoration(
-                            color: AppColors.divider.withOpacity(0.5),
+                            color: AppColors.divider,
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
@@ -366,9 +380,11 @@ class _FlashCheckoutScreenState extends State<FlashCheckoutScreen> {
                       const SizedBox(height: 140), // Space for bottom bar
                     ],
                   ),
-                ),
-              ],
-            ),
+                );
+              },
+            );
+            },
+          ),
           ),
 
           // Back button
