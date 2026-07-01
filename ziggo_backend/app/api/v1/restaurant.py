@@ -195,7 +195,7 @@ async def get_my_restaurant(
 # Order workflow — restaurant owner gates the order before riders see it.
 # ---------------------------------------------------------------------------
 
-def _order_to_dict(o: FoodOrder, cust_user: Optional[User] = None) -> dict:
+def _order_to_dict(o: FoodOrder, cust_user: Optional[User] = None, comm_pct: float = 20.0) -> dict:
     return {
         "id": o.id,
         "order_ref": o.order_ref,
@@ -205,6 +205,7 @@ def _order_to_dict(o: FoodOrder, cust_user: Optional[User] = None) -> dict:
         "total_amount": float(o.total_amount or 0),
         "delivery_fee": float(o.delivery_fee or 0),
         "final_amount": float(o.final_amount or 0),
+        "commission_percentage": comm_pct,
         "delivery_address": o.delivery_address,
         "delivery_lat": float(o.delivery_lat) if o.delivery_lat is not None else None,
         "delivery_lng": float(o.delivery_lng) if o.delivery_lng is not None else None,
@@ -286,7 +287,8 @@ async def list_my_orders(
     else:
         cust_to_user_obj = {}
 
-    return [_order_to_dict(o, cust_to_user_obj.get(o.customer_id)) for o in orders]
+    comm_pct = float(r.commission_percentage) if r.commission_percentage is not None else 20.0
+    return [_order_to_dict(o, cust_to_user_obj.get(o.customer_id), comm_pct) for o in orders]
 
 
 async def _refund_wallet_if_needed(
@@ -489,7 +491,7 @@ async def get_order_detail(
     """Full order payload for the merchant: line items joined to menu items,
     plus customer + bill summary. Owner-scoped — 403 if the order is on
     someone else's restaurant."""
-    _, o = await _load_owner_scoped_order(db, user, order_id)
+    r, o = await _load_owner_scoped_order(db, user, order_id)
 
     items_q = await db.execute(
         select(FoodOrderItem).where(FoodOrderItem.order_id == o.id)
@@ -524,7 +526,8 @@ async def get_order_detail(
             }
         )
 
-    base = _order_to_dict(o, cust_user)
+    comm_pct = float(r.commission_percentage) if r.commission_percentage is not None else 20.0
+    base = _order_to_dict(o, cust_user, comm_pct)
     base["items"] = line_items
     return base
 

@@ -76,9 +76,8 @@ async def _broadcast_to_riders(
         max_distance_km=10,
     )
 
-    # Driver earnings = delivery fee * (1 - commission_percentage / 100)
-    comm_pct = float(r.commission_percentage) if r.commission_percentage is not None else 20.0
-    driver_earnings = float(delivery_fee) * (1.0 - comm_pct / 100.0)
+    # Driver earnings = delivery fee * (1 - 0.20)
+    driver_earnings = float(delivery_fee) * 0.80
 
     food_request_payload = {
         "is_food": True,

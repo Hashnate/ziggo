@@ -48,18 +48,32 @@ def _dec(v) -> Decimal:
 def _food_split(o) -> tuple[Decimal, Decimal]:
     # Returns (driver_earnings, platform_fee)
     df = _dec(o.delivery_fee)
+    item_total = _dec(o.final_amount) - df
+    
     comm_pct = o.restaurant.commission_percentage if (o.restaurant and o.restaurant.commission_percentage is not None) else Decimal("20.00")
-    platform_cut = (df * (comm_pct / Decimal("100"))).quantize(Decimal("0.01"))
-    driver_earn = df - platform_cut
+    
+    driver_app_usage_charge = (df * _PLATFORM_DELIVERY_CUT).quantize(Decimal("0.01"))
+    driver_earn = df - driver_app_usage_charge
+    
+    restaurant_comm = (item_total * (comm_pct / Decimal("100"))).quantize(Decimal("0.01"))
+    platform_cut = driver_app_usage_charge + restaurant_comm
+    
     return driver_earn, platform_cut
 
 
 def _market_split(o) -> tuple[Decimal, Decimal]:
     # Returns (driver_earnings, platform_fee)
     df = _dec(o.delivery_fee)
+    item_total = _dec(o.final_amount) - df
+    
     comm_pct = o.vendor.commission_percentage if (o.vendor and o.vendor.commission_percentage is not None) else Decimal("20.00")
-    platform_cut = (df * (comm_pct / Decimal("100"))).quantize(Decimal("0.01"))
-    driver_earn = df - platform_cut
+    
+    driver_app_usage_charge = (df * _PLATFORM_DELIVERY_CUT).quantize(Decimal("0.01"))
+    driver_earn = df - driver_app_usage_charge
+    
+    vendor_comm = (item_total * (comm_pct / Decimal("100"))).quantize(Decimal("0.01"))
+    platform_cut = driver_app_usage_charge + vendor_comm
+    
     return driver_earn, platform_cut
 
 
