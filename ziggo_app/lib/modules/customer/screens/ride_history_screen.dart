@@ -193,20 +193,18 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                               color: AppColors.flash,
                               text: r['pickup_address']?.toString() ?? '',
                             ),
-                            Padding(
-                              padding: const EdgeInsets.only(left: 6, top: 4, bottom: 4),
-                              child: Column(
-                                children: List.generate(
-                                  2,
-                                  (_) => Container(
-                                    margin: const EdgeInsets.only(bottom: 2),
-                                    width: 2,
-                                    height: 3,
-                                    color: AppColors.divider,
-                                  ),
+                            _dashedConnector(),
+                            // Stops (if any)
+                            if ((r['stops'] as List?)?.isNotEmpty == true) ...[
+                              for (final stop in (r['stops'] as List)) ...[
+                                _locationLine(
+                                  icon: Icons.radio_button_checked_rounded,
+                                  color: Colors.orange,
+                                  text: stop['address']?.toString() ?? '',
                                 ),
-                              ),
-                            ),
+                                _dashedConnector(),
+                              ],
+                            ],
                             _locationLine(
                               icon: Icons.location_on_rounded,
                               color: AppColors.error,
@@ -255,6 +253,23 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
               },
             );
           },
+        ),
+      ),
+    );
+  }
+
+  Widget _dashedConnector() {
+    return Padding(
+      padding: const EdgeInsets.only(left: 6, top: 4, bottom: 4),
+      child: Column(
+        children: List.generate(
+          2,
+          (_) => Container(
+            margin: const EdgeInsets.only(bottom: 2),
+            width: 2,
+            height: 3,
+            color: AppColors.divider,
+          ),
         ),
       ),
     );

@@ -348,45 +348,94 @@ class RideDetailsScreen extends StatelessWidget {
             const SizedBox(height: 32),
             
             // --- LOCATIONS CARD ---
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 20, offset: const Offset(0, 4)),
-                ],
-                border: Border.all(color: Colors.grey.shade100),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Column(
-                    children: [
-                      const SizedBox(height: 4),
-                      Container(width: 12, height: 12, decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.black)),
-                      Container(width: 2, height: 40, color: Colors.grey.shade200, margin: const EdgeInsets.symmetric(vertical: 4)),
-                      Container(width: 12, height: 12, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.orange, width: 3))),
-                    ],
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            Builder(builder: (context) {
+              final stopsList = (rideData['stops'] as List?) ?? [];
+              // Build a flat list of all waypoints: pickup, stops..., drop
+              final allPoints = <Map<String, String?>>[
+                {'address': pickup, 'time': _formatTimeOnly(rideData['started_at']?.toString() ?? bookedAt)},
+                for (final s in stopsList)
+                  {'address': s['address']?.toString() ?? '', 'time': null},
+                {'address': drop, 'time': _formatTimeOnly(rideData['completed_at']?.toString())},
+              ];
+
+              return Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 20, offset: const Offset(0, 4)),
+                  ],
+                  border: Border.all(color: Colors.grey.shade100),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Left indicator column
+                    Column(
                       children: [
-                        Text(pickup, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87)),
                         const SizedBox(height: 4),
-                        Text(_formatTimeOnly(rideData['started_at']?.toString() ?? bookedAt), style: const TextStyle(fontSize: 13, color: Colors.black45)),
-                        const SizedBox(height: 16),
-                        Text(drop, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87)),
-                        const SizedBox(height: 4),
-                        Text(_formatTimeOnly(rideData['completed_at']?.toString()), style: const TextStyle(fontSize: 13, color: Colors.black45)),
+                        // Pickup dot
+                        Container(width: 12, height: 12, decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.black)),
+                        for (int i = 1; i < allPoints.length; i++) ...[
+                          // Connector line
+                          Container(width: 2, height: 40, color: Colors.grey.shade200, margin: const EdgeInsets.symmetric(vertical: 4)),
+                          // Stop or drop dot
+                          if (i < allPoints.length - 1)
+                            Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.orange, width: 2),
+                                color: Colors.orange.withValues(alpha: 0.15),
+                              ),
+                            )
+                          else
+                            Container(width: 12, height: 12, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.orange, width: 3))),
+                        ],
                       ],
                     ),
-                  ),
-                ],
-              ),
-            ),
+                    const SizedBox(width: 16),
+                    // Right address column
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (int i = 0; i < allPoints.length; i++) ...[
+                            if (i > 0) const SizedBox(height: 16),
+                            Text(
+                              allPoints[i]['address'] ?? '',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: i == 0 || i == allPoints.length - 1 ? Colors.black87 : Colors.black54,
+                              ),
+                            ),
+                            if (i == 0 && allPoints[i]['time'] != null && allPoints[i]['time']!.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(allPoints[i]['time']!, style: const TextStyle(fontSize: 13, color: Colors.black45)),
+                            ] else if (i == allPoints.length - 1 && allPoints[i]['time'] != null && allPoints[i]['time']!.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(allPoints[i]['time']!, style: const TextStyle(fontSize: 13, color: Colors.black45)),
+                            ] else if (i > 0 && i < allPoints.length - 1) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Icon(Icons.radio_button_checked_rounded, size: 11, color: Colors.orange.shade400),
+                                  const SizedBox(width: 4),
+                                  Text('Stop $i', style: TextStyle(fontSize: 11, color: Colors.orange.shade600, fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
             
             const SizedBox(height: 16),
             
