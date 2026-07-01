@@ -1235,11 +1235,18 @@ async def get_commission(
         )
     )
     orders = q.scalars().all()
-    total_sales = sum((o.final_amount or Decimal(0)) - (o.delivery_fee or Decimal(0)) for o in orders)
+    
+    cod_orders = [o for o in orders if o.payment_method == "cash"]
+    online_orders = [o for o in orders if o.payment_method != "cash"]
+    
+    cod_sales = sum((o.final_amount or Decimal(0)) - (o.delivery_fee or Decimal(0)) for o in cod_orders)
+    online_sales = sum((o.final_amount or Decimal(0)) - (o.delivery_fee or Decimal(0)) for o in online_orders)
+    total_sales = cod_sales + online_sales
 
     # 2. Commission rate & total owed
     comm_pct = Decimal(str(v.commission_percentage)) if v.commission_percentage is not None else Decimal("10.0")
-    total_commission_owed = (total_sales * comm_pct) / Decimal("100.0")
+    commission_owed_to_admin = (cod_sales * comm_pct) / Decimal("100.0")
+    settlement_owed_to_vendor = online_sales * (Decimal("100.0") - comm_pct) / Decimal("100.0")
 
     # 3. Total paid
     from ...models import WalletTransaction
@@ -1250,12 +1257,26 @@ async def get_commission(
         ).order_by(WalletTransaction.created_at.desc())
     )
     txs = tq.scalars().all()
-    total_paid = sum(tx.amount for tx in txs if tx.amount)
+    total_paid_to_admin = sum(tx.amount for tx in txs if tx.amount)
+    
+    stq = await db.execute(
+        select(WalletTransaction).where(
+            WalletTransaction.user_id == user.id,
+            WalletTransaction.type == "settlement_payment"
+        ).order_by(WalletTransaction.created_at.desc())
+    )
+    settlement_txs = stq.scalars().all()
+    total_paid_to_vendor = sum(tx.amount for tx in settlement_txs if tx.amount)
     
     # 4. Outstanding
-    outstanding = total_commission_owed - total_paid
-    if outstanding < Decimal("0"):
-        outstanding = Decimal("0")
+    net_owed_to_admin = (commission_owed_to_admin - total_paid_to_admin) - (settlement_owed_to_vendor - total_paid_to_vendor)
+    
+    admin_owes_vendor = Decimal("0")
+    vendor_owes_admin = Decimal("0")
+    if net_owed_to_admin > 0:
+        vendor_owes_admin = net_owed_to_admin
+    else:
+        admin_owes_vendor = -net_owed_to_admin
 
     payments = []
     for tx in txs:
@@ -1264,15 +1285,28 @@ async def get_commission(
             "amount": float(tx.amount or 0),
             "paid_at": tx.created_at,
             "method": "Wallet",
-            "reference": tx.reference_id
+            "reference": tx.reference_id,
+            "is_settlement": False
         })
+    for tx in settlement_txs:
+        payments.append({
+            "id": tx.id,
+            "amount": float(tx.amount or 0),
+            "paid_at": tx.created_at,
+            "method": "Admin Settlement",
+            "reference": tx.reference_id,
+            "is_settlement": True
+        })
+    payments.sort(key=lambda x: x["paid_at"], reverse=True)
 
     return {
-        "outstanding_amount": float(outstanding),
+        "outstanding_amount": float(vendor_owes_admin), # Backwards compatibility
+        "vendor_owes_admin": float(vendor_owes_admin),
+        "admin_owes_vendor": float(admin_owes_vendor),
         "commission_rate": float(comm_pct),
         "total_sales": float(total_sales),
-        "total_commission_owed": float(total_commission_owed),
-        "total_paid": float(total_paid),
+        "total_commission_owed": float(commission_owed_to_admin),
+        "total_paid": float(total_paid_to_admin),
         "payments": payments
     }
 
@@ -1294,10 +1328,16 @@ async def pay_commission(
         )
     )
     orders = q.scalars().all()
-    total_sales = sum((o.final_amount or Decimal(0)) - (o.delivery_fee or Decimal(0)) for o in orders)
+    
+    cod_orders = [o for o in orders if o.payment_method == "cash"]
+    online_orders = [o for o in orders if o.payment_method != "cash"]
+    
+    cod_sales = sum((o.final_amount or Decimal(0)) - (o.delivery_fee or Decimal(0)) for o in cod_orders)
+    online_sales = sum((o.final_amount or Decimal(0)) - (o.delivery_fee or Decimal(0)) for o in online_orders)
 
     comm_pct = Decimal(str(v.commission_percentage)) if v.commission_percentage is not None else Decimal("10.0")
-    total_commission_owed = (total_sales * comm_pct) / Decimal("100.0")
+    commission_owed_to_admin = (cod_sales * comm_pct) / Decimal("100.0")
+    settlement_owed_to_vendor = online_sales * (Decimal("100.0") - comm_pct) / Decimal("100.0")
 
     from ...models import WalletTransaction
     tq = await db.execute(
@@ -1307,9 +1347,19 @@ async def pay_commission(
         )
     )
     txs = tq.scalars().all()
-    total_paid = sum(tx.amount for tx in txs if tx.amount)
+    total_paid_to_admin = sum(tx.amount for tx in txs if tx.amount)
     
-    outstanding = total_commission_owed - total_paid
+    stq = await db.execute(
+        select(WalletTransaction).where(
+            WalletTransaction.user_id == user.id,
+            WalletTransaction.type == "settlement_payment"
+        )
+    )
+    settlement_txs = stq.scalars().all()
+    total_paid_to_vendor = sum(tx.amount for tx in settlement_txs if tx.amount)
+    
+    net_owed_to_admin = (commission_owed_to_admin - total_paid_to_admin) - (settlement_owed_to_vendor - total_paid_to_vendor)
+    outstanding = net_owed_to_admin
 
     if outstanding <= Decimal("0"):
         raise HTTPException(status_code=400, detail="No commission currently owed")

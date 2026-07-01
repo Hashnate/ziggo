@@ -214,8 +214,11 @@ class _CommissionHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final outstanding =
         (data['outstanding_amount'] as num? ?? 0).toDouble();
+    final adminOwesVendor =
+        (data['admin_owes_vendor'] as num? ?? 0).toDouble();
     final rate = (data['commission_rate'] as num? ?? 0).toDouble();
     final hasDebt = outstanding > 0;
+    final adminHasDebt = adminOwesVendor > 0;
 
     return Container(
       padding: const EdgeInsets.all(22),
@@ -225,7 +228,9 @@ class _CommissionHeroCard extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: hasDebt
               ? const [Color(0xFF7F1D1D), Color(0xFFB91C1C), Color(0xFFEF4444)]
-              : const [Color(0xFF14532D), Color(0xFF15803D), Color(0xFF22C55E)],
+              : adminHasDebt 
+                  ? const [Color(0xFF1E3A8A), Color(0xFF2563EB), Color(0xFF3B82F6)] // Blue for incoming settlement
+                  : const [Color(0xFF14532D), Color(0xFF15803D), Color(0xFF22C55E)],
         ),
         borderRadius: BorderRadius.circular(AppStyles.radiusLg),
         boxShadow: AppStyles.shadowLg,
@@ -243,7 +248,7 @@ class _CommissionHeroCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(100),
                 ),
                 child: Text(
-                  hasDebt ? 'OUTSTANDING COMMISSION' : 'ALL CLEAR',
+                  hasDebt ? 'OUTSTANDING COMMISSION' : (adminHasDebt ? 'INCOMING SETTLEMENT' : 'ALL CLEAR'),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 10,
@@ -274,7 +279,7 @@ class _CommissionHeroCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'Rs.${NumberFormat('#,##0').format(outstanding.round())}',
+            'Rs.${NumberFormat('#,##0').format(adminHasDebt ? adminOwesVendor.round() : outstanding.round())}',
             style: const TextStyle(
               color: Colors.white,
               fontSize: 40,
@@ -287,7 +292,9 @@ class _CommissionHeroCard extends StatelessWidget {
           Text(
             hasDebt
                 ? 'Commission payable to Ziggo Admin'
-                : 'No outstanding commission — you\'re up to date!',
+                : adminHasDebt
+                    ? 'Settlement incoming from Ziggo Admin'
+                    : 'No outstanding commission — you\'re up to date!',
             style: TextStyle(
               color: Colors.white.withOpacity(0.85),
               fontSize: 13,

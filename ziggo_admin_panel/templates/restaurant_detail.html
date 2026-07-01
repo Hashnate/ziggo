@@ -24,6 +24,27 @@
                 <span><i class="fas fa-business-time"></i> {{ restaurant.opening_time or '' }} – {{ restaurant.closing_time or '' }}</span>
                 <span class="px-2 py-0.5 rounded-full {% if restaurant.is_active %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-500{% endif %}">{{ 'Active' if restaurant.is_active else 'Inactive' }}</span>
             </div>
+            
+            <!-- Outstanding Display -->
+            <div class="mt-4 p-4 rounded-xl border {% if admin_owes_vendor > 0 %}bg-blue-50 border-blue-100{% elif vendor_owes_admin > 0 %}bg-red-50 border-red-100{% else %}bg-gray-50 border-gray-100{% endif %} flex items-center justify-between">
+                <div>
+                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Settlement Status</h4>
+                    {% if admin_owes_vendor > 0 %}
+                        <p class="text-lg font-black text-blue-600 mt-1">Ziggo owes Restaurant: Rs.{{ "{:,.2f}".format(admin_owes_vendor) }}</p>
+                    {% elif vendor_owes_admin > 0 %}
+                        <p class="text-lg font-black text-red-600 mt-1">Restaurant owes Ziggo: Rs.{{ "{:,.2f}".format(vendor_owes_admin) }}</p>
+                    {% else %}
+                        <p class="text-lg font-black text-gray-600 mt-1">Settled (Rs.0.00)</p>
+                    {% endif %}
+                </div>
+                {% if admin_owes_vendor > 0 %}
+                <form method="post" action="/admin/restaurants/{{ restaurant.id }}/pay-settlement">
+                    <button type="submit" class="px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-sm">
+                        <i class="fas fa-money-bill-wave mr-1.5"></i> Pay Settlement
+                    </button>
+                </form>
+                {% endif %}
+            </div>
         </div>
     </div>
 

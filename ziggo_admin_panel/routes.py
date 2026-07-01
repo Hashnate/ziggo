@@ -1,6 +1,7 @@
 """Server-rendered admin panel with real DB queries + simple session auth."""
 from datetime import datetime, timezone, timedelta
 import os
+from decimal import Decimal
 
 from fastapi import APIRouter, Request, Form, Depends, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -3244,6 +3245,84 @@ async def admin_restaurant_new_submit(
     return RedirectResponse(url=f"/admin/restaurants/{r.id}", status_code=303)
 
 
+@router.post("/restaurants/{restaurant_id}/pay-settlement")
+async def admin_restaurant_pay_settlement(
+    restaurant_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import Restaurant, FoodOrder, FoodOrderStatus, WalletTransaction, Customer
+    import secrets
+    
+    q = await db.execute(select(Restaurant).where(Restaurant.id == restaurant_id))
+    r = q.scalars().first()
+    if not r:
+        return RedirectResponse("/admin/restaurants", status_code=303)
+        
+    oq = await db.execute(
+        select(FoodOrder).where(
+            FoodOrder.restaurant_id == r.id,
+            FoodOrder.status == FoodOrderStatus.DELIVERED
+        )
+    )
+    orders = oq.scalars().all()
+    
+    cod_orders = [o for o in orders if o.payment_method == "cash"]
+    online_orders = [o for o in orders if o.payment_method != "cash"]
+    
+    cod_sales = sum((o.final_amount or Decimal(0)) - (o.delivery_fee or Decimal(0)) for o in cod_orders)
+    online_sales = sum((o.final_amount or Decimal(0)) - (o.delivery_fee or Decimal(0)) for o in online_orders)
+    
+    comm_pct = Decimal(str(r.commission_percentage)) if r.commission_percentage is not None else Decimal("20.0")
+    commission_owed_to_admin = (cod_sales * comm_pct) / Decimal("100.0")
+    settlement_owed_to_vendor = online_sales * (Decimal("100.0") - comm_pct) / Decimal("100.0")
+    
+    tq = await db.execute(
+        select(WalletTransaction).where(
+            WalletTransaction.user_id == r.owner_id,
+            WalletTransaction.type == "commission_payment"
+        )
+    )
+    txs = tq.scalars().all()
+    total_paid_to_admin = sum(tx.amount for tx in txs if tx.amount)
+    
+    stq = await db.execute(
+        select(WalletTransaction).where(
+            WalletTransaction.user_id == r.owner_id,
+            WalletTransaction.type == "settlement_payment"
+        )
+    )
+    settlement_txs = stq.scalars().all()
+    total_paid_to_vendor = sum(tx.amount for tx in settlement_txs if tx.amount)
+    
+    net_owed_to_admin = (commission_owed_to_admin - total_paid_to_admin) - (settlement_owed_to_vendor - total_paid_to_vendor)
+    
+    if net_owed_to_admin >= Decimal("0"):
+        return RedirectResponse(f"/admin/restaurants/{restaurant_id}", status_code=303)
+        
+    admin_owes_vendor = -net_owed_to_admin
+    
+    ref = "SETTLE" + secrets.token_hex(4).upper()
+    
+    cq = await db.execute(select(Customer).where(Customer.user_id == r.owner_id))
+    c = cq.scalars().first()
+    if c:
+        c.wallet_balance = (c.wallet_balance or Decimal("0")) + admin_owes_vendor
+        
+    tx = WalletTransaction(
+        user_id=r.owner_id,
+        amount=admin_owes_vendor,
+        type="settlement_payment",
+        description="Admin Settlement Payment",
+        reference_id=ref,
+        balance_after=(c.wallet_balance if c else admin_owes_vendor)
+    )
+    db.add(tx)
+    await db.commit()
+    
+    return RedirectResponse(f"/admin/restaurants/{restaurant_id}", status_code=303)
+
 @router.get("/restaurants/{restaurant_id}", response_class=HTMLResponse)
 async def admin_restaurant_detail(
     restaurant_id: int,
@@ -3275,6 +3354,53 @@ async def admin_restaurant_detail(
     ).scalars().all()
     selected_food_category_ids = {c.id for c in restaurant.food_categories}
 
+    # Calculate Commission Outstanding
+    from app.models import FoodOrder, FoodOrderStatus, WalletTransaction
+    oq = await db.execute(
+        select(FoodOrder).where(
+            FoodOrder.restaurant_id == restaurant.id,
+            FoodOrder.status == FoodOrderStatus.DELIVERED
+        )
+    )
+    orders = oq.scalars().all()
+    
+    cod_orders = [o for o in orders if o.payment_method == "cash"]
+    online_orders = [o for o in orders if o.payment_method != "cash"]
+    
+    cod_sales = sum((o.final_amount or Decimal(0)) - (o.delivery_fee or Decimal(0)) for o in cod_orders)
+    online_sales = sum((o.final_amount or Decimal(0)) - (o.delivery_fee or Decimal(0)) for o in online_orders)
+    
+    comm_pct = Decimal(str(restaurant.commission_percentage)) if restaurant.commission_percentage is not None else Decimal("20.0")
+    commission_owed_to_admin = (cod_sales * comm_pct) / Decimal("100.0")
+    settlement_owed_to_vendor = online_sales * (Decimal("100.0") - comm_pct) / Decimal("100.0")
+    
+    tq = await db.execute(
+        select(WalletTransaction).where(
+            WalletTransaction.user_id == restaurant.owner_id,
+            WalletTransaction.type == "commission_payment"
+        )
+    )
+    txs = tq.scalars().all()
+    total_paid_to_admin = sum(tx.amount for tx in txs if tx.amount)
+    
+    stq = await db.execute(
+        select(WalletTransaction).where(
+            WalletTransaction.user_id == restaurant.owner_id,
+            WalletTransaction.type == "settlement_payment"
+        )
+    )
+    settlement_txs = stq.scalars().all()
+    total_paid_to_vendor = sum(tx.amount for tx in settlement_txs if tx.amount)
+    
+    net_owed_to_admin = (commission_owed_to_admin - total_paid_to_admin) - (settlement_owed_to_vendor - total_paid_to_vendor)
+    
+    admin_owes_vendor = Decimal("0")
+    vendor_owes_admin = Decimal("0")
+    if net_owed_to_admin > 0:
+        vendor_owes_admin = net_owed_to_admin
+    else:
+        admin_owes_vendor = -net_owed_to_admin
+
     return templates.TemplateResponse(
         request, "restaurant_detail.html",
         {
@@ -3285,6 +3411,8 @@ async def admin_restaurant_detail(
             "items": restaurant.items,
             "all_food_categories": all_food_categories,
             "selected_food_category_ids": selected_food_category_ids,
+            "admin_owes_vendor": float(admin_owes_vendor),
+            "vendor_owes_admin": float(vendor_owes_admin),
             "error": None,
         },
     )
@@ -3698,6 +3826,84 @@ async def admin_market_new_submit(
     await db.refresh(v)
 
 
+@router.post("/market/{vendor_id}/pay-settlement")
+async def admin_market_pay_settlement(
+    vendor_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import MarketVendor, MarketOrder, MarketOrderStatus, WalletTransaction, Customer
+    import secrets
+    
+    q = await db.execute(select(MarketVendor).where(MarketVendor.id == vendor_id))
+    v = q.scalars().first()
+    if not v:
+        return RedirectResponse("/admin/market", status_code=303)
+        
+    oq = await db.execute(
+        select(MarketOrder).where(
+            MarketOrder.vendor_id == v.id,
+            MarketOrder.status == MarketOrderStatus.DELIVERED
+        )
+    )
+    orders = oq.scalars().all()
+    
+    cod_orders = [o for o in orders if o.payment_method == "cash"]
+    online_orders = [o for o in orders if o.payment_method != "cash"]
+    
+    cod_sales = sum((o.final_amount or Decimal(0)) - (o.delivery_fee or Decimal(0)) for o in cod_orders)
+    online_sales = sum((o.final_amount or Decimal(0)) - (o.delivery_fee or Decimal(0)) for o in online_orders)
+    
+    comm_pct = Decimal(str(v.commission_percentage)) if v.commission_percentage is not None else Decimal("10.0")
+    commission_owed_to_admin = (cod_sales * comm_pct) / Decimal("100.0")
+    settlement_owed_to_vendor = online_sales * (Decimal("100.0") - comm_pct) / Decimal("100.0")
+    
+    tq = await db.execute(
+        select(WalletTransaction).where(
+            WalletTransaction.user_id == v.owner_id,
+            WalletTransaction.type == "commission_payment"
+        )
+    )
+    txs = tq.scalars().all()
+    total_paid_to_admin = sum(tx.amount for tx in txs if tx.amount)
+    
+    stq = await db.execute(
+        select(WalletTransaction).where(
+            WalletTransaction.user_id == v.owner_id,
+            WalletTransaction.type == "settlement_payment"
+        )
+    )
+    settlement_txs = stq.scalars().all()
+    total_paid_to_vendor = sum(tx.amount for tx in settlement_txs if tx.amount)
+    
+    net_owed_to_admin = (commission_owed_to_admin - total_paid_to_admin) - (settlement_owed_to_vendor - total_paid_to_vendor)
+    
+    if net_owed_to_admin >= Decimal("0"):
+        return RedirectResponse(f"/admin/market/{vendor_id}", status_code=303)
+        
+    admin_owes_vendor = -net_owed_to_admin
+    
+    ref = "SETTLE" + secrets.token_hex(4).upper()
+    
+    cq = await db.execute(select(Customer).where(Customer.user_id == v.owner_id))
+    c = cq.scalars().first()
+    if c:
+        c.wallet_balance = (c.wallet_balance or Decimal("0")) + admin_owes_vendor
+        
+    tx = WalletTransaction(
+        user_id=v.owner_id,
+        amount=admin_owes_vendor,
+        type="settlement_payment",
+        description="Admin Settlement Payment",
+        reference_id=ref,
+        balance_after=(c.wallet_balance if c else admin_owes_vendor)
+    )
+    db.add(tx)
+    await db.commit()
+    
+    return RedirectResponse(f"/admin/market/{vendor_id}", status_code=303)
+
 @router.get("/market/{vendor_id}", response_class=HTMLResponse)
 async def admin_market_detail(
     vendor_id: int,
@@ -3722,6 +3928,53 @@ async def admin_market_detail(
             await db.execute(select(User).where(User.id == vendor.owner_id))
         ).scalars().first()
 
+    # Calculate Commission Outstanding
+    from app.models import MarketOrder, MarketOrderStatus, WalletTransaction
+    oq = await db.execute(
+        select(MarketOrder).where(
+            MarketOrder.vendor_id == vendor.id,
+            MarketOrder.status == MarketOrderStatus.DELIVERED
+        )
+    )
+    orders = oq.scalars().all()
+    
+    cod_orders = [o for o in orders if o.payment_method == "cash"]
+    online_orders = [o for o in orders if o.payment_method != "cash"]
+    
+    cod_sales = sum((o.final_amount or Decimal(0)) - (o.delivery_fee or Decimal(0)) for o in cod_orders)
+    online_sales = sum((o.final_amount or Decimal(0)) - (o.delivery_fee or Decimal(0)) for o in online_orders)
+    
+    comm_pct = Decimal(str(vendor.commission_percentage)) if vendor.commission_percentage is not None else Decimal("10.0")
+    commission_owed_to_admin = (cod_sales * comm_pct) / Decimal("100.0")
+    settlement_owed_to_vendor = online_sales * (Decimal("100.0") - comm_pct) / Decimal("100.0")
+    
+    tq = await db.execute(
+        select(WalletTransaction).where(
+            WalletTransaction.user_id == vendor.owner_id,
+            WalletTransaction.type == "commission_payment"
+        )
+    )
+    txs = tq.scalars().all()
+    total_paid_to_admin = sum(tx.amount for tx in txs if tx.amount)
+    
+    stq = await db.execute(
+        select(WalletTransaction).where(
+            WalletTransaction.user_id == vendor.owner_id,
+            WalletTransaction.type == "settlement_payment"
+        )
+    )
+    settlement_txs = stq.scalars().all()
+    total_paid_to_vendor = sum(tx.amount for tx in settlement_txs if tx.amount)
+    
+    net_owed_to_admin = (commission_owed_to_admin - total_paid_to_admin) - (settlement_owed_to_vendor - total_paid_to_vendor)
+    
+    admin_owes_vendor = Decimal("0")
+    vendor_owes_admin = Decimal("0")
+    if net_owed_to_admin > 0:
+        vendor_owes_admin = net_owed_to_admin
+    else:
+        admin_owes_vendor = -net_owed_to_admin
+
     return templates.TemplateResponse(
         request, "market_detail.html",
         {
@@ -3730,6 +3983,8 @@ async def admin_market_detail(
             "vendor": vendor,
             "owner": owner,
             "products": vendor.products,
+            "admin_owes_vendor": float(admin_owes_vendor),
+            "vendor_owes_admin": float(vendor_owes_admin),
         },
     )
 
