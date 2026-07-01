@@ -212,32 +212,44 @@ async def _food_order_to_booking_response(db: AsyncSession, order: FoodOrder) ->
         keep, cut = order.delivery_fee or 0, 0
 
     driver_obj = None
-    if order.driver:
-        trip_count_q = await db.execute(
-            select(func.count(Booking.id)).where(
-                Booking.driver_id == order.driver.id,
-                Booking.status == BookingStatus.COMPLETED
-            )
+    if order.driver_id:
+        drv_q = await db.execute(
+            select(Driver).options(selectinload(Driver.user)).where(Driver.id == order.driver_id)
         )
-        actual_trips = trip_count_q.scalar() or 0
+        drv = drv_q.scalars().first()
+        if drv:
+            trip_count_q = await db.execute(
+                select(func.count(Booking.id)).where(
+                    Booking.driver_id == drv.id,
+                    Booking.status == BookingStatus.COMPLETED
+                )
+            )
+            actual_trips = trip_count_q.scalar() or 0
+            driver_obj = {
+                "id": drv.id,
+                "full_name": drv.user.full_name if drv.user else None,
+                "rating": float(drv.user.rating) if drv.user and drv.user.rating else None,
+                "vehicle_type": drv.vehicle_type,
+                "vehicle_number": drv.vehicle_number,
+                "vehicle_model": drv.vehicle_model,
+                "phone_number": drv.user.phone_number if drv.user else None,
+                "current_lat": float(drv.current_lat) if drv.current_lat else None,
+                "current_lng": float(drv.current_lng) if drv.current_lng else None,
+                "current_heading": float(drv.current_heading) if drv.current_heading is not None else 0.0,
+                "profile_photo": drv.user.profile_photo if drv.user else None,
+                "completed_trips": actual_trips,
+            }
 
-        driver_obj = {
-            "id": order.driver.id,
-            "full_name": order.driver.user.full_name if order.driver.user else None,
-            "rating": float(order.driver.user.rating) if order.driver.user and order.driver.user.rating else None,
-            "vehicle_type": order.driver.vehicle_type,
-            "vehicle_number": order.driver.vehicle_number,
-            "vehicle_model": order.driver.vehicle_model,
-            "phone_number": order.driver.user.phone_number if order.driver.user else None,
-            "current_lat": float(order.driver.current_lat) if order.driver.current_lat else None,
-            "current_lng": float(order.driver.current_lng) if order.driver.current_lng else None,
-            "current_heading": float(order.driver.current_heading) if order.driver.current_heading is not None else 0.0,
-            "profile_photo": order.driver.user.profile_photo if order.driver.user else None,
-            "completed_trips": actual_trips,
-        }
-
-    cust_name = order.customer.user.full_name if order.customer and order.customer.user else None
-    cust_phone = order.customer.user.phone_number if order.customer and order.customer.user else None
+    cust_name = None
+    cust_phone = None
+    if order.customer_id:
+        cust_q = await db.execute(
+            select(Customer).options(selectinload(Customer.user)).where(Customer.id == order.customer_id)
+        )
+        cust = cust_q.scalars().first()
+        if cust and cust.user:
+            cust_name = cust.user.full_name
+            cust_phone = cust.user.phone_number
 
     pickup_fee = float(order.restaurant.pickup_fee) if order.restaurant.pickup_fee is not None else 70.0
     boost = float(order.restaurant.boost) if order.restaurant.boost is not None else 0.0
@@ -307,32 +319,44 @@ async def _market_order_to_booking_response(db: AsyncSession, order: MarketOrder
         keep, cut = order.delivery_fee or 0, 0
 
     driver_obj = None
-    if order.driver:
-        trip_count_q = await db.execute(
-            select(func.count(Booking.id)).where(
-                Booking.driver_id == order.driver.id,
-                Booking.status == BookingStatus.COMPLETED
-            )
+    if order.driver_id:
+        drv_q = await db.execute(
+            select(Driver).options(selectinload(Driver.user)).where(Driver.id == order.driver_id)
         )
-        actual_trips = trip_count_q.scalar() or 0
+        drv = drv_q.scalars().first()
+        if drv:
+            trip_count_q = await db.execute(
+                select(func.count(Booking.id)).where(
+                    Booking.driver_id == drv.id,
+                    Booking.status == BookingStatus.COMPLETED
+                )
+            )
+            actual_trips = trip_count_q.scalar() or 0
+            driver_obj = {
+                "id": drv.id,
+                "full_name": drv.user.full_name if drv.user else None,
+                "rating": float(drv.user.rating) if drv.user and drv.user.rating else None,
+                "vehicle_type": drv.vehicle_type,
+                "vehicle_number": drv.vehicle_number,
+                "vehicle_model": drv.vehicle_model,
+                "phone_number": drv.user.phone_number if drv.user else None,
+                "current_lat": float(drv.current_lat) if drv.current_lat else None,
+                "current_lng": float(drv.current_lng) if drv.current_lng else None,
+                "current_heading": float(drv.current_heading) if drv.current_heading is not None else 0.0,
+                "profile_photo": drv.user.profile_photo if drv.user else None,
+                "completed_trips": actual_trips,
+            }
 
-        driver_obj = {
-            "id": order.driver.id,
-            "full_name": order.driver.user.full_name if order.driver.user else None,
-            "rating": float(order.driver.user.rating) if order.driver.user and order.driver.user.rating else None,
-            "vehicle_type": order.driver.vehicle_type,
-            "vehicle_number": order.driver.vehicle_number,
-            "vehicle_model": order.driver.vehicle_model,
-            "phone_number": order.driver.user.phone_number if order.driver.user else None,
-            "current_lat": float(order.driver.current_lat) if order.driver.current_lat else None,
-            "current_lng": float(order.driver.current_lng) if order.driver.current_lng else None,
-            "current_heading": float(order.driver.current_heading) if order.driver.current_heading is not None else 0.0,
-            "profile_photo": order.driver.user.profile_photo if order.driver.user else None,
-            "completed_trips": actual_trips,
-        }
-
-    cust_name = order.customer.user.full_name if order.customer and order.customer.user else None
-    cust_phone = order.customer.user.phone_number if order.customer and order.customer.user else None
+    cust_name = None
+    cust_phone = None
+    if order.customer_id:
+        cust_q = await db.execute(
+            select(Customer).options(selectinload(Customer.user)).where(Customer.id == order.customer_id)
+        )
+        cust = cust_q.scalars().first()
+        if cust and cust.user:
+            cust_name = cust.user.full_name
+            cust_phone = cust.user.phone_number
 
     pickup_fee = float(order.vendor.pickup_fee) if order.vendor.pickup_fee is not None else 70.0
     boost = float(order.vendor.boost) if order.vendor.boost is not None else 0.0
@@ -945,6 +969,8 @@ async def list_my_bookings(
             .order_by(Booking.booked_at.desc())
             .limit(limit)
         )
+        bookings = q.scalars().all()
+        return [await _booking_to_response(db, b) for b in bookings]
     elif user.role == UserRole.DRIVER:
         driver = await _get_driver(db, user)
         q = await db.execute(
@@ -957,11 +983,7 @@ async def list_my_bookings(
 
         fq = await db.execute(
             select(FoodOrder)
-            .options(
-                selectinload(FoodOrder.restaurant),
-                selectinload(FoodOrder.customer).selectinload(Customer.user),
-                selectinload(FoodOrder.driver).selectinload(Driver.user)
-            )
+            .options(selectinload(FoodOrder.restaurant))
             .where(FoodOrder.driver_id == driver.id)
             .order_by(FoodOrder.created_at.desc())
             .limit(limit)
@@ -970,11 +992,7 @@ async def list_my_bookings(
 
         mq = await db.execute(
             select(MarketOrder)
-            .options(
-                selectinload(MarketOrder.vendor),
-                selectinload(MarketOrder.customer).selectinload(Customer.user),
-                selectinload(MarketOrder.driver).selectinload(Driver.user)
-            )
+            .options(selectinload(MarketOrder.vendor))
             .where(MarketOrder.driver_id == driver.id)
             .order_by(MarketOrder.created_at.desc())
             .limit(limit)
