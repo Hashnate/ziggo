@@ -650,7 +650,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Center(child: pw.Image(logoImage, height: 60)),
+              pw.Center(child: pw.Image(logoImage, height: 100)),
               pw.SizedBox(height: 20),
               pw.Header(
                 level: 0,

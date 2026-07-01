@@ -19,14 +19,14 @@ class FoodOrderDetailsScreen extends StatelessWidget {
     }
   }
 
-  Future<List<Map<String, dynamic>>> _fetchItems(int orderId) async {
+  Future<Map<String, dynamic>> _fetchDetails(int orderId) async {
     try {
       final res = await ApiClient.instance.dio.get(
         '/food/orders/$orderId/details',
       );
-      return List<Map<String, dynamic>>.from(res.data['items'] as List);
+      return Map<String, dynamic>.from(res.data);
     } catch (_) {
-      return [];
+      return {'items': []};
     }
   }
 
@@ -91,7 +91,7 @@ class FoodOrderDetailsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: Image.asset('assets/images/ziggo.png', height: 60)),
+            Center(child: Image.asset('assets/images/ziggo.png', height: 100)),
             const SizedBox(height: 20),
             const Center(
               child: Text(
@@ -126,18 +126,91 @@ class FoodOrderDetailsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 30),
 
-            FutureBuilder<List<Map<String, dynamic>>>(
-              future: _fetchItems(order['id'] as int),
+            FutureBuilder<Map<String, dynamic>>(
+              future: _fetchDetails(order['id'] as int),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                final items = snapshot.data ?? [];
+                final details = snapshot.data ?? {};
+                final rawItems = details['items'];
+                final items = rawItems is List ? rawItems.cast<Map<String, dynamic>>() : <Map<String, dynamic>>[];
                 if (items.isEmpty) return const SizedBox.shrink();
+
+                final restName = details['restaurant_name']?.toString() ?? 'Restaurant';
+                final restAddress = details['restaurant_address']?.toString() ?? 'Pickup location';
+                final deliveryAddress = order['delivery_address']?.toString() ?? 'Delivery location';
 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const Text(
+                      'DELIVERY DETAILS',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textTertiary,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.storefront_rounded, size: 20, color: AppColors.primary),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                restName,
+                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                restAddress,
+                                style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13, color: AppColors.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.only(left: 9.5, top: 4, bottom: 4),
+                      child: SizedBox(
+                        height: 20,
+                        child: VerticalDivider(
+                          color: AppColors.primary,
+                          thickness: 2,
+                        ),
+                      ),
+                    ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.location_on_rounded, size: 20, color: AppColors.primary),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Delivery Drop-off',
+                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                deliveryAddress,
+                                style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13, color: AppColors.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 30),
                     const Text(
                       'ORDER ITEMS',
                       style: TextStyle(

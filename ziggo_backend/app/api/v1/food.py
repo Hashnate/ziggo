@@ -714,7 +714,14 @@ async def get_my_food_order_details(
             "price_at_order": float(it.price_at_order)
         })
 
-    return {"items": items_details}
+    r_q = await db.execute(select(Restaurant).where(Restaurant.id == order.restaurant_id))
+    r = r_q.scalars().first()
+
+    return {
+        "items": items_details,
+        "restaurant_name": r.name if r else "Unknown Restaurant",
+        "restaurant_address": r.address if r else "Unknown Address",
+    }
 
 
 # ---------------------------------------------------------------------------

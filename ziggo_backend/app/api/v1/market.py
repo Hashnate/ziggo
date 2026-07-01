@@ -608,7 +608,14 @@ async def get_my_market_order_details(
             "price_at_order": float(it.price_at_order)
         })
 
-    return {"items": items_details}
+    v_q = await db.execute(select(MarketVendor).where(MarketVendor.id == order.vendor_id))
+    v = v_q.scalars().first()
+
+    return {
+        "items": items_details,
+        "store_name": v.store_name if v else "Unknown Store",
+        "store_address": v.address if v else "Unknown Address",
+    }
 
 # ---------------------------------------------------------------------------
 # Driver dispatch endpoints — mirror /food/orders/{id}/accept|decline|status
