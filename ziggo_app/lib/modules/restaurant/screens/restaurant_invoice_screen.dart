@@ -527,7 +527,7 @@ class _RestaurantOrderDetailScreenState
   Future<void> _downloadInvoice() async {
     final pdf = pw.Document();
 
-    final imageBytes = await rootBundle.load('assets/images/ziggo.png');
+    final imageBytes = await rootBundle.load('assets/images/light.png');
     final logoImage = pw.MemoryImage(imageBytes.buffer.asUint8List());
 
     final fmt = NumberFormat.currency(symbol: 'Rs.', decimalDigits: 2);

@@ -92,7 +92,7 @@ class MarketOrderDetailsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: Image.asset('assets/images/ziggo.png', height: 100)),
+            Center(child: Image.asset('assets/images/light.png', height: 100)),
             const SizedBox(height: 20),
             Center(
               child: Text(
