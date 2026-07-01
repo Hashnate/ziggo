@@ -79,6 +79,7 @@ class RestaurantProvider extends ChangeNotifier {
     }
     if (event == 'order_update') {
       loadOrders();
+      loadHistory();
       loadTodayStats();
       return;
     }

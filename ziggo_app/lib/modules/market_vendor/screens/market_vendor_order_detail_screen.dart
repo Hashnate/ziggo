@@ -24,6 +24,7 @@ class MarketVendorOrderDetailScreen extends StatefulWidget {
 class _MarketVendorOrderDetailScreenState
     extends State<MarketVendorOrderDetailScreen> {
   late Map<String, dynamic> _order;
+  String _initialStatus = '';
   List<Map<String, dynamic>> _lineItems = const [];
   bool _busy = false;
   bool _loadingDetail = true;
@@ -41,6 +42,7 @@ class _MarketVendorOrderDetailScreenState
   void initState() {
     super.initState();
     _order = Map<String, dynamic>.from(widget.order);
+    _initialStatus = _order['status']?.toString() ?? '';
     WidgetsBinding.instance.addPostFrameCallback((_) => _fetchDetail());
   }
 
@@ -372,6 +374,15 @@ class _MarketVendorOrderDetailScreenState
     if (latest != null) _order = latest;
     final status = _order['status']?.toString() ?? '';
 
+    if (_initialStatus != 'delivered' && status == 'delivered') {
+      _initialStatus = 'delivered'; // Prevent multiple pops
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
+      });
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -596,22 +607,6 @@ class _MarketVendorOrderDetailScreenState
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: _downloadInvoice,
-                    icon: const Icon(Icons.download_rounded, size: 18),
-                    label: const Text('Download Invoice'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      side: const BorderSide(color: AppColors.primary),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
                 ),
               ],
             ),

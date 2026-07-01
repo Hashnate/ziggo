@@ -86,6 +86,7 @@ class MarketVendorProvider extends ChangeNotifier {
     }
     if (event == 'market_order_update') {
       loadOrders();
+      loadHistory();
       loadTodayStats();
       return;
     }
