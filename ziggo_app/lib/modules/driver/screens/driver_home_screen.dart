@@ -1164,7 +1164,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     height: 24,
                     width: width * fraction,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF97316),
+                      color: AppColors.primaryLight,
                       borderRadius: BorderRadius.horizontal(
                         left: const Radius.circular(12),
                         right: Radius.circular(fraction >= 1.0 ? 12 : 0),
@@ -1208,10 +1208,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     width: 24,
                     height: 24,
                     decoration: BoxDecoration(
-                      color: ridesCompleted > 0 ? const Color(0xFFF97316) : Colors.white,
+                      color: ridesCompleted > 0 ? AppColors.primaryLight : Colors.white,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: ridesCompleted > 0 ? const Color(0xFFF97316) : const Color(0xFF4B5563), 
+                        color: ridesCompleted > 0 ? AppColors.primaryLight : const Color(0xFF4B5563), 
                         width: 2
                       ),
                     ),
@@ -1234,10 +1234,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     width: 24,
                     height: 24,
                     decoration: BoxDecoration(
-                      color: ridesCompleted >= endTrips ? const Color(0xFFF97316) : Colors.white,
+                      color: ridesCompleted >= endTrips ? AppColors.primaryLight : Colors.white,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: ridesCompleted >= endTrips ? const Color(0xFFF97316) : const Color(0xFF4B5563), 
+                        color: ridesCompleted >= endTrips ? AppColors.primaryLight : const Color(0xFF4B5563), 
                         width: 2
                       ),
                     ),

@@ -683,13 +683,6 @@ class RideDetailsScreen extends StatelessWidget {
               child: Column(
                 children: [
                   Text('Trip ID: $bookingRef', style: const TextStyle(fontSize: 12, color: Colors.black38, fontWeight: FontWeight.w600)),
-                  if (customerName != null || customerPhone != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      [customerName, customerPhone].where((e) => e != null && e.isNotEmpty).join(' • '),
-                      style: const TextStyle(fontSize: 12, color: Colors.black38),
-                    ),
-                  ],
                 ],
               ),
             ),
