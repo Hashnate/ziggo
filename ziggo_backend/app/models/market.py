@@ -68,6 +68,9 @@ class MarketVendor(Base):
     commission_percentage = Column(DECIMAL(5, 2), default=10.00, nullable=False)
     priority_level = Column(String(50), default="standard", nullable=False)
     is_featured = Column(Boolean, default=False, nullable=False)
+    pickup_fee = Column(DECIMAL(10, 2), default=70.00, nullable=False)
+    per_km_rate = Column(DECIMAL(10, 2), default=40.00, nullable=False)
+    boost = Column(DECIMAL(10, 2), default=0.00, nullable=False)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

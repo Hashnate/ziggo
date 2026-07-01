@@ -2953,6 +2953,10 @@ async def admin_restaurant_edit(
     closing_time: str = Form(""),
     delivery_fee: float = Form(150),
     eta_minutes: int = Form(30),
+    pickup_fee: float = Form(70.00),
+    per_km_rate: float = Form(40.00),
+    boost: float = Form(0.00),
+    commission_percentage: float = Form(20.00),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -3017,6 +3021,10 @@ async def admin_restaurant_edit(
     r.closing_time = closing_time.strip() or r.closing_time
     r.delivery_fee = Decimal(str(delivery_fee))
     r.eta_minutes = eta_minutes
+    r.pickup_fee = Decimal(str(pickup_fee))
+    r.per_km_rate = Decimal(str(per_km_rate))
+    r.boost = Decimal(str(boost))
+    r.commission_percentage = Decimal(str(commission_percentage))
     await db.commit()
     return RedirectResponse(url="/admin/restaurants", status_code=303)
 
@@ -3118,6 +3126,10 @@ async def admin_restaurant_new_submit(
     closing_time: str = Form("22:00"),
     delivery_fee: float = Form(150),
     eta_minutes: int = Form(30),
+    pickup_fee: float = Form(70.00),
+    per_km_rate: float = Form(40.00),
+    boost: float = Form(0.00),
+    commission_percentage: float = Form(20.00),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -3142,6 +3154,10 @@ async def admin_restaurant_new_submit(
         "closing_time": closing_time,
         "delivery_fee": delivery_fee,
         "eta_minutes": eta_minutes,
+        "pickup_fee": pickup_fee,
+        "per_km_rate": per_km_rate,
+        "boost": boost,
+        "commission_percentage": commission_percentage,
     }
 
     phone = owner_phone.strip()
@@ -3214,6 +3230,10 @@ async def admin_restaurant_new_submit(
         closing_time=closing_time.strip() or None,
         delivery_fee=Decimal(str(delivery_fee)),
         eta_minutes=eta_minutes,
+        pickup_fee=Decimal(str(pickup_fee)),
+        per_km_rate=Decimal(str(per_km_rate)),
+        boost=Decimal(str(boost)),
+        commission_percentage=Decimal(str(commission_percentage)),
         rating=Decimal("4.5"),
         is_active=True,  # admin pre-creates as already-approved
         is_open=True,
@@ -3497,7 +3517,6 @@ async def admin_market_new_submit(
     closing_time: str = Form("22:00"),
     delivery_fee: float = Form(250.0),
     eta_minutes: int = Form(40),
-    
     business_registration_number: str = Form(""),
     tax_vat_number: str = Form(""),
     self_delivery: str = Form("no"),
@@ -3508,18 +3527,18 @@ async def admin_market_new_submit(
     account_holder_name: str = Form(...),
     account_number: str = Form(...),
     branch_name: str = Form(""),
-    
     commission_percentage: float = Form(10.00),
     priority_level: str = Form("standard"),
     is_featured: str = Form("no"),
     vendor_status: str = Form("active"),
-    
+    pickup_fee: float = Form(70.00),
+    per_km_rate: float = Form(40.00),
+    boost: float = Form(0.00),
     nic_passport_copy: UploadFile = File(None),
     business_reg_cert: UploadFile = File(None),
     tax_cert: UploadFile = File(None),
     food_license: UploadFile = File(None),
     additional_documents: UploadFile = File(None),
-    
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -3557,6 +3576,9 @@ async def admin_market_new_submit(
         "priority_level": priority_level,
         "is_featured": is_featured,
         "vendor_status": vendor_status,
+        "pickup_fee": pickup_fee,
+        "per_km_rate": per_km_rate,
+        "boost": boost,
     }
 
     phone = owner_phone.strip()
@@ -3586,9 +3608,9 @@ async def admin_market_new_submit(
         db.add(owner)
         await db.flush()
     else:
-        existing = await db.execute(
-            select(MarketVendor).where(MarketVendor.owner_id == owner.id)
-        )
+        # Check if they already own a vendor.
+        from app.models import MarketVendor as _MV
+        existing = await db.execute(select(_MV).where(_MV.owner_id == owner.id))
         if existing.scalars().first() is not None:
             return templates.TemplateResponse(
                 request, "market_new.html",
@@ -3600,20 +3622,23 @@ async def admin_market_new_submit(
                     "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY or "",
                 },
             )
-        # Promote / update owner details
-        if owner.role in (UserRole.CUSTOMER, UserRole.RESTAURANT_OWNER):
-            has_restaurant = (
-                await db.execute(
-                    select(Restaurant).where(Restaurant.owner_id == owner.id)
-                )
-            ).scalars().first()
-            if not has_restaurant:
-                owner.role = UserRole.MARKET_OWNER
-        
-        if owner_full_name.strip():
-            owner.full_name = owner_full_name.strip()
-        if owner_email.strip():
-            owner.email = owner_email.strip()
+            
+        # Promote them to market_owner if they are a customer (or restaurant_owner
+        # but have no active restaurant).
+        has_restaurant = (
+            await db.execute(
+                select(Restaurant).where(Restaurant.owner_id == owner.id)
+            )
+        ).scalars().first()
+        if (
+            owner.role in (UserRole.CUSTOMER, UserRole.RESTAURANT_OWNER)
+            and not has_restaurant
+        ):
+            owner.role = UserRole.MARKET_OWNER
+            if owner_full_name.strip() and not owner.full_name:
+                owner.full_name = owner_full_name.strip()
+            if owner_email.strip() and not owner.email:
+                owner.email = owner_email.strip()
 
     # Save uploaded documents
     nic_url = await _save_vendor_doc(nic_passport_copy, "nic")
@@ -3661,11 +3686,13 @@ async def admin_market_new_submit(
         commission_percentage=Decimal(str(commission_percentage)),
         priority_level=priority_level.strip(),
         is_featured=(is_featured == "yes"),
+        pickup_fee=Decimal(str(pickup_fee)),
+        per_km_rate=Decimal(str(per_km_rate)),
+        boost=Decimal(str(boost)),
     )
     db.add(v)
     await db.commit()
     await db.refresh(v)
-    return RedirectResponse(url=f"/admin/market/{v.id}", status_code=303)
 
 
 @router.get("/market/{vendor_id}", response_class=HTMLResponse)
@@ -3756,6 +3783,9 @@ async def admin_market_vendor_edit(
     account_holder_name: str = Form(""),
     account_number: str = Form(""),
     branch_name: str = Form(""),
+    pickup_fee: float = Form(70.00),
+    per_km_rate: float = Form(40.00),
+    boost: float = Form(0.00),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -3779,6 +3809,9 @@ async def admin_market_vendor_edit(
     v.commission_percentage = Decimal(str(commission_percentage))
     v.priority_level = priority_level.strip() or v.priority_level
     v.is_featured = is_featured == "yes"
+    v.pickup_fee = Decimal(str(pickup_fee))
+    v.per_km_rate = Decimal(str(per_km_rate))
+    v.boost = Decimal(str(boost))
     if bank_name.strip():
         v.bank_name = bank_name.strip()
     if account_holder_name.strip():

@@ -186,7 +186,7 @@
                                     </form>
                                 {% endif %}
                                 <button
-                                    onclick='openEditVendor({{ v.id }}, {{ v.name|tojson }}, {{ (v.category or "")|tojson }}, {{ (v.description or "")|tojson }}, {{ (v.address or "")|tojson }}, {{ (v.phone_number or "")|tojson }}, {{ (v.opening_time or "")|tojson }}, {{ (v.closing_time or "")|tojson }}, {{ (v.delivery_fee or 0)|float }}, {{ (v.eta_minutes or 40) }}, {{ (v.commission_percentage or 10)|float }}, {{ (v.priority_level or "standard")|tojson }}, {{ ("yes" if v.is_featured else "no")|tojson }}, {{ (v.bank_name or "")|tojson }}, {{ (v.account_holder_name or "")|tojson }}, {{ (v.account_number or "")|tojson }}, {{ (v.branch_name or "")|tojson }})'
+                                    onclick='openEditVendor({{ v.id }}, {{ v.name|tojson }}, {{ (v.category or "")|tojson }}, {{ (v.description or "")|tojson }}, {{ (v.address or "")|tojson }}, {{ (v.phone_number or "")|tojson }}, {{ (v.opening_time or "")|tojson }}, {{ (v.closing_time or "")|tojson }}, {{ (v.delivery_fee or 0)|float }}, {{ (v.eta_minutes or 40) }}, {{ (v.commission_percentage or 10)|float }}, {{ (v.priority_level or "standard")|tojson }}, {{ ("yes" if v.is_featured else "no")|tojson }}, {{ (v.bank_name or "")|tojson }}, {{ (v.account_holder_name or "")|tojson }}, {{ (v.account_number or "")|tojson }}, {{ (v.branch_name or "")|tojson }}, {{ (v.pickup_fee or 70.0)|float }}, {{ (v.per_km_rate or 40.0)|float }}, {{ (v.boost or 0.0)|float }})'
                                     class="px-3 py-1.5 rounded-xl bg-blue-50 text-blue-600 text-xs font-bold hover:bg-blue-600 hover:text-white transition inline-flex items-center gap-1">
                                     <i class="fas fa-pen text-[10px]"></i> Edit
                                 </button>
@@ -484,6 +484,21 @@
                                    class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
                         </div>
                         <div>
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Pickup Fee (Rs.) *</label>
+                            <input type="number" step="0.01" name="pickup_fee" value="70.00" min="0" required
+                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Per KM Rate (Rs.) *</label>
+                            <input type="number" step="0.01" name="per_km_rate" value="40.00" min="0" required
+                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Boost (Rs.) *</label>
+                            <input type="number" step="0.01" name="boost" value="0.00" min="0" required
+                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                        </div>
+                        <div>
                             <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Priority Level</label>
                             <select name="priority_level"
                                     class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white text-sm">
@@ -574,6 +589,18 @@
                     <input id="ev_commission" name="commission_percentage" type="number" step="0.01" min="0" max="100" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
                 </div>
                 <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Pickup Fee (Rs.) *</label>
+                    <input id="ev_pickup_fee" name="pickup_fee" type="number" step="0.01" min="0" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Per KM Rate (Rs.) *</label>
+                    <input id="ev_per_km_rate" name="per_km_rate" type="number" step="0.01" min="0" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Boost (Rs.) *</label>
+                    <input id="ev_boost" name="boost" type="number" step="0.01" min="0" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
                     <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Priority Level</label>
                     <select id="ev_priority" name="priority_level" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white text-sm">
                         <option value="standard">Standard</option>
@@ -640,7 +667,7 @@
         document.getElementById('editVendorModal').style.display = 'none';
     }
 
-    function openEditVendor(id, name, category, description, address, phone, opening, closing, delivery_fee, eta, commission, priority, featured, bank, account_holder, account_number, branch) {
+    function openEditVendor(id, name, category, description, address, phone, opening, closing, delivery_fee, eta, commission, priority, featured, bank, account_holder, account_number, branch, pickup_fee, per_km_rate, boost) {
         document.getElementById('editVendorForm').action = '/admin/market/' + id + '/edit';
         document.getElementById('ev_name').value = name || '';
         document.getElementById('ev_category').value = category || 'Other';
@@ -658,6 +685,9 @@
         document.getElementById('ev_account_holder').value = account_holder || '';
         document.getElementById('ev_account_number').value = account_number || '';
         document.getElementById('ev_branch').value = branch || '';
+        document.getElementById('ev_pickup_fee').value = pickup_fee !== undefined ? pickup_fee : 70.00;
+        document.getElementById('ev_per_km_rate').value = per_km_rate !== undefined ? per_km_rate : 40.00;
+        document.getElementById('ev_boost').value = boost !== undefined ? boost : 0.00;
         document.getElementById('editVendorModal').style.display = 'flex';
     }
 

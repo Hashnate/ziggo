@@ -18,6 +18,7 @@ from decimal import Decimal
 from typing import Optional
 
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import (
@@ -42,6 +43,24 @@ _PLATFORM_DELIVERY_CUT = Decimal("0.20")
 
 def _dec(v) -> Decimal:
     return Decimal(str(v)) if v is not None else Decimal("0")
+
+
+def _food_split(o) -> tuple[Decimal, Decimal]:
+    # Returns (driver_earnings, platform_fee)
+    df = _dec(o.delivery_fee)
+    comm_pct = o.restaurant.commission_percentage if (o.restaurant and o.restaurant.commission_percentage is not None) else Decimal("20.00")
+    platform_cut = (df * (comm_pct / Decimal("100"))).quantize(Decimal("0.01"))
+    driver_earn = df - platform_cut
+    return driver_earn, platform_cut
+
+
+def _market_split(o) -> tuple[Decimal, Decimal]:
+    # Returns (driver_earnings, platform_fee)
+    df = _dec(o.delivery_fee)
+    comm_pct = o.vendor.commission_percentage if (o.vendor and o.vendor.commission_percentage is not None) else Decimal("20.00")
+    platform_cut = (df * (comm_pct / Decimal("100"))).quantize(Decimal("0.01"))
+    driver_earn = df - platform_cut
+    return driver_earn, platform_cut
 
 
 def _now_utc() -> datetime:
@@ -106,7 +125,7 @@ async def overview(db: AsyncSession) -> dict:
                 ride_cancelled += 1
 
     # Food
-    fq = await db.execute(select(FoodOrder))
+    fq = await db.execute(select(FoodOrder).options(joinedload(FoodOrder.restaurant)))
     food_orders = fq.scalars().all()
     food_gmv = Decimal("0")
     food_delivery_revenue = Decimal("0")
@@ -118,13 +137,14 @@ async def overview(db: AsyncSession) -> dict:
             food_gmv += _dec(o.final_amount)
             df = _dec(o.delivery_fee)
             food_delivery_revenue += df
-            food_commission += (df * _PLATFORM_DELIVERY_CUT).quantize(Decimal("0.01"))
+            _, platform_cut = _food_split(o)
+            food_commission += platform_cut
             food_completed += 1
         elif o.status == FoodOrderStatus.CANCELLED:
             food_cancelled += 1
 
     # Market
-    mq = await db.execute(select(MarketOrder))
+    mq = await db.execute(select(MarketOrder).options(joinedload(MarketOrder.vendor)))
     market_orders = mq.scalars().all()
     market_gmv = Decimal("0")
     market_delivery_revenue = Decimal("0")
@@ -136,9 +156,8 @@ async def overview(db: AsyncSession) -> dict:
             market_gmv += _dec(o.final_amount)
             df = _dec(o.delivery_fee)
             market_delivery_revenue += df
-            market_commission += (df * _PLATFORM_DELIVERY_CUT).quantize(
-                Decimal("0.01")
-            )
+            _, platform_cut = _market_split(o)
+            market_commission += platform_cut
             market_completed += 1
         elif o.status == MarketOrderStatus.CANCELLED:
             market_cancelled += 1
@@ -245,7 +264,7 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
         by_driver_b.setdefault(b.driver_id, []).append(b)
 
     # Food orders keyed by driver_id
-    fq = await db.execute(select(FoodOrder))
+    fq = await db.execute(select(FoodOrder).options(joinedload(FoodOrder.restaurant)))
     food = fq.scalars().all()
     by_driver_f: dict[int, list[FoodOrder]] = {}
     for o in food:
@@ -254,7 +273,7 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
         by_driver_f.setdefault(o.driver_id, []).append(o)
 
     # Market orders keyed by driver_id
-    mq = await db.execute(select(MarketOrder))
+    mq = await db.execute(select(MarketOrder).options(joinedload(MarketOrder.vendor)))
     market = mq.scalars().all()
     by_driver_m: dict[int, list[MarketOrder]] = {}
     for o in market:
@@ -297,7 +316,7 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
         for o in f_list:
             if o.status != FoodOrderStatus.DELIVERED:
                 continue
-            earn = (_dec(o.delivery_fee) * (Decimal("1") - _PLATFORM_DELIVERY_CUT)).quantize(Decimal("0.01"))
+            earn, _ = _food_split(o)
             total += earn
             food_count += 1
             ts = o.delivered_at or o.created_at
@@ -313,7 +332,7 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
         for o in m_list:
             if o.status != MarketOrderStatus.DELIVERED:
                 continue
-            earn = (_dec(o.delivery_fee) * (Decimal("1") - _PLATFORM_DELIVERY_CUT)).quantize(Decimal("0.01"))
+            earn, _ = _market_split(o)
             total += earn
             market_count += 1
             ts = o.delivered_at or o.created_at
@@ -367,12 +386,12 @@ async def driver_finance_detail(db: AsyncSession, driver_id: int) -> Optional[di
     bookings = bq.scalars().all()
 
     fq = await db.execute(
-        select(FoodOrder).where(FoodOrder.driver_id == d.id).order_by(FoodOrder.id.desc()).limit(200)
+        select(FoodOrder).options(joinedload(FoodOrder.restaurant)).where(FoodOrder.driver_id == d.id).order_by(FoodOrder.id.desc()).limit(200)
     )
     foods = fq.scalars().all()
 
     mq = await db.execute(
-        select(MarketOrder).where(MarketOrder.driver_id == d.id).order_by(MarketOrder.id.desc()).limit(200)
+        select(MarketOrder).options(joinedload(MarketOrder.vendor)).where(MarketOrder.driver_id == d.id).order_by(MarketOrder.id.desc()).limit(200)
     )
     markets = mq.scalars().all()
 
@@ -389,25 +408,25 @@ async def driver_finance_detail(db: AsyncSession, driver_id: int) -> Optional[di
             "when": (b.completed_at or b.booked_at).isoformat() if (b.completed_at or b.booked_at) else "",
         })
     for o in foods:
-        earn = (_dec(o.delivery_fee) * (Decimal("1") - _PLATFORM_DELIVERY_CUT)).quantize(Decimal("0.01"))
+        earn, platform_fee = _food_split(o)
         transactions.append({
             "kind": "Food delivery",
             "ref": o.order_ref,
             "amount": float(earn),
             "customer_paid": float(_dec(o.final_amount)),
-            "platform_fee": float((_dec(o.delivery_fee) * _PLATFORM_DELIVERY_CUT).quantize(Decimal("0.01"))),
+            "platform_fee": float(platform_fee),
             "status": o.status.value if o.status else "",
             "payment": o.payment_method or "",
             "when": (o.delivered_at or o.created_at).isoformat() if (o.delivered_at or o.created_at) else "",
         })
     for o in markets:
-        earn = (_dec(o.delivery_fee) * (Decimal("1") - _PLATFORM_DELIVERY_CUT)).quantize(Decimal("0.01"))
+        earn, platform_fee = _market_split(o)
         transactions.append({
             "kind": "Market delivery",
             "ref": o.order_ref,
             "amount": float(earn),
             "customer_paid": float(_dec(o.final_amount)),
-            "platform_fee": float((_dec(o.delivery_fee) * _PLATFORM_DELIVERY_CUT).quantize(Decimal("0.01"))),
+            "platform_fee": float(platform_fee),
             "status": o.status.value if o.status else "",
             "payment": o.payment_method or "",
             "when": (o.delivered_at or o.created_at).isoformat() if (o.delivered_at or o.created_at) else "",
@@ -475,7 +494,7 @@ async def customer_finance_table(db: AsyncSession) -> list[dict]:
             continue
         by_cust_b.setdefault(b.customer_id, []).append(b)
 
-    fq = await db.execute(select(FoodOrder))
+    fq = await db.execute(select(FoodOrder).options(joinedload(FoodOrder.restaurant)))
     foods = fq.scalars().all()
     by_cust_f: dict[int, list[FoodOrder]] = {}
     for o in foods:
@@ -483,7 +502,7 @@ async def customer_finance_table(db: AsyncSession) -> list[dict]:
             continue
         by_cust_f.setdefault(o.customer_id, []).append(o)
 
-    mq = await db.execute(select(MarketOrder))
+    mq = await db.execute(select(MarketOrder).options(joinedload(MarketOrder.vendor)))
     markets = mq.scalars().all()
     by_cust_m: dict[int, list[MarketOrder]] = {}
     for o in markets:
@@ -643,7 +662,7 @@ async def restaurant_finance_table(db: AsyncSession) -> list[dict]:
     if not restaurants:
         return []
 
-    fq = await db.execute(select(FoodOrder))
+    fq = await db.execute(select(FoodOrder).options(joinedload(FoodOrder.restaurant)))
     foods = fq.scalars().all()
     by_r: dict[int, list[FoodOrder]] = {}
     for o in foods:
@@ -664,9 +683,8 @@ async def restaurant_finance_table(db: AsyncSession) -> list[dict]:
             if o.status == FoodOrderStatus.DELIVERED:
                 items_revenue += _dec(o.final_amount) - _dec(o.delivery_fee)
                 delivery_fee_total += _dec(o.delivery_fee)
-                platform_commission += (
-                    _dec(o.delivery_fee) * _PLATFORM_DELIVERY_CUT
-                ).quantize(Decimal("0.01"))
+                _, platform_cut = _food_split(o)
+                platform_commission += platform_cut
                 delivered += 1
             elif o.status == FoodOrderStatus.CANCELLED:
                 cancelled += 1
@@ -702,7 +720,7 @@ async def restaurant_finance_detail(db: AsyncSession, restaurant_id: int) -> Opt
         owner = oq.scalars().first()
 
     fq = await db.execute(
-        select(FoodOrder)
+        select(FoodOrder).options(joinedload(FoodOrder.restaurant))
         .where(FoodOrder.restaurant_id == r.id)
         .order_by(FoodOrder.id.desc())
         .limit(200)
@@ -718,7 +736,7 @@ async def restaurant_finance_detail(db: AsyncSession, restaurant_id: int) -> Opt
     orders_view: list[dict] = []
     for o in foods:
         df = _dec(o.delivery_fee)
-        cm = (df * _PLATFORM_DELIVERY_CUT).quantize(Decimal("0.01"))
+        _, cm = _food_split(o)
         items = _dec(o.final_amount) - df
         if o.status == FoodOrderStatus.DELIVERED:
             items_revenue += items
@@ -776,7 +794,7 @@ async def vendor_finance_table(db: AsyncSession) -> list[dict]:
     if not vendors:
         return []
 
-    mq = await db.execute(select(MarketOrder))
+    mq = await db.execute(select(MarketOrder).options(joinedload(MarketOrder.vendor)))
     orders = mq.scalars().all()
     by_v: dict[int, list[MarketOrder]] = {}
     for o in orders:
@@ -797,9 +815,8 @@ async def vendor_finance_table(db: AsyncSession) -> list[dict]:
             if o.status == MarketOrderStatus.DELIVERED:
                 items_revenue += _dec(o.final_amount) - _dec(o.delivery_fee)
                 delivery_fee_total += _dec(o.delivery_fee)
-                platform_commission += (
-                    _dec(o.delivery_fee) * _PLATFORM_DELIVERY_CUT
-                ).quantize(Decimal("0.01"))
+                _, platform_cut = _food_split(o)
+                platform_commission += platform_cut
                 delivered += 1
             elif o.status == MarketOrderStatus.CANCELLED:
                 cancelled += 1
@@ -835,7 +852,7 @@ async def vendor_finance_detail(db: AsyncSession, vendor_id: int) -> Optional[di
         owner = oq.scalars().first()
 
     mq = await db.execute(
-        select(MarketOrder)
+        select(MarketOrder).options(joinedload(MarketOrder.vendor))
         .where(MarketOrder.vendor_id == v.id)
         .order_by(MarketOrder.id.desc())
         .limit(200)
@@ -851,7 +868,7 @@ async def vendor_finance_detail(db: AsyncSession, vendor_id: int) -> Optional[di
     orders_view: list[dict] = []
     for o in orders:
         df = _dec(o.delivery_fee)
-        cm = (df * _PLATFORM_DELIVERY_CUT).quantize(Decimal("0.01"))
+        _, cm = _food_split(o)
         items = _dec(o.final_amount) - df
         if o.status == MarketOrderStatus.DELIVERED:
             items_revenue += items
@@ -1002,7 +1019,7 @@ async def get_driver_outstanding_commission(db: AsyncSession, driver_id: int) ->
     
     # 2. Platform fee from completed cash food orders
     fq = await db.execute(
-        select(FoodOrder).where(
+        select(FoodOrder).options(joinedload(FoodOrder.restaurant)).where(
             FoodOrder.driver_id == driver_id,
             FoodOrder.status == FoodOrderStatus.DELIVERED,
             FoodOrder.payment_method == "cash"
@@ -1012,12 +1029,12 @@ async def get_driver_outstanding_commission(db: AsyncSession, driver_id: int) ->
     cash_food_commission = Decimal("0")
     for o in cash_foods:
         df = _dec(o.delivery_fee)
-        cut = (df * _PLATFORM_DELIVERY_CUT).quantize(Decimal("0.01"))
+        _, cut = _food_split(o)
         cash_food_commission += cut
         
     # 3. Platform fee from completed cash market orders
     mq = await db.execute(
-        select(MarketOrder).where(
+        select(MarketOrder).options(joinedload(MarketOrder.vendor)).where(
             MarketOrder.driver_id == driver_id,
             MarketOrder.status == MarketOrderStatus.DELIVERED,
             MarketOrder.payment_method == "cash"
@@ -1027,7 +1044,7 @@ async def get_driver_outstanding_commission(db: AsyncSession, driver_id: int) ->
     cash_market_commission = Decimal("0")
     for o in cash_markets:
         df = _dec(o.delivery_fee)
-        cut = (df * _PLATFORM_DELIVERY_CUT).quantize(Decimal("0.01"))
+        _, cut = _market_split(o)
         cash_market_commission += cut
         
     total_owed = cash_booking_commission + cash_food_commission + cash_market_commission
@@ -1110,14 +1127,14 @@ async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
     ride_count = len(bookings)
 
     fq = await db.execute(
-        select(FoodOrder).where(
+        select(FoodOrder).options(joinedload(FoodOrder.restaurant)).where(
             FoodOrder.driver_id == driver_id,
             FoodOrder.status == FoodOrderStatus.DELIVERED,
         )
     )
     foods = fq.scalars().all()
     mq = await db.execute(
-        select(MarketOrder).where(
+        select(MarketOrder).options(joinedload(MarketOrder.vendor)).where(
             MarketOrder.driver_id == driver_id,
             MarketOrder.status == MarketOrderStatus.DELIVERED,
         )
@@ -1128,7 +1145,10 @@ async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
     delivery_earnings = Decimal("0")
     for o in [*foods, *markets]:
         df = _dec(o.delivery_fee)
-        cut = (df * _PLATFORM_DELIVERY_CUT).quantize(Decimal("0.01"))
+        if hasattr(o, "restaurant_id"):
+            _, cut = _food_split(o)
+        else:
+            _, cut = _market_split(o)
         delivery_collected += df
         delivery_earnings += df - cut
     delivery_count = len(foods) + len(markets)
@@ -1174,16 +1194,16 @@ async def get_driver_payout_stats(db: AsyncSession, driver_id: int) -> dict:
     ride_earn = sum((_dec(b.driver_earnings) for b in bq.scalars().all()), Decimal("0"))
 
     fq = await db.execute(
-        select(FoodOrder)
+        select(FoodOrder).options(joinedload(FoodOrder.restaurant))
         .where(FoodOrder.driver_id == driver_id, FoodOrder.status == FoodOrderStatus.DELIVERED)
     )
-    food_earn = sum(((_dec(o.delivery_fee) * (Decimal("1") - _PLATFORM_DELIVERY_CUT)).quantize(Decimal("0.01")) for o in fq.scalars().all()), Decimal("0"))
+    food_earn = sum((_food_split(o)[0] for o in fq.scalars().all()), Decimal("0"))
 
     mq = await db.execute(
-        select(MarketOrder)
+        select(MarketOrder).options(joinedload(MarketOrder.vendor))
         .where(MarketOrder.driver_id == driver_id, MarketOrder.status == MarketOrderStatus.DELIVERED)
     )
-    market_earn = sum(((_dec(o.delivery_fee) * (Decimal("1") - _PLATFORM_DELIVERY_CUT)).quantize(Decimal("0.01")) for o in mq.scalars().all()), Decimal("0"))
+    market_earn = sum((_market_split(o)[0] for o in mq.scalars().all()), Decimal("0"))
 
     total_earned = ride_earn + food_earn + market_earn
 

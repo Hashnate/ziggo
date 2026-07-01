@@ -239,6 +239,9 @@ async def quote_delivery(
         lines,
         vendor.delivery_radius_km,
         base_fee_override=Decimal(str(vendor.delivery_fee)) if vendor.delivery_fee else None,
+        pickup_fee=Decimal(str(vendor.pickup_fee)) if vendor.pickup_fee is not None else None,
+        per_km_rate=Decimal(str(vendor.per_km_rate)) if vendor.per_km_rate is not None else None,
+        boost=Decimal(str(vendor.boost)) if vendor.boost is not None else None,
     )
     return {
         "distance_km": q["distance_km"],
@@ -316,6 +319,9 @@ async def create_market_order(
             lines,
             vendor.delivery_radius_km,
             base_fee_override=Decimal(str(vendor.delivery_fee)) if vendor.delivery_fee else None,
+            pickup_fee=Decimal(str(vendor.pickup_fee)) if vendor.pickup_fee is not None else None,
+            per_km_rate=Decimal(str(vendor.per_km_rate)) if vendor.per_km_rate is not None else None,
+            boost=Decimal(str(vendor.boost)) if vendor.boost is not None else None,
         )
         if not q["in_range"]:
             raise HTTPException(

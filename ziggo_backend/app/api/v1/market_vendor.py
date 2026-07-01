@@ -820,7 +820,8 @@ async def _broadcast_market_to_riders(
         max_distance_km=float(delivery.vendor_radius_km(vendor.delivery_radius_km)),
     )
 
-    driver_earnings = float(delivery_fee) * 0.8
+    comm_pct = float(vendor.commission_percentage) if vendor.commission_percentage is not None else 20.0
+    driver_earnings = float(delivery_fee) * (1.0 - comm_pct / 100.0)
 
     payload = {
         "is_market": True,

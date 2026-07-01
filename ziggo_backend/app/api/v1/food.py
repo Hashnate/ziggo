@@ -76,8 +76,9 @@ async def _broadcast_to_riders(
         max_distance_km=10,
     )
 
-    # 80% of delivery fee goes to the driver (matches the ride/flash split).
-    driver_earnings = float(delivery_fee) * 0.8
+    # Driver earnings = delivery fee * (1 - commission_percentage / 100)
+    comm_pct = float(r.commission_percentage) if r.commission_percentage is not None else 20.0
+    driver_earnings = float(delivery_fee) * (1.0 - comm_pct / 100.0)
 
     food_request_payload = {
         "is_food": True,
@@ -417,7 +418,17 @@ async def create_food_order(
         total += line_total
         line_items.append((item, line.quantity, item.price, line.notes))
 
-    base_delivery_fee = Decimal(str(r.delivery_fee or 0))
+    from ...services.fare_service import haversine_km
+    from decimal import ROUND_HALF_UP
+    if r.lat is not None and r.lng is not None and body.delivery_lat is not None and body.delivery_lng is not None:
+        dist_km = haversine_km(float(r.lat), float(r.lng), float(body.delivery_lat), float(body.delivery_lng))
+        pickup = r.pickup_fee if r.pickup_fee is not None else Decimal("70.00")
+        per_km = r.per_km_rate if r.per_km_rate is not None else Decimal("40.00")
+        boost_val = r.boost if r.boost is not None else Decimal("0.00")
+        base_delivery_fee = pickup + per_km * Decimal(str(dist_km)) + boost_val
+        base_delivery_fee = base_delivery_fee.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    else:
+        base_delivery_fee = Decimal(str(r.delivery_fee or 0))
 
     # BRD: RW-03 — Gold member gets the configured delivery-fee discount.
     from ...services import loyalty_service as L
