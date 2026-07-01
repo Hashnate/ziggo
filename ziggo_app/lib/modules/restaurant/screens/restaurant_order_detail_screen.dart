@@ -905,6 +905,7 @@ class _BarBtn extends StatelessWidget {
             : FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(icon, size: 18),

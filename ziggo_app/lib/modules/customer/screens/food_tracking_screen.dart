@@ -10,6 +10,14 @@ import '../food_provider.dart';
 import '../food_ui.dart';
 import 'food_home_screen.dart';
 
+// ─────────────────────────────────────────────
+//  Food-order colour tokens
+// ─────────────────────────────────────────────
+const _kOrange = Color(0xFFFF7849);
+const _kOrangeDark = Color(0xFFE8622E);
+const _kOrangeLight = Color(0xFFFFEDE6);
+const _kOrangeGlow = Color(0x44FF7849);
+
 class FoodTrackingScreen extends StatefulWidget {
   final String orderRef;
   const FoodTrackingScreen({super.key, required this.orderRef});
@@ -48,36 +56,95 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
     final TextEditingController reasonController = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppStyles.radiusMd)),
-        title: const Text('Cancel Order', style: TextStyle(fontWeight: FontWeight.w900)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Are you sure you want to cancel this order? This action cannot be undone.'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: reasonController,
-              decoration: const InputDecoration(
-                labelText: 'Reason for cancellation',
-                hintText: 'e.g., changed my mind, wrong items',
-                border: OutlineInputBorder(),
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppStyles.radiusMd)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.cancel_rounded,
+                        color: AppColors.error, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text('Cancel Order',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w900, fontSize: 18)),
+                ],
               ),
-              maxLength: 200,
-            ),
-          ],
+              const SizedBox(height: 16),
+              const Text(
+                'Are you sure you want to cancel this order?\nThis action cannot be undone.',
+                style: TextStyle(color: AppColors.textSecondary, height: 1.5),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: reasonController,
+                decoration: InputDecoration(
+                  labelText: 'Reason (optional)',
+                  hintText: 'e.g., changed my mind',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+                    borderSide: const BorderSide(color: AppColors.cardBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+                    borderSide: const BorderSide(color: AppColors.cardBorder),
+                  ),
+                ),
+                maxLength: 200,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppStyles.radiusSm)),
+                      ),
+                      child: const Text('KEEP ORDER',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textSecondary)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.error,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppStyles.radiusSm)),
+                        elevation: 0,
+                      ),
+                      child: const Text('CANCEL',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('NO', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.textSecondary)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('YES, CANCEL', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.error)),
-          ),
-        ],
       ),
     );
     if (confirmed == true && mounted) {
@@ -100,7 +167,10 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(context.read<FoodProvider>().error ?? 'Failed to cancel order.')),
+            SnackBar(
+                content: Text(
+                    context.read<FoodProvider>().error ??
+                        'Failed to cancel order.')),
           );
         }
       }
@@ -108,11 +178,11 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
   }
 
   static const List<_Step> _steps = [
-    _Step('pending', 'Order placed', Icons.receipt_long_rounded),
+    _Step('pending', 'Order Placed', Icons.receipt_long_rounded),
     _Step('confirmed', 'Confirmed', Icons.check_circle_rounded),
-    _Step('preparing', 'Preparing your food', Icons.restaurant_menu_rounded),
-    _Step('ready_for_pickup', 'Ready for pickup', Icons.shopping_bag_rounded),
-    _Step('out_for_delivery', 'Out for delivery', Icons.delivery_dining_rounded),
+    _Step('preparing', 'Preparing Food', Icons.restaurant_menu_rounded),
+    _Step('ready_for_pickup', 'Ready for Pickup', Icons.shopping_bag_rounded),
+    _Step('out_for_delivery', 'Out for Delivery', Icons.delivery_dining_rounded),
     _Step('delivered', 'Delivered', Icons.done_all_rounded),
   ];
 
@@ -125,311 +195,628 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
   Widget build(BuildContext context) {
     final status = _order?['status']?.toString() ?? 'pending';
     final current = _currentIndex(status);
+    final isDelivered = status == 'delivered';
 
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        title: Text(widget.orderRef,
-            style: const TextStyle(letterSpacing: 0.4, fontWeight: FontWeight.w900)),
-      ),
+      backgroundColor: const Color(0xFFF8F4F2),
       body: _order == null
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
-              children: staggered([
-                // Hero status card
-                Container(
-                  padding: const EdgeInsets.all(22),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF172554), Color(0xFF1E40AF), Color(0xFF3B82F6)],
-                    ),
-                    borderRadius: BorderRadius.circular(28),
-                    boxShadow: AppStyles.shadowLg,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.22),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Icon(_steps[current].icon, color: Colors.white, size: 24),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.22),
-                                    borderRadius: BorderRadius.circular(100),
-                                  ),
-                                  child: const Text(
-                                    'CURRENT STATUS',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 1,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  _steps[current].label,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 18,
-                                    letterSpacing: -0.3,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 18),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(100),
-                            ),
-                            child: Text(
-                              formatRs(_order!['final_amount'] as num?),
-                              style: const TextStyle(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.22),
-                              borderRadius: BorderRadius.circular(100),
-                            ),
-                            child: Text(
-                              (_order!['payment_method'] ?? '').toString().toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 11,
-                                letterSpacing: 0.6,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+          ? const Center(child: CircularProgressIndicator(color: _kOrange))
+          : CustomScrollView(
+              slivers: [
+                _HeroHeader(
+                  orderRef: widget.orderRef,
+                  current: current,
+                  steps: _steps,
+                  order: _order!,
                 ),
-                const SizedBox(height: 24),
-                // Step list with connecting line
-                _StepList(current: current),
-                const SizedBox(height: 24),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(AppStyles.radiusMd),
-                    boxShadow: AppStyles.shadowSm,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'DELIVERY ADDRESS',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: AppColors.textTertiary,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.4,
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      // ── Progress steps card ──
+                      _StepCard(current: current),
+                      const SizedBox(height: 16),
+
+                      // ── Delivery address card ──
+                      _InfoCard(
+                        icon: Icons.location_on_rounded,
+                        label: 'DELIVERY ADDRESS',
+                        value: _order!['delivery_address']?.toString() ?? '—',
+                      ),
+                      const SizedBox(height: 16),
+
+                      // ── Restaurant name if present ──
+                      if (_order!['restaurant_name'] != null) ...[
+                        _InfoCard(
+                          icon: Icons.storefront_rounded,
+                          label: 'RESTAURANT',
+                          value: _order!['restaurant_name'].toString(),
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Container(
-                            width: 32,
-                            height: 32,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(Icons.location_on_rounded,
-                                color: AppColors.primary, size: 16),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              _order!['delivery_address']?.toString() ?? '',
-                              style: const TextStyle(fontWeight: FontWeight.w900),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                        const SizedBox(height: 16),
+                      ],
+
+                      // ── Cancel button (only when pending) ──
+                      if (status == 'pending') ...[
+                        _CancelButton(
+                          onPressed: () => _showCancelConfirmation(context),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+
+                      // ── Done button (delivered) ──
+                      if (isDelivered) ...[
+                        _DoneButton(
+                          onPressed: () =>
+                              Navigator.popUntil(context, (r) => r.isFirst),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                    ]),
                   ),
                 ),
-                if (status == 'pending') ...[
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: () => _showCancelConfirmation(context),
-                    icon: const Icon(Icons.cancel_rounded, color: Colors.white),
-                    label: const Text(
-                      'CANCEL ORDER',
-                      style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 16),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.error,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      minimumSize: const Size(double.infinity, 56),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppStyles.radiusMd),
-                      ),
-                    ),
-                  ),
-                ],
-                if (status == 'delivered') ...[
-                  const SizedBox(height: 24),
-                  PrimaryButton(
-                    label: 'DONE',
-                    icon: Icons.check_circle_rounded,
-                    gold: true,
-                    onPressed: () {
-                      Navigator.popUntil(context, (r) => r.isFirst);
-                    },
-                  ),
-                ],
-              ]),
+              ],
             ),
     );
   }
 }
 
-class _StepList extends StatelessWidget {
+// ─────────────────────────────────────────────
+//  Sliver hero header
+// ─────────────────────────────────────────────
+class _HeroHeader extends StatelessWidget {
+  final String orderRef;
   final int current;
-  const _StepList({required this.current});
+  final List<_Step> steps;
+  final Map<String, dynamic> order;
+
+  const _HeroHeader({
+    required this.orderRef,
+    required this.current,
+    required this.steps,
+    required this.order,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppStyles.radiusMd),
-        boxShadow: AppStyles.shadowSm,
-      ),
-      child: Column(
-        children: List.generate(_FoodTrackingScreenState._steps.length, (i) {
-          final s = _FoodTrackingScreenState._steps[i];
-          final done = i <= current;
-          final isLast = i == _FoodTrackingScreenState._steps.length - 1;
-          return IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Column(
+    final progress = (current + 1) / steps.length;
+
+    return SliverToBoxAdapter(
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF1A0A05), Color(0xFF3D1A0A), _kOrangeDark],
+          ),
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(36),
+            bottomRight: Radius.circular(36),
+          ),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top bar
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 8, 16, 0),
+                child: Row(
                   children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
-                      width: 36,
-                      height: 36,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: done ? AppColors.primary : AppColors.surfaceMuted,
-                        shape: BoxShape.circle,
-                        boxShadow: done
-                            ? [
-                                BoxShadow(
-                                  color: AppColors.primary.withOpacity(0.35),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: Icon(
-                        s.icon,
-                        color: done ? Colors.white : AppColors.textTertiary,
-                        size: 18,
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                          color: Colors.white, size: 20),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'ORDER TRACKING',
+                            style: TextStyle(
+                              color: Colors.white54,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.6,
+                            ),
+                          ),
+                          Text(
+                            orderRef,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    if (!isLast)
-                      Expanded(
-                        child: Container(
-                          width: 3,
-                          margin: const EdgeInsets.symmetric(vertical: 4),
-                          decoration: BoxDecoration(
-                            color: i < current ? AppColors.primary : AppColors.divider,
-                            borderRadius: BorderRadius.circular(2),
+                    // Amount + payment chip
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          formatRs(order['final_amount'] as num?),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
                           ),
                         ),
-                      ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: Text(
+                            (order['payment_method'] ?? '').toString().toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
-                const SizedBox(width: 14),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Status icon + label
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Status icon
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.15),
+                        border: Border.all(
+                            color: Colors.white.withOpacity(0.3), width: 1.5),
+                      ),
+                      child: Icon(steps[current].icon,
+                          color: Colors.white, size: 28),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: _kOrange.withOpacity(0.25),
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            child: const Text(
+                              'CURRENT STATUS',
+                              style: TextStyle(
+                                color: _kOrange,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.4,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            steps[current].label,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 22,
+                              height: 1.1,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            steps[current].status == 'delivered'
+                                ? '✓ Your order has been delivered!'
+                                : 'In progress · Step ${current + 1} of ${steps.length}',
+                            style: const TextStyle(
+                              color: Colors.white60,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Progress bar
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${(progress * 100).round()}% complete',
+                          style: const TextStyle(
+                            color: Colors.white60,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          '${current + 1}/${steps.length} steps',
+                          style: const TextStyle(
+                            color: Colors.white60,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(100),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 8,
+                        backgroundColor: Colors.white.withOpacity(0.15),
+                        valueColor:
+                            const AlwaysStoppedAnimation<Color>(_kOrange),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 28),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Step timeline card
+// ─────────────────────────────────────────────
+class _StepCard extends StatelessWidget {
+  final int current;
+
+  const _StepCard({required this.current});
+
+  @override
+  Widget build(BuildContext context) {
+    final steps = _FoodTrackingScreenState._steps;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppStyles.radiusLg),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'ORDER PROGRESS',
+            style: TextStyle(
+              fontSize: 10,
+              color: AppColors.textTertiary,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.6,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...List.generate(steps.length, (i) {
+            final s = steps[i];
+            final isDone = i < current;
+            final isActive = i == current;
+            final isUpcoming = i > current;
+            final isLast = i == steps.length - 1;
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Icon + connector
+                SizedBox(
+                  width: 44,
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isDone
+                              ? _kOrange
+                              : isActive
+                                  ? _kOrange
+                                  : AppColors.surfaceMuted,
+                          boxShadow: isActive || isDone
+                              ? [
+                                  BoxShadow(
+                                    color: _kOrangeGlow,
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  )
+                                ]
+                              : null,
+                        ),
+                        child: Icon(
+                          isDone ? Icons.check_rounded : s.icon,
+                          color: isUpcoming
+                              ? AppColors.textTertiary
+                              : Colors.white,
+                          size: isDone ? 18 : 17,
+                        ),
+                      ),
+                      if (!isLast)
+                        Container(
+                          width: 2.5,
+                          height: 36,
+                          margin: const EdgeInsets.symmetric(vertical: 2),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(2),
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: isDone
+                                  ? [_kOrange, _kOrange.withOpacity(0.4)]
+                                  : [
+                                      AppColors.divider,
+                                      AppColors.divider,
+                                    ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Label + subtitle
                 Expanded(
                   child: Padding(
-                    padding: EdgeInsets.only(bottom: isLast ? 0 : 18),
+                    padding: EdgeInsets.only(
+                        top: 8, bottom: isLast ? 8 : 26),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           s.label,
                           style: TextStyle(
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w800,
                             fontSize: 14,
-                            color: done ? AppColors.textPrimary : AppColors.textTertiary,
+                            color: isUpcoming
+                                ? AppColors.textTertiary
+                                : AppColors.textPrimary,
                           ),
                         ),
-                        if (i == current)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Text(
-                              s.status == 'delivered' ? 'Completed' : 'In progress...',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: AppColors.primary,
+                        if (isActive) ...[
+                          const SizedBox(height: 3),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: _kOrangeLight,
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            child: const Text(
+                              '● In progress',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: _kOrangeDark,
                                 fontWeight: FontWeight.w900,
-                                letterSpacing: 0.3,
+                                letterSpacing: 0.2,
                               ),
                             ),
                           ),
+                        ] else if (isDone) ...[
+                          const SizedBox(height: 3),
+                          const Text(
+                            'Completed',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textTertiary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
                 ),
               ],
-            ),
-          );
-        }),
+            );
+          }),
+        ],
       ),
     );
   }
 }
 
+// ─────────────────────────────────────────────
+//  Info card (address / restaurant)
+// ─────────────────────────────────────────────
+class _InfoCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _InfoCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppStyles.radiusMd),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: _kOrangeLight,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: _kOrange, size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    color: AppColors.textTertiary,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Cancel button
+// ─────────────────────────────────────────────
+class _CancelButton extends StatelessWidget {
+  final VoidCallback onPressed;
+  const _CancelButton({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        height: 56,
+        decoration: BoxDecoration(
+          color: AppColors.error.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(AppStyles.radiusMd),
+          border: Border.all(color: AppColors.error.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.cancel_rounded, color: AppColors.error, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'CANCEL ORDER',
+              style: TextStyle(
+                color: AppColors.error,
+                fontWeight: FontWeight.w900,
+                fontSize: 14,
+                letterSpacing: 0.6,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Done button
+// ─────────────────────────────────────────────
+class _DoneButton extends StatelessWidget {
+  final VoidCallback onPressed;
+  const _DoneButton({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        height: 56,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [_kOrangeDark, _kOrange],
+          ),
+          borderRadius: BorderRadius.circular(AppStyles.radiusMd),
+          boxShadow: [
+            BoxShadow(
+              color: _kOrangeGlow,
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.check_circle_rounded, color: Colors.white, size: 22),
+            SizedBox(width: 8),
+            Text(
+              'DONE — GO HOME',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 15,
+                letterSpacing: 0.6,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Data class
+// ─────────────────────────────────────────────
 class _Step {
   final String status;
   final String label;

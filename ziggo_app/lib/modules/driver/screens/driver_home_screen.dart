@@ -2428,7 +2428,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       case 'confirmed':
       case 'preparing':
       case 'ready_for_pickup':
-        nextAction = 'PICKED UP — OUT FOR DELIVERY';
+        nextAction = 'PICKED UP';
         nextStatus = 'out_for_delivery';
         actionColor = AppColors.primary;
         actionIcon = Icons.delivery_dining_rounded;
@@ -2637,20 +2637,18 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     ],
                   ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(actionIcon, color: Colors.white, size: 16),
                       const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(
-                          nextAction,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.5,
-                          ),
+                      Text(
+                        nextAction,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
                         ),
                       ),
                     ],
