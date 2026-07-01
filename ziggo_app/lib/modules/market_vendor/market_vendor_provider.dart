@@ -8,6 +8,7 @@ import '../../core/network/api_client.dart';
 import '../../core/network/ws_client.dart';
 import '../../core/payments/payhere_service.dart';
 import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 /// State + API for the market-vendor portal. Mirrors RestaurantProvider but
 /// targets `/market/vendor/*` endpoints. The vendor account is pre-created by
@@ -80,7 +81,7 @@ class MarketVendorProvider extends ChangeNotifier {
     final event = msg['event'];
     if (event == 'new_market_order') {
       HapticFeedback.heavyImpact();
-      SystemSound.play(SystemSoundType.alert);
+      AudioPlayer().play(AssetSource('sounds/ride_alert.mp3'));
       newOrderPing.value = newOrderPing.value + 1;
       loadOrders();
       loadTodayStats();

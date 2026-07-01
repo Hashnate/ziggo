@@ -875,15 +875,13 @@ class _BarBtn extends StatelessWidget {
       height: double.infinity,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppStyles.radiusMd),
-        boxShadow: outlined
-            ? AppStyles.shadowSm
-            : [
-                BoxShadow(
-                  color: color.withOpacity(0.35),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-              ],
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(outlined ? 0.15 : 0.35),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: ElevatedButton(
         onPressed: busy ? null : onPressed,
@@ -917,7 +915,7 @@ class _BarBtn extends StatelessWidget {
                     label,
                     style: const TextStyle(
                       fontWeight: FontWeight.w900,
-                      fontSize: 12,
+                      fontSize: 13,
                       letterSpacing: 0.3,
                     ),
                   ),
