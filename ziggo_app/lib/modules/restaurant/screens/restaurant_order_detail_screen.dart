@@ -445,7 +445,7 @@ class _RestaurantOrderDetailScreenState
                   'Rs.${((_order['final_amount'] as num? ?? 0) - (_order['delivery_fee'] as num? ?? 0)).toStringAsFixed(0)}',
                 ),
                 _kv(
-                  'Platform Commission (-${(_order['commission_percentage'] as num? ?? 20).toStringAsFixed(0)}%)',
+                  'Platform Commission',
                   '-Rs.${(((_order['final_amount'] as num? ?? 0) - (_order['delivery_fee'] as num? ?? 0)) * ((_order['commission_percentage'] as num? ?? 20) / 100)).toStringAsFixed(0)}',
                 ),
                 const Divider(height: 18),

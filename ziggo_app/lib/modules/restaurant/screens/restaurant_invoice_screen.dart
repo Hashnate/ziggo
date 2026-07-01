@@ -445,7 +445,7 @@ class _RestaurantOrderDetailScreenState
                   'Rs.${((_order['final_amount'] as num? ?? 0) - (_order['delivery_fee'] as num? ?? 0)).toStringAsFixed(0)}',
                 ),
                 _kv(
-                  'Platform Commission (-${(_order['commission_percentage'] as num? ?? 20).toStringAsFixed(0)}%)',
+                  'Platform Commission',
                   '-Rs.${(((_order['final_amount'] as num? ?? 0) - (_order['delivery_fee'] as num? ?? 0)) * ((_order['commission_percentage'] as num? ?? 20) / 100)).toStringAsFixed(0)}',
                 ),
                 const Divider(height: 18),
@@ -802,30 +802,33 @@ class _ActionBar extends StatelessWidget {
         ],
       );
     } else if (status == 'confirmed') {
-      body = Row(
-        children: [
-          Expanded(
-            child: _BarBtn(
-              label: 'START COOKING',
-              icon: Icons.local_fire_department_rounded,
-              color: AppColors.warning,
-              outlined: true,
-              busy: false,
-              onPressed: onMarkPreparing,
+      body = SizedBox(
+        height: 56,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: _BarBtn(
+                label: 'START COOKING',
+                icon: Icons.local_fire_department_rounded,
+                color: AppColors.warning,
+                outlined: true,
+                busy: false,
+                onPressed: onMarkPreparing,
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            flex: 2,
-            child: _BarBtn(
-              label: 'MARK READY',
-              icon: Icons.shopping_bag_rounded,
-              color: AppColors.primary,
-              busy: busy,
-              onPressed: onMarkReady,
+            const SizedBox(width: 12),
+            Expanded(
+              child: _BarBtn(
+                label: 'MARK READY',
+                icon: Icons.shopping_bag_rounded,
+                color: AppColors.primary,
+                busy: busy,
+                onPressed: onMarkReady,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       );
     } else if (status == 'preparing') {
       body = _BarBtn(
@@ -869,7 +872,7 @@ class _BarBtn extends StatelessWidget {
     final bg = outlined ? Colors.white : color;
     final fg = outlined ? color : Colors.white;
     return Container(
-      height: 56,
+      height: double.infinity,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppStyles.radiusMd),
         boxShadow: outlined
@@ -889,6 +892,9 @@ class _BarBtn extends StatelessWidget {
           foregroundColor: fg,
           elevation: 0,
           shadowColor: Colors.transparent,
+          minimumSize: const Size(double.infinity, 56),
+          maximumSize: const Size(double.infinity, 56),
+          padding: EdgeInsets.zero,
           side: outlined
               ? BorderSide(color: color.withOpacity(0.4), width: 1.4)
               : null,
@@ -902,23 +908,20 @@ class _BarBtn extends StatelessWidget {
                 height: 22,
                 child: CircularProgressIndicator(color: fg, strokeWidth: 3),
               )
-            : FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(icon, size: 18),
-                    const SizedBox(width: 8),
-                    Text(
-                      label,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 14,
-                        letterSpacing: 0.5,
-                      ),
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 18),
+                  const SizedBox(width: 6),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 12,
+                      letterSpacing: 0.3,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
       ),
     );
