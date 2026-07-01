@@ -10,6 +10,7 @@ import '../../market_vendor/market_vendor_provider.dart';
 import '../../market_vendor/screens/market_vendor_home_screen.dart';
 import '../restaurant_provider.dart';
 import '../widgets/image_picker_tile.dart';
+import 'restaurant_commission_screen.dart';
 import 'restaurant_earnings_screen.dart';
 import 'restaurant_menu_screen.dart';
 import 'restaurant_order_detail_screen.dart';
@@ -270,6 +271,12 @@ class _RestaurantHomeScreenState extends State<RestaurantHomeScreen>
                   builder: (_) => const MarketVendorHomeScreen(embedded: true),
                 ),
               ),
+              onOpenCommission: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const RestaurantCommissionScreen(),
+                ),
+              ),
             ),
             if (!r.isApproved) const _PendingApprovalBanner(),
             if (r.isApproved) const _TodayStatsCard(),
@@ -368,12 +375,14 @@ class _Header extends StatelessWidget {
   final VoidCallback onOpenEarnings;
   final VoidCallback onOpenProfile;
   final VoidCallback onOpenMarket;
+  final VoidCallback onOpenCommission;
   const _Header({
     required this.onLogout,
     required this.onOpenMenu,
     required this.onOpenEarnings,
     required this.onOpenProfile,
     required this.onOpenMarket,
+    required this.onOpenCommission,
   });
 
   @override
@@ -451,6 +460,10 @@ class _Header extends StatelessWidget {
               const SizedBox(width: 8),
               _HeaderIcon(
                   icon: Icons.bar_chart_rounded, onTap: onOpenEarnings),
+              const SizedBox(width: 8),
+              _HeaderIcon(
+                  icon: Icons.account_balance_wallet_rounded,
+                  onTap: onOpenCommission),
               const SizedBox(width: 8),
               _HeaderIcon(icon: Icons.menu_book_rounded, onTap: onOpenMenu),
               const SizedBox(width: 8),

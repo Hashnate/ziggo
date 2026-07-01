@@ -474,6 +474,34 @@ class RestaurantProvider extends ChangeNotifier {
     }
   }
 
+  // -------- Commission --------
+
+  /// Fetches the restaurant's commission summary and payment history.
+  /// Returns a map with keys: outstanding_amount, commission_rate,
+  /// total_sales, total_commission_owed, total_paid, payments (list).
+  Future<Map<String, dynamic>?> fetchCommission() async {
+    try {
+      final resp =
+          await ApiClient.instance.dio.get('/restaurant/commission');
+      return Map<String, dynamic>.from(resp.data as Map);
+    } on DioException {
+      return null;
+    }
+  }
+
+  /// Submits a commission payment to the admin.
+  /// Returns null on success, or an error string on failure.
+  Future<String?> payCommission() async {
+    try {
+      await ApiClient.instance.dio.post('/restaurant/commission/pay');
+      return null;
+    } on DioException catch (e) {
+      return e.response?.data?['detail']?.toString() ??
+          e.message ??
+          'Payment failed';
+    }
+  }
+
   @override
   void dispose() {
     _ws.dispose();
