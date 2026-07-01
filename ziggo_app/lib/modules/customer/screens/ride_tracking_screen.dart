@@ -954,8 +954,16 @@ class _BottomCard extends StatelessWidget {
                                 width: double.infinity,
                                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF2563EB),
+                                  color: Colors.white,
                                   borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: const Color(0xFF2563EB), width: 2),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF2563EB).withOpacity(0.08),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
                                 ),
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -963,7 +971,7 @@ class _BottomCard extends StatelessWidget {
                                     const Text(
                                       'Share PIN',
                                       style: TextStyle(
-                                        color: Colors.white,
+                                        color: Color(0xFF2563EB),
                                         fontWeight: FontWeight.bold,
                                         fontSize: 15,
                                       ),
@@ -975,7 +983,7 @@ class _BottomCard extends StatelessWidget {
                                         height: 32,
                                         alignment: Alignment.center,
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFF1E3A8A),
+                                          color: const Color(0xFF2563EB),
                                           borderRadius: BorderRadius.circular(6),
                                         ),
                                         child: Text(
@@ -1373,94 +1381,110 @@ class _DriverCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              // Driver Avatar
-              Column(
-                children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-                    ),
-                    child: photoUrl != null
-                        ? CircleAvatar(
-                            radius: 24,
-                            backgroundColor: AppColors.primary.withOpacity(0.1),
-                            backgroundImage: NetworkImage(photoUrl),
-                            onBackgroundImageError: (exception, stackTrace) {
-                              debugPrint('Error loading driver photo: $exception');
-                            },
-                          )
-                        : fallback,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(Icons.star_rounded, color: AppColors.accent, size: 14),
-                      const SizedBox(width: 2),
-                      Text(
-                        rating,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(width: 14),
-              // Vehicle Icon
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 60,
-                    height: 40,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceMuted,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: vehiclePhotoUrl != null
-                          ? Image.network(
-                              vehiclePhotoUrl,
-                              fit: BoxFit.cover,
-                              width: 60,
-                              height: 40,
-                              errorBuilder: (context, error, stackTrace) => Padding(
-                                padding: const EdgeInsets.all(4.0),
-                                child: Image.asset(
+              // Combined Driver Avatar + Rating Badge + Vehicle Photo (overlapping)
+              SizedBox(
+                width: 116,
+                height: 64,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    // 1. Vehicle Photo (Layered behind)
+                    Positioned(
+                      left: 42,
+                      top: 0,
+                      child: SizedBox(
+                        width: 76,
+                        height: 64,
+                        child: vehiclePhotoUrl != null
+                            ? Image.network(
+                                vehiclePhotoUrl,
+                                fit: BoxFit.contain,
+                                width: 76,
+                                height: 64,
+                                errorBuilder: (context, error, stackTrace) => Image.asset(
                                   'assets/icons/${vehicleType == 'van' ? 'car' : (['bike', 'car', 'tuk', 'truck'].contains(vehicleType) ? vehicleType : 'car')}.png',
                                   fit: BoxFit.contain,
                                 ),
-                              ),
-                            )
-                          : Padding(
-                              padding: const EdgeInsets.all(4.0),
-                              child: Image.asset(
+                              )
+                            : Image.asset(
                                 'assets/icons/${vehicleType == 'van' ? 'car' : (['bike', 'car', 'tuk', 'truck'].contains(vehicleType) ? vehicleType : 'car')}.png',
                                 fit: BoxFit.contain,
                               ),
+                      ),
+                    ),
+                    // 2. Driver Avatar + Rating Badge (Layered on top)
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        alignment: Alignment.bottomCenter,
+                        children: [
+                          Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
+                            child: photoUrl != null
+                                ? CircleAvatar(
+                                    radius: 27,
+                                    backgroundColor: AppColors.primary.withOpacity(0.1),
+                                    backgroundImage: NetworkImage(photoUrl),
+                                    onBackgroundImageError: (exception, stackTrace) {
+                                      debugPrint('Error loading driver photo: $exception');
+                                    },
+                                  )
+                                : fallback,
+                          ),
+                          // Rating Badge
+                          Positioned(
+                            bottom: -4,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.grey.shade200, width: 1),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.08),
+                                    blurRadius: 2,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.star_rounded, color: AppColors.accent, size: 12),
+                                  const SizedBox(width: 1),
+                                  Text(
+                                    rating,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 10,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    vehicleType.toUpperCase(),
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.primary,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               const Spacer(),
               // Plate details
