@@ -1212,3 +1212,133 @@ async def get_earnings(
             float(total_revenue / total_delivered) if total_delivered else 0
         ),
     }
+
+
+# ---------------------------------------------------------------------------
+# Commission Management
+# ---------------------------------------------------------------------------
+
+@router.get("/commission")
+async def get_commission(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("market_owner", "restaurant_owner")),
+):
+    v = await _get_owned_vendor(db, user)
+    if v is None:
+        raise HTTPException(status_code=404, detail="Vendor account not found")
+
+    # 1. Total sales (Delivered orders)
+    q = await db.execute(
+        select(MarketOrder).where(
+            MarketOrder.vendor_id == v.id,
+            MarketOrder.status == MarketOrderStatus.DELIVERED
+        )
+    )
+    orders = q.scalars().all()
+    total_sales = sum((o.final_amount or Decimal(0)) - (o.delivery_fee or Decimal(0)) for o in orders)
+
+    # 2. Commission rate & total owed
+    comm_pct = Decimal(str(v.commission_percentage)) if v.commission_percentage is not None else Decimal("10.0")
+    total_commission_owed = (total_sales * comm_pct) / Decimal("100.0")
+
+    # 3. Total paid
+    from ...models import WalletTransaction
+    tq = await db.execute(
+        select(WalletTransaction).where(
+            WalletTransaction.user_id == user.id,
+            WalletTransaction.type == "commission_payment"
+        ).order_by(WalletTransaction.created_at.desc())
+    )
+    txs = tq.scalars().all()
+    total_paid = sum(tx.amount for tx in txs if tx.amount)
+    
+    # 4. Outstanding
+    outstanding = total_commission_owed - total_paid
+    if outstanding < Decimal("0"):
+        outstanding = Decimal("0")
+
+    payments = []
+    for tx in txs:
+        payments.append({
+            "id": tx.id,
+            "amount": float(tx.amount or 0),
+            "paid_at": tx.created_at,
+            "method": "Wallet",
+            "reference": tx.reference_id
+        })
+
+    return {
+        "outstanding_amount": float(outstanding),
+        "commission_rate": float(comm_pct),
+        "total_sales": float(total_sales),
+        "total_commission_owed": float(total_commission_owed),
+        "total_paid": float(total_paid),
+        "payments": payments
+    }
+
+
+@router.post("/commission/pay")
+async def pay_commission(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("market_owner", "restaurant_owner")),
+):
+    v = await _get_owned_vendor(db, user)
+    if v is None:
+        raise HTTPException(status_code=404, detail="Vendor account not found")
+
+    # Re-calculate outstanding amount
+    q = await db.execute(
+        select(MarketOrder).where(
+            MarketOrder.vendor_id == v.id,
+            MarketOrder.status == MarketOrderStatus.DELIVERED
+        )
+    )
+    orders = q.scalars().all()
+    total_sales = sum((o.final_amount or Decimal(0)) - (o.delivery_fee or Decimal(0)) for o in orders)
+
+    comm_pct = Decimal(str(v.commission_percentage)) if v.commission_percentage is not None else Decimal("10.0")
+    total_commission_owed = (total_sales * comm_pct) / Decimal("100.0")
+
+    from ...models import WalletTransaction
+    tq = await db.execute(
+        select(WalletTransaction).where(
+            WalletTransaction.user_id == user.id,
+            WalletTransaction.type == "commission_payment"
+        )
+    )
+    txs = tq.scalars().all()
+    total_paid = sum(tx.amount for tx in txs if tx.amount)
+    
+    outstanding = total_commission_owed - total_paid
+
+    if outstanding <= Decimal("0"):
+        raise HTTPException(status_code=400, detail="No commission currently owed")
+
+    # Check customer wallet
+    cq = await db.execute(select(Customer).where(Customer.user_id == user.id))
+    customer = cq.scalars().first()
+    
+    if not customer or (customer.wallet_balance or Decimal("0")) < outstanding:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Insufficient wallet balance. You need Rs.{float(outstanding):.2f} but have Rs.{float(customer.wallet_balance or 0):.2f}"
+        )
+
+    # Deduct and record
+    customer.wallet_balance = (customer.wallet_balance or Decimal("0")) - outstanding
+    
+    import secrets
+    ref = "CM" + secrets.token_hex(4).upper()
+    
+    tx = WalletTransaction(
+        user_id=user.id,
+        amount=outstanding,
+        type="commission_payment",
+        description="Commission Payment to Admin",
+        reference_id=ref,
+        balance_after=customer.wallet_balance
+    )
+    db.add(tx)
+    await db.commit()
+    
+    return {"ok": True, "paid_amount": float(outstanding)}

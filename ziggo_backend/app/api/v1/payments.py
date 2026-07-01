@@ -49,7 +49,7 @@ def _ensure_enabled():
 async def payhere_checkout(
     body: dict,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_role("customer")),
+    user: User = Depends(require_role("customer", "restaurant_owner", "market_owner")),
 ):
     """Start a wallet top-up. Body: {amount: number, return_url?, cancel_url?}.
 
@@ -253,7 +253,7 @@ async def payhere_notify(
 async def payhere_status(
     order_id: str,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_role("customer")),
+    user: User = Depends(require_role("customer", "restaurant_owner", "market_owner")),
 ):
     """Client polls this after the WebView closes. If the credit landed,
     returns the wallet transaction; otherwise 404 (still pending or failed)."""

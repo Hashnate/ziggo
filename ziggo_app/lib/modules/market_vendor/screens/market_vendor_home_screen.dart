@@ -15,6 +15,7 @@ import 'market_vendor_order_detail_screen.dart';
 import 'market_vendor_products_screen.dart';
 import 'market_vendor_profile_edit_screen.dart';
 import 'market_vendor_ads_screen.dart';
+import 'market_vendor_commission_screen.dart';
 
 class MarketVendorHomeScreen extends StatefulWidget {
   /// When true, the back/close arrow is shown (used when this screen is
@@ -278,6 +279,12 @@ class _MarketVendorHomeScreenState extends State<MarketVendorHomeScreen>
                   builder: (_) => const MarketVendorAdsScreen(),
                 ),
               ),
+              onOpenCommission: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const MarketVendorCommissionScreen(),
+                ),
+              ),
             ),
             if (r.isApproved) const _TodayStatsCard(),
             Container(
@@ -364,6 +371,7 @@ class _Header extends StatelessWidget {
   final VoidCallback onOpenEarnings;
   final VoidCallback onOpenProfile;
   final VoidCallback onOpenAds;
+  final VoidCallback onOpenCommission;
   final bool embedded;
   const _Header({
     required this.onLogout,
@@ -371,6 +379,7 @@ class _Header extends StatelessWidget {
     required this.onOpenEarnings,
     required this.onOpenProfile,
     required this.onOpenAds,
+    required this.onOpenCommission,
     this.embedded = false,
   });
 
@@ -453,6 +462,9 @@ class _Header extends StatelessWidget {
                     const SizedBox(width: 8),
                     _HeaderIcon(
                         icon: Icons.campaign_rounded, onTap: onOpenAds),
+                    const SizedBox(width: 8),
+                    _HeaderIcon(
+                        icon: Icons.account_balance_wallet_rounded, onTap: onOpenCommission),
                     const SizedBox(width: 8),
                     _HeaderIcon(icon: Icons.edit_rounded, onTap: onOpenProfile),
                     const SizedBox(width: 8),
