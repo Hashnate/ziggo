@@ -3523,9 +3523,9 @@ async def admin_market_new_submit(
     marketplace_delivery: str = Form("yes"),
     delivery_radius_km: float = Form(None),
     average_prep_time_minutes: int = Form(30),
-    bank_name: str = Form(...),
-    account_holder_name: str = Form(...),
-    account_number: str = Form(...),
+    bank_name: str = Form(""),
+    account_holder_name: str = Form(""),
+    account_number: str = Form(""),
     branch_name: str = Form(""),
     commission_percentage: float = Form(10.00),
     priority_level: str = Form("standard"),
@@ -3539,6 +3539,7 @@ async def admin_market_new_submit(
     tax_cert: UploadFile = File(None),
     food_license: UploadFile = File(None),
     additional_documents: UploadFile = File(None),
+    vendor_image: UploadFile = File(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -3646,6 +3647,7 @@ async def admin_market_new_submit(
     tax_cert_url = await _save_vendor_doc(tax_cert, "tax_cert")
     food_lic_url = await _save_vendor_doc(food_license, "food_lic")
     add_docs_url = await _save_vendor_doc(additional_documents, "add_docs")
+    vendor_img_url = await _save_vendor_doc(vendor_image, "vendor_image")
 
     is_active_val = (vendor_status == "active")
     is_open_val = is_active_val
@@ -3659,7 +3661,8 @@ async def admin_market_new_submit(
         lat=Decimal(str(lat)),
         lng=Decimal(str(lng)),
         phone_number=phone_number.strip() or phone,
-        image_url=image_url.strip() or None,
+        image_url=vendor_img_url or image_url.strip() or None,
+        logo_url=vendor_img_url or None,
         opening_time=opening_time.strip() or None,
         closing_time=closing_time.strip() or None,
         delivery_fee=Decimal(str(delivery_fee)),
@@ -3674,10 +3677,10 @@ async def admin_market_new_submit(
         marketplace_delivery=(marketplace_delivery == "yes"),
         delivery_radius_km=Decimal(str(delivery_radius_km)) if delivery_radius_km is not None else None,
         average_prep_time_minutes=average_prep_time_minutes,
-        bank_name=bank_name.strip(),
-        account_holder_name=account_holder_name.strip(),
-        account_number=account_number.strip(),
-        branch_name=branch_name.strip() or None,
+        bank_name=bank_name.strip() if bank_name else None,
+        account_holder_name=account_holder_name.strip() if account_holder_name else None,
+        account_number=account_number.strip() if account_number else None,
+        branch_name=branch_name.strip() if branch_name else None,
         nic_passport_copy_url=nic_url,
         business_reg_cert_url=biz_cert_url,
         tax_cert_url=tax_cert_url,
@@ -3771,6 +3774,8 @@ async def admin_market_vendor_edit(
     category: str = Form(""),
     description: str = Form(""),
     address: str = Form(""),
+    lat: float = Form(None),
+    lng: float = Form(None),
     phone_number: str = Form(""),
     opening_time: str = Form(""),
     closing_time: str = Form(""),
@@ -3786,6 +3791,7 @@ async def admin_market_vendor_edit(
     pickup_fee: float = Form(70.00),
     per_km_rate: float = Form(40.00),
     boost: float = Form(0.00),
+    vendor_image: UploadFile = File(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -3801,6 +3807,16 @@ async def admin_market_vendor_edit(
     v.category = category.strip() or v.category
     v.description = description.strip() or None
     v.address = address.strip() or v.address
+    if lat is not None:
+        v.lat = Decimal(str(lat))
+    if lng is not None:
+        v.lng = Decimal(str(lng))
+    
+    vendor_img_url = await _save_vendor_doc(vendor_image, "vendor_image")
+    if vendor_img_url:
+        v.image_url = vendor_img_url
+        v.logo_url = vendor_img_url
+        
     v.phone_number = phone_number.strip() or v.phone_number
     v.opening_time = opening_time.strip() or v.opening_time
     v.closing_time = closing_time.strip() or v.closing_time

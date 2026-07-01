@@ -186,7 +186,7 @@
                                     </form>
                                 {% endif %}
                                 <button
-                                    onclick='openEditVendor({{ v.id }}, {{ v.name|tojson }}, {{ (v.category or "")|tojson }}, {{ (v.description or "")|tojson }}, {{ (v.address or "")|tojson }}, {{ (v.phone_number or "")|tojson }}, {{ (v.opening_time or "")|tojson }}, {{ (v.closing_time or "")|tojson }}, {{ (v.delivery_fee or 0)|float }}, {{ (v.eta_minutes or 40) }}, {{ (v.commission_percentage or 10)|float }}, {{ (v.priority_level or "standard")|tojson }}, {{ ("yes" if v.is_featured else "no")|tojson }}, {{ (v.bank_name or "")|tojson }}, {{ (v.account_holder_name or "")|tojson }}, {{ (v.account_number or "")|tojson }}, {{ (v.branch_name or "")|tojson }}, {{ (v.pickup_fee or 70.0)|float }}, {{ (v.per_km_rate or 40.0)|float }}, {{ (v.boost or 0.0)|float }})'
+                                    onclick='openEditVendor({{ v.id }}, {{ v.name|tojson }}, {{ (v.category or "")|tojson }}, {{ (v.description or "")|tojson }}, {{ (v.address or "")|tojson }}, {{ (v.phone_number or "")|tojson }}, {{ (v.opening_time or "")|tojson }}, {{ (v.closing_time or "")|tojson }}, {{ (v.delivery_fee or 0)|float }}, {{ (v.eta_minutes or 40) }}, {{ (v.commission_percentage or 10)|float }}, {{ (v.priority_level or "standard")|tojson }}, {{ ("yes" if v.is_featured else "no")|tojson }}, {{ (v.bank_name or "")|tojson }}, {{ (v.account_holder_name or "")|tojson }}, {{ (v.account_number or "")|tojson }}, {{ (v.branch_name or "")|tojson }}, {{ (v.pickup_fee or 70.0)|float }}, {{ (v.per_km_rate or 40.0)|float }}, {{ (v.boost or 0.0)|float }}, {{ (v.lat or 6.9271)|float }}, {{ (v.lng or 79.8612)|float }})'
                                     class="px-3 py-1.5 rounded-xl bg-blue-50 text-blue-600 text-xs font-bold hover:bg-blue-600 hover:text-white transition inline-flex items-center gap-1">
                                     <i class="fas fa-pen text-[10px]"></i> Edit
                                 </button>
@@ -283,6 +283,11 @@
                             <input name="owner_phone" required pattern="\d{10}" placeholder="0712345678"
                                    class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
                         </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Vendor Image / Logo (JPG, PNG, WEBP)</label>
+                            <input type="file" name="vendor_image" accept="image/*"
+                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-ziggo-soft file:text-ziggo hover:file:bg-ziggo/10 bg-slate-50/50">
+                        </div>
                     </div>
                 </div>
 
@@ -327,27 +332,11 @@
                 <div class="section-card-modal">
                     <div class="flex justify-between items-center mb-3">
                         <h4 class="text-xs font-black text-ziggo uppercase tracking-wider flex items-center gap-1.5">
-                            <i class="fas fa-map-marked-alt text-red-500"></i> Location Picker
+                            <i class="fas fa-map-marked-alt text-red-500"></i> Location Selector
                         </h4>
-                        <div class="flex rounded-lg border border-gray-200 p-0.5 bg-gray-50">
-                            <button type="button" id="btn_search_mode" onclick="setLocationMode('search')"
-                                    class="px-2.5 py-1 rounded-md text-[10px] font-bold bg-white shadow-sm text-ziggo">
-                                Search
-                            </button>
-                            <button type="button" id="btn_manual_mode" onclick="setLocationMode('manual')"
-                                    class="px-2.5 py-1 rounded-md text-[10px] font-bold text-gray-500">
-                                Manual Coord
-                            </button>
-                        </div>
                     </div>
 
                     <div class="space-y-3">
-                        <div id="search_location_container">
-                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Search via Google Places</label>
-                            <input id="autocomplete_search" placeholder="Search Google Maps..."
-                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm shadow-sm">
-                        </div>
-
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div class="md:col-span-2">
                                 <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Store Address *</label>
@@ -365,8 +354,6 @@
                                        class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
                             </div>
                         </div>
-
-                        <div id="map" class="w-full h-64 rounded-xl border border-gray-200" style="min-height: 240px; z-index: 1;"></div>
                     </div>
                 </div>
 
@@ -405,63 +392,7 @@
                     </div>
                 </div>
 
-                <!-- 5. Settlement Bank Info -->
-                <div class="section-card-modal">
-                    <h4 class="text-xs font-black text-ziggo uppercase mb-3 tracking-wider flex items-center gap-1.5">
-                        <i class="fas fa-university text-yellow-500"></i> Settlements & Banking
-                    </h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Bank Name *</label>
-                            <input name="bank_name" required placeholder="Bank Name"
-                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Account Holder Name *</label>
-                            <input name="account_holder_name" required placeholder="Account Holder Name"
-                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Account Number *</label>
-                            <input name="account_number" required placeholder="Account Number"
-                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Branch Name</label>
-                            <input name="branch_name" placeholder="Branch location"
-                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
-                        </div>
-                    </div>
-                </div>
 
-                <!-- 6. Verification Docs -->
-                <div class="section-card-modal">
-                    <h4 class="text-xs font-black text-ziggo uppercase mb-3 tracking-wider flex items-center gap-1.5">
-                        <i class="fas fa-file-invoice text-orange-500"></i> Verification Documents
-                    </h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">NIC / Passport Copy *</label>
-                            <input type="file" name="nic_passport_copy" required accept="image/*,.pdf"
-                                   class="w-full p-2 border border-gray-200 rounded-xl text-xs">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Business Reg. Certificate</label>
-                            <input type="file" name="business_reg_cert" accept="image/*,.pdf"
-                                   class="w-full p-2 border border-gray-200 rounded-xl text-xs">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Tax Certificate</label>
-                            <input type="file" name="tax_cert" accept="image/*,.pdf"
-                                   class="w-full p-2 border border-gray-200 rounded-xl text-xs">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Food License</label>
-                            <input type="file" name="food_license" accept="image/*,.pdf"
-                                   class="w-full p-2 border border-gray-200 rounded-xl text-xs">
-                        </div>
-                    </div>
-                </div>
 
                 <!-- 7. Marketplace Configuration -->
                 <div class="section-card-modal">
@@ -530,7 +461,7 @@
 
 <!-- Edit Vendor Modal -->
 <div id="editVendorModal" class="modal-overlay">
-    <form id="editVendorForm" method="post" class="modal-container highlight-blue">
+    <form id="editVendorForm" method="post" enctype="multipart/form-data" class="modal-container highlight-blue">
         <div class="modal-header">
             <div>
                 <h3 class="text-base font-black text-ziggo flex items-center gap-2"><i class="fas fa-pen-to-square text-blue-500"></i> Edit Vendor</h3>
@@ -564,9 +495,21 @@
                     <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Address</label>
                     <input id="ev_address" name="address" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
                 </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Latitude *</label>
+                    <input id="ev_lat" name="lat" type="number" step="0.0000001" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Longitude *</label>
+                    <input id="ev_lng" name="lng" type="number" step="0.0000001" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
                 <div class="md:col-span-2">
                     <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Description</label>
                     <input id="ev_description" name="description" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Vendor Image / Logo (JPG, PNG, WEBP)</label>
+                    <input type="file" name="vendor_image" accept="image/*" class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-ziggo-soft file:text-ziggo hover:file:bg-ziggo/10 bg-slate-50/50">
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Opening Time</label>
@@ -614,22 +557,7 @@
                         <option value="yes">Yes</option>
                     </select>
                 </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Bank Name</label>
-                    <input id="ev_bank" name="bank_name" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Account Holder</label>
-                    <input id="ev_account_holder" name="account_holder_name" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Account Number</label>
-                    <input id="ev_account_number" name="account_number" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Branch Name</label>
-                    <input id="ev_branch" name="branch_name" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
-                </div>
+
             </div>
         </div>
         <div class="modal-footer">
@@ -648,15 +576,6 @@
     function openAddVendorModal() {
         var modal = document.getElementById('addVendorModal');
         modal.style.display = 'flex';
-        
-        // Timeout to let DOM render before Map container loads
-        setTimeout(function() {
-            if (!map) {
-                initMap();
-            } else {
-                google.maps.event.trigger(map, 'resize');
-            }
-        }, 100);
     }
 
     function closeModal() {
@@ -667,12 +586,14 @@
         document.getElementById('editVendorModal').style.display = 'none';
     }
 
-    function openEditVendor(id, name, category, description, address, phone, opening, closing, delivery_fee, eta, commission, priority, featured, bank, account_holder, account_number, branch, pickup_fee, per_km_rate, boost) {
+    function openEditVendor(id, name, category, description, address, phone, opening, closing, delivery_fee, eta, commission, priority, featured, bank, account_holder, account_number, branch, pickup_fee, per_km_rate, boost, lat, lng) {
         document.getElementById('editVendorForm').action = '/admin/market/' + id + '/edit';
         document.getElementById('ev_name').value = name || '';
         document.getElementById('ev_category').value = category || 'Other';
         document.getElementById('ev_description').value = description || '';
         document.getElementById('ev_address').value = address || '';
+        document.getElementById('ev_lat').value = lat !== undefined ? lat : 6.9271;
+        document.getElementById('ev_lng').value = lng !== undefined ? lng : 79.8612;
         document.getElementById('ev_phone').value = phone || '';
         document.getElementById('ev_opening').value = opening || '';
         document.getElementById('ev_closing').value = closing || '';
@@ -681,10 +602,6 @@
         document.getElementById('ev_commission').value = commission || 10;
         document.getElementById('ev_priority').value = priority || 'standard';
         document.getElementById('ev_featured').value = featured || 'no';
-        document.getElementById('ev_bank').value = bank || '';
-        document.getElementById('ev_account_holder').value = account_holder || '';
-        document.getElementById('ev_account_number').value = account_number || '';
-        document.getElementById('ev_branch').value = branch || '';
         document.getElementById('ev_pickup_fee').value = pickup_fee !== undefined ? pickup_fee : 70.00;
         document.getElementById('ev_per_km_rate').value = per_km_rate !== undefined ? per_km_rate : 40.00;
         document.getElementById('ev_boost').value = boost !== undefined ? boost : 0.00;
@@ -705,107 +622,6 @@
 
     function closeAddVendorModal() {
         closeModal();
-    }
-
-    function initMap() {
-        var initialLat = parseFloat(document.getElementById('vendor_lat').value) || 6.9271;
-        var initialLng = parseFloat(document.getElementById('vendor_lng').value) || 79.8612;
-        var initialLatLng = {lat: initialLat, lng: initialLng};
-
-        map = new google.maps.Map(document.getElementById('map'), {
-            center: initialLatLng,
-            zoom: 14,
-            mapTypeControl: false,
-            streetViewControl: false,
-            fullscreenControl: false,
-            gestureHandling: 'cooperative',
-            scrollwheel: false
-        });
-
-        marker = new google.maps.Marker({
-            position: initialLatLng,
-            map: map,
-            draggable: true,
-            title: "Drag to vendor location"
-        });
-
-        // Initialize Places Autocomplete
-        var searchInput = document.getElementById('autocomplete_search');
-        var autocomplete = new google.maps.places.Autocomplete(searchInput);
-        autocomplete.bindTo('bounds', map);
-
-        autocomplete.addListener('place_changed', function() {
-            var place = autocomplete.getPlace();
-            if (!place.geometry) {
-                return;
-            }
-
-            if (place.geometry.viewport) {
-                map.fitBounds(place.geometry.viewport);
-            } else {
-                map.setCenter(place.geometry.location);
-                map.setZoom(17);
-            }
-
-            marker.setPosition(place.geometry.location);
-            updateLocationFields(place.geometry.location.lat(), place.geometry.location.lng(), place.formatted_address || place.name);
-        });
-
-        // Draggable Marker dragend listener
-        marker.addListener('dragend', function() {
-            var pos = marker.getPosition();
-            geocodePosition(pos);
-        });
-
-        // Map Click listener to place marker
-        map.addListener('click', function(e) {
-            marker.setPosition(e.latLng);
-            geocodePosition(e.latLng);
-        });
-    }
-
-    function updateLocationFields(lat, lng, address) {
-        document.getElementById('vendor_lat').value = lat.toFixed(7);
-        document.getElementById('vendor_lng').value = lng.toFixed(7);
-        if (address) {
-            document.getElementById('vendor_address').value = address;
-        }
-    }
-
-    function geocodePosition(pos) {
-        updateLocationFields(pos.lat(), pos.lng());
-        var geocoder = new google.maps.Geocoder();
-        geocoder.geocode({
-            latLng: pos
-        }, function(results, status) {
-            if (status == google.maps.GeocoderStatus.OK) {
-                if (results[0]) {
-                    document.getElementById('vendor_address').value = results[0].formatted_address;
-                }
-            }
-        });
-    }
-
-    function setLocationMode(mode) {
-        var searchBtn = document.getElementById('btn_search_mode');
-        var manualBtn = document.getElementById('btn_manual_mode');
-        var searchContainer = document.getElementById('search_location_container');
-        var latInput = document.getElementById('vendor_lat');
-        var lngInput = document.getElementById('vendor_lng');
-
-        if (mode === 'search') {
-            searchBtn.className = "px-2.5 py-1 rounded-md text-[10px] font-bold bg-white shadow-sm text-ziggo";
-            manualBtn.className = "px-2.5 py-1 rounded-md text-[10px] font-bold text-gray-500";
-            searchContainer.style.display = "block";
-            latInput.readOnly = true;
-            lngInput.readOnly = true;
-        } else {
-            searchBtn.className = "px-2.5 py-1 rounded-md text-[10px] font-bold text-gray-500";
-            manualBtn.className = "px-2.5 py-1 rounded-md text-[10px] font-bold bg-white shadow-sm text-ziggo";
-            searchContainer.style.display = "none";
-            latInput.readOnly = false;
-            lngInput.readOnly = false;
-        }
     }
 
     // Toggle self delivery fields
@@ -829,8 +645,6 @@
     // Run toggle on init
     document.addEventListener("DOMContentLoaded", function() {
         toggleSelfDelivery();
-        setLocationMode('search');
     });
 </script>
-<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places" async defer></script>
 {% endblock %}

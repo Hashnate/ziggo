@@ -61,6 +61,11 @@
                     <input name="owner_phone" required pattern="\d{10}" value="{{ form.owner_phone or '' }}" placeholder="0712345678"
                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                 </div>
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Vendor Image / Logo (JPG, PNG, WEBP)</label>
+                    <input type="file" name="vendor_image" accept="image/*"
+                           class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-ziggo-soft file:text-ziggo hover:file:bg-ziggo/10 bg-slate-50/50">
+                </div>
             </div>
         </div>
 
@@ -104,42 +109,16 @@
             </div>
         </div>
 
-        <!-- 3. Location Picker (Google Map + Autocomplete / Coordinates) -->
+        <!-- 3. Location (Manual Coordinates) -->
         <div class="section-card">
-            <div class="flex items-center justify-between mb-4">
-                <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center">
-                        <i class="fas fa-map-marked-alt"></i>
-                    </div>
-                    <h3 class="text-lg font-black text-ziggo">3. Location</h3>
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center">
+                    <i class="fas fa-map-marked-alt"></i>
                 </div>
-                <div class="flex rounded-lg border border-gray-200 p-0.5 bg-gray-50">
-                    <button type="button" id="btn_search_mode" onclick="setLocationMode('search')"
-                            class="px-3 py-1.5 rounded-md text-xs font-bold transition bg-white shadow-sm text-ziggo">
-                        <i class="fas fa-search mr-1"></i> Search Mode
-                    </button>
-                    <button type="button" id="btn_manual_mode" onclick="setLocationMode('manual')"
-                            class="px-3 py-1.5 rounded-md text-xs font-bold transition text-gray-500">
-                        <i class="fas fa-edit mr-1"></i> Manual coordinates
-                    </button>
-                </div>
+                <h3 class="text-lg font-black text-ziggo">3. Location</h3>
             </div>
 
             <div class="space-y-4">
-                <!-- Search inputs -->
-                <div id="search_location_container" class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Search Address (Google Places)</label>
-                        <div class="relative">
-                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                                <i class="fas fa-search-location"></i>
-                            </span>
-                            <input id="autocomplete_search" placeholder="Type location address..."
-                                   class="w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo shadow-sm text-sm">
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Form Lat/Lng and Address -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="md:col-span-2">
@@ -157,12 +136,6 @@
                         <input id="vendor_lng" name="lng" type="number" step="0.0000001" required value="{{ form.lng or 79.8612 }}"
                                class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                     </div>
-                </div>
-
-                <!-- Map Container -->
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-2 uppercase">Drag marker to exact location</label>
-                    <div id="map" class="w-full h-80 rounded-xl border border-gray-200 shadow-inner overflow-hidden" style="min-height: 320px; z-index: 1;"></div>
                 </div>
             </div>
         </div>
@@ -205,74 +178,7 @@
             </div>
         </div>
 
-        <!-- 5. Bank / Settlement Details -->
-        <div class="section-card">
-            <div class="flex items-center gap-3 mb-4">
-                <div class="w-8 h-8 rounded-lg bg-yellow-50 text-yellow-600 flex items-center justify-center">
-                    <i class="fas fa-university"></i>
-                </div>
-                <h3 class="text-lg font-black text-ziggo">5. Bank / Settlement Details</h3>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Bank Name *</label>
-                    <input name="bank_name" required value="{{ form.bank_name or '' }}" placeholder="e.g. Commercial Bank"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Account Holder Name *</label>
-                    <input name="account_holder_name" required value="{{ form.account_holder_name or '' }}" placeholder="John Doe"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Account Number *</label>
-                    <input name="account_number" required value="{{ form.account_number or '' }}" placeholder="1002300456"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Branch Name</label>
-                    <input name="branch_name" value="{{ form.branch_name or '' }}" placeholder="e.g. Colombo Fort"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
-                </div>
-            </div>
-        </div>
 
-        <!-- 6. Verification Documents -->
-        <div class="section-card">
-            <div class="flex items-center gap-3 mb-4">
-                <div class="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center">
-                    <i class="fas fa-file-invoice"></i>
-                </div>
-                <h3 class="text-lg font-black text-ziggo">6. Verification Documents</h3>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">NIC / Passport Copy (Image or PDF) *</label>
-                    <input type="file" name="nic_passport_copy" required accept="image/*,.pdf"
-                           class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-ziggo-soft file:text-ziggo hover:file:bg-ziggo/10">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Business Registration Certificate</label>
-                    <input type="file" name="business_reg_cert" accept="image/*,.pdf"
-                           class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-ziggo-soft file:text-ziggo hover:file:bg-ziggo/10">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Tax Certificate</label>
-                    <input type="file" name="tax_cert" accept="image/*,.pdf"
-                           class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-ziggo-soft file:text-ziggo hover:file:bg-ziggo/10">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Food License (for bakery/grocery stalls)</label>
-                    <input type="file" name="food_license" accept="image/*,.pdf"
-                           class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-ziggo-soft file:text-ziggo hover:file:bg-ziggo/10">
-                </div>
-                <div class="md:col-span-2">
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Additional Documents</label>
-                    <input type="file" name="additional_documents" accept="image/*,.pdf"
-                           class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-ziggo-soft file:text-ziggo hover:file:bg-ziggo/10">
-                </div>
-            </div>
-        </div>
 
         <!-- 7. Marketplace Configuration (Admin Only) -->
         <div class="section-card">
@@ -344,108 +250,6 @@
 
 {% block scripts %}
 <script>
-    var map;
-    var marker;
-
-    function initMap() {
-        var initialLat = parseFloat(document.getElementById('vendor_lat').value) || 6.9271;
-        var initialLng = parseFloat(document.getElementById('vendor_lng').value) || 79.8612;
-        var initialLatLng = {lat: initialLat, lng: initialLng};
-
-        map = new google.maps.Map(document.getElementById('map'), {
-            center: initialLatLng,
-            zoom: 14,
-            mapTypeControl: false,
-            streetViewControl: false,
-            fullscreenControl: false
-        });
-
-        marker = new google.maps.Marker({
-            position: initialLatLng,
-            map: map,
-            draggable: true,
-            title: "Drag to vendor location"
-        });
-
-        // Initialize Places Autocomplete
-        var searchInput = document.getElementById('autocomplete_search');
-        var autocomplete = new google.maps.places.Autocomplete(searchInput);
-        autocomplete.bindTo('bounds', map);
-
-        autocomplete.addListener('place_changed', function() {
-            var place = autocomplete.getPlace();
-            if (!place.geometry) {
-                return;
-            }
-
-            if (place.geometry.viewport) {
-                map.fitBounds(place.geometry.viewport);
-            } else {
-                map.setCenter(place.geometry.location);
-                map.setZoom(17);
-            }
-
-            marker.setPosition(place.geometry.location);
-            updateLocationFields(place.geometry.location.lat(), place.geometry.location.lng(), place.formatted_address || place.name);
-        });
-
-        // Draggable Marker dragend listener
-        marker.addListener('dragend', function() {
-            var pos = marker.getPosition();
-            geocodePosition(pos);
-        });
-
-        // Map Click listener to place marker
-        map.addListener('click', function(e) {
-            marker.setPosition(e.latLng);
-            geocodePosition(e.latLng);
-        });
-    }
-
-    function updateLocationFields(lat, lng, address) {
-        document.getElementById('vendor_lat').value = lat.toFixed(7);
-        document.getElementById('vendor_lng').value = lng.toFixed(7);
-        if (address) {
-            document.getElementById('vendor_address').value = address;
-        }
-    }
-
-    function geocodePosition(pos) {
-        updateLocationFields(pos.lat(), pos.lng());
-        var geocoder = new google.maps.Geocoder();
-        geocoder.geocode({
-            latLng: pos
-        }, function(results, status) {
-            if (status == google.maps.GeocoderStatus.OK) {
-                if (results[0]) {
-                    document.getElementById('vendor_address').value = results[0].formatted_address;
-                }
-            }
-        });
-    }
-
-    function setLocationMode(mode) {
-        var searchBtn = document.getElementById('btn_search_mode');
-        var manualBtn = document.getElementById('btn_manual_mode');
-        var searchContainer = document.getElementById('search_location_container');
-        var latInput = document.getElementById('vendor_lat');
-        var lngInput = document.getElementById('vendor_lng');
-
-        if (mode === 'search') {
-            searchBtn.className = "px-3 py-1.5 rounded-md text-xs font-bold transition bg-white shadow-sm text-ziggo";
-            manualBtn.className = "px-3 py-1.5 rounded-md text-xs font-bold transition text-gray-500";
-            searchContainer.style.display = "block";
-            latInput.readOnly = true;
-            lngInput.readOnly = true;
-        } else {
-            searchBtn.className = "px-3 py-1.5 rounded-md text-xs font-bold transition text-gray-500";
-            manualBtn.className = "px-3 py-1.5 rounded-md text-xs font-bold transition bg-white shadow-sm text-ziggo";
-            searchContainer.style.display = "none";
-            latInput.readOnly = false;
-            lngInput.readOnly = false;
-        }
-    }
-
     function toggleSelfDelivery() {
         var selfDelivery = document.getElementById('self_delivery').value;
         var radiusContainer = document.getElementById('delivery_radius_container');
@@ -466,8 +270,6 @@
     // Run toggle on init
     document.addEventListener("DOMContentLoaded", function() {
         toggleSelfDelivery();
-        setLocationMode('search');
     });
 </script>
-<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places&callback=initMap" async defer></script>
 {% endblock %}

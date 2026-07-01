@@ -3,138 +3,185 @@
 {% block title %}Add Restaurant | Ziggo Admin{% endblock %}
 {% block page_title %}Add Restaurant{% endblock %}
 
+{% block head %}
+<style>
+    .section-card {
+        background: #ffffff;
+        border: 1px solid #f1f5f9;
+        border-radius: 1rem;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+        padding: 1.5rem;
+        transition: all 0.2s ease;
+    }
+    .section-card:hover {
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="max-w-3xl mx-auto bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-    <form method="post" action="/admin/restaurants/new" class="p-8 space-y-6">
+<div class="max-w-4xl mx-auto space-y-6">
+    <a href="/admin/restaurants" class="inline-flex items-center text-sm font-bold text-gray-500 hover:text-ziggo">
+        <i class="fas fa-arrow-left mr-2"></i> Back to restaurants
+    </a>
+
+    <form method="post" action="/admin/restaurants/new" class="space-y-6">
         {% if error %}
         <div class="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl font-bold text-sm">
             <i class="fas fa-exclamation-circle mr-1"></i> {{ error }}
         </div>
         {% endif %}
 
-        <div>
-            <h3 class="text-lg font-black text-ziggo mb-4">Owner login</h3>
-            <p class="text-xs text-gray-500 mb-3">The owner logs into the app with this phone number + OTP. Their account is created with role <code>restaurant_owner</code> automatically.</p>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Owner phone (10 digits)</label>
-                    <input name="owner_phone" required pattern="\d{10}" value="{{ form.owner_phone or '' }}"
-                           placeholder="0712345678"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+        <!-- 1. Owner Login Details -->
+        <div class="section-card">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <i class="fas fa-user-tie"></i>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Owner full name</label>
-                    <input name="owner_full_name" value="{{ form.owner_full_name or '' }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    <h3 class="text-lg font-black text-ziggo">1. Owner Account Settings</h3>
+                    <p class="text-xs text-gray-400 mt-0.5">The owner logs into the mobile app with this phone number via OTP.</p>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Owner Phone (10 digits) *</label>
+                    <input name="owner_phone" required pattern="\d{10}" value="{{ form.owner_phone or '' }}"
+                           placeholder="0712345678"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-slate-50/50">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Owner Full Name *</label>
+                    <input name="owner_full_name" required value="{{ form.owner_full_name or '' }}"
+                           placeholder="Owner Full Name"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-slate-50/50">
                 </div>
             </div>
         </div>
 
-        <div>
-            <h3 class="text-lg font-black text-ziggo mb-4">Basic info</h3>
+        <!-- 2. Restaurant Basic Information -->
+        <div class="section-card">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <i class="fas fa-info-circle"></i>
+                </div>
+                <h3 class="text-lg font-black text-ziggo">2. Basic Information</h3>
+            </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="md:col-span-2">
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Restaurant name</label>
-                    <input name="name" required value="{{ form.name or '' }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Restaurant Name *</label>
+                    <input name="name" required value="{{ form.name or '' }}" placeholder="e.g. Daily Fresh Restaurant"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-slate-50/50">
                 </div>
                 <div class="md:col-span-2">
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Short description</label>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Short Description</label>
                     <input name="description" value="{{ form.description or '' }}"
-                           placeholder="e.g. Authentic Sri Lankan curry"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                           placeholder="e.g. Authentic Sri Lankan curry and rice"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-slate-50/50">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Cuisine</label>
-                    <input name="cuisine" value="{{ form.cuisine or '' }}"
-                           placeholder="Italian, Sri Lankan, Café…"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Cuisine *</label>
+                    <input name="cuisine" required value="{{ form.cuisine or '' }}"
+                           placeholder="e.g. Italian, Sri Lankan, Café..."
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-slate-50/50">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Phone</label>
-                    <input name="phone_number" value="{{ form.phone_number or '' }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Contact Phone</label>
+                    <input name="phone_number" value="{{ form.phone_number or '' }}" placeholder="0712345678"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-slate-50/50">
                 </div>
                 <div class="md:col-span-2">
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Image URL (optional)</label>
                     <input name="image_url" value="{{ form.image_url or '' }}"
-                           placeholder="https://…"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                           placeholder="https://..."
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-xs bg-slate-50/50">
                 </div>
             </div>
         </div>
 
-        <div>
-            <h3 class="text-lg font-black text-ziggo mb-4">Location</h3>
+        <!-- 3. Restaurant Location -->
+        <div class="section-card">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center">
+                    <i class="fas fa-map-marked-alt"></i>
+                </div>
+                <h3 class="text-lg font-black text-ziggo">3. Location</h3>
+            </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="md:col-span-2">
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Address</label>
-                    <input name="address" value="{{ form.address or '' }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Address *</label>
+                    <input name="address" required value="{{ form.address or '' }}" placeholder="Physical location of restaurant"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-slate-50/50">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Latitude</label>
-                    <input name="lat" type="number" step="0.0000001" value="{{ form.lat or 6.9271 }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Latitude *</label>
+                    <input name="lat" type="number" step="0.0000001" required value="{{ form.lat or 6.9271 }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-slate-50/50">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Longitude</label>
-                    <input name="lng" type="number" step="0.0000001" value="{{ form.lng or 79.8612 }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Longitude *</label>
+                    <input name="lng" type="number" step="0.0000001" required value="{{ form.lng or 79.8612 }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-slate-50/50">
                 </div>
             </div>
         </div>
 
-        <div>
-            <h3 class="text-lg font-black text-ziggo mb-4">Service</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- 4. Service & Logistics Settings -->
+        <div class="section-card">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+                    <i class="fas fa-sliders-h"></i>
+                </div>
+                <h3 class="text-lg font-black text-ziggo">4. Service & Delivery Settings</h3>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Opening time</label>
-                    <input name="opening_time" type="time" value="{{ form.opening_time or '09:00' }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Opening Time *</label>
+                    <input name="opening_time" type="time" required value="{{ form.opening_time or '09:00' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-slate-50/50">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Closing time</label>
-                    <input name="closing_time" type="time" value="{{ form.closing_time or '22:00' }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Closing Time *</label>
+                    <input name="closing_time" type="time" required value="{{ form.closing_time or '22:00' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-slate-50/50">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Delivery fee (Rs.)</label>
-                    <input name="delivery_fee" type="number" step="0.01" min="0" value="{{ form.delivery_fee or 150 }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Delivery Fee (Rs.) *</label>
+                    <input name="delivery_fee" type="number" step="0.01" min="0" required value="{{ form.delivery_fee or 150 }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-slate-50/50">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">ETA (minutes)</label>
-                    <input name="eta_minutes" type="number" min="1" value="{{ form.eta_minutes or 30 }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">ETA (minutes) *</label>
+                    <input name="eta_minutes" type="number" min="1" required value="{{ form.eta_minutes or 30 }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-slate-50/50">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Pickup Fee (Rs.)</label>
-                    <input name="pickup_fee" type="number" step="0.01" min="0" value="{{ form.pickup_fee or 70.00 }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Pickup Fee (Rs.) *</label>
+                    <input name="pickup_fee" type="number" step="0.01" min="0" required value="{{ form.pickup_fee or 70.00 }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-slate-50/50">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Per KM Rate (Rs.)</label>
-                    <input name="per_km_rate" type="number" step="0.01" min="0" value="{{ form.per_km_rate or 40.00 }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Per KM Rate (Rs.) *</label>
+                    <input name="per_km_rate" type="number" step="0.01" min="0" required value="{{ form.per_km_rate or 40.00 }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-slate-50/50">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Boost (Rs.)</label>
-                    <input name="boost" type="number" step="0.01" min="0" value="{{ form.boost or 0.00 }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Boost (Rs.) *</label>
+                    <input name="boost" type="number" step="0.01" min="0" required value="{{ form.boost or 0.00 }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-slate-50/50">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Commission Percentage (%)</label>
-                    <input name="commission_percentage" type="number" step="0.01" min="0" max="100" value="{{ form.commission_percentage or 20.00 }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Commission (%) *</label>
+                    <input name="commission_percentage" type="number" step="0.01" min="0" max="100" required value="{{ form.commission_percentage or 20.00 }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-slate-50/50">
                 </div>
             </div>
         </div>
 
-        <div class="pt-6 border-t border-gray-100 flex justify-end gap-3">
-            <a href="/admin/restaurants" class="px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50">Cancel</a>
-            <button type="submit" class="px-8 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light">
-                <i class="fas fa-plus mr-2"></i> Create Restaurant
+        <div class="flex justify-end gap-3 pt-4">
+            <a href="/admin/restaurants" class="px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50 text-sm">Cancel</a>
+            <button type="submit" class="px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50 text-sm bg-white">
+                <i class="fas fa-plus mr-2 text-white"></i> Create Restaurant
             </button>
         </div>
         <p class="text-xs text-gray-400 mt-2">After creating, you'll be taken to the restaurant page where you can add menu categories and items.</p>
