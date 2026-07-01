@@ -5,18 +5,18 @@ import 'package:provider/provider.dart';
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/widgets/motion.dart';
-import '../restaurant_provider.dart';
+import '../market_vendor_provider.dart';
 
-class RestaurantCommissionScreen extends StatefulWidget {
-  const RestaurantCommissionScreen({super.key});
+class MarketVendorCommissionScreen extends StatefulWidget {
+  const MarketVendorCommissionScreen({super.key});
 
   @override
-  State<RestaurantCommissionScreen> createState() =>
-      _RestaurantCommissionScreenState();
+  State<MarketVendorCommissionScreen> createState() =>
+      _MarketVendorCommissionScreenState();
 }
 
-class _RestaurantCommissionScreenState
-    extends State<RestaurantCommissionScreen> {
+class _MarketVendorCommissionScreenState
+    extends State<MarketVendorCommissionScreen> {
   Map<String, dynamic>? _data;
   bool _loading = true;
   bool _paying = false;
@@ -29,7 +29,7 @@ class _RestaurantCommissionScreenState
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final p = context.read<RestaurantProvider>();
+    final p = context.read<MarketVendorProvider>();
     final result = await p.fetchCommission();
     if (!mounted) return;
     setState(() {
@@ -102,7 +102,7 @@ class _RestaurantCommissionScreenState
     if (confirmed != true || !mounted) return;
 
     setState(() => _paying = true);
-    final p = context.read<RestaurantProvider>();
+    final p = context.read<MarketVendorProvider>();
     final err = await p.payCommission(context, outstanding);
     if (!mounted) return;
     setState(() => _paying = false);

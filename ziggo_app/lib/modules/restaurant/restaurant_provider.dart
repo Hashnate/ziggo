@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/network/ws_client.dart';
+import '../../core/payments/payhere_service.dart';
+import 'package:flutter/material.dart';
 
 /// State + API for the restaurant-owner portal.
 class RestaurantProvider extends ChangeNotifier {
@@ -489,10 +491,22 @@ class RestaurantProvider extends ChangeNotifier {
     }
   }
 
-  /// Submits a commission payment to the admin.
+  /// Submits a commission payment to the admin via PayHere.
   /// Returns null on success, or an error string on failure.
-  Future<String?> payCommission() async {
+  Future<String?> payCommission(BuildContext context, double amount) async {
     try {
+      // Step 1: Pay via PayHere (tops up the owner's wallet)
+      final enabled = await PayHereService.instance.isEnabled();
+      if (!enabled) {
+        return 'PayHere is not enabled on this server.';
+      }
+      
+      final result = await PayHereService.instance.topUpWallet(context, amount);
+      if (!result.success) {
+        return result.message ?? 'Payment cancelled or failed';
+      }
+
+      // Step 2: Deduct from wallet to clear the commission
       await ApiClient.instance.dio.post('/restaurant/commission/pay');
       return null;
     } on DioException catch (e) {

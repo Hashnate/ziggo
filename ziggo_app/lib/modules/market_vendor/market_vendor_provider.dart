@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/network/ws_client.dart';
+import '../../core/payments/payhere_service.dart';
+import 'package:flutter/material.dart';
 
 /// State + API for the market-vendor portal. Mirrors RestaurantProvider but
 /// targets `/market/vendor/*` endpoints. The vendor account is pre-created by
@@ -242,6 +244,7 @@ class MarketVendorProvider extends ChangeNotifier {
       return null;
     }
   }
+
 
   // -------- Self-registration (mirrors RestaurantProvider.register) --------
 
@@ -496,6 +499,38 @@ class MarketVendorProvider extends ChangeNotifier {
     try {
       await ApiClient.instance.dio.delete('/market/vendor/ads/$adId');
       await fetchMyAds();
+      return null;
+    } on DioException catch (e) {
+      return e.response?.data?['detail']?.toString() ?? e.message ?? 'Failed';
+    }
+  }
+
+  // -------- Commission --------
+
+  Future<Map<String, dynamic>?> fetchCommission() async {
+    try {
+      final resp = await ApiClient.instance.dio.get('/market/vendor/commission');
+      return Map<String, dynamic>.from(resp.data);
+    } on DioException {
+      return null;
+    }
+  }
+
+  Future<String?> payCommission(BuildContext context, double amount) async {
+    try {
+      // Step 1: Pay via PayHere (tops up the owner's wallet)
+      final enabled = await PayHereService.instance.isEnabled();
+      if (!enabled) {
+        return 'PayHere is not enabled on this server.';
+      }
+      
+      final result = await PayHereService.instance.topUpWallet(context, amount);
+      if (!result.success) {
+        return result.message ?? 'Payment cancelled or failed';
+      }
+
+      // Step 2: Deduct from wallet to clear the commission
+      await ApiClient.instance.dio.post('/market/vendor/commission/pay');
       return null;
     } on DioException catch (e) {
       return e.response?.data?['detail']?.toString() ?? e.message ?? 'Failed';
