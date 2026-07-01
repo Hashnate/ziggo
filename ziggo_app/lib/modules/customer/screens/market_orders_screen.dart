@@ -4,6 +4,12 @@ import 'package:provider/provider.dart';
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../market_provider.dart';
+import 'market_order_details_screen.dart';
+import 'market_tracking_screen.dart';
+
+import '../../../app/app_colors.dart';
+import '../../../app/app_styles.dart';
+import '../market_provider.dart';
 
 /// "My Orders" with two tabs: Saved Carts (saved for later) and Ongoing
 /// (live market orders). Opened from the receipt icon in the market header.
@@ -38,20 +44,17 @@ class MarketOrdersScreen extends StatelessWidget {
             labelColor: AppColors.primary,
             unselectedLabelColor: AppColors.textTertiary,
             labelStyle: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
-            unselectedLabelStyle:
-                TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+            unselectedLabelStyle: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+            ),
             tabs: [
               Tab(text: 'Saved Carts'),
-              Tab(text: 'Ongoing'),
+              Tab(text: 'Orders'),
             ],
           ),
         ),
-        body: const TabBarView(
-          children: [
-            _SavedCartsTab(),
-            _OngoingTab(),
-          ],
-        ),
+        body: const TabBarView(children: [_SavedCartsTab(), _OngoingTab()]),
       ),
     );
   }
@@ -64,7 +67,8 @@ class _SavedCartsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return const _EmptyState(
       icon: Icons.bookmark_added_rounded,
-      message: 'Save cart items here to get notified when the outlet is available',
+      message:
+          'Save cart items here to get notified when the outlet is available',
     );
   }
 }
@@ -101,10 +105,7 @@ class _OngoingTabState extends State<_OngoingTab> {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        final ongoing = (snap.data ?? [])
-            .where((o) =>
-                !_doneStatuses.contains((o['status'] ?? '').toString().toLowerCase()))
-            .toList();
+        final ongoing = snap.data ?? [];
         if (ongoing.isEmpty) {
           return RefreshIndicator(
             onRefresh: _reload,
@@ -113,7 +114,7 @@ class _OngoingTabState extends State<_OngoingTab> {
                 SizedBox(height: 120),
                 _EmptyState(
                   icon: Icons.receipt_long_rounded,
-                  message: 'No ongoing orders right now',
+                  message: 'No orders right now',
                 ),
               ],
             ),
@@ -146,68 +147,107 @@ class _OrderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = (order['status'] ?? '').toString();
     final amount = (order['final_amount'] as num?)?.toDouble() ?? 0;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppStyles.radiusMd),
-        boxShadow: AppStyles.shadowSm,
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(14),
+    final isActive = !{'delivered', 'cancelled'}.contains(status.toLowerCase());
+    final ref = order['order_ref']?.toString() ?? '';
+
+    return InkWell(
+      onTap: () {
+        if (ref.isEmpty) return;
+        if (isActive) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MarketTrackingScreen(orderRef: ref),
             ),
-            child: const Icon(Icons.shopping_bag_rounded,
-                color: AppColors.primary, size: 22),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          );
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MarketOrderDetailsScreen(order: order),
+            ),
+          );
+        }
+      },
+      borderRadius: BorderRadius.circular(AppStyles.radiusMd),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppStyles.radiusMd),
+          boxShadow: AppStyles.shadowSm,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.shopping_bag_rounded,
+                color: AppColors.primary,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '#${order['order_ref'] ?? ''}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      _pretty(status),
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '#${order['order_ref'] ?? ''}',
+                  'Rs.${amount.toStringAsFixed(0)}',
                   style: const TextStyle(
                     fontWeight: FontWeight.w900,
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    _pretty(status),
-                    style: const TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.3,
-                    ),
+                    fontSize: 16,
                   ),
                 ),
               ],
             ),
-          ),
-          Text(
-            'Rs.${amount.toStringAsFixed(0)}',
-            style: const TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 16,
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.textTertiary,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

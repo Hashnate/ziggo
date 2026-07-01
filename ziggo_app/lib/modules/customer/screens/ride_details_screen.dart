@@ -38,7 +38,7 @@ class RideDetailsScreen extends StatelessWidget {
   String _formatDate(String? dateStr) {
     if (dateStr == null || dateStr.isEmpty) return '';
     try {
-      final date = DateTime.parse(dateStr);
+      final date = DateTime.parse(dateStr).toLocal();
       return DateFormat('dd MMM yyyy, hh:mm a').format(date);
     } catch (_) {
       if (dateStr.length >= 16) return dateStr.substring(0, 16);
@@ -49,7 +49,7 @@ class RideDetailsScreen extends StatelessWidget {
   String _formatTimeOnly(String? dateStr) {
     if (dateStr == null || dateStr.isEmpty) return '';
     try {
-      final date = DateTime.parse(dateStr);
+      final date = DateTime.parse(dateStr).toLocal();
       return DateFormat('hh:mm a').format(date);
     } catch (_) {
       return '';

@@ -680,6 +680,43 @@ async def list_my_food_orders(
     ]
 
 
+@router.get("/orders/{order_id}/details")
+async def get_my_food_order_details(
+    order_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    cust_q = await db.execute(select(Customer).where(Customer.user_id == user.id))
+    customer = cust_q.scalars().first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    oq = await db.execute(select(FoodOrder).where(FoodOrder.id == order_id, FoodOrder.customer_id == customer.id))
+    order = oq.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    items_q = await db.execute(select(FoodOrderItem).where(FoodOrderItem.order_id == order.id))
+    raw_items = items_q.scalars().all()
+
+    menu_ids = [i.menu_item_id for i in raw_items if i.menu_item_id is not None]
+    menu_by_id = {}
+    if menu_ids:
+        mq = await db.execute(select(MenuItem).where(MenuItem.id.in_(menu_ids)))
+        menu_by_id = {m.id: m for m in mq.scalars().all()}
+
+    items_details = []
+    for it in raw_items:
+        m = menu_by_id.get(it.menu_item_id)
+        items_details.append({
+            "name": m.name if m else "Removed item",
+            "quantity": it.quantity,
+            "price_at_order": float(it.price_at_order)
+        })
+
+    return {"items": items_details}
+
+
 # ---------------------------------------------------------------------------
 # Favorites — per-customer restaurant bookmarks (heart toggle on the home card)
 # ---------------------------------------------------------------------------
