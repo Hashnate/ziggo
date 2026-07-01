@@ -190,9 +190,9 @@ async def _food_order_to_booking_response(db: AsyncSession, order: FoodOrder) ->
     status_map = {
         FoodOrderStatus.PENDING: BookingStatus.SEARCHING,
         FoodOrderStatus.CONFIRMED: BookingStatus.ACCEPTED,
-        FoodOrderStatus.PREPARING: BookingStatus.ACTIVE,
-        FoodOrderStatus.READY_FOR_PICKUP: BookingStatus.ACTIVE,
-        FoodOrderStatus.OUT_FOR_DELIVERY: BookingStatus.ACTIVE,
+        FoodOrderStatus.PREPARING: BookingStatus.STARTED,
+        FoodOrderStatus.READY_FOR_PICKUP: BookingStatus.STARTED,
+        FoodOrderStatus.OUT_FOR_DELIVERY: BookingStatus.STARTED,
         FoodOrderStatus.DELIVERED: BookingStatus.COMPLETED,
         FoodOrderStatus.CANCELLED: BookingStatus.CANCELLED,
     }
@@ -277,7 +277,7 @@ async def _food_order_to_booking_response(db: AsyncSession, order: FoodOrder) ->
         accepted_at=order.confirmed_at,
         started_at=order.picked_up_at,
         completed_at=order.delivered_at,
-        cancelled_at=order.cancelled_at,
+        cancelled_at=None,
         customer_name=cust_name,
         customer_phone=cust_phone,
         driver=driver_obj,
@@ -301,9 +301,9 @@ async def _market_order_to_booking_response(db: AsyncSession, order: MarketOrder
     status_map = {
         MarketOrderStatus.PENDING: BookingStatus.SEARCHING,
         MarketOrderStatus.CONFIRMED: BookingStatus.ACCEPTED,
-        MarketOrderStatus.PREPARING: BookingStatus.ACTIVE,
-        MarketOrderStatus.READY_FOR_PICKUP: BookingStatus.ACTIVE,
-        MarketOrderStatus.OUT_FOR_DELIVERY: BookingStatus.ACTIVE,
+        MarketOrderStatus.PREPARING: BookingStatus.STARTED,
+        MarketOrderStatus.READY_FOR_PICKUP: BookingStatus.STARTED,
+        MarketOrderStatus.OUT_FOR_DELIVERY: BookingStatus.STARTED,
         MarketOrderStatus.DELIVERED: BookingStatus.COMPLETED,
         MarketOrderStatus.CANCELLED: BookingStatus.CANCELLED,
     }
@@ -384,7 +384,7 @@ async def _market_order_to_booking_response(db: AsyncSession, order: MarketOrder
         accepted_at=order.confirmed_at,
         started_at=order.picked_up_at,
         completed_at=order.delivered_at,
-        cancelled_at=order.cancelled_at,
+        cancelled_at=None,
         customer_name=cust_name,
         customer_phone=cust_phone,
         driver=driver_obj,
@@ -1008,7 +1008,8 @@ async def list_my_bookings(
             res.append((m.created_at, await _market_order_to_booking_response(db, m)))
 
         res.sort(key=lambda x: x[0].astimezone(timezone.utc) if x[0] else datetime.min.replace(tzinfo=timezone.utc), reverse=True)
-        return [x[1] for x in res[:limit]]
+        final_res = [x[1] for x in res[:limit]]
+        return final_res
     else:
         q = await db.execute(select(Booking).order_by(Booking.booked_at.desc()).limit(limit))
         bookings = q.scalars().all()

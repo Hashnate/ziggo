@@ -679,12 +679,12 @@
                 var sidebarEl = document.getElementById('sidebarSiteName');
                 if (sidebarEl) sidebarEl.textContent = d.site_name;
               }
-              {% if request.state.admin and request.state.admin.admin_role == 'superadmin' %}
+              /* {% if request.state.admin and request.state.admin.admin_role == 'superadmin' %} */
               if (d.admin_email) {
                 var footerEmailEl = document.getElementById('footerAdminEmail');
                 if (footerEmailEl) footerEmailEl.textContent = d.admin_email;
               }
-              {% endif %}
+              /* {% endif %} */
             })
             .catch(function() {});
         }
