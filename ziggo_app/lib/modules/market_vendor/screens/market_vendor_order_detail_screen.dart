@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -523,22 +528,26 @@ class _MarketVendorOrderDetailScreenState
                         ],
                       ),
           ),
-          _Section(
+        _Section(
             title: 'BILL',
             child: Column(
               children: [
+                _kv(
+                  'Order Value',
+                  'Rs.${(_order['final_amount'] as num? ?? 0).toStringAsFixed(0)}',
+                ),
                 _kv(
                   'Items total',
                   'Rs.${((_order['final_amount'] as num? ?? 0) - (_order['delivery_fee'] as num? ?? 0)).toStringAsFixed(0)}',
                 ),
                 _kv(
-                  'Delivery fee',
-                  'Rs.${(_order['delivery_fee'] as num? ?? 0).toStringAsFixed(0)}',
+                  'Platform Commission (-${(_order['commission_percentage'] as num? ?? 20).toStringAsFixed(0)}%)',
+                  '-Rs.${(((_order['final_amount'] as num? ?? 0) - (_order['delivery_fee'] as num? ?? 0)) * ((_order['commission_percentage'] as num? ?? 20) / 100)).toStringAsFixed(0)}',
                 ),
                 const Divider(height: 18),
                 _kv(
-                  'Total',
-                  'Rs.${(_order['final_amount'] as num? ?? 0).toStringAsFixed(0)}',
+                  'Net Earnings',
+                  'Rs.${(((_order['final_amount'] as num? ?? 0) - (_order['delivery_fee'] as num? ?? 0)) * (1 - ((_order['commission_percentage'] as num? ?? 20) / 100))).toStringAsFixed(0)}',
                   bold: true,
                 ),
                 const SizedBox(height: 6),
@@ -588,6 +597,22 @@ class _MarketVendorOrderDetailScreenState
                     ),
                   ],
                 ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _downloadInvoice,
+                    icon: const Icon(Icons.download_rounded, size: 18),
+                    label: const Text('Download Invoice'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -619,6 +644,105 @@ class _MarketVendorOrderDetailScreenState
         return AppColors.warning;
     }
     return AppColors.textSecondary;
+  }
+
+  Future<void> _downloadInvoice() async {
+    final pdf = pw.Document();
+
+    final imageBytes = await rootBundle.load('assets/images/ziggo.png');
+    final logoImage = pw.MemoryImage(imageBytes.buffer.asUint8List());
+
+    final fmt = NumberFormat.currency(symbol: 'Rs.', decimalDigits: 2);
+    final orderRef = _order['order_ref']?.toString() ?? 'Invoice';
+    final date = _order['created_at']?.toString().substring(0, 16) ?? '';
+    
+    final finalAmount = (_order['final_amount'] as num?)?.toDouble() ?? 0.0;
+    final deliveryFee = (_order['delivery_fee'] as num?)?.toDouble() ?? 0.0;
+    final itemTotal = finalAmount - deliveryFee;
+    final commPct = (_order['commission_percentage'] as num?)?.toDouble() ?? 20.0;
+    final commission = itemTotal * (commPct / 100.0);
+    final netEarnings = itemTotal - commission;
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Center(child: pw.Image(logoImage, height: 60)),
+              pw.SizedBox(height: 20),
+              pw.Header(
+                level: 0,
+                child: pw.Text(
+                  'ZIGGO VENDOR INVOICE',
+                  style: pw.TextStyle(
+                    fontSize: 24,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.blue900,
+                  ),
+                ),
+              ),
+              pw.SizedBox(height: 20),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(
+                    'Order Ref: $orderRef',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                  ),
+                  pw.Text('Date: $date'),
+                ],
+              ),
+              pw.SizedBox(height: 30),
+              pw.Text(
+                'Financial Details',
+                style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.Divider(),
+              pw.SizedBox(height: 10),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Gross Items Total'),
+                  pw.Text(fmt.format(itemTotal)),
+                ],
+              ),
+              pw.SizedBox(height: 5),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Platform Commission (${commPct.toStringAsFixed(1)}%)'),
+                  pw.Text('-${fmt.format(commission)}'),
+                ],
+              ),
+              pw.Divider(),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(
+                    'Net Earnings',
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                  ),
+                  pw.Text(
+                    fmt.format(netEarnings),
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    await Printing.sharePdf(
+      bytes: await pdf.save(),
+      filename: 'ziggo_vendor_invoice_$orderRef.pdf',
+    );
   }
 
   Widget _kv(String k, String v, {bool bold = false}) {

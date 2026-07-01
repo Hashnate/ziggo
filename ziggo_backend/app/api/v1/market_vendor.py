@@ -492,7 +492,7 @@ async def upload_product_image(
 # ---------------------------------------------------------------------------
 
 
-def _order_to_dict(o: MarketOrder, cust_user: Optional[User] = None) -> dict:
+def _order_to_dict(o: MarketOrder, cust_user: Optional[User] = None, comm_pct: float = 20.0) -> dict:
     return {
         "id": o.id,
         "order_ref": o.order_ref,
@@ -502,6 +502,7 @@ def _order_to_dict(o: MarketOrder, cust_user: Optional[User] = None) -> dict:
         "total_amount": float(o.total_amount or 0),
         "delivery_fee": float(o.delivery_fee or 0),
         "final_amount": float(o.final_amount or 0),
+        "commission_percentage": comm_pct,
         "delivery_address": o.delivery_address,
         "delivery_lat": float(o.delivery_lat) if o.delivery_lat is not None else None,
         "delivery_lng": float(o.delivery_lng) if o.delivery_lng is not None else None,
@@ -573,7 +574,8 @@ async def list_my_orders(
         user_by_id = {u.id: u for u in uq.scalars().all()}
         cust_to_user = {c.id: user_by_id.get(c.user_id) for c in customers}
 
-    return [_order_to_dict(o, cust_to_user.get(o.customer_id)) for o in orders]
+    comm_pct = float(v.commission_percentage) if v.commission_percentage is not None else 20.0
+    return [_order_to_dict(o, cust_to_user.get(o.customer_id), comm_pct) for o in orders]
 
 
 async def _load_owner_scoped_order(
@@ -597,7 +599,7 @@ async def get_order_detail(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_role("market_owner", "restaurant_owner")),
 ):
-    _, o = await _load_owner_scoped_order(db, user, order_id)
+    v, o = await _load_owner_scoped_order(db, user, order_id)
 
     items_q = await db.execute(
         select(MarketOrderItem).where(MarketOrderItem.order_id == o.id)
@@ -632,7 +634,8 @@ async def get_order_detail(
             }
         )
 
-    base = _order_to_dict(o, cust_user)
+    comm_pct = float(v.commission_percentage) if v.commission_percentage is not None else 20.0
+    base = _order_to_dict(o, cust_user, comm_pct)
     base["items"] = line_items
     return base
 
@@ -820,8 +823,8 @@ async def _broadcast_market_to_riders(
         max_distance_km=float(delivery.vendor_radius_km(vendor.delivery_radius_km)),
     )
 
-    comm_pct = float(vendor.commission_percentage) if vendor.commission_percentage is not None else 20.0
-    driver_earnings = float(delivery_fee) * (1.0 - comm_pct / 100.0)
+    # Driver earnings = delivery fee * (1 - 0.20)
+    driver_earnings = float(delivery_fee) * 0.80
 
     payload = {
         "is_market": True,
