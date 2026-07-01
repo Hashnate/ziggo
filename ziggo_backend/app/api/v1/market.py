@@ -574,6 +574,42 @@ async def list_my_market_orders(
     ]
 
 
+@router.get("/orders/{order_id}/details")
+async def get_my_market_order_details(
+    order_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    cust_q = await db.execute(select(Customer).where(Customer.user_id == user.id))
+    customer = cust_q.scalars().first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    oq = await db.execute(select(MarketOrder).where(MarketOrder.id == order_id, MarketOrder.customer_id == customer.id))
+    order = oq.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    items_q = await db.execute(select(MarketOrderItem).where(MarketOrderItem.order_id == order.id))
+    raw_items = items_q.scalars().all()
+
+    product_ids = [i.product_id for i in raw_items if i.product_id is not None]
+    product_by_id = {}
+    if product_ids:
+        pq = await db.execute(select(Product).where(Product.id.in_(product_ids)))
+        product_by_id = {p.id: p for p in pq.scalars().all()}
+
+    items_details = []
+    for it in raw_items:
+        p = product_by_id.get(it.product_id)
+        items_details.append({
+            "name": p.name if p else "Removed product",
+            "quantity": it.quantity,
+            "price_at_order": float(it.price_at_order)
+        })
+
+    return {"items": items_details}
+
 # ---------------------------------------------------------------------------
 # Driver dispatch endpoints — mirror /food/orders/{id}/accept|decline|status
 # ---------------------------------------------------------------------------

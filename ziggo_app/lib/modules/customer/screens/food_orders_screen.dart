@@ -5,6 +5,7 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../food_provider.dart';
 import '../food_ui.dart';
+import 'food_order_details_screen.dart';
 import 'food_tracking_screen.dart';
 
 class FoodOrdersScreen extends StatefulWidget {
@@ -147,14 +148,21 @@ class _FoodOrdersScreenState extends State<FoodOrdersScreen> {
                         ],
                       ),
                     ),
-                    trailing: isActive
-                        ? const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary)
-                        : null,
-                    onTap: isActive && ref.isNotEmpty
-                        ? () => Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => FoodTrackingScreen(orderRef: ref)),
-                            )
+                    trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary),
+                    onTap: ref.isNotEmpty
+                        ? () {
+                            if (isActive) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => FoodTrackingScreen(orderRef: ref)),
+                              );
+                            } else {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => FoodOrderDetailsScreen(order: o)),
+                              );
+                            }
+                          }
                         : null,
                   ),
                 );

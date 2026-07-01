@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
-import 'package:flutter/services.dart' show rootBundle;
 
 import '../../../app/app_colors.dart';
 import '../../../core/widgets/motion.dart';
@@ -61,6 +57,17 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
         return Icons.local_shipping_rounded;
       default:
         return Icons.directions_car_rounded;
+    }
+  }
+
+  String _formatDate(String? dateStr) {
+    if (dateStr == null || dateStr.isEmpty) return '';
+    try {
+      final d = DateTime.parse(dateStr).toLocal();
+      return DateFormat('dd MMM yyyy, hh:mm a').format(d);
+    } catch (_) {
+      if (dateStr.length >= 16) return dateStr.substring(0, 16);
+      return dateStr;
     }
   }
 
@@ -138,7 +145,7 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                                     style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
                                   ),
                                   Text(
-                                    r['booked_at']?.toString().substring(0, 16) ?? '',
+                                    _formatDate(r['booked_at']?.toString()),
                                     style: const TextStyle(
                                       fontSize: 11,
                                       color: AppColors.textTertiary,
@@ -373,119 +380,5 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
         ),
       ],
     );
-  }
-
-  Future<void> _downloadInvoice(Map<String, dynamic> r) async {
-    final pdf = pw.Document();
-
-    final imageBytes = await rootBundle.load('assets/images/ziggo.png');
-    final logoImage = pw.MemoryImage(imageBytes.buffer.asUint8List());
-
-    final fmt = NumberFormat.currency(symbol: 'Rs.', decimalDigits: 0);
-    final bookingRef = r['booking_ref']?.toString() ?? 'Invoice';
-    final date = r['booked_at']?.toString().substring(0, 16) ?? '';
-    final pickup = r['pickup_address']?.toString() ?? '';
-    final drop = r['drop_address']?.toString() ?? '';
-    final amount = fmt.format((r['final_amount'] as num?)?.toDouble() ?? 0);
-    final serviceType = (r['service_type'] ?? 'car').toString().toUpperCase();
-    final duration = _formatDuration(r);
-    final distance = _formatDistance(r);
-
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Center(
-                child: pw.Image(logoImage, height: 60),
-              ),
-              pw.SizedBox(height: 20),
-              pw.Header(
-                level: 0,
-                child: pw.Text('ZIGGO INVOICE', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
-              ),
-              pw.SizedBox(height: 20),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('Booking Ref: $bookingRef', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                  pw.Text('Date: $date'),
-                ],
-              ),
-              pw.SizedBox(height: 10),
-              pw.Text('Service: $serviceType'),
-              pw.SizedBox(height: 30),
-              pw.Text('Trip Details', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
-              pw.Divider(),
-              pw.SizedBox(height: 10),
-              pw.Row(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Expanded(
-                    flex: 1,
-                    child: pw.Text('Pickup:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                  ),
-                  pw.Expanded(
-                    flex: 3,
-                    child: pw.Text(pickup),
-                  ),
-                ],
-              ),
-              pw.SizedBox(height: 10),
-              pw.Row(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Expanded(
-                    flex: 1,
-                    child: pw.Text('Dropoff:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                  ),
-                  pw.Expanded(
-                    flex: 3,
-                    child: pw.Text(drop),
-                  ),
-                ],
-              ),
-              pw.SizedBox(height: 30),
-              pw.Text('Summary', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
-              pw.Divider(),
-              pw.SizedBox(height: 10),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('Duration:'),
-                  pw.Text(duration),
-                ],
-              ),
-              pw.SizedBox(height: 10),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('Distance:'),
-                  pw.Text(distance),
-                ],
-              ),
-              pw.SizedBox(height: 20),
-              pw.Divider(thickness: 2),
-              pw.SizedBox(height: 10),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('Total Amount:', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                  pw.Text(amount, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                ],
-              ),
-              pw.Spacer(),
-              pw.Center(
-                child: pw.Text('Thank you for riding with Ziggo!', style: pw.TextStyle(color: PdfColors.grey700, fontStyle: pw.FontStyle.italic)),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-
-    await Printing.sharePdf(bytes: await pdf.save(), filename: 'ziggo_invoice_$bookingRef.pdf');
   }
 }

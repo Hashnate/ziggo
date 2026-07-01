@@ -94,6 +94,17 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
     }
   }
 
+  String _formatDate(String? dateStr) {
+    if (dateStr == null || dateStr.isEmpty) return '';
+    try {
+      final d = DateTime.parse(dateStr).toLocal();
+      return DateFormat('dd MMM yyyy, hh:mm a').format(d);
+    } catch (_) {
+      if (dateStr.length >= 16) return dateStr.substring(0, 16);
+      return dateStr;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Theme(data: driverTheme(context), child: _buildScaffold(context));
@@ -324,10 +335,9 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                             ),
                                           ),
                                           Text(
-                                            r['booked_at']
-                                                    ?.toString()
-                                                    .substring(0, 16) ??
-                                                '',
+                                            _formatDate(
+                                              r['booked_at']?.toString(),
+                                            ),
                                             style: const TextStyle(
                                               fontSize: 11,
                                               color: AppColors.textTertiary,
@@ -594,7 +604,12 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
 
     final fmt = NumberFormat.currency(symbol: 'Rs.', decimalDigits: 2);
     final bookingRef = r['booking_ref']?.toString() ?? 'Invoice';
-    final date = r['booked_at']?.toString().substring(0, 16) ?? '';
+    final dateStr = r['booked_at']?.toString() ?? '';
+    final date = dateStr.isNotEmpty
+        ? DateFormat(
+            'dd MMM yyyy, hh:mm a',
+          ).format(DateTime.parse(dateStr).toLocal())
+        : '';
     final pickup = r['pickup_address']?.toString() ?? '';
     final drop = r['drop_address']?.toString() ?? '';
     final amount = fmt.format(
@@ -605,6 +620,28 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
     final serviceType = _formatServiceType(r['service_type']?.toString(), r);
     final duration = _formatDuration(r);
     final distance = _formatDistance(r);
+
+    final isFood =
+        r['is_food'] == true || serviceType.toLowerCase().contains('food');
+    final isMarket =
+        r['is_market'] == true || serviceType.toLowerCase().contains('market');
+
+    final pickupFee = (r['pickup_fee'] as num?)?.toDouble() ?? 0.0;
+    final boost = (r['boost'] as num?)?.toDouble() ?? 0.0;
+    final grossTotal = (r['fare_amount'] as num?)?.toDouble() ?? 0.0;
+    final distanceFare = grossTotal - pickupFee - boost;
+    final appUsage =
+        (r['app_usage_charges'] as num?)?.toDouble() ??
+        (r['platform_fee'] as num?)?.toDouble() ??
+        0.0;
+    final totalDeductions = (r['deductions'] as num?)?.toDouble() ?? appUsage;
+    final orderValue = (r['final_amount'] as num?)?.toDouble() ?? 0.0;
+    final itemsPrice =
+        (r['items_price'] as num?)?.toDouble() ?? (orderValue - grossTotal);
+    final driverEarnings =
+        (r['driver_earnings'] as num?)?.toDouble() ??
+        (r['final_amount'] as num?)?.toDouble() ??
+        (grossTotal - totalDeductions);
 
     pdf.addPage(
       pw.Page(
@@ -705,54 +742,103 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
               ),
               pw.Divider(),
               pw.SizedBox(height: 10),
-              _pdfBreakdownRow(
-                'Trip Fare / Base Fare',
-                'Rs.${((r['fare_amount'] as num?) ?? 0).toStringAsFixed(2)}',
-              ),
-              if (((r['pickup_fee'] as num?) ?? 0) > 0)
+              if (isFood || isMarket) ...[
                 _pdfBreakdownRow(
-                  '  • Included Pickup Fee',
-                  'Rs.${((r['pickup_fee'] as num?) ?? 0).toStringAsFixed(2)}',
+                  'Pickup fee',
+                  'Rs.${pickupFee.toStringAsFixed(2)}',
                 ),
-              if (((r['boost'] as num?) ?? 0) > 0)
                 _pdfBreakdownRow(
-                  'Boost Incentive (100% to you)',
-                  'Rs.${((r['boost'] as num?) ?? 0).toStringAsFixed(2)}',
+                  'Distance',
+                  'Rs.${distanceFare.toStringAsFixed(2)}',
                 ),
-              if (((r['passenger_deductible'] as num?) ?? 0) > 0)
+                _pdfBreakdownRow('Boost', 'Rs.${boost.toStringAsFixed(2)}'),
+                pw.SizedBox(height: 10),
+                pw.Divider(color: PdfColors.grey300),
+                pw.SizedBox(height: 10),
                 _pdfBreakdownRow(
-                  'Passenger Deductible (Added)',
-                  'Rs.${((r['passenger_deductible'] as num?) ?? 0).toStringAsFixed(2)}',
+                  'Gross Total',
+                  'Rs.${grossTotal.toStringAsFixed(2)}',
+                  isBold: true,
                 ),
-              if (((r['discount_amount'] as num?) ?? 0) > 0)
+                pw.SizedBox(height: 10),
                 _pdfBreakdownRow(
-                  'Promo / Redemption Discount',
-                  'Rs.${((r['discount_amount'] as num?) ?? 0).toStringAsFixed(2)}',
+                  'Apps Usage charges',
+                  'Rs.${appUsage.toStringAsFixed(2)}',
                   isNegative: true,
                 ),
-              _pdfBreakdownRow(
-                'Gross Total',
-                'Rs.${((r['final_amount'] as num?) ?? 0).toStringAsFixed(2)}',
-                isBold: true,
-              ),
-              pw.SizedBox(height: 10),
-              _pdfBreakdownRow(
-                'App Usage Charges (Commission)',
-                'Rs.${((r['app_usage_charges'] as num?) ?? (r['platform_fee'] as num?) ?? 0).toStringAsFixed(2)}',
-                isNegative: true,
-              ),
-              if (((r['passenger_deductible'] as num?) ?? 0) > 0)
                 _pdfBreakdownRow(
-                  'Passenger Deductible (Deducted)',
-                  'Rs.${((r['passenger_deductible'] as num?) ?? 0).toStringAsFixed(2)}',
+                  'Deductions',
+                  'Rs.${totalDeductions.toStringAsFixed(2)}',
+                  isBold: true,
                   isNegative: true,
                 ),
-              _pdfBreakdownRow(
-                'Total Deductions',
-                'Rs.${((r['deductions'] as num?) ?? 0).toStringAsFixed(2)}',
-                isNegative: true,
-                isBold: true,
-              ),
+                pw.SizedBox(height: 10),
+                _pdfBreakdownRow(
+                  'Your earnings',
+                  'Rs.${driverEarnings.toStringAsFixed(2)}',
+                  isBold: true,
+                ),
+                pw.SizedBox(height: 10),
+                pw.Divider(color: PdfColors.grey300),
+                pw.SizedBox(height: 10),
+                _pdfBreakdownRow(
+                  'Order value',
+                  'Rs.${orderValue.toStringAsFixed(2)}',
+                ),
+                _pdfBreakdownRow(
+                  isFood ? 'Food' : 'Market Items',
+                  'Rs.${itemsPrice.toStringAsFixed(2)}',
+                ),
+              ] else ...[
+                _pdfBreakdownRow(
+                  'Trip Fare / Base Fare',
+                  'Rs.${((r['fare_amount'] as num?) ?? 0).toStringAsFixed(2)}',
+                ),
+                if (((r['pickup_fee'] as num?) ?? 0) > 0)
+                  _pdfBreakdownRow(
+                    '  • Included Pickup Fee',
+                    'Rs.${((r['pickup_fee'] as num?) ?? 0).toStringAsFixed(2)}',
+                  ),
+                if (((r['boost'] as num?) ?? 0) > 0)
+                  _pdfBreakdownRow(
+                    'Boost Incentive (100% to you)',
+                    'Rs.${((r['boost'] as num?) ?? 0).toStringAsFixed(2)}',
+                  ),
+                if (((r['passenger_deductible'] as num?) ?? 0) > 0)
+                  _pdfBreakdownRow(
+                    'Passenger Deductible (Added)',
+                    'Rs.${((r['passenger_deductible'] as num?) ?? 0).toStringAsFixed(2)}',
+                  ),
+                if (((r['discount_amount'] as num?) ?? 0) > 0)
+                  _pdfBreakdownRow(
+                    'Promo / Redemption Discount',
+                    'Rs.${((r['discount_amount'] as num?) ?? 0).toStringAsFixed(2)}',
+                    isNegative: true,
+                  ),
+                _pdfBreakdownRow(
+                  'Gross Total',
+                  'Rs.${((r['final_amount'] as num?) ?? 0).toStringAsFixed(2)}',
+                  isBold: true,
+                ),
+                pw.SizedBox(height: 10),
+                _pdfBreakdownRow(
+                  'App Usage Charges (Commission)',
+                  'Rs.${((r['app_usage_charges'] as num?) ?? (r['platform_fee'] as num?) ?? 0).toStringAsFixed(2)}',
+                  isNegative: true,
+                ),
+                if (((r['passenger_deductible'] as num?) ?? 0) > 0)
+                  _pdfBreakdownRow(
+                    'Passenger Deductible (Deducted)',
+                    'Rs.${((r['passenger_deductible'] as num?) ?? 0).toStringAsFixed(2)}',
+                    isNegative: true,
+                  ),
+                _pdfBreakdownRow(
+                  'Total Deductions',
+                  'Rs.${((r['deductions'] as num?) ?? 0).toStringAsFixed(2)}',
+                  isNegative: true,
+                  isBold: true,
+                ),
+              ],
               pw.SizedBox(height: 10),
               pw.Divider(thickness: 2),
               pw.SizedBox(height: 10),
