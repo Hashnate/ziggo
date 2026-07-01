@@ -258,7 +258,13 @@ async def list_restaurants(
         )
     if q and q.strip():
         like = f"%{q.strip()}%"
-        stmt = stmt.where(or_(Restaurant.name.ilike(like), Restaurant.cuisine.ilike(like)))
+        stmt = stmt.where(
+            or_(
+                Restaurant.name.ilike(like),
+                Restaurant.cuisine.ilike(like),
+                Restaurant.items.any(MenuItem.name.ilike(like))
+            )
+        )
 
     rows = (await db.execute(stmt.order_by(Restaurant.id))).scalars().all()
 

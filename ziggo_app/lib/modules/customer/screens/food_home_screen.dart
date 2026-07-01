@@ -55,7 +55,7 @@ class FoodHomeScreen extends StatefulWidget {
 }
 
 class _FoodHomeScreenState extends State<FoodHomeScreen> {
-  String _filter = '';
+  final TextEditingController _searchCtrl = TextEditingController();
   final PageController _bannerController = PageController(viewportFraction: 0.93);
   Timer? _bannerTimer;
 
@@ -110,21 +110,14 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
   void dispose() {
     _bannerTimer?.cancel();
     _bannerController.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final p = context.watch<FoodProvider>();
-
-    var list = p.restaurants;
-    final filtered = _filter.isEmpty
-        ? list
-        : list
-            .where((r) =>
-                r['name'].toString().toLowerCase().contains(_filter) ||
-                (r['cuisine']?.toString().toLowerCase() ?? '').contains(_filter))
-            .toList();
+    final filtered = p.restaurants;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -348,6 +341,7 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
   }
 
   Widget _buildSearchBar() {
+    final food = context.read<FoodProvider>();
     return SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -358,18 +352,35 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
             borderRadius: BorderRadius.circular(AppStyles.radiusSm),
             boxShadow: AppStyles.shadowSm,
           ),
-          child: TextField(
-            onChanged: (v) => setState(() => _filter = v.trim().toLowerCase()),
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search_rounded, color: AppColors.textTertiary),
-              hintText: 'Search Pizza 🍕, Rice & Curry 🍛, Doughnut 🍩',
-              hintStyle: TextStyle(fontWeight: FontWeight.w500, color: AppColors.textTertiary, fontSize: 13),
-              filled: false,
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-            ),
+          child: Row(
+            children: [
+              const Icon(Icons.search_rounded, color: AppColors.textTertiary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _searchCtrl,
+                  onChanged: (v) => food.setSearchQuery(v),
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                  decoration: const InputDecoration(
+                    hintText: 'Search Pizza 🍕, Rice & Curry 🍛, Doughnut 🍩',
+                    hintStyle: TextStyle(fontWeight: FontWeight.w500, color: AppColors.textTertiary, fontSize: 13),
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                  ),
+                ),
+              ),
+              if (_searchCtrl.text.isNotEmpty)
+                GestureDetector(
+                  onTap: () {
+                    _searchCtrl.clear();
+                    food.setSearchQuery('');
+                    FocusScope.of(context).unfocus();
+                  },
+                  child: const Icon(Icons.close_rounded, color: AppColors.textTertiary, size: 20),
+                ),
+            ],
           ),
         ),
       ),

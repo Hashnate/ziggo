@@ -388,6 +388,30 @@ class DriverRideDetailsScreen extends StatelessWidget {
 
             const SizedBox(height: 32),
 
+            // --- BRANDING ---
+            Center(
+              child: Column(
+                children: [
+                  Image.asset(
+                    'assets/images/ziggo.png',
+                    height: 60,
+                    fit: BoxFit.contain,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Thanks for choosing Ziggo',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black54,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
             // --- TRIP REF INFO ---
             Center(
               child: Text('Trip ID: $bookingRef', style: const TextStyle(fontSize: 12, color: Colors.black38, fontWeight: FontWeight.w600)),
