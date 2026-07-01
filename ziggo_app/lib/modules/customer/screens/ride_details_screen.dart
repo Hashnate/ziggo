@@ -605,6 +605,30 @@ class RideDetailsScreen extends StatelessWidget {
             
             const SizedBox(height: 32),
             
+            // --- BRANDING ---
+            Center(
+              child: Column(
+                children: [
+                  Image.asset(
+                    'assets/images/ziggo.png',
+                    height: 60,
+                    fit: BoxFit.contain,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Thanks for choosing Ziggo',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black54,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 24),
+            
             // --- CUSTOMER & TRIP REF INFO ---
             Center(
               child: Column(

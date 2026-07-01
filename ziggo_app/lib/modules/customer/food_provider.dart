@@ -27,6 +27,9 @@ class FoodProvider extends ChangeNotifier {
   double? _deliveryLat;
   double? _deliveryLng;
 
+  // Active search query for filtering restaurants/menu items
+  String _searchQuery = '';
+
   /// Cart keyed by menu_item_id: { menu_item_id: {item, quantity} }
   final Map<int, Map<String, dynamic>> _cart = {};
   int? _activeRestaurantId;
@@ -48,6 +51,7 @@ class FoodProvider extends ChangeNotifier {
   Map<int, Map<String, dynamic>> get cart => _cart;
   int? get activeRestaurantId => _activeRestaurantId;
   Map<String, dynamic>? get activeRestaurant => _activeRestaurant;
+  String get searchQuery => _searchQuery;
 
   bool isFavorite(int id) => _favoriteIds.contains(id);
 
@@ -77,6 +81,12 @@ class FoodProvider extends ChangeNotifier {
     } on DioException {
       // ignore — keep whatever we have
     }
+  }
+
+  void setSearchQuery(String query) {
+    _searchQuery = query;
+    notifyListeners();
+    fetchRestaurants();
   }
 
   void setDeliveryLocation({
@@ -119,6 +129,9 @@ class FoodProvider extends ChangeNotifier {
       if (_deliveryLat != null && _deliveryLng != null) {
         qp['lat'] = _deliveryLat;
         qp['lng'] = _deliveryLng;
+      }
+      if (_searchQuery.trim().isNotEmpty) {
+        qp['q'] = _searchQuery.trim();
       }
       final resp = await ApiClient.instance.dio.get(
         '/food/restaurants',
