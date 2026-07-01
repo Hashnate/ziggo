@@ -22,6 +22,10 @@ from ...models import (
     CustomerCard,
     Payment,
     SystemSettings,
+    FoodOrder,
+    FoodOrderStatus,
+    MarketOrder,
+    MarketOrderStatus,
 )
 from ...schemas import (
     FareEstimateRequest,
@@ -106,6 +110,7 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
             "vehicle_type": b.driver.vehicle_type,
             "vehicle_number": b.driver.vehicle_number,
             "vehicle_model": b.driver.vehicle_model,
+            "vehicle_color": b.driver.vehicle_color,
             "phone_number": b.driver.user.phone_number if b.driver.user else None,
             "current_lat": float(b.driver.current_lat) if b.driver.current_lat else None,
             "current_lng": float(b.driver.current_lng) if b.driver.current_lng else None,
@@ -174,6 +179,202 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
             }
             for s in (b.stops or [])
         ],
+    )
+
+
+async def _food_order_to_booking_response(db: AsyncSession, order: FoodOrder) -> BookingResponse:
+    from sqlalchemy.orm import selectinload
+    from ...services.finance_service import _food_split
+    from ...services.fare_service import haversine_km
+
+    status_map = {
+        FoodOrderStatus.PENDING: BookingStatus.SEARCHING,
+        FoodOrderStatus.CONFIRMED: BookingStatus.ACCEPTED,
+        FoodOrderStatus.PREPARING: BookingStatus.ACTIVE,
+        FoodOrderStatus.READY_FOR_PICKUP: BookingStatus.ACTIVE,
+        FoodOrderStatus.OUT_FOR_DELIVERY: BookingStatus.ACTIVE,
+        FoodOrderStatus.DELIVERED: BookingStatus.COMPLETED,
+        FoodOrderStatus.CANCELLED: BookingStatus.CANCELLED,
+    }
+    booking_status = status_map.get(order.status, BookingStatus.SEARCHING)
+
+    dist_km = 0.0
+    if order.restaurant.lat is not None and order.restaurant.lng is not None and order.delivery_lat is not None and order.delivery_lng is not None:
+        dist_km = haversine_km(float(order.restaurant.lat), float(order.restaurant.lng), float(order.delivery_lat), float(order.delivery_lng))
+
+    duration_min = 0
+    if order.delivered_at and order.picked_up_at:
+        duration_min = int((order.delivered_at - order.picked_up_at).total_seconds() / 60)
+
+    try:
+        keep, cut = _food_split(order)
+    except Exception:
+        keep, cut = order.delivery_fee or 0, 0
+
+    driver_obj = None
+    if order.driver:
+        trip_count_q = await db.execute(
+            select(func.count(Booking.id)).where(
+                Booking.driver_id == order.driver.id,
+                Booking.status == BookingStatus.COMPLETED
+            )
+        )
+        actual_trips = trip_count_q.scalar() or 0
+
+        driver_obj = {
+            "id": order.driver.id,
+            "full_name": order.driver.user.full_name if order.driver.user else None,
+            "rating": float(order.driver.user.rating) if order.driver.user and order.driver.user.rating else None,
+            "vehicle_type": order.driver.vehicle_type,
+            "vehicle_number": order.driver.vehicle_number,
+            "vehicle_model": order.driver.vehicle_model,
+            "phone_number": order.driver.user.phone_number if order.driver.user else None,
+            "current_lat": float(order.driver.current_lat) if order.driver.current_lat else None,
+            "current_lng": float(order.driver.current_lng) if order.driver.current_lng else None,
+            "current_heading": float(order.driver.current_heading) if order.driver.current_heading is not None else 0.0,
+            "profile_photo": order.driver.user.profile_photo if order.driver.user else None,
+            "completed_trips": actual_trips,
+        }
+
+    cust_name = order.customer.user.full_name if order.customer and order.customer.user else None
+    cust_phone = order.customer.user.phone_number if order.customer and order.customer.user else None
+
+    pickup_fee = float(order.restaurant.pickup_fee) if order.restaurant.pickup_fee is not None else 70.0
+    boost = float(order.restaurant.boost) if order.restaurant.boost is not None else 0.0
+
+    return BookingResponse(
+        id=order.id,
+        booking_ref=order.order_ref,
+        status=booking_status,
+        service_type="food",
+        trip_type="one_way",
+        pickup_lat=float(order.restaurant.lat) if order.restaurant.lat is not None else 0.0,
+        pickup_lng=float(order.restaurant.lng) if order.restaurant.lng is not None else 0.0,
+        pickup_address=order.restaurant.address or order.restaurant.name,
+        drop_lat=float(order.delivery_lat) if order.delivery_lat is not None else 0.0,
+        drop_lng=float(order.delivery_lng) if order.delivery_lng is not None else 0.0,
+        drop_address=order.delivery_address,
+        distance_km=float(dist_km),
+        duration_min=duration_min,
+        fare_amount=float(order.delivery_fee or 0),
+        discount_amount=float(order.discount_amount or 0),
+        final_amount=float(order.final_amount or 0),
+        payment_method=order.payment_method,
+        payment_status=order.payment_status,
+        booked_at=order.created_at,
+        accepted_at=order.confirmed_at,
+        started_at=order.picked_up_at,
+        completed_at=order.delivered_at,
+        cancelled_at=order.cancelled_at,
+        customer_name=cust_name,
+        customer_phone=cust_phone,
+        driver=driver_obj,
+        pickup_fee=pickup_fee,
+        boost=boost,
+        passenger_deductible=0.0,
+        app_usage_charges=float(cut),
+        deductions=float(cut),
+        driver_earnings=float(keep),
+        is_food=True,
+        is_market=False,
+        items_price=float(order.total_amount or 0),
+        restaurant_name=order.restaurant.name,
+        stops=[]
+    )
+
+
+async def _market_order_to_booking_response(db: AsyncSession, order: MarketOrder) -> BookingResponse:
+    from ...services.finance_service import _market_split
+
+    status_map = {
+        MarketOrderStatus.PENDING: BookingStatus.SEARCHING,
+        MarketOrderStatus.CONFIRMED: BookingStatus.ACCEPTED,
+        MarketOrderStatus.PREPARING: BookingStatus.ACTIVE,
+        MarketOrderStatus.READY_FOR_PICKUP: BookingStatus.ACTIVE,
+        MarketOrderStatus.OUT_FOR_DELIVERY: BookingStatus.ACTIVE,
+        MarketOrderStatus.DELIVERED: BookingStatus.COMPLETED,
+        MarketOrderStatus.CANCELLED: BookingStatus.CANCELLED,
+    }
+    booking_status = status_map.get(order.status, BookingStatus.SEARCHING)
+
+    duration_min = 0
+    if order.delivered_at and order.picked_up_at:
+        duration_min = int((order.delivered_at - order.picked_up_at).total_seconds() / 60)
+
+    try:
+        keep, cut = _market_split(order)
+    except Exception:
+        keep, cut = order.delivery_fee or 0, 0
+
+    driver_obj = None
+    if order.driver:
+        trip_count_q = await db.execute(
+            select(func.count(Booking.id)).where(
+                Booking.driver_id == order.driver.id,
+                Booking.status == BookingStatus.COMPLETED
+            )
+        )
+        actual_trips = trip_count_q.scalar() or 0
+
+        driver_obj = {
+            "id": order.driver.id,
+            "full_name": order.driver.user.full_name if order.driver.user else None,
+            "rating": float(order.driver.user.rating) if order.driver.user and order.driver.user.rating else None,
+            "vehicle_type": order.driver.vehicle_type,
+            "vehicle_number": order.driver.vehicle_number,
+            "vehicle_model": order.driver.vehicle_model,
+            "phone_number": order.driver.user.phone_number if order.driver.user else None,
+            "current_lat": float(order.driver.current_lat) if order.driver.current_lat else None,
+            "current_lng": float(order.driver.current_lng) if order.driver.current_lng else None,
+            "current_heading": float(order.driver.current_heading) if order.driver.current_heading is not None else 0.0,
+            "profile_photo": order.driver.user.profile_photo if order.driver.user else None,
+            "completed_trips": actual_trips,
+        }
+
+    cust_name = order.customer.user.full_name if order.customer and order.customer.user else None
+    cust_phone = order.customer.user.phone_number if order.customer and order.customer.user else None
+
+    pickup_fee = float(order.vendor.pickup_fee) if order.vendor.pickup_fee is not None else 70.0
+    boost = float(order.vendor.boost) if order.vendor.boost is not None else 0.0
+
+    return BookingResponse(
+        id=order.id,
+        booking_ref=order.order_ref,
+        status=booking_status,
+        service_type="market",
+        trip_type="one_way",
+        pickup_lat=float(order.vendor.lat) if order.vendor.lat is not None else 0.0,
+        pickup_lng=float(order.vendor.lng) if order.vendor.lng is not None else 0.0,
+        pickup_address=order.vendor.address or order.vendor.name,
+        drop_lat=float(order.delivery_lat) if order.delivery_lat is not None else 0.0,
+        drop_lng=float(order.delivery_lng) if order.delivery_lng is not None else 0.0,
+        drop_address=order.delivery_address,
+        distance_km=float(order.delivery_distance_km) if order.delivery_distance_km else 0.0,
+        duration_min=duration_min,
+        fare_amount=float(order.delivery_fee or 0),
+        discount_amount=float(order.discount_amount or order.redeem_discount or 0),
+        final_amount=float(order.final_amount or 0),
+        payment_method=order.payment_method,
+        payment_status=order.payment_status,
+        booked_at=order.created_at,
+        accepted_at=order.confirmed_at,
+        started_at=order.picked_up_at,
+        completed_at=order.delivered_at,
+        cancelled_at=order.cancelled_at,
+        customer_name=cust_name,
+        customer_phone=cust_phone,
+        driver=driver_obj,
+        pickup_fee=pickup_fee,
+        boost=boost,
+        passenger_deductible=0.0,
+        app_usage_charges=float(cut),
+        deductions=float(cut),
+        driver_earnings=float(keep),
+        is_food=False,
+        is_market=True,
+        items_price=float(order.total_amount or 0),
+        vendor_name=order.vendor.name,
+        stops=[]
     )
 
 
@@ -752,11 +953,48 @@ async def list_my_bookings(
             .order_by(Booking.booked_at.desc())
             .limit(limit)
         )
+        bookings = q.scalars().all()
+
+        fq = await db.execute(
+            select(FoodOrder)
+            .options(
+                selectinload(FoodOrder.restaurant),
+                selectinload(FoodOrder.customer).selectinload(Customer.user),
+                selectinload(FoodOrder.driver).selectinload(Driver.user)
+            )
+            .where(FoodOrder.driver_id == driver.id)
+            .order_by(FoodOrder.created_at.desc())
+            .limit(limit)
+        )
+        foods = fq.scalars().all()
+
+        mq = await db.execute(
+            select(MarketOrder)
+            .options(
+                selectinload(MarketOrder.vendor),
+                selectinload(MarketOrder.customer).selectinload(Customer.user),
+                selectinload(MarketOrder.driver).selectinload(Driver.user)
+            )
+            .where(MarketOrder.driver_id == driver.id)
+            .order_by(MarketOrder.created_at.desc())
+            .limit(limit)
+        )
+        markets = mq.scalars().all()
+
+        res = []
+        for b in bookings:
+            res.append((b.booked_at, await _booking_to_response(db, b)))
+        for f in foods:
+            res.append((f.created_at, await _food_order_to_booking_response(db, f)))
+        for m in markets:
+            res.append((m.created_at, await _market_order_to_booking_response(db, m)))
+
+        res.sort(key=lambda x: x[0].astimezone(timezone.utc) if x[0] else datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+        return [x[1] for x in res[:limit]]
     else:
         q = await db.execute(select(Booking).order_by(Booking.booked_at.desc()).limit(limit))
-
-    bookings = q.scalars().all()
-    return [await _booking_to_response(db, b) for b in bookings]
+        bookings = q.scalars().all()
+        return [await _booking_to_response(db, b) for b in bookings]
 
 
 @router.get("/active", response_model=Optional[BookingResponse])

@@ -120,6 +120,7 @@ class DriverMini(BaseModel):
     vehicle_number: Optional[str] = None
     vehicle_model: Optional[str] = None
     phone_number: Optional[str] = None
+    vehicle_color: Optional[str] = None
     current_lat: Optional[float] = None
     current_lng: Optional[float] = None
     current_heading: Optional[float] = None
@@ -194,6 +195,13 @@ class BookingResponse(BaseModel):
     deductions: Optional[float] = 0
     driver_earnings: Optional[float] = 0
     stops: List[dict] = Field(default_factory=list)
+
+    # Food/Market specific fields
+    is_food: bool = False
+    is_market: bool = False
+    items_price: Optional[float] = None
+    restaurant_name: Optional[str] = None
+    vendor_name: Optional[str] = None
 
     class Config:
         from_attributes = True
