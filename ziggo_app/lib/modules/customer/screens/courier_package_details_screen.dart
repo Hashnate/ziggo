@@ -33,47 +33,42 @@ class CourierPackageDetailsScreen extends StatefulWidget {
 
 class _CourierPackageDetailsScreenState extends State<CourierPackageDetailsScreen> {
   final List<PackageDetail> _packages = [PackageDetail()];
-  double? _maxWeight = 15.0; // Default until fetched, null means no limit
+  double _maxWeight = 15.0; // Default, updated from backend tiers
   bool _isLoadingTiers = true;
 
   @override
   void initState() {
     super.initState();
-    _fetchMaxWeight();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchMaxWeight();
+    });
   }
 
   Future<void> _fetchMaxWeight() async {
-    // Tiers are shared for both flash and courier
     try {
-      // Using provider pattern although we don't strictly need it in the tree here
       final provider = Provider.of<BookingProvider>(context, listen: false);
       final tiers = await provider.fetchFlashTiers();
       if (tiers.isNotEmpty) {
-        bool hasOpenEnded = false;
         double highestMax = 0;
         for (var t in tiers) {
           if (t['max_weight_kg'] == null) {
-            hasOpenEnded = true;
-            break;
+            // open-ended top tier — no max cap; use the highest defined value
+            continue;
           }
           final maxW = (t['max_weight_kg'] as num).toDouble();
           if (maxW > highestMax) highestMax = maxW;
         }
         if (mounted) {
           setState(() {
-            _maxWeight = hasOpenEnded ? null : highestMax;
+            if (highestMax > 0) _maxWeight = highestMax;
             _isLoadingTiers = false;
           });
         }
       } else {
-        if (mounted) {
-          setState(() => _isLoadingTiers = false);
-        }
+        if (mounted) setState(() => _isLoadingTiers = false);
       }
     } catch (_) {
-      if (mounted) {
-        setState(() => _isLoadingTiers = false);
-      }
+      if (mounted) setState(() => _isLoadingTiers = false);
     }
   }
 
@@ -274,9 +269,9 @@ class _CourierPackageDetailsScreenState extends State<CourierPackageDetailsScree
                             ),
                             if (_isLoadingTiers)
                               const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                            else if (_maxWeight != null)
+                            else
                               Text(
-                                'Max: ${_maxWeight!.toStringAsFixed(0)}Kg',
+                                'Max: ${_maxWeight.toStringAsFixed(0)}Kg',
                                 style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.bold),
                               ),
                             if (_packages.length > 1) ...[
@@ -308,7 +303,7 @@ class _CourierPackageDetailsScreenState extends State<CourierPackageDetailsScree
                                     TextInputFormatter.withFunction((oldValue, newValue) {
                                       if (newValue.text.isEmpty) return newValue;
                                       final double? val = double.tryParse(newValue.text);
-                                      if (val == null || (_maxWeight != null && val > _maxWeight!) || val < 0) {
+                                      if (val == null || val > _maxWeight || val < 0) {
                                         return oldValue;
                                       }
                                       return newValue;
