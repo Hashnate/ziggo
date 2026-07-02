@@ -41,6 +41,8 @@ class _FlashTrackingScreenState extends State<FlashTrackingScreen> {
   LatLng? _customerLatLng;
   double? _customerHeading;
 
+  bool _isCollapsed = false;
+
   @override
   void initState() {
     super.initState();
@@ -422,262 +424,303 @@ class _FlashTrackingScreenState extends State<FlashTrackingScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Center(
-                        child: Container(
-                          width: 44,
-                          height: 5,
-                          decoration: BoxDecoration(
-                            color: AppColors.divider,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      // Status header
-                      Row(
-                        children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: meta.color.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Icon(meta.icon, color: meta.color),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  meta.label,
-                                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
-                                ),
-                                if (meta.hint.isNotEmpty)
-                                  Text(
-                                    meta.hint,
-                                    style: const TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      // Stage timeline (dotted line + 5 dots)
-                      _StageTimeline(currentStage: currentStage, stages: _stages),
-                      const SizedBox(height: 16),
-                      // Parcel card
-                      if (isParcel)
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.06),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.primary.withOpacity(0.15)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'PARCEL DETAILS',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: AppColors.textTertiary,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 1.4,
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _isCollapsed = !_isCollapsed;
+                          });
+                        },
+                        onVerticalDragEnd: (details) {
+                          if (details.primaryVelocity != null) {
+                            if (details.primaryVelocity! > 0) {
+                              setState(() => _isCollapsed = true);
+                            } else if (details.primaryVelocity! < 0) {
+                              setState(() => _isCollapsed = false);
+                            }
+                          }
+                        },
+                        behavior: HitTestBehavior.opaque,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Center(
+                              child: Container(
+                                width: 44,
+                                height: 5,
+                                decoration: BoxDecoration(
+                                  color: AppColors.divider,
+                                  borderRadius: BorderRadius.circular(10),
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 40,
-                                    height: 40,
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: const Icon(
-                                      Icons.inventory_2_rounded,
-                                      color: Colors.white,
-                                      size: 20,
-                                    ),
+                            ),
+                            const SizedBox(height: 16),
+                            // Status header
+                            Row(
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: meta.color.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(14),
                                   ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          parcelType.toUpperCase(),
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w900,
-                                            fontSize: 13,
-                                            letterSpacing: 0.4,
-                                          ),
-                                        ),
-                                        Text(
-                                          parcelWeight != null
-                                              ? '${parcelWeight.toString()} kg'
-                                              : '— kg',
-                                          style: const TextStyle(
-                                            color: AppColors.textSecondary,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                  child: Icon(meta.icon, color: meta.color),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        receiverName,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 13,
+                                        meta.label,
+                                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
+                                      ),
+                                      if (meta.hint.isNotEmpty)
+                                        Text(
+                                          meta.hint,
+                                          style: const TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                Icon(
+                                  _isCollapsed
+                                      ? Icons.keyboard_arrow_up_rounded
+                                      : Icons.keyboard_arrow_down_rounded,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeInOut,
+                        child: _isCollapsed
+                            ? const SizedBox.shrink()
+                            : Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 14),
+                                  // Stage timeline (dotted line + 5 dots)
+                                  _StageTimeline(currentStage: currentStage, stages: _stages),
+                                  const SizedBox(height: 16),
+                                  // Parcel card
+                                  if (isParcel)
+                                    Container(
+                                      padding: const EdgeInsets.all(14),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withOpacity(0.06),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(color: AppColors.primary.withOpacity(0.15)),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'PARCEL DETAILS',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: AppColors.textTertiary,
+                                              fontWeight: FontWeight.w900,
+                                              letterSpacing: 1.4,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Row(
+                                            children: [
+                                              Container(
+                                                width: 40,
+                                                height: 40,
+                                                alignment: Alignment.center,
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.primary,
+                                                  borderRadius: BorderRadius.circular(12),
+                                                ),
+                                                child: const Icon(
+                                                  Icons.inventory_2_rounded,
+                                                  color: Colors.white,
+                                                  size: 20,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      parcelType.toUpperCase(),
+                                                      style: const TextStyle(
+                                                        fontWeight: FontWeight.w900,
+                                                        fontSize: 13,
+                                                        letterSpacing: 0.4,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      parcelWeight != null
+                                                          ? '${parcelWeight.toString()} kg'
+                                                          : '— kg',
+                                                      style: const TextStyle(
+                                                        color: AppColors.textSecondary,
+                                                        fontSize: 11,
+                                                        fontWeight: FontWeight.w700,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              Column(
+                                                crossAxisAlignment: CrossAxisAlignment.end,
+                                                children: [
+                                                  Text(
+                                                    receiverName,
+                                                    style: const TextStyle(
+                                                      fontWeight: FontWeight.w900,
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    receiverPhone ?? '',
+                                                    style: const TextStyle(
+                                                      color: AppColors.textSecondary,
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w700,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(width: 8),
+                                              if (receiverPhone != null && receiverPhone.isNotEmpty)
+                                                GestureDetector(
+                                                  onTap: () => _callReceiver(receiverPhone),
+                                                  child: Container(
+                                                    width: 36,
+                                                    height: 36,
+                                                    alignment: Alignment.center,
+                                                    decoration: const BoxDecoration(
+                                                      color: AppColors.success,
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                    child: const Icon(
+                                                      Icons.phone_rounded,
+                                                      color: Colors.white,
+                                                      size: 16,
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                          if ((active['parcel_instructions'] ?? '').toString().isNotEmpty) ...[
+                                            const SizedBox(height: 8),
+                                            Container(
+                                              padding: const EdgeInsets.all(10),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                borderRadius: BorderRadius.circular(10),
+                                              ),
+                                              child: Row(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  const Icon(
+                                                    Icons.notes_rounded,
+                                                    size: 14,
+                                                    color: AppColors.textSecondary,
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  Expanded(
+                                                    child: Text(
+                                                      active['parcel_instructions'].toString(),
+                                                      style: const TextStyle(
+                                                        fontSize: 12,
+                                                        color: AppColors.textSecondary,
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                  const SizedBox(height: 12),
+                                  // Booking ref pill + cancel/fare row
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.surfaceMuted,
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(
+                                              Icons.receipt_long_rounded,
+                                              size: 13,
+                                              color: AppColors.textSecondary,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              active['booking_ref']?.toString() ?? '',
+                                              style: const TextStyle(
+                                                color: AppColors.textSecondary,
+                                                fontWeight: FontWeight.w900,
+                                                fontSize: 11,
+                                                letterSpacing: 0.5,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
+                                      const Spacer(),
                                       Text(
-                                        receiverPhone ?? '',
+                                        'Rs.${(active['final_amount'] ?? 0).toString()}',
                                         style: const TextStyle(
-                                          color: AppColors.textSecondary,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 18,
                                         ),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(width: 8),
-                                  if (receiverPhone != null && receiverPhone.isNotEmpty)
+                                  const SizedBox(height: 12),
+                                  // Cancel button if applicable
+                                  if (status == 'searching' || status == 'accepted')
                                     GestureDetector(
-                                      onTap: () => _callReceiver(receiverPhone),
+                                      onTap: () async {
+                                        await context.read<BookingProvider>().cancelActive();
+                                        if (context.mounted) Navigator.pop(context);
+                                      },
                                       child: Container(
-                                        width: 36,
-                                        height: 36,
+                                        padding: const EdgeInsets.symmetric(vertical: 14),
                                         alignment: Alignment.center,
-                                        decoration: const BoxDecoration(
-                                          color: AppColors.success,
-                                          shape: BoxShape.circle,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.error.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(14),
                                         ),
-                                        child: const Icon(
-                                          Icons.phone_rounded,
-                                          color: Colors.white,
-                                          size: 16,
+                                        child: const Text(
+                                          'CANCEL DELIVERY',
+                                          style: TextStyle(
+                                            color: AppColors.error,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 0.8,
+                                          ),
                                         ),
                                       ),
                                     ),
                                 ],
                               ),
-                              if ((active['parcel_instructions'] ?? '').toString().isNotEmpty) ...[
-                                const SizedBox(height: 8),
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Icon(
-                                        Icons.notes_rounded,
-                                        size: 14,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: Text(
-                                          active['parcel_instructions'].toString(),
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: AppColors.textSecondary,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      const SizedBox(height: 12),
-                      // Booking ref pill + cancel/fare row
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceMuted,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.receipt_long_rounded,
-                                  size: 13,
-                                  color: AppColors.textSecondary,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  active['booking_ref']?.toString() ?? '',
-                                  style: const TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 11,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            'Rs.${(active['final_amount'] ?? 0).toString()}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ],
                       ),
-                      const SizedBox(height: 12),
-                      // Cancel button if applicable
-                      if (status == 'searching' || status == 'accepted')
-                        GestureDetector(
-                          onTap: () async {
-                            await context.read<BookingProvider>().cancelActive();
-                            if (context.mounted) Navigator.pop(context);
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: AppColors.error.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Text(
-                              'CANCEL DELIVERY',
-                              style: TextStyle(
-                                color: AppColors.error,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.8,
-                              ),
-                            ),
-                          ),
-                        ),
                     ],
                   ),
                 ),

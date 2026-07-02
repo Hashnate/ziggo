@@ -537,9 +537,7 @@ class _MarketVendorOrderDetailScreenState
                         children: [
                           for (final it in _lineItems) _LineItemRow(line: it),
                         ],
-                      ),
-          ),
-        _Section(
+                            _Section(
             title: 'BILL',
             child: Column(
               children: [
@@ -548,11 +546,15 @@ class _MarketVendorOrderDetailScreenState
                   'Rs.${(_order['final_amount'] as num? ?? 0).toStringAsFixed(0)}',
                 ),
                 _kv(
+                  'Delivery Fee',
+                  '-Rs.${(_order['delivery_fee'] as num? ?? 0).toStringAsFixed(0)}',
+                ),
+                _kv(
                   'Items total',
                   'Rs.${((_order['final_amount'] as num? ?? 0) - (_order['delivery_fee'] as num? ?? 0)).toStringAsFixed(0)}',
                 ),
                 _kv(
-                  'Platform Commission (-${(_order['commission_percentage'] as num? ?? 20).toStringAsFixed(0)}%)',
+                  'App usage charge',
                   '-Rs.${(((_order['final_amount'] as num? ?? 0) - (_order['delivery_fee'] as num? ?? 0)) * ((_order['commission_percentage'] as num? ?? 20) / 100)).toStringAsFixed(0)}',
                 ),
                 const Divider(height: 18),
@@ -710,7 +712,15 @@ class _MarketVendorOrderDetailScreenState
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('Platform Commission (${commPct.toStringAsFixed(1)}%)'),
+                  pw.Text('Delivery Fee'),
+                  pw.Text('-${fmt.format(deliveryFee)}'),
+                ],
+              ),
+              pw.SizedBox(height: 5),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('App usage charge'),
                   pw.Text('-${fmt.format(commission)}'),
                 ],
               ),
