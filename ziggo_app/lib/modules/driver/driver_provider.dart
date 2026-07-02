@@ -90,6 +90,35 @@ class DriverProvider extends ChangeNotifier {
       notifyListeners();
     } else if (event == 'booking_update' || event == 'destination_updated') {
       loadActive();
+      // If the booking was cancelled by the customer while the driver still has
+      // a pending request for the same booking, dismiss the request card now so
+      // the driver is NOT shown a stale alert for a ride that no longer exists.
+      final cancelledStatus = data['status']?.toString();
+      if (cancelledStatus == 'cancelled') {
+        final pending = _pendingRequest;
+        if (pending != null) {
+          final pendingBid = pending['booking_id'];
+          final dataBid   = data['booking_id'];
+          if (dataBid != null && pendingBid != null && pendingBid == dataBid) {
+            _pendingRequest = null;
+            FcmService.instance.cancelRideAlert();
+            notifyListeners();
+          }
+        }
+      }
+    } else if (event == 'booking_cancelled') {
+      // Dedicated cancellation event — dismiss matching pending request.
+      loadActive();
+      final pending = _pendingRequest;
+      if (pending != null) {
+        final pendingBid = pending['booking_id'];
+        final dataBid   = data['booking_id'];
+        if (dataBid != null && pendingBid != null && pendingBid == dataBid) {
+          _pendingRequest = null;
+          FcmService.instance.cancelRideAlert();
+          notifyListeners();
+        }
+      }
     } else if (event == 'order_update') {
       loadActiveFoodOrder();
     } else if (event == 'market_order_update') {
