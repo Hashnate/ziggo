@@ -7,6 +7,7 @@ import secrets
 from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from ...database import get_db
 from ...models import (
@@ -170,6 +171,7 @@ async def list_ads(
     so only those targeting a radius that includes the user are returned."""
     q = await db.execute(
         select(MarketAd)
+        .options(selectinload(MarketAd.vendor))
         .join(MarketVendor, MarketAd.vendor_id == MarketVendor.id)
         .where(MarketAd.is_active == True, MarketVendor.is_active == True)  # noqa: E712
     )
