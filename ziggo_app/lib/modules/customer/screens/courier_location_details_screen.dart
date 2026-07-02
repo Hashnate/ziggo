@@ -264,7 +264,7 @@ class _CourierLocationDetailsScreenState extends State<CourierLocationDetailsScr
                     style: TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 16,
-                      color: AppColors.textPrimary, // the screenshot text color is dark grey
+                      color: Colors.white,
                     ),
                   ),
                 ),
