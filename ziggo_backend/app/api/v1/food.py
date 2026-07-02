@@ -372,6 +372,54 @@ async def get_menu(restaurant_id: int, db: AsyncSession = Depends(get_db)):
     return q.scalars().all()
 
 
+@router.post("/quote")
+async def quote_delivery(
+    body: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    """Preview the delivery fee for a cart before checkout. Body:
+    `{restaurant_id, delivery_lat, delivery_lng}`."""
+    try:
+        restaurant_id = int(body["restaurant_id"])
+        drop_lat = float(body["delivery_lat"])
+        drop_lng = float(body["delivery_lng"])
+    except (KeyError, ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="restaurant_id, delivery_lat, delivery_lng required")
+
+    cust_q = await db.execute(select(Customer).where(Customer.user_id == user.id))
+    customer = cust_q.scalars().first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer profile not found")
+
+    r_q = await db.execute(select(Restaurant).where(Restaurant.id == restaurant_id))
+    r = r_q.scalars().first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+    if r.lat is None or r.lng is None:
+        raise HTTPException(status_code=400, detail="Restaurant location not set")
+
+    from ...services.fare_service import haversine_km
+    from decimal import Decimal, ROUND_HALF_UP
+
+    dist_km = haversine_km(float(r.lat), float(r.lng), drop_lat, drop_lng)
+    pickup = r.pickup_fee if r.pickup_fee is not None else Decimal("70.00")
+    per_km = r.per_km_rate if r.per_km_rate is not None else Decimal("40.00")
+    boost_val = r.boost if r.boost is not None else Decimal("0.00")
+    
+    base_delivery_fee = pickup + per_km * Decimal(str(dist_km)) + boost_val
+    base_delivery_fee = base_delivery_fee.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+
+    from ...services import loyalty_service as L
+    discounted_delivery_fee = await L.gold_delivery_fee(db, customer, base_delivery_fee)
+    
+    return {
+        "distance_km": dist_km,
+        "delivery_fee": float(discounted_delivery_fee)
+    }
+
+
+
 @router.post("/orders", response_model=FoodOrderResponse, status_code=201)
 async def create_food_order(
     body: FoodOrderCreate,

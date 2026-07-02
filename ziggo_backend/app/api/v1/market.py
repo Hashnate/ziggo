@@ -245,10 +245,19 @@ async def quote_delivery(
         per_km_rate=Decimal(str(vendor.per_km_rate)) if vendor.per_km_rate is not None else None,
         boost=Decimal(str(vendor.boost)) if vendor.boost is not None else None,
     )
+
+    cust_q = await db.execute(select(Customer).where(Customer.user_id == user.id))
+    customer = cust_q.scalars().first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer profile not found")
+        
+    from ...services import loyalty_service as L
+    discounted_fee = await L.gold_delivery_fee(db, customer, q["fee"])
+
     return {
         "distance_km": q["distance_km"],
         "weight_kg": float(q["weight_kg"]),
-        "delivery_fee": float(q["fee"]),
+        "delivery_fee": float(discounted_fee),
         "radius_km": float(q["radius_km"]),
         "in_range": q["in_range"],
     }

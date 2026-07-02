@@ -227,11 +227,34 @@ class FoodProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Map<String, dynamic>? _quote;
+  Map<String, dynamic>? get quote => _quote;
+
   void clearCart() {
     _cart.clear();
     _activeRestaurantId = null;
     _activeRestaurant = null;
+    _quote = null;
     notifyListeners();
+  }
+
+  Future<Map<String, dynamic>?> quoteDelivery({
+    required double lat,
+    required double lng,
+  }) async {
+    if (_activeRestaurantId == null || _cart.isEmpty) return null;
+    try {
+      final resp = await ApiClient.instance.dio.post('/food/quote', data: {
+        'restaurant_id': _activeRestaurantId,
+        'delivery_lat': lat,
+        'delivery_lng': lng,
+      });
+      _quote = Map<String, dynamic>.from(resp.data as Map);
+      notifyListeners();
+      return _quote;
+    } on DioException catch (e) {
+      return null;
+    }
   }
 
   Future<Map<String, dynamic>?> placeOrder({

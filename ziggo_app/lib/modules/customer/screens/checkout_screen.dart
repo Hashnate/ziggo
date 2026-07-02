@@ -33,11 +33,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AddressesProvider>().refresh();
-      context.read<PromosProvider>().refresh();
-      context.read<PaymentMethodsProvider>().fetchCards();
-      context.read<PaymentMethodsProvider>().fetchCorporateProfile();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final addr = context.read<AddressesProvider>();
+      await addr.refresh();
+      if (mounted && _deliveryAddress == null && _deliveryPlace == null && addr.items.isNotEmpty) {
+        final def = addr.items.firstWhere(
+            (a) => a['is_default'] == true,
+            orElse: () => addr.items.first);
+        setState(() => _deliveryAddress = def);
+        _refreshQuote();
+      }
+      if (mounted) {
+        context.read<PromosProvider>().refresh();
+        context.read<PaymentMethodsProvider>().fetchCards();
+        context.read<PaymentMethodsProvider>().fetchCorporateProfile();
+      }
     });
   }
 
@@ -47,6 +57,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     super.dispose();
   }
 
+  Future<void> _refreshQuote() async {
+    double? lat;
+    double? lng;
+    if (_deliveryAddress != null) {
+      lat = (_deliveryAddress!['lat'] as num).toDouble();
+      lng = (_deliveryAddress!['lng'] as num).toDouble();
+    } else if (_deliveryPlace != null) {
+      lat = _deliveryPlace!.location.latitude;
+      lng = _deliveryPlace!.location.longitude;
+    }
+    if (lat != null && lng != null) {
+      await context.read<FoodProvider>().quoteDelivery(lat: lat, lng: lng);
+    }
+  }
+
   Future<void> _pickPlace() async {
     final p = await showPlaceSearch(context, title: 'Delivery address', allowCurrentLocation: true);
     if (p != null) {
@@ -54,6 +79,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _deliveryPlace = p;
         _deliveryAddress = null;
       });
+      _refreshQuote();
     }
   }
 
@@ -114,7 +140,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final addr = context.watch<AddressesProvider>();
     final promos = context.watch<PromosProvider>();
     final restaurant = food.activeRestaurant;
-    final deliveryFee = (restaurant?['delivery_fee'] as num?)?.toDouble() ?? 0;
+    final quote = food.quote;
+    final deliveryFee = (quote?['delivery_fee'] as num?)?.toDouble() ??
+        (restaurant?['delivery_fee'] as num?)?.toDouble() ?? 0.0;
     
     double total = food.cartTotal + deliveryFee;
     double discount = 0.0;
@@ -206,10 +234,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ...addr.items.map((a) {
                   final selected = _deliveryAddress?['id'] == a['id'];
                   return GestureDetector(
-                    onTap: () => setState(() {
-                      _deliveryAddress = a;
-                      _deliveryPlace = null;
-                    }),
+                    onTap: () {
+                      setState(() {
+                        _deliveryAddress = a;
+                        _deliveryPlace = null;
+                      });
+                      _refreshQuote();
+                    },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       margin: const EdgeInsets.only(bottom: 8),

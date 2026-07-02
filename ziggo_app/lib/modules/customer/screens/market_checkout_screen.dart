@@ -38,11 +38,21 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AddressesProvider>().refresh();
-      context.read<PromosProvider>().refresh();
-      context.read<PaymentMethodsProvider>().fetchCards();
-      context.read<PaymentMethodsProvider>().fetchCorporateProfile();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final addr = context.read<AddressesProvider>();
+      await addr.refresh();
+      if (mounted && _saved == null && _picked == null && addr.items.isNotEmpty) {
+        final def = addr.items.firstWhere(
+            (a) => a['is_default'] == true,
+            orElse: () => addr.items.first);
+        setState(() => _saved = def);
+        _refreshQuote();
+      }
+      if (mounted) {
+        context.read<PromosProvider>().refresh();
+        context.read<PaymentMethodsProvider>().fetchCards();
+        context.read<PaymentMethodsProvider>().fetchCorporateProfile();
+      }
     });
   }
 
