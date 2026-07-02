@@ -469,6 +469,9 @@ async def estimate_fare_bulk(
         customer = await _get_customer(db, user)
         
     results = {}
+    if "truck" not in req.service_types:
+        req.service_types.append("truck")
+        
     for st in req.service_types:
         try:
             fare = await calculate_fare(
@@ -494,6 +497,8 @@ async def estimate_fare_bulk(
             fare["service_type"] = st
             results[st] = fare
         except Exception as e:
+            import logging
+            logging.error(f"Error calculating fare for {st}: {e}", exc_info=True)
             # Skip or log error for this specific service type
             continue
             
