@@ -171,12 +171,26 @@
             <div>
                 <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Base Fare (Rs)</label>
                 <input type="number" step="0.01" min="0" name="base_fare" value="{{ courier_base }}" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                <p class="text-[10px] text-gray-400 mt-1">Applied to every courier delivery</p>
+                <p class="text-[10px] text-gray-400 mt-1">Flat fee applied to every courier delivery</p>
             </div>
             <div>
                 <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Per KM Rate (Rs)</label>
                 <input type="number" step="0.01" min="0" name="per_km_rate" value="{{ courier_per_km }}" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                <p class="text-[10px] text-gray-400 mt-1">Added per kilometer</p>
+                <p class="text-[10px] text-gray-400 mt-1">Added per kilometer of distance</p>
+            </div>
+            <div>
+                <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Platform Commission (%)</label>
+                <div class="relative">
+                    <input type="number" step="0.1" min="0" max="100" name="platform_fee_percent" value="{{ courier_commission }}" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo pr-10">
+                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">%</span>
+                </div>
+                <p class="text-[10px] text-gray-400 mt-1">Ziggo's cut from each delivery. Driver earns the remaining amount.</p>
+            </div>
+            <div class="bg-blue-50 rounded-xl p-4 text-xs text-blue-700 space-y-1">
+                <p class="font-black uppercase tracking-wide mb-1">How commission works</p>
+                <p>Fare = Base Fare + Weight Surcharge + (Distance × Per KM Rate)</p>
+                <p>Admin earns = Fare × <strong>{{ courier_commission }}%</strong></p>
+                <p>Driver earns = Fare − Admin commission</p>
             </div>
             <div class="pt-2 flex justify-end gap-3">
                 <button type="button" onclick="closePricingModal()" class="px-6 py-3 border border-ziggo-line rounded-xl font-black text-ziggo-muted hover:bg-gray-50">Cancel</button>

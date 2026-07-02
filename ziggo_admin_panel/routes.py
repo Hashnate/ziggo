@@ -1940,6 +1940,7 @@ async def admin_courier(
     setting = setting_q.scalars().first()
     courier_base = float(setting.base_fare) if setting and setting.base_fare is not None else 250.0
     courier_per_km = float(setting.per_km_rate) if setting and setting.per_km_rate is not None else 6.0
+    courier_commission = float(setting.platform_fee_percent) if setting and setting.platform_fee_percent is not None else 15.0
 
     return templates.TemplateResponse(
         request, "courier.html",
@@ -1955,6 +1956,7 @@ async def admin_courier(
             "page_range": page_range,
             "courier_base": courier_base,
             "courier_per_km": courier_per_km,
+            "courier_commission": courier_commission,
         },
     )
 
@@ -1968,6 +1970,7 @@ async def admin_courier_settings_update(
     form = await request.form()
     base_fare = float(form.get("base_fare", 250.0))
     per_km_rate = float(form.get("per_km_rate", 6.0))
+    platform_fee_percent = float(form.get("platform_fee_percent", 15.0))
 
     setting_q = await db.execute(select(FareSetting).where(FareSetting.service_type == "courier"))
     setting = setting_q.scalars().first()
@@ -1979,12 +1982,13 @@ async def admin_courier_settings_update(
             is_active=True,
             base_fare=base_fare,
             per_km_rate=per_km_rate,
-            platform_fee_percent=15,
+            platform_fee_percent=platform_fee_percent,
         )
         db.add(setting)
     else:
         setting.base_fare = base_fare
         setting.per_km_rate = per_km_rate
+        setting.platform_fee_percent = platform_fee_percent
         
     await db.commit()
     return RedirectResponse(url="/admin/courier", status_code=303)
