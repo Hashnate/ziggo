@@ -37,8 +37,16 @@
 </div>
 
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-    <div class="p-6 border-b border-gray-100">
+    <div class="p-6 border-b border-gray-100 flex justify-between items-center">
         <h3 class="font-bold text-ziggo">All courier deliveries ({{ stats.total }})</h3>
+        <div class="flex gap-2">
+            <a href="/admin/flash-pricing" class="px-3 py-1.5 bg-orange-50 text-orange-600 border border-orange-100 rounded-lg text-xs font-bold hover:bg-orange-100 transition flex items-center gap-1.5">
+                <i class="fas fa-weight-hanging"></i> Weight Tiers
+            </a>
+            <button onclick="openPricingModal()" class="px-3 py-1.5 bg-blue-50 text-ziggo border border-blue-100 rounded-lg text-xs font-bold hover:bg-blue-100 transition flex items-center gap-1.5">
+                <i class="fas fa-cog"></i> Edit Pricing
+            </button>
+        </div>
     </div>
     <div class="overflow-x-auto">
         <table class="w-full text-left">
@@ -149,4 +157,46 @@
     </div>
     {% endif %}
 </div>
+
+<!-- Pricing Modal -->
+<div id="pricingModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col">
+        <div class="p-6 border-b border-ziggo-line flex justify-between items-center bg-gray-50/50 flex-shrink-0">
+            <h3 class="text-xl font-black text-ziggo">Edit Courier Pricing</h3>
+            <button onclick="closePricingModal()" class="text-ziggo-faint hover:text-ziggo-ink">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        <form method="POST" action="/admin/courier/settings" class="p-8 space-y-5">
+            <div>
+                <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Base Fare (Rs)</label>
+                <input type="number" step="0.01" min="0" name="base_fare" value="{{ courier_base }}" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                <p class="text-[10px] text-gray-400 mt-1">Applied to every courier delivery</p>
+            </div>
+            <div>
+                <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Per KM Rate (Rs)</label>
+                <input type="number" step="0.01" min="0" name="per_km_rate" value="{{ courier_per_km }}" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                <p class="text-[10px] text-gray-400 mt-1">Added per kilometer</p>
+            </div>
+            <div class="pt-2 flex justify-end gap-3">
+                <button type="button" onclick="closePricingModal()" class="px-6 py-3 border border-ziggo-line rounded-xl font-black text-ziggo-muted hover:bg-gray-50">Cancel</button>
+                <button type="submit" class="px-8 py-3 bg-ziggo text-white rounded-xl font-black hover:bg-ziggo-light shadow-brand">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openPricingModal() {
+    document.getElementById('pricingModal').classList.remove('hidden');
+    document.getElementById('pricingModal').classList.add('flex');
+}
+function closePricingModal() {
+    document.getElementById('pricingModal').classList.add('hidden');
+    document.getElementById('pricingModal').classList.remove('flex');
+}
+document.getElementById('pricingModal').addEventListener('click', function(e) {
+    if (e.target === this) closePricingModal();
+});
+</script>
 {% endblock %}

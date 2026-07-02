@@ -164,9 +164,6 @@ async def calculate_fare(
         }
         return await _enrich_with_loyalty(db, rental_dict, customer, redeem_points)
 
-    # Courier: weight-led island-wide delivery. Fare = handling base + weight
-    # surcharge (shared FlashWeightTier table) + a gentle per-km component.
-    # Promo discount + platform split still apply. No surge, no multi-stop.
     if is_courier:
         setting_q = await db.execute(
             select(FareSetting).where(FareSetting.service_type == service_type)
@@ -178,7 +175,11 @@ async def calculate_fare(
         weight_surcharge = 0.0
         if parcel_weight_kg is not None:
             weight_surcharge = await _flash_surcharge(db, float(parcel_weight_kg))
-        fare = COURIER_BASE + weight_surcharge + COURIER_PER_KM * distance_km
+        
+        courier_base = float(setting.base_fare) if setting and setting.base_fare is not None else COURIER_BASE
+        courier_per_km = float(setting.per_km_rate) if setting and setting.per_km_rate is not None else COURIER_PER_KM
+        
+        fare = courier_base + weight_surcharge + courier_per_km * distance_km
         eta_days = courier_eta_days(distance_km)
 
         discount = 0.0

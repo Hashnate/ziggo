@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../../../app/app_colors.dart';
+import '../booking_provider.dart';
 import 'courier_confirm_details_screen.dart';
 
 class PackageDetail {
@@ -31,6 +33,49 @@ class CourierPackageDetailsScreen extends StatefulWidget {
 
 class _CourierPackageDetailsScreenState extends State<CourierPackageDetailsScreen> {
   final List<PackageDetail> _packages = [PackageDetail()];
+  double? _maxWeight = 15.0; // Default until fetched, null means no limit
+  bool _isLoadingTiers = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchMaxWeight();
+  }
+
+  Future<void> _fetchMaxWeight() async {
+    // Tiers are shared for both flash and courier
+    try {
+      // Using provider pattern although we don't strictly need it in the tree here
+      final provider = Provider.of<BookingProvider>(context, listen: false);
+      final tiers = await provider.fetchFlashTiers();
+      if (tiers.isNotEmpty) {
+        bool hasOpenEnded = false;
+        double highestMax = 0;
+        for (var t in tiers) {
+          if (t['max_weight_kg'] == null) {
+            hasOpenEnded = true;
+            break;
+          }
+          final maxW = (t['max_weight_kg'] as num).toDouble();
+          if (maxW > highestMax) highestMax = maxW;
+        }
+        if (mounted) {
+          setState(() {
+            _maxWeight = hasOpenEnded ? null : highestMax;
+            _isLoadingTiers = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() => _isLoadingTiers = false);
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoadingTiers = false);
+      }
+    }
+  }
 
   void _addPackage() {
     if (_packages.length < 20) {
@@ -227,10 +272,13 @@ class _CourierPackageDetailsScreenState extends State<CourierPackageDetailsScree
                                 style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
                               ),
                             ),
-                            const Text(
-                              'Max: 15Kg',
-                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.bold),
-                            ),
+                            if (_isLoadingTiers)
+                              const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                            else if (_maxWeight != null)
+                              Text(
+                                'Max: ${_maxWeight!.toStringAsFixed(0)}Kg',
+                                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.bold),
+                              ),
                             if (_packages.length > 1) ...[
                               const SizedBox(width: 8),
                               GestureDetector(
@@ -260,7 +308,7 @@ class _CourierPackageDetailsScreenState extends State<CourierPackageDetailsScree
                                     TextInputFormatter.withFunction((oldValue, newValue) {
                                       if (newValue.text.isEmpty) return newValue;
                                       final double? val = double.tryParse(newValue.text);
-                                      if (val == null || val > 15 || val < 0) {
+                                      if (val == null || (_maxWeight != null && val > _maxWeight!) || val < 0) {
                                         return oldValue;
                                       }
                                       return newValue;

@@ -1935,6 +1935,12 @@ async def admin_courier(
     end_idx = min(page * limit, total)
     page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
 
+    from app.models import FareSetting
+    setting_q = await db.execute(select(FareSetting).where(FareSetting.service_type == "courier"))
+    setting = setting_q.scalars().first()
+    courier_base = float(setting.base_fare) if setting and setting.base_fare is not None else 250.0
+    courier_per_km = float(setting.per_km_rate) if setting and setting.per_km_rate is not None else 6.0
+
     return templates.TemplateResponse(
         request, "courier.html",
         {
@@ -1947,8 +1953,41 @@ async def admin_courier(
             "start_idx": start_idx,
             "end_idx": end_idx,
             "page_range": page_range,
+            "courier_base": courier_base,
+            "courier_per_km": courier_per_km,
         },
     )
+
+@router.post("/courier/settings")
+async def admin_courier_settings_update(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import FareSetting
+    form = await request.form()
+    base_fare = float(form.get("base_fare", 250.0))
+    per_km_rate = float(form.get("per_km_rate", 6.0))
+
+    setting_q = await db.execute(select(FareSetting).where(FareSetting.service_type == "courier"))
+    setting = setting_q.scalars().first()
+    
+    if not setting:
+        setting = FareSetting(
+            service_type="courier",
+            display_name="Courier",
+            is_active=True,
+            base_fare=base_fare,
+            per_km_rate=per_km_rate,
+            platform_fee_percent=15,
+        )
+        db.add(setting)
+    else:
+        setting.base_fare = base_fare
+        setting.per_km_rate = per_km_rate
+        
+    await db.commit()
+    return RedirectResponse(url="/admin/courier", status_code=303)
 
 
 @router.get("/fare-settings", response_class=HTMLResponse)
