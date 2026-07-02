@@ -78,6 +78,15 @@ class BookingProvider extends ChangeNotifier {
     List<Map<String, dynamic>> packages = const [],
   }) async {
     try {
+      double? finalWeight = parcelWeightKg;
+      if (finalWeight == null && packages.isNotEmpty) {
+        double totalWeight = 0;
+        for (var p in packages) {
+          totalWeight += (p['weight_kg'] as num?)?.toDouble() ?? 0;
+        }
+        if (totalWeight > 0) finalWeight = totalWeight;
+      }
+
       final resp = await ApiClient.instance.dio.post(
         '/bookings/estimate',
         data: {
@@ -89,7 +98,7 @@ class BookingProvider extends ChangeNotifier {
           'trip_type': tripType,
           if (isFlash) 'is_flash': true,
           if (isCourier) 'is_courier': true,
-          if (parcelWeightKg != null) 'parcel_weight_kg': parcelWeightKg,
+          if (finalWeight != null) 'parcel_weight_kg': finalWeight,
           if (isRental) 'is_rental': true,
           if (rentalHours != null) 'rental_hours': rentalHours,
           if (promoCode != null && promoCode.isNotEmpty) 'promo_code': promoCode,
@@ -207,6 +216,15 @@ class BookingProvider extends ChangeNotifier {
     _setBusy(true);
     _lastError = null;
     try {
+      double? finalWeight = parcelWeightKg;
+      if (finalWeight == null && packages.isNotEmpty) {
+        double totalWeight = 0;
+        for (var p in packages) {
+          totalWeight += (p['weight_kg'] as num?)?.toDouble() ?? 0;
+        }
+        if (totalWeight > 0) finalWeight = totalWeight;
+      }
+
       final resp = await ApiClient.instance.dio.post(
         '/bookings',
         data: {
@@ -233,7 +251,7 @@ class BookingProvider extends ChangeNotifier {
             if (isFlash) 'is_flash': true,
             if (isCourier) 'is_courier': true,
             if (parcelType != null) 'parcel_type': parcelType,
-            if (parcelWeightKg != null) 'parcel_weight_kg': parcelWeightKg,
+            if (finalWeight != null) 'parcel_weight_kg': finalWeight,
             if (packages.isNotEmpty) 'packages': packages,
           },
           if (isRental) ...{
