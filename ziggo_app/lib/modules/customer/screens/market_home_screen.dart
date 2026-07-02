@@ -147,10 +147,25 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
   List<Map<String, dynamic>> _filtered(List<Map<String, dynamic>> all) {
     final q = _query.trim().toLowerCase();
     if (q.isEmpty) return all;
+
+    String baseQ = q;
+    if (q == 'groceries') baseQ = 'grocer';
+    else if (q == 'pharmaceutical') baseQ = 'pharma';
+    else if (q == 'fresh produce') baseQ = 'produce';
+    else if (q == 'poultry and meat') baseQ = 'meat';
+    else if (q == 'fresh flowers') baseQ = 'flower';
+    else if (q.endsWith('ies')) baseQ = q.substring(0, q.length - 3);
+    else if (q.endsWith('s') && q.length > 3) baseQ = q.substring(0, q.length - 1);
+
     return all.where((v) {
       final name = (v['name']?.toString() ?? '').toLowerCase();
       final cat = (v['category']?.toString() ?? '').toLowerCase();
-      return name.contains(q) || cat.contains(q);
+
+      if (name.contains(q) || cat.contains(q)) return true;
+      if (name.contains(baseQ) || cat.contains(baseQ)) return true;
+      if (cat.isNotEmpty && cat.length >= 3 && q.contains(cat)) return true;
+
+      return false;
     }).toList();
   }
 

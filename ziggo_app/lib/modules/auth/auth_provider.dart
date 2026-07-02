@@ -216,6 +216,11 @@ class AuthProvider extends ChangeNotifier {
     _profilePhoto = resp.data['profile_photo'] as String? ?? profilePhoto ?? _profilePhoto;
     _phoneNumber = resp.data['phone_number'] as String? ?? phoneNumber ?? _phoneNumber;
     _referredByUserId = resp.data['referred_by_user_id'] as int? ?? _referredByUserId;
+    if (resp.data['profile_completeness'] is Map) {
+      _completeness = Map<String, dynamic>.from(resp.data['profile_completeness'] as Map);
+    } else {
+      await _refreshMe();
+    }
     notifyListeners();
   }
 

@@ -455,21 +455,91 @@ class _Header extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              _HeaderIcon(
-                  icon: Icons.storefront_rounded, onTap: onOpenMarket),
-              const SizedBox(width: 8),
-              _HeaderIcon(
-                  icon: Icons.bar_chart_rounded, onTap: onOpenEarnings),
-              const SizedBox(width: 8),
-              _HeaderIcon(
-                  icon: Icons.account_balance_wallet_rounded,
-                  onTap: onOpenCommission),
-              const SizedBox(width: 8),
-              _HeaderIcon(icon: Icons.menu_book_rounded, onTap: onOpenMenu),
-              const SizedBox(width: 8),
-              _HeaderIcon(icon: Icons.edit_rounded, onTap: onOpenProfile),
-              const SizedBox(width: 8),
-              _HeaderIcon(icon: Icons.logout_rounded, onTap: onLogout),
+              SizedBox(
+                width: 36,
+                height: 36,
+                child: PopupMenuButton<VoidCallback>(
+                  color: const Color(0xFF1E293B),
+                  surfaceTintColor: Colors.transparent,
+                  padding: EdgeInsets.zero,
+                    icon: Container(
+                      width: 36,
+                      height: 36,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.more_vert_rounded, color: Colors.white, size: 20),
+                    ),
+                    onSelected: (fn) => fn(),
+                    offset: const Offset(0, 44),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: onOpenMarket,
+                        child: Row(
+                          children: [
+                            const Icon(Icons.storefront_rounded, color: Colors.white70, size: 20),
+                            const SizedBox(width: 12),
+                            const Text('Market', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: onOpenEarnings,
+                        child: Row(
+                          children: [
+                            const Icon(Icons.bar_chart_rounded, color: Colors.white70, size: 20),
+                            const SizedBox(width: 12),
+                            const Text('Earnings', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: onOpenCommission,
+                        child: Row(
+                          children: [
+                            const Icon(Icons.account_balance_wallet_rounded, color: Colors.white70, size: 20),
+                            const SizedBox(width: 12),
+                            const Text('Commission', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: onOpenMenu,
+                        child: Row(
+                          children: [
+                            const Icon(Icons.menu_book_rounded, color: Colors.white70, size: 20),
+                            const SizedBox(width: 12),
+                            const Text('Menu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: onOpenProfile,
+                        child: Row(
+                          children: [
+                            const Icon(Icons.edit_rounded, color: Colors.white70, size: 20),
+                            const SizedBox(width: 12),
+                            const Text('Profile', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuDivider(),
+                      PopupMenuItem(
+                        value: onLogout,
+                        child: Row(
+                          children: [
+                            const Icon(Icons.logout_rounded, color: AppColors.error, size: 20),
+                            const SizedBox(width: 12),
+                            const Text('Log out', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 14),

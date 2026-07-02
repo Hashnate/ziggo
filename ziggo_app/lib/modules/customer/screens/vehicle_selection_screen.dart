@@ -58,6 +58,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
   bool _loadingEstimates = false;
   bool _usePoints = false;
   bool _truckTermsAccepted = false;
+  DateTime? _scheduledTime;
   List<LatLng> _routePoints = const [];
 
   List<Map<String, dynamic>> _nearbyDrivers = const [];
@@ -71,7 +72,10 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       if (resp.data is List) {
         final list = List<Map<String, dynamic>>.from(resp.data as List);
         setState(() {
-          _serviceTypes = list.map((item) => item['service_type'] as String).toList();
+          _serviceTypes = list
+              .where((item) => widget.isTruckMode ? (item['is_truck'] == true) : (item['is_truck'] != true))
+              .map((item) => item['service_type'] as String)
+              .toList();
           _categoryData = {
             for (var item in list) item['service_type'] as String: item
           };
@@ -80,7 +84,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     } catch (e) {
       debugPrint("Error fetching active services: $e");
       setState(() {
-        _serviceTypes = ['tuk', 'bike', 'car', 'mini', 'van', 'truck'];
+        _serviceTypes = widget.isTruckMode ? [] : ['tuk', 'bike', 'car', 'mini', 'van', 'truck'];
         _categoryData = {};
       });
     }
@@ -114,6 +118,81 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     } catch (e) {
       debugPrint("Error getting current location: $e");
     }
+  }
+
+  String _formatDateTime(DateTime dt) {
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final month = months[dt.month - 1];
+    final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+    final period = dt.hour >= 12 ? 'PM' : 'AM';
+    final minute = dt.minute.toString().padLeft(2, '0');
+    return "$month ${dt.day}, $hour:$minute $period";
+  }
+
+  Future<void> _handleLaterTap() async {
+    if (_scheduledTime != null) {
+      final action = await showModalBottomSheet<String>(
+        context: context,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 16),
+              Text(
+                'Scheduled Ride: ${_formatDateTime(_scheduledTime!)}',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.edit_calendar_rounded, color: AppColors.primary),
+                title: const Text('Change Date & Time'),
+                onTap: () => Navigator.pop(ctx, 'change'),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.cancel_outlined, color: AppColors.error),
+                title: const Text('Cancel Schedule'),
+                onTap: () => Navigator.pop(ctx, 'cancel'),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      );
+
+      if (action == 'cancel') {
+        setState(() => _scheduledTime = null);
+        return;
+      } else if (action != 'change') {
+        return;
+      }
+    }
+
+    final d = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 30)),
+    );
+    if (d == null || !mounted) return;
+    final t = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+    if (t == null || !mounted) return;
+
+    final selected = DateTime(d.year, d.month, d.day, t.hour, t.minute);
+    if (selected.isBefore(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cannot schedule in the past')),
+      );
+      return;
+    }
+
+    setState(() => _scheduledTime = selected);
   }
 
   void _startNearbyDriverPolling() {
@@ -194,7 +273,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       await _fetchActiveServices();
     }
     
-    final servicesToFetch = widget.isTruckMode ? ['truck'] : _serviceTypes;
+    final servicesToFetch = _serviceTypes;
 
     final bulkRes = await booking.estimateFaresBulk(
       serviceTypes: servicesToFetch,
@@ -226,16 +305,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
             }
           }
 
-          if (widget.isTruckMode && st == 'truck') {
-            // Mock truck variations based on the base truck fare
-            final baseAmt = resMap['final_amount'] as num;
-            _estimates['light'] = {...resMap, 'final_amount': baseAmt * 1.0, 'capacity': 1, 'duration_min': resMap['duration_min']};
-            _estimates['light_open'] = {...resMap, 'final_amount': baseAmt * 1.0, 'capacity': 1, 'duration_min': resMap['duration_min']};
-            _estimates['mover'] = {...resMap, 'final_amount': baseAmt * 2.5, 'capacity': 1, 'duration_min': resMap['duration_min']};
-            _estimates['mover_open'] = {...resMap, 'final_amount': baseAmt * 2.5, 'capacity': 1, 'duration_min': resMap['duration_min']};
-          } else {
-            _estimates[st] = resMap;
-          }
+          _estimates[st] = resMap;
         }
       });
     }
@@ -244,16 +314,10 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     setState(() {
       _loadingEstimates = false;
       if (_serviceType == null || !_estimates.containsKey(_serviceType)) {
-        if (widget.isTruckMode) {
-          if (_estimates.containsKey('light')) {
-            _serviceType = 'light';
-          }
-        } else {
-          for (final st in _serviceTypes) {
-            if (_estimates.containsKey(st)) {
-              _serviceType = st;
-              break;
-            }
+        for (final st in _serviceTypes) {
+          if (_estimates.containsKey(st)) {
+            _serviceType = st;
+            break;
           }
         }
       }
@@ -299,7 +363,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     String? caughtError;
     
     try {
-      final actualServiceType = widget.isTruckMode ? 'truck' : _serviceType!;
+      final actualServiceType = _serviceType!;
       created = await booking.createBooking(
         serviceType: actualServiceType,
         pickup: confirmedPlace.location,
@@ -320,6 +384,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
         receiverName: _secondaryPhone != null && _secondaryPhone!.isNotEmpty ? 'Secondary' : null,
         receiverPhone: _secondaryPhone != null && _secondaryPhone!.isNotEmpty ? _secondaryPhone : null,
         parcelInstructions: _driverNote.isNotEmpty ? _driverNote : null,
+        scheduledTime: _scheduledTime,
       );
     } catch (e) {
       caughtError = e.toString();
@@ -695,10 +760,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                       child: ListView(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        children: (widget.isTruckMode 
-                            ? ['light', 'light_open', 'mover', 'mover_open'] 
-                            : _serviceTypes
-                          ).map((st) => _vehicleCard(st)).toList(),
+                        children: _serviceTypes.map((st) => _vehicleCard(st)).toList(),
                       ),
                     ),
                   
@@ -849,14 +911,20 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                             child: SizedBox(
                               height: 54,
                               child: OutlinedButton.icon(
-                                onPressed: () {
-                                  // TODO: Schedule later
-                                },
+                                onPressed: _handleLaterTap,
                                 icon: const Icon(Icons.schedule_rounded, color: AppColors.textPrimary, size: 20),
-                                label: const Text('Later', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: AppColors.textPrimary)),
+                                label: Text(
+                                  _scheduledTime != null
+                                      ? _formatDateTime(_scheduledTime!)
+                                      : 'Later',
+                                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: AppColors.textPrimary),
+                                  maxLines: 2,
+                                  textAlign: TextAlign.center,
+                                ),
                                 style: OutlinedButton.styleFrom(
                                   side: const BorderSide(color: AppColors.cardBorder),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(27)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 4),
                                 ),
                               ),
                             ),

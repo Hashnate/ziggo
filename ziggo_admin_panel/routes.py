@@ -2352,6 +2352,7 @@ async def admin_categories_new(
     discount_percentage: float = Form(0),
     search_radius_km: int | None = Form(None),
     is_active: str = Form("on"),
+    is_truck: str = Form("off"),
     image: UploadFile | None = File(None),
     preset_icon: str | None = Form(None),
     next: str = Form(""),
@@ -2386,6 +2387,7 @@ async def admin_categories_new(
             promo_message=promo_message.strip() or None,
             discount_percentage=Decimal(str(discount_percentage)),
             is_active=(is_active == "on"),
+            is_truck=(is_truck == "on"),
             base_fare=Decimal(str(base_fare)),
             per_km_rate=Decimal(str(per_km_rate)),
             per_minute_rate=Decimal(str(per_minute_rate)),
@@ -2422,6 +2424,7 @@ async def admin_categories_edit(
     discount_percentage: float = Form(0),
     search_radius_km: int | None = Form(None),
     is_active: str = Form(""),
+    is_truck: str = Form("off"),
     image: UploadFile | None = File(None),
     preset_icon: str | None = Form(None),
     next: str = Form(""),
@@ -2441,6 +2444,7 @@ async def admin_categories_edit(
     f.promo_message = promo_message.strip() or None
     f.discount_percentage = Decimal(str(discount_percentage))
     f.is_active = (is_active == "on")
+    f.is_truck = (is_truck == "on")
     f.base_fare = Decimal(str(base_fare))
     f.per_km_rate = Decimal(str(per_km_rate))
     f.per_minute_rate = Decimal(str(per_minute_rate))

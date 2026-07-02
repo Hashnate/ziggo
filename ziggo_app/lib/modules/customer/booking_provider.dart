@@ -202,6 +202,7 @@ class BookingProvider extends ChangeNotifier {
     // BRD: CD-19 — intermediate stops
     List<Map<String, dynamic>> stops = const [],
     List<Map<String, dynamic>> packages = const [],
+    DateTime? scheduledTime,
   }) async {
     _setBusy(true);
     _lastError = null;
@@ -227,6 +228,7 @@ class BookingProvider extends ChangeNotifier {
             'parcel_instructions': parcelInstructions,
           if (redeemPoints > 0) 'redeem_points': redeemPoints,
           if (stops.isNotEmpty) 'stops': stops,
+          if (scheduledTime != null) 'scheduled_time': scheduledTime.toIso8601String(),
           if (isFlash || isCourier) ...{
             if (isFlash) 'is_flash': true,
             if (isCourier) 'is_courier': true,

@@ -125,6 +125,7 @@ class FareSetting(Base):
     discount_percentage = Column(DECIMAL(5, 2), default=0.00)
     display_order = Column(Integer, nullable=False, default=0)
     search_radius_km = Column(Integer, nullable=True)
+    is_truck = Column(Boolean, nullable=False, default=False)
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
