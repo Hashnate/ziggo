@@ -537,7 +537,9 @@ class _MarketVendorOrderDetailScreenState
                         children: [
                           for (final it in _lineItems) _LineItemRow(line: it),
                         ],
-                            _Section(
+                      ),
+          ),
+          _Section(
             title: 'BILL',
             child: Column(
               children: [

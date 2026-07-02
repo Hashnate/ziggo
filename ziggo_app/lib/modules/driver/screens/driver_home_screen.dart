@@ -26,6 +26,9 @@ import 'driver_earnings_screen.dart';
 import 'driver_profile_screen.dart';
 import 'driver_registration_screen.dart';
 import 'driver_rating_screen.dart';
+import 'driver_food_rating_screen.dart';
+import 'driver_market_rating_screen.dart';
+import 'driver_ride_details_screen.dart';
 
 // Ziggo light driver UI tokens — clean light brand surfaces + gold accent.
 const Color _kPanel = AppColors.surface;       // clean white (matching surface)
@@ -2619,9 +2622,22 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               child: GestureDetector(
                 onTap: nextStatus == null
                     ? null
-                    : () => isMarket
-                        ? driver.updateMarketOrderStatus(nextStatus!)
-                        : driver.updateFoodOrderStatus(nextStatus!),
+                    : () async {
+                        final orderId = order['id'] as int;
+                        final ok = isMarket
+                            ? await driver.updateMarketOrderStatus(nextStatus!)
+                            : await driver.updateFoodOrderStatus(nextStatus!);
+                        if (ok && nextStatus == 'delivered' && mounted) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => isMarket
+                                  ? DriverMarketRatingScreen(orderId: orderId)
+                                  : DriverFoodRatingScreen(orderId: orderId),
+                            ),
+                          );
+                        }
+                      },
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   alignment: Alignment.center,

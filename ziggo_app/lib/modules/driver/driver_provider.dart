@@ -75,15 +75,31 @@ class DriverProvider extends ChangeNotifier {
     if (data == null) return;
     
     // Aggressive catch-all: If it looks like a request, show it!
-    final isRequestEvent = event == 'new_ride_request' || 
+    // But exclude cancellation events that might contain 'request'.
+    final isCancelEvent = event.toString().contains('cancel');
+    final isRequestEvent = !isCancelEvent && (
+                           event == 'new_ride_request' || 
                            event == 'new_ride' || 
                            event == 'new_market_order' || 
                            event == 'new_market_request' || 
                            event.toString().contains('request') ||
                            event.toString().contains('broadcast') ||
-                           (data.containsKey('pickup_lat') && data.containsKey('fare'));
+                           (data.containsKey('pickup_lat') && data.containsKey('fare'))
+    );
 
-    if (isRequestEvent) {
+    if (isCancelEvent) {
+      loadActive();
+      final pending = _pendingRequest;
+      if (pending != null) {
+        final pendingBid = pending['booking_id'] ?? pending['food_order_id'] ?? pending['market_order_id'];
+        final dataBid   = data['booking_id'] ?? data['food_order_id'] ?? data['market_order_id'];
+        if (dataBid != null && pendingBid != null && pendingBid == dataBid) {
+          _pendingRequest = null;
+          FcmService.instance.cancelRideAlert();
+          notifyListeners();
+        }
+      }
+    } else if (isRequestEvent) {
       // Rich payload — rides, parcels (is_flash), food orders (is_food),
       // and market orders (is_market) all flow through this listener.
       _pendingRequest = data;

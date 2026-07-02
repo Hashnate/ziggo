@@ -648,6 +648,41 @@ async def create_food_order(
     )
 
 
+@router.get("/orders/{order_id}")
+async def get_food_order(
+    order_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Retrieve a single food order by ID (customer or driver)."""
+    q = await db.execute(select(FoodOrder).where(FoodOrder.id == order_id))
+    order = q.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Access control: only the ordering customer or the assigned driver can view it.
+    if user.role == UserRole.CUSTOMER:
+        cust_q = await db.execute(select(Customer).where(Customer.user_id == user.id))
+        customer = cust_q.scalars().first()
+        if not customer or order.customer_id != customer.id:
+            raise HTTPException(status_code=403, detail="Not your order")
+    elif user.role == UserRole.DRIVER:
+        drv_q = await db.execute(select(Driver).where(Driver.user_id == user.id))
+        driver = drv_q.scalars().first()
+        if not driver or order.driver_id != driver.id:
+            raise HTTPException(status_code=403, detail="Not your assigned order")
+    else:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    return {
+        "id": order.id,
+        "order_ref": order.order_ref,
+        "status": order.status.value,
+        "customer_rating": order.customer_rating,
+        "customer_feedback": order.customer_feedback,
+    }
+
+
 @router.get("/orders", response_model=List[FoodOrderResponse])
 async def list_my_food_orders(
     db: AsyncSession = Depends(get_db),
@@ -1098,6 +1133,8 @@ async def get_active_food_order(
         "payment_method": o.payment_method,
         "payment_status": o.payment_status,
         "instructions": o.instructions,
+        "customer_rating": o.customer_rating,
+        "customer_feedback": o.customer_feedback,
     }
 
 
@@ -1207,3 +1244,55 @@ async def cancel_food_order(
     await db.commit()
     return {"ok": True, "status": order.status.value}
 
+
+@router.post("/orders/{order_id}/rate")
+async def rate_food_order(
+    order_id: int,
+    body: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    """Customer rates a delivered food order (1-5 stars + optional text feedback).
+
+    Silently allows re-rating so the customer can correct an accidental tap.
+    """
+    rating = body.get("rating")
+    if not isinstance(rating, int) or not (1 <= rating <= 5):
+        raise HTTPException(status_code=400, detail="rating must be an integer between 1 and 5")
+    feedback = (body.get("feedback") or "").strip() or None
+
+    cust_q = await db.execute(select(Customer).where(Customer.user_id == user.id))
+    customer = cust_q.scalars().first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer profile not found")
+
+    q = await db.execute(select(FoodOrder).where(FoodOrder.id == order_id, FoodOrder.customer_id == customer.id))
+    order = q.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.status != FoodOrderStatus.DELIVERED:
+        raise HTTPException(status_code=400, detail="Only delivered orders can be rated")
+
+    order.customer_rating = rating
+    order.customer_feedback = feedback
+    await db.commit()
+
+    # Notify the assigned driver via WebSocket so the driver rating screen
+    # updates in real-time without having to wait for the next poll cycle.
+    if order.driver_id:
+        from ...models import Driver as _Driver
+        dq = await db.execute(select(_Driver).where(_Driver.id == order.driver_id))
+        drv = dq.scalars().first()
+        if drv:
+            await manager.send(
+                drv.user_id,
+                "food_order_rated",
+                {
+                    "food_order_id": order.id,
+                    "order_ref": order.order_ref,
+                    "customer_rating": rating,
+                    "customer_feedback": feedback,
+                },
+            )
+
+    return {"ok": True, "customer_rating": rating}

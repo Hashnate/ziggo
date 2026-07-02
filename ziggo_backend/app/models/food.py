@@ -138,6 +138,9 @@ class FoodOrder(Base):
 
     instructions = Column(Text)
     cancellation_reason = Column(Text)
+    # Customer delivery rating (1-5) and optional text feedback left after delivery.
+    customer_rating = Column(Integer, nullable=True)
+    customer_feedback = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     confirmed_at = Column(DateTime(timezone=True))
     ready_at = Column(DateTime(timezone=True))

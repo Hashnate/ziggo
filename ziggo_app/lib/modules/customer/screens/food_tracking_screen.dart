@@ -9,6 +9,7 @@ import '../../../core/widgets/motion.dart';
 import '../food_provider.dart';
 import '../food_ui.dart';
 import 'food_home_screen.dart';
+import 'food_rating_screen.dart';
 
 // ─────────────────────────────────────────────
 //  Food-order colour tokens
@@ -321,11 +322,26 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
                         const SizedBox(height: 8),
                       ],
 
-                      // ── Done button (delivered) ──
+                      // ── Done button (delivered) — goes to rating screen ──
                       if (isDelivered) ...[
                         _DoneButton(
-                          onPressed: () =>
-                              Navigator.popUntil(context, (r) => r.isFirst),
+                          onPressed: () {
+                            final orderId = _order?['id'] as int?;
+                            final orderRef = _order?['order_ref']?.toString() ?? widget.orderRef;
+                            if (orderId != null) {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => FoodRatingScreen(
+                                    orderId: orderId,
+                                    orderRef: orderRef,
+                                  ),
+                                ),
+                              );
+                            } else {
+                              Navigator.popUntil(context, (r) => r.isFirst);
+                            }
+                          },
                         ),
                         const SizedBox(height: 8),
                       ],
