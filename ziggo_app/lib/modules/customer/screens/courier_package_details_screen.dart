@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../app/app_colors.dart';
 import 'courier_confirm_details_screen.dart';
 
@@ -254,6 +255,17 @@ class _CourierPackageDetailsScreenState extends State<CourierPackageDetailsScree
                                 child: TextField(
                                   controller: pkg.weightController,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                                    TextInputFormatter.withFunction((oldValue, newValue) {
+                                      if (newValue.text.isEmpty) return newValue;
+                                      final double? val = double.tryParse(newValue.text);
+                                      if (val == null || val > 15 || val < 0) {
+                                        return oldValue;
+                                      }
+                                      return newValue;
+                                    }),
+                                  ],
                                   decoration: const InputDecoration(
                                     border: InputBorder.none,
                                     hintText: '0',
