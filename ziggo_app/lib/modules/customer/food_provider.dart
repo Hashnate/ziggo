@@ -294,4 +294,21 @@ class FoodProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  Future<bool> rateOrder(int orderId, int rating, {String? feedback}) async {
+    try {
+      await ApiClient.instance.dio.post(
+        '/food/orders/$orderId/rate',
+        data: {
+          'rating': rating,
+          if (feedback != null && feedback.isNotEmpty) 'feedback': feedback,
+        },
+      );
+      return true;
+    } on DioException catch (e) {
+      _error = e.response?.data?['detail']?.toString() ?? e.message;
+      notifyListeners();
+      return false;
+    }
+  }
 }

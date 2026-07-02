@@ -8,6 +8,7 @@ import '../../../app/app_styles.dart';
 import '../../../core/widgets/motion.dart';
 import '../market_provider.dart';
 import 'market_home_screen.dart';
+import 'market_rating_screen.dart';
 
 class MarketTrackingScreen extends StatefulWidget {
   final String orderRef;
@@ -641,7 +642,21 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
                     icon: Icons.check_circle_rounded,
                     gold: true,
                     onPressed: () {
-                      Navigator.popUntil(context, (r) => r.isFirst);
+                      final orderId = _order?['id'] as int?;
+                      final orderRef = _order?['order_ref']?.toString() ?? widget.orderRef;
+                      if (orderId != null) {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => MarketRatingScreen(
+                              orderId: orderId,
+                              orderRef: orderRef,
+                            ),
+                          ),
+                        );
+                      } else {
+                        Navigator.popUntil(context, (r) => r.isFirst);
+                      }
                     },
                   ),
                 ],
