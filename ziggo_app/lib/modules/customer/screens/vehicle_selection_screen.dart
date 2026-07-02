@@ -269,7 +269,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     final booking = context.read<BookingProvider>();
     _estimates.clear();
     
-    if (!widget.isTruckMode && _serviceTypes.isEmpty) {
+    if (_serviceTypes.isEmpty) {
       await _fetchActiveServices();
     }
     
