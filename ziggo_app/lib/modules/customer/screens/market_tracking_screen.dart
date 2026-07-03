@@ -61,6 +61,82 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
     }
     _lastSeenStatus = newStatus;
     setState(() => _order = match.isEmpty ? null : match);
+    if (_order != null && _order!['status'] == 'rejected') {
+      _showRejectedDialog();
+    }
+  }
+
+  bool _isShowingRejectedDialog = false;
+
+  void _showRejectedDialog() {
+    if (_isShowingRejectedDialog) return;
+    _isShowingRejectedDialog = true;
+    _poll?.cancel();
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppStyles.radiusMd)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.error_outline_rounded,
+                    color: AppColors.error, size: 40),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Order Rejected',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 20,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Your order was rejected by the store. If you paid via wallet, your amount has been refunded.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.textSecondary, height: 1.5),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (_) => const MarketHomeScreen()),
+                      (route) => route.isFirst,
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.error,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppStyles.radiusSm)),
+                    elevation: 0,
+                  ),
+                  child: const Text('BACK TO HOME',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w900, color: Colors.white)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _showCancelConfirmation(BuildContext context) async {
