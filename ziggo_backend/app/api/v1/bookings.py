@@ -13,6 +13,7 @@ from ...database import get_db
 from ...models import (
     Booking,
     BookingStatus,
+    BookingMessage,
     Customer,
     Driver,
     User,
@@ -2029,6 +2030,16 @@ async def send_booking_message(
     if not sender_type:
         raise HTTPException(status_code=403, detail="Not part of this booking")
 
+    # Save message to DB
+    new_msg = BookingMessage(
+        booking_id=b.id,
+        sender_type=sender_type,
+        message=body.message,
+    )
+    db.add(new_msg)
+    await db.commit()
+    await db.refresh(new_msg)
+
     if target_user_id:
         payload = {
             "booking_id": b.id,
@@ -2037,4 +2048,33 @@ async def send_booking_message(
         }
         await manager.send(target_user_id, "chat_message", payload)
 
-    return {"status": "success"}
+    return {"status": "success", "message_id": new_msg.id}
+
+@router.get("/{booking_id}/messages")
+async def get_booking_messages(
+    booking_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    q = await db.execute(select(Booking).where(Booking.id == booking_id))
+    b = q.scalars().first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Booking not found")
+        
+    mq = await db.execute(
+        select(BookingMessage)
+        .where(BookingMessage.booking_id == booking_id)
+        .order_by(BookingMessage.created_at.asc())
+    )
+    messages = mq.scalars().all()
+    
+    return [
+        {
+            "id": m.id,
+            "booking_id": m.booking_id,
+            "sender_type": m.sender_type,
+            "message": m.message,
+            "created_at": m.created_at.isoformat() if m.created_at else None
+        }
+        for m in messages
+    ]

@@ -202,3 +202,14 @@ class PromoCode(Base):
     valid_from = Column(DateTime(timezone=True))
     valid_to = Column(DateTime(timezone=True))
     is_active = Column(Boolean, default=True)
+
+class BookingMessage(Base):
+    __tablename__ = "booking_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    booking_id = Column(Integer, ForeignKey("bookings.id", ondelete="CASCADE"), nullable=False, index=True)
+    sender_type = Column(String(20), nullable=False)  # 'customer' | 'driver'
+    message = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    booking = relationship("Booking")

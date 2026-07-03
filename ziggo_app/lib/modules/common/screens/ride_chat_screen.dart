@@ -2,11 +2,14 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/ws_client.dart';
 import '../../../core/storage/token_storage.dart';
+import '../../customer/booking_provider.dart';
 
 class RideChatScreen extends StatefulWidget {
   static bool isOpen = false;
@@ -197,6 +200,39 @@ class _RideChatScreenState extends State<RideChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    String subTitle = 'Active Ride Chat';
+    
+    // For customers, show vehicle number and ETA to pickup
+    if (!widget.isDriver) {
+      try {
+        final booking = context.watch<BookingProvider>().activeBooking;
+        if (booking != null && booking['driver'] != null) {
+          final driver = booking['driver'] as Map<String, dynamic>;
+          final plate = driver['vehicle_plate_number']?.toString() ?? '';
+          
+          final pickupLat = (booking['pickup_lat'] as num?)?.toDouble();
+          final pickupLng = (booking['pickup_lng'] as num?)?.toDouble();
+          final currentLat = (driver['current_lat'] as num?)?.toDouble();
+          final currentLng = (driver['current_lng'] as num?)?.toDouble();
+          
+          String etaStr = '';
+          if (pickupLat != null && pickupLng != null && currentLat != null && currentLng != null) {
+            final distMeters = const Distance().as(
+              LengthUnit.Meter,
+              LatLng(currentLat, currentLng),
+              LatLng(pickupLat, pickupLng),
+            );
+            // Assuming average urban speed ~25 km/h (416 m/min)
+            final minutes = (distMeters / 416).ceil();
+            etaStr = ' • ETA: $minutes min';
+          }
+          subTitle = '$plate$etaStr';
+        }
+      } catch (_) {
+        // Fallback to default subtitle if provider read fails
+      }
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -217,9 +253,9 @@ class _RideChatScreenState extends State<RideChatScreen> {
                 fontWeight: FontWeight.w900,
               ),
             ),
-            const Text(
-              'Active Ride Chat',
-              style: TextStyle(
+            Text(
+              subTitle,
+              style: const TextStyle(
                 color: AppColors.textTertiary,
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
@@ -227,14 +263,6 @@ class _RideChatScreenState extends State<RideChatScreen> {
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.phone, color: Colors.black),
-            onPressed: () {
-              // Usually handled by tapping the phone icon on the main screen
-            },
-          ),
-        ],
       ),
       body: Column(
         children: [
