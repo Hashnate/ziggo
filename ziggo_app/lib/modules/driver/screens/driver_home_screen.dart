@@ -16,6 +16,7 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/map/ziggo_map.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/network/ws_client.dart';
 import '../../auth/auth_provider.dart';
 import '../../customer/screens/support_screen.dart';
 import '../driver_provider.dart';
@@ -54,6 +55,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   bool _muted = false;           // local-only — wired into TTS when we add it
   StreamSubscription<Position>? _speedSub;
   StreamSubscription<RemoteMessage>? _notificationSubscription;
+  StreamSubscription? _wsSub;
   bool _isShowingRideRequest = false;
   bool _incentivesExpanded = true;
   bool _activeRideExpanded = true;
@@ -74,6 +76,23 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       final initialMessage = FcmService.instance.consumePendingClick();
       if (initialMessage != null) {
         _processNotificationMessage(initialMessage);
+      }
+    });
+
+    _wsSub = WsClient.instance.events.listen((msg) {
+      if (msg['event'] == 'chat_message') {
+        final data = msg['data'] as Map<String, dynamic>?;
+        if (data != null && data['message'] != null && data['sender_type'] != 'driver') {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Customer: ${data['message']}'),
+                backgroundColor: AppColors.primary,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        }
       }
     });
   }
@@ -134,6 +153,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   @override
   void dispose() {
+    _wsSub?.cancel();
     _speedSub?.cancel();
     _notificationSubscription?.cancel();
     _incentivePageController.dispose();
@@ -404,6 +424,68 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         );
       }
     }
+  }
+
+  Future<void> _messageCustomer(BuildContext context, int bookingId) async {
+    final presets = [
+      "I have arrived",
+      "I'm on my way",
+      "Stuck in traffic, will be slightly delayed",
+      "Where exactly are you?",
+      "Okay",
+    ];
+
+    await showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44, height: 5,
+                  decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text('Message Customer', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+              const SizedBox(height: 16),
+              ...presets.map((msg) => ListTile(
+                title: Text(msg, style: const TextStyle(fontWeight: FontWeight.w600)),
+                trailing: const Icon(Icons.send_rounded, size: 18, color: AppColors.primary),
+                contentPadding: EdgeInsets.zero,
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    await ApiClient.instance.dio.post(
+                      '/bookings/$bookingId/message',
+                      data: {'message': msg},
+                    );
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Message sent')),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Failed to send message')),
+                      );
+                    }
+                  }
+                },
+              )),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _openNavigation(double lat, double lng) async {
@@ -1641,6 +1723,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         constraints: const BoxConstraints(),
                         icon: const Icon(Icons.phone_rounded, color: AppColors.success, size: 22),
                         onPressed: () => _callPhone(customerPhone),
+                      ),
+                    if (customerPhone.isNotEmpty)
+                      const SizedBox(width: 12),
+                    if (customerPhone.isNotEmpty && ride['id'] != null)
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: const Icon(Icons.chat_bubble_rounded, color: AppColors.primary, size: 22),
+                        onPressed: () => _messageCustomer(context, ride['id'] as int),
                       ),
                     if (customerPhone.isNotEmpty && secondaryPhone != null && secondaryPhone.isNotEmpty)
                       const SizedBox(width: 12),

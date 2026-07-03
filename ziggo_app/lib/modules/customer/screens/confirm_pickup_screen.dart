@@ -100,14 +100,13 @@ class _ConfirmPickupScreenState extends State<ConfirmPickupScreen> {
               controller: _mapController,
               center: _currentPlace.location,
               zoom: 16,
-              showMyLocation: true,
+              showMyLocation: false,
               onPositionChanged: _onMapPositionChanged,
               markers: [
                 ZiggoMarker(
                   point: _currentPlace.location,
-                  icon: Icons.location_on,
+                  icon: Icons.arrow_upward_rounded,
                   color: const Color(0xFF0099FF),
-                  label: 'Meet your driver here',
                 ),
               ],
               circles: [

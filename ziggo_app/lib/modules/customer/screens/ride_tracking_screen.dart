@@ -13,6 +13,7 @@ import '../../../core/map/place_search_sheet.dart';
 import '../../../core/map/places.dart';
 import '../../../core/map/ziggo_map.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/network/ws_client.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../booking_provider.dart';
 import 'rating_screen.dart';
@@ -46,6 +47,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
   StreamSubscription<Position>? _positionSubscription;
   LatLng? _customerLatLng;
   double? _customerHeading;
+  StreamSubscription? _wsSub;
 
   @override
   void initState() {
@@ -54,6 +56,22 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
       context.read<BookingProvider>().loadActive();
     });
     _startPositionUpdates();
+    _wsSub = WsClient.instance.events.listen((msg) {
+      if (msg['event'] == 'chat_message') {
+        final data = msg['data'] as Map<String, dynamic>?;
+        if (data != null && data['message'] != null && data['sender_type'] != 'customer') {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Driver: ${data['message']}'),
+                backgroundColor: AppColors.primary,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        }
+      }
+    });
   }
 
   void _startPositionUpdates() {
@@ -74,6 +92,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
 
   @override
   void dispose() {
+    _wsSub?.cancel();
     _nearbyTimer?.cancel();
     _positionSubscription?.cancel();
     super.dispose();
@@ -1617,16 +1636,60 @@ class _DriverCard extends StatelessWidget {
   }
 
   Future<void> _messageDriver(BuildContext context, String? phone) async {
-    if (phone == null || phone.trim().isEmpty) {
-      _toast(context, 'Driver phone unavailable');
-      return;
-    }
-    final uri = Uri.parse('sms:${phone.trim()}');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    } else {
-      if (context.mounted) _toast(context, 'No messaging app available');
-    }
+    final booking = context.read<BookingProvider>().activeBooking;
+    if (booking == null) return;
+    
+    final presets = [
+      "I'm on my way",
+      "Please wait a minute",
+      "Where are you?",
+      "I'll be there in 2 mins",
+      "Okay",
+    ];
+
+    await showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44, height: 5,
+                  decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text('Message Driver', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+              const SizedBox(height: 16),
+              ...presets.map((msg) => ListTile(
+                title: Text(msg, style: const TextStyle(fontWeight: FontWeight.w600)),
+                trailing: const Icon(Icons.send_rounded, size: 18, color: AppColors.primary),
+                contentPadding: EdgeInsets.zero,
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    await ApiClient.instance.dio.post(
+                      '/bookings/${booking['id']}/message',
+                      data: {'message': msg},
+                    );
+                    if (context.mounted) _toast(context, 'Message sent');
+                  } catch (e) {
+                    if (context.mounted) _toast(context, 'Failed to send message');
+                  }
+                },
+              )),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _toast(BuildContext context, String msg) {

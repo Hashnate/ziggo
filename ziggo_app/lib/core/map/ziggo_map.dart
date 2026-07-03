@@ -59,7 +59,7 @@ class CustomMarkerData {
   CustomMarkerData(this.bitmap, this.anchor);
 }
 
-Future<CustomMarkerData> _createCustomMarkerBitmap(String label, Color color, double pixelRatio) async {
+Future<CustomMarkerData> _createCustomMarkerBitmap(String label, Color color, IconData? icon, double pixelRatio) async {
   final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
   final Canvas canvas = Canvas(pictureRecorder);
   canvas.scale(pixelRatio);
@@ -137,11 +137,31 @@ Future<CustomMarkerData> _createCustomMarkerBitmap(String label, Color color, do
       ..style = PaintingStyle.fill;
     canvas.drawCircle(Offset(centerX, centerY), 7.5, dotOuterPaint);
 
-    // Draw center dot inner fill
-    final Paint dotInnerPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(Offset(centerX, centerY), 4.5, dotInnerPaint);
+    if (icon != null) {
+      final TextPainter iconPainter = TextPainter(
+        text: TextSpan(
+          text: String.fromCharCode(icon.codePoint),
+          style: TextStyle(
+            fontSize: 12.0,
+            fontFamily: icon.fontFamily,
+            package: icon.fontPackage,
+            color: color,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      iconPainter.layout();
+      iconPainter.paint(
+        canvas,
+        Offset(centerX - iconPainter.width / 2, centerY - iconPainter.height / 2),
+      );
+    } else {
+      // Draw center dot inner fill
+      final Paint dotInnerPaint = Paint()
+        ..color = color
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(Offset(centerX, centerY), 4.5, dotInnerPaint);
+    }
 
     // Draw bubble shadow
     final double bubbleY = 8.0;
@@ -252,11 +272,31 @@ Future<CustomMarkerData> _createCustomMarkerBitmap(String label, Color color, do
     ..style = PaintingStyle.fill;
   canvas.drawCircle(Offset(centerX, centerY), 9, dotOuterPaint);
   
-  // 5. Draw Center dot inner fill
-  final Paint dotInnerPaint = Paint()
-    ..color = Colors.black
-    ..style = PaintingStyle.fill;
-  canvas.drawCircle(Offset(centerX, centerY), 5.5, dotInnerPaint);
+  if (icon != null) {
+    final TextPainter iconPainter = TextPainter(
+      text: TextSpan(
+        text: String.fromCharCode(icon.codePoint),
+        style: TextStyle(
+          fontSize: 14.0,
+          fontFamily: icon.fontFamily,
+          package: icon.fontPackage,
+          color: Colors.black,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    iconPainter.layout();
+    iconPainter.paint(
+      canvas,
+      Offset(centerX - iconPainter.width / 2, centerY - iconPainter.height / 2),
+    );
+  } else {
+    // 5. Draw Center dot inner fill
+    final Paint dotInnerPaint = Paint()
+      ..color = Colors.black
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(centerX, centerY), 5.5, dotInnerPaint);
+  }
   
   // 6. Define bubble rect and tail path
   final double bubbleY = 8;
@@ -312,6 +352,86 @@ Future<CustomMarkerData> _createCustomMarkerBitmap(String label, Color color, do
   return CustomMarkerData(
     gmaps.BitmapDescriptor.fromBytes(uint8List),
     Offset(0.5, centerY / height),
+  );
+}
+
+Future<CustomMarkerData> _createIconOnlyMarkerBitmap(IconData icon, Color color, double size, double pixelRatio) async {
+  final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
+  final Canvas canvas = Canvas(pictureRecorder);
+  canvas.scale(pixelRatio);
+
+  final double width = size + 20;
+  final double height = size + 30;
+  final double centerX = width / 2;
+  final double centerY = size / 2 + 5;
+
+  // Shadow
+  final Paint shadowPaint = Paint()
+    ..color = Colors.black.withOpacity(0.12)
+    ..style = PaintingStyle.fill;
+  canvas.drawCircle(Offset(centerX, centerY + 3), size / 2, shadowPaint);
+
+  // Background circle
+  final Paint circlePaint = Paint()
+    ..color = color
+    ..style = PaintingStyle.fill;
+  canvas.drawCircle(Offset(centerX, centerY), size / 2, circlePaint);
+  
+  // White border
+  final Paint borderPaint = Paint()
+    ..color = Colors.white
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 3.0;
+  canvas.drawCircle(Offset(centerX, centerY), size / 2, borderPaint);
+
+  // Icon
+  final TextPainter iconPainter = TextPainter(
+    text: TextSpan(
+      text: String.fromCharCode(icon.codePoint),
+      style: TextStyle(
+        fontSize: size * 0.6,
+        fontFamily: icon.fontFamily,
+        package: icon.fontPackage,
+        color: Colors.white,
+      ),
+    ),
+    textDirection: TextDirection.ltr,
+  );
+  iconPainter.layout();
+  iconPainter.paint(
+    canvas,
+    Offset(centerX - iconPainter.width / 2, centerY - iconPainter.height / 2),
+  );
+
+  // Shadow for dot
+  final Paint dotShadowPaint = Paint()
+    ..color = Colors.black.withOpacity(0.2)
+    ..style = PaintingStyle.fill;
+  canvas.drawCircle(Offset(centerX, height - 8), 5, dotShadowPaint);
+
+  // Small black dot at bottom
+  final Paint dotPaint = Paint()
+    ..color = Colors.black
+    ..style = PaintingStyle.fill;
+  
+  // White border for dot
+  final Paint dotBorderPaint = Paint()
+    ..color = Colors.white
+    ..style = PaintingStyle.fill;
+  
+  canvas.drawCircle(Offset(centerX, height - 10), 7, dotBorderPaint);
+  canvas.drawCircle(Offset(centerX, height - 10), 4.5, dotPaint);
+
+  final ui.Image img = await pictureRecorder.endRecording().toImage(
+    (width * pixelRatio).toInt(),
+    (height * pixelRatio).toInt(),
+  );
+  final ByteData? byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+  final Uint8List uint8List = byteData!.buffer.asUint8List();
+
+  return CustomMarkerData(
+    gmaps.BitmapDescriptor.fromBytes(uint8List),
+    Offset(0.5, (height - 10) / height),
   );
 }
 
@@ -494,14 +614,31 @@ class _ZiggoMapState extends State<ZiggoMap> {
     super.dispose();
   }
 
-  Future<void> _ensureLabelIcon(String label, Color color, double pixelRatio) async {
-    final key = '$label-${color.value}-$pixelRatio';
+  Future<void> _ensureLabelIcon(String label, Color color, IconData? icon, double pixelRatio) async {
+    final key = '$label-${color.value}-$pixelRatio-${icon?.codePoint}';
     if (_customLabelCache.containsKey(key) || _loadingLabels.contains(key)) {
       return;
     }
     _loadingLabels.add(key);
     try {
-      final data = await _createCustomMarkerBitmap(label, color, pixelRatio);
+      final data = await _createCustomMarkerBitmap(label, color, icon, pixelRatio);
+      _customLabelCache[key] = data.bitmap;
+      _customLabelAnchors[key] = data.anchor;
+      if (mounted) setState(() {});
+    } catch (_) {
+    } finally {
+      _loadingLabels.remove(key);
+    }
+  }
+
+  Future<void> _ensureIconMarker(IconData icon, Color color, double size, double pixelRatio) async {
+    final key = 'icon-${icon.codePoint}-${color.value}-$size-$pixelRatio';
+    if (_customLabelCache.containsKey(key) || _loadingLabels.contains(key)) {
+      return;
+    }
+    _loadingLabels.add(key);
+    try {
+      final data = await _createIconOnlyMarkerBitmap(icon, color, size, pixelRatio);
       _customLabelCache[key] = data.bitmap;
       _customLabelAnchors[key] = data.anchor;
       if (mounted) setState(() {});
@@ -569,13 +706,13 @@ class _ZiggoMapState extends State<ZiggoMap> {
       Offset anchor = const Offset(0.5, 1.0);
       
       if (m.label != null) {
-        final key = '${m.label}-${m.color.value}-$pixelRatio';
+        final key = '${m.label}-${m.color.value}-$pixelRatio-${m.icon.codePoint}';
         final cached = _customLabelCache[key];
         if (cached != null) {
           icon = cached;
           anchor = _customLabelAnchors[key] ?? const Offset(0.5, 0.70);
         } else {
-          _ensureLabelIcon(m.label!, m.color, pixelRatio);
+          _ensureLabelIcon(m.label!, m.color, m.icon, pixelRatio);
           icon = gmaps.BitmapDescriptor.defaultMarkerWithHue(_hueFor(m.color));
         }
       } else if (m.assetPath != null) {
@@ -592,7 +729,15 @@ class _ZiggoMapState extends State<ZiggoMap> {
           icon = gmaps.BitmapDescriptor.defaultMarkerWithHue(_hueFor(m.color));
         }
       } else {
-        icon = gmaps.BitmapDescriptor.defaultMarkerWithHue(_hueFor(m.color));
+        final key = 'icon-${m.icon.codePoint}-${m.color.value}-${m.size}-$pixelRatio';
+        final cached = _customLabelCache[key];
+        if (cached != null) {
+          icon = cached;
+          anchor = _customLabelAnchors[key] ?? const Offset(0.5, 0.70);
+        } else {
+          _ensureIconMarker(m.icon, m.color, m.size, pixelRatio);
+          icon = gmaps.BitmapDescriptor.defaultMarkerWithHue(_hueFor(m.color));
+        }
       }
       
       gMarkers.add(

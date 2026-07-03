@@ -7,6 +7,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request, status, Qu
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
+from pydantic import BaseModel
 
 from ...database import get_db
 from ...models import (
@@ -1966,3 +1967,56 @@ async def update_booking_destination(
             await db.commit()
 
     return await _booking_to_response(db, b)
+
+class MessageRequest(BaseModel):
+    message: str
+
+@router.post("/{booking_id}/message")
+async def send_booking_message(
+    booking_id: int, 
+    body: MessageRequest, 
+    db: AsyncSession = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    q = await db.execute(select(Booking).where(Booking.id == booking_id))
+    b = q.scalars().first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    target_user_id = None
+    sender_type = None
+
+    if b.customer_id:
+        cq = await db.execute(select(Customer).where(Customer.id == b.customer_id))
+        cust = cq.scalars().first()
+        if cust and cust.user_id == current_user.id:
+            sender_type = 'customer'
+            if b.driver_id:
+                dq = await db.execute(select(Driver).where(Driver.id == b.driver_id))
+                drv = dq.scalars().first()
+                if drv:
+                    target_user_id = drv.user_id
+
+    if b.driver_id and not sender_type:
+        dq = await db.execute(select(Driver).where(Driver.id == b.driver_id))
+        drv = dq.scalars().first()
+        if drv and drv.user_id == current_user.id:
+            sender_type = 'driver'
+            if b.customer_id:
+                cq = await db.execute(select(Customer).where(Customer.id == b.customer_id))
+                cust = cq.scalars().first()
+                if cust:
+                    target_user_id = cust.user_id
+
+    if not sender_type:
+        raise HTTPException(status_code=403, detail="Not part of this booking")
+
+    if target_user_id:
+        payload = {
+            "booking_id": b.id,
+            "sender_type": sender_type,
+            "message": body.message,
+        }
+        await manager.send(target_user_id, "chat_message", payload)
+
+    return {"status": "success"}
