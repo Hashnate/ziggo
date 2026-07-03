@@ -696,6 +696,92 @@ async def create_food_order(
     )
 
 
+@router.get("/orders/active")
+async def get_active_food_order(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Return the caller's currently-in-progress food order (driver or customer).
+
+    Customer view spans the full lifecycle (PENDING through OUT_FOR_DELIVERY).
+    Driver view is narrower — under P2 a driver only owns the order from
+    READY_FOR_PICKUP onwards.
+    """
+    customer_active = (
+        FoodOrderStatus.PENDING,
+        FoodOrderStatus.CONFIRMED,
+        FoodOrderStatus.PREPARING,
+        FoodOrderStatus.READY_FOR_PICKUP,
+        FoodOrderStatus.OUT_FOR_DELIVERY,
+    )
+    driver_active = (
+        FoodOrderStatus.CONFIRMED,
+        FoodOrderStatus.PREPARING,
+        FoodOrderStatus.READY_FOR_PICKUP,
+        FoodOrderStatus.OUT_FOR_DELIVERY,
+    )
+    if user.role == UserRole.DRIVER:
+        driver = await _get_driver(db, user)
+        q = await db.execute(
+            select(FoodOrder)
+            .where(FoodOrder.driver_id == driver.id, FoodOrder.status.in_(driver_active))
+            .order_by(FoodOrder.id.desc())
+        )
+    elif user.role == UserRole.CUSTOMER:
+        cust_q = await db.execute(select(Customer).where(Customer.user_id == user.id))
+        customer = cust_q.scalars().first()
+        if not customer:
+            return None
+        q = await db.execute(
+            select(FoodOrder)
+            .where(FoodOrder.customer_id == customer.id, FoodOrder.status.in_(customer_active))
+            .order_by(FoodOrder.id.desc())
+        )
+    else:
+        return None
+
+    o = q.scalars().first()
+    if not o:
+        return None
+
+    # Join restaurant + customer user so the driver UI can render pickup info,
+    # navigate-to coordinates, and a tappable customer phone number.
+    r_q = await db.execute(select(Restaurant).where(Restaurant.id == o.restaurant_id))
+    r = r_q.scalars().first()
+    cust_q = await db.execute(select(Customer).where(Customer.id == o.customer_id))
+    c = cust_q.scalars().first()
+    cust_user = None
+    if c:
+        u_q = await db.execute(select(User).where(User.id == c.user_id))
+        cust_user = u_q.scalars().first()
+
+    return {
+        "id": o.id,
+        "order_ref": o.order_ref,
+        "status": o.status.value,
+        "restaurant_id": o.restaurant_id,
+        "customer_id": o.customer_id,
+        "driver_id": o.driver_id,
+        "restaurant_name": r.name if r else None,
+        "restaurant_address": r.address if r else None,
+        "restaurant_phone": r.phone_number if r else None,
+        "pickup_lat": float(r.lat) if r and r.lat is not None else None,
+        "pickup_lng": float(r.lng) if r and r.lng is not None else None,
+        "delivery_address": o.delivery_address,
+        "delivery_lat": float(o.delivery_lat) if o.delivery_lat else None,
+        "delivery_lng": float(o.delivery_lng) if o.delivery_lng else None,
+        "customer_name": cust_user.full_name if cust_user else None,
+        "customer_phone": cust_user.phone_number if cust_user else None,
+        "final_amount": float(o.final_amount or 0),
+        "delivery_fee": float(o.delivery_fee or 0),
+        "payment_method": o.payment_method,
+        "payment_status": o.payment_status,
+        "instructions": o.instructions,
+        "customer_rating": o.customer_rating,
+        "customer_feedback": o.customer_feedback,
+    }
+
+
 @router.get("/orders/{order_id}")
 async def get_food_order(
     order_id: int,
@@ -1117,92 +1203,19 @@ async def update_food_order_status(
             "order_update",
             {"food_order_id": order.id, "status": order.status.value},
         )
+    if order.driver_id:
+        drv_q = await db.execute(select(Driver).where(Driver.id == order.driver_id))
+        drv = drv_q.scalars().first()
+        if drv:
+            await manager.send(
+                drv.user_id,
+                "order_update",
+                {"food_order_id": order.id, "status": order.status.value},
+            )
 
     return {"ok": True, "status": order.status.value}
 
 
-@router.get("/orders/active")
-async def get_active_food_order(
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    """Return the caller's currently-in-progress food order (driver or customer).
-
-    Customer view spans the full lifecycle (PENDING through OUT_FOR_DELIVERY).
-    Driver view is narrower — under P2 a driver only owns the order from
-    READY_FOR_PICKUP onwards.
-    """
-    customer_active = (
-        FoodOrderStatus.PENDING,
-        FoodOrderStatus.CONFIRMED,
-        FoodOrderStatus.PREPARING,
-        FoodOrderStatus.READY_FOR_PICKUP,
-        FoodOrderStatus.OUT_FOR_DELIVERY,
-    )
-    driver_active = (
-        FoodOrderStatus.READY_FOR_PICKUP,
-        FoodOrderStatus.OUT_FOR_DELIVERY,
-    )
-    if user.role == UserRole.DRIVER:
-        driver = await _get_driver(db, user)
-        q = await db.execute(
-            select(FoodOrder)
-            .where(FoodOrder.driver_id == driver.id, FoodOrder.status.in_(driver_active))
-            .order_by(FoodOrder.id.desc())
-        )
-    elif user.role == UserRole.CUSTOMER:
-        cust_q = await db.execute(select(Customer).where(Customer.user_id == user.id))
-        customer = cust_q.scalars().first()
-        if not customer:
-            return None
-        q = await db.execute(
-            select(FoodOrder)
-            .where(FoodOrder.customer_id == customer.id, FoodOrder.status.in_(customer_active))
-            .order_by(FoodOrder.id.desc())
-        )
-    else:
-        return None
-
-    o = q.scalars().first()
-    if not o:
-        return None
-
-    # Join restaurant + customer user so the driver UI can render pickup info,
-    # navigate-to coordinates, and a tappable customer phone number.
-    r_q = await db.execute(select(Restaurant).where(Restaurant.id == o.restaurant_id))
-    r = r_q.scalars().first()
-    cust_q = await db.execute(select(Customer).where(Customer.id == o.customer_id))
-    c = cust_q.scalars().first()
-    cust_user = None
-    if c:
-        u_q = await db.execute(select(User).where(User.id == c.user_id))
-        cust_user = u_q.scalars().first()
-
-    return {
-        "id": o.id,
-        "order_ref": o.order_ref,
-        "status": o.status.value,
-        "restaurant_id": o.restaurant_id,
-        "customer_id": o.customer_id,
-        "driver_id": o.driver_id,
-        "restaurant_name": r.name if r else None,
-        "restaurant_address": r.address if r else None,
-        "restaurant_phone": r.phone_number if r else None,
-        "pickup_lat": float(r.lat) if r and r.lat is not None else None,
-        "pickup_lng": float(r.lng) if r and r.lng is not None else None,
-        "delivery_address": o.delivery_address,
-        "delivery_lat": float(o.delivery_lat) if o.delivery_lat else None,
-        "delivery_lng": float(o.delivery_lng) if o.delivery_lng else None,
-        "customer_name": cust_user.full_name if cust_user else None,
-        "customer_phone": cust_user.phone_number if cust_user else None,
-        "final_amount": float(o.final_amount or 0),
-        "delivery_fee": float(o.delivery_fee or 0),
-        "payment_method": o.payment_method,
-        "payment_status": o.payment_status,
-        "instructions": o.instructions,
-        "customer_rating": o.customer_rating,
-        "customer_feedback": o.customer_feedback,
-    }
 
 
 @router.post("/orders/{order_id}/cancel")

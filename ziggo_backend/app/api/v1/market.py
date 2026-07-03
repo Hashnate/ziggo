@@ -585,6 +585,66 @@ async def list_my_market_orders(
     ]
 
 
+@router.get("/orders/active")
+async def get_active_market_order(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Driver's currently-in-progress market delivery, mirroring /food/orders/active."""
+    driver_active = (
+        MarketOrderStatus.CONFIRMED,
+        MarketOrderStatus.PREPARING,
+        MarketOrderStatus.READY_FOR_PICKUP,
+        MarketOrderStatus.OUT_FOR_DELIVERY,
+    )
+    if user.role != UserRole.DRIVER:
+        return None
+    driver = await _get_driver(db, user)
+    q = await db.execute(
+        select(MarketOrder)
+        .where(MarketOrder.driver_id == driver.id, MarketOrder.status.in_(driver_active))
+        .order_by(MarketOrder.id.desc())
+    )
+    o = q.scalars().first()
+    if not o:
+        return None
+
+    v_q = await db.execute(select(MarketVendor).where(MarketVendor.id == o.vendor_id))
+    vendor = v_q.scalars().first()
+    cust_q = await db.execute(select(Customer).where(Customer.id == o.customer_id))
+    c = cust_q.scalars().first()
+    cust_user = None
+    if c:
+        u_q = await db.execute(select(User).where(User.id == c.user_id))
+        cust_user = u_q.scalars().first()
+
+    return {
+        "id": o.id,
+        "order_ref": o.order_ref,
+        "status": o.status.value,
+        "vendor_id": o.vendor_id,
+        "customer_id": o.customer_id,
+        "driver_id": o.driver_id,
+        "vendor_name": vendor.name if vendor else None,
+        "vendor_address": vendor.address if vendor else None,
+        "vendor_phone": vendor.phone_number if vendor else None,
+        "pickup_lat": float(vendor.lat) if vendor and vendor.lat is not None else None,
+        "pickup_lng": float(vendor.lng) if vendor and vendor.lng is not None else None,
+        "delivery_address": o.delivery_address,
+        "delivery_lat": float(o.delivery_lat) if o.delivery_lat else None,
+        "delivery_lng": float(o.delivery_lng) if o.delivery_lng else None,
+        "customer_name": cust_user.full_name if cust_user else None,
+        "customer_phone": cust_user.phone_number if cust_user else None,
+        "final_amount": float(o.final_amount or 0),
+        "delivery_fee": float(o.delivery_fee or 0),
+        "payment_method": o.payment_method,
+        "payment_status": o.payment_status,
+        "instructions": o.instructions,
+        "customer_rating": o.customer_rating,
+        "customer_feedback": o.customer_feedback,
+    }
+
+
 @router.get("/orders/{order_id}")
 async def get_market_order(
     order_id: int,
@@ -893,66 +953,19 @@ async def update_market_order_status(
             "market_order_update",
             {"market_order_id": order.id, "status": order.status.value},
         )
+    if order.driver_id:
+        drv_q = await db.execute(select(Driver).where(Driver.id == order.driver_id))
+        drv = drv_q.scalars().first()
+        if drv:
+            await manager.send(
+                drv.user_id,
+                "market_order_update",
+                {"market_order_id": order.id, "status": order.status.value},
+            )
 
     return {"ok": True, "status": order.status.value}
 
 
-@router.get("/orders/active")
-async def get_active_market_order(
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    """Driver's currently-in-progress market delivery, mirroring /food/orders/active."""
-    driver_active = (
-        MarketOrderStatus.READY_FOR_PICKUP,
-        MarketOrderStatus.OUT_FOR_DELIVERY,
-    )
-    if user.role != UserRole.DRIVER:
-        return None
-    driver = await _get_driver(db, user)
-    q = await db.execute(
-        select(MarketOrder)
-        .where(MarketOrder.driver_id == driver.id, MarketOrder.status.in_(driver_active))
-        .order_by(MarketOrder.id.desc())
-    )
-    o = q.scalars().first()
-    if not o:
-        return None
-
-    v_q = await db.execute(select(MarketVendor).where(MarketVendor.id == o.vendor_id))
-    vendor = v_q.scalars().first()
-    cust_q = await db.execute(select(Customer).where(Customer.id == o.customer_id))
-    c = cust_q.scalars().first()
-    cust_user = None
-    if c:
-        u_q = await db.execute(select(User).where(User.id == c.user_id))
-        cust_user = u_q.scalars().first()
-
-    return {
-        "id": o.id,
-        "order_ref": o.order_ref,
-        "status": o.status.value,
-        "vendor_id": o.vendor_id,
-        "customer_id": o.customer_id,
-        "driver_id": o.driver_id,
-        "vendor_name": vendor.name if vendor else None,
-        "vendor_address": vendor.address if vendor else None,
-        "vendor_phone": vendor.phone_number if vendor else None,
-        "pickup_lat": float(vendor.lat) if vendor and vendor.lat is not None else None,
-        "pickup_lng": float(vendor.lng) if vendor and vendor.lng is not None else None,
-        "delivery_address": o.delivery_address,
-        "delivery_lat": float(o.delivery_lat) if o.delivery_lat else None,
-        "delivery_lng": float(o.delivery_lng) if o.delivery_lng else None,
-        "customer_name": cust_user.full_name if cust_user else None,
-        "customer_phone": cust_user.phone_number if cust_user else None,
-        "final_amount": float(o.final_amount or 0),
-        "delivery_fee": float(o.delivery_fee or 0),
-        "payment_method": o.payment_method,
-        "payment_status": o.payment_status,
-        "instructions": o.instructions,
-        "customer_rating": o.customer_rating,
-        "customer_feedback": o.customer_feedback,
-    }
 
 
 @router.post("/orders/{order_id}/cancel")
