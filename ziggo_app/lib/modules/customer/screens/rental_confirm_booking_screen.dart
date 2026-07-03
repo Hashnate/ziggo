@@ -89,7 +89,8 @@ class _RentalConfirmBookingScreenState extends State<RentalConfirmBookingScreen>
     else if (widget.vehicleType == 'van') base = 2500;
     else base = 1000;
 
-    return base * widget.hours;
+    double extraKm = widget.distance > 5 ? (widget.distance - 5) : 0;
+    return (base * widget.hours) + (extraKm * 140);
   }
 
   @override

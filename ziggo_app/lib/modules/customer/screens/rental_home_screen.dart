@@ -430,6 +430,8 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
       child: Row(
         children: _vehicles.map((v) {
           final sel = _vehicleType == v.$1;
+          final extraKm = _distance > 5 ? (_distance - 5) : 0;
+          final totalPrice = (v.$5 * _hours) + (extraKm * 140);
           return GestureDetector(
             onTap: () => setState(() => _vehicleType = v.$1),
             child: Container(
@@ -454,7 +456,7 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
                   Text(v.$2, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: sel ? AppColors.primary : AppColors.textPrimary)),
                   const SizedBox(height: 4),
                   Text(
-                    'Rs.${v.$5.toInt() * _hours}',
+                    'Rs.${totalPrice.toInt()}',
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: sel ? AppColors.primary.withOpacity(0.8) : AppColors.textSecondary),
                   ),
                 ],
