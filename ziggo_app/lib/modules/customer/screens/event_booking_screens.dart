@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../wallet_provider.dart';
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 
@@ -478,6 +480,21 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
   Future<void> _purchase() async {
     if (!_agreed || _busy) return;
     setState(() => _busy = true);
+    
+    if (_paymentMethod == 'card') {
+      final wallet = context.read<WalletProvider>();
+      final err = await wallet.topUpViaPayHere(context, _total);
+      if (!mounted) return;
+      if (err != null) {
+        setState(() => _busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(err),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFFEF4444),
+        ));
+        return;
+      }
+    }
     try {
       final resp = await ApiClient.instance.dio.post(
         '/events/${widget.event['id']}/book',
@@ -485,7 +502,7 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
           'items': widget.selected
               .map((t) => {'tier_id': t['id'], 'quantity': t['quantity']})
               .toList(),
-          'payment_method': _paymentMethod,
+          'payment_method': 'wallet',
           if (_promoCode != null && _promoCode!.isNotEmpty) 'promo_code': _promoCode,
         },
       );
