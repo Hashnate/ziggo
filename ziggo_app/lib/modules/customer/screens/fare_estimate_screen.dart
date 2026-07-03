@@ -1,7 +1,8 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:latlong2/latlong.dart' hide Path;
 import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
@@ -32,6 +33,11 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
   String _tripType = 'one_way';
   List<Place> _stops = [];
 
+  bool _isDragging = false;
+  bool _isResolving = false;
+  LatLng? _deviceLocation;
+  Timer? _debounceTimer;
+
   @override
   void initState() {
     super.initState();
@@ -43,21 +49,69 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
   @override
   void dispose() {
     _nearbyTimer?.cancel();
+    _debounceTimer?.cancel();
     super.dispose();
   }
 
   Future<void> _initLocation() async {
     final here = await MapsService.instance.currentLocationAsPlace();
     if (!mounted || here == null) return;
-    setState(() => _currentLocation = here);
+    setState(() {
+      _currentLocation = here;
+      _deviceLocation = here.location;
+    });
     _mapController.moveTo(here.location, zoom: 16);
     _startNearbyDriverPolling();
+  }
+
+  void _onMapPositionChanged(LatLng center) {
+    setState(() {
+      _isDragging = true;
+      _currentLocation = Place(
+        'Fetching address...',
+        'Fetching address...',
+        center,
+      );
+    });
+
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 600), () {
+      if (mounted) {
+        setState(() {
+          _isDragging = false;
+        });
+      }
+      _resolveLocation(center);
+    });
+  }
+
+  Future<void> _resolveLocation(LatLng center) async {
+    if (!mounted) return;
+    setState(() => _isResolving = true);
+
+    final address = await MapsService.instance.reverseGeocode(center);
+
+    if (!mounted) return;
+
+    if (address != null) {
+      setState(() {
+        _currentLocation = Place(
+          address.split(',').first, // Main text
+          address,                  // Full address
+          center,
+        );
+      });
+    }
+    setState(() => _isResolving = false);
   }
 
   Future<void> _moveToCurrentLocation() async {
     final here = await MapsService.instance.currentLocationAsPlace();
     if (!mounted || here == null) return;
-    setState(() => _currentLocation = here);
+    setState(() {
+      _currentLocation = here;
+      _deviceLocation = here.location;
+    });
     _mapController.moveTo(here.location, zoom: 16);
   }
 
@@ -222,6 +276,12 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
 
   @override
   Widget build(BuildContext context) {
+    bool isAtDeviceLocation = false;
+    if (_currentLocation != null && _deviceLocation != null) {
+      final dist = const Distance().as(LengthUnit.Meter, _currentLocation!.location, _deviceLocation!);
+      isAtDeviceLocation = dist < 20;
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Stack(
@@ -231,16 +291,80 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
               controller: _mapController,
               center: _currentLocation?.location ?? kColomboCenter,
               zoom: 16,
-              showMyLocation: false, // We'll show a custom marker instead
-              markers: [
-                if (_currentLocation != null)
-                  pinMarker(
-                    point: _currentLocation!.location,
-                    icon: Icons.my_location_rounded,
-                    color: AppColors.info,
-                    label: widget.isTruckMode ? 'Meet your truck here' : 'Meet your driver here',
-                  ),
-              ],
+              showMyLocation: true,
+              onPositionChanged: _onMapPositionChanged,
+            ),
+          ),
+          
+          // Center Pin (Fixed in center of screen)
+          Align(
+            alignment: Alignment.center,
+            child: FractionalTranslation(
+              translation: const Offset(0.0, -0.5),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+                transform: Matrix4.translationValues(0, _isDragging ? -15.0 : 0.0, 0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Tooltip
+                    if (isAtDeviceLocation) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF009DE0),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 3)),
+                          ],
+                        ),
+                        child: Text(
+                          widget.isTruckMode ? 'Meet your truck here' : 'Meet your driver here',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      // Small triangle/arrow pointing down
+                      CustomPaint(
+                        size: const Size(12, 8),
+                        painter: _TrianglePainter(color: const Color(0xFF009DE0)),
+                      ),
+                      const SizedBox(height: 4),
+                    ],
+                    // The human icon with shadow
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        AnimatedOpacity(
+                          duration: const Duration(milliseconds: 200),
+                          opacity: _isDragging ? 0.3 : 1.0,
+                          child: Container(
+                            width: 16,
+                            height: 6,
+                            margin: const EdgeInsets.only(top: 36),
+                            decoration: BoxDecoration(
+                              color: Colors.black45,
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: const [
+                                BoxShadow(color: Colors.black26, blurRadius: 4),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const Icon(
+                          Icons.accessibility_new_rounded,
+                          size: 48,
+                          color: Colors.black87,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
           SafeArea(
@@ -644,4 +768,28 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
       ),
     );
   }
+}
+
+class _TrianglePainter extends CustomPainter {
+  final Color color;
+
+  _TrianglePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final path = ui.Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width / 2, size.height)
+      ..close();
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
