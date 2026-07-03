@@ -12,7 +12,7 @@ from .user import (
     ReferralKind,
     ReferralStatus,
 )
-from .booking import Booking, BookingStatus, BookingStop, Payment, PromoCode
+from .booking import Booking, BookingStatus, BookingStop, Payment, PromoCode, BookingMessage
 from .corporate import CorporateAccount, CorporateMember
 from .misc import (
     WalletTransaction,
@@ -71,6 +71,7 @@ __all__ = [
     "ReferralStatus",
     "Booking",
     "BookingStatus",
+    "BookingMessage",
     "BookingStop",
     "Payment",
     "PromoCode",
