@@ -357,8 +357,8 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
                         ),
                         Image.asset(
                           'assets/icons/custom_pickup_pin.png',
-                          width: 48,
-                          height: 48,
+                          width: 58,
+                          height: 58,
                         ),
                       ],
                     ),
