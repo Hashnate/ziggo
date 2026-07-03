@@ -3872,6 +3872,8 @@ async def admin_market_new_submit(
     await db.commit()
     await db.refresh(v)
 
+    return RedirectResponse(url="/admin/market", status_code=303)
+
 
 @router.post("/market/{vendor_id}/pay-settlement")
 async def admin_market_pay_settlement(
@@ -4119,7 +4121,24 @@ async def admin_market_vendor_edit(
         v.image_url = vendor_img_url
         v.logo_url = vendor_img_url
         
-    v.phone_number = phone_number.strip() or v.phone_number
+    if phone_number.strip():
+        new_phone = phone_number.strip()
+        v.phone_number = new_phone
+        from app.models import User, UserRole
+        uq = await db.execute(select(User).where(User.phone_number == new_phone))
+        new_owner = uq.scalars().first()
+        if new_owner is None:
+            new_owner = User(
+                phone_number=new_phone,
+                role=UserRole.MARKET_OWNER,
+                is_active=True,
+            )
+            db.add(new_owner)
+            await db.flush()
+        else:
+            if new_owner.role in (UserRole.CUSTOMER, UserRole.RESTAURANT_OWNER):
+                new_owner.role = UserRole.MARKET_OWNER
+        v.owner_id = new_owner.id
     v.opening_time = opening_time.strip() or v.opening_time
     v.closing_time = closing_time.strip() or v.closing_time
     v.delivery_fee = Decimal(str(delivery_fee))
