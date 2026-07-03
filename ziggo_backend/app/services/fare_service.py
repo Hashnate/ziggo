@@ -256,20 +256,22 @@ async def calculate_fare(
         platform_pct = float(setting.platform_fee_percent) if (setting.platform_fee_percent is not None and float(setting.platform_fee_percent) > 0) else sys_commission
         surge = float(setting.surge_multiplier or 1)
         boost_val = float(setting.boost or 0)
-        passenger_deductible_val = float(setting.passenger_deductible or 0)
+        passenger_deductible_pct = float(setting.passenger_deductible or 0)
+        pickup_fee_pct = float(setting.pickup_fee or 0)
     else:
         d = DEFAULTS.get(service_type, DEFAULTS["car"])
         base, per_km, per_min, min_fare = d["base"], d["per_km"], d["per_min"], d["min"]
         platform_pct = sys_commission
         surge = 1.0
-        boost_val, passenger_deductible_val = 0.0, 0.0
+        boost_val, passenger_deductible_pct, pickup_fee_pct = 0.0, 0.0, 0.0
 
     pickup_distance_km = 0.0
     if driver_accepted_lat is not None and driver_accepted_lng is not None:
         pickup_distance_km = haversine_km(driver_accepted_lat, driver_accepted_lng, pickup_lat, pickup_lng)
     
-    # Recalculate pickup fee as distance * per_km rate
-    pickup_fee_val = pickup_distance_km * per_km
+    # Recalculate pickup fee as percentage of distance * per_km rate
+    base_pickup_fee = pickup_distance_km * per_km
+    pickup_fee_val = base_pickup_fee * (pickup_fee_pct / 100.0)
 
     # Dynamic surge pricing window check from SystemSettings
     if ss:
@@ -379,6 +381,7 @@ async def calculate_fare(
             promo_applied = p.code
 
     final_pre_deductible = max(0.0, fare_val - discount)
+    passenger_deductible_val = final_pre_deductible * (passenger_deductible_pct / 100.0)
     feeable_amount = max(0.0, final_pre_deductible - boost_val)
     app_usage_charges = feeable_amount * (platform_pct / 100.0)
     

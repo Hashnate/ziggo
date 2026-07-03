@@ -767,14 +767,33 @@ async def list_my_food_orders(
 async def get_my_food_order_details(
     order_id: int,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_role("customer")),
+    user: User = Depends(get_current_user),
 ):
-    cust_q = await db.execute(select(Customer).where(Customer.user_id == user.id))
-    customer = cust_q.scalars().first()
-    if not customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
+    if user.role not in (UserRole.CUSTOMER, UserRole.DRIVER):
+        raise HTTPException(status_code=403, detail="Unauthorized")
 
-    oq = await db.execute(select(FoodOrder).where(FoodOrder.id == order_id, FoodOrder.customer_id == customer.id))
+    if user.role == UserRole.CUSTOMER:
+        cust_q = await db.execute(select(Customer).where(Customer.user_id == user.id))
+        customer = cust_q.scalars().first()
+        if not customer:
+            raise HTTPException(status_code=404, detail="Customer not found")
+        customer_id = customer.id
+        driver_id = None
+    else:
+        drv_q = await db.execute(select(Driver).where(Driver.user_id == user.id))
+        driver = drv_q.scalars().first()
+        if not driver:
+            raise HTTPException(status_code=404, detail="Driver not found")
+        customer_id = None
+        driver_id = driver.id
+
+    conditions = [FoodOrder.id == order_id]
+    if customer_id:
+        conditions.append(FoodOrder.customer_id == customer_id)
+    if driver_id:
+        conditions.append(FoodOrder.driver_id == driver_id)
+
+    oq = await db.execute(select(FoodOrder).where(*conditions))
     order = oq.scalars().first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")

@@ -10,6 +10,7 @@ import '../food_provider.dart';
 import '../food_ui.dart';
 import 'food_home_screen.dart';
 import 'food_rating_screen.dart';
+import '../../../core/network/ws_client.dart';
 
 // ─────────────────────────────────────────────
 //  Food-order colour tokens
@@ -31,16 +32,24 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
   Map<String, dynamic>? _order;
   Timer? _poll;
 
+  StreamSubscription? _wsSub;
+
   @override
   void initState() {
     super.initState();
     _refresh();
     _poll = Timer.periodic(const Duration(seconds: 5), (_) => _refresh());
+    _wsSub = WsClient.instance.events.listen((msg) {
+      if (msg['event'] == 'order_update') {
+        _refresh();
+      }
+    });
   }
 
   @override
   void dispose() {
     _poll?.cancel();
+    _wsSub?.cancel();
     super.dispose();
   }
 

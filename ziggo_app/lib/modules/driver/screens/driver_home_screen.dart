@@ -29,6 +29,8 @@ import 'driver_rating_screen.dart';
 import 'driver_food_rating_screen.dart';
 import 'driver_market_rating_screen.dart';
 import 'driver_ride_details_screen.dart';
+import '../../customer/screens/food_order_details_screen.dart';
+import '../../customer/screens/market_order_details_screen.dart';
 
 // Ziggo light driver UI tokens — clean light brand surfaces + gold accent.
 const Color _kPanel = AppColors.surface;       // clean white (matching surface)
@@ -2449,10 +2451,21 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         actionIcon = Icons.check_rounded;
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => isMarket
+                ? MarketOrderDetailsScreen(orderData: order)
+                : FoodOrderDetailsScreen(orderData: order),
+          ),
+        );
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -2675,8 +2688,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           ],
         ),
       ],
-    );
-  }
+    ),
+  );
+}
 
   Widget _statBlock(String label, String value, Color color, IconData icon) {
     return Column(

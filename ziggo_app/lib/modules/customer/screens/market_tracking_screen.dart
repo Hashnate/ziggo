@@ -9,6 +9,7 @@ import '../../../core/widgets/motion.dart';
 import '../market_provider.dart';
 import 'market_home_screen.dart';
 import 'market_rating_screen.dart';
+import '../../../core/network/ws_client.dart';
 
 class MarketTrackingScreen extends StatefulWidget {
   final String orderRef;
@@ -23,16 +24,24 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
   Timer? _poll;
   String? _lastSeenStatus;
 
+  StreamSubscription? _wsSub;
+
   @override
   void initState() {
     super.initState();
     _refresh();
     _poll = Timer.periodic(const Duration(seconds: 5), (_) => _refresh());
+    _wsSub = WsClient.instance.events.listen((msg) {
+      if (msg['event'] == 'market_order_update') {
+        _refresh();
+      }
+    });
   }
 
   @override
   void dispose() {
     _poll?.cancel();
+    _wsSub?.cancel();
     super.dispose();
   }
 
