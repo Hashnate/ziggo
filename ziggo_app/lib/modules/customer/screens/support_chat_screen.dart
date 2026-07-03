@@ -49,7 +49,6 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
   void dispose() {
     _pollTimer?.cancel();
     _wsSub?.cancel();
-    _ws.dispose();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();

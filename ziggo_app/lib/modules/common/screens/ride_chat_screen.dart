@@ -56,7 +56,6 @@ class _RideChatScreenState extends State<RideChatScreen> {
     RideChatScreen.isOpen = false;
     _pollTimer?.cancel();
     _wsSub?.cancel();
-    _ws.dispose();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
