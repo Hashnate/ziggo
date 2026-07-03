@@ -8,6 +8,7 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/network/api_client.dart';
 import 'event_booking_screens.dart';
+import 'my_tickets_screen.dart';
 
 /// Events / ticketing — browse concerts, shows, festivals. Purchase pipeline
 /// is not wired yet; tapping Buy on a tier surfaces a "contact organizer" CTA.
@@ -158,7 +159,12 @@ class _EventHomeScreenState extends State<EventHomeScreen> {
               ),
               IconButton(
                 icon: const Icon(Icons.confirmation_number_outlined),
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const MyTicketsScreen()),
+                  );
+                },
               ),
               const SizedBox(width: 8),
             ],
@@ -712,29 +718,100 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       ],
                     ),
                   ),
-                  
-                  if (description != null && description.isNotEmpty) ...[
-                    const Text('About Event', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.textPrimary)),
-                    const SizedBox(height: 12),
-                    AnimatedSize(
-                      duration: const Duration(milliseconds: 180),
-                      alignment: Alignment.topCenter,
-                      child: Text(
-                        description,
-                        maxLines: _aboutExpanded ? null : 4,
-                        overflow: _aboutExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 15, height: 1.6, fontWeight: FontWeight.w500, color: Colors.grey.shade800),
+
+                  if (ev['additional_fields'] is List && (ev['additional_fields'] as List).isNotEmpty) ...[
+                    Container(
+                      margin: const EdgeInsets.only(top: 20),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, 10)),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Event Info',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.textPrimary),
+                          ),
+                          const SizedBox(height: 12),
+                          for (var item in ev['additional_fields'] as List) ...[
+                            if (item is Map && item['label'] != null && item['value'] != null) ...[
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 6),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      "${item['label']}: ",
+                                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.primary),
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        "${item['value']}",
+                                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (item != (ev['additional_fields'] as List).last)
+                                const Divider(height: 12, thickness: 0.5),
+                            ],
+                          ],
+                        ],
                       ),
                     ),
-                    GestureDetector(
-                      onTap: () => setState(() => _aboutExpanded = !_aboutExpanded),
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 8, bottom: 24),
-                        child: Text(
-                          _aboutExpanded ? 'Read less' : 'Read more',
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.primary),
-                        ),
-                      ),
+                  ],
+                  
+                  if (description != null && description.isNotEmpty) ...[
+                    const Text('About Event', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.textPrimary)),
+                    const SizedBox(height: 12),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final span = TextSpan(
+                          text: description,
+                          style: TextStyle(fontSize: 15, height: 1.6, fontWeight: FontWeight.w500, color: Colors.grey.shade800),
+                        );
+                        final tp = TextPainter(
+                          text: span,
+                          maxLines: 4,
+                          textDirection: TextDirection.ltr,
+                        );
+                        tp.layout(maxWidth: constraints.maxWidth);
+                        final isExceeded = tp.didExceedMaxLines;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            AnimatedSize(
+                              duration: const Duration(milliseconds: 180),
+                              alignment: Alignment.topCenter,
+                              child: Text(
+                                description,
+                                maxLines: _aboutExpanded ? null : 4,
+                                overflow: _aboutExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 15, height: 1.6, fontWeight: FontWeight.w500, color: Colors.grey.shade800),
+                              ),
+                            ),
+                            if (isExceeded)
+                              GestureDetector(
+                                onTap: () => setState(() => _aboutExpanded = !_aboutExpanded),
+                                child: Padding(
+                                  padding: const EdgeInsets.only(top: 8, bottom: 24),
+                                  child: Text(
+                                    _aboutExpanded ? 'Read less' : 'Read more',
+                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.primary),
+                                  ),
+                                ),
+                              )
+                            else
+                              const SizedBox(height: 24),
+                          ],
+                        );
+                      },
                     ),
                   ],
                   const SizedBox(height: 120),

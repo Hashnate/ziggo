@@ -1004,7 +1004,8 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
 /// ---------------------------------------------------------------------------
 class EventTicketScreen extends StatelessWidget {
   final Map<String, dynamic> order;
-  const EventTicketScreen({super.key, required this.order});
+  final bool fromHistory;
+  const EventTicketScreen({super.key, required this.order, this.fromHistory = false});
 
   @override
   Widget build(BuildContext context) {
@@ -1022,11 +1023,13 @@ class EventTicketScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        automaticallyImplyLeading: false,
+        automaticallyImplyLeading: fromHistory,
         actions: [
           IconButton(
-            icon: const Icon(Icons.close_rounded, color: Colors.white),
-            onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
+            icon: Icon(fromHistory ? Icons.arrow_back_ios_new_rounded : Icons.close_rounded, color: Colors.white),
+            onPressed: () => fromHistory
+                ? Navigator.of(context).pop()
+                : Navigator.of(context).popUntil((r) => r.isFirst),
           ),
         ],
       ),
@@ -1108,13 +1111,15 @@ class EventTicketScreen extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
+                  onPressed: () => fromHistory
+                      ? Navigator.of(context).pop()
+                      : Navigator.of(context).popUntil((r) => r.isFirst),
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: AppColors.textPrimary, width: 2),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
-                  child: Text('BACK TO HOME',
+                  child: Text(fromHistory ? 'BACK' : 'BACK TO HOME',
                       style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w900)),
                 ),
               ),

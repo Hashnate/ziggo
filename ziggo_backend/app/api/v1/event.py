@@ -101,6 +101,7 @@ def _serialize_event(e: Event, tiers_payload: list[dict] | None = None) -> dict:
         "organizer_phone": e.organizer_phone,
         "starts_at": e.starts_at.isoformat() if e.starts_at else None,
         "ends_at": e.ends_at.isoformat() if e.ends_at else None,
+        "additional_fields": e.additional_fields or [],
     }
     if e.tiers:
         out["from_price"] = float(min(t.price for t in e.tiers))

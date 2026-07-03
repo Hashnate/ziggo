@@ -17,6 +17,7 @@ from sqlalchemy import (
     ForeignKey,
     Text,
     Enum as SQLEnum,
+    JSON,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -45,6 +46,7 @@ class Event(Base):
     starts_at = Column(DateTime(timezone=True), nullable=False, index=True)
     ends_at = Column(DateTime(timezone=True))
     is_published = Column(Boolean, default=True, index=True)
+    additional_fields = Column(JSON, default=list, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     tiers = relationship(

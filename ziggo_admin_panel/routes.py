@@ -6367,6 +6367,8 @@ async def admin_events_new_submit(
     tier_names: list[str] = Form(default=[]),
     tier_prices: list[str] = Form(default=[]),
     tier_capacities: list[str] = Form(default=[]),
+    field_labels: list[str] = Form(default=[]),
+    field_values: list[str] = Form(default=[]),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -6383,10 +6385,18 @@ async def admin_events_new_submit(
             return None
         return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
+    additional_fields = []
+    for i in range(max(len(field_labels), len(field_values))):
+        lbl = field_labels[i].strip() if i < len(field_labels) else ""
+        val = field_values[i].strip() if i < len(field_values) else ""
+        if lbl and val:
+            additional_fields.append({"label": lbl, "value": val})
+
     form = {
         "name": name, "venue": venue, "city": city, "category": category, "description": description,
         "organizer_name": organizer_name,
         "organizer_phone": organizer_phone, "starts_at": starts_at, "ends_at": ends_at,
+        "additional_fields": additional_fields,
     }
     sa = _parse_dt(starts_at)
     if sa is None:
@@ -6411,6 +6421,7 @@ async def admin_events_new_submit(
         starts_at=sa,
         ends_at=_parse_dt(ends_at),
         is_published=True,
+        additional_fields=additional_fields,
     )
     db.add(ev)
     await db.flush()
@@ -6459,7 +6470,8 @@ async def admin_events_edit_form(
         "ends_at": ev.ends_at.strftime("%Y-%m-%dT%H:%M") if ev.ends_at else "",
         "organizer_name": ev.organizer_name,
         "organizer_phone": ev.organizer_phone,
-        "tiers": ev.tiers
+        "tiers": ev.tiers,
+        "additional_fields": ev.additional_fields or [],
     }
 
     return templates.TemplateResponse(
@@ -6486,6 +6498,8 @@ async def admin_events_edit_submit(
     tier_names: list[str] = Form(default=[]),
     tier_prices: list[str] = Form(default=[]),
     tier_capacities: list[str] = Form(default=[]),
+    field_labels: list[str] = Form(default=[]),
+    field_values: list[str] = Form(default=[]),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -6505,12 +6519,19 @@ async def admin_events_edit_submit(
     if not ev:
         raise HTTPException(status_code=404, detail="Event not found")
 
+    additional_fields = []
+    for i in range(max(len(field_labels), len(field_values))):
+        lbl = field_labels[i].strip() if i < len(field_labels) else ""
+        val = field_values[i].strip() if i < len(field_values) else ""
+        if lbl and val:
+            additional_fields.append({"label": lbl, "value": val})
+
     sa = _parse_dt(starts_at)
     if sa is None:
         form = {
             "id": ev.id, "name": name, "venue": venue, "city": city, "category": category, "description": description,
             "organizer_name": organizer_name, "organizer_phone": organizer_phone, "starts_at": starts_at, "ends_at": ends_at,
-            "tiers": []
+            "tiers": [], "additional_fields": additional_fields
         }
         return templates.TemplateResponse(
             request, "event_edit.html",
@@ -6528,6 +6549,7 @@ async def admin_events_edit_submit(
     ev.organizer_phone = organizer_phone.strip() or None
     ev.starts_at = sa
     ev.ends_at = _parse_dt(ends_at)
+    ev.additional_fields = additional_fields
 
     saved_image_url = await _save_event_image(image)
     if saved_image_url:
