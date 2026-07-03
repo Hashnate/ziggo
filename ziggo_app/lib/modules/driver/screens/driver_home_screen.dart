@@ -11,6 +11,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:audioplayers/audioplayers.dart';
 
 import '../../../core/notifications/fcm_service.dart';
+import '../../common/screens/ride_chat_screen.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
@@ -83,14 +84,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       if (msg['event'] == 'chat_message') {
         final data = msg['data'] as Map<String, dynamic>?;
         if (data != null && data['message'] != null && data['sender_type'] != 'driver') {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Customer: ${data['message']}'),
-                backgroundColor: AppColors.primary,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+          if (!RideChatScreen.isOpen) {
+            FcmService.instance.showChatNotification('Message from Customer', data['message']);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Customer: ${data['message']}'),
+                  backgroundColor: AppColors.primary,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
           }
         }
       }
@@ -427,62 +431,21 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   Future<void> _messageCustomer(BuildContext context, int bookingId) async {
-    final presets = [
-      "I have arrived",
-      "I'm on my way",
-      "Stuck in traffic, will be slightly delayed",
-      "Where exactly are you?",
-      "Okay",
-    ];
+    final driverProvider = context.read<DriverProvider>();
+    final ride = driverProvider.activeRide ?? driverProvider.rideRequest;
+    
+    String customerName = 'Customer';
+    if (ride != null && ride['customer'] != null && ride['customer']['name'] != null) {
+      customerName = ride['customer']['name'];
+    }
 
-    await showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 44, height: 5,
-                  decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-              const SizedBox(height: 18),
-              const Text('Message Customer', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-              const SizedBox(height: 16),
-              ...presets.map((msg) => ListTile(
-                title: Text(msg, style: const TextStyle(fontWeight: FontWeight.w600)),
-                trailing: const Icon(Icons.send_rounded, size: 18, color: AppColors.primary),
-                contentPadding: EdgeInsets.zero,
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  try {
-                    await ApiClient.instance.dio.post(
-                      '/bookings/$bookingId/message',
-                      data: {'message': msg},
-                    );
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Message sent')),
-                      );
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Failed to send message')),
-                      );
-                    }
-                  }
-                },
-              )),
-            ],
-          ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RideChatScreen(
+          bookingId: bookingId,
+          otherParticipantName: customerName,
+          isDriver: true,
         ),
       ),
     );

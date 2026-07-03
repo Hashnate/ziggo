@@ -460,6 +460,35 @@ class FcmService {
     } catch (_) {}
   }
 
+  /// Show a local notification for an incoming chat message.
+  Future<void> showChatNotification(String title, String body) async {
+    try {
+      await _local.show(
+        DateTime.now().millisecondsSinceEpoch.hashCode,
+        title,
+        body,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            _generalAlertChannelId,
+            _generalAlertChannelName,
+            channelDescription: _generalAlertChannelDesc,
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
+          ),
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('[fcm] failed to show chat notification: $e');
+    }
+  }
+
   Future<void> dispose() async {
     await _foregroundSub?.cancel();
     await _tokenSub?.cancel();
