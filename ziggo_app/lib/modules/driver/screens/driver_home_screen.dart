@@ -2457,8 +2457,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           context,
           MaterialPageRoute(
             builder: (_) => isMarket
-                ? MarketOrderDetailsScreen(orderData: order)
-                : FoodOrderDetailsScreen(orderData: order),
+                ? MarketOrderDetailsScreen(order: order)
+                : FoodOrderDetailsScreen(order: order),
           ),
         );
       },
