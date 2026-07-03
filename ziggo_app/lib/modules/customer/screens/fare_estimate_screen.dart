@@ -355,10 +355,10 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
                             ),
                           ),
                         ),
-                        const Icon(
-                          Icons.accessibility_new_rounded,
-                          size: 48,
-                          color: Colors.black87,
+                        Image.asset(
+                          'assets/icons/custom_pickup_pin.png',
+                          width: 48,
+                          height: 48,
                         ),
                       ],
                     ),
