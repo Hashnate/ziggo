@@ -1655,6 +1655,24 @@ async def update_booking_status(
                         type="ride_update",
                     )
                 )
+    if b.status == BookingStatus.CANCELLED and b.driver_id is None:
+        dispatch_vehicle = None if (b.is_flash or b.is_courier) else b.service_type
+        max_radius = await get_search_radius_for_service(db, dispatch_vehicle)
+        nearby = await find_all_nearby_drivers(
+            db,
+            float(b.pickup_lat),
+            float(b.pickup_lng),
+            dispatch_vehicle,
+            max_distance_km=max_radius,
+            exclude_driver_id=None,
+        )
+        for nd in nearby:
+            await manager.send(
+                nd.user_id,
+                "booking_cancelled",
+                {"booking_id": b.id, "booking_ref": b.booking_ref},
+            )
+
     if b.driver_id:
         dq = await db.execute(select(Driver).where(Driver.id == b.driver_id))
         drv = dq.scalars().first()
