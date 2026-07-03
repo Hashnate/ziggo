@@ -426,7 +426,7 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
   late int _remaining;
   Timer? _timer;
 
-  String _paymentMethod = 'cash'; // cash | wallet
+  String _paymentMethod = 'card'; // card | wallet
   String? _promoCode;
   bool _agreed = false;
   bool _busy = false;
@@ -758,7 +758,7 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
                     color: const Color(0xFF22C55E).withOpacity(0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(isWallet ? Icons.account_balance_wallet_rounded : Icons.payments_rounded,
+                  child: Icon(isWallet ? Icons.account_balance_wallet_rounded : Icons.credit_card_rounded,
                       color: const Color(0xFF22C55E), size: 20),
                 ),
                 const SizedBox(width: 16),
@@ -766,11 +766,11 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(isWallet ? 'Ziggo Wallet' : 'Cash',
+                      Text(isWallet ? 'Ziggo Wallet' : 'Card',
                           style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
                       if (!isWallet)
-                        const Text('Payment method is not available',
-                            style: TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.w700)),
+                        const Text('Pay securely with your card',
+                            style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w700)),
                     ],
                   ),
                 ),
@@ -863,13 +863,13 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
                 style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
             const SizedBox(height: 8),
             ListTile(
-              leading: Icon(Icons.payments_rounded, color: AppColors.textPrimary),
-              title: const Text('Cash', style: TextStyle(fontWeight: FontWeight.w800)),
-              trailing: _paymentMethod == 'cash'
+              leading: Icon(Icons.credit_card_rounded, color: AppColors.textPrimary),
+              title: const Text('Card', style: TextStyle(fontWeight: FontWeight.w800)),
+              trailing: _paymentMethod == 'card'
                   ? Icon(Icons.check_circle_rounded, color: AppColors.textPrimary)
                   : null,
               onTap: () {
-                setState(() => _paymentMethod = 'cash');
+                setState(() => _paymentMethod = 'card');
                 Navigator.pop(ctx);
               },
             ),
