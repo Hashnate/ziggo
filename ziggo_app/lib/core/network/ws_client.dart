@@ -7,6 +7,8 @@ import 'api_client.dart';
 
 /// Thin wrapper around a single user-scoped WebSocket connection.
 class WsClient {
+  static final WsClient instance = WsClient();
+  
   WebSocketChannel? _channel;
   StreamSubscription? _sub;
   final _controller = StreamController<Map<String, dynamic>>.broadcast();
