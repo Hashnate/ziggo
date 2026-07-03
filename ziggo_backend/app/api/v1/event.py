@@ -171,7 +171,10 @@ async def my_tickets(
     rows = (
         await db.execute(
             select(EventOrder)
-            .options(selectinload(EventOrder.items), selectinload(EventOrder.event))
+            .options(
+                selectinload(EventOrder.items), 
+                selectinload(EventOrder.event).selectinload(Event.tiers)
+            )
             .where(EventOrder.customer_id == cust.id)
             .order_by(EventOrder.created_at.desc())
         )
@@ -313,7 +316,10 @@ async def book_tickets(
     order = (
         await db.execute(
             select(EventOrder)
-            .options(selectinload(EventOrder.items), selectinload(EventOrder.event))
+            .options(
+                selectinload(EventOrder.items), 
+                selectinload(EventOrder.event).selectinload(Event.tiers)
+            )
             .where(EventOrder.id == order.id)
         )
     ).scalars().first()

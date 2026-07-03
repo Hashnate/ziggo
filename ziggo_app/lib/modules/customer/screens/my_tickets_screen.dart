@@ -41,7 +41,8 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
     } on DioException catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.response?.data?['detail']?.toString() ??
+          final data = e.response?.data;
+          _error = (data is Map ? data['detail']?.toString() : null) ??
               e.message ??
               'Could not load tickets';
           _loading = false;
