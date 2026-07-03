@@ -361,9 +361,22 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         return;
       }
     }
-    await driver.toggleOnline(goingOnline);
-    if (!mounted) return;
-    if (goingOnline) _centerOnDriver();
+    try {
+      final success = await driver.toggleOnline(goingOnline);
+      if (!mounted) return;
+      if (!success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to change online status.')),
+        );
+        return;
+      }
+      if (goingOnline) _centerOnDriver();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+      );
+    }
   }
 
   Future<void> _callPhone(String? phone) async {

@@ -356,7 +356,10 @@ class DriverProvider extends ChangeNotifier {
         _stopLocationStream();
       }
       return true;
-    } on DioException {
+    } on DioException catch (e) {
+      if (e.response?.data != null && e.response!.data is Map && e.response!.data['detail'] != null) {
+        throw Exception(e.response!.data['detail']);
+      }
       return false;
     }
   }
