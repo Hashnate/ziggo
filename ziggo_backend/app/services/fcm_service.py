@@ -325,6 +325,10 @@ def _format(event: str, payload: dict) -> tuple[str, str]:
             return ("Ride cancelled", "Your ride has been cancelled.")
     if event == "no_drivers_available":
         return ("No drivers found", "We couldn't find a driver nearby. Please try again.")
+    if event == "chat_message":
+        sender = payload.get("sender_type", "User").capitalize()
+        message = payload.get("message", "Sent you a message")
+        return (f"New message from {sender}", message)
     if event in ("food_order_update", "order_update"):
       status = payload.get("status", "")
       return ("Order update", f"Your food order is now {status}.")

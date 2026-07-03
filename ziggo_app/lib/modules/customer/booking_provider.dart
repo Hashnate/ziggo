@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/network/ws_client.dart';
+import '../../core/notifications/fcm_service.dart';
 
 /// Drives the full ride lifecycle: estimate → create → track → rate.
 class BookingProvider extends ChangeNotifier {
@@ -56,6 +57,13 @@ class BookingProvider extends ChangeNotifier {
           _activeBooking = {..._activeBooking!, 'driver': driverData};
           notifyListeners();
         }
+      }
+    });
+
+    // Fallback: If WebSocket drops a message, FCM push notifications act as a secondary trigger
+    FcmService.instance.onForegroundEvent.listen((data) {
+      if (data['event'] == 'booking_update') {
+        loadActive();
       }
     });
   }

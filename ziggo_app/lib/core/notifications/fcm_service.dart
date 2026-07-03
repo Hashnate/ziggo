@@ -258,6 +258,9 @@ class FcmService {
   Stream<RemoteMessage> get onNotificationClicked => _clickController.stream;
   RemoteMessage? _pendingClick;
 
+  final StreamController<Map<String, dynamic>> _foregroundEventsController = StreamController<Map<String, dynamic>>.broadcast();
+  Stream<Map<String, dynamic>> get onForegroundEvent => _foregroundEventsController.stream;
+
   RemoteMessage? consumePendingClick() {
     final msg = _pendingClick;
     _pendingClick = null;
@@ -391,6 +394,9 @@ class FcmService {
     if (kDebugMode) {
       debugPrint('[fcm] foreground: $title — $body');
     }
+
+    // Emit event so providers can listen to push notifications and refresh state
+    _foregroundEventsController.add(message.data);
 
     final isFoodOrMarket = message.data['is_food'] == 'true' ||
         message.data['is_market'] == 'true' ||

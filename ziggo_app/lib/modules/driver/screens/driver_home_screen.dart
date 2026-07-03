@@ -432,7 +432,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   Future<void> _messageCustomer(BuildContext context, int bookingId) async {
     final driverProvider = context.read<DriverProvider>();
-    final ride = driverProvider.activeRide ?? driverProvider.rideRequest;
+    final ride = driverProvider.activeRide ?? driverProvider.pendingRequest;
     
     String customerName = 'Customer';
     if (ride != null && ride['customer'] != null && ride['customer']['name'] != null) {
