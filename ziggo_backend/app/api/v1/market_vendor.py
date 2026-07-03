@@ -392,7 +392,7 @@ async def create_product(
         description=body.description,
         price=Decimal(str(body.price)),
         original_price=Decimal(str(body.original_price))
-        if body.original_price is not None
+        if body.original_price is not None and body.original_price > 0
         else None,
         stock_quantity=body.stock_quantity,
         unit=body.unit,
@@ -402,6 +402,10 @@ async def create_product(
         is_available=body.is_available,
         weight_kg=Decimal(str(body.weight_kg)) if body.weight_kg is not None else None,
     )
+    
+    if p.original_price and p.original_price < p.price:
+        p.price, p.original_price = p.original_price, p.price
+        
     db.add(p)
     await db.commit()
     await db.refresh(p)
@@ -441,6 +445,10 @@ async def update_product(
         p.original_price = (
             Decimal(str(body.original_price)) if body.original_price > 0 else None
         )
+
+    if p.original_price and p.original_price < p.price:
+        p.price, p.original_price = p.original_price, p.price
+
     if body.stock_quantity is not None:
         p.stock_quantity = body.stock_quantity
     if body.unit is not None:
