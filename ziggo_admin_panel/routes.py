@@ -6074,6 +6074,9 @@ async def admin_demo_request_delete(
     return RedirectResponse(url="/admin/demo-requests", status_code=303)
 
 
+
+
+
 # ---------- Live notification feed for the top-bar bell ----------
 @router.get("/notif-feed")
 async def admin_notif_feed(
@@ -6082,7 +6085,7 @@ async def admin_notif_feed(
 ):
     """Real-time admin alerts for the bell popup. Read-only aggregate over
     existing tables — adds nothing to and changes nothing in the rest of the app."""
-    from app.api.v1.public import ContactMessage, DriverApplication, DemoRequest
+    from app.api.v1.public import ContactMessage, DemoRequest
     from app.models import Complaint
 
     def plural(n, word):
@@ -6118,19 +6121,6 @@ async def admin_notif_feed(
             "icon": "fa-laptop-code", "url": "/admin/demo-requests", "count": unread_demos,
         })
 
-    new_apps = (
-        await db.execute(
-            select(func.count(DriverApplication.id)).where(
-                DriverApplication.is_read == False  # noqa: E712
-            )
-        )
-    ).scalar() or 0
-    if new_apps:
-        items.append({
-            "title": plural(new_apps, "driver application"),
-            "subtitle": "Awaiting review",
-            "icon": "fa-id-card", "url": "/admin/drivers", "count": new_apps,
-        })
 
     pending_drivers = (
         await db.execute(

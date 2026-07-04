@@ -709,7 +709,7 @@
       <h1>Drive your future.<br><em>Be your own boss.</em></h1>
       <p class="pm-lede">Choose your hours. Industry's lowest commission. Weekly payouts on the dot. Join 50,000+ Sri Lankans already earning on the country's #1 super app.</p>
       <div class="drive-hero-cta-row">
-        <a href="#signup" class="pm-btn pm-btn-primary pm-btn-lg">Sign up to drive <i class="fa-solid fa-arrow-right"></i></a>
+        <a href="signup.html" class="pm-btn pm-btn-primary pm-btn-lg">Sign up to drive <i class="fa-solid fa-arrow-right"></i></a>
         <a href="#earnings" class="pm-btn pm-btn-ghost pm-btn-lg">See what you'd earn</a>
       </div>
       <div class="drive-hero-quick">
@@ -883,141 +883,7 @@
   </div>
 </section>
 
-<!-- ========== APPLY ========== -->
-<section class="drive-section alt" id="signup">
-  <div class="apply-wrap">
-    <div class="apply-side" data-reveal>
-      <span class="pm-eyebrow"><span class="dot"></span> Apply now</span>
-      <h2>Three minutes is all it <em>takes.</em></h2>
-      <p>Tell us a bit about you and your vehicle. We'll come back within 48 hours with the next steps.</p>
-      <ul>
-        <li><i class="fa-solid fa-circle-check"></i> Free to apply &middot; no signup fee</li>
-        <li><i class="fa-solid fa-circle-check"></i> Get verified in 2&ndash;3 days</li>
-        <li><i class="fa-solid fa-circle-check"></i> Start earning the same week</li>
-      </ul>
-    </div>
-    <form class="apply-form" id="driveApplyForm" data-reveal data-reveal-delay="100">
-      <h3>Apply to drive</h3>
-      <p class="subtitle">We'll reach out within 48 hours.</p>
-      <div class="form-row"><label>Full name</label><input type="text" id="daName" required placeholder="Your name"></div>
-      <div class="form-row"><label>Mobile number</label><input type="tel" id="daMobile" required placeholder="+94 7X XXX XXXX"></div>
-      <div class="form-row"><label>City</label>
-        <div class="cz-select" id="cityDropdown">
-          <button type="button" class="cz-select-trigger placeholder">
-            <span class="cz-select-value">Select your city</span>
-            <i class="fa-solid fa-chevron-down"></i>
-          </button>
-          <input type="hidden" name="city" id="daCity">
-          <ul class="cz-select-list">
-            <li data-value="Colombo">Colombo</li><li data-value="Gampaha">Gampaha</li><li data-value="Kalutara">Kalutara</li>
-            <li data-value="Kandy">Kandy</li><li data-value="Matale">Matale</li><li data-value="Nuwara Eliya">Nuwara Eliya</li>
-            <li data-value="Galle">Galle</li><li data-value="Matara">Matara</li><li data-value="Hambantota">Hambantota</li>
-            <li data-value="Jaffna">Jaffna</li><li data-value="Kilinochchi">Kilinochchi</li><li data-value="Mannar">Mannar</li>
-            <li data-value="Vavuniya">Vavuniya</li><li data-value="Mullaitivu">Mullaitivu</li><li data-value="Batticaloa">Batticaloa</li>
-            <li data-value="Ampara">Ampara</li><li data-value="Trincomalee">Trincomalee</li><li data-value="Kurunegala">Kurunegala</li>
-            <li data-value="Puttalam">Puttalam</li><li data-value="Anuradhapura">Anuradhapura</li><li data-value="Polonnaruwa">Polonnaruwa</li>
-            <li data-value="Badulla">Badulla</li><li data-value="Monaragala">Monaragala</li><li data-value="Ratnapura">Ratnapura</li>
-            <li data-value="Kegalle">Kegalle</li>
-          </ul>
-        </div>
-      </div>
-      <div class="form-row"><label>Vehicle type</label>
-        <select id="driveVehicle" required>
-          <option value="">Select vehicle</option>
-          <option>Bike</option><option>Tuk</option><option>Car</option>
-          <option>Van</option><option>Truck</option><option>Auto</option>
-        </select>
-      </div>
-      <div class="form-row"><label>NIC number</label><input type="text" id="daNic" required placeholder="200012345678 or 90123456V"></div>
-      <button type="submit" id="daBtn" class="pm-btn pm-btn-primary pm-btn-lg">Submit application <i class="fa-solid fa-arrow-right"></i></button>
-      <p id="daStatus" style="margin-top:14px;font-size:.9rem;font-weight:600;"></p>
-    </form>
-    <script>
-    (function(){
-      var dd = document.getElementById('cityDropdown');
-      if (dd) {
-        var trigger = dd.querySelector('.cz-select-trigger');
-        var valueEl = dd.querySelector('.cz-select-value');
-        var hidden = dd.querySelector('input[type=hidden]');
-        var list = dd.querySelector('.cz-select-list');
-        trigger.addEventListener('click', function(e){ e.stopPropagation(); dd.classList.toggle('open'); });
-        list.addEventListener('click', function(e){
-          var li = e.target.closest('li'); if (!li) return;
-          valueEl.textContent = li.textContent;
-          hidden.value = li.dataset.value || li.textContent;
-          trigger.classList.remove('placeholder');
-          list.querySelectorAll('li').forEach(function(x){ x.classList.remove('sel'); });
-          li.classList.add('sel');
-          dd.classList.remove('open');
-        });
-        document.addEventListener('click', function(e){ if (!dd.contains(e.target)) dd.classList.remove('open'); });
-      }
-    })();
-    (function(){
-      var form = document.getElementById('driveApplyForm');
-      if (!form) return;
-      form.addEventListener('submit', async function(e){
-        e.preventDefault();
-        var btn = document.getElementById('daBtn');
-        var status = document.getElementById('daStatus');
-        var orig = btn.innerHTML;
-        var get = function(id){ var el = document.getElementById(id); return el ? el.value.trim() : ''; };
-        var payload = {
-          full_name: get('daName'),
-          mobile: get('daMobile'),
-          city: get('daCity'),
-          vehicle_type: get('driveVehicle'),
-          nic: get('daNic')
-        };
-        if (!payload.city) { status.style.color = '#b91c1c'; status.textContent = 'Please select your city.'; return; }
-        if (!payload.vehicle_type) { status.style.color = '#b91c1c'; status.textContent = 'Please select a vehicle type.'; return; }
-        btn.disabled = true; btn.innerHTML = 'Submitting…'; status.textContent = '';
-        try {
-          var res = await fetch('/api/v1/public/driver-application', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          var data = await res.json().catch(function(){ return {}; });
-          if (res.ok) {
-            form.reset();
-            btn.innerHTML = '<i class="fa-solid fa-check"></i> Application submitted';
-            status.style.color = '#15803d';
-            status.textContent = (data && data.message) || "Thanks! We'll reach out within 48 hours.";
-          } else {
-            btn.disabled = false; btn.innerHTML = orig;
-            status.style.color = '#b91c1c';
-            status.textContent = (data && data.detail) ? (''+data.detail) : 'Something went wrong. Please try again.';
-          }
-        } catch (err) {
-          btn.disabled = false; btn.innerHTML = orig;
-          status.style.color = '#b91c1c';
-          status.textContent = 'Network error. Please try again.';
-        }
-      });
-    })();
-    (function(){
-      var sel = document.getElementById('driveVehicle');
-      if (!sel) return;
-      fetch('/api/v1/public/categories')
-        .then(function(r){ return r.ok ? r.json() : null; })
-        .then(function(list){
-          if (!Array.isArray(list) || !list.length) return; // keep fallback options
-          sel.innerHTML = '<option value="">Select vehicle</option>';
-          list.forEach(function(c){
-            var name = (c.name || c.service_type || '').toString();
-            name = name.charAt(0).toUpperCase() + name.slice(1);
-            var o = document.createElement('option');
-            o.value = c.service_type || name;
-            o.textContent = name;
-            sel.appendChild(o);
-          });
-        })
-        .catch(function(){});
-    })();
-    </script>
-  </div>
-</section>
+
 
 <!-- ========== FOOTER ========== -->
 <footer class="pm-footer">
