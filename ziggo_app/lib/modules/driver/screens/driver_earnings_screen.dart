@@ -71,135 +71,137 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
               color: kDriverBg,
               borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
             ),
-            padding: EdgeInsets.fromLTRB(16, 20, 16, 24 + MediaQuery.of(context).viewInsets.bottom),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.textTertiary.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Settle Commission Payment',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.textPrimary,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Amount due: Rs.${commissionAmount.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.error,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: TextFormField(
-                    initialValue: commissionAmount.toStringAsFixed(2),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: InputDecoration(
-                      labelText: 'Amount to pay (Rs.)',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.divider),
+            padding: EdgeInsets.fromLTRB(16, 20, 16, 24 + MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.textTertiary.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.divider),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.primary),
-                      ),
-                      prefixIcon: const Icon(Icons.payments_rounded, color: AppColors.textTertiary),
                     ),
-                    onChanged: (val) {
-                      amountToPay = double.tryParse(val) ?? 0.0;
-                    },
                   ),
-                ),
-                const SizedBox(height: 20),
-                if (p.cards.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 30),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: kDriverCard,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.cardBorder),
-                    ),
-                    child: const Column(
-                      children: [
-                        Icon(Icons.credit_card_rounded, color: AppColors.textTertiary, size: 40),
-                        SizedBox(height: 8),
-                        Text(
-                          'No cards added yet',
-                          style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                  )
-                else ...[
+                  const SizedBox(height: 20),
                   const Text(
-                    'SELECT A SAVED CARD',
-                    style: TextStyle(fontSize: 10, color: AppColors.textTertiary, fontWeight: FontWeight.w900, letterSpacing: 1.2),
+                    'Settle Commission Payment',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textPrimary,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 10),
-                  ...p.cards.map((c) {
-                    final String cardNo = c['card_no'] ?? '';
-                    final String last4 = cardNo.length > 4 ? cardNo.substring(cardNo.length - 4) : cardNo;
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 10),
+                  Text(
+                    'Amount due: Rs.${commissionAmount.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.error,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: TextFormField(
+                      initialValue: commissionAmount.toStringAsFixed(2),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: InputDecoration(
+                        labelText: 'Amount to pay (Rs.)',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.divider),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.divider),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.primary),
+                        ),
+                        prefixIcon: const Icon(Icons.payments_rounded, color: AppColors.textTertiary),
+                      ),
+                      onChanged: (val) {
+                        amountToPay = double.tryParse(val) ?? 0.0;
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  if (p.cards.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 30),
+                      alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: kDriverCard,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.divider),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.cardBorder),
                       ),
-                      child: ListTile(
-                        leading: const Icon(Icons.credit_card_rounded, color: AppColors.primary),
-                        title: Text('${c['card_type'] ?? 'Card'} ending in $last4'),
-                        subtitle: Text('Expires: ${c['card_expiry']}'),
-                        trailing: const Icon(Icons.chevron_right_rounded),
-                        onTap: () => Navigator.pop(ctx, c),
+                      child: const Column(
+                        children: [
+                          Icon(Icons.credit_card_rounded, color: AppColors.textTertiary, size: 40),
+                          SizedBox(height: 8),
+                          Text(
+                            'No cards added yet',
+                            style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold),
+                          ),
+                        ],
                       ),
-                    );
-                  }),
-                ],
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const PaymentMethodsScreen()),
-                    );
-                    await provider.fetchCards();
-                    setSheetState(() {});
-                  },
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('Add new card'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    )
+                  else ...[
+                    const Text(
+                      'SELECT A SAVED CARD',
+                      style: TextStyle(fontSize: 10, color: AppColors.textTertiary, fontWeight: FontWeight.w900, letterSpacing: 1.2),
+                    ),
+                    const SizedBox(height: 10),
+                    ...p.cards.map((c) {
+                      final String cardNo = c['card_no'] ?? '';
+                      final String last4 = cardNo.length > 4 ? cardNo.substring(cardNo.length - 4) : cardNo;
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        decoration: BoxDecoration(
+                          color: kDriverCard,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.divider),
+                        ),
+                        child: ListTile(
+                          leading: const Icon(Icons.credit_card_rounded, color: AppColors.primary),
+                          title: Text('${c['card_type'] ?? 'Card'} ending in $last4'),
+                          subtitle: Text('Expires: ${c['card_expiry']}'),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () => Navigator.pop(ctx, c),
+                        ),
+                      );
+                    }),
+                  ],
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const PaymentMethodsScreen()),
+                      );
+                      await provider.fetchCards();
+                      setSheetState(() {});
+                    },
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Add new card'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         },

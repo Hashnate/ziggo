@@ -771,8 +771,8 @@ class _ServicesGrid extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               GradientServiceTile(
-                icon: Icons.directions_car_filled_rounded,
-                imageAsset: 'assets/icons/car.png',
+                icon: Icons.motorcycle_rounded,
+                imageAsset: 'assets/icons/bike.png',
                 label: 'Rides',
                 onTap: onRide,
               ),
