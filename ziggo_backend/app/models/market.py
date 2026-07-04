@@ -71,6 +71,7 @@ class MarketVendor(Base):
     pickup_fee = Column(DECIMAL(10, 2), default=70.00, nullable=False)
     per_km_rate = Column(DECIMAL(10, 2), default=40.00, nullable=False)
     boost = Column(DECIMAL(10, 2), default=0.00, nullable=False)
+    max_settle_amount = Column(DECIMAL(10, 2), default=1000.00)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

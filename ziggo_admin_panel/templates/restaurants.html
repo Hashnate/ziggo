@@ -147,7 +147,7 @@
                                 </form>
                             {% endif %}
                             <button
-                                onclick='openEditRestaurant({{ r.id }}, {{ r.name|tojson }}, {{ (r.description or "")|tojson }}, {{ (r.cuisine or "")|tojson }}, {{ (r.address or "")|tojson }}, {{ (r.phone_number or "")|tojson }}, {{ (r.opening_time or "")|tojson }}, {{ (r.closing_time or "")|tojson }}, {{ (r.delivery_fee or 0)|float }}, {{ (r.eta_minutes or 30) }}, {{ (r.owner_phone or "")|tojson }}, {{ (r.owner_full_name or "")|tojson }}, {{ (r.lat or 6.9271)|float }}, {{ (r.lng or 79.8612)|float }}, {{ (r.image_url or "")|tojson }}, {{ (r.pickup_fee or 70.0)|float }}, {{ (r.per_km_rate or 40.0)|float }}, {{ (r.boost or 0.0)|float }}, {{ (r.commission_percentage or 20.0)|float }})'
+                                onclick='openEditRestaurant({{ r.id }}, {{ r.name|tojson }}, {{ (r.description or "")|tojson }}, {{ (r.cuisine or "")|tojson }}, {{ (r.address or "")|tojson }}, {{ (r.phone_number or "")|tojson }}, {{ (r.opening_time or "")|tojson }}, {{ (r.closing_time or "")|tojson }}, {{ (r.delivery_fee or 0)|float }}, {{ (r.eta_minutes or 30) }}, {{ (r.owner_phone or "")|tojson }}, {{ (r.owner_full_name or "")|tojson }}, {{ (r.lat or 6.9271)|float }}, {{ (r.lng or 79.8612)|float }}, {{ (r.image_url or "")|tojson }}, {{ (r.pickup_fee or 70.0)|float }}, {{ (r.per_km_rate or 40.0)|float }}, {{ (r.boost or 0.0)|float }}, {{ (r.commission_percentage or 20.0)|float }}, {{ (r.max_settle_amount or 1000.0)|float }})'
                                 class="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-xs font-bold hover:bg-blue-600 hover:text-white transition inline-flex items-center gap-1">
                                 <i class="fas fa-pen text-[10px]"></i> Edit
                             </button>
@@ -283,6 +283,10 @@
                     <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Commission Percentage (%) *</label>
                     <input id="edit_r_commission_percentage" name="commission_percentage" type="number" step="0.01" min="0" max="100" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
                 </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Max Settle Amount (Rs.) *</label>
+                    <input id="edit_r_max_settle_amount" name="max_settle_amount" type="number" step="0.01" min="0" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
             </div>
         </div>
         <div class="modal-footer">
@@ -295,7 +299,7 @@
 
 {% block scripts %}
 <script>
-    function openEditRestaurant(id, name, description, cuisine, address, phone, opening, closing, delivery_fee, eta, owner_phone, owner_name, lat, lng, image_url, pickup_fee, per_km_rate, boost, commission_percentage) {
+    function openEditRestaurant(id, name, description, cuisine, address, phone, opening, closing, delivery_fee, eta, owner_phone, owner_name, lat, lng, image_url, pickup_fee, per_km_rate, boost, commission_percentage, max_settle_amount) {
         document.getElementById('editRestaurantForm').action = '/admin/restaurants/' + id + '/edit';
         document.getElementById('edit_r_name').value = name || '';
         document.getElementById('edit_r_description').value = description || '';
@@ -315,6 +319,7 @@
         document.getElementById('edit_r_per_km_rate').value = per_km_rate !== undefined ? per_km_rate : 40.00;
         document.getElementById('edit_r_boost').value = boost !== undefined ? boost : 0.00;
         document.getElementById('edit_r_commission_percentage').value = commission_percentage !== undefined ? commission_percentage : 20.00;
+        document.getElementById('edit_r_max_settle_amount').value = max_settle_amount !== undefined ? max_settle_amount : 1000.00;
         document.getElementById('editRestaurantModal').style.display = 'flex';
     }
 

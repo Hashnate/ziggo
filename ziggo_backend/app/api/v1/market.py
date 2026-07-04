@@ -988,6 +988,10 @@ async def update_market_order_status(
         if order.driver_id:
             from ...services.finance_service import check_and_deactivate_driver
             await check_and_deactivate_driver(db, order.driver_id)
+            
+        # Check and deactivate market vendor if outstanding commission exceeds limit
+        from ...services.finance_service import check_and_deactivate_market_vendor
+        await check_and_deactivate_market_vendor(db, order.vendor_id)
     elif new_status == MarketOrderStatus.CANCELLED and order.redeem_points and order.redeem_points > 0:
         # BRD: RW-02 — refund redeemed points on cancellation.
         cq = await db.execute(select(Customer).where(Customer.id == order.customer_id))

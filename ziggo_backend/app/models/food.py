@@ -52,6 +52,7 @@ class Restaurant(Base):
     per_km_rate = Column(DECIMAL(10, 2), default=40.00, nullable=False)
     boost = Column(DECIMAL(10, 2), default=0.00, nullable=False)
     commission_percentage = Column(DECIMAL(5, 2), default=20.00, nullable=False)
+    max_settle_amount = Column(DECIMAL(10, 2), default=1000.00)
 
     owner_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

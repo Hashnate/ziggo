@@ -3009,6 +3009,7 @@ async def admin_restaurant_edit(
     per_km_rate: float = Form(40.00),
     boost: float = Form(0.00),
     commission_percentage: float = Form(20.00),
+    max_settle_amount: float = Form(1000.00),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -3077,6 +3078,7 @@ async def admin_restaurant_edit(
     r.per_km_rate = Decimal(str(per_km_rate))
     r.boost = Decimal(str(boost))
     r.commission_percentage = Decimal(str(commission_percentage))
+    r.max_settle_amount = Decimal(str(max_settle_amount))
     await db.commit()
     return RedirectResponse(url="/admin/restaurants", status_code=303)
 
@@ -3182,6 +3184,7 @@ async def admin_restaurant_new_submit(
     per_km_rate: float = Form(40.00),
     boost: float = Form(0.00),
     commission_percentage: float = Form(20.00),
+    max_settle_amount: float = Form(1000.00),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -3286,6 +3289,7 @@ async def admin_restaurant_new_submit(
         per_km_rate=Decimal(str(per_km_rate)),
         boost=Decimal(str(boost)),
         commission_percentage=Decimal(str(commission_percentage)),
+        max_settle_amount=Decimal(str(max_settle_amount)),
         rating=Decimal("4.5"),
         is_active=True,  # admin pre-creates as already-approved
         is_open=True,
@@ -3719,6 +3723,7 @@ async def admin_market_new_submit(
     food_license: UploadFile = File(None),
     additional_documents: UploadFile = File(None),
     vendor_image: UploadFile = File(None),
+    max_settle_amount: float = Form(1000.00),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -3866,6 +3871,7 @@ async def admin_market_new_submit(
         food_license_url=food_lic_url,
         additional_docs_url=add_docs_url,
         commission_percentage=Decimal(str(commission_percentage)),
+        max_settle_amount=Decimal(str(max_settle_amount)),
         priority_level=priority_level.strip(),
         is_featured=(is_featured == "yes"),
         pickup_fee=Decimal(str(pickup_fee)),
@@ -4099,6 +4105,7 @@ async def admin_market_vendor_edit(
     pickup_fee: float = Form(70.00),
     per_km_rate: float = Form(40.00),
     boost: float = Form(0.00),
+    max_settle_amount: float = Form(1000.00),
     vendor_image: UploadFile = File(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
@@ -4153,6 +4160,7 @@ async def admin_market_vendor_edit(
     v.pickup_fee = Decimal(str(pickup_fee))
     v.per_km_rate = Decimal(str(per_km_rate))
     v.boost = Decimal(str(boost))
+    v.max_settle_amount = Decimal(str(max_settle_amount))
     if bank_name.strip():
         v.bank_name = bank_name.strip()
     if account_holder_name.strip():

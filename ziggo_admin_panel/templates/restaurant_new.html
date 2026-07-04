@@ -175,6 +175,11 @@
                     <input name="commission_percentage" type="number" step="0.01" min="0" max="100" required value="{{ form.commission_percentage or 20.00 }}"
                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-slate-50/50">
                 </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Max Settle Amount (Rs.) *</label>
+                    <input name="max_settle_amount" type="number" step="0.01" min="0" required value="{{ form.max_settle_amount or 1000.00 }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-slate-50/50">
+                </div>
             </div>
         </div>
 

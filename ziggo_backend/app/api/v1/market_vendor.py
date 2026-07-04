@@ -1399,4 +1399,6 @@ async def pay_commission(
     db.add(tx)
     await db.commit()
     
+    from ...services.finance_service import check_and_deactivate_market_vendor
+    await check_and_deactivate_market_vendor(db, vendor.id)
     return {"ok": True, "paid_amount": float(outstanding)}

@@ -1050,29 +1050,12 @@ async def get_commission(
     if r is None:
         raise HTTPException(status_code=404, detail="Register your restaurant first")
 
-    # 1. Total sales (Delivered orders)
-    q = await db.execute(
-        select(FoodOrder).where(
-            FoodOrder.restaurant_id == r.id,
-            FoodOrder.status == FoodOrderStatus.DELIVERED
-        )
-    )
-    orders = q.scalars().all()
+    from ...services.finance_service import get_restaurant_outstanding_commission
+    vendor_owes_admin = await get_restaurant_outstanding_commission(db, r.id)
+    admin_owes_vendor = Decimal("0")
     
-    cod_orders = [o for o in orders if o.payment_method == "cash"]
-    online_orders = [o for o in orders if o.payment_method != "cash"]
-    
-    cod_sales = sum((o.final_amount or Decimal(0)) - (o.delivery_fee or Decimal(0)) for o in cod_orders)
-    online_sales = sum((o.final_amount or Decimal(0)) - (o.delivery_fee or Decimal(0)) for o in online_orders)
-    total_sales = cod_sales + online_sales
-
-    # 2. Commission rate & total owed
-    comm_pct = Decimal(str(r.commission_percentage)) if r.commission_percentage is not None else Decimal("20.0")
-    commission_owed_to_admin = (cod_sales * comm_pct) / Decimal("100.0")
-    settlement_owed_to_vendor = online_sales * (Decimal("100.0") - comm_pct) / Decimal("100.0")
-
-    # 3. Total paid
-    from ...models import WalletTransaction
+    # Get payments for history
+    from ...models import WalletTransaction, FoodOrder, FoodOrderStatus
     tq = await db.execute(
         select(WalletTransaction).where(
             WalletTransaction.user_id == user.id,
@@ -1091,15 +1074,18 @@ async def get_commission(
     settlement_txs = stq.scalars().all()
     total_paid_to_vendor = sum(tx.amount for tx in settlement_txs if tx.amount)
     
-    # 4. Outstanding
-    net_owed_to_admin = (commission_owed_to_admin - total_paid_to_admin) - (settlement_owed_to_vendor - total_paid_to_vendor)
+    q = await db.execute(
+        select(FoodOrder).where(
+            FoodOrder.restaurant_id == r.id,
+            FoodOrder.status == FoodOrderStatus.DELIVERED
+        )
+    )
+    orders = q.scalars().all()
+    total_sales = sum((o.final_amount or Decimal(0)) - (o.delivery_fee or Decimal(0)) for o in orders)
     
-    admin_owes_vendor = Decimal("0")
-    vendor_owes_admin = Decimal("0")
-    if net_owed_to_admin > 0:
-        vendor_owes_admin = net_owed_to_admin
-    else:
-        admin_owes_vendor = -net_owed_to_admin
+    comm_pct = Decimal(str(r.commission_percentage)) if r.commission_percentage is not None else Decimal("20.0")
+    # For simplicity, we just use the calculated outstanding instead of recompiling totals
+    commission_owed_to_admin = total_sales * comm_pct / Decimal("100.0")
 
     payments = []
     for tx in txs:
@@ -1214,4 +1200,6 @@ async def pay_commission(
     db.add(tx)
     await db.commit()
     
+    from ...services.finance_service import check_and_deactivate_restaurant
+    await check_and_deactivate_restaurant(db, r.id)
     return {"ok": True, "paid_amount": float(outstanding)}
