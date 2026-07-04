@@ -1170,72 +1170,8 @@ async def update_food_order_status(
 
                 # Check driver incentives (daily bonus and cycle bonus) from SystemSettings
                 from ...models import DriverPayout, SystemSettings, Booking, BookingStatus, MarketOrder, MarketOrderStatus
-                ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
-                ss = ss_q.scalars().first()
-                if ss:
-                    min_daily = int(ss.min_rides_daily_bonus) if ss.min_rides_daily_bonus is not None else 0
-                    daily_amt = Decimal(str(ss.daily_bonus_amount or 0))
-                    if min_daily > 0 and daily_amt > 0:
-                        if drv.today_rides == min_daily:
-                            drv.today_earnings += daily_amt
-                            drv.total_earnings += daily_amt
-                            db.add(DriverPayout(
-                                driver_id=drv.id,
-                                user_id=drv.user_id,
-                                amount=daily_amt,
-                                description=f"Daily Ride Bonus ({min_daily} rides reached)",
-                            ))
-                            db.add(Notification(
-                                user_id=drv.user_id,
-                                title="Daily Bonus Unlocked!",
-                                body=f"Congratulations! You completed {min_daily} rides today and earned a bonus of Rs.{daily_amt:,.2f}.",
-                                type="payment",
-                            ))
-
-                    cycle_rides = int(ss.commission_cycle_rides) if ss.commission_cycle_rides is not None else 0
-                    cycle_amt = Decimal(str(ss.commission_per_cycle or 0))
-                    if cycle_rides > 0 and cycle_amt > 0:
-                        # Count total completed rides (bookings + food orders + market orders)
-                        b_count_q = await db.execute(
-                            select(func.count(Booking.id)).where(
-                                Booking.driver_id == drv.id,
-                                Booking.status == BookingStatus.COMPLETED
-                            )
-                        )
-                        b_count = b_count_q.scalar() or 0
-
-                        f_count_q = await db.execute(
-                            select(func.count(FoodOrder.id)).where(
-                                FoodOrder.driver_id == drv.id,
-                                FoodOrder.status == FoodOrderStatus.DELIVERED
-                            )
-                        )
-                        f_count = f_count_q.scalar() or 0
-
-                        m_count_q = await db.execute(
-                            select(func.count(MarketOrder.id)).where(
-                                MarketOrder.driver_id == drv.id,
-                                MarketOrder.status == MarketOrderStatus.DELIVERED
-                            )
-                        )
-                        m_count = m_count_q.scalar() or 0
-
-                        completed_count = b_count + f_count + m_count
-                        if completed_count > 0 and completed_count % cycle_rides == 0:
-                            drv.total_earnings += cycle_amt
-                            drv.today_earnings += cycle_amt
-                            db.add(DriverPayout(
-                                driver_id=drv.id,
-                                user_id=drv.user_id,
-                                amount=cycle_amt,
-                                description=f"Commission Cycle Bonus ({completed_count} rides reached)",
-                            ))
-                            db.add(Notification(
-                                user_id=drv.user_id,
-                                title="Commission Cycle Bonus!",
-                                body=f"Congratulations! You completed another cycle of {cycle_rides} rides and earned a bonus of Rs.{cycle_amt:,.2f}.",
-                                type="payment",
-                            ))
+                from app.services.finance_service import evaluate_and_award_driver_incentives
+                await evaluate_and_award_driver_incentives(db, drv.id)
         
         # Check and deactivate driver if outstanding commission exceeds limit
         if order.driver_id:

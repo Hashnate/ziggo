@@ -1240,7 +1240,56 @@ async def get_driver_payout_stats(db: AsyncSession, driver_id: int) -> dict:
         "pending": float(pending),
     }
 
+async def evaluate_and_award_driver_incentives(db: AsyncSession, driver_id: int) -> None:
+    """Evaluate active DriverIncentives and award the driver if they exactly hit the target."""
+    from app.models import Driver, DriverIncentive, DriverPayout, Notification, Booking, BookingStatus, FoodOrder, FoodOrderStatus, MarketOrder, MarketOrderStatus
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import select, func
+    from decimal import Decimal
 
+    dq = await db.execute(select(Driver).where(Driver.id == driver_id))
+    drv = dq.scalars().first()
+    if not drv:
+        return
+        
+    iq = await db.execute(select(DriverIncentive).where(DriverIncentive.is_active == True))
+    incentives = iq.scalars().all()
+    if not incentives:
+        return
 
+    colombo_tz = timezone(timedelta(hours=5, minutes=30))
+    now_colombo = datetime.now(colombo_tz)
+    midnight_colombo = datetime(now_colombo.year, now_colombo.month, now_colombo.day, tzinfo=colombo_tz)
 
-
+    for inc in incentives:
+        limit_days = inc.limit_days or 1
+        if limit_days <= 1:
+            rides_completed = drv.today_rides or 0
+        else:
+            start_date_colombo = midnight_colombo - timedelta(days=limit_days - 1)
+            start_date_utc = start_date_colombo.astimezone(timezone.utc)
+            
+            b_count = (await db.execute(select(func.count(Booking.id)).where(Booking.driver_id == drv.id, Booking.status == BookingStatus.COMPLETED, Booking.completed_at >= start_date_utc))).scalar() or 0
+            f_count = (await db.execute(select(func.count(FoodOrder.id)).where(FoodOrder.driver_id == drv.id, FoodOrder.status == FoodOrderStatus.DELIVERED, FoodOrder.delivered_at >= start_date_utc))).scalar() or 0
+            m_count = (await db.execute(select(func.count(MarketOrder.id)).where(MarketOrder.driver_id == drv.id, MarketOrder.status == MarketOrderStatus.DELIVERED, MarketOrder.delivered_at >= start_date_utc))).scalar() or 0
+            
+            rides_completed = b_count + f_count + m_count
+            
+        # ONLY award if they exactly hit the requirement on this ride
+        if rides_completed == inc.trips_required:
+            amt = Decimal(str(inc.reward_amount or 0))
+            if amt > 0:
+                drv.total_earnings += amt
+                drv.today_earnings += amt
+                db.add(DriverPayout(
+                    driver_id=drv.id,
+                    user_id=drv.user_id,
+                    amount=amt,
+                    description=f"{inc.title} Bonus ({inc.trips_required} trips completed)"
+                ))
+                db.add(Notification(
+                    user_id=drv.user_id,
+                    title="Incentive Unlocked!",
+                    body=f"Congratulations! You completed {inc.trips_required} trips and earned a bonus of Rs.{amt:,.2f}.",
+                    type="payment"
+                ))
