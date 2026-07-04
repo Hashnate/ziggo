@@ -95,15 +95,7 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
         )
         actual_trips = trip_count_q.scalar() or 0
 
-        # Get vehicle_front photo from driver documents
-        doc_q = await db.execute(
-            select(DriverDocument).where(
-                DriverDocument.driver_id == b.driver.id,
-                DriverDocument.document_type == 'vehicle_front'
-            )
-        )
-        vehicle_doc = doc_q.scalars().first()
-        actual_vehicle_photo = vehicle_doc.document_url if vehicle_doc else b.driver.vehicle_photo_url
+        actual_vehicle_photo = b.driver.vehicle_photo_url
 
         driver_obj = {
             "id": b.driver.id,
