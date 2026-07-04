@@ -2396,6 +2396,7 @@ async def admin_categories_new(
     search_radius_km: int | None = Form(None),
     is_active: str = Form("on"),
     is_truck: str = Form("off"),
+    rental_hourly_rate: float | None = Form(None),
     image: UploadFile | None = File(None),
     preset_icon: str | None = Form(None),
     next: str = Form(""),
@@ -2441,6 +2442,7 @@ async def admin_categories_new(
             boost=Decimal(str(boost)),
             passenger_deductible=Decimal(str(passenger_deductible)),
             search_radius_km=search_radius_km,
+            rental_hourly_rate=Decimal(str(rental_hourly_rate)) if rental_hourly_rate is not None else None,
             display_order=max_order + 1,
         )
     )
@@ -2468,6 +2470,7 @@ async def admin_categories_edit(
     search_radius_km: int | None = Form(None),
     is_active: str = Form(""),
     is_truck: str = Form("off"),
+    rental_hourly_rate: float | None = Form(None),
     image: UploadFile | None = File(None),
     preset_icon: str | None = Form(None),
     next: str = Form(""),
@@ -2498,6 +2501,7 @@ async def admin_categories_edit(
     f.boost = Decimal(str(boost))
     f.passenger_deductible = Decimal(str(passenger_deductible))
     f.search_radius_km = search_radius_km
+    f.rental_hourly_rate = Decimal(str(rental_hourly_rate)) if rental_hourly_rate is not None else None
 
     if preset_icon:
         f.image_url = preset_icon

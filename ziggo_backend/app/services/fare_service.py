@@ -122,7 +122,13 @@ async def calculate_fare(
         )
         setting = setting_q.scalars().first()
         platform_pct = float(setting.platform_fee_percent) if (setting and setting.platform_fee_percent is not None and float(setting.platform_fee_percent) > 0) else sys_commission
-        hourly = float(RENTAL_HOURLY.get(service_type, RENTAL_HOURLY["car"]))
+        
+        # Use dynamic rental_hourly_rate if defined, otherwise fallback to RENTAL_HOURLY dictionary
+        if setting and setting.rental_hourly_rate is not None:
+            hourly = float(setting.rental_hourly_rate)
+        else:
+            hourly = float(RENTAL_HOURLY.get(service_type, RENTAL_HOURLY["car"]))
+            
         fare = hourly * hours
 
         discount = 0.0

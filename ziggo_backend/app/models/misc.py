@@ -126,6 +126,7 @@ class FareSetting(Base):
     display_order = Column(Integer, nullable=False, default=0)
     search_radius_km = Column(Integer, nullable=True)
     is_truck = Column(Boolean, nullable=False, default=False)
+    rental_hourly_rate = Column(DECIMAL(10, 2), nullable=True)
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
