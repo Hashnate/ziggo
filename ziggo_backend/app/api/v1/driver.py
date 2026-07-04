@@ -456,7 +456,7 @@ _ADMIN_PANEL_DIR = _find_admin_panel_dir()
 _DOC_UPLOAD_DIR = os.path.join(_ADMIN_PANEL_DIR, "static", "uploads", "driver_docs")
 os.makedirs(_DOC_UPLOAD_DIR, exist_ok=True)
 _VALID_DOC_TYPES = {"nic_front", "nic_back", "license_front", "license_back", "vehicle_reg", "insurance", "year_license", "eco_test", "vehicle_front", "vehicle_back", "vehicle_side"}
-_ALLOWED_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".pdf"}
+_ALLOWED_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".pdf", ".avif"}
 _MAX_DOC_BYTES = 25 * 1024 * 1024  # 25 MB
 
 async def _save_doc(file: UploadFile, doc_type: str) -> str:
@@ -464,7 +464,7 @@ async def _save_doc(file: UploadFile, doc_type: str) -> str:
         raise HTTPException(status_code=400, detail="No filename")
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in _ALLOWED_EXTS:
-        raise HTTPException(status_code=400, detail="Must be JPG, PNG, WEBP, or PDF")
+        raise HTTPException(status_code=400, detail="Must be JPG, PNG, WEBP, PDF, or AVIF")
     data = await file.read()
     if len(data) == 0:
         raise HTTPException(status_code=400, detail="Empty file")
@@ -581,8 +581,8 @@ os.makedirs(_PROFILE_PHOTO_DIR, exist_ok=True)
 
 async def _save_profile_photo(asset: UploadFile) -> str:
     ext = os.path.splitext(asset.filename or "")[1].lower()
-    if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
-        raise HTTPException(status_code=400, detail="Photo must be JPG, PNG, or WEBP")
+    if ext not in {".jpg", ".jpeg", ".png", ".webp", ".avif"}:
+        raise HTTPException(status_code=400, detail="Photo must be JPG, PNG, WEBP, or AVIF")
     data = await asset.read()
     if not data:
         raise HTTPException(status_code=400, detail="Empty file")

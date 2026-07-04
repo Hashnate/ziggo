@@ -1,13 +1,14 @@
 import asyncio
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from fastapi import Request
 from fastapi.responses import RedirectResponse
+
 
 from .config import settings
 from .database import engine
@@ -81,6 +82,30 @@ async def admin_forbidden_handler(request: Request, exc: _AdminForbidden):
         from fastapi.responses import JSONResponse
         return JSONResponse(status_code=403, content={"detail": "Access denied: Insufficient permissions"})
     return RedirectResponse(url="/admin/forbidden", status_code=303)
+
+
+@app.exception_handler(HTTPException)
+async def admin_http_exception_handler(request: Request, exc: HTTPException):
+    accept = request.headers.get("accept", "")
+    if (request.url.path.startswith("/admin/") 
+            and not request.url.path.startswith("/admin-api/")
+            and "json" not in accept):
+        referer = request.headers.get("referer") or "/admin/market-home"
+        import urllib.parse
+        parsed_referer = urllib.parse.urlparse(referer)
+        redirect_path = parsed_referer.path or "/admin/market-home"
+        
+        # Keep existing query params and update/add 'error'
+        query_params = urllib.parse.parse_qs(parsed_referer.query)
+        query_params["error"] = [exc.detail]
+        new_query = urllib.parse.urlencode(query_params, doseq=True)
+        
+        return RedirectResponse(url=f"{redirect_path}?{new_query}", status_code=303)
+        
+    # Standard JSON handling for everything else
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
 
 
 # JSON API

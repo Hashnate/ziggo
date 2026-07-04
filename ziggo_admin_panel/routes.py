@@ -36,12 +36,12 @@ VEHICLE_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "vehicles")
 os.makedirs(VEHICLE_UPLOAD_DIR, exist_ok=True)
 BRANDING_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "branding")
 os.makedirs(BRANDING_UPLOAD_DIR, exist_ok=True)
-ALLOWED_PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
+ALLOWED_PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".avif"}
 MAX_PHOTO_BYTES = 5 * 1024 * 1024  # 5 MB
 
 DOC_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "driver_docs")
 os.makedirs(DOC_UPLOAD_DIR, exist_ok=True)
-ALLOWED_DOC_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".pdf"}
+ALLOWED_DOC_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".pdf", ".avif"}
 MAX_DOC_BYTES = 8 * 1024 * 1024  # 8 MB
 
 
@@ -56,7 +56,7 @@ async def _save_uploaded_photo(photo: UploadFile | None) -> str | None:
         return None
     ext = os.path.splitext(photo.filename)[1].lower()
     if ext not in ALLOWED_PHOTO_EXTS:
-        raise HTTPException(status_code=400, detail="Image must be JPG, PNG, or WEBP")
+        raise HTTPException(status_code=400, detail="Image must be JPG, PNG, WEBP, or AVIF")
     data = await photo.read()
     if len(data) == 0:
         return None
@@ -75,7 +75,7 @@ async def _save_uploaded_doc(doc: UploadFile | None, doc_type: str) -> str | Non
         return None
     ext = os.path.splitext(doc.filename)[1].lower()
     if ext not in ALLOWED_DOC_EXTS:
-        raise HTTPException(status_code=400, detail="Document must be JPG, PNG, WEBP, or PDF")
+        raise HTTPException(status_code=400, detail="Document must be JPG, PNG, WEBP, PDF, or AVIF")
     data = await doc.read()
     if len(data) == 0:
         return None
@@ -94,7 +94,7 @@ async def _save_vendor_doc(doc: UploadFile | None, doc_type: str) -> str | None:
         return None
     ext = os.path.splitext(doc.filename)[1].lower()
     if ext not in ALLOWED_DOC_EXTS:
-        raise HTTPException(status_code=400, detail="Document must be JPG, PNG, WEBP, or PDF")
+        raise HTTPException(status_code=400, detail="Document must be JPG, PNG, WEBP, PDF, or AVIF")
     data = await doc.read()
     if len(data) == 0:
         return None
@@ -115,7 +115,7 @@ async def _save_category_image(photo: UploadFile | None) -> str | None:
         return None
     ext = os.path.splitext(photo.filename)[1].lower()
     if ext not in ALLOWED_PHOTO_EXTS:
-        raise HTTPException(status_code=400, detail="Image must be JPG, PNG, or WEBP")
+        raise HTTPException(status_code=400, detail="Image must be JPG, PNG, WEBP, or AVIF")
     data = await photo.read()
     if len(data) == 0:
         return None
@@ -134,7 +134,7 @@ async def _save_vehicle_photo(photo: UploadFile | None) -> str | None:
         return None
     ext = os.path.splitext(photo.filename)[1].lower()
     if ext not in ALLOWED_PHOTO_EXTS:
-        raise HTTPException(status_code=400, detail="Photo must be JPG, PNG, or WEBP")
+        raise HTTPException(status_code=400, detail="Photo must be JPG, PNG, WEBP, or AVIF")
     data = await photo.read()
     if len(data) == 0:
         return None
@@ -158,7 +158,7 @@ async def _save_branding_asset(asset: UploadFile | None, label: str) -> str | No
     ext = os.path.splitext(asset.filename)[1].lower()
     if ext not in ALLOWED_BRANDING_EXTS:
         raise HTTPException(
-            status_code=400, detail=f"{label} must be JPG, PNG, WEBP, SVG or ICO"
+            status_code=400, detail=f"{label} must be JPG, PNG, WEBP, AVIF, SVG or ICO"
         )
     data = await asset.read()
     if len(data) == 0:
@@ -4270,7 +4270,7 @@ async def _save_market_home_image(photo: UploadFile | None) -> str | None:
         return None
     ext = os.path.splitext(photo.filename)[1].lower()
     if ext not in ALLOWED_PHOTO_EXTS:
-        raise HTTPException(status_code=400, detail="Image must be JPG, PNG, or WEBP")
+        raise HTTPException(status_code=400, detail="Image must be JPG, PNG, WEBP, or AVIF")
     data = await photo.read()
     if len(data) == 0:
         return None
@@ -4297,8 +4297,8 @@ async def admin_market_home(
         await db.execute(
             select(MarketAd)
             .options(selectinload(MarketAd.vendor))
-            .join(MarketVendor, MarketAd.vendor_id == MarketVendor.id)
-            .order_by(MarketAd.id.desc())
+            .outerjoin(MarketVendor, MarketAd.vendor_id == MarketVendor.id)
+            .order_by(MarketAd.display_order, MarketAd.id.desc())
         )
     ).scalars().all()
 
@@ -4437,9 +4437,10 @@ async def admin_market_category_delete(
 # ---------- Ads ----------
 @router.post("/market-home/ads/new")
 async def admin_market_ad_new(
-    vendor_id: int = Form(...),
+    vendor_id: int | None = Form(None),
     radius_km: float = Form(5.0),
     image_url: str = Form(""),
+    display_order: int = Form(0),
     is_active: str = Form("off"),
     link_type: str = Form("none"),
     link_value: str = Form(""),
@@ -4454,9 +4455,10 @@ async def admin_market_ad_new(
         raise HTTPException(status_code=400, detail="An ad image (upload or URL) is required")
     db.add(
         MarketAd(
-            vendor_id=vendor_id,
+            vendor_id=vendor_id if vendor_id and vendor_id > 0 else None,
             image_url=url,
             radius_km=Decimal(str(radius_km)),
+            display_order=int(display_order or 0),
             is_active=(is_active == "on"),
             link_type=link_type,
             link_value=link_value.strip() or None,
@@ -4469,9 +4471,10 @@ async def admin_market_ad_new(
 @router.post("/market-home/ads/{id}/edit")
 async def admin_market_ad_edit(
     id: int,
-    vendor_id: int = Form(...),
+    vendor_id: int | None = Form(None),
     radius_km: float = Form(5.0),
     image_url: str = Form(""),
+    display_order: int = Form(0),
     link_type: str = Form("none"),
     link_value: str = Form(""),
     image: UploadFile | None = File(None),
@@ -4483,8 +4486,9 @@ async def admin_market_ad_edit(
     ad = (await db.execute(select(MarketAd).where(MarketAd.id == id))).scalars().first()
     if not ad:
         raise HTTPException(status_code=404, detail="Ad not found")
-    ad.vendor_id = vendor_id
+    ad.vendor_id = vendor_id if vendor_id and vendor_id > 0 else None
     ad.radius_km = Decimal(str(radius_km))
+    ad.display_order = int(display_order or 0)
     ad.link_type = link_type
     ad.link_value = link_value.strip() or None
     new_url = await _save_market_home_image(image)
@@ -7413,7 +7417,7 @@ async def _save_food_home_image(photo: UploadFile | None) -> str | None:
         return None
     ext = os.path.splitext(photo.filename)[1].lower()
     if ext not in ALLOWED_PHOTO_EXTS:
-        raise HTTPException(status_code=400, detail="Image must be JPG, PNG, or WEBP")
+        raise HTTPException(status_code=400, detail="Image must be JPG, PNG, WEBP, or AVIF")
     data = await photo.read()
     if len(data) == 0:
         return None

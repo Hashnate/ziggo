@@ -6,13 +6,6 @@
 {% block content %}
 <div class="space-y-6">
 
-    {% if request.query_params.get("error") %}
-    <div class="bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl p-4 flex items-center gap-3 font-bold">
-        <i class="fas fa-exclamation-circle"></i>
-        {{ request.query_params.get("error") }}
-    </div>
-    {% endif %}
-
     <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
             <h2 class="text-lg font-black text-slate-800 tracking-tight">Administrative Accounts</h2>

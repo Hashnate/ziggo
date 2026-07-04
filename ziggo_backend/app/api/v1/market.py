@@ -169,27 +169,36 @@ async def list_ads(
 ):
     """Retrieve active advertisements. If lat and lng are provided, filter ads
     so only those targeting a radius that includes the user are returned."""
+    from sqlalchemy import or_, and_
     q = await db.execute(
         select(MarketAd)
         .options(selectinload(MarketAd.vendor))
-        .join(MarketVendor, MarketAd.vendor_id == MarketVendor.id)
-        .where(MarketAd.is_active == True, MarketVendor.is_active == True)  # noqa: E712
+        .outerjoin(MarketVendor, MarketAd.vendor_id == MarketVendor.id)
+        .where(
+            MarketAd.is_active == True,
+            or_(
+                MarketAd.vendor_id == None,
+                and_(MarketVendor.id != None, MarketVendor.is_active == True)
+            )
+        )
+        .order_by(MarketAd.display_order, MarketAd.id)
     )
     rows = q.scalars().all()
     has_origin = lat is not None and lng is not None
     res = []
     for ad in rows:
         vendor = ad.vendor
-        if has_origin and vendor.lat is not None and vendor.lng is not None:
-            distance_km = haversine_km(lat, lng, float(vendor.lat), float(vendor.lng))
-            # check targeting radius
-            radius = float(ad.radius_km)
-            if distance_km > radius:
-                continue
+        if vendor is not None:
+            if has_origin and vendor.lat is not None and vendor.lng is not None:
+                distance_km = haversine_km(lat, lng, float(vendor.lat), float(vendor.lng))
+                # check targeting radius
+                radius = float(ad.radius_km)
+                if distance_km > radius:
+                    continue
         res.append({
             "id": ad.id,
             "vendor_id": ad.vendor_id,
-            "vendor_name": vendor.name,
+            "vendor_name": vendor.name if vendor else "Global Banner",
             "image_url": ad.image_url,
             "radius_km": float(ad.radius_km),
             "link_type": ad.link_type,

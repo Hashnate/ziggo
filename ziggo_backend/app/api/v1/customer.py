@@ -103,8 +103,8 @@ os.makedirs(_PROFILE_PHOTO_DIR, exist_ok=True)
 
 async def _save_profile_photo(asset: UploadFile) -> str:
     ext = os.path.splitext(asset.filename or "")[1].lower()
-    if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
-        raise HTTPException(status_code=400, detail="Photo must be JPG, PNG, or WEBP")
+    if ext not in {".jpg", ".jpeg", ".png", ".webp", ".avif"}:
+        raise HTTPException(status_code=400, detail="Photo must be JPG, PNG, WEBP, or AVIF")
     data = await asset.read()
     if not data:
         raise HTTPException(status_code=400, detail="Empty file")

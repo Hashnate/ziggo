@@ -539,7 +539,25 @@
         </header>
 
         <!-- Page Content -->
-        <div class="flex-1 overflow-y-auto px-5 py-4">
+        <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+            {% if request.query_params.get("error") %}
+            <div class="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 flex items-start gap-3 text-sm max-w-6xl font-bold">
+                <i class="fas fa-circle-exclamation mt-0.5 shrink-0 text-red-500"></i>
+                <div>
+                    <p class="font-extrabold uppercase tracking-wider text-[10px] text-red-500 mb-0.5">Error</p>
+                    <p>{{ request.query_params.get("error") }}</p>
+                </div>
+            </div>
+            {% endif %}
+            {% if request.query_params.get("success") %}
+            <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-start gap-3 text-sm max-w-6xl font-bold">
+                <i class="fas fa-circle-check mt-0.5 shrink-0 text-emerald-500"></i>
+                <div>
+                    <p class="font-extrabold uppercase tracking-wider text-[10px] text-emerald-500 mb-0.5">Success</p>
+                    <p>{{ request.query_params.get("success") }}</p>
+                </div>
+            </div>
+            {% endif %}
             {% block content %}{% endblock %}
         </div>
     </main>

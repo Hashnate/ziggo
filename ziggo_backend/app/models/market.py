@@ -172,12 +172,13 @@ class MarketAd(Base):
     __tablename__ = "market_ads"
 
     id = Column(Integer, primary_key=True, index=True)
-    vendor_id = Column(Integer, ForeignKey("market_vendors.id", ondelete="CASCADE"), nullable=False)
+    vendor_id = Column(Integer, ForeignKey("market_vendors.id", ondelete="CASCADE"), nullable=True)
     image_url = Column(String(255), nullable=False)
     radius_km = Column(DECIMAL(10, 2), default=5.00, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     link_type = Column(String(20), nullable=False, default="none")
     link_value = Column(String(255))
+    display_order = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     vendor = relationship("MarketVendor")

@@ -53,7 +53,7 @@ _REPO_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
 _UPLOAD_BASE = os.path.join(_REPO_ROOT, "ziggo_admin_panel", "static", "uploads")
-_ALLOWED_IMG_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
+_ALLOWED_IMG_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".avif"}
 _MAX_IMG_BYTES = 5 * 1024 * 1024
 
 
@@ -62,7 +62,7 @@ async def _save_image(photo: UploadFile, kind: str) -> str:
         raise HTTPException(status_code=400, detail="No file provided")
     ext = os.path.splitext(photo.filename)[1].lower()
     if ext not in _ALLOWED_IMG_EXTS:
-        raise HTTPException(status_code=400, detail="Image must be JPG, PNG, or WEBP")
+        raise HTTPException(status_code=400, detail="Image must be JPG, PNG, WEBP, or AVIF")
     data = await photo.read()
     if not data:
         raise HTTPException(status_code=400, detail="Empty file")
