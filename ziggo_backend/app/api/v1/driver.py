@@ -698,7 +698,7 @@ async def get_driver_incentives(
     user: User = Depends(require_role("driver")),
 ):
     """Get list of all active driver incentive tiers."""
-    from ...models import DriverIncentive, Driver, Booking, BookingStatus
+    from ...models import DriverIncentive, Driver, Booking, BookingStatus, FoodOrder, FoodOrderStatus, MarketOrder, MarketOrderStatus
     from datetime import timedelta
     from sqlalchemy import func
 
@@ -730,14 +730,34 @@ async def get_driver_incentives(
             start_date_colombo = midnight_colombo - timedelta(days=limit_days - 1)
             start_date_utc = start_date_colombo.astimezone(timezone.utc)
             
-            count_q = await db.execute(
+            b_count_q = await db.execute(
                 select(func.count(Booking.id)).where(
                     Booking.driver_id == drv.id,
                     Booking.status == BookingStatus.COMPLETED,
                     Booking.completed_at >= start_date_utc
                 )
             )
-            rides_completed = count_q.scalar() or 0
+            b_count = b_count_q.scalar() or 0
+
+            f_count_q = await db.execute(
+                select(func.count(FoodOrder.id)).where(
+                    FoodOrder.driver_id == drv.id,
+                    FoodOrder.status == FoodOrderStatus.DELIVERED,
+                    FoodOrder.delivered_at >= start_date_utc
+                )
+            )
+            f_count = f_count_q.scalar() or 0
+
+            m_count_q = await db.execute(
+                select(func.count(MarketOrder.id)).where(
+                    MarketOrder.driver_id == drv.id,
+                    MarketOrder.status == MarketOrderStatus.DELIVERED,
+                    MarketOrder.delivered_at >= start_date_utc
+                )
+            )
+            m_count = m_count_q.scalar() or 0
+
+            rides_completed = b_count + f_count + m_count
 
         results.append({
             "id": r.id,

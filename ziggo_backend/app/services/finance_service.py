@@ -1136,9 +1136,14 @@ async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
         )
     )
     bookings = bq.scalars().all()
-    ride_collected = sum((_dec(b.final_amount or b.fare_amount) for b in bookings), Decimal("0"))
-    ride_earnings = sum((_dec(b.driver_earnings) for b in bookings), Decimal("0"))
-    ride_count = len(bookings)
+
+    # Classify bookings
+    passenger_bookings = [b for b in bookings if not b.is_flash and not b.is_courier]
+    delivery_bookings = [b for b in bookings if b.is_flash or b.is_courier]
+
+    ride_collected = sum((_dec(b.final_amount or b.fare_amount) for b in passenger_bookings), Decimal("0"))
+    ride_earnings = sum((_dec(b.driver_earnings) for b in passenger_bookings), Decimal("0"))
+    ride_count = len(passenger_bookings)
 
     fq = await db.execute(
         select(FoodOrder).options(joinedload(FoodOrder.restaurant)).where(
@@ -1155,8 +1160,9 @@ async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
     )
     markets = mq.scalars().all()
 
-    delivery_collected = Decimal("0")
-    delivery_earnings = Decimal("0")
+    delivery_collected = sum((_dec(b.final_amount or b.fare_amount) for b in delivery_bookings), Decimal("0"))
+    delivery_earnings = sum((_dec(b.driver_earnings) for b in delivery_bookings), Decimal("0"))
+
     for o in [*foods, *markets]:
         df = _dec(o.delivery_fee)
         if hasattr(o, "restaurant_id"):
@@ -1165,7 +1171,7 @@ async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
             _, cut = _market_split(o)
         delivery_collected += df
         delivery_earnings += df - cut
-    delivery_count = len(foods) + len(markets)
+    delivery_count = len(delivery_bookings) + len(foods) + len(markets)
 
     collected = ride_collected + delivery_collected
     earnings = ride_earnings + delivery_earnings

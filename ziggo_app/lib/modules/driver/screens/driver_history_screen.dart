@@ -476,6 +476,12 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
 
   String _formatServiceType(String? serviceType, Map<String, dynamic> r) {
     if (serviceType == null) return 'Ride';
+    if (r['is_flash'] == true || serviceType.toLowerCase() == 'flash') {
+      return 'Flash Delivery';
+    }
+    if (r['is_courier'] == true || serviceType.toLowerCase() == 'courier') {
+      return 'Courier';
+    }
     if (serviceType.toLowerCase() == 'food' || r['is_food'] == true) {
       return 'Bike food';
     }

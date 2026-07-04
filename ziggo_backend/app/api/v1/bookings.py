@@ -1532,14 +1532,33 @@ async def update_booking_status(
                     cycle_rides = int(ss.commission_cycle_rides) if ss.commission_cycle_rides is not None else 0
                     cycle_amt = Decimal(str(ss.commission_per_cycle or 0))
                     if cycle_rides > 0 and cycle_amt > 0:
-                        # Count total completed bookings for this driver
-                        count_q = await db.execute(
+                        # Count total completed bookings, food orders, and market orders for this driver
+                        b_count_q = await db.execute(
                             select(func.count(Booking.id)).where(
                                 Booking.driver_id == drv.id,
                                 Booking.status == BookingStatus.COMPLETED
                             )
                         )
-                        completed_count = (count_q.scalar() or 0)
+                        b_count = b_count_q.scalar() or 0
+
+                        from ...models import FoodOrder, FoodOrderStatus, MarketOrder, MarketOrderStatus
+                        f_count_q = await db.execute(
+                            select(func.count(FoodOrder.id)).where(
+                                FoodOrder.driver_id == drv.id,
+                                FoodOrder.status == FoodOrderStatus.DELIVERED
+                            )
+                        )
+                        f_count = f_count_q.scalar() or 0
+
+                        m_count_q = await db.execute(
+                            select(func.count(MarketOrder.id)).where(
+                                MarketOrder.driver_id == drv.id,
+                                MarketOrder.status == MarketOrderStatus.DELIVERED
+                            )
+                        )
+                        m_count = m_count_q.scalar() or 0
+
+                        completed_count = b_count + f_count + m_count
                         if completed_count > 0 and completed_count % cycle_rides == 0:
                             drv.total_earnings += cycle_amt
                             drv.today_earnings += cycle_amt
