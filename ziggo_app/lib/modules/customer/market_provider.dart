@@ -6,6 +6,8 @@ import '../../core/network/api_client.dart';
 class MarketProvider extends ChangeNotifier {
   List<Map<String, dynamic>> _vendors = const [];
   List<Map<String, dynamic>> _ads = const [];
+  List<Map<String, dynamic>> _deals = const [];
+  List<Map<String, dynamic>> _categories = const [];
   bool _loading = false;
   String? _error;
 
@@ -24,6 +26,8 @@ class MarketProvider extends ChangeNotifier {
 
   List<Map<String, dynamic>> get vendors => _vendors;
   List<Map<String, dynamic>> get ads => _ads;
+  List<Map<String, dynamic>> get deals => _deals;
+  List<Map<String, dynamic>> get categories => _categories;
   bool get loading => _loading;
   String? get error => _error;
   Map<int, Map<String, dynamic>> get cart => _cart;
@@ -204,6 +208,26 @@ class MarketProvider extends ChangeNotifier {
         },
       );
       _ads = List<Map<String, dynamic>>.from(resp.data as List);
+      notifyListeners();
+    } on DioException {
+      // ignore
+    }
+  }
+
+  Future<void> fetchDeals() async {
+    try {
+      final resp = await ApiClient.instance.dio.get('/market/deals');
+      _deals = List<Map<String, dynamic>>.from(resp.data as List);
+      notifyListeners();
+    } on DioException {
+      // ignore
+    }
+  }
+
+  Future<void> fetchCategories() async {
+    try {
+      final resp = await ApiClient.instance.dio.get('/market/categories');
+      _categories = List<Map<String, dynamic>>.from(resp.data as List);
       notifyListeners();
     } on DioException {
       // ignore

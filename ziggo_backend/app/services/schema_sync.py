@@ -23,7 +23,7 @@ from sqlalchemy import inspect, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from ..database import Base
-from ..models import Event, EventTicketTier, EventOrder, EventOrderItem, FlashWeightTier, CorporateAccount, CorporateMember, DriverPayout, MarketAd, DriverIncentive, ReferralBonus, PeakHourSetting  # noqa: F401 — ensures import for create_all
+from ..models import Event, EventTicketTier, EventOrder, EventOrderItem, FlashWeightTier, CorporateAccount, CorporateMember, DriverPayout, MarketAd, MarketDeal, DriverIncentive, ReferralBonus, PeakHourSetting  # noqa: F401 — ensures import for create_all
 
 # (table_name, column_name, column_ddl)
 PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
@@ -86,6 +86,12 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("bookings", "peak_surcharge", "NUMERIC(10, 2) DEFAULT 0"),
     ("users", "referral_code", "VARCHAR(16)"),
     ("users", "referred_by_user_id", "INTEGER"),
+    ("market_ads", "link_type", "VARCHAR(20) NOT NULL DEFAULT 'none'"),
+    ("market_ads", "link_value", "VARCHAR(255)"),
+    ("market_deals", "link_type", "VARCHAR(20) NOT NULL DEFAULT 'none'"),
+    ("market_deals", "link_value", "VARCHAR(255)"),
+    ("food_deals", "link_type", "VARCHAR(20) NOT NULL DEFAULT 'none'"),
+    ("food_deals", "link_value", "VARCHAR(255)"),
 )
 
 
@@ -163,6 +169,36 @@ DEFAULT_FOOD_DEALS = [
     {"title": "Spend more, Save more", "subtitle": "Deals from your favourite outlets!", "image_url": "https://images.unsplash.com/photo-1576867757603-05b134ebc379?q=80&w=400&auto=format&fit=crop", "color": "green", "promo_code": None, "display_order": 3},
 ]
 
+DEFAULT_MARKET_DEALS = [
+    {"title": "Spend more\nSave more", "subtitle": "Deals from your favourite outlets!", "image_url": "local:spend_save", "color": "green", "promo_code": None, "display_order": 1},
+    {"title": "Buy 1\nGet 1 Free!", "subtitle": "Double your delight!", "image_url": "local:bag", "color": "orange", "promo_code": "WELCOME", "display_order": 2},
+    {"title": "Combo Deals!", "subtitle": "Best compliments for the day", "image_url": "local:combo", "color": "purple", "promo_code": "FLAT100", "display_order": 3},
+    {"title": "Discount Offers!", "subtitle": "Lowest price deals", "image_url": "local:discount", "color": "blue", "promo_code": "ZIGGO50", "display_order": 4},
+]
+
+
+DEFAULT_MARKET_CATEGORIES = [
+    {"name": "Groceries", "image_url": "local:groceries", "color": "green", "display_order": 1},
+    {"name": "Pharmaceutical", "image_url": "local:pharmaceutical", "color": "red", "display_order": 2},
+    {"name": "Fresh Produce", "image_url": "local:freshproduce", "color": "green", "display_order": 3},
+    {"name": "Household", "image_url": "local:household", "color": "blue", "display_order": 4},
+    {"name": "Dairy", "image_url": "local:dairy", "color": "orange", "display_order": 5},
+    {"name": "Baby Care", "image_url": "local:babycare", "color": "purple", "display_order": 6},
+    {"name": "Poultry and Meat", "image_url": "local:poultryandmeat", "color": "red", "display_order": 7},
+    {"name": "Personal Care", "image_url": "local:personalcare", "color": "purple", "display_order": 8},
+    {"name": "Seafood", "image_url": "local:seafood", "color": "cyan", "display_order": 9},
+    {"name": "Pet Care", "image_url": "local:petcare", "color": "orange", "display_order": 10},
+    {"name": "Frozen Foods", "image_url": "local:frozenfoods", "color": "blue", "display_order": 11},
+    {"name": "Cosmetics", "image_url": "local:cosmetics", "color": "red", "display_order": 12},
+    {"name": "Fresh Flowers", "image_url": "local:freshflower", "color": "purple", "display_order": 13},
+    {"name": "Bakery", "image_url": "local:bakery", "color": "orange", "display_order": 14},
+    {"name": "Stationery", "image_url": "local:stationery", "color": "indigo", "display_order": 15},
+    {"name": "Electronics", "image_url": "local:electronics", "color": "indigo", "display_order": 16},
+    {"name": "Ayurvedic", "image_url": "local:ayurvedic", "color": "green", "display_order": 17},
+    {"name": "21+", "image_url": "local:21+", "color": "primary", "display_order": 18},
+    {"name": "Intimacy", "image_url": "local:intimacy", "color": "purple", "display_order": 19},
+]
+
 
 async def ensure_schema(engine: AsyncEngine) -> None:
     async with engine.begin() as conn:
@@ -189,6 +225,8 @@ async def ensure_schema(engine: AsyncEngine) -> None:
         await _seed_flash_tiers(conn)
         await _seed_sample_events(conn)
         await _seed_food_home(conn)
+        await _seed_market_home(conn)
+        await _seed_market_categories(conn)
         await _seed_incentives(conn)
         await _seed_peak_hours(conn)
         await _cleanup_bad_payouts(conn)
@@ -311,6 +349,34 @@ async def _seed_food_home(conn) -> None:
 
     if seeded:
         print(f"[schema_sync] Seeded food home: {', '.join(seeded)}")
+
+
+async def _seed_market_home(conn) -> None:
+    from ..models import MarketDeal, PromoCode
+
+    if (await conn.execute(select(MarketDeal))).scalars().first() is None:
+        for row in DEFAULT_MARKET_DEALS:
+            values = {k: v for k, v in row.items() if k != "promo_code"}
+            code = row.get("promo_code")
+            promo_id = None
+            if code:
+                pq = await conn.execute(select(PromoCode.id).where(PromoCode.code == code))
+                promo_id = pq.scalar_one_or_none()
+            await conn.execute(
+                MarketDeal.__table__.insert().values(is_active=True, promo_code_id=promo_id, **values)
+            )
+        print(f"[schema_sync] Seeded market home: {len(DEFAULT_MARKET_DEALS)} deals")
+
+
+async def _seed_market_categories(conn) -> None:
+    from ..models import MarketCategory
+
+    if (await conn.execute(select(MarketCategory))).scalars().first() is None:
+        for row in DEFAULT_MARKET_CATEGORIES:
+            await conn.execute(
+                MarketCategory.__table__.insert().values(is_active=True, **row)
+            )
+        print(f"[schema_sync] Seeded market categories: {len(DEFAULT_MARKET_CATEGORIES)}")
 
 
 async def _seed_incentives(conn) -> None:

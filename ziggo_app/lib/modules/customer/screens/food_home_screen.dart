@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
@@ -476,6 +477,65 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
       case 'promo':
         if (value.isNotEmpty) _showPromoSheet(value);
         break;
+      case 'url':
+        if (value.isNotEmpty) {
+          final uri = Uri.tryParse(value);
+          if (uri != null) {
+            canLaunchUrl(uri).then((can) {
+              if (can) launchUrl(uri, mode: LaunchMode.externalApplication);
+            });
+          }
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  void _onDealTap(Map<String, dynamic> deal) {
+    final type = deal['link_type']?.toString() ?? 'none';
+    final value = deal['link_value']?.toString() ?? '';
+    final code = deal['promo_code']?.toString() ?? '';
+
+    if (type == 'none' || type.isEmpty) {
+      if (code.isNotEmpty) {
+        _showPromoSheet(code);
+      }
+      return;
+    }
+
+    final food = context.read<FoodProvider>();
+    switch (type) {
+      case 'restaurant':
+        final id = int.tryParse(value);
+        if (id != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => RestaurantDetailScreen(restaurantId: id)),
+          );
+        }
+        break;
+      case 'category':
+        final id = int.tryParse(value);
+        if (id != null) food.setCategoryFilter(id);
+        break;
+      case 'collection':
+        final id = int.tryParse(value);
+        if (id != null) food.setCollectionFilter(id);
+        break;
+      case 'promo':
+        if (value.isNotEmpty) _showPromoSheet(value);
+        break;
+      case 'url':
+        if (value.isNotEmpty) {
+          final uri = Uri.tryParse(value);
+          if (uri != null) {
+            canLaunchUrl(uri).then((can) {
+              if (can) launchUrl(uri, mode: LaunchMode.externalApplication);
+            });
+          }
+        }
+        break;
       default:
         break;
     }
@@ -582,9 +642,7 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: GestureDetector(
-                      onTap: () {
-                        if (code != null && code.isNotEmpty) _showPromoSheet(code);
-                      },
+                      onTap: () => _onDealTap(deal),
                       child: Container(
                         width: 240,
                         decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(16)),

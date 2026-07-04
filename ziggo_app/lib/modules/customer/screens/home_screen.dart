@@ -205,7 +205,9 @@ class _Header extends StatelessWidget {
                   ? DecorationImage(
                       image: auth.profilePhoto!.startsWith('http')
                           ? NetworkImage(auth.profilePhoto!)
-                          : FileImage(File(auth.profilePhoto!)) as ImageProvider,
+                          : (auth.profilePhoto!.startsWith('/static')
+                              ? NetworkImage('${ApiConfig.baseHost}${auth.profilePhoto!}')
+                              : FileImage(File(auth.profilePhoto!)) as ImageProvider),
                       fit: BoxFit.cover,
                     )
                   : null,

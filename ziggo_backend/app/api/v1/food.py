@@ -227,6 +227,8 @@ async def food_home(db: AsyncSession = Depends(get_db)):
                 "color": d.color,
                 "promo_id": d.promo_code_id,
                 "promo_code": d.promo_code.code if d.promo_code else None,
+                "link_type": d.link_type,
+                "link_value": d.link_value,
             }
             for d in deals_q.scalars().all()
         ],

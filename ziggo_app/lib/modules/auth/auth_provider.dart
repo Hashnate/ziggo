@@ -194,13 +194,32 @@ class AuthProvider extends ChangeNotifier {
     String? phoneNumber,
     String? referredByCode,
   }) async {
+    String? uploadedUrl;
+    if (profilePhoto != null && profilePhoto.isNotEmpty && !profilePhoto.startsWith('http') && !profilePhoto.startsWith('/static')) {
+      try {
+        final photoForm = FormData.fromMap({
+          'photo': await MultipartFile.fromFile(profilePhoto),
+        });
+        final uploadResp = await ApiClient.instance.dio.post('/customer/profile-photo', data: photoForm);
+        if (uploadResp.data != null && uploadResp.data['profile_photo'] != null) {
+          uploadedUrl = uploadResp.data['profile_photo'] as String?;
+        }
+      } catch (_) {
+        // Fallback
+      }
+    }
+
     final body = <String, dynamic>{};
     if (fullName != null) body['full_name'] = fullName;
     if (email != null) body['email'] = email;
     if (birthday != null) body['birthday'] = birthday;
     if (gender != null) body['gender'] = gender;
     if (emergencyContact != null) body['emergency_contact'] = emergencyContact;
-    if (profilePhoto != null) body['profile_photo'] = profilePhoto;
+    if (uploadedUrl != null) {
+      body['profile_photo'] = uploadedUrl;
+    } else if (profilePhoto != null) {
+      body['profile_photo'] = profilePhoto;
+    }
     if (phoneNumber != null) body['phone_number'] = phoneNumber;
     if (referredByCode != null && referredByCode.trim().isNotEmpty) {
       body['referred_by_code'] = referredByCode.trim().toUpperCase();

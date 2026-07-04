@@ -192,8 +192,59 @@ async def list_ads(
             "vendor_name": vendor.name,
             "image_url": ad.image_url,
             "radius_km": float(ad.radius_km),
+            "link_type": ad.link_type,
+            "link_value": ad.link_value,
         })
     return res
+
+
+@router.get("/deals")
+async def list_market_deals(db: AsyncSession = Depends(get_db)):
+    """Retrieve active marketplace deals & offers sorted by display_order."""
+    from ...models import MarketDeal
+    from sqlalchemy.orm import selectinload
+
+    q = await db.execute(
+        select(MarketDeal)
+        .options(selectinload(MarketDeal.promo_code))
+        .where(MarketDeal.is_active == True)  # noqa: E712
+        .order_by(MarketDeal.display_order, MarketDeal.id)
+    )
+    return [
+        {
+            "id": d.id,
+            "title": d.title,
+            "subtitle": d.subtitle,
+            "image_url": d.image_url,
+            "color": d.color,
+            "promo_id": d.promo_code_id,
+            "promo_code": d.promo_code.code if d.promo_code else None,
+            "link_type": d.link_type,
+            "link_value": d.link_value,
+        }
+        for d in q.scalars().all()
+    ]
+
+
+@router.get("/categories")
+async def list_market_categories(db: AsyncSession = Depends(get_db)):
+    """Retrieve active marketplace categories sorted by display_order."""
+    from ...models import MarketCategory
+
+    q = await db.execute(
+        select(MarketCategory)
+        .where(MarketCategory.is_active == True)  # noqa: E712
+        .order_by(MarketCategory.display_order, MarketCategory.id)
+    )
+    return [
+        {
+            "id": c.id,
+            "name": c.name,
+            "image_url": c.image_url,
+            "color": c.color,
+        }
+        for c in q.scalars().all()
+    ]
 
 
 @router.post("/quote")

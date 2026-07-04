@@ -1,0 +1,600 @@
+{% extends "base.html" %}
+
+{% block title %}Market Home | Ziggo Admin{% endblock %}
+{% block page_title %}Market Home Layout{% endblock %}
+
+{% block content %}
+{% set input_cls = "w-full p-2.5 border border-ziggo-line rounded-lg outline-none focus:border-ziggo text-sm" %}
+{% set colors = ['primary', 'orange', 'purple', 'green', 'blue', 'red', 'indigo', 'cyan'] %}
+
+<div class="space-y-8 max-w-6xl">
+    <p class="text-sm text-ziggo-muted font-bold">
+        Everything here drives the customer <span class="text-ziggo">Marketplace</span> home screen
+        (banners/ads carousel, popular categories grid, and deal cards). Banners are geofenced to the target radius around the vendor.
+    </p>
+
+    <!-- ============================ ADS / BANNERS ============================ -->
+    <section class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div class="p-5 border-b border-ziggo-line flex items-center justify-between">
+            <div>
+                <h3 class="text-lg font-black text-ziggo">Marketplace Ads &amp; Banners</h3>
+                <p class="text-xs text-ziggo-muted">{{ ads|length }} total — geofenced carousel banners with redirect routing</p>
+            </div>
+        </div>
+
+        <div class="divide-y divide-ziggo-line">
+            {% for ad in ads %}
+            <div class="p-4 flex flex-wrap items-center gap-3">
+                <div class="w-24 h-14 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center flex-shrink-0">
+                    {% if ad.image_url %}<img src="{{ ad.image_url }}" class="w-full h-full object-cover">{% else %}<i class="fas fa-image text-ziggo-faint"></i>{% endif %}
+                </div>
+                <form method="post" enctype="multipart/form-data" action="/admin/market-home/ads/{{ ad.id }}/edit" class="flex-1 grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
+                    <div class="md:col-span-2">
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Vendor</label>
+                        <select name="vendor_id" required class="{{ input_cls }}">
+                            {% for v in vendors %}
+                            <option value="{{ v.id }}" {% if ad.vendor_id == v.id %}selected{% endif %}>{{ v.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Radius (km)</label>
+                        <input name="radius_km" type="number" step="0.1" value="{{ ad.radius_km }}" placeholder="5.0" class="{{ input_cls }}">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Image URL</label>
+                        <input name="image_url" placeholder="Image URL (or upload)" class="{{ input_cls }}">
+                    </div>
+                    <div>
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Upload Image</label>
+                        <input type="file" name="image" accept="image/*" class="{{ input_cls }} text-xs">
+                    </div>
+                    <!-- Link Redirect Configuration -->
+                    <div class="md:col-span-2">
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Redirect Type</label>
+                        <select name="link_type" class="link-type-select {{ input_cls }}">
+                            <option value="none" {% if ad.link_type == 'none' %}selected{% endif %}>No Redirect</option>
+                            <option value="vendor" {% if ad.link_type == 'vendor' %}selected{% endif %}>Outlet (Vendor)</option>
+                            <option value="category" {% if ad.link_type == 'category' %}selected{% endif %}>Category Group</option>
+                            <option value="promo" {% if ad.link_type == 'promo' %}selected{% endif %}>Promo Code</option>
+                            <option value="url" {% if ad.link_type == 'url' %}selected{% endif %}>External Web URL</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-3 link-value-wrapper">
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Redirect Value</label>
+                        
+                        <select class="redirect-val-input vendor-select {{ input_cls }}" style="display:none;">
+                            {% for v in vendors %}
+                            <option value="{{ v.id }}" {% if ad.vendor_id == v.id %}selected{% endif %}>{{ v.name }}</option>
+                            {% endfor %}
+                        </select>
+                        
+                        <select class="redirect-val-input category-select {{ input_cls }}" style="display:none;">
+                            <option value="Grocery" {% if ad.link_type == 'category' and ad.link_value == 'Grocery' %}selected{% endif %}>Grocery</option>
+                            <option value="Pharmacy" {% if ad.link_type == 'category' and ad.link_value == 'Pharmacy' %}selected{% endif %}>Pharmacy</option>
+                        </select>
+
+                        <select class="redirect-val-input promo-select {{ input_cls }}" style="display:none;">
+                            {% for p in promos %}
+                            <option value="{{ p.code }}" {% if ad.link_type == 'promo' and ad.link_value == p.code %}selected{% endif %}>{{ p.code }}</option>
+                            {% endfor %}
+                        </select>
+
+                        <input type="text" class="redirect-val-input url-input {{ input_cls }}" value="{{ ad.link_value or '' }}" placeholder="e.g., https://example.com" style="display:none;">
+                    </div>
+                    <div class="flex justify-end mt-1">
+                        <button class="px-3.5 py-2.5 bg-ziggo text-white rounded-lg text-xs font-bold hover:bg-ziggo-light"><i class="fas fa-save mr-1"></i> Save</button>
+                    </div>
+                </form>
+                <div class="flex items-center gap-2">
+                    <form method="post" action="/admin/market-home/ads/{{ ad.id }}/toggle">
+                        <button class="px-3 py-1.5 rounded-full text-[11px] font-black uppercase {% if ad.is_active %}bg-emerald-50 text-emerald-600{% else %}bg-gray-100 text-gray-500{% endif %}">{{ 'Active' if ad.is_active else 'Off' }}</button>
+                    </form>
+                    <form method="post" action="/admin/market-home/ads/{{ ad.id }}/delete" onsubmit="return confirm('Delete this advertisement?')">
+                        <button class="px-2.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-xs"><i class="fas fa-trash"></i></button>
+                    </form>
+                </div>
+            </div>
+            {% else %}
+            <p class="p-6 text-sm text-ziggo-muted text-center">No active advertisements yet.</p>
+            {% endfor %}
+        </div>
+
+        <div class="p-4 bg-gray-50/60 flex flex-wrap items-center gap-3">
+            <div class="w-24 flex-shrink-0 hidden md:block"></div>
+            <form method="post" enctype="multipart/form-data" action="/admin/market-home/ads/new" class="flex-1 grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
+                <div class="md:col-span-2">
+                    <select name="vendor_id" required class="{{ input_cls }}">
+                        <option value="">— pick vendor —</option>
+                        {% for v in vendors %}
+                        <option value="{{ v.id }}">{{ v.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <input name="radius_km" type="number" step="0.1" value="5.0" placeholder="Radius (km)" class="{{ input_cls }}">
+                </div>
+                <div class="md:col-span-2">
+                    <input name="image_url" placeholder="Image URL" class="{{ input_cls }}">
+                </div>
+                <div>
+                    <input type="file" name="image" accept="image/*" class="{{ input_cls }} text-xs">
+                </div>
+                <!-- Link Redirect Creation -->
+                <div class="md:col-span-2">
+                    <select name="link_type" class="link-type-select {{ input_cls }}">
+                        <option value="none">No Redirect</option>
+                        <option value="vendor">Outlet (Vendor)</option>
+                        <option value="category">Category Group</option>
+                        <option value="promo">Promo Code</option>
+                        <option value="url">External Web URL</option>
+                    </select>
+                </div>
+                <div class="md:col-span-3 link-value-wrapper">
+                    <select class="redirect-val-input vendor-select {{ input_cls }}" style="display:none;">
+                        {% for v in vendors %}
+                        <option value="{{ v.id }}">{{ v.name }}</option>
+                        {% endfor %}
+                    </select>
+                    
+                    <select class="redirect-val-input category-select {{ input_cls }}" style="display:none;">
+                        <option value="Grocery">Grocery</option>
+                        <option value="Pharmacy">Pharmacy</option>
+                    </select>
+
+                    <select class="redirect-val-input promo-select {{ input_cls }}" style="display:none;">
+                        {% for p in promos %}
+                        <option value="{{ p.code }}">{{ p.code }}</option>
+                        {% endfor %}
+                    </select>
+
+                    <input type="text" class="redirect-val-input url-input {{ input_cls }}" placeholder="e.g., https://example.com" style="display:none;">
+                </div>
+                <div class="flex justify-end gap-2 items-center">
+                    <label class="flex items-center gap-1.5 text-xs font-bold mr-1 cursor-pointer select-none">
+                        <input type="checkbox" name="is_active" checked> Active
+                    </label>
+                    <button class="px-4 py-2.5 bg-ziggo text-white rounded-lg text-xs font-bold hover:bg-ziggo-light whitespace-nowrap"><i class="fas fa-plus mr-1"></i> Add</button>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <!-- ============================ CATEGORIES ============================ -->
+    <section class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div class="p-5 border-b border-ziggo-line">
+            <h3 class="text-lg font-black text-ziggo">Marketplace Categories</h3>
+            <p class="text-xs text-ziggo-muted">{{ categories|length }} total — popular categories dynamic grid on customer home</p>
+        </div>
+
+        <div class="divide-y divide-ziggo-line">
+            {% for c in categories %}
+            <div class="p-4 flex flex-wrap items-center gap-3">
+                <div class="w-12 h-12 rounded-full bg-{{ 'orange' if c.color=='orange' else 'purple' if c.color=='purple' else 'green' if c.color=='green' else 'blue' if c.color=='blue' else 'red' if c.color=='red' else 'indigo' if c.color=='indigo' else 'cyan' if c.color=='cyan' else 'gray' }}-100 overflow-hidden flex items-center justify-center flex-shrink-0">
+                    {% if c.image_url and c.image_url.startswith('local:') %}
+                        <span class="text-[9px] font-black uppercase text-ziggo-muted text-center select-none">{{ c.image_url.split(':')[-1][:5] }}</span>
+                    {% elif c.image_url %}
+                        <img src="{{ c.image_url }}" class="w-full h-full object-cover">
+                    {% else %}
+                        <i class="fas fa-tags text-ziggo-faint"></i>
+                    {% endif %}
+                </div>
+                <form method="post" enctype="multipart/form-data" action="/admin/market-home/categories/{{ c.id }}/edit" class="flex-1 grid grid-cols-2 md:grid-cols-5 gap-2 items-end">
+                    <div>
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Name</label>
+                        <input name="name" value="{{ c.name }}" placeholder="Category Name" required class="{{ input_cls }}">
+                    </div>
+                    <div>
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Color Theme</label>
+                        <select name="color" class="{{ input_cls }}">
+                            {% for col in colors %}<option value="{{ col }}" {% if c.color == col %}selected{% endif %}>{{ col }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Display Order</label>
+                        <input name="display_order" type="number" value="{{ c.display_order }}" title="Order" class="{{ input_cls }}">
+                    </div>
+                    
+                    <div class="md:col-span-2 flex gap-1 items-end">
+                        <div class="flex-1">
+                            <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Graphic Style</label>
+                            <select name="graphic_style" class="category-graphic-style-select {{ input_cls }}">
+                                <option value="local:groceries" {% if c.image_url == 'local:groceries' %}selected{% endif %}>3D: Groceries</option>
+                                <option value="local:pharmaceutical" {% if c.image_url == 'local:pharmaceutical' %}selected{% endif %}>3D: Pharma</option>
+                                <option value="local:freshproduce" {% if c.image_url == 'local:freshproduce' %}selected{% endif %}>3D: Fresh Produce</option>
+                                <option value="local:household" {% if c.image_url == 'local:household' %}selected{% endif %}>3D: Household</option>
+                                <option value="local:dairy" {% if c.image_url == 'local:dairy' %}selected{% endif %}>3D: Dairy</option>
+                                <option value="local:babycare" {% if c.image_url == 'local:babycare' %}selected{% endif %}>3D: Baby Care</option>
+                                <option value="local:poultryandmeat" {% if c.image_url == 'local:poultryandmeat' %}selected{% endif %}>3D: Poultry & Meat</option>
+                                <option value="local:personalcare" {% if c.image_url == 'local:personalcare' %}selected{% endif %}>3D: Personal Care</option>
+                                <option value="local:seafood" {% if c.image_url == 'local:seafood' %}selected{% endif %}>3D: Seafood</option>
+                                <option value="local:petcare" {% if c.image_url == 'local:petcare' %}selected{% endif %}>3D: Pet Care</option>
+                                <option value="local:frozenfoods" {% if c.image_url == 'local:frozenfoods' %}selected{% endif %}>3D: Frozen Foods</option>
+                                <option value="local:cosmetics" {% if c.image_url == 'local:cosmetics' %}selected{% endif %}>3D: Cosmetics</option>
+                                <option value="local:freshflower" {% if c.image_url == 'local:freshflower' %}selected{% endif %}>3D: Flowers</option>
+                                <option value="local:bakery" {% if c.image_url == 'local:bakery' %}selected{% endif %}>3D: Bakery</option>
+                                <option value="local:stationery" {% if c.image_url == 'local:stationery' %}selected{% endif %}>3D: Stationery</option>
+                                <option value="local:electronics" {% if c.image_url == 'local:electronics' %}selected{% endif %}>3D: Electronics</option>
+                                <option value="local:ayurvedic" {% if c.image_url == 'local:ayurvedic' %}selected{% endif %}>3D: Ayurvedic</option>
+                                <option value="local:21+" {% if c.image_url == 'local:21+' %}selected{% endif %}>3D: 21+</option>
+                                <option value="local:intimacy" {% if c.image_url == 'local:intimacy' %}selected{% endif %}>3D: Intimacy</option>
+                                <option value="custom" {% if not c.image_url or not c.image_url.startswith('local:') %}selected{% endif %}>Custom Image Upload</option>
+                            </select>
+                        </div>
+                        <button class="px-3.5 py-2.5 bg-ziggo text-white rounded-lg text-xs font-bold hover:bg-ziggo-light"><i class="fas fa-save"></i></button>
+                    </div>
+
+                    <div class="md:col-span-3 category-custom-wrapper">
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Custom Image URL</label>
+                        <input name="image_url" value="{% if c.image_url and not c.image_url.startswith('local:') %}{{ c.image_url }}{% endif %}" placeholder="URL" class="{{ input_cls }}">
+                    </div>
+                    <div class="md:col-span-2 category-custom-wrapper">
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Upload File</label>
+                        <input type="file" name="image" accept="image/*" class="{{ input_cls }} text-xs">
+                    </div>
+                </form>
+                <div class="flex items-center gap-2">
+                    <form method="post" action="/admin/market-home/categories/{{ c.id }}/toggle">
+                        <button class="px-3 py-1.5 rounded-full text-[11px] font-black uppercase {% if c.is_active %}bg-emerald-50 text-emerald-600{% else %}bg-gray-100 text-gray-500{% endif %}">{{ 'Active' if c.is_active else 'Off' }}</button>
+                    </form>
+                    <form method="post" action="/admin/market-home/categories/{{ c.id }}/delete" onsubmit="return confirm('Delete this category?')">
+                        <button class="px-2.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-xs"><i class="fas fa-trash"></i></button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="p-4 bg-gray-50/60 flex flex-wrap items-center gap-3">
+            <div class="w-12 flex-shrink-0 hidden md:block"></div>
+            <form method="post" enctype="multipart/form-data" action="/admin/market-home/categories/new" class="flex-1 grid grid-cols-2 md:grid-cols-5 gap-2 items-end">
+                <div>
+                    <input name="name" placeholder="Category Name" required class="{{ input_cls }}">
+                </div>
+                <div>
+                    <select name="color" class="{{ input_cls }}">
+                        {% for col in colors %}<option value="{{ col }}">{{ col }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <input name="display_order" type="number" value="0" placeholder="Order" class="{{ input_cls }}">
+                </div>
+                
+                <div class="md:col-span-2 flex gap-1 items-end">
+                    <div class="flex-1">
+                        <select name="graphic_style" class="category-graphic-style-select {{ input_cls }}">
+                            <option value="local:groceries">3D: Groceries</option>
+                            <option value="local:pharmaceutical">3D: Pharma</option>
+                            <option value="local:freshproduce">3D: Fresh Produce</option>
+                            <option value="local:household">3D: Household</option>
+                            <option value="local:dairy">3D: Dairy</option>
+                            <option value="local:babycare">3D: Baby Care</option>
+                            <option value="local:poultryandmeat">3D: Poultry & Meat</option>
+                            <option value="local:personalcare">3D: Personal Care</option>
+                            <option value="local:seafood">3D: Seafood</option>
+                            <option value="local:petcare">3D: Pet Care</option>
+                            <option value="local:frozenfoods">3D: Frozen Foods</option>
+                            <option value="local:cosmetics">3D: Cosmetics</option>
+                            <option value="local:freshflower">3D: Flowers</option>
+                            <option value="local:bakery">3D: Bakery</option>
+                            <option value="local:stationery">3D: Stationery</option>
+                            <option value="local:electronics">3D: Electronics</option>
+                            <option value="local:ayurvedic">3D: Ayurvedic</option>
+                            <option value="local:21+">3D: 21+</option>
+                            <option value="local:intimacy">3D: Intimacy</option>
+                            <option value="custom">Custom Image Upload</option>
+                        </select>
+                    </div>
+                    <button class="px-4 py-2.5 bg-ziggo text-white rounded-lg text-xs font-bold hover:bg-ziggo-light whitespace-nowrap"><i class="fas fa-plus mr-1"></i> Add</button>
+                </div>
+
+                <div class="md:col-span-3 category-custom-wrapper">
+                    <input name="image_url" placeholder="Custom Image URL" class="{{ input_cls }}">
+                </div>
+                <div class="md:col-span-2 category-custom-wrapper">
+                    <input type="file" name="image" accept="image/*" class="{{ input_cls }} text-xs">
+                </div>
+
+                <div class="flex items-center gap-1.5 text-xs font-bold mr-1 cursor-pointer select-none">
+                    <input type="checkbox" name="is_active" checked> Active
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <!-- ============================ DEALS & OFFERS ============================ -->
+    <section class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div class="p-5 border-b border-ziggo-line">
+            <h3 class="text-lg font-black text-ziggo">Deals &amp; Offers</h3>
+            <p class="text-xs text-ziggo-muted">{{ deals|length }} total — promo-linked deal cards with redirect routing</p>
+        </div>
+
+        <div class="divide-y divide-ziggo-line">
+            {% for d in deals %}
+            <div class="p-4 flex flex-wrap items-center gap-3">
+                <div class="w-20 h-14 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 bg-{{ 'orange' if d.color=='orange' else 'purple' if d.color=='purple' else 'green' if d.color=='green' else 'blue' }}-100">
+                    {% if d.image_url and d.image_url.startswith('local:') %}
+                        <span class="text-[10px] font-black uppercase text-ziggo-muted p-1 text-center select-none bg-white/70 rounded border border-ziggo-line">{{ d.image_url.split(':')[-1] }}</span>
+                    {% elif d.image_url %}
+                        <img src="{{ d.image_url }}" class="w-full h-full object-cover">
+                    {% else %}
+                        <i class="fas fa-tags text-ziggo-faint"></i>
+                    {% endif %}
+                </div>
+                <form method="post" enctype="multipart/form-data" action="/admin/market-home/deals/{{ d.id }}/edit" class="flex-1 grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
+                    <div>
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Title</label>
+                        <input name="title" value="{{ d.title }}" placeholder="Title" required class="{{ input_cls }}">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Subtitle</label>
+                        <input name="subtitle" value="{{ d.subtitle or '' }}" placeholder="Subtitle" class="{{ input_cls }}">
+                    </div>
+                    <div>
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Color Scheme</label>
+                        <select name="color" class="{{ input_cls }}">
+                            {% for col in colors %}<option value="{{ col }}" {% if d.color == col %}selected{% endif %}>{{ col }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Display Order</label>
+                        <input name="display_order" type="number" value="{{ d.display_order }}" title="Order" class="{{ input_cls }}">
+                    </div>
+                    <div>
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Linked Promo Code</label>
+                        <select name="promo_code_id" class="{{ input_cls }}">
+                            <option value="">— no promo —</option>
+                            {% for p in promos %}<option value="{{ p.id }}" {% if d.promo_code_id == p.id %}selected{% endif %}>{{ p.code }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- Link Redirect Configuration -->
+                    <div class="md:col-span-2">
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Redirect Type</label>
+                        <select name="link_type" class="link-type-select {{ input_cls }}">
+                            <option value="none" {% if d.link_type == 'none' %}selected{% endif %}>No Redirect</option>
+                            <option value="vendor" {% if d.link_type == 'vendor' %}selected{% endif %}>Outlet (Vendor)</option>
+                            <option value="category" {% if d.link_type == 'category' %}selected{% endif %}>Category Group</option>
+                            <option value="promo" {% if d.link_type == 'promo' %}selected{% endif %}>Promo Code</option>
+                            <option value="url" {% if d.link_type == 'url' %}selected{% endif %}>External Web URL</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-3 link-value-wrapper">
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Redirect Value</label>
+                        
+                        <select class="redirect-val-input vendor-select {{ input_cls }}" style="display:none;">
+                            {% for v in vendors %}
+                            <option value="{{ v.id }}" {% if d.link_type == 'vendor' and d.link_value == v.id|string %}selected{% endif %}>{{ v.name }}</option>
+                            {% endfor %}
+                        </select>
+                        
+                        <select class="redirect-val-input category-select {{ input_cls }}" style="display:none;">
+                            <option value="Grocery" {% if d.link_type == 'category' and d.link_value == 'Grocery' %}selected{% endif %}>Grocery</option>
+                            <option value="Pharmacy" {% if d.link_type == 'category' and d.link_value == 'Pharmacy' %}selected{% endif %}>Pharmacy</option>
+                        </select>
+
+                        <select class="redirect-val-input promo-select {{ input_cls }}" style="display:none;">
+                            {% for p in promos %}
+                            <option value="{{ p.code }}" {% if d.link_type == 'promo' and d.link_value == p.code %}selected{% endif %}>{{ p.code }}</option>
+                            {% endfor %}
+                        </select>
+
+                        <input type="text" class="redirect-val-input url-input {{ input_cls }}" value="{{ d.link_value or '' }}" placeholder="e.g., https://example.com" style="display:none;">
+                    </div>
+                    <div class="flex justify-end mt-1">
+                        <button class="px-3.5 py-2.5 bg-ziggo text-white rounded-lg text-xs font-bold hover:bg-ziggo-light"><i class="fas fa-save mr-1"></i> Save</button>
+                    </div>
+
+                    <!-- Graphic Style Selection -->
+                    <div class="md:col-span-2">
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Graphic Style</label>
+                        <select name="graphic_style" class="graphic-style-select {{ input_cls }}">
+                            <option value="local:spend_save" {% if d.image_url == 'local:spend_save' %}selected{% endif %}>3D Icon: Toy Shop (Spend & Save)</option>
+                            <option value="local:bag" {% if d.image_url == 'local:bag' %}selected{% endif %}>3D Icon: Shopping Bags (FREE)</option>
+                            <option value="local:combo" {% if d.image_url == 'local:combo' %}selected{% endif %}>3D Icon: Burger Bag (Combo)</option>
+                            <option value="local:discount" {% if d.image_url == 'local:discount' %}selected{% endif %}>3D Icon: Percentage (Discount)</option>
+                            <option value="local:bundle" {% if d.image_url == 'local:bundle' %}selected{% endif %}>3D Icon: Shopping Cart (Bundle)</option>
+                            <option value="custom" {% if not d.image_url or not d.image_url.startswith('local:') %}selected{% endif %}>Custom Image Upload / URL</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-2 custom-graphic-wrapper">
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Image URL</label>
+                        <input name="image_url" value="{% if d.image_url and not d.image_url.startswith('local:') %}{{ d.image_url }}{% endif %}" placeholder="Image URL" class="{{ input_cls }}">
+                    </div>
+                    <div class="md:col-span-2 custom-graphic-wrapper">
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Upload Graphic</label>
+                        <input type="file" name="image" accept="image/*" class="{{ input_cls }} text-xs">
+                    </div>
+                </form>
+                <div class="flex items-center gap-2">
+                    <form method="post" action="/admin/market-home/deals/{{ d.id }}/toggle">
+                        <button class="px-3 py-1.5 rounded-full text-[11px] font-black uppercase {% if d.is_active %}bg-emerald-50 text-emerald-600{% else %}bg-gray-100 text-gray-500{% endif %}">{{ 'Active' if d.is_active else 'Off' }}</button>
+                    </form>
+                    <form method="post" action="/admin/market-home/deals/{{ d.id }}/delete" onsubmit="return confirm('Delete this deal?')">
+                        <button class="px-2.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-xs"><i class="fas fa-trash"></i></button>
+                    </form>
+                </div>
+            </div>
+            {% else %}
+            <p class="p-6 text-sm text-ziggo-muted text-center">No deals yet.</p>
+            {% endfor %}
+        </div>
+
+        <div class="p-4 bg-gray-50/60 flex flex-wrap items-center gap-3">
+            <div class="w-20 flex-shrink-0 hidden md:block"></div>
+            <form method="post" enctype="multipart/form-data" action="/admin/market-home/deals/new" class="flex-1 grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
+                <div>
+                    <input name="title" placeholder="Title e.g. Buy 1 Get 1" required class="{{ input_cls }}">
+                </div>
+                <div class="md:col-span-2">
+                    <input name="subtitle" placeholder="Subtitle" class="{{ input_cls }}">
+                </div>
+                <div>
+                    <select name="color" class="{{ input_cls }}">
+                        {% for col in colors %}<option value="{{ col }}">{{ col }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <input name="display_order" type="number" value="0" placeholder="Order" class="{{ input_cls }}">
+                </div>
+                <div>
+                    <select name="promo_code_id" class="{{ input_cls }}">
+                        <option value="">— no promo —</option>
+                        {% for p in promos %}<option value="{{ p.id }}">{{ p.code }}</option>{% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Link Redirect Creation -->
+                <div class="md:col-span-2">
+                    <select name="link_type" class="link-type-select {{ input_cls }}">
+                        <option value="none">No Redirect</option>
+                        <option value="vendor">Outlet (Vendor)</option>
+                        <option value="category">Category Group</option>
+                        <option value="promo">Promo Code</option>
+                        <option value="url">External Web URL</option>
+                    </select>
+                </div>
+                <div class="md:col-span-3 link-value-wrapper">
+                    <select class="redirect-val-input vendor-select {{ input_cls }}" style="display:none;">
+                        {% for v in vendors %}
+                        <option value="{{ v.id }}">{{ v.name }}</option>
+                        {% endfor %}
+                    </select>
+                    
+                    <select class="redirect-val-input category-select {{ input_cls }}" style="display:none;">
+                        <option value="Grocery">Grocery</option>
+                        <option value="Pharmacy">Pharmacy</option>
+                    </select>
+
+                    <select class="redirect-val-input promo-select {{ input_cls }}" style="display:none;">
+                        {% for p in promos %}
+                        <option value="{{ p.code }}">{{ p.code }}</option>
+                        {% endfor %}
+                    </select>
+
+                    <input type="text" class="redirect-val-input url-input {{ input_cls }}" placeholder="e.g., https://example.com" style="display:none;">
+                </div>
+
+                <!-- Graphic Style Creation -->
+                <div class="md:col-span-2">
+                    <select name="graphic_style" class="graphic-style-select {{ input_cls }}">
+                        <option value="local:spend_save">3D Icon: Toy Shop (Spend & Save)</option>
+                        <option value="local:bag">3D Icon: Shopping Bags (FREE)</option>
+                        <option value="local:combo">3D Icon: Burger Bag (Combo)</option>
+                        <option value="local:discount">3D Icon: Percentage (Discount)</option>
+                        <option value="local:bundle">3D Icon: Shopping Cart (Bundle)</option>
+                        <option value="custom">Custom Image Upload / URL</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2 custom-graphic-wrapper">
+                    <input name="image_url" placeholder="Image URL" class="{{ input_cls }}">
+                </div>
+                <div class="md:col-span-2 custom-graphic-wrapper">
+                    <input type="file" name="image" accept="image/*" class="{{ input_cls }} text-xs">
+                </div>
+
+                <div class="flex justify-end gap-2 items-center">
+                    <label class="flex items-center gap-1.5 text-xs font-bold cursor-pointer select-none">
+                        <input type="checkbox" name="is_active" checked> Active
+                    </label>
+                    <button class="px-4 py-2.5 bg-ziggo text-white rounded-lg text-xs font-bold hover:bg-ziggo-light whitespace-nowrap"><i class="fas fa-plus mr-1"></i> Add</button>
+                </div>
+            </form>
+        </div>
+    </section>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function updateRedirectFields(form) {
+        const typeSelect = form.querySelector('.link-type-select');
+        const linkValueWrapper = form.querySelector('.link-value-wrapper');
+        const type = typeSelect ? typeSelect.value : 'none';
+
+        if (!linkValueWrapper) return;
+
+        // Hide all inputs first and remove their name attribute so they are not submitted
+        const inputs = linkValueWrapper.querySelectorAll('.redirect-val-input');
+        inputs.forEach(input => {
+            input.style.display = 'none';
+            input.removeAttribute('name');
+        });
+
+        // Show and activate the corresponding input
+        let activeInput = null;
+        if (type === 'vendor') {
+            activeInput = linkValueWrapper.querySelector('.vendor-select');
+        } else if (type === 'category') {
+            activeInput = linkValueWrapper.querySelector('.category-select');
+        } else if (type === 'promo') {
+            activeInput = linkValueWrapper.querySelector('.promo-select');
+        } else if (type === 'url') {
+            activeInput = linkValueWrapper.querySelector('.url-input');
+        }
+
+        if (activeInput) {
+            linkValueWrapper.style.visibility = 'visible';
+            linkValueWrapper.style.opacity = '1';
+            activeInput.style.display = 'block';
+            activeInput.setAttribute('name', 'link_value');
+        } else {
+            // If no redirect, keep the spacing but hide the dropdown/input
+            linkValueWrapper.style.visibility = 'hidden';
+            linkValueWrapper.style.opacity = '0';
+        }
+    }
+
+    function updateGraphicFields(form) {
+        const styleSelect = form.querySelector('.graphic-style-select');
+        const customWrappers = form.querySelectorAll('.custom-graphic-wrapper');
+        const style = styleSelect ? styleSelect.value : 'custom';
+
+        customWrappers.forEach(w => {
+            if (style === 'custom') {
+                w.style.display = 'block';
+            } else {
+                w.style.display = 'none';
+            }
+        });
+    }
+
+    function updateCategoryGraphicFields(form) {
+        const styleSelect = form.querySelector('.category-graphic-style-select');
+        const customWrappers = form.querySelectorAll('.category-custom-wrapper');
+        const style = styleSelect ? styleSelect.value : 'custom';
+
+        customWrappers.forEach(w => {
+            if (style === 'custom') {
+                w.style.display = 'block';
+            } else {
+                w.style.display = 'none';
+            }
+        });
+    }
+
+    // Attach listeners to all link-type-select fields
+    document.querySelectorAll('.link-type-select').forEach(select => {
+        const form = select.closest('form');
+        select.addEventListener('change', () => updateRedirectFields(form));
+        // Run once on load to initialize correct state
+        updateRedirectFields(form);
+    });
+
+    // Attach listeners to graphic-style-select fields
+    document.querySelectorAll('.graphic-style-select').forEach(select => {
+        const form = select.closest('form');
+        select.addEventListener('change', () => updateGraphicFields(form));
+        // Run once on load to initialize correct state
+        updateGraphicFields(form);
+    });
+
+    // Attach listeners to category-graphic-style-select fields
+    document.querySelectorAll('.category-graphic-style-select').forEach(select => {
+        const form = select.closest('form');
+        select.addEventListener('change', () => updateCategoryGraphicFields(form));
+        // Run once on load to initialize correct state
+        updateCategoryGraphicFields(form);
+    });
+});
+</script>
+{% endblock %}

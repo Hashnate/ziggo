@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../app/app_colors.dart';
+import '../../../core/network/api_client.dart';
 import '../../../core/widgets/motion.dart';
 import '../../auth/auth_provider.dart';
 import 'additional_settings_screen.dart';
@@ -338,7 +339,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               backgroundImage: auth.profilePhoto != null && auth.profilePhoto!.isNotEmpty 
                   ? (auth.profilePhoto!.startsWith('http') 
                       ? NetworkImage(auth.profilePhoto!) 
-                      : FileImage(File(auth.profilePhoto!)) as ImageProvider)
+                      : (auth.profilePhoto!.startsWith('/static')
+                          ? NetworkImage('${ApiConfig.baseHost}${auth.profilePhoto!}')
+                          : FileImage(File(auth.profilePhoto!)) as ImageProvider))
                   : null,
               child: auth.profilePhoto == null || auth.profilePhoto!.isEmpty
                   ? const Icon(Icons.person, color: Colors.white, size: 18)

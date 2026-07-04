@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
+import '../../../core/network/api_client.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/widgets/motion.dart';
 import '../../auth/auth_provider.dart';
@@ -195,7 +196,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ? DecorationImage(
                       image: profilePhoto.startsWith('http')
                           ? NetworkImage(profilePhoto)
-                          : FileImage(File(profilePhoto)) as ImageProvider,
+                          : (profilePhoto.startsWith('/static')
+                              ? NetworkImage('${ApiConfig.baseHost}$profilePhoto')
+                              : FileImage(File(profilePhoto)) as ImageProvider),
                       fit: BoxFit.cover,
                     )
                   : null,

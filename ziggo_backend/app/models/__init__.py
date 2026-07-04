@@ -54,6 +54,8 @@ from .market import (
     MarketOrderItem,
     MarketOrderStatus,
     MarketAd,
+    MarketDeal,
+    MarketCategory,
 )
 from .event import Event, EventTicketTier, EventOrder, EventOrderItem, EventOrderStatus
 __all__ = [
@@ -110,6 +112,8 @@ __all__ = [
     "MarketOrderItem",
     "MarketOrderStatus",
     "MarketAd",
+    "MarketDeal",
+    "MarketCategory",
     "Event",
     "EventTicketTier",
     "EventOrder",

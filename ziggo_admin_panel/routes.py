@@ -4257,6 +4257,391 @@ async def admin_market_delete(
     return RedirectResponse(url="/admin/market", status_code=303)
 
 
+# ===========================================================================
+# Market Home layout — ads / deals
+# (drives the customer Market home screen via GET /api/v1/market/ads & deals)
+# ===========================================================================
+MARKET_HOME_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "market_home")
+os.makedirs(MARKET_HOME_UPLOAD_DIR, exist_ok=True)
+
+
+async def _save_market_home_image(photo: UploadFile | None) -> str | None:
+    if photo is None or not photo.filename:
+        return None
+    ext = os.path.splitext(photo.filename)[1].lower()
+    if ext not in ALLOWED_PHOTO_EXTS:
+        raise HTTPException(status_code=400, detail="Image must be JPG, PNG, or WEBP")
+    data = await photo.read()
+    if len(data) == 0:
+        return None
+    if len(data) > MAX_PHOTO_BYTES:
+        raise HTTPException(status_code=400, detail="Image must be under 5 MB")
+    import secrets
+    fname = f"{secrets.token_hex(8)}{ext}"
+    fpath = os.path.join(MARKET_HOME_UPLOAD_DIR, fname)
+    with open(fpath, "wb") as f:
+        f.write(data)
+    return f"/static/uploads/market_home/{fname}"
+
+
+@router.get("/market-home", response_class=HTMLResponse)
+async def admin_market_home(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import MarketAd, MarketDeal, MarketVendor, PromoCode, MarketCategory
+    from sqlalchemy.orm import selectinload
+
+    ads = (
+        await db.execute(
+            select(MarketAd)
+            .options(selectinload(MarketAd.vendor))
+            .join(MarketVendor, MarketAd.vendor_id == MarketVendor.id)
+            .order_by(MarketAd.id.desc())
+        )
+    ).scalars().all()
+
+    deals = (
+        await db.execute(
+            select(MarketDeal)
+            .options(selectinload(MarketDeal.promo_code))
+            .order_by(MarketDeal.display_order, MarketDeal.id)
+        )
+    ).scalars().all()
+
+    vendors = (
+        await db.execute(
+            select(MarketVendor).where(MarketVendor.is_active == True).order_by(MarketVendor.name)  # noqa: E712
+        )
+    ).scalars().all()
+
+    promos = (
+        await db.execute(
+            select(PromoCode)
+            .where(PromoCode.is_active == True, PromoCode.category.in_(["all", "market"]))  # noqa: E712
+            .order_by(PromoCode.code)
+        )
+    ).scalars().all()
+
+    categories = (
+        await db.execute(
+            select(MarketCategory)
+            .order_by(MarketCategory.display_order, MarketCategory.id)
+        )
+    ).scalars().all()
+
+    return templates.TemplateResponse(
+        request,
+        "market_home.html",
+        {
+            "request": request,
+            "active_page": "market-home",
+            "ads": ads,
+            "deals": deals,
+            "vendors": vendors,
+            "promos": promos,
+            "categories": categories,
+        },
+    )
+
+
+# ---------- Categories ----------
+@router.post("/market-home/categories/new")
+async def admin_market_category_new(
+    name: str = Form(...),
+    color: str = Form("primary"),
+    image_url: str = Form(""),
+    display_order: int = Form(0),
+    is_active: str = Form("off"),
+    image: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import MarketCategory
+
+    if not name.strip():
+        raise HTTPException(status_code=400, detail="Category name is required")
+    url = await _save_market_home_image(image) or (image_url.strip() or None)
+    db.add(
+        MarketCategory(
+            name=name.strip(),
+            color=color.strip() or "primary",
+            image_url=url,
+            display_order=int(display_order or 0),
+            is_active=(is_active == "on"),
+        )
+    )
+    await db.commit()
+    return RedirectResponse(url="/admin/market-home", status_code=303)
+
+
+@router.post("/market-home/categories/{id}/edit")
+async def admin_market_category_edit(
+    id: int,
+    name: str = Form(...),
+    color: str = Form("primary"),
+    image_url: str = Form(""),
+    display_order: int = Form(0),
+    image: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import MarketCategory
+
+    c = (await db.execute(select(MarketCategory).where(MarketCategory.id == id))).scalars().first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Category not found")
+    c.name = name.strip() or c.name
+    c.color = color.strip() or "primary"
+    c.display_order = int(display_order or 0)
+    new_url = await _save_market_home_image(image)
+    if new_url:
+        c.image_url = new_url
+    elif image_url.strip():
+        c.image_url = image_url.strip()
+    await db.commit()
+    return RedirectResponse(url="/admin/market-home", status_code=303)
+
+
+@router.post("/market-home/categories/{id}/toggle")
+async def admin_market_category_toggle(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import MarketCategory
+
+    c = (await db.execute(select(MarketCategory).where(MarketCategory.id == id))).scalars().first()
+    if c:
+        c.is_active = not c.is_active
+        await db.commit()
+    return RedirectResponse(url="/admin/market-home", status_code=303)
+
+
+@router.post("/market-home/categories/{id}/delete")
+async def admin_market_category_delete(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import MarketCategory
+
+    c = (await db.execute(select(MarketCategory).where(MarketCategory.id == id))).scalars().first()
+    if c:
+        await db.delete(c)
+        await db.commit()
+    return RedirectResponse(url="/admin/market-home", status_code=303)
+
+
+# ---------- Ads ----------
+@router.post("/market-home/ads/new")
+async def admin_market_ad_new(
+    vendor_id: int = Form(...),
+    radius_km: float = Form(5.0),
+    image_url: str = Form(""),
+    is_active: str = Form("off"),
+    link_type: str = Form("none"),
+    link_value: str = Form(""),
+    image: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import MarketAd
+
+    url = await _save_market_home_image(image) or (image_url.strip() or None)
+    if not url:
+        raise HTTPException(status_code=400, detail="An ad image (upload or URL) is required")
+    db.add(
+        MarketAd(
+            vendor_id=vendor_id,
+            image_url=url,
+            radius_km=Decimal(str(radius_km)),
+            is_active=(is_active == "on"),
+            link_type=link_type,
+            link_value=link_value.strip() or None,
+        )
+    )
+    await db.commit()
+    return RedirectResponse(url="/admin/market-home", status_code=303)
+
+
+@router.post("/market-home/ads/{id}/edit")
+async def admin_market_ad_edit(
+    id: int,
+    vendor_id: int = Form(...),
+    radius_km: float = Form(5.0),
+    image_url: str = Form(""),
+    link_type: str = Form("none"),
+    link_value: str = Form(""),
+    image: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import MarketAd
+
+    ad = (await db.execute(select(MarketAd).where(MarketAd.id == id))).scalars().first()
+    if not ad:
+        raise HTTPException(status_code=404, detail="Ad not found")
+    ad.vendor_id = vendor_id
+    ad.radius_km = Decimal(str(radius_km))
+    ad.link_type = link_type
+    ad.link_value = link_value.strip() or None
+    new_url = await _save_market_home_image(image)
+    if new_url:
+        ad.image_url = new_url
+    elif image_url.strip():
+        ad.image_url = image_url.strip()
+    await db.commit()
+    return RedirectResponse(url="/admin/market-home", status_code=303)
+
+
+@router.post("/market-home/ads/{id}/toggle")
+async def admin_market_ad_toggle(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import MarketAd
+
+    ad = (await db.execute(select(MarketAd).where(MarketAd.id == id))).scalars().first()
+    if ad:
+        ad.is_active = not ad.is_active
+        await db.commit()
+    return RedirectResponse(url="/admin/market-home", status_code=303)
+
+
+@router.post("/market-home/ads/{id}/delete")
+async def admin_market_ad_delete(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import MarketAd
+
+    ad = (await db.execute(select(MarketAd).where(MarketAd.id == id))).scalars().first()
+    if ad:
+        await db.delete(ad)
+        await db.commit()
+    return RedirectResponse(url="/admin/market-home", status_code=303)
+
+
+# ---------- Deals ----------
+@router.post("/market-home/deals/new")
+async def admin_market_deal_new(
+    title: str = Form(...),
+    subtitle: str = Form(""),
+    color: str = Form("primary"),
+    promo_code_id: str = Form(""),
+    image_url: str = Form(""),
+    display_order: int = Form(0),
+    is_active: str = Form("off"),
+    link_type: str = Form("none"),
+    link_value: str = Form(""),
+    graphic_style: str = Form("custom"),
+    image: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import MarketDeal
+
+    if not title.strip():
+        raise HTTPException(status_code=400, detail="Deal title is required")
+
+    if graphic_style != "custom":
+        url = graphic_style
+    else:
+        url = await _save_market_home_image(image) or (image_url.strip() or None)
+
+    db.add(
+        MarketDeal(
+            title=title.strip(),
+            subtitle=subtitle.strip() or None,
+            color=color.strip() or "primary",
+            promo_code_id=int(promo_code_id) if promo_code_id.strip() else None,
+            image_url=url,
+            display_order=int(display_order or 0),
+            is_active=(is_active == "on"),
+            link_type=link_type,
+            link_value=link_value.strip() or None,
+        )
+    )
+    await db.commit()
+    return RedirectResponse(url="/admin/market-home", status_code=303)
+
+
+@router.post("/market-home/deals/{id}/edit")
+async def admin_market_deal_edit(
+    id: int,
+    title: str = Form(...),
+    subtitle: str = Form(""),
+    color: str = Form("primary"),
+    promo_code_id: str = Form(""),
+    image_url: str = Form(""),
+    display_order: int = Form(0),
+    link_type: str = Form("none"),
+    link_value: str = Form(""),
+    graphic_style: str = Form("custom"),
+    image: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import MarketDeal
+
+    d = (await db.execute(select(MarketDeal).where(MarketDeal.id == id))).scalars().first()
+    if not d:
+        raise HTTPException(status_code=404, detail="Deal not found")
+    d.title = title.strip() or d.title
+    d.subtitle = subtitle.strip() or None
+    d.color = color.strip() or "primary"
+    d.promo_code_id = int(promo_code_id) if promo_code_id.strip() else None
+    d.display_order = int(display_order or 0)
+    d.link_type = link_type
+    d.link_value = link_value.strip() or None
+
+    if graphic_style != "custom":
+        d.image_url = graphic_style
+    else:
+        new_url = await _save_market_home_image(image)
+        if new_url:
+            d.image_url = new_url
+        elif image_url.strip():
+            d.image_url = image_url.strip()
+
+    await db.commit()
+    return RedirectResponse(url="/admin/market-home", status_code=303)
+
+
+@router.post("/market-home/deals/{id}/toggle")
+async def admin_market_deal_toggle(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import MarketDeal
+
+    d = (await db.execute(select(MarketDeal).where(MarketDeal.id == id))).scalars().first()
+    if d:
+        d.is_active = not d.is_active
+        await db.commit()
+    return RedirectResponse(url="/admin/market-home", status_code=303)
+
+
+@router.post("/market-home/deals/{id}/delete")
+async def admin_market_deal_delete(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import MarketDeal
+
+    d = (await db.execute(select(MarketDeal).where(MarketDeal.id == id))).scalars().first()
+    if d:
+        await db.delete(d)
+        await db.commit()
+    return RedirectResponse(url="/admin/market-home", status_code=303)
+
+
 # ---------- Reports / Insight & Analytics ----------
 def _parse_iso_date_or(default_dt, raw: str):
     if not raw:
@@ -5601,6 +5986,78 @@ async def admin_inbox_delete(
     return RedirectResponse(url="/admin/inbox", status_code=303)
 
 
+# ---------- Corporate demo requests ----------
+@router.get("/demo-requests", response_class=HTMLResponse)
+async def admin_demo_requests(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.api.v1.public import DemoRequest
+
+    rows = (
+        await db.execute(
+            select(DemoRequest).order_by(DemoRequest.id.desc()).limit(500)
+        )
+    ).scalars().all()
+    total = (await db.execute(select(func.count(DemoRequest.id)))).scalar() or 0
+    unread = (
+        await db.execute(
+            select(func.count(DemoRequest.id)).where(
+                DemoRequest.is_read == False
+            )
+        )
+    ).scalar() or 0
+    return templates.TemplateResponse(
+        request,
+        "demo_requests.html",
+        {
+            "request": request,
+            "active_page": "demo_requests",
+            "requests": rows,
+            "total": total,
+            "unread": unread,
+            "read": total - unread,
+        },
+    )
+
+
+@router.post("/demo-requests/{req_id}/read")
+async def admin_demo_request_toggle_read(
+    req_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.api.v1.public import DemoRequest
+
+    r = (
+        await db.execute(select(DemoRequest).where(DemoRequest.id == req_id))
+    ).scalars().first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Request not found")
+    r.is_read = not bool(r.is_read)
+    await db.commit()
+    return RedirectResponse(url="/admin/demo-requests", status_code=303)
+
+
+@router.post("/demo-requests/{req_id}/delete")
+async def admin_demo_request_delete(
+    req_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.api.v1.public import DemoRequest
+
+    r = (
+        await db.execute(select(DemoRequest).where(DemoRequest.id == req_id))
+    ).scalars().first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Request not found")
+    await db.delete(r)
+    await db.commit()
+    return RedirectResponse(url="/admin/demo-requests", status_code=303)
+
+
 # ---------- Live notification feed for the top-bar bell ----------
 @router.get("/notif-feed")
 async def admin_notif_feed(
@@ -5609,7 +6066,7 @@ async def admin_notif_feed(
 ):
     """Real-time admin alerts for the bell popup. Read-only aggregate over
     existing tables — adds nothing to and changes nothing in the rest of the app."""
-    from app.api.v1.public import ContactMessage, DriverApplication
+    from app.api.v1.public import ContactMessage, DriverApplication, DemoRequest
     from app.models import Complaint
 
     def plural(n, word):
@@ -5629,6 +6086,20 @@ async def admin_notif_feed(
             "title": plural(unread_msgs, "new website message"),
             "subtitle": "From the contact form",
             "icon": "fa-inbox", "url": "/admin/inbox", "count": unread_msgs,
+        })
+
+    unread_demos = (
+        await db.execute(
+            select(func.count(DemoRequest.id)).where(
+                DemoRequest.is_read == False
+            )
+        )
+    ).scalar() or 0
+    if unread_demos:
+        items.append({
+            "title": plural(unread_demos, "corporate demo request"),
+            "subtitle": "From business page",
+            "icon": "fa-laptop-code", "url": "/admin/demo-requests", "count": unread_demos,
         })
 
     new_apps = (
@@ -7313,6 +7784,8 @@ async def admin_food_deal_new(
     image_url: str = Form(""),
     display_order: int = Form(0),
     is_active: str = Form("on"),
+    link_type: str = Form("none"),
+    link_value: str = Form(""),
     image: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
@@ -7331,6 +7804,8 @@ async def admin_food_deal_new(
             image_url=url,
             display_order=int(display_order or 0),
             is_active=(is_active == "on"),
+            link_type=link_type,
+            link_value=link_value.strip() or None,
         )
     )
     await db.commit()
@@ -7346,6 +7821,8 @@ async def admin_food_deal_edit(
     promo_code_id: str = Form(""),
     image_url: str = Form(""),
     display_order: int = Form(0),
+    link_type: str = Form("none"),
+    link_value: str = Form(""),
     image: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
@@ -7360,6 +7837,8 @@ async def admin_food_deal_edit(
     d.color = color.strip() or "primary"
     d.promo_code_id = int(promo_code_id) if promo_code_id.strip() else None
     d.display_order = int(display_order or 0)
+    d.link_type = link_type
+    d.link_value = link_value.strip() or None
     new_url = await _save_food_home_image(image)
     if new_url:
         d.image_url = new_url

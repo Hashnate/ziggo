@@ -1,7 +1,7 @@
 from decimal import Decimal
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
@@ -79,6 +79,56 @@ async def update_profile(
     await db.commit()
     await db.refresh(user)
     return user
+
+
+import os
+import secrets
+
+def _find_admin_panel_dir() -> str:
+    curr = os.path.abspath(__file__)
+    for _ in range(10):
+        curr = os.path.dirname(curr)
+        candidate = os.path.join(curr, "ziggo_admin_panel")
+        if os.path.isdir(candidate):
+            return candidate
+    return os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
+        "ziggo_admin_panel"
+    )
+
+_ADMIN_PANEL_DIR = _find_admin_panel_dir()
+_PROFILE_PHOTO_DIR = os.path.join(_ADMIN_PANEL_DIR, "static", "uploads", "customers")
+os.makedirs(_PROFILE_PHOTO_DIR, exist_ok=True)
+
+
+async def _save_profile_photo(asset: UploadFile) -> str:
+    ext = os.path.splitext(asset.filename or "")[1].lower()
+    if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
+        raise HTTPException(status_code=400, detail="Photo must be JPG, PNG, or WEBP")
+    data = await asset.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file")
+    if len(data) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Photo must be under 5 MB")
+    fname = f"profile_{secrets.token_hex(8)}{ext}"
+    fpath = os.path.join(_PROFILE_PHOTO_DIR, fname)
+    with open(fpath, "wb") as f:
+        f.write(data)
+    return f"/static/uploads/customers/{fname}"
+
+
+@router.post("/profile-photo")
+async def upload_profile_photo(
+    photo: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    """Customer uploads their profile photo."""
+    url = await _save_profile_photo(photo)
+    user.profile_photo = url
+    await db.commit()
+    await db.refresh(user)
+    return {"ok": True, "profile_photo": url}
 
 
 # BRD: CD-32 — Account deletion. We soft-delete: PII is scrubbed but the user

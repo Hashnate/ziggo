@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
@@ -44,6 +46,8 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<MarketProvider>().refreshVendors();
       context.read<MarketProvider>().fetchAds();
+      context.read<MarketProvider>().fetchDeals();
+      context.read<MarketProvider>().fetchCategories();
       context.read<AddressesProvider>().refresh();
     });
     _bannerTimer = Timer.periodic(const Duration(seconds: 4), (_) {
@@ -104,6 +108,8 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
             lat: picked.location.latitude,
             lng: picked.location.longitude,
           );
+      context.read<MarketProvider>().fetchDeals();
+      context.read<MarketProvider>().fetchCategories();
     }
   }
 
@@ -113,25 +119,162 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
     return '${ApiConfig.baseHost}$path';
   }
 
-  Future<void> _handleAdTap(Map<String, dynamic> ad) async {
-    final provider = context.read<MarketProvider>();
-    showDialog(
+  void _showPromoSheet(String code) {
+    showModalBottomSheet(
       context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Promo code',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.cardBorder),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(code,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                            letterSpacing: 1)),
+                  ),
+                  TextButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: code));
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Copied $code — apply at checkout'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.copy_rounded, size: 18),
+                    label: const Text('Copy'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Apply this code at checkout to get the discount.',
+              style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 13),
+            ),
+          ],
+        ),
+      ),
     );
-    final vendor = await provider.fetchVendorById(ad['vendor_id'] as int);
-    if (mounted) Navigator.pop(context);
-    if (vendor != null && mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => MarketVendorScreen(vendor: vendor)),
-      );
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open vendor shop'), backgroundColor: AppColors.warning),
-      );
+  }
+
+  Future<void> _handleRedirect(String type, String value) async {
+    switch (type) {
+      case 'vendor':
+        final vendorId = int.tryParse(value);
+        if (vendorId == null) return;
+        
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          ),
+        );
+
+        final vendor = await context.read<MarketProvider>().fetchVendorById(vendorId);
+        
+        if (mounted) {
+          Navigator.pop(context);
+          if (vendor != null) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => MarketVendorScreen(vendor: vendor)),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Could not open store — please try again'),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        }
+        break;
+
+      case 'category':
+        if (value.isNotEmpty) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MarketGroupScreen(groupName: value),
+            ),
+          );
+        }
+        break;
+
+      case 'promo':
+        if (value.isNotEmpty) {
+          _showPromoSheet(value);
+        }
+        break;
+
+      case 'url':
+        if (value.isNotEmpty) {
+          final uri = Uri.tryParse(value);
+          if (uri != null) {
+            if (await canLaunchUrl(uri)) {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            }
+          }
+        }
+        break;
+
+      default:
+        break;
     }
+  }
+
+  Future<void> _handleAdTap(Map<String, dynamic> ad) async {
+    final type = ad['link_type']?.toString() ?? 'none';
+    final value = ad['link_value']?.toString() ?? '';
+
+    if (type == 'none' || type.isEmpty) {
+      final vendorId = ad['vendor_id'] as int?;
+      if (vendorId != null) {
+        await _handleRedirect('vendor', vendorId.toString());
+      }
+      return;
+    }
+
+    await _handleRedirect(type, value);
+  }
+
+  Future<void> _handleDealTap(Map<String, dynamic> d) async {
+    final type = d['link_type']?.toString() ?? 'none';
+    final value = d['link_value']?.toString() ?? '';
+    final title = d['title']?.toString() ?? '';
+
+    if (type == 'none' || type.isEmpty) {
+      await _handleRedirect('category', title.replaceAll('\n', ' '));
+      return;
+    }
+
+    await _handleRedirect(type, value);
   }
 
   void _openFavourites() => Navigator.push(
@@ -186,6 +329,8 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
             final lng = _selectedPlace?.location.longitude;
             await p.refreshVendors(lat: lat, lng: lng);
             await p.fetchAds(lat: lat, lng: lng);
+            await p.fetchDeals();
+            await p.fetchCategories();
           },
           child: CustomScrollView(
             slivers: [
@@ -563,18 +708,23 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
 
   // -------------------------------------------------------- categories
   Widget _categories() {
+    final p = context.watch<MarketProvider>();
+    final list = p.categories.isNotEmpty ? p.categories : null;
+
+    final itemCount = list != null ? list.length : _kCategories.length;
+
     // Column-major fill: each on-screen column stacks two categories
     // (item i on top, item i+1 below), scrolling horizontally for the rest.
     final columns = <Widget>[];
-    for (var i = 0; i < _kCategories.length; i += 2) {
+    for (var i = 0; i < itemCount; i += 2) {
       columns.add(Padding(
         padding: const EdgeInsets.only(right: 12),
         child: Column(
           children: [
-            _categoryTile(_kCategories[i]),
+            list != null ? _dynamicCategoryTile(list[i]) : _categoryTile(_kCategories[i]),
             const SizedBox(height: 10),
-            if (i + 1 < _kCategories.length)
-              _categoryTile(_kCategories[i + 1])
+            if (i + 1 < itemCount)
+              list != null ? _dynamicCategoryTile(list[i + 1]) : _categoryTile(_kCategories[i + 1])
             else
               const SizedBox(width: 66, height: 86),
           ],
@@ -597,6 +747,151 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
         ],
       ),
     );
+  }
+
+  Widget _dynamicCategoryTile(Map<String, dynamic> c) {
+    final name = c['name']?.toString() ?? '';
+    final rawImg = c['image_url']?.toString() ?? '';
+    final colorName = c['color']?.toString() ?? 'primary';
+    final Color color = _getColor(colorName);
+
+    Widget imageWidget;
+    if (rawImg.startsWith('local:')) {
+      final key = rawImg.replaceFirst('local:', '');
+      String assetPath;
+      switch (key) {
+        case 'groceries':
+          assetPath = 'assets/images/marketplace/groceries.png';
+          break;
+        case 'pharmaceutical':
+          assetPath = 'assets/images/marketplace/pharmaceutical.png';
+          break;
+        case 'freshproduce':
+          assetPath = 'assets/images/marketplace/freshproduce.png';
+          break;
+        case 'household':
+          assetPath = 'assets/images/marketplace/household.png';
+          break;
+        case 'dairy':
+          assetPath = 'assets/images/marketplace/dairy.png';
+          break;
+        case 'babycare':
+          assetPath = 'assets/images/marketplace/babycare.png';
+          break;
+        case 'poultryandmeat':
+          assetPath = 'assets/images/marketplace/poultryandmeat.png';
+          break;
+        case 'personalcare':
+          assetPath = 'assets/images/marketplace/personalcare.png';
+          break;
+        case 'seafood':
+          assetPath = 'assets/images/marketplace/seafood.png';
+          break;
+        case 'petcare':
+          assetPath = 'assets/images/marketplace/petcare.png';
+          break;
+        case 'frozenfoods':
+          assetPath = 'assets/images/marketplace/frozenfoods.png';
+          break;
+        case 'cosmetics':
+          assetPath = 'assets/images/marketplace/cosmetics.png';
+          break;
+        case 'freshflower':
+          assetPath = 'assets/images/marketplace/freshflower.png';
+          break;
+        case 'bakery':
+          assetPath = 'assets/images/marketplace/bakery-Photoroom.png';
+          break;
+        case 'stationery':
+          assetPath = 'assets/images/marketplace/stationery.png';
+          break;
+        case 'electronics':
+          assetPath = 'assets/images/marketplace/electronics.png';
+          break;
+        case 'ayurvedic':
+          assetPath = 'assets/images/marketplace/ayurvedic.png';
+          break;
+        case '21+':
+          assetPath = 'assets/images/marketplace/21+.png';
+          break;
+        case 'intimacy':
+          assetPath = 'assets/images/marketplace/intimacy.png';
+          break;
+        default:
+          assetPath = 'assets/images/marketplace/groceries.png';
+      }
+      imageWidget = Image.asset(
+        assetPath,
+        fit: BoxFit.contain,
+      );
+    } else {
+      final imageUrl = _resolveImg(rawImg);
+      imageWidget = imageUrl != null
+          ? Image.network(
+              imageUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Icon(
+                Icons.shopping_bag_rounded,
+                color: color,
+                size: 28,
+              ),
+            )
+          : Icon(
+              Icons.shopping_bag_rounded,
+              color: color,
+              size: 28,
+            );
+    }
+
+    return GestureDetector(
+      onTap: () => _selectCategory(name),
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 66,
+        child: Column(
+          children: [
+            SizedBox(
+              width: 62,
+              height: 62,
+              child: imageWidget,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              name,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Colors.black,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _getColor(String colorName) {
+    switch (colorName) {
+      case 'green':
+        return const Color(0xFF16A34A);
+      case 'orange':
+        return const Color(0xFFF97316);
+      case 'purple':
+        return const Color(0xFF8B5CF6);
+      case 'blue':
+        return const Color(0xFF3B82F6);
+      case 'indigo':
+        return const Color(0xFF4F46E5);
+      case 'red':
+        return const Color(0xFFDC2626);
+      case 'cyan':
+        return const Color(0xFF0891B2);
+      default:
+        return const Color(0xFF3B82F6);
+    }
   }
 
   Widget _categoryTile(_MarketCategory c) {
@@ -745,6 +1040,11 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
 
   // ------------------------------------------------------------- deals
   Widget _deals() {
+    final p = context.watch<MarketProvider>();
+    final list = p.deals.isNotEmpty ? p.deals : null;
+
+    final itemCount = list != null ? list.length : _kDeals.length;
+
     return Padding(
       padding: const EdgeInsets.only(top: 20),
       child: Column(
@@ -755,9 +1055,15 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-              itemCount: _kDeals.length,
+              itemCount: itemCount,
               separatorBuilder: (_, __) => const SizedBox(width: 12),
-              itemBuilder: (_, i) => _dealCard(_kDeals[i]),
+              itemBuilder: (_, i) {
+                if (list != null) {
+                  return _dynamicDealCard(list[i]);
+                } else {
+                  return _dealCard(_kDeals[i]);
+                }
+              },
             ),
           ),
         ],
@@ -858,6 +1164,175 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
         ),
       ),
     );
+  }
+
+  Widget _dynamicDealCard(Map<String, dynamic> d) {
+    final title = d['title']?.toString() ?? '';
+    final subtitle = d['subtitle']?.toString() ?? '';
+    final rawImg = d['image_url']?.toString() ?? '';
+    final colorName = d['color']?.toString() ?? 'primary';
+    final List<Color> gradient = _getGradientForColor(colorName);
+
+    Widget imageWidget;
+    if (rawImg.startsWith('local:')) {
+      final key = rawImg.replaceFirst('local:', '');
+      String assetPath;
+      switch (key) {
+        case 'spend_save':
+          assetPath = 'assets/images/marketplace/deal_spend_save.png';
+          break;
+        case 'bag':
+          assetPath = 'assets/images/marketplace/deal_bag.png';
+          break;
+        case 'combo':
+          assetPath = 'assets/images/marketplace/deal_combo.png';
+          break;
+        case 'discount':
+          assetPath = 'assets/images/marketplace/deal_discount.png';
+          break;
+        case 'bundle':
+          assetPath = 'assets/images/marketplace/deal_bundle.png';
+          break;
+        default:
+          assetPath = 'assets/images/marketplace/deal_spend_save.png';
+      }
+      imageWidget = Opacity(
+        opacity: 0.8,
+        child: Image.asset(
+          assetPath,
+          width: 96,
+          height: 96,
+          fit: BoxFit.contain,
+        ),
+      );
+    } else {
+      final imageUrl = _resolveImg(rawImg);
+      imageWidget = imageUrl != null
+          ? ClipRRect(
+              borderRadius: const BorderRadius.only(
+                bottomRight: Radius.circular(18),
+              ),
+              child: Opacity(
+                opacity: 0.6,
+                child: Image.network(
+                  imageUrl,
+                  width: 96,
+                  height: 96,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Icon(
+                    Icons.shopping_bag_rounded,
+                    size: 82,
+                    color: Colors.white.withOpacity(0.22),
+                  ),
+                ),
+              ),
+            )
+          : Icon(
+              Icons.shopping_bag_rounded,
+              size: 82,
+              color: Colors.white.withOpacity(0.22),
+            );
+    }
+
+    return GestureDetector(
+      onTap: () => _handleDealTap(d),
+      child: Container(
+        width: 166,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: gradient,
+          ),
+          borderRadius: BorderRadius.circular(AppStyles.radiusLg),
+          boxShadow: AppStyles.shadowSm,
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              right: -10,
+              bottom: -10,
+              child: imageWidget,
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      height: 1.1,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Flexible(
+                    child: Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '*T&C Apply',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    width: 30,
+                    height: 30,
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.chevron_right_rounded,
+                        color: gradient.last, size: 20),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Color> _getGradientForColor(String colorName) {
+    switch (colorName) {
+      case 'green':
+        return const [Color(0xFF16A34A), Color(0xFF84CC16)];
+      case 'orange':
+        return const [Color(0xFFF97316), Color(0xFFFBBF24)];
+      case 'purple':
+        return const [Color(0xFF8B5CF6), Color(0xFFEC4899)];
+      case 'blue':
+        return const [Color(0xFF8B5CF6), Color(0xFF6366F1)];
+      case 'indigo':
+        return const [Color(0xFF4F46E5), Color(0xFF818CF8)];
+      case 'red':
+        return const [Color(0xFFDC2626), Color(0xFFF87171)];
+      case 'cyan':
+        return const [Color(0xFF0891B2), Color(0xFF22D3EE)];
+      default:
+        return const [Color(0xFF3B82F6), Color(0xFF60A5FA)];
+    }
   }
 
   // ------------------------------------------------------- section head

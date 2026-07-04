@@ -307,3 +307,46 @@ async def public_contact(
         "id": row.id,
         "message": "Thanks! We'll get back to you within 24 hours.",
     }
+
+
+class DemoRequest(Base):
+    """Submissions from the public website "Request a demo" form."""
+
+    __tablename__ = "demo_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    full_name = Column(String(120), nullable=False)
+    company = Column(String(120), nullable=False)
+    email = Column(String(120), nullable=False)
+    team_size = Column(String(30), nullable=False)
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class PublicDemoRequest(BaseModel):
+    full_name: str = Field(..., min_length=1, max_length=120)
+    company: str = Field(..., min_length=1, max_length=120)
+    email: str = Field(..., min_length=3, max_length=120)
+    team_size: str = Field(..., min_length=1, max_length=30)
+
+
+@router.post("/demo-requests")
+async def public_demo_request(
+    req: PublicDemoRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Persist a demo request from the public website form. No auth."""
+    row = DemoRequest(
+        full_name=req.full_name.strip(),
+        company=req.company.strip(),
+        email=req.email.strip(),
+        team_size=req.team_size.strip(),
+    )
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
+    return {
+        "ok": True,
+        "id": row.id,
+        "message": "Thanks! We'll reach out within 24 hours.",
+    }

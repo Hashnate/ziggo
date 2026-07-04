@@ -176,6 +176,41 @@ class MarketAd(Base):
     image_url = Column(String(255), nullable=False)
     radius_km = Column(DECIMAL(10, 2), default=5.00, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+    link_type = Column(String(20), nullable=False, default="none")
+    link_value = Column(String(255))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     vendor = relationship("MarketVendor")
+
+
+class MarketDeal(Base):
+    __tablename__ = "market_deals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(120), nullable=False)
+    subtitle = Column(String(200))
+    image_url = Column(String(255))
+    color = Column(String(20), nullable=False, default="primary")
+    promo_code_id = Column(
+        Integer, ForeignKey("promo_codes.id", ondelete="SET NULL"), nullable=True
+    )
+    display_order = Column(Integer, nullable=False, default=0)
+    is_active = Column(Boolean, nullable=False, default=True)
+    link_type = Column(String(20), nullable=False, default="none")
+    link_value = Column(String(255))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    promo_code = relationship("PromoCode")
+
+
+class MarketCategory(Base):
+    __tablename__ = "market_categories"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(120), nullable=False)
+    color = Column(String(20), nullable=False, default="primary")
+    image_url = Column(String(255))
+    display_order = Column(Integer, nullable=False, default=0)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
