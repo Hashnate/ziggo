@@ -8,6 +8,7 @@ import '../../auth/auth_provider.dart';
 import '../../common/screens/merchant_pending_screen.dart';
 import '../../market_vendor/market_vendor_provider.dart';
 import '../../market_vendor/screens/market_vendor_home_screen.dart';
+import '../../market_vendor/screens/market_vendor_ads_screen.dart';
 import '../restaurant_provider.dart';
 import '../widgets/image_picker_tile.dart';
 import 'restaurant_commission_screen.dart';
@@ -265,10 +266,10 @@ class _RestaurantHomeScreenState extends State<RestaurantHomeScreen>
                   builder: (_) => const RestaurantProfileEditScreen(),
                 ),
               ),
-              onOpenMarket: () => Navigator.push(
+              onOpenAds: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const MarketVendorHomeScreen(embedded: true),
+                  builder: (_) => const MarketVendorAdsScreen(),
                 ),
               ),
               onOpenCommission: () => Navigator.push(
@@ -374,14 +375,14 @@ class _Header extends StatelessWidget {
   final VoidCallback onOpenMenu;
   final VoidCallback onOpenEarnings;
   final VoidCallback onOpenProfile;
-  final VoidCallback onOpenMarket;
+  final VoidCallback onOpenAds;
   final VoidCallback onOpenCommission;
   const _Header({
     required this.onLogout,
     required this.onOpenMenu,
     required this.onOpenEarnings,
     required this.onOpenProfile,
-    required this.onOpenMarket,
+    required this.onOpenAds,
     required this.onOpenCommission,
   });
 
@@ -477,12 +478,12 @@ class _Header extends StatelessWidget {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     itemBuilder: (context) => [
                       PopupMenuItem(
-                        value: onOpenMarket,
+                        value: onOpenAds,
                         child: Row(
                           children: [
-                            const Icon(Icons.storefront_rounded, color: Colors.white70, size: 20),
+                            const Icon(Icons.campaign_rounded, color: Colors.white70, size: 20),
                             const SizedBox(width: 12),
-                            const Text('Market', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                            const Text('Ads', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                           ],
                         ),
                       ),

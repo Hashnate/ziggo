@@ -88,6 +88,7 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("users", "referred_by_user_id", "INTEGER"),
     ("market_ads", "link_type", "VARCHAR(20) NOT NULL DEFAULT 'none'"),
     ("market_ads", "link_value", "VARCHAR(255)"),
+    ("market_ads", "restaurant_id", "INTEGER REFERENCES restaurants(id) ON DELETE CASCADE"),
     ("market_deals", "link_type", "VARCHAR(20) NOT NULL DEFAULT 'none'"),
     ("market_deals", "link_value", "VARCHAR(255)"),
     ("food_deals", "link_type", "VARCHAR(20) NOT NULL DEFAULT 'none'"),
