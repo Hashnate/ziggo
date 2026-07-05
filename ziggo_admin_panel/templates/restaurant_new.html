@@ -147,7 +147,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Delivery Fee (%) *</label>
-                    <input name="delivery_fee" type="number" step="0.01" min="0" required value="{{ form.delivery_fee or 150 }}"
+                    <input name="delivery_fee" type="number" step="0.01" min="0" max="100" required value="{{ form.delivery_fee or 150 }}"
                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-slate-50/50">
                 </div>
                 <div>
@@ -157,7 +157,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Pickup Fee (%) *</label>
-                    <input name="pickup_fee" type="number" step="0.01" min="0" required value="{{ form.pickup_fee or 70.00 }}"
+                    <input name="pickup_fee" type="number" step="0.01" min="0" max="100" required value="{{ form.pickup_fee or 70.00 }}"
                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-slate-50/50">
                 </div>
                 <div>
@@ -167,7 +167,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Boost (%) *</label>
-                    <input name="boost" type="number" step="0.01" min="0" required value="{{ form.boost or 0.00 }}"
+                    <input name="boost" type="number" step="0.01" min="0" max="100" required value="{{ form.boost or 0.00 }}"
                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-slate-50/50">
                 </div>
                 <div>
