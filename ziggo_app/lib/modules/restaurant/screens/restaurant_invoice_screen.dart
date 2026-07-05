@@ -114,7 +114,21 @@ class _RestaurantOrderDetailScreenState
       _toast(err, error: true);
       return;
     }
-    _toast('Marked ready â€” finding a rider');
+    _toast('Marked ready — finding a rider');
+  }
+
+  Future<void> _rebroadcast() async {
+    final id = _order['id'] as int?;
+    if (id == null) return;
+    setState(() => _busy = true);
+    final err = await context.read<RestaurantProvider>().rebroadcast(id);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (err != null) {
+      _toast(err, error: true);
+      return;
+    }
+    _toast('Looking for a rider again…');
   }
 
   Future<void> _reject() async {
@@ -508,10 +522,12 @@ class _RestaurantOrderDetailScreenState
       bottomNavigationBar: _ActionBar(
         status: status,
         busy: _busy,
+        driverAssigned: _order['driver_id'] != null,
         onAccept: _accept,
         onReject: _reject,
         onMarkPreparing: _markPreparing,
         onMarkReady: _markReady,
+        onRebroadcast: _rebroadcast,
       ),
     );
   }
@@ -770,18 +786,22 @@ class _HeroStatus extends StatelessWidget {
 class _ActionBar extends StatelessWidget {
   final String status;
   final bool busy;
+  final bool driverAssigned;
   final VoidCallback onAccept;
   final VoidCallback onReject;
   final VoidCallback onMarkPreparing;
   final VoidCallback onMarkReady;
+  final VoidCallback onRebroadcast;
 
   const _ActionBar({
     required this.status,
     required this.busy,
+    required this.driverAssigned,
     required this.onAccept,
     required this.onReject,
     required this.onMarkPreparing,
     required this.onMarkReady,
+    required this.onRebroadcast,
   });
 
   @override
@@ -849,6 +869,14 @@ class _ActionBar extends StatelessWidget {
         color: AppColors.primary,
         busy: busy,
         onPressed: onMarkReady,
+      );
+    } else if (status == 'ready_for_pickup' && !driverAssigned) {
+      body = _BarBtn(
+        label: 'FIND A RIDER AGAIN',
+        icon: Icons.delivery_dining_rounded,
+        color: AppColors.warning,
+        busy: busy,
+        onPressed: onRebroadcast,
       );
     }
     if (body == null) return const SizedBox.shrink();

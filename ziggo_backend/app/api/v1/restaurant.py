@@ -477,6 +477,56 @@ async def mark_order_ready(
     return {"ok": True, "status": o.status.value}
 
 
+@router.post("/orders/{order_id}/rebroadcast")
+async def rebroadcast_to_riders(
+    order_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("restaurant_owner")),
+):
+    """Re-fire the rider broadcast for a food order that's stuck at
+    READY_FOR_PICKUP with no driver_id. Errors if the order has already
+    been claimed."""
+    from .food import _broadcast_to_riders
+    from ...models import FoodOrderItem
+
+    r, o = await _load_owner_scoped_order(db, user, order_id)
+    if o.status != FoodOrderStatus.READY_FOR_PICKUP:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Order must be READY_FOR_PICKUP to rebroadcast (current: {o.status.value})",
+        )
+    if o.driver_id is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="A rider has already accepted this order.",
+        )
+
+    cq = await db.execute(select(Customer).where(Customer.id == o.customer_id))
+    c = cq.scalars().first()
+    customer_user: Optional[User] = None
+    if c:
+        u_q = await db.execute(select(User).where(User.id == c.user_id))
+        customer_user = u_q.scalars().first()
+
+    items_q = await db.execute(
+        select(FoodOrderItem).where(FoodOrderItem.order_id == o.id)
+    )
+    items = items_q.scalars().all()
+    items_count = sum(i.quantity for i in items) if items else 1
+
+    if customer_user is not None:
+        await _broadcast_to_riders(
+            db,
+            o,
+            r,
+            customer_user,
+            items_count,
+            Decimal(str(o.delivery_fee or 0)),
+        )
+    await db.commit()
+    return {"ok": True, "status": o.status.value}
+
+
 # ---------------------------------------------------------------------------
 # Single-order detail (with line items so the merchant knows what to cook)
 # ---------------------------------------------------------------------------

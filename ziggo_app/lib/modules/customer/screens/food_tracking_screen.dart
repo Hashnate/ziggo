@@ -718,23 +718,33 @@ class _StepCard extends StatelessWidget {
                         ),
                         if (isActive) ...[
                           const SizedBox(height: 3),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: _kOrangeLight,
-                              borderRadius: BorderRadius.circular(100),
-                            ),
-                            child: const Text(
-                              '● In progress',
+                          if (s.status == 'delivered')
+                            const Text(
+                              'Completed',
                               style: TextStyle(
-                                fontSize: 10,
-                                color: _kOrangeDark,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.2,
+                                fontSize: 11,
+                                color: AppColors.textTertiary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            )
+                          else
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: _kOrangeLight,
+                                borderRadius: BorderRadius.circular(100),
+                              ),
+                              child: const Text(
+                                '● In progress',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: _kOrangeDark,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.2,
+                                ),
                               ),
                             ),
-                          ),
                         ] else if (isDone) ...[
                           const SizedBox(height: 3),
                           const Text(
