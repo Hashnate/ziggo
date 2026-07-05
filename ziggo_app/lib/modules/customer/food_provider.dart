@@ -248,6 +248,10 @@ class FoodProvider extends ChangeNotifier {
         'restaurant_id': _activeRestaurantId,
         'delivery_lat': lat,
         'delivery_lng': lng,
+        'items': _cart.values.map((e) => {
+          'menu_item_id': (e['item'] as Map)['id'],
+          'quantity': e['quantity'],
+        }).toList(),
       });
       _quote = Map<String, dynamic>.from(resp.data as Map);
       notifyListeners();

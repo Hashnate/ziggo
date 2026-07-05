@@ -245,8 +245,11 @@ async def _food_order_to_booking_response(db: AsyncSession, order: FoodOrder) ->
             cust_name = cust.user.full_name
             cust_phone = cust.user.phone_number
 
-    pickup_fee = float(order.restaurant.pickup_fee) if order.restaurant.pickup_fee is not None else 70.0
-    boost = float(order.restaurant.boost) if order.restaurant.boost is not None else 0.0
+    items_total = float(order.total_amount or 0)
+    pickup_pct = float(order.restaurant.pickup_fee) if (order.restaurant and order.restaurant.pickup_fee is not None) else 70.0
+    boost_pct = float(order.restaurant.boost) if (order.restaurant and order.restaurant.boost is not None) else 0.0
+    pickup_fee = items_total * (pickup_pct / 100.0)
+    boost = items_total * (boost_pct / 100.0)
 
     return BookingResponse(
         id=order.id,
@@ -352,8 +355,11 @@ async def _market_order_to_booking_response(db: AsyncSession, order: MarketOrder
             cust_name = cust.user.full_name
             cust_phone = cust.user.phone_number
 
-    pickup_fee = float(order.vendor.pickup_fee) if order.vendor.pickup_fee is not None else 70.0
-    boost = float(order.vendor.boost) if order.vendor.boost is not None else 0.0
+    items_total = float(order.total_amount or 0)
+    pickup_pct = float(order.vendor.pickup_fee) if (order.vendor and order.vendor.pickup_fee is not None) else 70.0
+    boost_pct = float(order.vendor.boost) if (order.vendor and order.vendor.boost is not None) else 0.0
+    pickup_fee = items_total * (pickup_pct / 100.0)
+    boost = items_total * (boost_pct / 100.0)
 
     return BookingResponse(
         id=order.id,

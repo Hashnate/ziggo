@@ -51,6 +51,7 @@ def compute_delivery_fee(
     pickup_fee: Optional[Decimal] = None,
     per_km_rate: Optional[Decimal] = None,
     boost: Optional[Decimal] = None,
+    items_subtotal: Decimal = Decimal("0.00"),
 ) -> Decimal:
     """Distance + weight delivery fee, clamped and rounded to whole rupees.
 
@@ -58,11 +59,14 @@ def compute_delivery_fee(
     while still layering distance and weight on top.
     """
     if pickup_fee is not None:
-        base = pickup_fee
+        base = items_subtotal * (pickup_fee / Decimal("100"))
     else:
-        base = base_fee_override if base_fee_override and base_fee_override > 0 else BASE_FEE
+        if base_fee_override and base_fee_override > 0:
+            base = items_subtotal * (base_fee_override / Decimal("100"))
+        else:
+            base = BASE_FEE
     per_km = per_km_rate if per_km_rate is not None else PER_KM
-    boost_val = boost if boost is not None else Decimal("0")
+    boost_val = items_subtotal * (boost / Decimal("100")) if boost is not None else Decimal("0")
     dist = Decimal(str(max(0.0, distance_km)))
 
     distance_fee = base + per_km * max(Decimal("0"), dist - FREE_KM) + boost_val
@@ -99,6 +103,9 @@ def quote(
         float(vendor_lat), float(vendor_lng), float(drop_lat), float(drop_lng)
     )
     weight = order_weight_kg(lines)
+    items_subtotal = Decimal("0.00")
+    for product, qty in lines:
+        items_subtotal += Decimal(str(getattr(product, "price", 0))) * Decimal(int(qty))
     fee = compute_delivery_fee(
         distance_km,
         weight,
@@ -106,6 +113,7 @@ def quote(
         pickup_fee=pickup_fee,
         per_km_rate=per_km_rate,
         boost=boost,
+        items_subtotal=items_subtotal,
     )
     radius = vendor_radius_km(delivery_radius_km)
 

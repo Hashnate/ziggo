@@ -404,10 +404,26 @@ async def quote_delivery(
     from ...services.fare_service import haversine_km
     from decimal import Decimal, ROUND_HALF_UP
 
+    items = body.get("items") or []
+    items_subtotal = Decimal("0.00")
+    for item_data in items:
+        try:
+            item_id = int(item_data["menu_item_id"])
+            qty = int(item_data["quantity"])
+            iq = await db.execute(select(MenuItem).where(MenuItem.id == item_id))
+            mitem = iq.scalars().first()
+            if mitem:
+                items_subtotal += Decimal(str(mitem.price)) * qty
+        except Exception:
+            pass
+
     dist_km = haversine_km(float(r.lat), float(r.lng), drop_lat, drop_lng)
-    pickup = r.pickup_fee if r.pickup_fee is not None else Decimal("70.00")
+    pickup_pct = r.pickup_fee if r.pickup_fee is not None else Decimal("70.00")
     per_km = r.per_km_rate if r.per_km_rate is not None else Decimal("40.00")
-    boost_val = r.boost if r.boost is not None else Decimal("0.00")
+    boost_pct = r.boost if r.boost is not None else Decimal("0.00")
+    
+    pickup = items_subtotal * (pickup_pct / Decimal("100"))
+    boost_val = items_subtotal * (boost_pct / Decimal("100"))
     
     base_delivery_fee = pickup + per_km * Decimal(str(dist_km)) + boost_val
     base_delivery_fee = base_delivery_fee.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
@@ -477,13 +493,17 @@ async def create_food_order(
     from decimal import ROUND_HALF_UP
     if r.lat is not None and r.lng is not None and body.delivery_lat is not None and body.delivery_lng is not None:
         dist_km = haversine_km(float(r.lat), float(r.lng), float(body.delivery_lat), float(body.delivery_lng))
-        pickup = r.pickup_fee if r.pickup_fee is not None else Decimal("70.00")
+        pickup_pct = r.pickup_fee if r.pickup_fee is not None else Decimal("70.00")
         per_km = r.per_km_rate if r.per_km_rate is not None else Decimal("40.00")
-        boost_val = r.boost if r.boost is not None else Decimal("0.00")
+        boost_pct = r.boost if r.boost is not None else Decimal("0.00")
+        
+        pickup = total * (pickup_pct / Decimal("100"))
+        boost_val = total * (boost_pct / Decimal("100"))
+        
         base_delivery_fee = pickup + per_km * Decimal(str(dist_km)) + boost_val
         base_delivery_fee = base_delivery_fee.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
     else:
-        base_delivery_fee = Decimal(str(r.delivery_fee or 0))
+        base_delivery_fee = total * (Decimal(str(r.delivery_fee or 0)) / Decimal("100"))
 
     # BRD: RW-03 — Gold member gets the configured delivery-fee discount.
     from ...services import loyalty_service as L
