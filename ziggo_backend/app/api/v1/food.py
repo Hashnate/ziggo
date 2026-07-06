@@ -949,10 +949,20 @@ async def get_my_food_order_details(
     r_q = await db.execute(select(Restaurant).where(Restaurant.id == order.restaurant_id))
     r = r_q.scalars().first()
 
+    dist_km = 0.0
+    if r and r.lat is not None and r.lng is not None and order.delivery_lat is not None and order.delivery_lng is not None:
+        dist_km = haversine_km(float(r.lat), float(r.lng), float(order.delivery_lat), float(order.delivery_lng))
+
+    duration_min = 0
+    if order.delivered_at and order.picked_up_at:
+        duration_min = max(0, int((order.delivered_at - order.picked_up_at).total_seconds() / 60))
+
     return {
         "items": items_details,
         "restaurant_name": r.name if r else "Unknown Restaurant",
         "restaurant_address": r.address if r else "Unknown Address",
+        "distance_km": round(dist_km, 2),
+        "duration_min": duration_min,
     }
 
 

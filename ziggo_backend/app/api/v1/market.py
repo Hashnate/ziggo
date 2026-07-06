@@ -826,10 +826,20 @@ async def get_my_market_order_details(
     v_q = await db.execute(select(MarketVendor).where(MarketVendor.id == order.vendor_id))
     v = v_q.scalars().first()
 
+    dist_km = float(order.delivery_distance_km) if order.delivery_distance_km is not None else 0.0
+    if dist_km == 0.0 and v and v.lat is not None and v.lng is not None and order.delivery_lat is not None and order.delivery_lng is not None:
+        dist_km = haversine_km(float(v.lat), float(v.lng), float(order.delivery_lat), float(order.delivery_lng))
+
+    duration_min = 0
+    if order.delivered_at and order.picked_up_at:
+        duration_min = max(0, int((order.delivered_at - order.picked_up_at).total_seconds() / 60))
+
     return {
         "items": items_details,
         "store_name": v.name if v else "Unknown Store",
         "store_address": v.address if v else "Unknown Address",
+        "distance_km": round(dist_km, 2),
+        "duration_min": duration_min,
     }
 
 # ---------------------------------------------------------------------------

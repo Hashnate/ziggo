@@ -210,7 +210,59 @@ class FoodOrderDetailsScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.divider),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.route_outlined, color: AppColors.primary, size: 20),
+                                const SizedBox(width: 10),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Distance', style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+                                    Text('${details['distance_km'] ?? '0.0'} km', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.divider),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.timer_outlined, color: AppColors.primary, size: 20),
+                                const SizedBox(width: 10),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Duration', style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+                                    Text('${details['duration_min'] ?? '0'} mins', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
                     const Text(
                       'ORDER ITEMS',
                       style: TextStyle(
