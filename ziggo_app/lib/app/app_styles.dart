@@ -164,6 +164,7 @@ class GradientServiceTile extends StatelessWidget {
   /// the tile renders the illustration free-floating instead of the flat icon
   /// inside the navy badge.
   final String? imageAsset;
+  final EdgeInsetsGeometry? imagePadding;
 
   const GradientServiceTile({
     super.key,
@@ -173,16 +174,24 @@ class GradientServiceTile extends StatelessWidget {
     this.isNew = false,
     this.badgeText,
     this.imageAsset,
+    this.imagePadding,
     this.gradientColors,
     this.iconColor,
   });
 
   Widget _glyph() {
     if (imageAsset != null) {
+      Widget image = Image.asset(imageAsset!, fit: BoxFit.contain);
+      if (imagePadding != null) {
+        image = Padding(
+          padding: imagePadding!,
+          child: image,
+        );
+      }
       return SizedBox(
         width: 70,
         height: 70,
-        child: Image.asset(imageAsset!, fit: BoxFit.contain),
+        child: image,
       );
     }
     return Container(
