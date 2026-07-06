@@ -649,7 +649,7 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
                             Padding(
                               padding: const EdgeInsets.only(bottom: 8),
                               child: PrimaryButton(
-                                text: 'I have picked up my order',
+                                label: 'I have picked up my order',
                                 onPressed: _busy ? null : () async {
                                   final market = context.read<MarketProvider>();
                                   final orderId = _order?['id'] as int?;

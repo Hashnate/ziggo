@@ -343,7 +343,7 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: PrimaryButton(
-                            text: 'I have picked up my food',
+                            label: 'I have picked up my food',
                             onPressed: _busy ? null : () async {
                               final food = context.read<FoodProvider>();
                               final orderId = _order?['id'] as int?;
