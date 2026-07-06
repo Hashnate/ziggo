@@ -74,6 +74,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   LatLng? _pendingPickupLatLng;
   List<LatLng> _pendingRoutePoints = [];
   String? _pendingPickupLabel;
+  bool _requestSheetCollapsed = false;
+  int? _lastPendingRequestId;
 
   void _foodMarketRoutePointsCleaned() {
     _lastRouteOrderId = null;
@@ -636,8 +638,30 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       }
     }
 
-    if (pending != null && ride == null && food == null && market == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _showRideRequest(pending));
+    if (pending != null) {
+      final rawId = pending['booking_id'] ?? pending['food_order_id'] ?? pending['market_order_id'] ?? 0;
+      final currentId = rawId is int ? rawId : (int.tryParse(rawId.toString()) ?? 0);
+      if (_lastPendingRequestId != currentId) {
+        _lastPendingRequestId = currentId;
+        _requestSheetCollapsed = false;
+        _pendingPickupLatLng = null;
+        _pendingRoutePoints = [];
+        _pendingPickupLabel = null;
+      }
+    } else {
+      _lastPendingRequestId = null;
+      if (_pendingPickupLatLng != null || _pendingRoutePoints.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() {
+              _pendingPickupLatLng = null;
+              _pendingRoutePoints = [];
+              _pendingPickupLabel = null;
+              _requestSheetCollapsed = false;
+            });
+          }
+        });
+      }
     }
 
     final surgePolygons = driver.surgeZones.map((z) {
@@ -815,6 +839,33 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               alignment: Alignment.bottomCenter,
               child: _buildBottomCard(driver, ride, food, market),
             )
+          else if (pending != null)
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: _RideRequestSheet(
+                request: pending,
+                driverLocation: loc,
+                onShowPickupOnMap: (pickup, routePoints, label) {
+                  setState(() {
+                    _pendingPickupLatLng = pickup;
+                    _pendingRoutePoints = routePoints;
+                    _pendingPickupLabel = label;
+                    _requestSheetCollapsed = true;
+                  });
+                  if (loc != null) {
+                    _mapController.fitBounds([loc, pickup]);
+                  } else {
+                    _mapController.moveTo(pickup);
+                  }
+                },
+                isCollapsed: _requestSheetCollapsed,
+                onToggleCollapse: () {
+                  setState(() {
+                    _requestSheetCollapsed = !_requestSheetCollapsed;
+                  });
+                },
+              ),
+            )
           else
             Align(
               alignment: Alignment.bottomCenter,
@@ -827,7 +878,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 ? (ride != null
                     ? (_activeRideExpanded ? 460.0 : 160.0)
                     : 300.0)
-                : (_incentivesExpanded ? 360.0 : 160.0),
+                : (pending != null
+                    ? (_requestSheetCollapsed ? 110.0 : 400.0)
+                    : (_incentivesExpanded ? 360.0 : 160.0)),
             child: GestureDetector(
               onTap: _centerOnDriver,
               child: Container(
@@ -3013,10 +3066,14 @@ class _RideRequestSheet extends StatefulWidget {
   final Map<String, dynamic> request;
   final LatLng? driverLocation;
   final Function(LatLng pickup, List<LatLng> routePoints, String label) onShowPickupOnMap;
+  final bool isCollapsed;
+  final VoidCallback onToggleCollapse;
 
   const _RideRequestSheet({
     required this.request,
     required this.onShowPickupOnMap,
+    required this.isCollapsed,
+    required this.onToggleCollapse,
     this.driverLocation,
   });
 
@@ -3096,7 +3153,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
     try {
       ok = await context.read<DriverProvider>().acceptRide(_requestId);
     } finally {
-      if (mounted) Navigator.pop(context);
+      if (mounted) setState(() => _busy = false);
     }
     if (!mounted) return;
     if (!ok) {
@@ -3123,7 +3180,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
     try {
       await context.read<DriverProvider>().declineRide(_requestId);
     } finally {
-      if (mounted) Navigator.pop(context);
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -3131,9 +3188,6 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
   Widget build(BuildContext context) {
     final pending = context.watch<DriverProvider>().pendingRequest;
     if (pending == null && !_busy) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) Navigator.of(context).pop();
-      });
       return const SizedBox.shrink();
     }
 
@@ -3162,6 +3216,97 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
         : isFood
             ? 'FOOD DELIVERY'
             : (isFlash ? 'PARCEL DELIVERY' : 'NEW RIDE');
+
+    if (widget.isCollapsed) {
+      return Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: AppStyles.shadowLg,
+        ),
+        child: SafeArea(
+          top: false,
+          child: InkWell(
+            onTap: widget.onToggleCollapse,
+            borderRadius: BorderRadius.circular(24),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(badgeIcon, color: AppColors.primary, size: 12),
+                        const SizedBox(width: 4),
+                        Text(
+                          badgeLabel,
+                          style: const TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 10,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.keyboard_arrow_up_rounded, color: AppColors.primary, size: 20),
+                        SizedBox(width: 4),
+                        Text(
+                          'TAP TO EXPAND',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 10,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(
+                          value: progress.clamp(0.0, 1.0),
+                          strokeWidth: 2.5,
+                          color: _secondsLeft <= 10 ? AppColors.error : AppColors.primary,
+                          backgroundColor: Colors.black12,
+                        ),
+                      ),
+                      Text(
+                        '$_secondsLeft',
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 14),
