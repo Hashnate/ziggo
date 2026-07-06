@@ -314,6 +314,7 @@ async def quote_delivery(
         if product:
             lines.append((product, int(line.get("quantity", 1))))
 
+    print(f"DEBUG QUOTE: vendor_id={vendor_id}, vendor.lat={vendor.lat}, vendor.lng={vendor.lng}, drop_lat={drop_lat}, drop_lng={drop_lng}, vendor.delivery_fee={vendor.delivery_fee}, vendor.pickup_fee={vendor.pickup_fee}, vendor.per_km_rate={vendor.per_km_rate}, vendor.boost={vendor.boost}")
     q = delivery.quote(
         vendor.lat,
         vendor.lng,
@@ -326,6 +327,7 @@ async def quote_delivery(
         per_km_rate=Decimal(str(vendor.per_km_rate)) if vendor.per_km_rate is not None else None,
         boost=Decimal(str(vendor.boost)) if vendor.boost is not None else None,
     )
+    print(f"DEBUG QUOTE RESULT: {q}")
 
     cust_q = await db.execute(select(Customer).where(Customer.user_id == user.id))
     customer = cust_q.scalars().first()
@@ -334,6 +336,7 @@ async def quote_delivery(
         
     from ...services import loyalty_service as L
     discounted_fee = await L.gold_delivery_fee(db, customer, q["fee"])
+    print(f"DEBUG QUOTE DISCOUNTED: {discounted_fee}")
 
     return {
         "distance_km": q["distance_km"],

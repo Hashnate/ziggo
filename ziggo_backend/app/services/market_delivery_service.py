@@ -58,13 +58,12 @@ def compute_delivery_fee(
     `base_fee_override` lets a vendor's own `delivery_fee` replace BASE_FEE
     while still layering distance and weight on top.
     """
-    if pickup_fee is not None:
+    if base_fee_override is not None and base_fee_override > 0:
+        base = items_subtotal * (base_fee_override / Decimal("100"))
+    elif pickup_fee is not None:
         base = items_subtotal * (pickup_fee / Decimal("100"))
     else:
-        if base_fee_override and base_fee_override > 0:
-            base = items_subtotal * (base_fee_override / Decimal("100"))
-        else:
-            base = BASE_FEE
+        base = BASE_FEE
     per_km = per_km_rate if per_km_rate is not None else PER_KM
     boost_val = items_subtotal * (boost / Decimal("100")) if boost is not None else Decimal("0")
     dist = Decimal(str(max(0.0, distance_km)))
@@ -75,7 +74,8 @@ def compute_delivery_fee(
     weight_extra = Decimal(ceil(over)) * PER_KG_OVER
 
     fee = distance_fee + weight_extra
-    fee = max(MIN_FEE, min(MAX_FEE, fee))
+    effective_min = Decimal("0") if base_fee_override is not None else MIN_FEE
+    fee = max(effective_min, min(MAX_FEE, fee))
     return fee.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
 
 

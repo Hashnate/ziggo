@@ -424,7 +424,10 @@ async def quote_delivery(
     per_km = r.per_km_rate if r.per_km_rate is not None else Decimal("40.00")
     boost_pct = r.boost if r.boost is not None else Decimal("0.00")
     
-    pickup = items_subtotal * (pickup_pct / Decimal("100"))
+    if r.delivery_fee is not None and r.delivery_fee > 0:
+        pickup = items_subtotal * (r.delivery_fee / Decimal("100"))
+    else:
+        pickup = items_subtotal * (pickup_pct / Decimal("100"))
     boost_val = items_subtotal * (boost_pct / Decimal("100"))
     
     base_delivery_fee = pickup + per_km * Decimal(str(dist_km)) + boost_val
@@ -505,7 +508,10 @@ async def create_food_order(
             per_km = r.per_km_rate if r.per_km_rate is not None else Decimal("40.00")
             boost_pct = r.boost if r.boost is not None else Decimal("0.00")
             
-            pickup = total * (pickup_pct / Decimal("100"))
+            if r.delivery_fee is not None and r.delivery_fee > 0:
+                pickup = total * (r.delivery_fee / Decimal("100"))
+            else:
+                pickup = total * (pickup_pct / Decimal("100"))
             boost_val = total * (boost_pct / Decimal("100"))
             
             base_delivery_fee = pickup + per_km * Decimal(str(dist_km)) + boost_val
