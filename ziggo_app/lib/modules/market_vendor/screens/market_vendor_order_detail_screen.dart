@@ -227,6 +227,7 @@ class _MarketVendorOrderDetailScreenState
       return;
     }
     _toast('Delivered — nice work!');
+    Navigator.pop(context);
   }
 
   Future<void> _rebroadcast() async {

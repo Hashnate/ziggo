@@ -222,6 +222,10 @@ class RestaurantProvider extends ChangeNotifier {
     return _orderAction('POST', '/restaurant/orders/$orderId/ready');
   }
 
+  Future<String?> markDelivered(int orderId) async {
+    return _orderAction('POST', '/restaurant/orders/$orderId/delivered');
+  }
+
   Future<String?> rebroadcast(int orderId) async {
     return _orderAction('POST', '/restaurant/orders/$orderId/rebroadcast');
   }

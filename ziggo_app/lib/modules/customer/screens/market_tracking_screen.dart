@@ -74,16 +74,8 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
     if (_order != null) {
       if (_order!['status'] == 'rejected') {
         _showRejectedDialog();
-      } else if (_order!['status'] == 'delivered') {
-        _poll?.cancel();
-        _wsSub?.cancel();
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const MarketHomeScreen()),
-          (route) => route.isFirst,
-        );
       }
-      if (_storeName == null && _order!['status'] != 'delivered') {
+      if (_storeName == null) {
         _fetchStoreDetails(_order!['id'] as int);
       }
     }

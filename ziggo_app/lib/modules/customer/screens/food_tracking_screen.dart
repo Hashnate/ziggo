@@ -64,14 +64,6 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
       setState(() => _order = match.isEmpty ? null : match);
       if (_order != null && _order!['status'] == 'rejected') {
         _showRejectedDialog();
-      } else if (_order != null && _order!['status'] == 'delivered') {
-        _poll?.cancel();
-        _wsSub?.cancel();
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const FoodHomeScreen()),
-          (route) => route.isFirst,
-        );
       }
     }
   }
