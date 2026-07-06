@@ -668,6 +668,7 @@ async def list_my_market_orders(
             delivery_mode=o.delivery_mode,
             created_at=o.created_at,
             cancellation_reason=o.cancellation_reason,
+            is_self_pickup=o.is_self_pickup,
         )
         for o in rows
     ]
@@ -825,7 +826,7 @@ async def get_my_market_order_details(
 
     return {
         "items": items_details,
-        "store_name": v.store_name if v else "Unknown Store",
+        "store_name": v.name if v else "Unknown Store",
         "store_address": v.address if v else "Unknown Address",
     }
 

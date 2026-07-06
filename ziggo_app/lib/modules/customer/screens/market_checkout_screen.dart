@@ -145,7 +145,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
     final vendor = p.activeVendor;
     final quote = p.quote;
     final hasAddress = _saved != null || _picked != null;
-    final outOfRange = quote != null && quote['in_range'] == false;
+    final outOfRange = !_isSelfPickup && quote != null && quote['in_range'] == false;
     // Show the live quoted fee once an address is chosen; before then the
     // delivery line is a placeholder and isn't added to the total.
     final deliveryFee = _isSelfPickup ? 0.0 : ((quote?['delivery_fee'] as num?)?.toDouble() ?? 0.0);
