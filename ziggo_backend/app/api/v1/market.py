@@ -400,37 +400,44 @@ async def create_market_order(
     # overrides the engine's base fare. Hard-block drops outside the radius.
     delivery_distance_km = None
     total_weight_kg = None
-    if vendor.lat is not None and vendor.lng is not None:
-        q = delivery.quote(
-            vendor.lat,
-            vendor.lng,
-            body.delivery_lat,
-            body.delivery_lng,
-            lines,
-            vendor.delivery_radius_km,
-            base_fee_override=Decimal(str(vendor.delivery_fee)) if vendor.delivery_fee else None,
-            pickup_fee=Decimal(str(vendor.pickup_fee)) if vendor.pickup_fee is not None else None,
-            per_km_rate=Decimal(str(vendor.per_km_rate)) if vendor.per_km_rate is not None else None,
-            boost=Decimal(str(vendor.boost)) if vendor.boost is not None else None,
-        )
-        if not q["in_range"]:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Delivery address is outside {vendor.name}'s {q['radius_km']}km delivery range",
-            )
-        base_delivery_fee = q["fee"]
-        delivery_distance_km = Decimal(str(q["distance_km"]))
-        total_weight_kg = q["weight_kg"]
+    if body.is_self_pickup:
+        base_delivery_fee = Decimal("0")
+        gold_discount = Decimal("0")
+        delivery_fee = Decimal("0")
+        delivery_distance_km = Decimal("0")
+        total_weight_kg = Decimal("0")
     else:
-        base_delivery_fee = (
-            Decimal(str(vendor.delivery_fee)) if (vendor.delivery_fee or 0) > 0 else Decimal("150")
-        )
+        if vendor.lat is not None and vendor.lng is not None and body.delivery_lat is not None and body.delivery_lng is not None:
+            q = delivery.quote(
+                vendor.lat,
+                vendor.lng,
+                body.delivery_lat,
+                body.delivery_lng,
+                lines,
+                vendor.delivery_radius_km,
+                base_fee_override=Decimal(str(vendor.delivery_fee)) if vendor.delivery_fee else None,
+                pickup_fee=Decimal(str(vendor.pickup_fee)) if vendor.pickup_fee is not None else None,
+                per_km_rate=Decimal(str(vendor.per_km_rate)) if vendor.per_km_rate is not None else None,
+                boost=Decimal(str(vendor.boost)) if vendor.boost is not None else None,
+            )
+            if not q["in_range"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Delivery address is outside {vendor.name}'s {q['radius_km']}km delivery range",
+                )
+            base_delivery_fee = q["fee"]
+            delivery_distance_km = Decimal(str(q["distance_km"]))
+            total_weight_kg = q["weight_kg"]
+        else:
+            base_delivery_fee = (
+                Decimal(str(vendor.delivery_fee)) if (vendor.delivery_fee or 0) > 0 else Decimal("150")
+            )
 
-    # BRD: RW-03 — Gold delivery discount.
-    from ...services import loyalty_service as L
-    discounted_delivery_fee = await L.gold_delivery_fee(db, customer, base_delivery_fee)
-    gold_discount = (base_delivery_fee - discounted_delivery_fee).quantize(Decimal("0.01"))
-    delivery_fee = discounted_delivery_fee
+        # BRD: RW-03 — Gold delivery discount.
+        from ...services import loyalty_service as L
+        discounted_delivery_fee = await L.gold_delivery_fee(db, customer, base_delivery_fee)
+        gold_discount = (base_delivery_fee - discounted_delivery_fee).quantize(Decimal("0.01"))
+        delivery_fee = discounted_delivery_fee
 
     # Optional market promo.
     promo_discount = Decimal("0")
@@ -487,9 +494,10 @@ async def create_market_order(
         redeem_discount=redeem_value,
         gold_discount=gold_discount,
         final_amount=final,
-        delivery_address=body.delivery_address,
-        delivery_lat=Decimal(str(body.delivery_lat)),
-        delivery_lng=Decimal(str(body.delivery_lng)),
+        delivery_address=body.delivery_address if not body.is_self_pickup else "Self Pickup",
+        delivery_lat=Decimal(str(body.delivery_lat)) if (body.delivery_lat is not None and not body.is_self_pickup) else vendor.lat,
+        delivery_lng=Decimal(str(body.delivery_lng)) if (body.delivery_lng is not None and not body.is_self_pickup) else vendor.lng,
+        is_self_pickup=body.is_self_pickup,
         delivery_distance_km=delivery_distance_km,
         total_weight_kg=total_weight_kg,
         payment_method=body.payment_method,
@@ -625,6 +633,7 @@ async def create_market_order(
         total_weight_kg=float(order.total_weight_kg) if order.total_weight_kg is not None else None,
         delivery_mode=order.delivery_mode,
         created_at=order.created_at,
+        is_self_pickup=order.is_self_pickup,
     )
 
 
@@ -1227,3 +1236,57 @@ async def rate_market_order(
             )
 
     return {"ok": True, "customer_rating": rating}
+
+
+@router.post("/orders/{order_id}/complete")
+async def complete_self_pickup_order(
+    order_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    """Self-pickup only: Customer marks their order as DELIVERED/completed."""
+    cust_q = await db.execute(select(Customer).where(Customer.user_id == user.id))
+    customer = cust_q.scalars().first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer profile not found")
+
+    q = await db.execute(
+        select(MarketOrder)
+        .where(MarketOrder.id == order_id, MarketOrder.customer_id == customer.id)
+    )
+    order = q.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    if not order.is_self_pickup:
+        raise HTTPException(status_code=400, detail="Only self-pickup orders can be completed by the customer")
+
+    if order.status != MarketOrderStatus.READY_FOR_PICKUP:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Order must be READY_FOR_PICKUP to complete (current: {order.status.value})",
+        )
+
+    order.status = MarketOrderStatus.DELIVERED
+    order.delivered_at = datetime.now(timezone.utc)
+    order.payment_status = "paid"
+
+    # award loyalty points
+    if order.final_amount:
+        from ...services.loyalty_service import award_points as _award
+        await _award(
+            db, customer,
+            spend_amount=order.final_amount,
+            source_kind="market_order",
+            source_id=order.id,
+            description=f"Earned on {order.order_ref}",
+        )
+
+    # notify vendor / customer update
+    await manager.send(
+        customer.user_id,
+        "market_order_update",
+        {"market_order_id": order.id, "status": order.status.value},
+    )
+    await db.commit()
+    return {"ok": True, "status": order.status.value}

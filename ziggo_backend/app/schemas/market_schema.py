@@ -43,15 +43,16 @@ class MarketOrderItemRequest(BaseModel):
 class MarketOrderCreate(BaseModel):
     vendor_id: int
     items: List[MarketOrderItemRequest]
-    delivery_address: str
-    delivery_lat: float
-    delivery_lng: float
+    delivery_address: Optional[str] = None
+    delivery_lat: Optional[float] = None
+    delivery_lng: Optional[float] = None
     payment_method: str = "cash"
     instructions: Optional[str] = None
     # BRD: RW-02 — loyalty points the customer wants to redeem at checkout
     redeem_points: int = 0
     # BRD: optional promo code applied at checkout
     promo_code: Optional[str] = None
+    is_self_pickup: bool = False
 
 
 class MarketOrderResponse(BaseModel):
@@ -61,7 +62,7 @@ class MarketOrderResponse(BaseModel):
     total_amount: float
     delivery_fee: float
     final_amount: float
-    delivery_address: str
+    delivery_address: Optional[str] = None
     payment_method: str
     payment_status: str
     delivery_distance_km: Optional[float] = None
@@ -69,6 +70,7 @@ class MarketOrderResponse(BaseModel):
     delivery_mode: Optional[str] = None
     created_at: datetime
     cancellation_reason: Optional[str] = None
+    is_self_pickup: bool = False
 
     class Config:
         from_attributes = True

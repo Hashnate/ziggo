@@ -1022,6 +1022,20 @@ async def mark_ready(
             {"market_order_id": o.id, "status": o.status.value, "delivery_mode": mode},
         )
 
+    if o.is_self_pickup:
+        if c:
+            db.add(
+                Notification(
+                    user_id=c.user_id,
+                    title="Order ready for pickup",
+                    body=f"Your order {o.order_ref} is ready for self pickup at {v.name}",
+                    type="market_order_update",
+                    data=f'{{"market_order_id":{o.id}}}',
+                )
+            )
+            await db.commit()
+        return {"ok": True, "status": o.status.value, "delivery_mode": "pickup"}
+
     if mode == "self":
         # Vendor delivers — no rider broadcast. Vendor advances the order via
         # /out-for-delivery and /delivered.
@@ -1102,13 +1116,20 @@ async def vendor_delivered(
     """Self-delivery only: OUT_FOR_DELIVERY → DELIVERED, driven by the vendor.
     Awards loyalty points, same as the rider-completed path."""
     _, o = await _load_owner_scoped_order(db, user, order_id)
-    if o.delivery_mode != "self":
+    if o.delivery_mode != "self" and not o.is_self_pickup:
         raise HTTPException(status_code=400, detail="This order is delivered by a marketplace rider")
-    if o.status != MarketOrderStatus.OUT_FOR_DELIVERY:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Order must be OUT_FOR_DELIVERY (current: {o.status.value})",
-        )
+    if o.is_self_pickup:
+        if o.status not in (MarketOrderStatus.READY_FOR_PICKUP, MarketOrderStatus.OUT_FOR_DELIVERY):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Order must be READY_FOR_PICKUP or OUT_FOR_DELIVERY (current: {o.status.value})",
+            )
+    else:
+        if o.status != MarketOrderStatus.OUT_FOR_DELIVERY:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Order must be OUT_FOR_DELIVERY (current: {o.status.value})",
+            )
     o.status = MarketOrderStatus.DELIVERED
     o.delivered_at = datetime.now(timezone.utc)
     o.payment_status = "paid"

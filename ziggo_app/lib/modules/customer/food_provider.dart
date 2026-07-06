@@ -262,14 +262,15 @@ class FoodProvider extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>?> placeOrder({
-    required String deliveryAddress,
-    required double lat,
-    required double lng,
+    String? deliveryAddress,
+    double? lat,
+    double? lng,
     String paymentMethod = 'cash',
     String? instructions,
     // BRD: RW-02 / RW-04 — opt-in checkout discounts.
     int redeemPoints = 0,
     String? promoCode,
+    bool isSelfPickup = false,
   }) async {
     if (_activeRestaurantId == null || _cart.isEmpty) return null;
     final items = _cart.values
@@ -282,13 +283,14 @@ class FoodProvider extends ChangeNotifier {
       final resp = await ApiClient.instance.dio.post('/food/orders', data: {
         'restaurant_id': _activeRestaurantId,
         'items': items,
-        'delivery_address': deliveryAddress,
-        'delivery_lat': lat,
-        'delivery_lng': lng,
+        if (deliveryAddress != null) 'delivery_address': deliveryAddress,
+        if (lat != null) 'delivery_lat': lat,
+        if (lng != null) 'delivery_lng': lng,
         'payment_method': paymentMethod,
         if (instructions != null && instructions.isNotEmpty) 'instructions': instructions,
         if (redeemPoints > 0) 'redeem_points': redeemPoints,
         if (promoCode != null && promoCode.isNotEmpty) 'promo_code': promoCode,
+        'is_self_pickup': isSelfPickup,
       });
       clearCart();
       return Map<String, dynamic>.from(resp.data);
@@ -296,6 +298,17 @@ class FoodProvider extends ChangeNotifier {
       _error = e.response?.data?['detail']?.toString() ?? e.message;
       notifyListeners();
       return null;
+    }
+  }
+
+  Future<bool> completeOrder(int orderId) async {
+    try {
+      await ApiClient.instance.dio.post('/food/orders/$orderId/complete');
+      return true;
+    } on DioException catch (e) {
+      _error = e.response?.data?['detail']?.toString() ?? e.message;
+      notifyListeners();
+      return false;
     }
   }
 

@@ -31,6 +31,7 @@ class FoodTrackingScreen extends StatefulWidget {
 class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
   Map<String, dynamic>? _order;
   Timer? _poll;
+  bool _busy = false;
 
   StreamSubscription? _wsSub;
 
@@ -305,11 +306,17 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
                       _StepCard(current: current),
                       const SizedBox(height: 16),
 
-                      // ── Delivery address card ──
+                      // ── Delivery address / Pickup location card ──
                       _InfoCard(
-                        icon: Icons.location_on_rounded,
-                        label: 'DELIVERY ADDRESS',
-                        value: _order!['delivery_address']?.toString() ?? '—',
+                        icon: (_order!['is_self_pickup'] == true)
+                            ? Icons.storefront_rounded
+                            : Icons.location_on_rounded,
+                        label: (_order!['is_self_pickup'] == true)
+                            ? 'PICKUP LOCATION'
+                            : 'DELIVERY ADDRESS',
+                        value: (_order!['is_self_pickup'] == true)
+                            ? (_order!['restaurant_address']?.toString() ?? 'At Restaurant')
+                            : (_order!['delivery_address']?.toString() ?? '—'),
                       ),
                       const SizedBox(height: 16),
 
@@ -329,6 +336,37 @@ class _FoodTrackingScreenState extends State<FoodTrackingScreen> {
                           onPressed: () => _showCancelConfirmation(context),
                         ),
                         const SizedBox(height: 8),
+                      ],
+
+                      // ── Complete Self Pickup Order button ──
+                      if (status == 'ready_for_pickup' && _order!['is_self_pickup'] == true) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: PrimaryButton(
+                            text: 'I have picked up my food',
+                            onPressed: _busy ? null : () async {
+                              final food = context.read<FoodProvider>();
+                              final orderId = _order?['id'] as int?;
+                              if (orderId != null) {
+                                setState(() => _busy = true);
+                                final ok = await food.completeOrder(orderId);
+                                if (mounted) {
+                                  setState(() => _busy = false);
+                                  if (ok) {
+                                    _refresh();
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(food.error ?? 'Failed to complete order'),
+                                        backgroundColor: AppColors.error,
+                                      ),
+                                    );
+                                  }
+                                }
+                              }
+                            },
+                          ),
+                        ),
                       ],
 
                       // ── Done button (delivered) — goes to rating screen ──

@@ -113,6 +113,7 @@ class FoodOrder(Base):
     customer_id = Column(Integer, ForeignKey("customers.id", ondelete="SET NULL"), nullable=True)
     restaurant_id = Column(Integer, ForeignKey("restaurants.id", ondelete="SET NULL"), nullable=True)
     driver_id = Column(Integer, ForeignKey("drivers.id", ondelete="SET NULL"), nullable=True)
+    is_self_pickup = Column(Boolean, default=False, nullable=False)
 
     status = Column(
         SQLEnum(FoodOrderStatus, name="food_order_status"),

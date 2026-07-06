@@ -27,6 +27,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
   Map<String, dynamic>? _saved;
   bool _busy = false;
   bool _usePoints = false;
+  bool _isSelfPickup = false;
   final _instructionsCtrl = TextEditingController();
 
   @override
@@ -80,25 +81,31 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
   }
 
   Future<void> _placeOrder() async {
-    double lat, lng; String addr;
-    if (_saved != null) {
-      lat = (_saved!['lat'] as num).toDouble();
-      lng = (_saved!['lng'] as num).toDouble();
-      addr = _saved!['address'].toString();
-    } else if (_picked != null) {
-      lat = _picked!.location.latitude;
-      lng = _picked!.location.longitude;
-      addr = _picked!.fullAddress;
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Choose a delivery address'),
-          backgroundColor: AppColors.warning,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
+    double? lat;
+    double? lng;
+    String? addr;
+
+    if (!_isSelfPickup) {
+      if (_saved != null) {
+        lat = (_saved!['lat'] as num).toDouble();
+        lng = (_saved!['lng'] as num).toDouble();
+        addr = _saved!['address'].toString();
+      } else if (_picked != null) {
+        lat = _picked!.location.latitude;
+        lng = _picked!.location.longitude;
+        addr = _picked!.fullAddress;
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Choose a delivery address'),
+            backgroundColor: AppColors.warning,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
     }
+
     setState(() => _busy = true);
     final order = await context.read<MarketProvider>().placeOrder(
       deliveryAddress: addr,
@@ -108,6 +115,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
       instructions: _instructionsCtrl.text.trim(),
       redeemPoints: _usePoints ? context.read<PromosProvider>().points : 0,
       promoCode: context.read<MarketProvider>().pendingPromoCode,
+      isSelfPickup: _isSelfPickup,
     );
     if (!mounted) return;
     setState(() => _busy = false);
@@ -129,18 +137,20 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
     );
   }
 
+  @override
   Widget build(BuildContext context) {
     final p = context.watch<MarketProvider>();
     final addr = context.watch<AddressesProvider>();
     final promos = context.watch<PromosProvider>();
+    final vendor = p.activeVendor;
     final quote = p.quote;
     final hasAddress = _saved != null || _picked != null;
     final outOfRange = quote != null && quote['in_range'] == false;
     // Show the live quoted fee once an address is chosen; before then the
     // delivery line is a placeholder and isn't added to the total.
-    final deliveryFee = (quote?['delivery_fee'] as num?)?.toDouble() ?? 0.0;
+    final deliveryFee = _isSelfPickup ? 0.0 : ((quote?['delivery_fee'] as num?)?.toDouble() ?? 0.0);
 
-    double total = p.cartTotal + (hasAddress ? deliveryFee : 0.0);
+    double total = p.cartTotal + ((hasAddress && !_isSelfPickup) ? deliveryFee : 0.0);
     double discount = 0.0;
     if (_usePoints) {
       discount = promos.pointsValue;
@@ -158,6 +168,85 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
         children: staggered([
+          // Segmented pickup vs delivery toggle
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: AppStyles.shadowSm,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() {
+                      _isSelfPickup = false;
+                      _refreshQuote();
+                    }),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: !_isSelfPickup ? AppColors.primary : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.delivery_dining_rounded,
+                              color: !_isSelfPickup ? Colors.white : AppColors.textSecondary,
+                              size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Delivery',
+                            style: TextStyle(
+                              color: !_isSelfPickup ? Colors.white : AppColors.textSecondary,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() {
+                      _isSelfPickup = true;
+                    }),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _isSelfPickup ? AppColors.primary : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.shopping_bag_rounded,
+                              color: _isSelfPickup ? Colors.white : AppColors.textSecondary,
+                              size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Self Pickup',
+                            style: TextStyle(
+                              color: _isSelfPickup ? Colors.white : AppColors.textSecondary,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
           _section(
             'YOUR CART',
             Column(
@@ -196,117 +285,154 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
             ),
           ),
           _section(
-            'DELIVERY ADDRESS',
-            Column(
-              children: [
-                ...addr.items.map((a) {
-                  final selected = _saved?['id'] == a['id'];
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() { _saved = a; _picked = null; });
-                      _refreshQuote();
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? AppColors.market.withOpacity(0.08)
-                            : Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: selected ? AppColors.market : AppColors.cardBorder,
-                          width: selected ? 1.5 : 1,
+            _isSelfPickup ? 'PICKUP LOCATION' : 'DELIVERY ADDRESS',
+            _isSelfPickup
+                ? Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: AppColors.market.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.storefront_rounded,
+                            color: AppColors.market, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              vendor?['name']?.toString() ?? '',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w900, fontSize: 15),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              vendor?['address']?.toString() ?? 'At Vendor Stalls',
+                              style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          ],
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 38,
-                            height: 38,
-                            alignment: Alignment.center,
+                    ],
+                  )
+                : Column(
+                    children: [
+                      ...addr.items.map((a) {
+                        final selected = _saved?['id'] == a['id'];
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() { _saved = a; _picked = null; });
+                            _refreshQuote();
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: AppColors.surfaceMuted,
-                              borderRadius: BorderRadius.circular(11),
+                              color: selected
+                                  ? AppColors.market.withOpacity(0.08)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: selected ? AppColors.market : AppColors.cardBorder,
+                                width: selected ? 1.5 : 1,
+                              ),
                             ),
-                            child: Icon(
-                              Icons.location_on_rounded,
-                              color: selected ? AppColors.market : AppColors.textSecondary,
-                              size: 18,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            child: Row(
                               children: [
-                                Text(
-                                  a['label']?.toString() ?? '',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 14,
+                                Container(
+                                  width: 38,
+                                  height: 38,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surfaceMuted,
+                                    borderRadius: BorderRadius.circular(11),
+                                  ),
+                                  child: Icon(
+                                    Icons.location_on_rounded,
+                                    color: selected ? AppColors.market : AppColors.textSecondary,
+                                    size: 18,
                                   ),
                                 ),
-                                Text(
-                                  a['address']?.toString() ?? '',
-                                  style: const TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        a['label']?.toString() ?? '',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      Text(
+                                        a['address']?.toString() ?? '',
+                                        style: const TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                 ),
+                                if (selected)
+                                  const Icon(Icons.check_circle_rounded,
+                                      color: AppColors.market),
                               ],
                             ),
                           ),
-                          if (selected)
-                            const Icon(Icons.check_circle_rounded,
-                                color: AppColors.market),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
-                GestureDetector(
-                  onTap: _pickPlace,
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceMuted,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.cardBorder),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 38,
-                          height: 38,
-                          alignment: Alignment.center,
+                        );
+                      }),
+                      GestureDetector(
+                        onTap: _pickPlace,
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: AppColors.market.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(11),
+                            color: AppColors.surfaceMuted,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.cardBorder),
                           ),
-                          child: const Icon(Icons.add_location_alt_rounded,
-                              color: AppColors.market, size: 18),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            _picked?.fullAddress ?? 'Pick another location',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w900, fontSize: 14),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 38,
+                                height: 38,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: AppColors.market.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(11),
+                                ),
+                                child: const Icon(Icons.add_location_alt_rounded,
+                                    color: AppColors.market, size: 18),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  _picked?.fullAddress ?? 'Pick another location',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w900, fontSize: 14),
+                                ),
+                              ),
+                              const Icon(Icons.chevron_right_rounded,
+                                  color: AppColors.textTertiary),
+                            ],
                           ),
                         ),
-                        const Icon(Icons.chevron_right_rounded,
-                            color: AppColors.textTertiary),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
           ),
           _section(
             'INSTRUCTIONS',

@@ -54,15 +54,16 @@ class FoodOrderItemRequest(BaseModel):
 class FoodOrderCreate(BaseModel):
     restaurant_id: int
     items: List[FoodOrderItemRequest]
-    delivery_address: str
-    delivery_lat: float
-    delivery_lng: float
+    delivery_address: Optional[str] = None
+    delivery_lat: Optional[float] = None
+    delivery_lng: Optional[float] = None
     payment_method: str = "cash"
     instructions: Optional[str] = None
     # BRD: RW-02 — loyalty points the customer wants to redeem at checkout
     redeem_points: int = 0
     # BRD: optional promo code applied at checkout
     promo_code: Optional[str] = None
+    is_self_pickup: bool = False
 
 
 class FoodOrderItemResponse(BaseModel):
@@ -81,10 +82,13 @@ class FoodOrderResponse(BaseModel):
     total_amount: float
     delivery_fee: float
     final_amount: float
-    delivery_address: str
+    delivery_address: Optional[str] = None
     payment_method: str
     payment_status: str
     created_at: datetime
+    is_self_pickup: bool = False
+    restaurant_name: Optional[str] = None
+    restaurant_address: Optional[str] = None
     items: List[FoodOrderItemResponse] = []
 
     class Config:

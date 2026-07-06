@@ -425,6 +425,12 @@ async def admin_dashboard(
             labels.append(day_start.strftime("%a"))
         data.append(rev_by_day.get(day_start.date().isoformat(), 0.0))
 
+    from app.models import Restaurant, MarketVendor, PromoCode, Complaint
+    total_restaurants = (await db.execute(select(func.count(Restaurant.id)))).scalar() or 0
+    total_vendors = (await db.execute(select(func.count(MarketVendor.id)))).scalar() or 0
+    active_promos = (await db.execute(select(func.count(PromoCode.id)).where(PromoCode.is_active == True))).scalar() or 0
+    open_complaints = (await db.execute(select(func.count(Complaint.id)).where(Complaint.status == "open"))).scalar() or 0
+
     return templates.TemplateResponse(
         request, "dashboard.html",
         {
@@ -443,6 +449,10 @@ async def admin_dashboard(
                 "avg_surge": float(avg_surge or 1),
                 "revenue_chart_labels": labels,
                 "revenue_chart_data": data,
+                "total_restaurants": total_restaurants,
+                "total_vendors": total_vendors,
+                "active_promos": active_promos,
+                "open_complaints": open_complaints,
             },
         },
     )

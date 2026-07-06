@@ -489,27 +489,33 @@ async def create_food_order(
         total += line_total
         line_items.append((item, line.quantity, item.price, line.notes))
 
-    from ...services.fare_service import haversine_km
-    from decimal import ROUND_HALF_UP
-    if r.lat is not None and r.lng is not None and body.delivery_lat is not None and body.delivery_lng is not None:
-        dist_km = haversine_km(float(r.lat), float(r.lng), float(body.delivery_lat), float(body.delivery_lng))
-        pickup_pct = r.pickup_fee if r.pickup_fee is not None else Decimal("70.00")
-        per_km = r.per_km_rate if r.per_km_rate is not None else Decimal("40.00")
-        boost_pct = r.boost if r.boost is not None else Decimal("0.00")
-        
-        pickup = total * (pickup_pct / Decimal("100"))
-        boost_val = total * (boost_pct / Decimal("100"))
-        
-        base_delivery_fee = pickup + per_km * Decimal(str(dist_km)) + boost_val
-        base_delivery_fee = base_delivery_fee.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    from ...services.loyalty_service import gold_delivery_fee
+    if body.is_self_pickup:
+        base_delivery_fee = Decimal("0")
+        gold_discount = Decimal("0")
+        delivery_fee = Decimal("0")
     else:
-        base_delivery_fee = total * (Decimal(str(r.delivery_fee or 0)) / Decimal("100"))
+        from ...services.fare_service import haversine_km
+        from decimal import ROUND_HALF_UP
+        if r.lat is not None and r.lng is not None and body.delivery_lat is not None and body.delivery_lng is not None:
+            dist_km = haversine_km(float(r.lat), float(r.lng), float(body.delivery_lat), float(body.delivery_lng))
+            pickup_pct = r.pickup_fee if r.pickup_fee is not None else Decimal("70.00")
+            per_km = r.per_km_rate if r.per_km_rate is not None else Decimal("40.00")
+            boost_pct = r.boost if r.boost is not None else Decimal("0.00")
+            
+            pickup = total * (pickup_pct / Decimal("100"))
+            boost_val = total * (boost_pct / Decimal("100"))
+            
+            base_delivery_fee = pickup + per_km * Decimal(str(dist_km)) + boost_val
+            base_delivery_fee = base_delivery_fee.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+        else:
+            base_delivery_fee = total * (Decimal(str(r.delivery_fee or 0)) / Decimal("100"))
 
-    # BRD: RW-03 — Gold member gets the configured delivery-fee discount.
-    from ...services import loyalty_service as L
-    discounted_delivery_fee = await L.gold_delivery_fee(db, customer, base_delivery_fee)
-    gold_discount = (base_delivery_fee - discounted_delivery_fee).quantize(Decimal("0.01"))
-    delivery_fee = discounted_delivery_fee
+        # BRD: RW-03 — Gold member gets the configured delivery-fee discount.
+        from ...services import loyalty_service as L
+        discounted_delivery_fee = await L.gold_delivery_fee(db, customer, base_delivery_fee)
+        gold_discount = (base_delivery_fee - discounted_delivery_fee).quantize(Decimal("0.01"))
+        delivery_fee = discounted_delivery_fee
 
     # Optional promo discount (applied to items subtotal, not delivery)
     promo_discount = Decimal("0")
@@ -569,9 +575,10 @@ async def create_food_order(
         redeem_discount=redeem_value,
         gold_discount=gold_discount,
         final_amount=final,
-        delivery_address=body.delivery_address,
-        delivery_lat=Decimal(str(body.delivery_lat)),
-        delivery_lng=Decimal(str(body.delivery_lng)),
+        delivery_address=body.delivery_address if not body.is_self_pickup else "Self Pickup",
+        delivery_lat=Decimal(str(body.delivery_lat)) if (body.delivery_lat is not None and not body.is_self_pickup) else r.lat,
+        delivery_lng=Decimal(str(body.delivery_lng)) if (body.delivery_lng is not None and not body.is_self_pickup) else r.lng,
+        is_self_pickup=body.is_self_pickup,
         payment_method=body.payment_method,
         payment_status="pending",
         instructions=body.instructions,
@@ -700,7 +707,14 @@ async def create_food_order(
         order.confirmed_at = now
         order.ready_at = now
         await db.commit()
-        await _broadcast_to_riders(db, order, r, user, items_count, delivery_fee)
+        if not order.is_self_pickup:
+            await _broadcast_to_riders(db, order, r, user, items_count, delivery_fee)
+        else:
+            await manager.send(
+                user.id,
+                "order_update",
+                {"food_order_id": order.id, "status": order.status.value},
+            )
         await db.commit()
 
     return FoodOrderResponse(
@@ -714,6 +728,7 @@ async def create_food_order(
         payment_method=order.payment_method,
         payment_status=order.payment_status,
         created_at=order.created_at,
+        is_self_pickup=order.is_self_pickup,
         items=[],
     )
 
@@ -801,6 +816,7 @@ async def get_active_food_order(
         "instructions": o.instructions,
         "customer_rating": o.customer_rating,
         "customer_feedback": o.customer_feedback,
+        "is_self_pickup": o.is_self_pickup,
     }
 
 
@@ -848,8 +864,10 @@ async def list_my_food_orders(
     customer = cust_q.scalars().first()
     if not customer:
         return []
+    from sqlalchemy.orm import joinedload
     q = await db.execute(
         select(FoodOrder)
+        .options(joinedload(FoodOrder.restaurant))
         .where(FoodOrder.customer_id == customer.id)
         .order_by(FoodOrder.id.desc())
     )
@@ -866,6 +884,9 @@ async def list_my_food_orders(
             payment_method=o.payment_method or "",
             payment_status=o.payment_status or "",
             created_at=o.created_at,
+            is_self_pickup=o.is_self_pickup,
+            restaurant_name=o.restaurant.name if o.restaurant else None,
+            restaurant_address=o.restaurant.address if o.restaurant else None,
         )
         for o in rows
     ]
@@ -1423,3 +1444,57 @@ async def rate_food_order(
             )
 
     return {"ok": True, "customer_rating": rating}
+
+
+@router.post("/orders/{order_id}/complete")
+async def complete_self_pickup_order(
+    order_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    """Self-pickup only: Customer marks their order as DELIVERED/completed."""
+    cust_q = await db.execute(select(Customer).where(Customer.user_id == user.id))
+    customer = cust_q.scalars().first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer profile not found")
+
+    q = await db.execute(
+        select(FoodOrder)
+        .where(FoodOrder.id == order_id, FoodOrder.customer_id == customer.id)
+    )
+    order = q.scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    if not order.is_self_pickup:
+        raise HTTPException(status_code=400, detail="Only self-pickup orders can be completed by the customer")
+
+    if order.status != FoodOrderStatus.READY_FOR_PICKUP:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Order must be READY_FOR_PICKUP to complete (current: {order.status.value})",
+        )
+
+    order.status = FoodOrderStatus.DELIVERED
+    order.delivered_at = datetime.now(timezone.utc)
+    order.payment_status = "paid"
+
+    # award loyalty points
+    if order.final_amount:
+        from ...services.loyalty_service import award_points as _award
+        await _award(
+            db, customer,
+            spend_amount=order.final_amount,
+            source_kind="food_order",
+            source_id=order.id,
+            description=f"Earned on {order.order_ref}",
+        )
+
+    # notify restaurant owner / customer update
+    await manager.send(
+        customer.user_id,
+        "order_update",
+        {"food_order_id": order.id, "status": order.status.value},
+    )
+    await db.commit()
+    return {"ok": True, "status": order.status.value}

@@ -452,27 +452,40 @@ async def mark_order_ready(
             {"food_order_id": o.id, "status": o.status.value},
         )
 
-    # Broadcast to nearby riders
-    items_count_q = await db.execute(
-        select(FoodOrder).where(FoodOrder.id == o.id)
-    )
-    # Total item count: pull from food_order_items
-    from ...models import FoodOrderItem
-    items_q = await db.execute(
-        select(FoodOrderItem).where(FoodOrderItem.order_id == o.id)
-    )
-    items = items_q.scalars().all()
-    items_count = sum(i.quantity for i in items) if items else 1
-
-    if customer_user is not None:
-        await _broadcast_to_riders(
-            db,
-            o,
-            r,
-            customer_user,
-            items_count,
-            Decimal(str(o.delivery_fee or 0)),
+    if o.is_self_pickup:
+        if c:
+            db.add(
+                Notification(
+                    user_id=c.user_id,
+                    title="Order ready for pickup",
+                    body=f"Your order {o.order_ref} is ready for self pickup at {r.name}",
+                    type="order_update",
+                    data=f'{{"food_order_id":{o.id}}}',
+                )
+            )
+            await db.commit()
+    else:
+        # Broadcast to nearby riders
+        items_count_q = await db.execute(
+            select(FoodOrder).where(FoodOrder.id == o.id)
         )
+        # Total item count: pull from food_order_items
+        from ...models import FoodOrderItem
+        items_q = await db.execute(
+            select(FoodOrderItem).where(FoodOrderItem.order_id == o.id)
+        )
+        items = items_q.scalars().all()
+        items_count = sum(i.quantity for i in items) if items else 1
+
+        if customer_user is not None:
+            await _broadcast_to_riders(
+                db,
+                o,
+                r,
+                customer_user,
+                items_count,
+                Decimal(str(o.delivery_fee or 0)),
+            )
     await db.commit()
     return {"ok": True, "status": o.status.value}
 
@@ -1253,3 +1266,44 @@ async def pay_commission(
     from ...services.finance_service import check_and_deactivate_restaurant
     await check_and_deactivate_restaurant(db, r.id)
     return {"ok": True, "paid_amount": float(outstanding)}
+
+
+@router.post("/orders/{order_id}/delivered")
+async def mark_order_delivered(
+    order_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("restaurant_owner")),
+):
+    """Self-pickup only: READY_FOR_PICKUP → DELIVERED, driven by the restaurant owner."""
+    r, o = await _load_owner_scoped_order(db, user, order_id)
+    if not o.is_self_pickup:
+        raise HTTPException(status_code=400, detail="Only self-pickup orders can be marked delivered by the restaurant")
+    if o.status != FoodOrderStatus.READY_FOR_PICKUP:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Order must be READY_FOR_PICKUP (current: {o.status.value})",
+        )
+    o.status = FoodOrderStatus.DELIVERED
+    o.delivered_at = datetime.now(timezone.utc)
+    o.payment_status = "paid"
+    
+    # award loyalty points
+    cq = await db.execute(select(Customer).where(Customer.id == o.customer_id))
+    c_for_pts = cq.scalars().first()
+    if c_for_pts and o.final_amount:
+        from ...services.loyalty_service import award_points as _award
+        await _award(
+            db, c_for_pts,
+            spend_amount=o.final_amount,
+            source_kind="food_order",
+            source_id=o.id,
+            description=f"Earned on {o.order_ref}",
+        )
+    
+    await manager.send(
+        c_for_pts.user_id,
+        "order_update",
+        {"food_order_id": o.id, "status": o.status.value},
+    )
+    await db.commit()
+    return {"ok": True, "status": o.status.value}

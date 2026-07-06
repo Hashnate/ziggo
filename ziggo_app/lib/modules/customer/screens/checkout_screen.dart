@@ -29,6 +29,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _instructionsCtrl = TextEditingController();
   bool _busy = false;
   bool _usePoints = false;
+  bool _isSelfPickup = false;
 
   @override
   void initState() {
@@ -85,26 +86,29 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _placeOrder() async {
     final food = context.read<FoodProvider>();
-    double lat, lng;
-    String addr;
+    double? lat;
+    double? lng;
+    String? addr;
 
-    if (_deliveryAddress != null) {
-      lat = (_deliveryAddress!['lat'] as num).toDouble();
-      lng = (_deliveryAddress!['lng'] as num).toDouble();
-      addr = _deliveryAddress!['address'].toString();
-    } else if (_deliveryPlace != null) {
-      lat = _deliveryPlace!.location.latitude;
-      lng = _deliveryPlace!.location.longitude;
-      addr = _deliveryPlace!.fullAddress;
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Choose a delivery address'),
-          backgroundColor: AppColors.warning,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
+    if (!_isSelfPickup) {
+      if (_deliveryAddress != null) {
+        lat = (_deliveryAddress!['lat'] as num).toDouble();
+        lng = (_deliveryAddress!['lng'] as num).toDouble();
+        addr = _deliveryAddress!['address'].toString();
+      } else if (_deliveryPlace != null) {
+        lat = _deliveryPlace!.location.latitude;
+        lng = _deliveryPlace!.location.longitude;
+        addr = _deliveryPlace!.fullAddress;
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Choose a delivery address'),
+            backgroundColor: AppColors.warning,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
     }
 
     setState(() => _busy = true);
@@ -115,6 +119,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       paymentMethod: _payment,
       instructions: _instructionsCtrl.text.trim(),
       redeemPoints: _usePoints ? context.read<PromosProvider>().points : 0,
+      isSelfPickup: _isSelfPickup,
     );
     if (!mounted) return;
     setState(() => _busy = false);
@@ -134,15 +139,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  @override
   Widget build(BuildContext context) {
     final food = context.watch<FoodProvider>();
     final addr = context.watch<AddressesProvider>();
     final promos = context.watch<PromosProvider>();
     final restaurant = food.activeRestaurant;
     final quote = food.quote;
-    final deliveryFee = (quote?['delivery_fee'] as num?)?.toDouble() ??
-        (restaurant?['delivery_fee'] as num?)?.toDouble() ?? 0.0;
+    final deliveryFee = _isSelfPickup ? 0.0 : ((quote?['delivery_fee'] as num?)?.toDouble() ??
+        (restaurant?['delivery_fee'] as num?)?.toDouble() ?? 0.0);
     
     double total = food.cartTotal + deliveryFee;
     double discount = 0.0;
@@ -162,6 +166,85 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
         children: staggered([
+          // Segmented pickup vs delivery toggle
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: AppStyles.shadowSm,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() {
+                      _isSelfPickup = false;
+                      _refreshQuote();
+                    }),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: !_isSelfPickup ? AppColors.primary : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.delivery_dining_rounded,
+                              color: !_isSelfPickup ? Colors.white : AppColors.textSecondary,
+                              size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Delivery',
+                            style: TextStyle(
+                              color: !_isSelfPickup ? Colors.white : AppColors.textSecondary,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() {
+                      _isSelfPickup = true;
+                    }),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _isSelfPickup ? AppColors.primary : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.shopping_bag_rounded,
+                              color: _isSelfPickup ? Colors.white : AppColors.textSecondary,
+                              size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Self Pickup',
+                            style: TextStyle(
+                              color: _isSelfPickup ? Colors.white : AppColors.textSecondary,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
           _Section(
             title: 'YOUR ORDER',
             child: Column(
@@ -228,116 +311,153 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
           ),
           _Section(
-            title: 'DELIVERY ADDRESS',
-            child: Column(
-              children: [
-                ...addr.items.map((a) {
-                  final selected = _deliveryAddress?['id'] == a['id'];
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _deliveryAddress = a;
-                        _deliveryPlace = null;
-                      });
-                      _refreshQuote();
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: selected ? AppColors.primary.withOpacity(0.08) : Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: selected ? AppColors.primary : AppColors.cardBorder,
-                          width: selected ? 1.5 : 1,
+            title: _isSelfPickup ? 'PICKUP LOCATION' : 'DELIVERY ADDRESS',
+            child: _isSelfPickup
+                ? Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.storefront_rounded,
+                            color: AppColors.primary, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              restaurant?['name']?.toString() ?? '',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w900, fontSize: 15),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              restaurant?['address']?.toString() ?? 'At Restaurant',
+                              style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          ],
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 38,
-                            height: 38,
-                            alignment: Alignment.center,
+                    ],
+                  )
+                : Column(
+                    children: [
+                      ...addr.items.map((a) {
+                        final selected = _deliveryAddress?['id'] == a['id'];
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _deliveryAddress = a;
+                              _deliveryPlace = null;
+                            });
+                            _refreshQuote();
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: AppColors.surfaceMuted,
-                              borderRadius: BorderRadius.circular(11),
+                              color: selected ? AppColors.primary.withOpacity(0.08) : Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: selected ? AppColors.primary : AppColors.cardBorder,
+                                width: selected ? 1.5 : 1,
+                              ),
                             ),
-                            child: Icon(
-                              Icons.location_on_rounded,
-                              color: selected ? AppColors.primary : AppColors.textSecondary,
-                              size: 18,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            child: Row(
                               children: [
-                                Text(
-                                  a['label']?.toString() ?? '',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 14,
+                                Container(
+                                  width: 38,
+                                  height: 38,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surfaceMuted,
+                                    borderRadius: BorderRadius.circular(11),
+                                  ),
+                                  child: Icon(
+                                    Icons.location_on_rounded,
+                                    color: selected ? AppColors.primary : AppColors.textSecondary,
+                                    size: 18,
                                   ),
                                 ),
-                                Text(
-                                  a['address']?.toString() ?? '',
-                                  style: const TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        a['label']?.toString() ?? '',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      Text(
+                                        a['address']?.toString() ?? '',
+                                        style: const TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                 ),
+                                if (selected)
+                                  const Icon(Icons.check_circle_rounded, color: AppColors.primary),
                               ],
                             ),
                           ),
-                          if (selected)
-                            const Icon(Icons.check_circle_rounded, color: AppColors.primary),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
-                GestureDetector(
-                  onTap: _pickPlace,
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceMuted,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.cardBorder),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 38,
-                          height: 38,
-                          alignment: Alignment.center,
+                        );
+                      }),
+                      GestureDetector(
+                        onTap: _pickPlace,
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(11),
+                            color: AppColors.surfaceMuted,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.cardBorder),
                           ),
-                          child: const Icon(Icons.add_location_alt_rounded,
-                              color: AppColors.primary, size: 18),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            _deliveryPlace?.fullAddress ?? 'Pick another location',
-                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 38,
+                                height: 38,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(11),
+                                ),
+                                child: const Icon(Icons.add_location_alt_rounded,
+                                    color: AppColors.primary, size: 18),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  _deliveryPlace?.fullAddress ?? 'Pick another location',
+                                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                                ),
+                              ),
+                              const Icon(Icons.chevron_right_rounded,
+                                  color: AppColors.textTertiary),
+                            ],
                           ),
                         ),
-                        const Icon(Icons.chevron_right_rounded,
-                            color: AppColors.textTertiary),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
           ),
           _Section(
             title: 'INSTRUCTIONS',

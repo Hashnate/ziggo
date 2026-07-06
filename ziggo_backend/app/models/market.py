@@ -115,6 +115,7 @@ class MarketOrder(Base):
     customer_id = Column(Integer, ForeignKey("customers.id"))
     vendor_id = Column(Integer, ForeignKey("market_vendors.id"))
     driver_id = Column(Integer, ForeignKey("drivers.id"), nullable=True)
+    is_self_pickup = Column(Boolean, default=False, nullable=False)
 
     status = Column(
         SQLEnum(MarketOrderStatus, name="market_order_status"),

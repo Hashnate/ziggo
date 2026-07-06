@@ -177,6 +177,7 @@
         <div>
             <p class="text-xs font-black uppercase text-ziggo-faint tracking-widest">Food</p>
             <p class="text-sm font-black text-ziggo-ink mt-0.5">Manage restaurants</p>
+            <span class="text-[11px] text-ziggo-muted font-bold block mt-1">{{ stats.total_restaurants }} registered</span>
         </div>
     </a>
     <a href="/admin/market" class="zi-card zi-card-hover p-5 flex items-center gap-4">
@@ -186,6 +187,7 @@
         <div>
             <p class="text-xs font-black uppercase text-ziggo-faint tracking-widest">Mart</p>
             <p class="text-sm font-black text-ziggo-ink mt-0.5">Manage vendors</p>
+            <span class="text-[11px] text-ziggo-muted font-bold block mt-1">{{ stats.total_vendors }} registered</span>
         </div>
     </a>
     <a href="/admin/promotions" class="zi-card zi-card-hover p-5 flex items-center gap-4">
@@ -195,6 +197,7 @@
         <div>
             <p class="text-xs font-black uppercase text-ziggo-faint tracking-widest">Marketing</p>
             <p class="text-sm font-black text-ziggo-ink mt-0.5">Promo codes</p>
+            <span class="text-[11px] text-ziggo-muted font-bold block mt-1">{{ stats.active_promos }} active</span>
         </div>
     </a>
     <a href="/admin/complaints" class="zi-card zi-card-hover p-5 flex items-center gap-4">
@@ -204,6 +207,7 @@
         <div>
             <p class="text-xs font-black uppercase text-ziggo-faint tracking-widest">Support</p>
             <p class="text-sm font-black text-ziggo-ink mt-0.5">Complaints</p>
+            <span class="text-[11px] text-ziggo-muted font-bold block mt-1">{{ stats.open_complaints }} open</span>
         </div>
     </a>
 </div>

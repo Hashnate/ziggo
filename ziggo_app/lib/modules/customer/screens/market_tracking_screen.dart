@@ -33,6 +33,7 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
   Timer? _poll;
   String? _lastSeenStatus;
   StreamSubscription? _wsSub;
+  bool _busy = false;
 
   String? _storeName;
   String? _storeAddress;
@@ -611,16 +612,22 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
                           _StepCard(current: current),
                           const SizedBox(height: 16),
 
-                          // ── Delivery address card ──
+                          // ── Delivery address / Pickup location card ──
                           _InfoCard(
-                            icon: Icons.location_on_rounded,
-                            label: 'DELIVERY ADDRESS',
-                            value: _order!['delivery_address']?.toString() ?? '—',
+                            icon: (_order!['is_self_pickup'] == true)
+                                ? Icons.storefront_rounded
+                                : Icons.location_on_rounded,
+                            label: (_order!['is_self_pickup'] == true)
+                                ? 'PICKUP LOCATION'
+                                : 'DELIVERY ADDRESS',
+                            value: (_order!['is_self_pickup'] == true)
+                                ? (_storeAddress ?? 'At Store')
+                                : (_order!['delivery_address']?.toString() ?? '—'),
                           ),
                           const SizedBox(height: 16),
 
                           // ── Market vendor name if present ──
-                          if (_storeName != null) ...[
+                          if (_storeName != null && _order!['is_self_pickup'] != true) ...[
                             _InfoCard(
                               icon: Icons.storefront_rounded,
                               label: 'STORE',
@@ -635,6 +642,37 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
                               onPressed: () => _showCancelConfirmation(context),
                             ),
                             const SizedBox(height: 8),
+                          ],
+
+                          // ── Complete Self Pickup Order button ──
+                          if (status == 'ready_for_pickup' && _order!['is_self_pickup'] == true) ...[
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: PrimaryButton(
+                                text: 'I have picked up my order',
+                                onPressed: _busy ? null : () async {
+                                  final market = context.read<MarketProvider>();
+                                  final orderId = _order?['id'] as int?;
+                                  if (orderId != null) {
+                                    setState(() => _busy = true);
+                                    final ok = await market.completeOrder(orderId);
+                                    if (mounted) {
+                                      setState(() => _busy = false);
+                                      if (ok) {
+                                        _refresh();
+                                      } else {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(market.error ?? 'Failed to complete order'),
+                                            backgroundColor: AppColors.error,
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  }
+                                },
+                              ),
+                            ),
                           ],
 
                           // ── Done button (delivered) — goes to rating screen ──
