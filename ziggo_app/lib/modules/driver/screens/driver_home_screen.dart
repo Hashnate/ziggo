@@ -71,6 +71,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   List<LatLng> _driverToPickupPoints = [];
   List<LatLng> _pickupToDeliveryPoints = [];
 
+  LatLng? _pendingPickupLatLng;
+  List<LatLng> _pendingRoutePoints = [];
+  String? _pendingPickupLabel;
+
   void _foodMarketRoutePointsCleaned() {
     _lastRouteOrderId = null;
     _lastRouteOrderType = null;
@@ -697,6 +701,12 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       strokeWidth: 5,
                       color: Colors.black,
                     ),
+                  if (_pendingRoutePoints.isNotEmpty)
+                    ZiggoPolyline(
+                      points: _pendingRoutePoints,
+                      strokeWidth: 5,
+                      color: AppColors.primary,
+                    ),
                 ],
                 markers: [
                   pinMarker(
@@ -707,6 +717,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     rotation: _heading,
                     size: 32,
                   ),
+                  if (_pendingPickupLatLng != null)
+                    pinMarker(
+                      point: _pendingPickupLatLng!,
+                      icon: Icons.storefront_rounded,
+                      color: AppColors.primary,
+                      size: 30,
+                      label: 'Pickup | ${_pendingPickupLabel ?? "Shop"}',
+                    ),
                   if (ride != null) ...[
                     pinMarker(
                       point: LatLng(
@@ -2955,22 +2973,52 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     if (_isShowingRideRequest) return;
     _isShowingRideRequest = true;
 
+    final driver = context.read<DriverProvider>();
+    final loc = driver.currentLocation;
+
     showModalBottomSheet(
       context: context,
       isDismissible: false,
       enableDrag: false,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _RideRequestSheet(request: request),
+      builder: (ctx) => _RideRequestSheet(
+        request: request,
+        driverLocation: loc,
+        onShowPickupOnMap: (pickup, routePoints, label) {
+          setState(() {
+            _pendingPickupLatLng = pickup;
+            _pendingRoutePoints = routePoints;
+            _pendingPickupLabel = label;
+          });
+          if (loc != null) {
+            _mapController.fitBounds([loc, pickup]);
+          } else {
+            _mapController.moveTo(pickup);
+          }
+        },
+      ),
     ).whenComplete(() {
       _isShowingRideRequest = false;
+      setState(() {
+        _pendingPickupLatLng = null;
+        _pendingRoutePoints = [];
+        _pendingPickupLabel = null;
+      });
     });
   }
 }
 
 class _RideRequestSheet extends StatefulWidget {
   final Map<String, dynamic> request;
-  const _RideRequestSheet({required this.request});
+  final LatLng? driverLocation;
+  final Function(LatLng pickup, List<LatLng> routePoints, String label) onShowPickupOnMap;
+
+  const _RideRequestSheet({
+    required this.request,
+    required this.onShowPickupOnMap,
+    this.driverLocation,
+  });
 
   @override
   State<_RideRequestSheet> createState() => _RideRequestSheetState();
@@ -3160,6 +3208,60 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                       ],
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  if (r['pickup_lat'] != null && r['pickup_lng'] != null)
+                    GestureDetector(
+                      onTap: () async {
+                        final double? lat = (r['pickup_lat'] as num?)?.toDouble();
+                        final double? lng = (r['pickup_lng'] as num?)?.toDouble();
+                        if (lat != null && lng != null) {
+                          final pickup = LatLng(lat, lng);
+                          List<LatLng> routePoints = [];
+                          if (widget.driverLocation != null) {
+                            final dir = await MapsService.instance.directions(widget.driverLocation!, pickup);
+                            if (dir != null) {
+                              routePoints = dir.points;
+                            }
+                          }
+                          final label = (r['restaurant_name'] ?? r['vendor_name'] ?? 'Pickup').toString();
+                          widget.onShowPickupOnMap(pickup, routePoints, label);
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(100),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withOpacity(0.3),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(
+                              Icons.near_me_rounded,
+                              color: Colors.white,
+                              size: 12,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'SHOW ON MAP',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 10,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   const Spacer(),
                   Stack(
                     alignment: Alignment.center,
