@@ -93,6 +93,8 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("market_deals", "link_value", "VARCHAR(255)"),
     ("food_deals", "link_type", "VARCHAR(20) NOT NULL DEFAULT 'none'"),
     ("food_deals", "link_value", "VARCHAR(255)"),
+    ("food_orders", "is_self_pickup", "BOOLEAN NOT NULL DEFAULT FALSE"),
+    ("market_orders", "is_self_pickup", "BOOLEAN NOT NULL DEFAULT FALSE"),
 )
 
 

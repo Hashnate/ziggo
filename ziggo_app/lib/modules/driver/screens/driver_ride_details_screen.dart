@@ -23,6 +23,28 @@ class DriverRideDetailsScreen extends StatelessWidget {
     }
   }
 
+  IconData _getPaymentIcon(String method) {
+    final m = method.toLowerCase();
+    if (m.startsWith('card')) {
+      return Icons.credit_card_rounded;
+    } else if (m.startsWith('wallet')) {
+      return Icons.account_balance_wallet_rounded;
+    } else {
+      return Icons.payments_outlined;
+    }
+  }
+
+  String _getPaymentLabel(String method) {
+    final m = method.toLowerCase();
+    if (m.startsWith('card')) {
+      return 'Card';
+    } else if (m.startsWith('wallet')) {
+      return 'Wallet';
+    } else {
+      return 'Cash';
+    }
+  }
+
   String _formatDate(String? dateStr) {
     if (dateStr == null || dateStr.isEmpty) return '';
     try {
@@ -483,6 +505,26 @@ class DriverRideDetailsScreen extends StatelessWidget {
                     const Divider(height: 24),
                     _breakdownRow('Order value', fmt.format(orderValue)),
                     _breakdownRow(isFood ? 'Food' : 'Market Items', fmt.format(itemsPrice)),
+                    const Divider(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Payment method',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.black54),
+                        ),
+                        Row(
+                          children: [
+                            Icon(_getPaymentIcon(paymentMethod), size: 16, color: Colors.black54),
+                            const SizedBox(width: 6),
+                            Text(
+                              _getPaymentLabel(paymentMethod),
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ] else ...[
                     // Standard ride breakdown
                     _breakdownRow('Trip fare', fmt.format((rideData['fare_amount'] as num?) ?? 0)),
@@ -504,6 +546,26 @@ class DriverRideDetailsScreen extends StatelessWidget {
                     const SizedBox(height: 16),
 
                     _breakdownRow('Your earnings', fmt.format(driverEarnings), isBold: true),
+                    const Divider(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Payment method',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.black54),
+                        ),
+                        Row(
+                          children: [
+                            Icon(_getPaymentIcon(paymentMethod), size: 16, color: Colors.black54),
+                            const SizedBox(width: 6),
+                            Text(
+                              _getPaymentLabel(paymentMethod),
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ],
                 ],
               ),
