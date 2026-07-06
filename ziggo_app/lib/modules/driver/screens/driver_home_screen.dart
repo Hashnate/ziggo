@@ -604,6 +604,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         ),
                         icon: Icons.restaurant_rounded,
                         color: AppColors.flash,
+                        label: 'Shop | ${food['restaurant_name'] ?? 'Restaurant'}',
                       ),
                     if (food['delivery_lat'] != null &&
                         food['delivery_lng'] != null)
@@ -614,6 +615,30 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         ),
                         icon: Icons.location_on_rounded,
                         color: AppColors.error,
+                        label: 'Drop | ${food['delivery_address'] ?? ''}',
+                      ),
+                  ],
+                  if (ride == null && market != null) ...[
+                    if (market['pickup_lat'] != null && market['pickup_lng'] != null)
+                      pinMarker(
+                        point: LatLng(
+                          (market['pickup_lat'] as num).toDouble(),
+                          (market['pickup_lng'] as num).toDouble(),
+                        ),
+                        icon: Icons.storefront_rounded,
+                        color: AppColors.flash,
+                        label: 'Shop | ${market['vendor_name'] ?? 'Vendor'}',
+                      ),
+                    if (market['delivery_lat'] != null &&
+                        market['delivery_lng'] != null)
+                      pinMarker(
+                        point: LatLng(
+                          (market['delivery_lat'] as num).toDouble(),
+                          (market['delivery_lng'] as num).toDouble(),
+                        ),
+                        icon: Icons.location_on_rounded,
+                        color: AppColors.error,
+                        label: 'Drop | ${market['delivery_address'] ?? ''}',
                       ),
                   ],
                 ],
