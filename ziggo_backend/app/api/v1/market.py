@@ -400,6 +400,7 @@ async def create_market_order(
     # overrides the engine's base fare. Hard-block drops outside the radius.
     delivery_distance_km = None
     total_weight_kg = None
+    from ...services import loyalty_service as L
     if body.is_self_pickup:
         base_delivery_fee = Decimal("0")
         gold_discount = Decimal("0")
@@ -434,7 +435,6 @@ async def create_market_order(
             )
 
         # BRD: RW-03 — Gold delivery discount.
-        from ...services import loyalty_service as L
         discounted_delivery_fee = await L.gold_delivery_fee(db, customer, base_delivery_fee)
         gold_discount = (base_delivery_fee - discounted_delivery_fee).quantize(Decimal("0.01"))
         delivery_fee = discounted_delivery_fee

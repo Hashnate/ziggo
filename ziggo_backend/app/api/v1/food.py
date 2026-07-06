@@ -489,7 +489,7 @@ async def create_food_order(
         total += line_total
         line_items.append((item, line.quantity, item.price, line.notes))
 
-    from ...services.loyalty_service import gold_delivery_fee
+    from ...services import loyalty_service as L
     if body.is_self_pickup:
         base_delivery_fee = Decimal("0")
         gold_discount = Decimal("0")
@@ -512,7 +512,6 @@ async def create_food_order(
             base_delivery_fee = total * (Decimal(str(r.delivery_fee or 0)) / Decimal("100"))
 
         # BRD: RW-03 — Gold member gets the configured delivery-fee discount.
-        from ...services import loyalty_service as L
         discounted_delivery_fee = await L.gold_delivery_fee(db, customer, base_delivery_fee)
         gold_discount = (base_delivery_fee - discounted_delivery_fee).quantize(Decimal("0.01"))
         delivery_fee = discounted_delivery_fee
