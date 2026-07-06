@@ -1213,7 +1213,7 @@ class _BottomCard extends StatelessWidget {
                                                 ),
                                               ),
                                             ],
-                                          ),
+                                          ],
                                         ),
                                     ],
                                   ),
