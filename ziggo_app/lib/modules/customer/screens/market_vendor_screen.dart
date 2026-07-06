@@ -324,7 +324,7 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
     final area = widget.vendor['address']?.toString().trim() ?? '';
     final rating = (widget.vendor['rating'] as num?)?.toDouble() ?? 0;
     final eta = widget.vendor['eta_minutes'];
-    final fee = (widget.vendor['delivery_fee'] as num?)?.toDouble() ?? 0;
+    final pickupFee = (widget.vendor['pickup_fee'] as num?)?.toDouble() ?? 70.0;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 52, 20, 4),
@@ -369,7 +369,7 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
                   size: 15, color: AppColors.success),
               const SizedBox(width: 4),
               Text(
-                rating > 0 ? '${(rating * 20).toStringAsFixed(0)}% (500+)' : '96% (500+)',
+                rating > 0 ? '${(rating * 20).toStringAsFixed(0)}%' : '96%',
                 style: const TextStyle(
                   fontWeight: FontWeight.w900,
                   fontSize: 13,
@@ -393,7 +393,7 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
                   size: 15, color: AppColors.textSecondary),
               const SizedBox(width: 3),
               Text(
-                'Fee: LKR ${fee.toStringAsFixed(2)}',
+                'Fee: ${pickupFee.toStringAsFixed(0)}%',
                 style: const TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 13,
