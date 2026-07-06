@@ -623,6 +623,7 @@ class _MarketVendorOrderDetailScreenState
         deliveryMode: _order['delivery_mode']?.toString(),
         driverAssigned: _order['driver_id'] != null,
         busy: _busy,
+        isSelfPickup: _order['is_self_pickup'] == true,
         onAccept: _accept,
         onReject: _reject,
         onMarkPreparing: _markPreparing,
@@ -965,6 +966,7 @@ class _ActionBar extends StatelessWidget {
   final String? deliveryMode;
   final bool driverAssigned;
   final bool busy;
+  final bool isSelfPickup;
   final VoidCallback onAccept;
   final VoidCallback onReject;
   final VoidCallback onMarkPreparing;
@@ -978,6 +980,7 @@ class _ActionBar extends StatelessWidget {
     required this.deliveryMode,
     required this.driverAssigned,
     required this.busy,
+    required this.isSelfPickup,
     required this.onAccept,
     required this.onReject,
     required this.onMarkPreparing,
@@ -1050,15 +1053,36 @@ class _ActionBar extends StatelessWidget {
         busy: busy,
         onPressed: onMarkReady,
       );
-    } else if (status == 'ready_for_pickup' && deliveryMode == 'self') {
-      // Vendor is delivering this one — drive it forward themselves.
-      body = _BarBtn(
-        label: 'OUT FOR DELIVERY',
-        icon: Icons.directions_run_rounded,
-        color: AppColors.primary,
-        busy: busy,
-        onPressed: onOutForDelivery,
-      );
+    } else if (status == 'ready_for_pickup') {
+      if (isSelfPickup) {
+        body = _BarBtn(
+          label: 'MARK DELIVERED',
+          icon: Icons.task_alt_rounded,
+          color: AppColors.success,
+          busy: busy,
+          onPressed: onDelivered,
+        );
+      } else if (deliveryMode == 'self') {
+        // Vendor is delivering this one — drive it forward themselves.
+        body = _BarBtn(
+          label: 'OUT FOR DELIVERY',
+          icon: Icons.directions_run_rounded,
+          color: AppColors.primary,
+          busy: busy,
+          onPressed: onOutForDelivery,
+        );
+      } else if (!driverAssigned) {
+        // Marketplace order stuck waiting for a rider — let the vendor re-fire
+        // the broadcast in case the first one missed everyone (no riders online,
+        // location changed, etc.).
+        body = _BarBtn(
+          label: 'FIND A RIDER AGAIN',
+          icon: Icons.delivery_dining_rounded,
+          color: AppColors.warning,
+          busy: busy,
+          onPressed: onRebroadcast,
+        );
+      }
     } else if (status == 'out_for_delivery' && deliveryMode == 'self') {
       body = _BarBtn(
         label: 'MARK DELIVERED',
@@ -1066,17 +1090,6 @@ class _ActionBar extends StatelessWidget {
         color: AppColors.success,
         busy: busy,
         onPressed: onDelivered,
-      );
-    } else if (status == 'ready_for_pickup' && !driverAssigned) {
-      // Marketplace order stuck waiting for a rider — let the vendor re-fire
-      // the broadcast in case the first one missed everyone (no riders online,
-      // location changed, etc.).
-      body = _BarBtn(
-        label: 'FIND A RIDER AGAIN',
-        icon: Icons.delivery_dining_rounded,
-        color: AppColors.warning,
-        busy: busy,
-        onPressed: onRebroadcast,
       );
     }
     if (body == null) return const SizedBox.shrink();

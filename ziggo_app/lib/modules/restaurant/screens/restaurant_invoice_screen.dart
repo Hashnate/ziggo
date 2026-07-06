@@ -131,6 +131,21 @@ class _RestaurantOrderDetailScreenState
     _toast('Looking for a rider again…');
   }
 
+  Future<void> _delivered() async {
+    final id = _order['id'] as int?;
+    if (id == null) return;
+    setState(() => _busy = true);
+    final err = await context.read<RestaurantProvider>().markDelivered(id);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (err != null) {
+      _toast(err, error: true);
+      return;
+    }
+    _toast('Delivered — nice work!');
+    Navigator.pop(context);
+  }
+
   Future<void> _reject() async {
     final id = _order['id'] as int?;
     if (id == null) return;
@@ -523,11 +538,13 @@ class _RestaurantOrderDetailScreenState
         status: status,
         busy: _busy,
         driverAssigned: _order['driver_id'] != null,
+        isSelfPickup: _order['is_self_pickup'] == true,
         onAccept: _accept,
         onReject: _reject,
         onMarkPreparing: _markPreparing,
         onMarkReady: _markReady,
         onRebroadcast: _rebroadcast,
+        onDelivered: _delivered,
       ),
     );
   }
@@ -787,21 +804,25 @@ class _ActionBar extends StatelessWidget {
   final String status;
   final bool busy;
   final bool driverAssigned;
+  final bool isSelfPickup;
   final VoidCallback onAccept;
   final VoidCallback onReject;
   final VoidCallback onMarkPreparing;
   final VoidCallback onMarkReady;
   final VoidCallback onRebroadcast;
+  final VoidCallback onDelivered;
 
   const _ActionBar({
     required this.status,
     required this.busy,
     required this.driverAssigned,
+    required this.isSelfPickup,
     required this.onAccept,
     required this.onReject,
     required this.onMarkPreparing,
     required this.onMarkReady,
     required this.onRebroadcast,
+    required this.onDelivered,
   });
 
   @override
@@ -870,14 +891,24 @@ class _ActionBar extends StatelessWidget {
         busy: busy,
         onPressed: onMarkReady,
       );
-    } else if (status == 'ready_for_pickup' && !driverAssigned) {
-      body = _BarBtn(
-        label: 'FIND A RIDER AGAIN',
-        icon: Icons.delivery_dining_rounded,
-        color: AppColors.warning,
-        busy: busy,
-        onPressed: onRebroadcast,
-      );
+    } else if (status == 'ready_for_pickup') {
+      if (isSelfPickup) {
+        body = _BarBtn(
+          label: 'MARK DELIVERED',
+          icon: Icons.task_alt_rounded,
+          color: AppColors.success,
+          busy: busy,
+          onPressed: onDelivered,
+        );
+      } else if (!driverAssigned) {
+        body = _BarBtn(
+          label: 'FIND A RIDER AGAIN',
+          icon: Icons.delivery_dining_rounded,
+          color: AppColors.warning,
+          busy: busy,
+          onPressed: onRebroadcast,
+        );
+      }
     }
     if (body == null) return const SizedBox.shrink();
     return SafeArea(
