@@ -2916,7 +2916,8 @@ async def admin_restaurants(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from app.models import Restaurant
+    from app.models import Restaurant, FoodOrder, FoodOrderStatus
+    from decimal import Decimal
 
     limit = 50
     offset = (page - 1) * limit
@@ -2979,6 +2980,20 @@ async def admin_restaurants(
     end_idx = min(page * limit, total)
     page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
 
+    # Calculate Total Commission and Payout
+    stats_q = await db.execute(
+        select(FoodOrder.final_amount, FoodOrder.delivery_fee, Restaurant.commission_percentage)
+        .join(Restaurant, FoodOrder.restaurant_id == Restaurant.id)
+        .where(FoodOrder.status == FoodOrderStatus.DELIVERED)
+    )
+    total_commission = Decimal("0")
+    total_payout = Decimal("0")
+    for final_amt, dev_fee, comm_pct in stats_q.all():
+        base_amt = (final_amt or Decimal("0")) - (dev_fee or Decimal("0"))
+        comm = (base_amt * (comm_pct or Decimal("10.0"))) / Decimal("100")
+        total_commission += comm
+        total_payout += (base_amt - comm)
+
     return templates.TemplateResponse(
         request, "restaurants.html",
         {
@@ -2993,6 +3008,8 @@ async def admin_restaurants(
             "page_range": page_range,
             "search": search,
             "status": status,
+            "total_commission": total_commission,
+            "total_payout": total_payout,
         },
     )
 
@@ -3625,7 +3642,8 @@ async def admin_market(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from app.models import MarketVendor
+    from app.models import MarketVendor, MarketOrder, MarketOrderStatus
+    from decimal import Decimal
 
     limit = 50
     offset = (page - 1) * limit
@@ -3655,6 +3673,20 @@ async def admin_market(
     end_idx = min(page * limit, total)
     page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
 
+    # Calculate Total Commission and Payout
+    stats_q = await db.execute(
+        select(MarketOrder.final_amount, MarketOrder.delivery_fee, MarketVendor.commission_percentage)
+        .join(MarketVendor, MarketOrder.vendor_id == MarketVendor.id)
+        .where(MarketOrder.status == MarketOrderStatus.DELIVERED)
+    )
+    total_commission = Decimal("0")
+    total_payout = Decimal("0")
+    for final_amt, dev_fee, comm_pct in stats_q.all():
+        base_amt = (final_amt or Decimal("0")) - (dev_fee or Decimal("0"))
+        comm = (base_amt * (comm_pct or Decimal("10.0"))) / Decimal("100")
+        total_commission += comm
+        total_payout += (base_amt - comm)
+
     return templates.TemplateResponse(
         request, "market.html",
         {
@@ -3670,6 +3702,8 @@ async def admin_market(
             "search": search,
             "status": status,
             "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY or "",
+            "total_commission": total_commission,
+            "total_payout": total_payout,
         },
     )
 
