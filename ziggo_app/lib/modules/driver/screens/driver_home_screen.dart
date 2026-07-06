@@ -16,6 +16,7 @@ import '../../common/screens/ride_chat_screen.dart';
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/map/ziggo_map.dart';
+import '../../../core/map/maps_service.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/ws_client.dart';
 import '../../auth/auth_provider.dart';
@@ -63,6 +64,119 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   int _activeIncentiveIndex = 0;
   final PageController _incentivePageController = PageController(initialPage: 0);
 
+  String? _lastRouteOrderType; // 'food' or 'market'
+  int? _lastRouteOrderId;
+  String? _lastRouteOrderStatus;
+  LatLng? _lastDriverLatLng;
+  List<LatLng> _driverToPickupPoints = [];
+  List<LatLng> _pickupToDeliveryPoints = [];
+
+  void _foodMarketRoutePointsCleaned() {
+    _lastRouteOrderId = null;
+    _lastRouteOrderType = null;
+    _lastRouteOrderStatus = null;
+    _lastDriverLatLng = null;
+    _driverToPickupPoints = [];
+    _pickupToDeliveryPoints = [];
+  }
+
+  List<LatLng> _getRemainingRoute(List<LatLng> routePoints, LatLng? driverLoc) {
+    if (routePoints.isEmpty) return [];
+    if (driverLoc == null) return routePoints;
+    int closestIndex = 0;
+    double minSqDistance = double.infinity;
+    for (int i = 0; i < routePoints.length; i++) {
+      final p = routePoints[i];
+      final dLat = driverLoc.latitude - p.latitude;
+      final dLng = driverLoc.longitude - p.longitude;
+      final sqDist = dLat * dLat + dLng * dLng;
+      if (sqDist < minSqDistance) {
+        minSqDistance = sqDist;
+        closestIndex = i;
+      }
+    }
+    if (closestIndex >= routePoints.length - 1) {
+      return [driverLoc, routePoints.last];
+    }
+    return [driverLoc, ...routePoints.sublist(closestIndex)];
+  }
+
+  List<LatLng> get _foodMarketRoutePoints {
+    final driver = context.read<DriverProvider>();
+    final food = driver.activeFoodOrder;
+    final market = driver.activeMarketOrder;
+    final activeOrder = food ?? market;
+    if (activeOrder == null || _lastDriverLatLng == null) return [];
+
+    final status = (activeOrder['status'] ?? '').toString();
+    final headingToCustomer = status == 'out_for_delivery';
+
+    final remainingDriverToPickup = _getRemainingRoute(_driverToPickupPoints, _lastDriverLatLng);
+
+    if (headingToCustomer) {
+      return remainingDriverToPickup;
+    } else {
+      return [...remainingDriverToPickup, ..._pickupToDeliveryPoints];
+    }
+  }
+
+  Future<void> _updateFoodMarketRoute(LatLng driverLoc, Map<String, dynamic> order, bool isMarket) async {
+    final orderId = order['id'] as int?;
+    final status = (order['status'] ?? '').toString();
+    final pickupLat = (order['pickup_lat'] as num?)?.toDouble();
+    final pickupLng = (order['pickup_lng'] as num?)?.toDouble();
+    final dropLat = (order['delivery_lat'] as num?)?.toDouble();
+    final dropLng = (order['delivery_lng'] as num?)?.toDouble();
+
+    if (pickupLat == null || pickupLng == null || dropLat == null || dropLng == null || orderId == null) {
+      return;
+    }
+
+    final pickup = LatLng(pickupLat, pickupLng);
+    final drop = LatLng(dropLat, dropLng);
+
+    final isNewOrder = _lastRouteOrderId != orderId || _lastRouteOrderType != (isMarket ? 'market' : 'food');
+    if (isNewOrder) {
+      _lastRouteOrderId = orderId;
+      _lastRouteOrderType = isMarket ? 'market' : 'food';
+      _pickupToDeliveryPoints = [];
+      _driverToPickupPoints = [];
+      _lastRouteOrderStatus = null;
+      _lastDriverLatLng = null;
+
+      final dir = await MapsService.instance.directions(pickup, drop);
+      if (dir != null && dir.points.isNotEmpty) {
+        _pickupToDeliveryPoints = dir.points;
+      } else {
+        _pickupToDeliveryPoints = [pickup, drop];
+      }
+    }
+
+    final statusChanged = _lastRouteOrderStatus != status;
+    final driverMoved = _lastDriverLatLng == null ||
+        Geolocator.distanceBetween(
+          _lastDriverLatLng!.latitude, _lastDriverLatLng!.longitude,
+          driverLoc.latitude, driverLoc.longitude
+        ) > 20;
+
+    if (statusChanged || driverMoved || isNewOrder) {
+      _lastRouteOrderStatus = status;
+      _lastDriverLatLng = driverLoc;
+
+      final headingToCustomer = status == 'out_for_delivery';
+      final target = headingToCustomer ? drop : pickup;
+
+      final dir = await MapsService.instance.directions(driverLoc, target);
+      if (dir != null && dir.points.isNotEmpty) {
+        _driverToPickupPoints = dir.points;
+      } else {
+        _driverToPickupPoints = [driverLoc, target];
+      }
+      if (mounted) {
+        setState(() {});
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -152,6 +266,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           _heading = p.heading;
         }
       });
+      final driver = context.read<DriverProvider>();
+      final food = driver.activeFoodOrder;
+      final market = driver.activeMarketOrder;
+      final currentLoc = LatLng(p.latitude, p.longitude);
+      if (food != null) {
+        _updateFoodMarketRoute(currentLoc, food, false);
+      } else if (market != null) {
+        _updateFoodMarketRoute(currentLoc, market, true);
+      }
     });
   }
 
@@ -494,6 +617,21 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final pending = driver.pendingRequest;
     final loc = driver.currentLocation ?? kColomboCenter;
 
+    if (food == null && market == null) {
+      _foodMarketRoutePointsCleaned();
+    } else if (driver.currentLocation != null) {
+      _lastDriverLatLng ??= driver.currentLocation;
+      if (food != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _updateFoodMarketRoute(driver.currentLocation!, food, false);
+        });
+      } else if (market != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _updateFoodMarketRoute(driver.currentLocation!, market, true);
+        });
+      }
+    }
+
     if (pending != null && ride == null && food == null && market == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _showRideRequest(pending));
     }
@@ -552,6 +690,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 showMyLocation: true,
                 darkMode: false,
                 polygons: surgePolygons,
+                polylines: [
+                  if (_foodMarketRoutePoints.isNotEmpty)
+                    ZiggoPolyline(
+                      points: _foodMarketRoutePoints,
+                      strokeWidth: 5,
+                      color: Colors.black,
+                    ),
+                ],
                 markers: [
                   pinMarker(
                     point: loc,
