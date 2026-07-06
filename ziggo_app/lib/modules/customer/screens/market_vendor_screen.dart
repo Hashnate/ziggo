@@ -28,7 +28,9 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
   @override
   void initState() {
     super.initState();
-    _future = context.read<MarketProvider>().fetchProducts(_vendorId);
+    final mp = context.read<MarketProvider>();
+    mp.setActiveVendor(widget.vendor);
+    _future = mp.fetchProducts(_vendorId);
   }
 
   @override
