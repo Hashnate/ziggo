@@ -552,6 +552,7 @@ def _order_to_dict(o: MarketOrder, cust_user: Optional[User] = None, comm_pct: f
         "delivered_at": o.delivered_at,
         "customer_name": cust_user.full_name if cust_user else None,
         "customer_phone": cust_user.phone_number if cust_user else None,
+        "is_self_pickup": o.is_self_pickup,
     }
 
 

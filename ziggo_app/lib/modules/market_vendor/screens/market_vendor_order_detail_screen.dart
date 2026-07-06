@@ -1008,7 +1008,6 @@ class _ActionBar extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            flex: 2,
             child: _BarBtn(
               label: 'ACCEPT',
               icon: Icons.check_rounded,
@@ -1034,7 +1033,6 @@ class _ActionBar extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            flex: 2,
             child: _BarBtn(
               label: 'MARK READY',
               icon: Icons.shopping_bag_rounded,
