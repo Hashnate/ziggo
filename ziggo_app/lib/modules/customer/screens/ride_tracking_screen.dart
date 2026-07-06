@@ -1161,21 +1161,61 @@ class _BottomCard extends StatelessWidget {
                                     ),
                                   ),
                                   const SizedBox(height: 10),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.success.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      (active['payment_method'] ?? 'Cash').toString().toUpperCase(),
-                                      style: const TextStyle(
-                                        color: AppColors.success,
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 10,
-                                        letterSpacing: 0.5,
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.success.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          (active['payment_method'] ?? 'Cash').toString().toUpperCase(),
+                                          style: const TextStyle(
+                                            color: AppColors.success,
+                                            fontWeight: FontWeight.w900,
+                                            fontSize: 10,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                      if (active['distance_km'] != null || active['duration_min'] != null)
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            if (active['distance_km'] != null) ...[
+                                              const Icon(Icons.straighten_rounded, size: 14, color: AppColors.textSecondary),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                '${double.tryParse(active['distance_km'].toString())?.toStringAsFixed(1) ?? active['distance_km']} km',
+                                                style: const TextStyle(
+                                                  color: AppColors.textSecondary,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                            ],
+                                            if (active['distance_km'] != null && active['duration_min'] != null)
+                                              const Padding(
+                                                padding: EdgeInsets.symmetric(horizontal: 6),
+                                                child: Text('•', style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                                              ),
+                                            if (active['duration_min'] != null) ...[
+                                              const Icon(Icons.access_time_rounded, size: 14, color: AppColors.textSecondary),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                '${double.tryParse(active['duration_min'].toString())?.round() ?? active['duration_min']} mins',
+                                                style: const TextStyle(
+                                                  color: AppColors.textSecondary,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 ],
                               ),
