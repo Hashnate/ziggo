@@ -674,7 +674,7 @@ class _MarketVendorOrderDetailScreenState
               pw.Header(
                 level: 0,
                 child: pw.Text(
-                  'ZIGGO VENDOR INVOICE',
+                  'ZIGGO MARKET INVOICE',
                   style: pw.TextStyle(
                     fontSize: 24,
                     fontWeight: pw.FontWeight.bold,
@@ -715,14 +715,14 @@ class _MarketVendorOrderDetailScreenState
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Text('Delivery Fee'),
-                  pw.Text('-${fmt.format(deliveryFee)}'),
+                  pw.Text(fmt.format(deliveryFee)),
                 ],
               ),
               pw.SizedBox(height: 5),
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('App usage charge'),
+                  pw.Text('App usage charge (${commPct.toStringAsFixed(1)}%)'),
                   pw.Text('-${fmt.format(commission)}'),
                 ],
               ),
@@ -748,7 +748,7 @@ class _MarketVendorOrderDetailScreenState
 
     await Printing.sharePdf(
       bytes: await pdf.save(),
-      filename: 'ziggo_vendor_invoice_$orderRef.pdf',
+      filename: 'ziggo_market_invoice_$orderRef.pdf',
     );
   }
 

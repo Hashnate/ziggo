@@ -376,7 +376,7 @@ async def _market_order_to_booking_response(db: AsyncSession, order: MarketOrder
         distance_km=float(order.delivery_distance_km) if order.delivery_distance_km else 0.0,
         duration_min=duration_min,
         fare_amount=float(order.delivery_fee or 0),
-        discount_amount=float(order.discount_amount or order.redeem_discount or 0),
+        discount_amount=float((order.redeem_discount or 0) + (order.gold_discount or 0)),
         final_amount=float(order.final_amount or 0),
         payment_method=order.payment_method,
         payment_status=order.payment_status,
