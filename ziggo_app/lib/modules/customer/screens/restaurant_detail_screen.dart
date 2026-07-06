@@ -222,6 +222,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
     final cuisine = r['cuisine']?.toString();
     final eta = r['eta_minutes'];
     final isOpenNow = r['is_open_now'] == true;
+    final pickupFee = (r['pickup_fee'] as num?)?.toDouble() ?? 70.0;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 42, 16, 0),
@@ -266,7 +267,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
               const SizedBox(width: 4),
               Text('Est: $eta mins', style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
               const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('•', style: TextStyle(color: AppColors.textTertiary))),
-              Text('Fee: ${formatRs(r['delivery_fee'] as num?)}', style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
+              Text('Fee: ${pickupFee.toStringAsFixed(0)}%', style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
             ],
           ),
           const SizedBox(height: 20),
