@@ -3038,6 +3038,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       builder: (ctx) => _RideRequestSheet(
         request: request,
         driverLocation: loc,
+        isCollapsed: false,
+        onToggleCollapse: () {},
         onShowPickupOnMap: (pickup, routePoints, label) {
           setState(() {
             _pendingPickupLatLng = pickup;
