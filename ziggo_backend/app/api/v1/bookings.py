@@ -298,7 +298,7 @@ async def _market_order_to_booking_response(db: AsyncSession, order: MarketOrder
     status_map = {
         MarketOrderStatus.PENDING: BookingStatus.SEARCHING,
         MarketOrderStatus.CONFIRMED: BookingStatus.ACCEPTED,
-        MarketOrderStatus.PREPARING: BookingStatus.STARTED,
+        MarketOrderStatus.PROCESSING: BookingStatus.STARTED,
         MarketOrderStatus.READY_FOR_PICKUP: BookingStatus.STARTED,
         MarketOrderStatus.OUT_FOR_DELIVERY: BookingStatus.STARTED,
         MarketOrderStatus.DELIVERED: BookingStatus.COMPLETED,

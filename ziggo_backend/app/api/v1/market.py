@@ -672,7 +672,7 @@ async def get_active_market_order(
     """Driver's currently-in-progress market delivery, mirroring /food/orders/active."""
     driver_active = (
         MarketOrderStatus.CONFIRMED,
-        MarketOrderStatus.PREPARING,
+        MarketOrderStatus.PROCESSING,
         MarketOrderStatus.READY_FOR_PICKUP,
         MarketOrderStatus.OUT_FOR_DELIVERY,
     )

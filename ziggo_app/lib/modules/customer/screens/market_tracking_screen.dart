@@ -10,6 +10,15 @@ import '../market_provider.dart';
 import 'market_home_screen.dart';
 import 'market_rating_screen.dart';
 import '../../../core/network/ws_client.dart';
+import '../../../core/network/api_client.dart';
+
+// ─────────────────────────────────────────────
+//  Market-order green color tokens
+// ─────────────────────────────────────────────
+const _kGreen = Color(0xFF22C55E);
+const _kGreenDark = Color(0xFF16A34A);
+const _kGreenLight = Color(0xFFDCFCE7);
+const _kGreenGlow = Color(0x4422C55E);
 
 class MarketTrackingScreen extends StatefulWidget {
   final String orderRef;
@@ -23,8 +32,10 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
   Map<String, dynamic>? _order;
   Timer? _poll;
   String? _lastSeenStatus;
-
   StreamSubscription? _wsSub;
+
+  String? _storeName;
+  String? _storeAddress;
 
   @override
   void initState() {
@@ -53,17 +64,33 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
     );
     if (!mounted) return;
     final newStatus = match.isEmpty ? null : match['status']?.toString();
-    // Show a one-shot snackbar the moment a fresh status arrives, so the
-    // customer is alerted to important transitions (cancellation in
-    // particular) instead of having to notice the badge change.
     if (_lastSeenStatus != null && newStatus != null && newStatus != _lastSeenStatus) {
       _showStatusToast(newStatus, match['cancellation_reason']?.toString());
     }
     _lastSeenStatus = newStatus;
     setState(() => _order = match.isEmpty ? null : match);
-    if (_order != null && _order!['status'] == 'rejected') {
-      _showRejectedDialog();
+    
+    if (_order != null) {
+      if (_order!['status'] == 'rejected') {
+        _showRejectedDialog();
+      }
+      if (_storeName == null) {
+        _fetchStoreDetails(_order!['id'] as int);
+      }
     }
+  }
+
+  Future<void> _fetchStoreDetails(int orderId) async {
+    try {
+      final res = await ApiClient.instance.dio.get('/market/orders/$orderId/details');
+      final data = Map<String, dynamic>.from(res.data);
+      if (mounted) {
+        setState(() {
+          _storeName = data['store_name']?.toString();
+          _storeAddress = data['store_address']?.toString();
+        });
+      }
+    } catch (_) {}
   }
 
   bool _isShowingRejectedDialog = false;
@@ -143,36 +170,95 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
     final TextEditingController reasonController = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppStyles.radiusMd)),
-        title: const Text('Cancel Order', style: TextStyle(fontWeight: FontWeight.w900)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Are you sure you want to cancel this order? This action cannot be undone.'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: reasonController,
-              decoration: const InputDecoration(
-                labelText: 'Reason for cancellation',
-                hintText: 'e.g., changed my mind, wrong items',
-                border: OutlineInputBorder(),
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppStyles.radiusMd)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.cancel_rounded,
+                        color: AppColors.error, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text('Cancel Order',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w900, fontSize: 18)),
+                ],
               ),
-              maxLength: 200,
-            ),
-          ],
+              const SizedBox(height: 16),
+              const Text(
+                'Are you sure you want to cancel this order?\nThis action cannot be undone.',
+                style: TextStyle(color: AppColors.textSecondary, height: 1.5),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: reasonController,
+                decoration: InputDecoration(
+                  labelText: 'Reason (optional)',
+                  hintText: 'e.g., changed my mind',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+                    borderSide: const BorderSide(color: AppColors.cardBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+                    borderSide: const BorderSide(color: AppColors.cardBorder),
+                  ),
+                ),
+                maxLength: 200,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppStyles.radiusSm)),
+                      ),
+                      child: const Text('KEEP ORDER',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textSecondary)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.error,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppStyles.radiusSm)),
+                        elevation: 0,
+                      ),
+                      child: const Text('CANCEL',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('NO', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.textSecondary)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('YES, CANCEL', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.error)),
-          ),
-        ],
       ),
     );
     if (confirmed == true && mounted) {
@@ -195,7 +281,10 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(context.read<MarketProvider>().error ?? 'Failed to cancel order.')),
+            SnackBar(
+                content: Text(
+                    context.read<MarketProvider>().error ??
+                        'Failed to cancel order.')),
           );
         }
       }
@@ -219,9 +308,14 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
         color = AppColors.success;
         icon = Icons.check_circle_rounded;
         break;
+      case 'processing':
+        msg = 'The store is packing your order.';
+        color = _kGreen;
+        icon = Icons.inventory_2_rounded;
+        break;
       case 'ready_for_pickup':
         msg = 'Your order is ready — finding a rider.';
-        color = AppColors.market;
+        color = _kGreenDark;
         icon = Icons.shopping_bag_rounded;
         break;
       case 'out_for_delivery':
@@ -257,7 +351,7 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
     );
   }
 
-  static const _steps = [
+  static const List<_Step> _steps = [
     _Step('pending', 'Order placed', Icons.receipt_long_rounded),
     _Step('confirmed', 'Confirmed', Icons.check_circle_rounded),
     _Step('processing', 'Packing your order', Icons.inventory_2_rounded),
@@ -266,8 +360,7 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
     _Step('delivered', 'Delivered', Icons.done_all_rounded),
   ];
 
-  int _idx(String status) {
-    // Legacy `shipped` value maps to out_for_delivery for back-compat.
+  int _currentIndex(String status) {
     if (status == 'shipped') status = 'out_for_delivery';
     final i = _steps.indexWhere((s) => s.status == status);
     return i < 0 ? 0 : i;
@@ -483,270 +576,664 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
   @override
   Widget build(BuildContext context) {
     final status = _order?['status']?.toString() ?? 'pending';
-    final cur = _idx(status);
+    final current = _currentIndex(status);
     final isCancelled = status == 'cancelled';
+    final isDelivered = status == 'delivered';
+
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        title: Text(widget.orderRef,
-            style: const TextStyle(letterSpacing: 0.4, fontWeight: FontWeight.w900)),
-      ),
+      backgroundColor: const Color(0xFFF2F6F3), // Light green-tinted background
       body: _order == null
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: _kGreen))
           : isCancelled
-              ? _cancelledView()
-              : ListView(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
-              children: staggered([
-                Container(
-                  padding: const EdgeInsets.all(22),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF22C55E), Color(0xFF16A34A)],
-                    ),
-                    borderRadius: BorderRadius.circular(28),
-                    boxShadow: AppStyles.shadowLg,
+              ? Scaffold(
+                  backgroundColor: AppColors.background,
+                  appBar: AppBar(
+                    backgroundColor: AppColors.background,
+                    elevation: 0,
+                    title: Text(widget.orderRef,
+                        style: const TextStyle(letterSpacing: 0.4, fontWeight: FontWeight.w900)),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.22),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Icon(_steps[cur].icon, color: Colors.white, size: 24),
+                  body: _cancelledView(),
+                )
+              : CustomScrollView(
+                  slivers: [
+                    _HeroHeader(
+                      orderRef: widget.orderRef,
+                      current: current,
+                      steps: _steps,
+                      order: _order!,
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                      sliver: SliverList(
+                        delegate: SliverChildListDelegate([
+                          // ── Progress steps card ──
+                          _StepCard(current: current),
+                          const SizedBox(height: 16),
+
+                          // ── Delivery address card ──
+                          _InfoCard(
+                            icon: Icons.location_on_rounded,
+                            label: 'DELIVERY ADDRESS',
+                            value: _order!['delivery_address']?.toString() ?? '—',
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.22),
-                                    borderRadius: BorderRadius.circular(100),
-                                  ),
-                                  child: const Text(
-                                    'CURRENT STATUS',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 1,
+                          const SizedBox(height: 16),
+
+                          // ── Market vendor name if present ──
+                          if (_storeName != null) ...[
+                            _InfoCard(
+                              icon: Icons.storefront_rounded,
+                              label: 'STORE',
+                              value: _storeName!,
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+
+                          // ── Cancel button (only when pending) ──
+                          if (status == 'pending') ...[
+                            _CancelButton(
+                              onPressed: () => _showCancelConfirmation(context),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+
+                          // ── Done button (delivered) — goes to rating screen ──
+                          if (isDelivered) ...[
+                            _DoneButton(
+                              onPressed: () {
+                                final orderId = _order?['id'] as int?;
+                                final orderRef = _order?['order_ref']?.toString() ?? widget.orderRef;
+                                if (orderId != null) {
+                                  Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => MarketRatingScreen(
+                                        orderId: orderId,
+                                        orderRef: orderRef,
+                                      ),
                                     ),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  _steps[cur].label,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 18,
-                                    letterSpacing: -0.3,
-                                  ),
-                                ),
-                              ],
+                                  );
+                                } else {
+                                  Navigator.popUntil(context, (r) => r.isFirst);
+                                }
+                              },
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                        ]),
+                      ),
+                    ),
+                  ],
+                ),
+    );
+  }
+}
+
+// Helper formatting function
+String _formatRs(num? value) {
+  return 'Rs.${(value ?? 0).toStringAsFixed(0)}';
+}
+
+// ─────────────────────────────────────────────
+//  Sliver hero header
+// ─────────────────────────────────────────────
+class _HeroHeader extends StatelessWidget {
+  final String orderRef;
+  final int current;
+  final List<_Step> steps;
+  final Map<String, dynamic> order;
+
+  const _HeroHeader({
+    required this.orderRef,
+    required this.current,
+    required this.steps,
+    required this.order,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = (current + 1) / steps.length;
+
+    return SliverToBoxAdapter(
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF062B14), Color(0xFF0F5A2B), _kGreenDark],
+          ),
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(36),
+            bottomRight: Radius.circular(36),
+          ),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top bar
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 8, 16, 0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                          color: Colors.white, size: 20),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'ORDER TRACKING',
+                            style: TextStyle(
+                              color: Colors.white54,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.6,
+                            ),
+                          ),
+                          Text(
+                            orderRef,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                              letterSpacing: 0.4,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 18),
-                      Row(
+                    ),
+                    // Amount + payment chip
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          _formatRs(order['final_amount'] as num?),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: Text(
+                            (order['payment_method'] ?? '').toString().toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Status icon + label
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Status icon
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.15),
+                        border: Border.all(
+                            color: Colors.white.withOpacity(0.3), width: 1.5),
+                      ),
+                      child: Icon(steps[current].icon,
+                          color: Colors.white, size: 28),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
+                                horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: _kGreen.withOpacity(0.25),
                               borderRadius: BorderRadius.circular(100),
                             ),
-                            child: Text(
-                              'Rs.${(_order!['final_amount'] as num).toStringAsFixed(0)}',
-                              style: const TextStyle(
-                                color: AppColors.market,
+                            child: const Text(
+                              'CURRENT STATUS',
+                              style: TextStyle(
+                                color: _kGreen,
+                                fontSize: 9,
                                 fontWeight: FontWeight.w900,
-                                fontSize: 13,
+                                letterSpacing: 1.4,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.22),
-                              borderRadius: BorderRadius.circular(100),
+                          const SizedBox(height: 6),
+                          Text(
+                            steps[current].label,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 22,
+                              height: 1.1,
                             ),
-                            child: Text(
-                              (_order!['payment_method'] ?? '').toString().toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 11,
-                                letterSpacing: 0.6,
-                              ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            steps[current].status == 'delivered'
+                                ? '✓ Your order has been delivered!'
+                                : 'In progress · Step ${current + 1} of ${steps.length}',
+                            style: const TextStyle(
+                              color: Colors.white60,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
                       ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Progress bar
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${(progress * 100).round()}% complete',
+                          style: const TextStyle(
+                            color: Colors.white60,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          '${current + 1}/${steps.length} steps',
+                          style: const TextStyle(
+                            color: Colors.white60,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(100),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 8,
+                        backgroundColor: Colors.white.withOpacity(0.15),
+                        valueColor:
+                            const AlwaysStoppedAnimation<Color>(_kGreen),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 28),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Step timeline card
+// ─────────────────────────────────────────────
+class _StepCard extends StatelessWidget {
+  final int current;
+
+  const _StepCard({required this.current});
+
+  @override
+  Widget build(BuildContext context) {
+    final steps = _MarketTrackingScreenState._steps;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppStyles.radiusLg),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'ORDER PROGRESS',
+            style: TextStyle(
+              fontSize: 10,
+              color: AppColors.textTertiary,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.6,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...List.generate(steps.length, (i) {
+            final s = steps[i];
+            final isDone = i < current;
+            final isActive = i == current;
+            final isUpcoming = i > current;
+            final isLast = i == steps.length - 1;
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Icon + connector
+                SizedBox(
+                  width: 44,
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isDone
+                              ? _kGreen
+                              : isActive
+                                  ? _kGreen
+                                  : AppColors.surfaceMuted,
+                          boxShadow: isActive || isDone
+                              ? [
+                                  BoxShadow(
+                                    color: _kGreenGlow,
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  )
+                                ]
+                              : null,
+                        ),
+                        child: Icon(
+                          isDone ? Icons.check_rounded : s.icon,
+                          color: isUpcoming
+                              ? AppColors.textTertiary
+                              : Colors.white,
+                          size: isDone ? 18 : 17,
+                        ),
+                      ),
+                      if (!isLast)
+                        Container(
+                          width: 2.5,
+                          height: 36,
+                          margin: const EdgeInsets.symmetric(vertical: 2),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(2),
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: isDone
+                                  ? [_kGreen, _kGreen.withOpacity(0.4)]
+                                  : [
+                                      AppColors.divider,
+                                      AppColors.divider,
+                                    ],
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: AppColors.cardBorder),
-                  ),
-                  child: Column(
-                    children: List.generate(_steps.length, (i) {
-                      final s = _steps[i];
-                      final done = i <= cur;
-                      final isLast = i == _steps.length - 1;
-                      return IntrinsicHeight(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Column(
-                              children: [
-                                AnimatedContainer(
-                                  duration: const Duration(milliseconds: 250),
-                                  width: 36,
-                                  height: 36,
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: done ? AppColors.market : AppColors.surfaceMuted,
-                                    shape: BoxShape.circle,
-                                    boxShadow: done
-                                        ? [
-                                            BoxShadow(
-                                              color: AppColors.market.withOpacity(0.35),
-                                              blurRadius: 12,
-                                              offset: const Offset(0, 4),
-                                            ),
-                                          ]
-                                        : null,
-                                  ),
-                                  child: Icon(
-                                    s.icon,
-                                    color: done ? Colors.white : AppColors.textTertiary,
-                                    size: 18,
-                                  ),
-                                ),
-                                if (!isLast)
-                                  Expanded(
-                                    child: Container(
-                                      width: 3,
-                                      margin: const EdgeInsets.symmetric(vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: i < cur ? AppColors.market : AppColors.divider,
-                                        borderRadius: BorderRadius.circular(2),
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Padding(
-                                padding: EdgeInsets.only(bottom: isLast ? 0 : 18),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      s.label,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 14,
-                                        color: done
-                                            ? AppColors.textPrimary
-                                            : AppColors.textTertiary,
-                                      ),
-                                    ),
-                                    if (i == cur)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 2),
-                                        child: Text(
-                                          s.status == 'delivered' ? 'Completed' : 'In progress...',
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            color: AppColors.market,
-                                            fontWeight: FontWeight.w900,
-                                            letterSpacing: 0.3,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
+                const SizedBox(width: 12),
+                // Label + subtitle
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                        top: 8, bottom: isLast ? 8 : 26),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          s.label,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14,
+                            color: isUpcoming
+                                ? AppColors.textTertiary
+                                : AppColors.textPrimary,
+                          ),
+                        ),
+                        if (isActive) ...[
+                          const SizedBox(height: 3),
+                          if (s.status == 'delivered')
+                            const Text(
+                              'Completed',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textTertiary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            )
+                          else
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: _kGreenLight,
+                                borderRadius: BorderRadius.circular(100),
+                              ),
+                              child: const Text(
+                                '● In progress',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: _kGreenDark,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.2,
                                 ),
                               ),
                             ),
-                          ],
-                        ),
-                      );
-                    }),
-                  ),
-                ),
-                if (status == 'pending') ...[
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: () => _showCancelConfirmation(context),
-                    icon: const Icon(Icons.cancel_rounded, color: Colors.white),
-                    label: const Text(
-                      'CANCEL ORDER',
-                      style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 16),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.error,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      minimumSize: const Size(double.infinity, 56),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppStyles.radiusMd),
-                      ),
-                    ),
-                  ),
-                ],
-                if (status == 'delivered') ...[
-                  const SizedBox(height: 24),
-                  PrimaryButton(
-                    label: 'DONE',
-                    icon: Icons.check_circle_rounded,
-                    gold: true,
-                    onPressed: () {
-                      final orderId = _order?['id'] as int?;
-                      final orderRef = _order?['order_ref']?.toString() ?? widget.orderRef;
-                      if (orderId != null) {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => MarketRatingScreen(
-                              orderId: orderId,
-                              orderRef: orderRef,
+                        ] else if (isDone) ...[
+                          const SizedBox(height: 3),
+                          const Text(
+                            'Completed',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textTertiary,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                        );
-                      } else {
-                        Navigator.popUntil(context, (r) => r.isFirst);
-                      }
-                    },
+                        ],
+                      ],
+                    ),
                   ),
-                ],
-              ]),
+                ),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Info card (address / store)
+// ─────────────────────────────────────────────
+class _InfoCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _InfoCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppStyles.radiusMd),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: _kGreenLight,
+              borderRadius: BorderRadius.circular(12),
             ),
+            child: Icon(icon, color: _kGreen, size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    color: AppColors.textTertiary,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Cancel button
+// ─────────────────────────────────────────────
+class _CancelButton extends StatelessWidget {
+  final VoidCallback onPressed;
+  const _CancelButton({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        height: 56,
+        decoration: BoxDecoration(
+          color: AppColors.error.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(AppStyles.radiusMd),
+          border: Border.all(color: AppColors.error.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.cancel_rounded, color: AppColors.error, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'CANCEL ORDER',
+              style: TextStyle(
+                color: AppColors.error,
+                fontWeight: FontWeight.w900,
+                fontSize: 14,
+                letterSpacing: 0.6,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Done button
+// ─────────────────────────────────────────────
+class _DoneButton extends StatelessWidget {
+  final VoidCallback onPressed;
+  const _DoneButton({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        height: 56,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [_kGreenDark, _kGreen],
+          ),
+          borderRadius: BorderRadius.circular(AppStyles.radiusMd),
+          boxShadow: [
+            BoxShadow(
+              color: _kGreenGlow,
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.check_circle_rounded, color: Colors.white, size: 22),
+            SizedBox(width: 8),
+            Text(
+              'DONE — GO HOME',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 15,
+                letterSpacing: 0.6,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
