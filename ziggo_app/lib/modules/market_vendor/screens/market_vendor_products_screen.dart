@@ -150,153 +150,268 @@ class _MarketVendorProductsScreenState
     bool isPopular = initial?['is_popular'] == true;
     File? pickedFile;
 
-    return showDialog<Map<String, dynamic>>(
+    return showModalBottomSheet<Map<String, dynamic>>(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
         return StatefulBuilder(builder: (ctx, setLocal) {
-          return AlertDialog(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Text(initial == null ? 'New product' : 'Edit product'),
-            content: SingleChildScrollView(
+          return Container(
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(AppStyles.radiusLg)),
+            ),
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 14,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            ),
+            child: SingleChildScrollView(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    initial == null ? 'New product' : 'Edit product',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   ImagePickerTile(
                     existingUrl: initial?['image_url']?.toString(),
                     pickedFile: pickedFile,
                     emptyHint: 'Add a photo for this product',
-                    height: 130,
+                    height: 140,
                     onPicked: (f) => setLocal(() => pickedFile = f),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: name,
+                    decoration: InputDecoration(
+                      labelText: 'Product name',
+                      hintText: 'e.g. Anchor Milk Powder',
+                      filled: true,
+                      fillColor: AppColors.surfaceMuted,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
-                    controller: name,
-                    decoration: const InputDecoration(
-                      labelText: 'Product name',
-                      hintText: 'e.g. Anchor Milk Powder',
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
                     controller: category,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Category',
                       hintText: 'e.g. Fresh Produce, Skin Care',
+                      filled: true,
+                      fillColor: AppColors.surfaceMuted,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
                         child: TextField(
                           controller: price,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'Price (Rs.)',
+                            filled: true,
+                            fillColor: AppColors.surfaceMuted,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: TextField(
                           controller: originalPrice,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'Original Price (Rs.)',
                             hintText: 'For discounts',
+                            filled: true,
+                            fillColor: AppColors.surfaceMuted,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
                         child: TextField(
                           controller: stock,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'Stock on hand',
+                            filled: true,
+                            fillColor: AppColors.surfaceMuted,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: TextField(
                           controller: unit,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'Unit',
                             hintText: '400g, 1L, pack',
+                            filled: true,
+                            fillColor: AppColors.surfaceMuted,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   TextField(
                     controller: weight,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Weight (kg)',
                       hintText: 'Used to calculate delivery fee — e.g. 1.5',
+                      filled: true,
+                      fillColor: AppColors.surfaceMuted,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   TextField(
                     controller: desc,
                     maxLines: 2,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Description (optional)',
+                      filled: true,
+                      fillColor: AppColors.surfaceMuted,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 12),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     dense: true,
-                    title: const Text('Available for ordering'),
+                    title: const Text('Available for ordering', style: TextStyle(fontWeight: FontWeight.w600)),
                     value: isAvailable,
                     onChanged: (v) => setLocal(() => isAvailable = v),
                   ),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     dense: true,
-                    title: const Text('Mark as Popular Pick'),
+                    title: const Text('Mark as Popular Pick', style: TextStyle(fontWeight: FontWeight.w600)),
                     value: isPopular,
                     onChanged: (v) => setLocal(() => isPopular = v),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+                            ),
+                            side: const BorderSide(color: AppColors.cardBorder),
+                          ),
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+                            ),
+                          ),
+                          onPressed: () {
+                            if (name.text.trim().isEmpty) return;
+                            final p = double.tryParse(price.text.trim());
+                            if (p == null || p < 0) return;
+                            Navigator.pop(ctx, {
+                              'name': name.text.trim(),
+                              'price': p,
+                              'original_price': double.tryParse(originalPrice.text.trim()),
+                              'category': category.text.trim(),
+                              'stock_quantity':
+                                  int.tryParse(stock.text.trim()) ?? 0,
+                              'unit': unit.text.trim(),
+                              'weight_kg': double.tryParse(weight.text.trim()),
+                              'description': desc.text.trim(),
+                              'is_available': isAvailable,
+                              'is_popular': isPopular,
+                              'picked_file': pickedFile,
+                            });
+                          },
+                          child: const Text(
+                            'Save',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Cancel')),
-              ElevatedButton(
-                onPressed: () {
-                  if (name.text.trim().isEmpty) return;
-                  final p = double.tryParse(price.text.trim());
-                  if (p == null || p < 0) return;
-                  Navigator.pop(ctx, {
-                    'name': name.text.trim(),
-                    'price': p,
-                    'original_price': double.tryParse(originalPrice.text.trim()),
-                    'category': category.text.trim(),
-                    'stock_quantity':
-                        int.tryParse(stock.text.trim()) ?? 0,
-                    'unit': unit.text.trim(),
-                    'weight_kg': double.tryParse(weight.text.trim()),
-                    'description': desc.text.trim(),
-                    'is_available': isAvailable,
-                    'is_popular': isPopular,
-                    'picked_file': pickedFile,
-                  });
-                },
-                child: const Text('Save'),
-              ),
-            ],
           );
         });
       },
