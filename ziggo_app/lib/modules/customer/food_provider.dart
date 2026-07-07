@@ -265,12 +265,13 @@ class FoodProvider extends ChangeNotifier {
     String? deliveryAddress,
     double? lat,
     double? lng,
-    String paymentMethod = 'cash',
+    required String paymentMethod,
     String? instructions,
     // BRD: RW-02 / RW-04 — opt-in checkout discounts.
     int redeemPoints = 0,
     String? promoCode,
     bool isSelfPickup = false,
+    double appUsageCharge = 0.0,
   }) async {
     if (_activeRestaurantId == null || _cart.isEmpty) return null;
     final items = _cart.values
@@ -291,6 +292,7 @@ class FoodProvider extends ChangeNotifier {
         if (redeemPoints > 0) 'redeem_points': redeemPoints,
         if (promoCode != null && promoCode.isNotEmpty) 'promo_code': promoCode,
         'is_self_pickup': isSelfPickup,
+        'app_usage_charge': appUsageCharge,
       });
       clearCart();
       return Map<String, dynamic>.from(resp.data);

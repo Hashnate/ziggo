@@ -107,15 +107,19 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
     }
 
     setState(() => _busy = true);
+    final promos = context.read<PromosProvider>();
+    final appUsageCharge = _isSelfPickup ? ((promos.loyalty['self_pickup_app_usage_charge'] as num?)?.toDouble() ?? 15.0) : 0.0;
+
     final order = await context.read<MarketProvider>().placeOrder(
       deliveryAddress: addr,
       lat: lat,
       lng: lng,
       paymentMethod: _payment,
       instructions: _instructionsCtrl.text.trim(),
-      redeemPoints: _usePoints ? context.read<PromosProvider>().points : 0,
+      redeemPoints: _usePoints ? promos.points : 0,
       promoCode: context.read<MarketProvider>().pendingPromoCode,
       isSelfPickup: _isSelfPickup,
+      appUsageCharge: appUsageCharge,
     );
     if (!mounted) return;
     setState(() => _busy = false);
@@ -149,8 +153,9 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
     // Show the live quoted fee once an address is chosen; before then the
     // delivery line is a placeholder and isn't added to the total.
     final deliveryFee = _isSelfPickup ? 0.0 : ((quote?['delivery_fee'] as num?)?.toDouble() ?? 0.0);
+    final appUsageCharge = _isSelfPickup ? ((promos.loyalty['self_pickup_app_usage_charge'] as num?)?.toDouble() ?? 15.0) : 0.0;
 
-    double total = p.cartTotal + ((hasAddress && !_isSelfPickup) ? deliveryFee : 0.0);
+    double total = p.cartTotal + ((hasAddress && !_isSelfPickup) ? deliveryFee : 0.0) + appUsageCharge;
     double discount = 0.0;
     if (_usePoints) {
       discount = promos.pointsValue;
@@ -566,31 +571,35 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
             Column(
               children: [
                 _row('Items', 'Rs.${p.cartTotal.toStringAsFixed(0)}'),
-                _row(
-                  'Delivery',
-                  !hasAddress
-                      ? 'Pick address'
-                      : quote == null
-                          ? 'Calculating…'
-                          : 'Rs.${deliveryFee.toStringAsFixed(0)}',
-                ),
-                if (quote != null && hasAddress)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2, bottom: 2),
-                    child: Row(
-                      children: [
-                        Text(
-                          '${(quote['distance_km'] as num?)?.toStringAsFixed(1) ?? '—'} km'
-                          ' • ${(quote['weight_kg'] as num?)?.toStringAsFixed(1) ?? '—'} kg',
-                          style: const TextStyle(
-                            color: AppColors.textTertiary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 11.5,
-                          ),
-                        ),
-                      ],
-                    ),
+                if (!_isSelfPickup) ...[
+                  _row(
+                    'Delivery',
+                    !hasAddress
+                        ? 'Pick address'
+                        : quote == null
+                            ? 'Calculating…'
+                            : 'Rs.${deliveryFee.toStringAsFixed(0)}',
                   ),
+                  if (quote != null && hasAddress)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2, bottom: 2),
+                      child: Row(
+                        children: [
+                          Text(
+                            '${(quote['distance_km'] as num?)?.toStringAsFixed(1) ?? '—'} km'
+                            ' • ${(quote['weight_kg'] as num?)?.toStringAsFixed(1) ?? '—'} kg',
+                            style: const TextStyle(
+                              color: AppColors.textTertiary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+                if (_isSelfPickup && appUsageCharge > 0)
+                  _row('App usage charge', 'Rs.${appUsageCharge.toStringAsFixed(0)}'),
                 if (_usePoints && discount > 0)
                   _row('Points Discount', '-Rs.${discount.toStringAsFixed(0)}', color: AppColors.success),
                 const Divider(height: 16),

@@ -495,10 +495,12 @@ async def create_food_order(
         line_items.append((item, line.quantity, item.price, line.notes))
 
     from ...services import loyalty_service as L
+    app_usage_charge = Decimal("0.00")
     if body.is_self_pickup:
         base_delivery_fee = Decimal("0")
         gold_discount = Decimal("0")
         delivery_fee = Decimal("0")
+        app_usage_charge = Decimal(str(body.app_usage_charge or 0.0))
     else:
         from ...services.fare_service import haversine_km
         from decimal import ROUND_HALF_UP
@@ -542,7 +544,7 @@ async def create_food_order(
                 promo_discount = Decimal(str(p.discount_value))
             promo_code_applied = p.code
 
-    subtotal_before_points = total + delivery_fee - promo_discount
+    subtotal_before_points = total + delivery_fee + app_usage_charge - promo_discount
     subtotal_before_points = max(Decimal("0.00"), subtotal_before_points)
 
     # BRD: RW-02 — quote redemption (clamps to balance, min, max%).
@@ -576,6 +578,7 @@ async def create_food_order(
         status=FoodOrderStatus.PENDING,
         total_amount=total,
         delivery_fee=delivery_fee,
+        app_usage_charge=app_usage_charge,
         tax_amount=Decimal("0"),
         discount_amount=promo_discount,
         redeem_points=redeem_pts,
@@ -730,6 +733,7 @@ async def create_food_order(
         status=order.status.value,
         total_amount=float(order.total_amount),
         delivery_fee=float(order.delivery_fee),
+        app_usage_charge=float(order.app_usage_charge or 0),
         final_amount=float(order.final_amount),
         delivery_address=order.delivery_address,
         payment_method=order.payment_method,
@@ -886,6 +890,7 @@ async def list_my_food_orders(
             status=o.status.value,
             total_amount=float(o.total_amount or 0),
             delivery_fee=float(o.delivery_fee or 0),
+            app_usage_charge=float(o.app_usage_charge or 0),
             final_amount=float(o.final_amount or 0),
             delivery_address=o.delivery_address or "",
             payment_method=o.payment_method or "",

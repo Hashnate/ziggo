@@ -129,6 +129,7 @@ class FoodOrder(Base):
     redeem_discount = Column(DECIMAL(10, 2), nullable=False, default=0)
     # BRD: RW-03 — gold delivery discount applied (so admin reporting can see it)
     gold_discount = Column(DECIMAL(10, 2), nullable=False, default=0)
+    app_usage_charge = Column(DECIMAL(10, 2), nullable=False, default=0.00)
     final_amount = Column(DECIMAL(10, 2))
 
     delivery_address = Column(Text)

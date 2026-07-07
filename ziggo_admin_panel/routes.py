@@ -2144,6 +2144,7 @@ async def admin_settings_save(
     loyalty_min_redeem_points: int = Form(100),
     loyalty_max_redeem_order_pct: float = Form(20),
     gold_delivery_discount_pct: float = Form(50),
+    self_pickup_app_usage_charge: float = Form(15.0),
     # Multi-stop trips (BRD: CD-19 / BE-16 / BR-9)
     multi_stop_max_count: int = Form(2),
     multi_stop_free_minutes: int = Form(3),
@@ -2227,6 +2228,7 @@ async def admin_settings_save(
     s.loyalty_min_redeem_points = max(1, int(loyalty_min_redeem_points))
     s.loyalty_max_redeem_order_pct = Decimal(str(loyalty_max_redeem_order_pct))
     s.gold_delivery_discount_pct = Decimal(str(gold_delivery_discount_pct))
+    s.self_pickup_app_usage_charge = Decimal(str(self_pickup_app_usage_charge))
     # BRD: CD-19 — multi-stop policy
     s.multi_stop_max_count = max(0, min(5, int(multi_stop_max_count)))
     s.multi_stop_free_minutes = max(0, int(multi_stop_free_minutes))

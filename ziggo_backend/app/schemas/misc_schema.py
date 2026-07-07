@@ -28,6 +28,7 @@ class LoyaltyBalanceResponse(BaseModel):
     value_per_point: float
     min_redeem_points: int
     max_redeem_order_pct: float
+    self_pickup_app_usage_charge: float = 15.0
 
 
 class LoyaltyTransactionResponse(BaseModel):

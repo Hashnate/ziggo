@@ -128,6 +128,10 @@
                             <label class="block text-xs font-black text-ziggo-muted mb-1">Unreasonable Penalty – Rider (Rs.)</label>
                             <input type="number" step="0.01" min="0" name="rider_penalty" value="{{ s.rider_penalty if s.rider_penalty is not none else 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                         </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Self Pickup App Usage Charge (Rs.)</label>
+                            <input type="number" step="0.01" min="0" name="self_pickup_app_usage_charge" value="{{ s.self_pickup_app_usage_charge if s.self_pickup_app_usage_charge is not none else 15.00 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
                         <hr class="border-ziggo-line my-4">
                         <h4 class="text-sm font-black text-ziggo-ink mb-3">Driver Search Settings</h4>
                         <div>

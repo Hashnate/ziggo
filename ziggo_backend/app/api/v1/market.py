@@ -406,12 +406,14 @@ async def create_market_order(
     delivery_distance_km = None
     total_weight_kg = None
     from ...services import loyalty_service as L
+    app_usage_charge = Decimal("0.00")
     if body.is_self_pickup:
         base_delivery_fee = Decimal("0")
         gold_discount = Decimal("0")
         delivery_fee = Decimal("0")
         delivery_distance_km = Decimal("0")
         total_weight_kg = Decimal("0")
+        app_usage_charge = Decimal(str(body.app_usage_charge or 0.0))
     else:
         if vendor.lat is not None and vendor.lng is not None and body.delivery_lat is not None and body.delivery_lng is not None:
             q = delivery.quote(
@@ -462,7 +464,7 @@ async def create_market_order(
                 promo_discount = Decimal(str(p.discount_value))
             promo_code_applied = p.code
 
-    subtotal_before_points = max(Decimal("0.00"), total + delivery_fee - promo_discount)
+    subtotal_before_points = max(Decimal("0.00"), total + delivery_fee + app_usage_charge - promo_discount)
 
     # BRD: RW-02 — quote redemption.
     redeem_pts, redeem_value, _redeem_reason = await L.quote_redemption(
@@ -495,6 +497,7 @@ async def create_market_order(
         status=MarketOrderStatus.PENDING,
         total_amount=total,
         delivery_fee=delivery_fee,
+        app_usage_charge=app_usage_charge,
         redeem_points=redeem_pts,
         redeem_discount=redeem_value,
         gold_discount=gold_discount,
@@ -630,6 +633,7 @@ async def create_market_order(
         status=order.status.value,
         total_amount=float(order.total_amount or 0),
         delivery_fee=float(order.delivery_fee or 0),
+        app_usage_charge=float(order.app_usage_charge or 0),
         final_amount=float(order.final_amount or 0),
         delivery_address=order.delivery_address or "",
         payment_method=order.payment_method or "",
@@ -664,6 +668,7 @@ async def list_my_market_orders(
             status=o.status.value,
             total_amount=float(o.total_amount or 0),
             delivery_fee=float(o.delivery_fee or 0),
+            app_usage_charge=float(o.app_usage_charge or 0),
             final_amount=float(o.final_amount or 0),
             delivery_address=o.delivery_address or "",
             payment_method=o.payment_method or "",

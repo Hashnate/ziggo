@@ -111,6 +111,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
     }
 
+    final promos = context.read<PromosProvider>();
+    final appUsageCharge = _isSelfPickup ? ((promos.loyalty['self_pickup_app_usage_charge'] as num?)?.toDouble() ?? 15.0) : 0.0;
+
     setState(() => _busy = true);
     final order = await food.placeOrder(
       deliveryAddress: addr,
@@ -118,8 +121,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       lng: lng,
       paymentMethod: _payment,
       instructions: _instructionsCtrl.text.trim(),
-      redeemPoints: _usePoints ? context.read<PromosProvider>().points : 0,
+      redeemPoints: _usePoints ? promos.points : 0,
       isSelfPickup: _isSelfPickup,
+      appUsageCharge: appUsageCharge,
     );
     if (!mounted) return;
     setState(() => _busy = false);
@@ -147,8 +151,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final quote = food.quote;
     final deliveryFee = _isSelfPickup ? 0.0 : ((quote?['delivery_fee'] as num?)?.toDouble() ??
         (restaurant?['delivery_fee'] as num?)?.toDouble() ?? 0.0);
+    final appUsageCharge = _isSelfPickup ? ((promos.loyalty['self_pickup_app_usage_charge'] as num?)?.toDouble() ?? 15.0) : 0.0;
     
-    double total = food.cartTotal + deliveryFee;
+    double total = food.cartTotal + deliveryFee + appUsageCharge;
     double discount = 0.0;
     if (_usePoints) {
       discount = promos.pointsValue;
@@ -565,7 +570,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             child: Column(
               children: [
                 _row('Items total', formatRs(food.cartTotal)),
-                _row('Delivery fee', formatRs(deliveryFee)),
+                if (!_isSelfPickup) _row('Delivery fee', formatRs(deliveryFee)),
+                if (_isSelfPickup && appUsageCharge > 0)
+                  _row('App usage charge', formatRs(appUsageCharge)),
                 if (_usePoints && discount > 0)
                   _row('Points Discount', '-${formatRs(discount)}', color: AppColors.success),
                 const Divider(height: 16),

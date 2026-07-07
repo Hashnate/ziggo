@@ -53,6 +53,7 @@ class MarketOrderCreate(BaseModel):
     # BRD: optional promo code applied at checkout
     promo_code: Optional[str] = None
     is_self_pickup: bool = False
+    app_usage_charge: Optional[float] = 0.0
 
 
 class MarketOrderResponse(BaseModel):
@@ -61,6 +62,7 @@ class MarketOrderResponse(BaseModel):
     status: str
     total_amount: float
     delivery_fee: float
+    app_usage_charge: float = 0.0
     final_amount: float
     delivery_address: Optional[str] = None
     payment_method: str

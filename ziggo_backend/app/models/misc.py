@@ -174,6 +174,8 @@ class SystemSettings(Base):
     loyalty_max_redeem_order_pct = Column(DECIMAL(5, 2), nullable=False, default=20)
     # Gold membership (BRD: RW-03)
     gold_delivery_discount_pct = Column(DECIMAL(5, 2), nullable=False, default=50)
+    # Self-pickup app usage charge
+    self_pickup_app_usage_charge = Column(DECIMAL(10, 2), nullable=False, default=15.00)
     # Multi-stop trips (BRD: CD-19 / BE-16 / BR-9)
     multi_stop_max_count = Column(Integer, nullable=False, default=2)
     multi_stop_free_minutes = Column(Integer, nullable=False, default=3)
