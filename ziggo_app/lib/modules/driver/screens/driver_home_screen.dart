@@ -187,6 +187,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         setState(() {});
       }
     }
+  }
+
   Future<void> _updateActiveRideRoute(LatLng driverLoc, Map<String, dynamic> ride) async {
     final rideId = ride['id'] as int?;
     final status = (ride['status'] ?? '').toString();
