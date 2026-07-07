@@ -72,8 +72,9 @@ class FoodOrderDetailsScreen extends StatelessWidget {
 
     final finalAmount = (order['final_amount'] as num?)?.toDouble() ?? 0.0;
     final deliveryFee = (order['delivery_fee'] as num?)?.toDouble() ?? 0.0;
+    final appUsageCharge = (order['app_usage_charge'] as num?)?.toDouble() ?? 0.0;
     final discount = (order['discount_amount'] as num?)?.toDouble() ?? 0.0;
-    final itemTotal = finalAmount - deliveryFee + discount;
+    final itemTotal = finalAmount - deliveryFee - appUsageCharge + discount;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -322,7 +323,8 @@ class FoodOrderDetailsScreen extends StatelessWidget {
             const Divider(color: AppColors.divider),
             const SizedBox(height: 12),
             _breakdownRow('Items Total', fmt.format(itemTotal)),
-            _breakdownRow('Delivery Fee', fmt.format(deliveryFee)),
+            if (deliveryFee > 0) _breakdownRow('Delivery Fee', fmt.format(deliveryFee)),
+            if (appUsageCharge > 0) _breakdownRow('App usage charge', fmt.format(appUsageCharge)),
             if (discount > 0)
               _breakdownRow('Discount', fmt.format(discount), isNegative: true),
             const SizedBox(height: 12),
