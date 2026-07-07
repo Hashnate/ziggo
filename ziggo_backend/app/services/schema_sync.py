@@ -97,7 +97,7 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("market_orders", "is_self_pickup", "BOOLEAN NOT NULL DEFAULT FALSE"),
     ("food_orders", "app_usage_charge", "DECIMAL(10, 2) NOT NULL DEFAULT 0.00"),
     ("market_orders", "app_usage_charge", "DECIMAL(10, 2) NOT NULL DEFAULT 0.00"),
-    ("system_settings", "self_pickup_app_usage_charge", "DECIMAL(10, 2) NOT NULL DEFAULT 15.00"),
+    ("system_settings", "self_pickup_app_usage_charge", "DECIMAL(10, 2) NOT NULL DEFAULT 5.00"),
 )
 
 

@@ -108,7 +108,8 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
 
     setState(() => _busy = true);
     final promos = context.read<PromosProvider>();
-    final appUsageCharge = _isSelfPickup ? ((promos.loyalty['self_pickup_app_usage_charge'] as num?)?.toDouble() ?? 15.0) : 0.0;
+    final appUsagePct = _isSelfPickup ? ((promos.loyalty['self_pickup_app_usage_charge'] as num?)?.toDouble() ?? 5.0) : 0.0;
+    final appUsageCharge = _isSelfPickup ? (context.read<MarketProvider>().cartTotal * (appUsagePct / 100.0)) : 0.0;
 
     final order = await context.read<MarketProvider>().placeOrder(
       deliveryAddress: addr,
@@ -153,7 +154,8 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
     // Show the live quoted fee once an address is chosen; before then the
     // delivery line is a placeholder and isn't added to the total.
     final deliveryFee = _isSelfPickup ? 0.0 : ((quote?['delivery_fee'] as num?)?.toDouble() ?? 0.0);
-    final appUsageCharge = _isSelfPickup ? ((promos.loyalty['self_pickup_app_usage_charge'] as num?)?.toDouble() ?? 15.0) : 0.0;
+    final appUsagePct = _isSelfPickup ? ((promos.loyalty['self_pickup_app_usage_charge'] as num?)?.toDouble() ?? 5.0) : 0.0;
+    final appUsageCharge = _isSelfPickup ? (p.cartTotal * (appUsagePct / 100.0)) : 0.0;
 
     double total = p.cartTotal + ((hasAddress && !_isSelfPickup) ? deliveryFee : 0.0) + appUsageCharge;
     double discount = 0.0;
@@ -599,7 +601,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
                     ),
                 ],
                 if (_isSelfPickup && appUsageCharge > 0)
-                  _row('App usage charge', 'Rs.${appUsageCharge.toStringAsFixed(0)}'),
+                  _row('App usage charge (${appUsagePct.toStringAsFixed(1)}%)', 'Rs.${appUsageCharge.toStringAsFixed(0)}'),
                 if (_usePoints && discount > 0)
                   _row('Points Discount', '-Rs.${discount.toStringAsFixed(0)}', color: AppColors.success),
                 const Divider(height: 16),

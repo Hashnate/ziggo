@@ -112,7 +112,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
 
     final promos = context.read<PromosProvider>();
-    final appUsageCharge = _isSelfPickup ? ((promos.loyalty['self_pickup_app_usage_charge'] as num?)?.toDouble() ?? 15.0) : 0.0;
+    final appUsagePct = _isSelfPickup ? ((promos.loyalty['self_pickup_app_usage_charge'] as num?)?.toDouble() ?? 5.0) : 0.0;
+    final appUsageCharge = _isSelfPickup ? (food.cartTotal * (appUsagePct / 100.0)) : 0.0;
 
     setState(() => _busy = true);
     final order = await food.placeOrder(
@@ -151,7 +152,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final quote = food.quote;
     final deliveryFee = _isSelfPickup ? 0.0 : ((quote?['delivery_fee'] as num?)?.toDouble() ??
         (restaurant?['delivery_fee'] as num?)?.toDouble() ?? 0.0);
-    final appUsageCharge = _isSelfPickup ? ((promos.loyalty['self_pickup_app_usage_charge'] as num?)?.toDouble() ?? 15.0) : 0.0;
+    final appUsagePct = _isSelfPickup ? ((promos.loyalty['self_pickup_app_usage_charge'] as num?)?.toDouble() ?? 5.0) : 0.0;
+    final appUsageCharge = _isSelfPickup ? (food.cartTotal * (appUsagePct / 100.0)) : 0.0;
     
     double total = food.cartTotal + deliveryFee + appUsageCharge;
     double discount = 0.0;
@@ -572,7 +574,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 _row('Items total', formatRs(food.cartTotal)),
                 if (!_isSelfPickup) _row('Delivery fee', formatRs(deliveryFee)),
                 if (_isSelfPickup && appUsageCharge > 0)
-                  _row('App usage charge', formatRs(appUsageCharge)),
+                  _row('App usage charge (${appUsagePct.toStringAsFixed(1)}%)', formatRs(appUsageCharge)),
                 if (_usePoints && discount > 0)
                   _row('Points Discount', '-${formatRs(discount)}', color: AppColors.success),
                 const Divider(height: 16),
