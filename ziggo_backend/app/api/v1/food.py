@@ -173,7 +173,11 @@ def _restaurant_summary(
 
 
 @router.get("/home")
-async def food_home(db: AsyncSession = Depends(get_db)):
+async def food_home(
+    lat: Optional[float] = None,
+    lng: Optional[float] = None,
+    db: AsyncSession = Depends(get_db)
+):
     """Aggregated home-screen layout: carousel banners, cuisine categories,
     curated collections, and promo-linked deals — all admin-managed at
     /admin/food-home and seeded on first boot. One round-trip so the Flutter
@@ -200,17 +204,57 @@ async def food_home(db: AsyncSession = Depends(get_db)):
         .order_by(FoodDeal.display_order, FoodDeal.id)
     )
 
+    from ...models import MarketAd
+    # Get active restaurant advertisements
+    ads_q = await db.execute(
+        select(MarketAd)
+        .options(selectinload(MarketAd.restaurant))
+        .where(
+            MarketAd.is_active == True,
+            MarketAd.restaurant_id != None
+        )
+    )
+    ads = ads_q.scalars().all()
+    
+    # Filter restaurant ads by target radius if lat/lng are provided
+    active_ad_banners = []
+    for ad in ads:
+        r = ad.restaurant
+        if r is None or not r.is_active:
+            continue
+        
+        # Check coordinates and radius targeting
+        if lat is not None and lng is not None:
+            if r.lat is not None and r.lng is not None:
+                distance_km = haversine_km(lat, lng, float(r.lat), float(r.lng))
+                if distance_km > float(ad.radius_km):
+                    continue
+            else:
+                continue # if location is requested but restaurant has no lat/lng, skip
+        
+        active_ad_banners.append({
+            "id": ad.id,
+            "title": r.name,
+            "image_url": ad.image_url,
+            "link_type": "restaurant",
+            "link_value": str(ad.restaurant_id),
+        })
+
+    banners_list = [
+        {
+            "id": b.id,
+            "title": b.title,
+            "image_url": b.image_url,
+            "link_type": b.link_type,
+            "link_value": b.link_value,
+        }
+        for b in banners_q.scalars().all()
+    ]
+    # Append the location-targeted restaurant ads to the list of banners
+    banners_list.extend(active_ad_banners)
+
     return {
-        "banners": [
-            {
-                "id": b.id,
-                "title": b.title,
-                "image_url": b.image_url,
-                "link_type": b.link_type,
-                "link_value": b.link_value,
-            }
-            for b in banners_q.scalars().all()
-        ],
+        "banners": banners_list,
         "categories": [
             {"id": c.id, "name": c.name, "icon_url": c.icon_url}
             for c in cats_q.scalars().all()

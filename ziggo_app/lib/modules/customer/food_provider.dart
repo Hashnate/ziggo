@@ -67,11 +67,14 @@ class FoodProvider extends ChangeNotifier {
         (raw as List? ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
       );
 
-  /// Fetch the admin-configured home layout (banners, categories, collections,
-  /// deals) in one round-trip. Keeps the previous layout on transient failure.
   Future<void> fetchHome() async {
     try {
-      final resp = await ApiClient.instance.dio.get('/food/home');
+      final queryParams = <String, dynamic>{};
+      if (_deliveryLat != null && _deliveryLng != null) {
+        queryParams['lat'] = _deliveryLat;
+        queryParams['lng'] = _deliveryLng;
+      }
+      final resp = await ApiClient.instance.dio.get('/food/home', queryParameters: queryParams);
       final data = Map<String, dynamic>.from(resp.data as Map);
       _banners = _asList(data['banners']);
       _categories = _asList(data['categories']);
