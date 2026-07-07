@@ -8,7 +8,7 @@ import '../../auth/auth_provider.dart';
 import '../../common/screens/merchant_pending_screen.dart';
 import '../../market_vendor/market_vendor_provider.dart';
 import '../../market_vendor/screens/market_vendor_home_screen.dart';
-import '../../market_vendor/screens/market_vendor_ads_screen.dart';
+import 'restaurant_ads_screen.dart';
 import '../restaurant_provider.dart';
 import '../widgets/image_picker_tile.dart';
 import 'restaurant_commission_screen.dart';
@@ -269,7 +269,7 @@ class _RestaurantHomeScreenState extends State<RestaurantHomeScreen>
               onOpenAds: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const MarketVendorAdsScreen(),
+                  builder: (_) => const RestaurantAdsScreen(),
                 ),
               ),
               onOpenCommission: () => Navigator.push(

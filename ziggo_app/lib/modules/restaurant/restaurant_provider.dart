@@ -52,6 +52,9 @@ class RestaurantProvider extends ChangeNotifier {
   bool _loadingMenu = false;
   bool get loadingMenu => _loadingMenu;
 
+  List<Map<String, dynamic>> _ads = const [];
+  List<Map<String, dynamic>> get ads => _ads;
+
   /// Fires every time a new_food_order WS event arrives. Screens listen to it
   /// to show a banner / play a sound without rebuilding the whole tree.
   final ValueNotifier<int> newOrderPing = ValueNotifier<int>(0);
@@ -522,6 +525,40 @@ class RestaurantProvider extends ChangeNotifier {
       return e.response?.data?['detail']?.toString() ??
           e.message ??
           'Payment failed';
+    }
+  }
+
+  Future<void> fetchMyAds() async {
+    try {
+      final resp = await ApiClient.instance.dio.get('/market/vendor/ads');
+      _ads = List<Map<String, dynamic>>.from(resp.data as List);
+      notifyListeners();
+    } on DioException {
+      // ignore
+    }
+  }
+
+  Future<String?> uploadAd(File file, double radiusKm) async {
+    try {
+      final form = FormData.fromMap({
+        'photo': await MultipartFile.fromFile(file.path),
+        'radius_km': radiusKm,
+      });
+      await ApiClient.instance.dio.post('/market/vendor/ads', data: form);
+      await fetchMyAds();
+      return null;
+    } on DioException catch (e) {
+      return e.response?.data?['detail']?.toString() ?? e.message ?? 'Failed';
+    }
+  }
+
+  Future<String?> deleteAd(int adId) async {
+    try {
+      await ApiClient.instance.dio.delete('/market/vendor/ads/$adId');
+      await fetchMyAds();
+      return null;
+    } on DioException catch (e) {
+      return e.response?.data?['detail']?.toString() ?? e.message ?? 'Failed';
     }
   }
 
