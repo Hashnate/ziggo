@@ -4356,6 +4356,7 @@ async def admin_market_home(
             select(MarketAd)
             .options(selectinload(MarketAd.vendor))
             .outerjoin(MarketVendor, MarketAd.vendor_id == MarketVendor.id)
+            .where(MarketAd.restaurant_id == None)
             .order_by(MarketAd.display_order, MarketAd.id.desc())
         )
     ).scalars().all()
@@ -4528,6 +4529,7 @@ async def admin_market_ad_new(
 
 @router.post("/market-home/ads/{id}/edit")
 async def admin_market_ad_edit(
+    request: Request,
     id: int,
     vendor_id: int | None = Form(None),
     radius_km: float = Form(5.0),
@@ -4543,8 +4545,18 @@ async def admin_market_ad_edit(
 
     ad = (await db.execute(select(MarketAd).where(MarketAd.id == id))).scalars().first()
     if not ad:
-        raise HTTPException(status_code=404, detail="Ad not found")
-    ad.vendor_id = vendor_id if vendor_id and vendor_id > 0 else None
+      raise HTTPException(status_code=404, detail="Ad not found")
+    
+    # Check if a restaurant_id is posted
+    form_data = await request.form()
+    if "restaurant_id" in form_data:
+        rid = form_data.get("restaurant_id")
+        ad.restaurant_id = int(rid) if rid and int(rid) > 0 else None
+        ad.vendor_id = None
+    else:
+        ad.vendor_id = vendor_id if vendor_id and vendor_id > 0 else None
+        ad.restaurant_id = None
+
     ad.radius_km = Decimal(str(radius_km))
     ad.display_order = int(display_order or 0)
     ad.link_type = link_type
@@ -4555,7 +4567,8 @@ async def admin_market_ad_edit(
     elif image_url.strip():
         ad.image_url = image_url.strip()
     await db.commit()
-    return RedirectResponse(url="/admin/market-home", status_code=303)
+    redirect_url = "/admin/food-home" if ad.restaurant_id else "/admin/market-home"
+    return RedirectResponse(url=redirect_url, status_code=303)
 
 
 @router.post("/market-home/ads/{id}/toggle")
@@ -4567,10 +4580,13 @@ async def admin_market_ad_toggle(
     from app.models import MarketAd
 
     ad = (await db.execute(select(MarketAd).where(MarketAd.id == id))).scalars().first()
+    redirect_url = "/admin/market-home"
     if ad:
         ad.is_active = not ad.is_active
         await db.commit()
-    return RedirectResponse(url="/admin/market-home", status_code=303)
+        if ad.restaurant_id:
+            redirect_url = "/admin/food-home"
+    return RedirectResponse(url=redirect_url, status_code=303)
 
 
 @router.post("/market-home/ads/{id}/delete")
@@ -4582,10 +4598,13 @@ async def admin_market_ad_delete(
     from app.models import MarketAd
 
     ad = (await db.execute(select(MarketAd).where(MarketAd.id == id))).scalars().first()
+    redirect_url = "/admin/market-home"
     if ad:
+        if ad.restaurant_id:
+            redirect_url = "/admin/food-home"
         await db.delete(ad)
         await db.commit()
-    return RedirectResponse(url="/admin/market-home", status_code=303)
+    return RedirectResponse(url=redirect_url, status_code=303)
 
 
 # ---------- Deals ----------
@@ -7492,6 +7511,7 @@ async def admin_food_home(
         FoodDeal,
         Restaurant,
         PromoCode,
+        MarketAd,
     )
 
     banners = (
@@ -7524,6 +7544,15 @@ async def admin_food_home(
             select(PromoCode).where(PromoCode.is_active == True).order_by(PromoCode.code)  # noqa: E712
         )
     ).scalars().all()
+    
+    restaurant_ads = (
+        await db.execute(
+            select(MarketAd)
+            .options(selectinload(MarketAd.restaurant))
+            .where(MarketAd.restaurant_id != None)
+            .order_by(MarketAd.display_order, MarketAd.id.desc())
+        )
+    ).scalars().all()
 
     return templates.TemplateResponse(
         request,
@@ -7532,6 +7561,7 @@ async def admin_food_home(
             "request": request,
             "active_page": "food-home",
             "banners": banners,
+            "restaurant_ads": restaurant_ads,
             "categories": categories,
             "collections": collections,
             "deals": deals,
@@ -7539,6 +7569,39 @@ async def admin_food_home(
             "promos": promos,
         },
     )
+
+
+@router.post("/food-home/ads/new")
+async def admin_food_ad_new(
+    restaurant_id: int | None = Form(None),
+    radius_km: float = Form(5.0),
+    image_url: str = Form(""),
+    display_order: int = Form(0),
+    is_active: str = Form("off"),
+    link_type: str = Form("none"),
+    link_value: str = Form(""),
+    image: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import MarketAd
+
+    url = await _save_market_home_image(image) or (image_url.strip() or None)
+    if not url:
+        raise HTTPException(status_code=400, detail="An ad image (upload or URL) is required")
+    db.add(
+        MarketAd(
+            restaurant_id=restaurant_id if restaurant_id and restaurant_id > 0 else None,
+            image_url=url,
+            radius_km=Decimal(str(radius_km)),
+            display_order=int(display_order or 0),
+            is_active=(is_active == "on"),
+            link_type=link_type,
+            link_value=link_value.strip() or None,
+        )
+    )
+    await db.commit()
+    return RedirectResponse(url="/admin/food-home", status_code=303)
 
 
 # ---------- Banners ----------

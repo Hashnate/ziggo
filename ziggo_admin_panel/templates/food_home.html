@@ -141,6 +141,162 @@
         </div>
     </section>
 
+    <!-- ============================ RESTAURANT PARTNER ADS ============================ -->
+    <section class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div class="p-5 border-b border-ziggo-line flex items-center justify-between">
+            <div>
+                <h3 class="text-lg font-black text-ziggo">Restaurant Partner Ads &amp; Banners</h3>
+                <p class="text-xs text-ziggo-muted">{{ restaurant_ads|length }} total — geofenced carousel banners with redirect routing</p>
+            </div>
+        </div>
+
+        <div class="divide-y divide-ziggo-line">
+            {% for ad in restaurant_ads %}
+            <div class="p-4 flex flex-wrap items-center gap-3">
+                <div class="w-24 h-14 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center flex-shrink-0">
+                    {% if ad.image_url %}<img src="{{ ad.image_url }}" class="w-full h-full object-cover">{% else %}<i class="fas fa-image text-ziggo-faint"></i>{% endif %}
+                </div>
+                <form method="post" enctype="multipart/form-data" action="/admin/market-home/ads/{{ ad.id }}/edit" class="flex-1 grid grid-cols-2 md:grid-cols-7 gap-2 items-end">
+                    <div class="md:col-span-2">
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Restaurant</label>
+                        <select name="restaurant_id" class="{{ input_cls }}">
+                            <option value="" {% if not ad.restaurant_id %}selected{% endif %}>No linked restaurant (Global Banner)</option>
+                            {% for r in restaurants %}
+                            <option value="{{ r.id }}" {% if ad.restaurant_id == r.id %}selected{% endif %}>{{ r.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Radius (km)</label>
+                        <input name="radius_km" type="number" step="0.1" value="{{ ad.radius_km }}" placeholder="5.0" class="{{ input_cls }}">
+                    </div>
+                    <div>
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Order</label>
+                        <input name="display_order" type="number" value="{{ ad.display_order }}" placeholder="0" class="{{ input_cls }}">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Image URL</label>
+                        <input name="image_url" placeholder="Image URL (or upload)" class="{{ input_cls }}">
+                    </div>
+                    <div>
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Upload Image</label>
+                        <input type="file" name="image" accept="image/*" class="{{ input_cls }} text-xs">
+                    </div>
+                    <!-- Link Redirect Configuration -->
+                    <div class="md:col-span-2">
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Redirect Type</label>
+                        <select name="link_type" class="link-type-select {{ input_cls }}">
+                            <option value="none" {% if ad.link_type == 'none' %}selected{% endif %}>No Redirect</option>
+                            <option value="restaurant" {% if ad.link_type == 'restaurant' %}selected{% endif %}>Outlet (Restaurant)</option>
+                            <option value="category" {% if ad.link_type == 'category' %}selected{% endif %}>Cuisine Category</option>
+                            <option value="promo" {% if ad.link_type == 'promo' %}selected{% endif %}>Promo Code</option>
+                            <option value="url" {% if ad.link_type == 'url' %}selected{% endif %}>External Web URL</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-4 link-value-wrapper">
+                        <label class="block text-[9px] font-extrabold uppercase text-ziggo-faint tracking-wider mb-1">Redirect Value</label>
+                        
+                        <select class="redirect-val-input restaurant-select {{ input_cls }}" style="display:none;">
+                            {% for r in restaurants %}
+                            <option value="{{ r.id }}" {% if ad.link_type == 'restaurant' and ad.link_value == r.id|string %}selected{% endif %}>{{ r.name }}</option>
+                            {% endfor %}
+                        </select>
+                        
+                        <select class="redirect-val-input category-select {{ input_cls }}" style="display:none;">
+                            {% for c in categories %}
+                            <option value="{{ c.name }}" {% if ad.link_type == 'category' and ad.link_value == c.name %}selected{% endif %}>{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+
+                        <select class="redirect-val-input promo-select {{ input_cls }}" style="display:none;">
+                            {% for p in promos %}
+                            <option value="{{ p.code }}" {% if ad.link_type == 'promo' and ad.link_value == p.code %}selected{% endif %}>{{ p.code }}</option>
+                            {% endfor %}
+                        </select>
+
+                        <input type="text" class="redirect-val-input url-input {{ input_cls }}" value="{{ ad.link_value or '' }}" placeholder="e.g., https://example.com" style="display:none;">
+                    </div>
+                    <div class="flex justify-end mt-1">
+                        <button class="px-3.5 py-2.5 bg-ziggo text-white rounded-lg text-xs font-bold hover:bg-ziggo-light"><i class="fas fa-save mr-1"></i> Save</button>
+                    </div>
+                </form>
+                <div class="flex items-center gap-2">
+                    <form method="post" action="/admin/market-home/ads/{{ ad.id }}/toggle">
+                        <button class="px-3 py-1.5 rounded-full text-[11px] font-black uppercase {% if ad.is_active %}bg-emerald-50 text-emerald-600{% else %}bg-gray-100 text-gray-500{% endif %}">{{ 'Active' if ad.is_active else 'Off' }}</button>
+                    </form>
+                    <form method="post" action="/admin/market-home/ads/{{ ad.id }}/delete" onsubmit="return confirm('Delete this advertisement?')">
+                        <button class="px-2.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-xs"><i class="fas fa-trash"></i></button>
+                    </form>
+                </div>
+            </div>
+            {% else %}
+            <p class="p-6 text-sm text-ziggo-muted text-center">No active advertisements yet.</p>
+            {% endfor %}
+        </div>
+
+        <div class="p-4 bg-gray-50/60 flex flex-wrap items-center gap-3">
+            <div class="w-24 flex-shrink-0 hidden md:block"></div>
+            <form method="post" enctype="multipart/form-data" action="/admin/food-home/ads/new" class="flex-1 grid grid-cols-2 md:grid-cols-7 gap-2 items-end">
+                <div class="md:col-span-2">
+                    <select name="restaurant_id" class="{{ input_cls }}">
+                        <option value="" selected>No linked restaurant (Global Banner)</option>
+                        {% for r in restaurants %}
+                        <option value="{{ r.id }}">{{ r.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <input name="radius_km" type="number" step="0.1" value="5.0" placeholder="Radius (km)" class="{{ input_cls }}">
+                </div>
+                <div>
+                    <input name="display_order" type="number" value="0" placeholder="Order" class="{{ input_cls }}">
+                </div>
+                <div class="md:col-span-2">
+                    <input name="image_url" placeholder="Image URL" class="{{ input_cls }}">
+                </div>
+                <div>
+                    <input type="file" name="image" accept="image/*" class="{{ input_cls }} text-xs">
+                </div>
+                <div class="md:col-span-2">
+                    <select name="link_type" class="link-type-select {{ input_cls }}">
+                        <option value="none" selected>No Redirect</option>
+                        <option value="restaurant">Outlet (Restaurant)</option>
+                        <option value="category">Cuisine Category</option>
+                        <option value="promo">Promo Code</option>
+                        <option value="url">External Web URL</option>
+                    </select>
+                </div>
+                <div class="md:col-span-4 link-value-wrapper">
+                    <select class="redirect-val-input restaurant-select {{ input_cls }}" style="display:none;">
+                        {% for r in restaurants %}
+                        <option value="{{ r.id }}">{{ r.name }}</option>
+                        {% endfor %}
+                    </select>
+                    
+                    <select class="redirect-val-input category-select {{ input_cls }}" style="display:none;">
+                        {% for c in categories %}
+                        <option value="{{ c.name }}">{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+
+                    <select class="redirect-val-input promo-select {{ input_cls }}" style="display:none;">
+                        {% for p in promos %}
+                        <option value="{{ p.code }}">{{ p.code }}</option>
+                        {% endfor %}
+                    </select>
+
+                    <input type="text" class="redirect-val-input url-input {{ input_cls }}" placeholder="e.g., https://example.com" style="display:none;">
+                </div>
+                <div class="flex justify-end gap-2 items-center">
+                    <label class="flex items-center gap-1.5 text-xs font-bold mr-1 cursor-pointer select-none">
+                        <input type="checkbox" name="is_active" checked> Active
+                    </label>
+                    <button class="px-4 py-2.5 bg-ziggo text-white rounded-lg text-xs font-bold hover:bg-ziggo-light whitespace-nowrap"><i class="fas fa-plus mr-1"></i> Add</button>
+                </div>
+            </form>
+        </div>
+    </section>
+
     <!-- ============================ CATEGORIES ============================ -->
     <section class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
         <div class="p-5 border-b border-ziggo-line">
