@@ -601,7 +601,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
                     ),
                 ],
                 if (_isSelfPickup && appUsageCharge > 0)
-                  _row('App usage charge (${appUsagePct.toStringAsFixed(1)}%)', 'Rs.${appUsageCharge.toStringAsFixed(0)}'),
+                  _row('App usage charge', 'Rs.${appUsageCharge.toStringAsFixed(0)}'),
                 if (_usePoints && discount > 0)
                   _row('Points Discount', '-Rs.${discount.toStringAsFixed(0)}', color: AppColors.success),
                 const Divider(height: 16),

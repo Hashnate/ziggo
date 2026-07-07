@@ -574,7 +574,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 _row('Items total', formatRs(food.cartTotal)),
                 if (!_isSelfPickup) _row('Delivery fee', formatRs(deliveryFee)),
                 if (_isSelfPickup && appUsageCharge > 0)
-                  _row('App usage charge (${appUsagePct.toStringAsFixed(1)}%)', formatRs(appUsageCharge)),
+                  _row('App usage charge', formatRs(appUsageCharge)),
                 if (_usePoints && discount > 0)
                   _row('Points Discount', '-${formatRs(discount)}', color: AppColors.success),
                 const Divider(height: 16),
