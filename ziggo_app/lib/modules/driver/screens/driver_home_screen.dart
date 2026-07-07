@@ -77,6 +77,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   bool _requestSheetCollapsed = false;
   int? _lastPendingRequestId;
 
+  int? _lastRideId;
+  String? _lastRideStatus;
+  LatLng? _lastRideDriverLatLng;
+  List<LatLng> _rideRoutePoints = [];
+
   void _foodMarketRoutePointsCleaned() {
     _lastRouteOrderId = null;
     _lastRouteOrderType = null;
@@ -182,7 +187,45 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         setState(() {});
       }
     }
+  Future<void> _updateActiveRideRoute(LatLng driverLoc, Map<String, dynamic> ride) async {
+    final rideId = ride['id'] as int?;
+    final status = (ride['status'] ?? '').toString();
+    final pickupLat = (ride['pickup_lat'] as num?)?.toDouble();
+    final pickupLng = (ride['pickup_lng'] as num?)?.toDouble();
+    final dropLat = (ride['drop_lat'] as num?)?.toDouble();
+    final dropLng = (ride['drop_lng'] as num?)?.toDouble();
+
+    if (pickupLat == null || pickupLng == null || dropLat == null || dropLng == null || rideId == null) {
+      return;
+    }
+
+    final target = status == 'started' ? LatLng(dropLat, dropLng) : LatLng(pickupLat, pickupLng);
+
+    final isNewRide = _lastRideId != rideId;
+    final statusChanged = _lastRideStatus != status;
+    final driverMoved = _lastRideDriverLatLng == null ||
+        Geolocator.distanceBetween(
+          _lastRideDriverLatLng!.latitude, _lastRideDriverLatLng!.longitude,
+          driverLoc.latitude, driverLoc.longitude
+        ) > 20;
+
+    if (isNewRide || statusChanged || driverMoved) {
+      _lastRideId = rideId;
+      _lastRideStatus = status;
+      _lastRideDriverLatLng = driverLoc;
+
+      final dir = await MapsService.instance.directions(driverLoc, target);
+      if (dir != null && dir.points.isNotEmpty) {
+        _rideRoutePoints = dir.points;
+      } else {
+        _rideRoutePoints = [driverLoc, target];
+      }
+      if (mounted) {
+        setState(() {});
+      }
+    }
   }
+
 
   @override
   void initState() {
@@ -581,24 +624,19 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   Future<void> _openNavigation(double lat, double lng) async {
-    final candidates = <Uri>[
-      if (Platform.isAndroid) Uri.parse('geo:$lat,$lng?q=$lat,$lng'),
-      if (Platform.isAndroid) Uri.parse('google.navigation:q=$lat,$lng&mode=d'),
-      if (Platform.isIOS) Uri.parse('https://maps.apple.com/?daddr=$lat,$lng&dirflg=d'),
-      if (Platform.isIOS) Uri.parse('comgooglemaps://?daddr=$lat,$lng&directionsmode=driving'),
-      Uri.parse('https://www.openstreetmap.org/?mlat=$lat&mlon=$lng#map=17/$lat/$lng'),
-    ];
+    final driver = context.read<DriverProvider>();
+    final driverLoc = driver.currentLocation;
+    final target = LatLng(lat, lng);
 
-    for (final uri in candidates) {
-      if (await canLaunchUrl(uri)) {
-        if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
-      }
-    }
+    setState(() {
+      _activeRideExpanded = false;
+      _requestSheetCollapsed = true;
+    });
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No navigation app available')),
-      );
+    if (driverLoc != null) {
+      _mapController.fitBounds([driverLoc, target], padding: 80);
+    } else {
+      _mapController.moveTo(target, zoom: 16);
     }
   }
 
@@ -622,6 +660,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final market = driver.activeMarketOrder;
     final pending = driver.pendingRequest;
     final loc = driver.currentLocation ?? kColomboCenter;
+
+    if (ride == null) {
+      _rideRoutePoints = [];
+      _lastRideId = null;
+      _lastRideStatus = null;
+      _lastRideDriverLatLng = null;
+    } else if (driver.currentLocation != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _updateActiveRideRoute(driver.currentLocation!, ride);
+      });
+    }
 
     if (food == null && market == null) {
       _foodMarketRoutePointsCleaned();
@@ -730,6 +779,12 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       points: _pendingRoutePoints,
                       strokeWidth: 5,
                       color: AppColors.primary,
+                    ),
+                  if (_rideRoutePoints.isNotEmpty)
+                    ZiggoPolyline(
+                      points: _rideRoutePoints,
+                      strokeWidth: 5,
+                      color: Colors.blue,
                     ),
                 ],
                 markers: [
