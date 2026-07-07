@@ -582,10 +582,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   Future<void> _openNavigation(double lat, double lng) async {
     final candidates = <Uri>[
-      if (Platform.isAndroid) Uri.parse('google.navigation:q=$lat,$lng&mode=d'),
       if (Platform.isAndroid) Uri.parse('geo:$lat,$lng?q=$lat,$lng'),
-      if (Platform.isIOS) Uri.parse('comgooglemaps://?daddr=$lat,$lng&directionsmode=driving'),
+      if (Platform.isAndroid) Uri.parse('google.navigation:q=$lat,$lng&mode=d'),
       if (Platform.isIOS) Uri.parse('https://maps.apple.com/?daddr=$lat,$lng&dirflg=d'),
+      if (Platform.isIOS) Uri.parse('comgooglemaps://?daddr=$lat,$lng&directionsmode=driving'),
       Uri.parse('https://www.openstreetmap.org/?mlat=$lat&mlon=$lng#map=17/$lat/$lng'),
     ];
 
