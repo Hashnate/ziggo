@@ -30,52 +30,120 @@ class _RestaurantAdsScreenState extends State<RestaurantAdsScreen> {
     File? pickedFile;
     final radiusCtrl = TextEditingController(text: '5.0');
 
-    final result = await showDialog<Map<String, dynamic>>(
+    final result = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('New Advertisement', style: TextStyle(fontWeight: FontWeight.w900)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ImagePickerTile(
-                pickedFile: pickedFile,
-                emptyHint: 'Select ad banner image',
-                height: 140,
-                onPicked: (f) => setLocal(() => pickedFile = f),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: radiusCtrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Target Radius (km)',
-                  hintText: 'e.g. 5.0',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ],
+        builder: (ctx, setLocal) => Container(
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(AppStyles.radiusLg)),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 14,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'New Advertisement',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ImagePickerTile(
+                  pickedFile: pickedFile,
+                  emptyHint: 'Select ad banner image',
+                  height: 150,
+                  onPicked: (f) => setLocal(() => pickedFile = f),
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: radiusCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: 'Target Radius (km)',
+                    hintText: 'e.g. 5.0',
+                    filled: true,
+                    fillColor: AppColors.surfaceMuted,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+                          ),
+                          side: const BorderSide(color: AppColors.cardBorder),
+                        ),
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+                          ),
+                        ),
+                        onPressed: () {
+                          if (pickedFile == null) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              const SnackBar(content: Text('Please select an image'), backgroundColor: AppColors.error),
+                            );
+                            return;
+                          }
+                          final radius = double.tryParse(radiusCtrl.text) ?? 5.0;
+                          Navigator.pop(ctx, {'file': pickedFile, 'radius': radius});
+                        },
+                        child: const Text(
+                          'Upload',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            ElevatedButton(
-              onPressed: () {
-                if (pickedFile == null) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('Please select an image'), backgroundColor: AppColors.error),
-                  );
-                  return;
-                }
-                final radius = double.tryParse(radiusCtrl.text) ?? 5.0;
-                Navigator.pop(ctx, {'file': pickedFile, 'radius': radius});
-              },
-              child: const Text('Upload'),
-            ),
-          ],
+          ),
         ),
       ),
     );
