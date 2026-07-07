@@ -11,64 +11,33 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../market_provider.dart';
 
-/// "My Orders" with two tabs: Saved Carts (saved for later) and Ongoing
-/// (live market orders). Opened from the receipt icon in the market header.
+/// "My Orders" screen displaying live/past market orders. 
+/// Opened from the receipt icon in the market header.
 class MarketOrdersScreen extends StatelessWidget {
   const MarketOrdersScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      appBar: AppBar(
         backgroundColor: AppColors.surface,
-        appBar: AppBar(
-          backgroundColor: AppColors.surface,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.close_rounded, color: AppColors.textPrimary),
-            onPressed: () => Navigator.pop(context),
-          ),
-          title: const Text(
-            'My Orders',
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w900,
-              fontSize: 20,
-              letterSpacing: -0.3,
-            ),
-          ),
-          bottom: const TabBar(
-            indicatorColor: AppColors.primary,
-            indicatorWeight: 3,
-            labelColor: AppColors.primary,
-            unselectedLabelColor: AppColors.textTertiary,
-            labelStyle: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
-            unselectedLabelStyle: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 15,
-            ),
-            tabs: [
-              Tab(text: 'Saved Carts'),
-              Tab(text: 'Orders'),
-            ],
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close_rounded, color: AppColors.textPrimary),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'My Orders',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w900,
+            fontSize: 20,
+            letterSpacing: -0.3,
           ),
         ),
-        body: const TabBarView(children: [_SavedCartsTab(), _OngoingTab()]),
       ),
-    );
-  }
-}
-
-class _SavedCartsTab extends StatelessWidget {
-  const _SavedCartsTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return const _EmptyState(
-      icon: Icons.bookmark_added_rounded,
-      message:
-          'Save cart items here to get notified when the outlet is available',
+      body: const _OngoingTab(),
     );
   }
 }
