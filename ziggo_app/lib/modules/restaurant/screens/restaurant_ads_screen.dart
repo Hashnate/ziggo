@@ -99,16 +99,18 @@ class _RestaurantAdsScreenState extends State<RestaurantAdsScreen> {
                     Expanded(
                       child: OutlinedButton(
                         style: OutlinedButton.styleFrom(
+                          backgroundColor: Colors.grey[200],
+                          foregroundColor: Colors.grey[700],
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(AppStyles.radiusSm),
                           ),
-                          side: const BorderSide(color: AppColors.cardBorder),
+                          side: BorderSide(color: Colors.grey[300]!),
                         ),
                         onPressed: () => Navigator.pop(ctx),
                         child: const Text(
                           'Cancel',
-                          style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold),
+                          style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
