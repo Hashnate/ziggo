@@ -663,6 +663,30 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final pending = driver.pendingRequest;
     final loc = driver.currentLocation ?? kColomboCenter;
 
+    double? mapNavLat;
+    double? mapNavLng;
+    if (ride != null) {
+      final rideStatus = ride['status'] as String?;
+      final customerLat = (ride['pickup_lat'] as num).toDouble();
+      final customerLng = (ride['pickup_lng'] as num).toDouble();
+      final dropLat = (ride['drop_lat'] as num).toDouble();
+      final dropLng = (ride['drop_lng'] as num).toDouble();
+      mapNavLat = rideStatus == 'started' ? dropLat : customerLat;
+      mapNavLng = rideStatus == 'started' ? dropLng : customerLng;
+    } else if (food != null || market != null) {
+      final order = food ?? market;
+      if (order != null) {
+        final status = (order['status'] ?? '').toString();
+        final pickupLat = (order['pickup_lat'] as num?)?.toDouble();
+        final pickupLng = (order['pickup_lng'] as num?)?.toDouble();
+        final dropLat = (order['delivery_lat'] as num?)?.toDouble();
+        final dropLng = (order['delivery_lng'] as num?)?.toDouble();
+        final headingToCustomer = status == 'out_for_delivery';
+        mapNavLat = headingToCustomer ? dropLat : pickupLat;
+        mapNavLng = headingToCustomer ? dropLng : pickupLng;
+      }
+    }
+
     if (ride == null) {
       _rideRoutePoints = [];
       _lastRideId = null;
@@ -973,6 +997,34 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 muted: _muted,
                 onToggleMute: () => setState(() => _muted = !_muted),
                 onReportIncident: _reportIncident,
+              ),
+            ),
+          if (mapNavLat != null && mapNavLng != null)
+            Positioned(
+              left: 14,
+              top: MediaQuery.of(context).padding.top + 70,
+              child: GestureDetector(
+                onTap: () => _openNavigation(mapNavLat!, mapNavLng!),
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.12),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.navigation_rounded,
+                    color: Colors.black87,
+                    size: 22,
+                  ),
+                ),
               ),
             ),
         ],
@@ -2162,25 +2214,29 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           children: [
             Expanded(
               child: GestureDetector(
-                onTap: () => _openNavigation(
-                  status == 'started' ? dropLat : customerLat,
-                  status == 'started' ? dropLng : customerLng,
-                ),
+                onTap: () => _handleCancelRide(driver, ride),
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceMuted,
+                    color: AppColors.error.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.error.withOpacity(0.3)),
                   ),
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.navigation_rounded, size: 16),
+                      Icon(Icons.close_rounded, color: AppColors.error, size: 16),
                       SizedBox(width: 6),
                       Text(
-                        'NAVIGATE',
-                        style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                        'CANCEL RIDE',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.error,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
+                        ),
                       ),
                     ],
                   ),
@@ -2234,38 +2290,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             ),
           ],
         ),
-        if (expanded) ...[
-          const SizedBox(height: 12),
-          GestureDetector(
-            onTap: () => _handleCancelRide(driver, ride),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.error.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.error.withOpacity(0.3)),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.close_rounded, size: 16, color: AppColors.error),
-                  SizedBox(width: 6),
-                  Text(
-                    'CANCEL RIDE',
-                    style: TextStyle(
-                      color: AppColors.error,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 13,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
       ],
     );
   }
@@ -2969,35 +2993,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         const SizedBox(height: 14),
         Row(
           children: [
-            if (navLat != null && navLng != null)
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => _openNavigation(navLat, navLng),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceMuted,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.navigation_rounded, size: 16),
-                        SizedBox(width: 6),
-                        Text(
-                          'NAVIGATE',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            if (navLat != null && navLng != null) const SizedBox(width: 10),
             Expanded(
-              flex: 2,
               child: GestureDetector(
                 onTap: nextStatus == null
                     ? null
@@ -3007,7 +3003,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                             ? await driver.updateMarketOrderStatus(nextStatus!)
                             : await driver.updateFoodOrderStatus(nextStatus!);
                         if (ok && nextStatus == 'delivered' && mounted) {
-                          Navigator.push(
+                           Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) => isMarket
