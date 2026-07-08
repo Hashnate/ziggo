@@ -3164,6 +3164,29 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
         _decline();
       }
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showPickupOnMapAutomatically();
+    });
+  }
+
+  Future<void> _showPickupOnMapAutomatically() async {
+    final r = widget.request;
+    final double? lat = (r['pickup_lat'] as num?)?.toDouble();
+    final double? lng = (r['pickup_lng'] as num?)?.toDouble();
+    if (lat != null && lng != null) {
+      final pickup = LatLng(lat, lng);
+      List<LatLng> routePoints = [];
+      if (widget.driverLocation != null) {
+        final dir = await MapsService.instance.directions(widget.driverLocation!, pickup);
+        if (dir != null) {
+          routePoints = dir.points;
+        }
+      }
+      final label = (r['restaurant_name'] ?? r['vendor_name'] ?? 'Pickup').toString();
+      if (mounted) {
+        widget.onShowPickupOnMap(pickup, routePoints, label);
+      }
+    }
   }
 
   // Loop the ride-alert sound IN-APP for as long as the request sheet is open.
@@ -3412,60 +3435,6 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  if (r['pickup_lat'] != null && r['pickup_lng'] != null)
-                    GestureDetector(
-                      onTap: () async {
-                        final double? lat = (r['pickup_lat'] as num?)?.toDouble();
-                        final double? lng = (r['pickup_lng'] as num?)?.toDouble();
-                        if (lat != null && lng != null) {
-                          final pickup = LatLng(lat, lng);
-                          List<LatLng> routePoints = [];
-                          if (widget.driverLocation != null) {
-                            final dir = await MapsService.instance.directions(widget.driverLocation!, pickup);
-                            if (dir != null) {
-                              routePoints = dir.points;
-                            }
-                          }
-                          final label = (r['restaurant_name'] ?? r['vendor_name'] ?? 'Pickup').toString();
-                          widget.onShowPickupOnMap(pickup, routePoints, label);
-                        }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(100),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withOpacity(0.3),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(
-                              Icons.near_me_rounded,
-                              color: Colors.white,
-                              size: 12,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              'SHOW ON MAP',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 10,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
                   const Spacer(),
                   Stack(
                     alignment: Alignment.center,
