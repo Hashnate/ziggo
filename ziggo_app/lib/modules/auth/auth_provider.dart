@@ -15,11 +15,15 @@ enum AuthStatus { unauthenticated, authenticating, authenticated, error }
 /// that with `['detail']` used to crash the whole app.
 String? _dioMessage(DioException e) {
   final data = e.response?.data;
-  if (data is Map) return data['detail']?.toString();
-  if (data is String && data.trim().isNotEmpty && !data.contains('<')) {
-    return data;
+  String? msg;
+  if (data is Map) {
+    msg = data['detail']?.toString();
+  } else if (data is String && data.trim().isNotEmpty && !data.contains('<')) {
+    msg = data;
+  } else {
+    msg = e.message;
   }
-  return e.message;
+  return msg != null ? ApiClient.sanitizeString(msg) : null;
 }
 
 class AuthProvider extends ChangeNotifier {
