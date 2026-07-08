@@ -2228,14 +2228,16 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     children: [
                       Icon(Icons.close_rounded, color: AppColors.error, size: 16),
                       SizedBox(width: 6),
-                      Text(
-                        'CANCEL RIDE',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: AppColors.error,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.5,
+                      Flexible(
+                        child: Text(
+                          'CANCEL RIDE',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.error,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
                     ],
@@ -2245,7 +2247,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             ),
             const SizedBox(width: 10),
             Expanded(
-              flex: 2,
               child: GestureDetector(
                 onTap: () {
                   if (nextStatus == 'completed') {
@@ -2275,12 +2276,16 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     children: [
                       Icon(actionIcon, color: Colors.white, size: 16),
                       const SizedBox(width: 6),
-                      Text(
-                        nextAction,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.5,
+                      Flexible(
+                        child: Text(
+                          nextAction,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
                     ],
