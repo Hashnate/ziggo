@@ -6,6 +6,8 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/widgets/motion.dart';
 import '../restaurant_provider.dart';
+import 'restaurant_daily_report_screen.dart';
+
 
 class RestaurantEarningsScreen extends StatefulWidget {
   const RestaurantEarningsScreen({super.key});
@@ -474,42 +476,61 @@ class _DailyRow extends StatelessWidget {
     final orders = (day['orders'] as num? ?? 0).toInt();
     final revenue = (day['revenue'] as num? ?? 0).toDouble();
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  dateLabel,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 14,
-                  ),
-                ),
-                Text(
-                  '$delivered delivered • $orders total',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+    return InkWell(
+      onTap: () {
+        if (iso.isNotEmpty) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => RestaurantDailyReportScreen(date: iso),
             ),
-          ),
-          Text(
-            'Rs.${NumberFormat('#,##0').format(revenue.round())}',
-            style: const TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 15,
-              color: AppColors.primary,
+          );
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    dateLabel,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14,
+                    ),
+                  ),
+                  Text(
+                    '$delivered delivered • $orders total',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            Text(
+              'Rs.${NumberFormat('#,##0').format(revenue.round())}',
+              style: const TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 15,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.textTertiary,
+              size: 18,
+            ),
+          ],
+        ),
       ),
     );
+
   }
 }

@@ -488,6 +488,19 @@ class RestaurantProvider extends ChangeNotifier {
     }
   }
 
+  Future<Map<String, dynamic>?> fetchDailyReport({required String date}) async {
+    try {
+      final resp = await ApiClient.instance.dio.get(
+        '/restaurant/earnings/daily',
+        queryParameters: {'date': date},
+      );
+      return Map<String, dynamic>.from(resp.data as Map);
+    } on DioException {
+      return null;
+    }
+  }
+
+
   // -------- Commission --------
 
   /// Fetches the restaurant's commission summary and payment history.

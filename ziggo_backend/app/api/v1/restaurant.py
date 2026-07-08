@@ -1058,6 +1058,110 @@ async def get_earnings(
     }
 
 
+@router.get("/earnings/daily")
+async def get_daily_earnings(
+    date: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("restaurant_owner")),
+):
+    """Retrieve detailed sales report, items sold, and orders for a specific day (UTC)."""
+    r = await _get_owned_restaurant(db, user)
+    if r is None:
+        raise HTTPException(status_code=404, detail="Register your restaurant first")
+
+    try:
+        dt = datetime.strptime(date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+
+    start = datetime(dt.year, dt.month, dt.day, 0, 0, 0, tzinfo=timezone.utc)
+    end = start + timedelta(days=1)
+
+    q = await db.execute(
+        select(FoodOrder).where(
+            FoodOrder.restaurant_id == r.id,
+            FoodOrder.created_at >= start,
+            FoodOrder.created_at < end,
+        )
+    )
+    orders = q.scalars().all()
+
+    total_revenue = Decimal("0")
+    total_orders = 0
+    total_delivered = 0
+    total_cancelled = 0
+
+    items_map = {}
+    orders_list = []
+
+    for o in orders:
+        total_orders += 1
+        is_delivered = o.status == FoodOrderStatus.DELIVERED
+        is_cancelled = o.status == FoodOrderStatus.CANCELLED
+
+        if is_delivered:
+            rev = (o.final_amount or Decimal(0)) - (o.delivery_fee or Decimal(0))
+            total_revenue += rev
+            total_delivered += 1
+        elif is_cancelled:
+            total_cancelled += 1
+
+        items_q = await db.execute(
+            select(FoodOrderItem).where(FoodOrderItem.order_id == o.id)
+        )
+        order_items = items_q.scalars().all()
+
+        item_names = []
+        for oi in order_items:
+            mq = await db.execute(select(MenuItem).where(MenuItem.id == oi.menu_item_id))
+            menu_item = mq.scalars().first()
+            item_name = menu_item.name if menu_item else "Removed Item"
+            item_qty = oi.quantity or 0
+            item_price = oi.price_at_order or Decimal(0)
+            item_total = item_price * item_qty
+
+            item_names.append(f"{item_name} x{item_qty}")
+
+            if is_delivered:
+                if item_name not in items_map:
+                    items_map[item_name] = {"quantity": 0, "revenue": Decimal("0")}
+                items_map[item_name]["quantity"] += item_qty
+                items_map[item_name]["revenue"] += item_total
+
+        orders_list.append({
+            "id": o.id,
+            "order_ref": o.order_ref,
+            "status": o.status.value,
+            "final_amount": float(o.final_amount or 0),
+            "created_at": o.created_at.isoformat() if o.created_at else None,
+            "items_summary": ", ".join(item_names),
+        })
+
+    orders_list.sort(key=lambda x: x["created_at"] or "", reverse=True)
+
+    items_sold_list = [
+        {
+            "name": name,
+            "quantity": val["quantity"],
+            "revenue": float(val["revenue"])
+        }
+        for name, val in items_map.items()
+    ]
+    items_sold_list.sort(key=lambda x: x["quantity"], reverse=True)
+
+    return {
+        "date": date,
+        "revenue": float(total_revenue),
+        "total_orders": total_orders,
+        "total_delivered": total_delivered,
+        "total_cancelled": total_cancelled,
+        "average_order_value": float(total_revenue / total_delivered) if total_delivered else 0,
+        "items_sold": items_sold_list,
+        "orders": orders_list
+    }
+
+
+
 # ---------------------------------------------------------------------------
 # "Mark preparing" — CONFIRMED → PREPARING (kitchen visibility step)
 # ---------------------------------------------------------------------------
