@@ -58,11 +58,15 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
     }
     final list = set.toList()..sort();
     if (hasUncategorised && list.isNotEmpty) list.add('Other');
+    if (list.isNotEmpty) list.insert(0, 'All');
     return list;
   }
 
   List<Map<String, dynamic>> _inCategory(
       List<Map<String, dynamic>> products, String category) {
+    if (category == 'All') {
+      return products;
+    }
     if (category == 'Other') {
       return products
           .where((p) => (p['category']?.toString().trim() ?? '').isEmpty)

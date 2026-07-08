@@ -70,13 +70,23 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
             );
           }
 
-          final categories = (r['categories'] as List).cast<Map<String, dynamic>>();
           final items = (r['items'] as List).cast<Map<String, dynamic>>();
 
           final byCat = <int, List<Map<String, dynamic>>>{};
           for (final it in items) {
             final cid = (it['category_id'] as int?) ?? 0;
             byCat.putIfAbsent(cid, () => []).add(it);
+          }
+
+          final categories = List<Map<String, dynamic>>.from(
+            (r['categories'] as List).cast<Map<String, dynamic>>(),
+          );
+          if (byCat[0]?.isNotEmpty ?? false) {
+            categories.add({
+              'id': 0,
+              'name': 'Other',
+              'description': 'Other items',
+            });
           }
 
           // Popular Picks come from the backend (most-ordered available items).
@@ -433,7 +443,12 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
       }
     }
     children.add(const SizedBox(height: 100));
-    return SliverList(delegate: SliverChildListDelegate(children));
+    return SliverToBoxAdapter(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      ),
+    );
   }
 
   List<Widget> _buildSearchResults(List<Map<String, dynamic>> items, Map<String, dynamic> r) {
