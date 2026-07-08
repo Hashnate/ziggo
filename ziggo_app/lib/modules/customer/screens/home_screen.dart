@@ -779,7 +779,7 @@ class _ServicesGrid extends StatelessWidget {
               GradientServiceTile(
                 icon: Icons.restaurant_rounded,
                 imageAsset: 'assets/icons/food.png',
-                imagePadding: const EdgeInsets.all(8),
+                imagePadding: const EdgeInsets.all(14),
                 label: 'Food',
                 onTap: onFood,
               ),
