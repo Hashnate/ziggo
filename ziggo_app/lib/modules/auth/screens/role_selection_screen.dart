@@ -19,33 +19,8 @@ class RoleSelectionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF030712),
-      body: Stack(
-        children: [
-          // Premium radial backdrop
-          const Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: Alignment.topRight,
-                  radius: 1.5,
-                  colors: [Color(0xFF1E3A8A), Color(0xFF030712)],
-                ),
-              ),
-            ),
-          ),
-          // Glow blobs
-          Positioned(
-            top: -110,
-            right: -70,
-            child: _blob(300, AppColors.primaryLight.withOpacity(0.16)),
-          ),
-          Positioned(
-            bottom: -80,
-            left: -90,
-            child: _blob(340, AppColors.accent.withOpacity(0.07)),
-          ),
-          SafeArea(
+      backgroundColor: Colors.black,
+      body: SafeArea(
             child: SingleChildScrollView(
               physics: const ClampingScrollPhysics(),
               padding: const EdgeInsets.symmetric(horizontal: 26),
@@ -215,10 +190,8 @@ class RoleSelectionScreen extends StatelessWidget {
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
+        );
+      }
 
   Widget _blob(double size, Color color) {
     return Container(
