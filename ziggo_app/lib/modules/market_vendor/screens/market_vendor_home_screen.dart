@@ -416,14 +416,14 @@ class _Header extends StatelessWidget {
                   end: Alignment.bottomRight,
                   colors: coverUrl == null
                       ? const [
-                          Color(0xFF14532D),
-                          Color(0xFF15803D),
-                          Color(0xFF22C55E),
+                          Color(0xFF0F172A),
+                          Color(0xFF1E293B),
+                          Color(0xFF334155),
                         ]
                       : [
-                          const Color(0xFF052E1A).withOpacity(0.78),
-                          const Color(0xFF15803D).withOpacity(0.72),
-                          const Color(0xFF22C55E).withOpacity(0.65),
+                          const Color(0xFF0F172A).withOpacity(0.85),
+                          const Color(0xFF1E293B).withOpacity(0.75),
+                          const Color(0xFF334155).withOpacity(0.65),
                         ],
                 ),
               ),
@@ -458,7 +458,7 @@ class _Header extends StatelessWidget {
                       width: 36,
                       height: 36,
                       child: PopupMenuButton<VoidCallback>(
-                        color: const Color(0xFF064E3B),
+                        color: const Color(0xFF0F172A),
                         surfaceTintColor: Colors.transparent,
                         padding: EdgeInsets.zero,
                           icon: Container(
