@@ -81,28 +81,14 @@ async def verify_otp(request: OTPVerify, db: AsyncSession = Depends(get_db)):
         switchable_roles = {
             UserRole.CUSTOMER,
             UserRole.DRIVER,
+            UserRole.RESTAURANT_OWNER,
+            UserRole.MARKET_OWNER,
         }
 
         roles_match = user.role == request.role
 
         if not roles_match:
-            if user.role == UserRole.RESTAURANT_OWNER:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="This phone number is registered to a Restaurant. Please log in using the 'Run a Restaurant' portal.",
-                )
-            if user.role == UserRole.MARKET_OWNER:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="This phone number is registered to a Market. Please log in using the 'Manage Market Place' portal.",
-                )
-            if request.role in {UserRole.RESTAURANT_OWNER, UserRole.MARKET_OWNER}:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"This account is registered as a {user.role.value}. Please register your merchant account or contact support.",
-                )
-
-            # Allow customer <-> driver switching
+            # Allow switching among switchable roles (customer, driver, restaurant_owner, market_owner)
             if user.role in switchable_roles and request.role in switchable_roles:
                 # Auto-create the missing profile for the requested role
                 if request.role == UserRole.DRIVER and not user.driver_profile:
@@ -119,6 +105,21 @@ async def verify_otp(request: OTPVerify, db: AsyncSession = Depends(get_db)):
                 await db.commit()
                 await db.refresh(user)
             else:
+                if user.role == UserRole.RESTAURANT_OWNER:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="This phone number is registered to a Restaurant. Please log in using the 'Run a Restaurant' portal.",
+                    )
+                if user.role == UserRole.MARKET_OWNER:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="This phone number is registered to a Market. Please log in using the 'Manage Market Place' portal.",
+                    )
+                if request.role in {UserRole.RESTAURANT_OWNER, UserRole.MARKET_OWNER}:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=f"This account is registered as a {user.role.value}. Please register your merchant account or contact support.",
+                    )
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail=f"Phone already registered as {user.role.value}",

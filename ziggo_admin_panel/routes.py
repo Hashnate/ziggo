@@ -3077,16 +3077,7 @@ async def admin_restaurant_edit(
             if existing.scalars().first() is not None:
                 raise HTTPException(status_code=400, detail=f"User {phone} already owns a different restaurant.")
             
-            from app.models import MarketVendor as _MV
-            has_market = (
-                await db.execute(
-                    select(_MV).where(_MV.owner_id == owner.id)
-                )
-            ).scalars().first()
-            if (
-                owner.role in (UserRole.CUSTOMER, UserRole.MARKET_OWNER)
-                and not has_market
-            ):
+            if owner.role in (UserRole.CUSTOMER, UserRole.DRIVER, UserRole.MARKET_OWNER):
                 owner.role = UserRole.RESTAURANT_OWNER
 
         r.owner_id = owner.id
@@ -3282,20 +3273,7 @@ async def admin_restaurant_new_submit(
                     "form": form_echo,
                 },
             )
-        # Promote when safe — plain customer OR a market_owner without a
-        # market vendor (i.e. they never got onboarded for market). Avoid
-        # touching drivers/admins or anyone with an active market vendor.
-        from app.models import MarketVendor as _MV
-
-        has_market = (
-            await db.execute(
-                select(_MV).where(_MV.owner_id == owner.id)
-            )
-        ).scalars().first()
-        if (
-            owner.role in (UserRole.CUSTOMER, UserRole.MARKET_OWNER)
-            and not has_market
-        ):
+        if owner.role in (UserRole.CUSTOMER, UserRole.DRIVER, UserRole.MARKET_OWNER):
             owner.role = UserRole.RESTAURANT_OWNER
             if owner_full_name.strip() and not owner.full_name:
                 owner.full_name = owner_full_name.strip()
@@ -3854,17 +3832,7 @@ async def admin_market_new_submit(
                 },
             )
             
-        # Promote them to market_owner if they are a customer (or restaurant_owner
-        # but have no active restaurant).
-        has_restaurant = (
-            await db.execute(
-                select(Restaurant).where(Restaurant.owner_id == owner.id)
-            )
-        ).scalars().first()
-        if (
-            owner.role in (UserRole.CUSTOMER, UserRole.RESTAURANT_OWNER)
-            and not has_restaurant
-        ):
+        if owner.role in (UserRole.CUSTOMER, UserRole.DRIVER, UserRole.RESTAURANT_OWNER):
             owner.role = UserRole.MARKET_OWNER
             if owner_full_name.strip() and not owner.full_name:
                 owner.full_name = owner_full_name.strip()
@@ -4193,7 +4161,7 @@ async def admin_market_vendor_edit(
             db.add(new_owner)
             await db.flush()
         else:
-            if new_owner.role in (UserRole.CUSTOMER, UserRole.RESTAURANT_OWNER):
+            if new_owner.role in (UserRole.CUSTOMER, UserRole.DRIVER, UserRole.RESTAURANT_OWNER):
                 new_owner.role = UserRole.MARKET_OWNER
         v.owner_id = new_owner.id
     v.opening_time = opening_time.strip() or v.opening_time

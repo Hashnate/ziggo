@@ -274,13 +274,21 @@ async def list_my_ads(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_role("market_owner", "restaurant_owner")),
 ):
-    v = await _get_owned_vendor(db, user)
+    v = None
     r = None
-    if v is None:
+    if user.role == UserRole.RESTAURANT_OWNER:
         from .restaurant import _get_owned_restaurant
         r = await _get_owned_restaurant(db, user)
         if r is None:
-            raise HTTPException(status_code=404, detail="Vendor or Restaurant account not found")
+            v = await _get_owned_vendor(db, user)
+    else:
+        v = await _get_owned_vendor(db, user)
+        if v is None:
+            from .restaurant import _get_owned_restaurant
+            r = await _get_owned_restaurant(db, user)
+
+    if v is None and r is None:
+        raise HTTPException(status_code=404, detail="Vendor or Restaurant account not found")
     
     if v is not None:
         q = await db.execute(select(MarketAd).where(MarketAd.vendor_id == v.id))
@@ -308,13 +316,21 @@ async def upload_ad(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_role("market_owner", "restaurant_owner")),
 ):
-    v = await _get_owned_vendor(db, user)
+    v = None
     r = None
-    if v is None:
+    if user.role == UserRole.RESTAURANT_OWNER:
         from .restaurant import _get_owned_restaurant
         r = await _get_owned_restaurant(db, user)
         if r is None:
-            raise HTTPException(status_code=404, detail="Vendor or Restaurant account not found")
+            v = await _get_owned_vendor(db, user)
+    else:
+        v = await _get_owned_vendor(db, user)
+        if v is None:
+            from .restaurant import _get_owned_restaurant
+            r = await _get_owned_restaurant(db, user)
+
+    if v is None and r is None:
+        raise HTTPException(status_code=404, detail="Vendor or Restaurant account not found")
     url = await _save_image(photo, "market_ads")
     ad = MarketAd(
         vendor_id=v.id if v else None,
@@ -342,13 +358,21 @@ async def delete_ad(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_role("market_owner", "restaurant_owner")),
 ):
-    v = await _get_owned_vendor(db, user)
+    v = None
     r = None
-    if v is None:
+    if user.role == UserRole.RESTAURANT_OWNER:
         from .restaurant import _get_owned_restaurant
         r = await _get_owned_restaurant(db, user)
         if r is None:
-            raise HTTPException(status_code=404, detail="Vendor or Restaurant account not found")
+            v = await _get_owned_vendor(db, user)
+    else:
+        v = await _get_owned_vendor(db, user)
+        if v is None:
+            from .restaurant import _get_owned_restaurant
+            r = await _get_owned_restaurant(db, user)
+
+    if v is None and r is None:
+        raise HTTPException(status_code=404, detail="Vendor or Restaurant account not found")
             
     if v is not None:
         ad_q = await db.execute(
