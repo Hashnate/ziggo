@@ -165,7 +165,7 @@ class _MarketVendorDailyReportScreenState
           const Divider(color: Colors.white24, height: 1),
           const SizedBox(height: 16),
           Row(
-            mainAxisAlignment: MainAxisAlignment.between,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _buildMetricItem('Completed', '$delivered', Colors.greenAccent),
               _buildMetricItem('Cancelled', '$cancelled', Colors.redAccent),
