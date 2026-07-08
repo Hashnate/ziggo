@@ -79,31 +79,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF030712),
-      body: Stack(
-        children: [
-          const Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: Alignment.topRight,
-                  radius: 1.5,
-                  colors: [Color(0xFF1E3A8A), Color(0xFF030712)],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            top: -110,
-            right: -70,
-            child: _blob(300, AppColors.primaryLight.withOpacity(0.16)),
-          ),
-          Positioned(
-            bottom: -80,
-            left: -90,
-            child: _blob(340, AppColors.accent.withOpacity(0.07)),
-          ),
-          SafeArea(
+      backgroundColor: Colors.black,
+      body: SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
@@ -270,8 +247,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               ),
             ),
           ),
-        ],
-      ),
     );
   }
 
@@ -340,18 +315,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _blob(double size, Color color) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        boxShadow: [BoxShadow(color: color, blurRadius: 90, spreadRadius: 30)],
-      ),
     );
   }
 }
