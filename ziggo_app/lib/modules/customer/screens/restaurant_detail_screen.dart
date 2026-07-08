@@ -39,19 +39,6 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
 
   GlobalKey _keyFor(String id) => _sectionKeys.putIfAbsent(id, () => GlobalKey());
 
-  void _scrollToSection(String keyId, int tabIndex) {
-    setState(() => _activeCategoryIndex = tabIndex);
-    final ctx = _keyFor(keyId).currentContext;
-    if (ctx != null) {
-      Scrollable.ensureVisible(
-        ctx,
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeInOut,
-        alignment: 0.0,
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final food = context.watch<FoodProvider>();
@@ -96,6 +83,22 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
               .whereType<Map<String, dynamic>>()
               .toList();
 
+           final tabs = <MapEntry<String, dynamic>>[];
+          if (popularPicks.isNotEmpty) {
+            tabs.add(const MapEntry('Popular Picks', 'popular'));
+          }
+          for (final cat in categories) {
+            final id = cat['id'] as int;
+            if ((byCat[id] ?? const []).isNotEmpty) {
+              tabs.add(MapEntry(cat['name']?.toString() ?? '', cat));
+            }
+          }
+
+          if (_activeCategoryIndex >= tabs.length) {
+            _activeCategoryIndex = 0;
+          }
+          final activeTab = tabs.isNotEmpty ? tabs[_activeCategoryIndex] : null;
+
           final searching = _search.isNotEmpty;
 
           return CustomScrollView(
@@ -115,27 +118,29 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                 ..._buildSearchResults(items, r)
               else ...[
                 // 3. Popular Picks (real, most-ordered)
-                if (popularPicks.isNotEmpty)
+                if (popularPicks.isNotEmpty && activeTab?.value == 'popular')
                   SliverToBoxAdapter(
                     child: _buildPopularPicks(popularPicks, r),
                   ),
 
                 // 4. Sticky Category Tabs
-                SliverPersistentHeader(
-                  pinned: true,
-                  delegate: _StickyHeaderDelegate(
-                    minHeight: 50,
-                    maxHeight: 50,
-                    child: Container(
-                      color: Colors.white,
-                      alignment: Alignment.centerLeft,
-                      child: _buildCategoryTabs(popularPicks.isNotEmpty, categories, byCat),
+                if (tabs.isNotEmpty)
+                  SliverPersistentHeader(
+                    pinned: true,
+                    delegate: _StickyHeaderDelegate(
+                      minHeight: 50,
+                      maxHeight: 50,
+                      child: Container(
+                        color: Colors.white,
+                        alignment: Alignment.centerLeft,
+                        child: _buildCategoryTabs(tabs),
+                      ),
                     ),
                   ),
-                ),
 
                 // 5. Category Lists
-                _buildCategorySlivers(categories, byCat, r),
+                if (activeTab != null && activeTab.value != 'popular')
+                  _buildCategorySlivers(activeTab.value, byCat, r),
               ],
             ],
           );
@@ -370,36 +375,24 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
   }
 
   // Tabs are built from the real sections: an optional Popular Picks tab plus
-  // every category that actually has items. Tapping scrolls to the section.
-  Widget _buildCategoryTabs(
-    bool hasPopular,
-    List<Map<String, dynamic>> categories,
-    Map<int, List<Map<String, dynamic>>> byCat,
-  ) {
-    final tabs = <MapEntry<String, String>>[];
-    if (hasPopular) tabs.add(const MapEntry('Popular Picks', 'popular'));
-    for (final cat in categories) {
-      final id = cat['id'] as int;
-      if ((byCat[id] ?? const []).isNotEmpty) {
-        tabs.add(MapEntry(cat['name']?.toString() ?? '', 'cat_$id'));
-      }
-    }
+  // every category that actually has items. Tapping filters by category.
+  Widget _buildCategoryTabs(List<MapEntry<String, dynamic>> tabs) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
           for (var i = 0; i < tabs.length; i++)
-            _catTab(tabs[i].key, i, tabs[i].value),
+            _catTab(tabs[i].key, i),
         ],
       ),
     );
   }
 
-  Widget _catTab(String name, int index, String keyId) {
+  Widget _catTab(String name, int index) {
     final active = _activeCategoryIndex == index;
     return GestureDetector(
-      onTap: () => _scrollToSection(keyId, index),
+      onTap: () => setState(() => _activeCategoryIndex = index),
       child: Container(
         margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -421,25 +414,25 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
   }
 
   Widget _buildCategorySlivers(
-    List<Map<String, dynamic>> categories,
+    dynamic activeCategory,
     Map<int, List<Map<String, dynamic>>> byCat,
     Map<String, dynamic> r,
   ) {
     final children = <Widget>[];
-    for (final cat in categories) {
-      final id = cat['id'] as int;
+    if (activeCategory is Map<String, dynamic>) {
+      final id = activeCategory['id'] as int;
       final catItems = byCat[id] ?? const [];
-      if (catItems.isEmpty) continue;
-      children.add(Padding(
-        key: _keyFor('cat_$id'),
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-        child: Text(
-          cat['name']?.toString().toUpperCase() ?? '',
-          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
-        ),
-      ));
-      for (final it in catItems) {
-        children.add(DishTile(item: it, restaurant: r));
+      if (catItems.isNotEmpty) {
+        children.add(Padding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+          child: Text(
+            activeCategory['name']?.toString().toUpperCase() ?? '',
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+          ),
+        ));
+        for (final it in catItems) {
+          children.add(DishTile(item: it, restaurant: r));
+        }
       }
     }
     children.add(const SizedBox(height: 100));
