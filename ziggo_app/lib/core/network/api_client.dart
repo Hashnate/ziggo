@@ -105,13 +105,13 @@ class ApiClient {
 
   static String sanitizeString(String text) {
     // Matches http://..., https://..., ws://..., wss://..., ftp://... up to a space, quote, or closing paren/bracket/comma
-    final urlRegex = RegExp(r'(https?|wss?|ftp)://[^\s"')\]},]+', caseSensitive: false);
+    final urlRegex = RegExp(r'''(https?|wss?|ftp)://[^\s"')\]},]+''', caseSensitive: false);
     // Matches IP addresses (like 187.127.152.141 or 10.0.2.2) with optional port
     final ipRegex = RegExp(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?\b');
     // Matches any domain name ending with .lk or localhost
     final hostRegex = RegExp(r'\b(ziggo\.lk|localhost)(:\d+)?\b', caseSensitive: false);
     // Matches paths starting with /api/v1/ or /ws
-    final pathRegex = RegExp(r'/(api/v1|ws)[^\s"')\]},]*', caseSensitive: false);
+    final pathRegex = RegExp(r'''/(api/v1|ws)[^\s"')\]},]*''', caseSensitive: false);
 
     var sanitized = text;
     sanitized = sanitized.replaceAll(urlRegex, '[endpoint]');
