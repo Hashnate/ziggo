@@ -192,18 +192,6 @@ class RoleSelectionScreen extends StatelessWidget {
           ),
         );
       }
-
-  Widget _blob(double size, Color color) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        boxShadow: [BoxShadow(color: color, blurRadius: 90, spreadRadius: 30)],
-      ),
-    );
-  }
 }
 
 class _RoleCard extends StatelessWidget {
