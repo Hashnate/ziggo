@@ -193,15 +193,25 @@ class _RestaurantSectionState extends State<_RestaurantSection> {
         final allItems = (r['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
         final internalCategories = (r['categories'] as List?)?.cast<Map<String, dynamic>>() ?? [];
         final globalCatName = widget.category['name']?.toString().toLowerCase() ?? '';
+        String baseQ = globalCatName;
+        if (globalCatName.endsWith('s') && globalCatName.length > 3) {
+          baseQ = globalCatName.substring(0, globalCatName.length - 1);
+        } else if (globalCatName.endsWith('ies')) {
+          baseQ = globalCatName.substring(0, globalCatName.length - 3);
+        }
 
         final matchingCatIds = internalCategories
-            .where((c) => c['name']?.toString().toLowerCase().contains(globalCatName) ?? false)
+            .where((c) {
+              final cName = c['name']?.toString().toLowerCase() ?? '';
+              return cName.contains(globalCatName) || cName.contains(baseQ);
+            })
             .map((c) => c['id'])
             .toSet();
 
         var matchedItems = allItems.where((it) {
           final isCatMatch = matchingCatIds.contains(it['category_id']);
-          final isNameMatch = it['name']?.toString().toLowerCase().contains(globalCatName) ?? false;
+          final itName = it['name']?.toString().toLowerCase() ?? '';
+          final isNameMatch = itName.contains(globalCatName) || itName.contains(baseQ);
           return isCatMatch || isNameMatch;
         }).toList();
 
