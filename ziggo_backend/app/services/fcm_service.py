@@ -131,7 +131,7 @@ async def _send_to_token(
             ios_sound = "food_alert.caf"
         else:
             android_sound = "ride_alert"
-            android_channel = "ziggo_ride_alerts_v6"
+            android_channel = "ziggo_ride_alerts_v7"
             ios_sound = "ride_alert.caf"
     else:
         android_sound = "default"
@@ -150,18 +150,14 @@ async def _send_to_token(
     payload_data["body"] = body
 
     if event == "new_ride_request":
-        # Include notification block for Android too to guarantee OS-levelheads-up display and sound delivery
-        # even when backgrounded/Doze Mode, while passing data block to the app background handler.
+        # Data-only payload for Android to force the OS to run the background Dart handler
+        # (firebaseMessagingBackgroundHandler) which displays the custom 30-second looping notification.
+        # iOS still gets the notification block via APNs.
         msg = messaging.Message(
             token=token,
-            notification=messaging.Notification(title=title, body=body),
             data=payload_data,
             android=messaging.AndroidConfig(
                 priority="high",
-                notification=messaging.AndroidNotification(
-                    sound=android_sound,
-                    channel_id=android_channel,
-                ),
             ),
             apns=messaging.APNSConfig(
                 headers={"apns-priority": "10"},

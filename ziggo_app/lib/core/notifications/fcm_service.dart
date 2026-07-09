@@ -35,7 +35,7 @@ import '../network/api_client.dart';
 // (see fcm_service.py `channel_id="ziggo_ride_alerts"`). Bumping this id
 // here forces Android to create a fresh channel (use this trick if you ever
 // swap the sound file — Android won't update an existing channel's sound).
-const String _rideAlertChannelId = 'ziggo_ride_alerts_v6';
+const String _rideAlertChannelId = 'ziggo_ride_alerts_v7';
 const String _rideAlertChannelName = 'Ride alerts';
 const String _rideAlertChannelDesc =
     'New ride requests. Plays continuous custom sound.';
@@ -97,6 +97,8 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           priority: Priority.high,
           playSound: true,
           sound: const RawResourceAndroidNotificationSound('ride_alert'),
+          audioAttributesUsage: AudioAttributesUsage.alarm,
+          category: AndroidNotificationCategory.alarm,
           // FLAG_INSISTENT (4) — loops the sound until the notification is cancelled.
           additionalFlags: Int32List.fromList(<int>[4]),
           enableVibration: true,
@@ -171,6 +173,7 @@ class FcmService {
               importance: Importance.max,
               playSound: true,
               sound: RawResourceAndroidNotificationSound('ride_alert'),
+              audioAttributesUsage: AudioAttributesUsage.alarm,
               enableVibration: true,
             ),
           );
