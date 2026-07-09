@@ -514,6 +514,21 @@ class ZiggoMapController {
     }
   }
 
+  Future<void> startNavigation(LatLng target, {double zoom = 18.5, double tilt = 45.0, double bearing = 0.0}) async {
+    try {
+      await _c?.animateCamera(gmaps.CameraUpdate.newCameraPosition(
+        gmaps.CameraPosition(
+          target: _g(target),
+          zoom: zoom,
+          tilt: tilt,
+          bearing: bearing,
+        ),
+      ));
+    } catch (e) {
+      debugPrint("ZiggoMapController.startNavigation error: $e");
+    }
+  }
+
   void dispose() => _c = null;
 }
 

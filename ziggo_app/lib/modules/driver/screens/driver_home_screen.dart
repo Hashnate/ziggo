@@ -59,6 +59,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   StreamSubscription<RemoteMessage>? _notificationSubscription;
   StreamSubscription? _wsSub;
   bool _isShowingRideRequest = false;
+  bool _isNavigating = false;
   bool _incentivesExpanded = true;
   bool _activeRideExpanded = true;
   int _activeIncentiveIndex = 0;
@@ -321,6 +322,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       final food = driver.activeFoodOrder;
       final market = driver.activeMarketOrder;
       final currentLoc = LatLng(p.latitude, p.longitude);
+      if (_isNavigating) {
+        _mapController.startNavigation(currentLoc, bearing: _heading);
+      }
       if (food != null) {
         _updateFoodMarketRoute(currentLoc, food, false);
       } else if (market != null) {
@@ -510,6 +514,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   Future<void> _centerOnDriver() async {
     if (!mounted) return;
+    setState(() {
+      _isNavigating = false;
+    });
     final driver = context.read<DriverProvider>();
     final loc = driver.currentLocation;
     if (loc != null) {
@@ -631,15 +638,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final target = LatLng(lat, lng);
 
     setState(() {
+      _isNavigating = true;
       _activeRideExpanded = false;
       _requestSheetCollapsed = true;
     });
 
-    if (driverLoc != null) {
-      _mapController.fitBounds([driverLoc, target], padding: 80);
-    } else {
-      _mapController.moveTo(target, zoom: 16);
-    }
+    final focusLoc = driverLoc ?? target;
+    _mapController.startNavigation(focusLoc, bearing: _heading);
   }
 
   @override
@@ -685,6 +690,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         mapNavLat = headingToCustomer ? dropLat : pickupLat;
         mapNavLng = headingToCustomer ? dropLng : pickupLng;
       }
+    }
+
+    if (mapNavLat == null || mapNavLng == null) {
+      _isNavigating = false;
     }
 
     if (ride == null) {
@@ -810,7 +819,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     ZiggoPolyline(
                       points: _rideRoutePoints,
                       strokeWidth: 5,
-                      color: Colors.blue,
+                      color: AppColors.primaryDark,
                     ),
                 ],
                 markers: [
@@ -997,34 +1006,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 muted: _muted,
                 onToggleMute: () => setState(() => _muted = !_muted),
                 onReportIncident: _reportIncident,
-              ),
-            ),
-          if (mapNavLat != null && mapNavLng != null)
-            Positioned(
-              left: 14,
-              top: MediaQuery.of(context).padding.top + 70,
-              child: GestureDetector(
-                onTap: () => _openNavigation(mapNavLat!, mapNavLng!),
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.12),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.navigation_rounded,
-                    color: Colors.black87,
-                    size: 22,
-                  ),
-                ),
+                onOpenNavigation: (mapNavLat != null && mapNavLng != null)
+                    ? () => _openNavigation(mapNavLat!, mapNavLng!)
+                    : null,
               ),
             ),
         ],
@@ -4365,11 +4349,13 @@ class _DriverHUD extends StatelessWidget {
   final bool muted;
   final VoidCallback onToggleMute;
   final VoidCallback onReportIncident;
+  final VoidCallback? onOpenNavigation;
   const _DriverHUD({
     required this.speedKmh,
     required this.muted,
     required this.onToggleMute,
     required this.onReportIncident,
+    this.onOpenNavigation,
   });
 
   @override
@@ -4441,6 +4427,22 @@ class _DriverHUD extends StatelessWidget {
             child: const Icon(Icons.report_rounded, color: Colors.white, size: 22),
           ),
         ),
+        if (onOpenNavigation != null) ...[
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: onOpenNavigation,
+            child: Container(
+              width: 44, height: 44,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.primaryDark,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: AppStyles.shadowSm,
+              ),
+              child: const Icon(Icons.navigation_rounded, color: Colors.white, size: 22),
+            ),
+          ),
+        ],
       ],
     );
   }
