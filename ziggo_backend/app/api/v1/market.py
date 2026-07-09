@@ -68,6 +68,16 @@ async def list_vendors(
     """List active, currently-open market vendors. When `lat`/`lng` are
     supplied the result is enriched with `distance_km` and sorted nearest-first
     so "Outlets near you" reflects the customer's chosen delivery location."""
+    from ...models import MarketDeal
+    from sqlalchemy.orm import selectinload
+
+    deals_q = await db.execute(
+        select(MarketDeal)
+        .where(MarketDeal.is_active == True)  # noqa: E712
+        .order_by(MarketDeal.display_order, MarketDeal.id)
+    )
+    active_deals = deals_q.scalars().all()
+
     q = await db.execute(
         select(MarketVendor).where(MarketVendor.is_active == True).order_by(MarketVendor.id)  # noqa: E712
     )
@@ -92,6 +102,17 @@ async def list_vendors(
             radius = float(delivery.vendor_radius_km(v.delivery_radius_km))
             if distance_km > radius:
                 continue
+
+        discount_tag = None
+        for d in active_deals:
+            if d.link_type == "vendor" and d.link_value == str(v.id):
+                discount_tag = d.title
+                break
+            elif d.link_type == "category" and v.category and d.link_value:
+                if d.link_value.strip().lower() == v.category.strip().lower():
+                    discount_tag = d.title
+                    break
+
         enriched.append(
             {
                 "id": v.id,
@@ -111,6 +132,7 @@ async def list_vendors(
                 "is_open": bool(v.is_open) if v.is_open is not None else True,
                 "is_open_now": is_open_now,
                 "is_featured": bool(v.is_featured),
+                "discount_tag": discount_tag,
             }
         )
     if has_origin:
@@ -143,6 +165,25 @@ async def get_vendor(vendor_id: int, db: AsyncSession = Depends(get_db)):
     v = v_q.scalars().first()
     if not v:
         raise HTTPException(status_code=404, detail="Vendor not found")
+
+    from ...models import MarketDeal
+    deals_q = await db.execute(
+        select(MarketDeal)
+        .where(MarketDeal.is_active == True)  # noqa: E712
+        .order_by(MarketDeal.display_order, MarketDeal.id)
+    )
+    active_deals = deals_q.scalars().all()
+
+    discount_tag = None
+    for d in active_deals:
+        if d.link_type == "vendor" and d.link_value == str(v.id):
+            discount_tag = d.title
+            break
+        elif d.link_type == "category" and v.category and d.link_value:
+            if d.link_value.strip().lower() == v.category.strip().lower():
+                discount_tag = d.title
+                break
+
     return {
         "id": v.id,
         "name": v.name,
@@ -160,6 +201,7 @@ async def get_vendor(vendor_id: int, db: AsyncSession = Depends(get_db)):
         "is_active": bool(v.is_active),
         "is_open": bool(v.is_open) if v.is_open is not None else True,
         "is_featured": bool(v.is_featured),
+        "discount_tag": discount_tag,
     }
 
 
