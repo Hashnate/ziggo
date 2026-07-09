@@ -8230,6 +8230,7 @@ async def admin_referrals(
         .limit(500)
     )
     bonuses = q.scalars().all()
+    s = await _get_or_create_settings(db)
     
     return templates.TemplateResponse(
         request, "referrals.html",
@@ -8237,6 +8238,23 @@ async def admin_referrals(
             "request": request,
             "active_page": "referrals",
             "bonuses": bonuses,
+            "s": s,
+            "saved": request.query_params.get("saved") == "1",
         },
     )
+
+
+@router.post("/referrals/settings")
+async def admin_referrals_settings_save(
+    referral_referrer_amount: float = Form(300.00),
+    referral_referred_amount: float = Form(300.00),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from decimal import Decimal
+    s = await _get_or_create_settings(db)
+    s.referral_referrer_amount = Decimal(str(referral_referrer_amount))
+    s.referral_referred_amount = Decimal(str(referral_referred_amount))
+    await db.commit()
+    return RedirectResponse(url="/admin/referrals?saved=1", status_code=303)
 

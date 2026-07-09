@@ -9,6 +9,7 @@ class ReferralsProvider extends ChangeNotifier {
   int _totalReferred = 0;
   double _earnedAmount = 0.0;
   double _pendingAmount = 0.0;
+  double _referralAmount = 300.0;
   List<Map<String, dynamic>> _friends = const [];
   bool _loading = false;
 
@@ -16,6 +17,7 @@ class ReferralsProvider extends ChangeNotifier {
   int get totalReferred => _totalReferred;
   double get earnedAmount => _earnedAmount;
   double get pendingAmount => _pendingAmount;
+  double get referralAmount => _referralAmount;
   List<Map<String, dynamic>> get friends => _friends;
   bool get loading => _loading;
 
@@ -29,6 +31,7 @@ class ReferralsProvider extends ChangeNotifier {
       _totalReferred = data['total_referred'] as int? ?? 0;
       _earnedAmount = (data['earned_amount'] as num?)?.toDouble() ?? 0.0;
       _pendingAmount = (data['pending_amount'] as num?)?.toDouble() ?? 0.0;
+      _referralAmount = (data['referral_amount'] as num?)?.toDouble() ?? 300.0;
       _friends = List<Map<String, dynamic>>.from(data['friends'] as List? ?? []);
     } on DioException {
       // swallow; UI will show last known state

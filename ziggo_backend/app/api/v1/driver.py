@@ -300,13 +300,18 @@ async def register_driver(
             raise HTTPException(status_code=400, detail="You cannot refer yourself")
 
         user.referred_by_user_id = referrer.id
-        from ...models import ReferralBonus, ReferralKind, ReferralStatus
+        from ...models import ReferralBonus, ReferralKind, ReferralStatus, SystemSettings
+        ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+        ss = ss_q.scalars().first()
+        ref_amt = ss.referral_referrer_amount if (ss and ss.referral_referrer_amount is not None) else Decimal("300.00")
+        refd_amt = ss.referral_referred_amount if (ss and ss.referral_referred_amount is not None) else Decimal("300.00")
+
         bonus = ReferralBonus(
             referrer_user_id=referrer.id,
             referred_user_id=user.id,
             kind=ReferralKind.credit,
-            referrer_amount=Decimal("300.00"),
-            referred_amount=Decimal("300.00"),
+            referrer_amount=ref_amt,
+            referred_amount=refd_amt,
             status=ReferralStatus.pending,
             trigger_description="Referral bonus — driver completed first order"
         )

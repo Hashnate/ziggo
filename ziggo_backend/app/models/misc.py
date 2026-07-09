@@ -187,6 +187,9 @@ class SystemSettings(Base):
     peak_end_hour = Column(Integer, default=20)
     peak_extra_amount = Column(DECIMAL(10, 2), default=0.00)
     peak_is_active = Column(Boolean, nullable=False, default=False)
+    # Referral
+    referral_referrer_amount = Column(DECIMAL(10, 2), nullable=False, default=Decimal("300.00"))
+    referral_referred_amount = Column(DECIMAL(10, 2), nullable=False, default=Decimal("300.00"))
     # Branding
     logo_url = Column(String(255))
     favicon_url = Column(String(255))

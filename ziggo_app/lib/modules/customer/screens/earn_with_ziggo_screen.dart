@@ -49,8 +49,9 @@ class _EarnWithZiggoScreenState extends State<EarnWithZiggoScreen> {
     );
   }
 
-  Future<void> _shareCode(String code) async {
-    final message = "Sign up for Ziggo using my referral code $code and get Rs.300.00 wallet credit on your first completed trip! Download the app now.";
+  Future<void> _shareCode(String code, double amount) async {
+    final formattedAmt = amount.toStringAsFixed(2);
+    final message = "Sign up for Ziggo using my referral code $code and get Rs.$formattedAmt wallet credit on your first completed trip! Download the app now.";
     final url = Uri.parse("whatsapp://send?text=${Uri.encodeComponent(message)}");
     if (await canLaunchUrl(url)) {
       await launchUrl(url);
@@ -137,9 +138,9 @@ class _EarnWithZiggoScreenState extends State<EarnWithZiggoScreen> {
                               onPressed: () => _copyToClipboard(code),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.share, color: AppColors.primary),
-                              onPressed: () => _shareCode(code),
-                            ),
+                               icon: const Icon(Icons.share, color: AppColors.primary),
+                               onPressed: () => _shareCode(code, r.referralAmount),
+                             ),
                           ],
                         )
                       ],
