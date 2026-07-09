@@ -813,7 +813,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     ZiggoPolyline(
                       points: _pendingRoutePoints,
                       strokeWidth: 5,
-                      color: AppColors.primary,
+                      color: AppColors.primaryDark,
                     ),
                   if (_rideRoutePoints.isNotEmpty)
                     ZiggoPolyline(
