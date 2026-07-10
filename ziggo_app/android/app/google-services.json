@@ -9,6 +9,25 @@
       "client_info": {
         "mobilesdk_app_id": "1:1053237837535:android:fe1d05d016ae75e0f4b36a",
         "android_client_info": {
+          "package_name": "com.example.ziggo_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC02XixbfRZwTXAtvN_lDWEmdxmemlc8hI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1053237837535:android:51d68b9c5fafd5b1f4b36a",
+        "android_client_info": {
           "package_name": "lk.ziggo.app"
         }
       },
