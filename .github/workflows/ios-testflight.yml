@@ -78,6 +78,9 @@ jobs:
           printf 'GOOGLE_MAPS_API_KEY=%s\n' "$MAPS_API_KEY" > .env
           printf 'MAPS_API_KEY=%s\n' "$MAPS_API_KEY" > ios/Flutter/Secrets.xcconfig
 
+          # Inject GoogleService-Info.plist for Firebase Cloud Messaging
+          echo "${{ secrets.IOS_GOOGLE_SERVICE_INFO_BASE64 }}" | base64 --decode -o ios/Runner/GoogleService-Info.plist
+
           # Archive unsigned, then sign at export time from ExportOptions.plist.
           flutter build ipa --release --no-codesign --build-number="$BUILD_NUMBER"
 
