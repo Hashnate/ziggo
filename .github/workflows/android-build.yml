@@ -66,7 +66,8 @@ jobs:
           echo "GOOGLE_MAPS_API_KEY=$MAPS_API_KEY" > .env
 
           # 5. Inject google-services.json for Firebase
-          echo "${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_BASE64 }}" | base64 --decode > android/app/google-services.json
+          # Using -di to ignore newlines/whitespace safely
+          echo "${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_BASE64 }}" | base64 -di > android/app/google-services.json
 
       - name: Build Android App Bundle (AAB)
         run: flutter build appbundle --release
