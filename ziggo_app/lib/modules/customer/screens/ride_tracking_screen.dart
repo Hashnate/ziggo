@@ -35,6 +35,8 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
   List<LatLng> _routePoints = const [];
   List<DirectionStep> _routeSteps = const [];
   String? _routeKey;
+  LatLng? _lastRouteFrom;
+  LatLng? _lastRouteTo;
   bool _sheetExpanded = true;
   String? _lastStatus;
   bool _otpDialogShown = false;
@@ -169,13 +171,27 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
     super.dispose();
   }
 
-  /// Fetches the road route once per unique pickup/drop pair.
-  void _ensureRoute(LatLng pickup, LatLng drop) {
-    final key = '${pickup.latitude},${pickup.longitude}'
-        '-${drop.latitude},${drop.longitude}';
-    if (key == _routeKey) return;
+  /// Fetches the road route dynamically with distance checks to prevent excessive API requests.
+  void _ensureRoute(LatLng from, LatLng to) {
+    if (_lastRouteFrom != null && _lastRouteTo != null) {
+      final distFrom = Geolocator.distanceBetween(
+        _lastRouteFrom!.latitude, _lastRouteFrom!.longitude,
+        from.latitude, from.longitude,
+      );
+      final distTo = Geolocator.distanceBetween(
+        _lastRouteTo!.latitude, _lastRouteTo!.longitude,
+        to.latitude, to.longitude,
+      );
+      if (distFrom < 20 && distTo < 20 && _routePoints.isNotEmpty) {
+        return;
+      }
+    }
+    _lastRouteFrom = from;
+    _lastRouteTo = to;
+    final key = '${from.latitude},${from.longitude}'
+        '-${to.latitude},${to.longitude}';
     _routeKey = key;
-    MapsService.instance.directions(pickup, drop).then((dir) {
+    MapsService.instance.directions(from, to).then((dir) {
       if (mounted && dir != null && dir.points.isNotEmpty) {
         setState(() {
           _routePoints = dir.points;
@@ -401,7 +417,17 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
       _lastStatus = status;
     }
 
-    _ensureRoute(pickup, drop);
+    final LatLng routeFrom;
+    final LatLng routeTo;
+    if (status == 'accepted' || status == 'arrived') {
+      routeFrom = driverLatLng ?? pickup;
+      routeTo = pickup;
+    } else {
+      routeFrom = pickup;
+      routeTo = drop;
+    }
+
+    _ensureRoute(routeFrom, routeTo);
     _updateMapCamera(status, pickup, drop, driverLatLng);
 
     // Show wandering driver pins only while we're still hunting for a driver.
@@ -427,10 +453,10 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
       });
     }
 
-    final showRemainingRoute = status == 'started';
+    final showRemainingRoute = status == 'accepted' || status == 'arrived' || status == 'started';
     final activeRoutePoints = (showRemainingRoute && currentDisplayLatLng != null)
         ? _getRemainingRoute(_routePoints, currentDisplayLatLng)
-        : (_routePoints.isNotEmpty ? _routePoints : [pickup, drop]);
+        : (_routePoints.isNotEmpty ? _routePoints : [routeFrom, routeTo]);
 
     return Scaffold(
       backgroundColor: AppColors.background,
