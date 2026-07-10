@@ -27,7 +27,7 @@ class RideTrackingScreen extends StatefulWidget {
   State<RideTrackingScreen> createState() => _RideTrackingScreenState();
 }
 
-class _RideTrackingScreenState extends State<RideTrackingScreen> {
+class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTickerProviderStateMixin {
   final ZiggoMapController _mapController = ZiggoMapController();
   bool _navigatedToRating = false;
   bool _driverCancelled = false;
@@ -51,9 +51,42 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
   double? _customerHeading;
   StreamSubscription? _wsSub;
 
+  AnimationController? _markerAnimController;
+  LatLng? _animatedDriverLatLng;
+  double? _animatedDriverHeading;
+  LatLng? _prevTargetLatLng;
+  double? _prevTargetHeading;
+  LatLng? _animStartLatLng;
+  LatLng? _animEndLatLng;
+  double? _animStartHeading;
+  double? _animEndHeading;
+
   @override
   void initState() {
     super.initState();
+    _markerAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+    _markerAnimController!.addListener(() {
+      if (!mounted) return;
+      if (_animStartLatLng != null && _animEndLatLng != null) {
+        final t = _markerAnimController!.value;
+        setState(() {
+          _animatedDriverLatLng = LatLng(
+            _animStartLatLng!.latitude + (_animEndLatLng!.latitude - _animStartLatLng!.latitude) * t,
+            _animStartLatLng!.longitude + (_animEndLatLng!.longitude - _animStartLatLng!.longitude) * t,
+          );
+          if (_animStartHeading != null && _animEndHeading != null) {
+            double diff = _animEndHeading! - _animStartHeading!;
+            while (diff < -180.0) diff += 360.0;
+            while (diff > 180.0) diff -= 360.0;
+            _animatedDriverHeading = _animStartHeading! + diff * t;
+          }
+        });
+      }
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<BookingProvider>().loadActive();
     });
@@ -95,8 +128,41 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
     }, onError: (_) {});
   }
 
+  void _updateInterpolatedDriverLocation(LatLng? targetLatLng, double targetHeading) {
+    if (targetLatLng == null) {
+      _animatedDriverLatLng = null;
+      _animatedDriverHeading = null;
+      _prevTargetLatLng = null;
+      _prevTargetHeading = null;
+      return;
+    }
+
+    if (_prevTargetLatLng == null) {
+      _animatedDriverLatLng = targetLatLng;
+      _animatedDriverHeading = targetHeading;
+      _prevTargetLatLng = targetLatLng;
+      _prevTargetHeading = targetHeading;
+      return;
+    }
+
+    if (_prevTargetLatLng != targetLatLng || _prevTargetHeading != targetHeading) {
+      _animStartLatLng = _animatedDriverLatLng ?? _prevTargetLatLng;
+      _animStartHeading = _animatedDriverHeading ?? _prevTargetHeading;
+      _animEndLatLng = targetLatLng;
+      _animEndHeading = targetHeading;
+      
+      _prevTargetLatLng = targetLatLng;
+      _prevTargetHeading = targetHeading;
+
+      _markerAnimController?.stop();
+      _markerAnimController?.reset();
+      _markerAnimController?.forward();
+    }
+  }
+
   @override
   void dispose() {
+    _markerAnimController?.dispose();
     _wsSub?.cancel();
     _nearbyTimer?.cancel();
     _positionSubscription?.cancel();
@@ -298,6 +364,15 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
             ? LatLng(driverLat.toDouble(), driverLng.toDouble())
             : null);
 
+    final double targetHeading = (status == 'started' && _customerHeading != null)
+        ? _customerHeading!
+        : ((driver?['current_heading'] as num?)?.toDouble() ?? 0.0);
+
+    _updateInterpolatedDriverLocation(driverLatLng, targetHeading);
+
+    final currentDisplayLatLng = _animatedDriverLatLng ?? driverLatLng;
+    final currentDisplayHeading = _animatedDriverHeading ?? targetHeading;
+
     final meta = _statusMeta(status);
     final serviceType = active['service_type'] as String?;
 
@@ -353,8 +428,8 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
     }
 
     final showRemainingRoute = status == 'started';
-    final activeRoutePoints = (showRemainingRoute && driverLatLng != null)
-        ? _getRemainingRoute(_routePoints, driverLatLng)
+    final activeRoutePoints = (showRemainingRoute && currentDisplayLatLng != null)
+        ? _getRemainingRoute(_routePoints, currentDisplayLatLng)
         : (_routePoints.isNotEmpty ? _routePoints : [pickup, drop]);
 
     return Scaffold(
@@ -395,15 +470,13 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                   color: AppColors.warning,
                   label: 'Drop | ${active['drop_address'] ?? 'Destination'}',
                 ),
-                if (driverLatLng != null)
+                if (currentDisplayLatLng != null)
                   pinMarker(
-                    point: driverLatLng,
+                    point: currentDisplayLatLng,
                     icon: Icons.directions_car_rounded,
                     color: Colors.black,
                     assetPath: _vehicleAsset(driver?['vehicle_type'] as String?),
-                    rotation: (status == 'started' && _customerHeading != null)
-                        ? _customerHeading!
-                        : ((driver?['current_heading'] as num?)?.toDouble() ?? 0.0),
+                    rotation: currentDisplayHeading,
                   ),
               ],
               polylines: [
