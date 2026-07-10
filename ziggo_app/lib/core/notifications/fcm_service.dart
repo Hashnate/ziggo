@@ -139,7 +139,9 @@ class FcmService {
     try {
       await Firebase.initializeApp();
       _firebaseAvailable = true;
+      unawaited(_logToServer('[fcm] Firebase initialized successfully on iOS/Android.'));
     } catch (e) {
+      unawaited(_logToServer('[fcm] Firebase.initializeApp failed: $e'));
       if (kDebugMode) {
         debugPrint('[fcm] Firebase.initializeApp failed: $e — push disabled');
       }
@@ -244,8 +246,10 @@ class FcmService {
 
       // 6. Cache token + listen for rotations
       _cachedToken = await messaging.getToken();
+      unawaited(_logToServer('[fcm] init step 6 done, cachedToken: ${(_cachedToken != null && _cachedToken!.length > 15) ? _cachedToken!.substring(0, 15) : _cachedToken}...'));
       _tokenSub = messaging.onTokenRefresh.listen((t) {
         _cachedToken = t;
+        unawaited(_logToServer('[fcm] onTokenRefresh triggered: ${(t.length > 15) ? t.substring(0, 15) : t}...'));
         unawaited(_sendToBackend(t));
       });
 
@@ -253,8 +257,18 @@ class FcmService {
         debugPrint('[fcm] init complete, channel=$_rideAlertChannelId, token=${_cachedToken?.substring(0, 20)}...');
       }
     } catch (e) {
+      unawaited(_logToServer('[fcm] init step failed: $e'));
       if (kDebugMode) debugPrint('[fcm] init step failed: $e');
     }
+  }
+
+  Future<void> _logToServer(String msg) async {
+    try {
+      await ApiClient.instance.dio.post(
+        '/public/log',
+        data: {'message': msg},
+      );
+    } catch (_) {}
   }
 
   final StreamController<RemoteMessage> _clickController = StreamController<RemoteMessage>.broadcast();
@@ -332,24 +346,30 @@ class FcmService {
   }
 
   /// Push the FCM token to the backend. Called after a successful login.
+  /// Push the FCM token to the backend. Called after a successful login.
   Future<bool> registerWithBackend() async {
-    // Wait for init() to finish (it fetches the token) so a fast login right
-    // after launch doesn't no-op before Firebase is ready.
+    unawaited(_logToServer('[fcm] registerWithBackend called. waiting for init...'));
     await init();
+    unawaited(_logToServer('[fcm] init finished inside registerWithBackend. firebaseAvailable: $_firebaseAvailable'));
     if (!_firebaseAvailable) return false;
     
     String? token = _cachedToken;
+    unawaited(_logToServer('[fcm] starting token retrieval loop. initial cached token: ${(token != null && token.length > 15) ? token.substring(0, 15) : token}'));
     // Retry up to 8 times with a 1-second delay if the token is null (very common on iOS startup/login)
     for (int i = 0; i < 8; i++) {
       if (token != null && token.isNotEmpty) break;
       try {
         token = await FirebaseMessaging.instance.getToken();
-      } catch (_) {}
+        unawaited(_logToServer('[fcm] getToken loop try $i: ${(token != null && token.length > 15) ? token.substring(0, 15) : token}'));
+      } catch (e) {
+        unawaited(_logToServer('[fcm] getToken loop try $i threw error: $e'));
+      }
       if (token == null || token.isEmpty) {
         await Future.delayed(const Duration(seconds: 1));
       }
     }
     _cachedToken = token;
+    unawaited(_logToServer('[fcm] token retrieval loop finished. cachedToken: ${(token != null && token.length > 15) ? token.substring(0, 15) : token}'));
     
     if (token == null || token.isEmpty) return false;
     return _sendToBackend(token);
@@ -359,6 +379,7 @@ class FcmService {
   /// addressed to the previous user. Called from AuthProvider.logout()
   /// BEFORE the JWT is wiped so the auth header is still attached.
   Future<void> clearOnBackend() async {
+    _cachedToken = null; // Also clear local cache so next login retrieves a fresh one!
     if (!_firebaseAvailable) return;
     try {
       await ApiClient.instance.dio.put(
@@ -372,13 +393,20 @@ class FcmService {
 
   Future<bool> _sendToBackend(String token) async {
     try {
+      unawaited(_logToServer('[fcm] PUT fcm-token payload sending...'));
       final resp = await ApiClient.instance.dio.put(
         '/auth/fcm-token',
         data: {'token': token},
       );
-      return resp.data is Map && resp.data['ok'] == true;
+      final ok = resp.data is Map && resp.data['ok'] == true;
+      unawaited(_logToServer('[fcm] PUT fcm-token resp status: ${resp.statusCode}, ok: $ok'));
+      return ok;
     } on DioException catch (e) {
+      unawaited(_logToServer('[fcm] PUT fcm-token threw DioException: ${e.message}, response: ${e.response?.data}'));
       if (kDebugMode) debugPrint('[fcm] register failed: ${e.message}');
+      return false;
+    } catch (e) {
+      unawaited(_logToServer('[fcm] PUT fcm-token threw unknown exception: $e'));
       return false;
     }
   }

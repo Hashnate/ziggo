@@ -35,6 +35,16 @@ class PublicEstimateRequest(BaseModel):
     drop_lng: float
 
 
+class ClientLogRequest(BaseModel):
+    message: str
+
+
+@router.post("/log")
+async def client_log(req: ClientLogRequest):
+    print(f"[client-log] {req.message}")
+    return {"ok": True}
+
+
 @router.post("/estimate")
 async def public_estimate(
     req: PublicEstimateRequest,
