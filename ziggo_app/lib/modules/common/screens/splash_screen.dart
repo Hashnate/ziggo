@@ -44,14 +44,7 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF172554), Color(0xFF1E40AF), Color(0xFF2563EB)],
-            stops: [0, 0.55, 1.0],
-          ),
-        ),
+        color: Colors.black,
         child: Stack(
           children: [
             // Layered ambient glow blobs
