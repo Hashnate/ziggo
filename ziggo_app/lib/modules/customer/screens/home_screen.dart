@@ -13,6 +13,13 @@ import '../../auth/auth_provider.dart';
 import '../booking_provider.dart';
 import '../notifications_provider.dart';
 import '../wallet_provider.dart';
+import '../food_provider.dart';
+import '../market_provider.dart';
+import 'restaurant_detail_screen.dart';
+import 'market_vendor_screen.dart';
+import 'market_group_screen.dart';
+import 'dart:async';
+import 'package:url_launcher/url_launcher.dart';
 import 'fare_estimate_screen.dart';
 import 'event_home_screen.dart';
 import 'flash_home_screen.dart';
@@ -44,18 +51,438 @@ class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _autoRedirected = false;
 
+  final PageController _foodBannerCtrl = PageController(viewportFraction: 0.93);
+  final PageController _marketBannerCtrl = PageController(viewportFraction: 0.93);
+  Timer? _foodBannerTimer;
+  Timer? _marketBannerTimer;
+  int _marketBannerPage = 0;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<WalletProvider>().refresh();
-      context.read<BookingProvider>().loadActive();
-      context.read<NotificationsProvider>().refresh();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
+  }
+
+  void _bootstrap() {
+    context.read<WalletProvider>().refresh();
+    context.read<BookingProvider>().loadActive();
+    context.read<NotificationsProvider>().refresh();
+    
+    context.read<FoodProvider>().fetchHome();
+    context.read<MarketProvider>().fetchAds();
+
+    _foodBannerTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (_foodBannerCtrl.hasClients) {
+        final p = context.read<FoodProvider>();
+        if (p.banners.isEmpty) return;
+        
+        int nextPage = _foodBannerCtrl.page!.round() + 1;
+        if (nextPage >= p.banners.length) {
+          nextPage = 0;
+        }
+        _foodBannerCtrl.animateToPage(
+          nextPage,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+      }
     });
+
+    _marketBannerTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (_marketBannerCtrl.hasClients) {
+        final p = context.read<MarketProvider>();
+        final itemsCount = p.ads.isNotEmpty ? p.ads.length : _kHomeMarketBanners.length;
+        if (itemsCount == 0) return;
+        
+        int nextPage = (_marketBannerPage + 1) % itemsCount;
+        _marketBannerCtrl.animateToPage(
+          nextPage,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _foodBannerTimer?.cancel();
+    _marketBannerTimer?.cancel();
+    _foodBannerCtrl.dispose();
+    _marketBannerCtrl.dispose();
+    super.dispose();
   }
 
   void _open(Widget screen) {
     Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+  }
+
+  String? _resolveAsset(String? path) {
+    if (path == null || path.isEmpty) return null;
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    return '${ApiConfig.baseHost}$path';
+  }
+
+  void _onFoodBannerTap(Map<String, dynamic> banner) {
+    final type = banner['link_type']?.toString() ?? 'none';
+    final value = banner['link_value']?.toString() ?? '';
+    final food = context.read<FoodProvider>();
+    switch (type) {
+      case 'restaurant':
+        final id = int.tryParse(value);
+        if (id != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => RestaurantDetailScreen(restaurantId: id)),
+          );
+        }
+        break;
+      case 'category':
+        final id = int.tryParse(value);
+        if (id != null) {
+          food.setCategoryFilter(id);
+          _open(const FoodHomeScreen());
+        }
+        break;
+      case 'collection':
+        final id = int.tryParse(value);
+        if (id != null) {
+          food.setCollectionFilter(id);
+          _open(const FoodHomeScreen());
+        }
+        break;
+      case 'url':
+        if (value.isNotEmpty) {
+          final uri = Uri.tryParse(value);
+          if (uri != null) {
+            canLaunchUrl(uri).then((can) {
+              if (can) launchUrl(uri, mode: LaunchMode.externalApplication);
+            });
+          }
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  Future<void> _onMarketAdTap(Map<String, dynamic> ad) async {
+    final type = ad['link_type']?.toString() ?? 'none';
+    final value = ad['link_value']?.toString() ?? '';
+
+    if (type == 'none' || type.isEmpty) {
+      final vendorId = ad['vendor_id'] as int?;
+      if (vendorId != null) {
+        await _handleMarketRedirect('vendor', vendorId.toString());
+      }
+      return;
+    }
+
+    await _handleMarketRedirect(type, value);
+  }
+
+  Future<void> _handleMarketRedirect(String type, String value) async {
+    switch (type) {
+      case 'vendor':
+        final vendorId = int.tryParse(value);
+        if (vendorId == null) return;
+        
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          ),
+        );
+
+        final vendor = await context.read<MarketProvider>().fetchVendorById(vendorId);
+        
+        if (mounted) {
+          Navigator.pop(context);
+          if (vendor != null) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => MarketVendorScreen(vendor: vendor)),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Could not open store — please try again'),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        }
+        break;
+
+      case 'category':
+        if (value.isNotEmpty) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MarketGroupScreen(groupName: value),
+            ),
+          );
+        }
+        break;
+
+      case 'url':
+        if (value.isNotEmpty) {
+          final uri = Uri.tryParse(value);
+          if (uri != null) {
+            if (await canLaunchUrl(uri)) {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            }
+          }
+        }
+        break;
+
+      default:
+        break;
+    }
+  }
+
+  Widget _buildFoodBanners() {
+    final p = context.watch<FoodProvider>();
+    final banners = p.banners;
+    if (banners.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
+            'Food Offers',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 160,
+          child: PageView.builder(
+            controller: _foodBannerCtrl,
+            padEnds: true,
+            itemCount: banners.length,
+            itemBuilder: (context, index) {
+              final banner = banners[index];
+              final img = _resolveAsset(banner['image_url']?.toString());
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: GestureDetector(
+                  onTap: () => _onFoodBannerTap(banner),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: img == null
+                        ? Container(color: AppColors.surfaceMuted)
+                        : Image.network(
+                            img,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            errorBuilder: (_, __, ___) => Container(color: AppColors.surfaceMuted),
+                          ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(banners.length, (index) {
+            return AnimatedBuilder(
+              animation: _foodBannerCtrl,
+              builder: (context, child) {
+                double page = 0.0;
+                if (_foodBannerCtrl.hasClients && _foodBannerCtrl.position.haveDimensions) {
+                  page = _foodBannerCtrl.page ?? 0.0;
+                }
+                final isSelected = (page.round() == index);
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  height: 6,
+                  width: isSelected ? 20 : 6,
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.food : AppColors.divider,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                );
+              },
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMarketBanners() {
+    final p = context.watch<MarketProvider>();
+    final ads = p.ads;
+    final itemsCount = ads.isNotEmpty ? ads.length : _kHomeMarketBanners.length;
+    if (itemsCount == 0) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
+            'Market Offers',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 160,
+          child: PageView.builder(
+            controller: _marketBannerCtrl,
+            onPageChanged: (i) => setState(() => _marketBannerPage = i),
+            itemCount: itemsCount,
+            itemBuilder: (_, i) {
+              if (ads.isNotEmpty) {
+                final ad = ads[i];
+                final imageUrl = _resolveAsset(ad['image_url']?.toString());
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: GestureDetector(
+                    onTap: () => _onMarketAdTap(ad),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: imageUrl != null
+                          ? Image.network(
+                              imageUrl,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: AppColors.surfaceMuted,
+                                child: const Center(
+                                  child: Icon(Icons.broken_image_rounded, color: AppColors.textTertiary, size: 44),
+                                ),
+                              ),
+                            )
+                          : Container(color: AppColors.surfaceMuted),
+                    ),
+                  ),
+                );
+              } else {
+                return _marketBannerCard(_kHomeMarketBanners[i]);
+              }
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(itemsCount, (i) {
+            final active = i == _marketBannerPage;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: active ? 18 : 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: active ? AppColors.primary : AppColors.cardBorder,
+                borderRadius: BorderRadius.circular(100),
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  Widget _marketBannerCard(_HomeMarketBanner b) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: b.image != null
+            ? Image.asset(
+                b.image!,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                errorBuilder: (_, __, ___) => _marketBannerGradient(b),
+              )
+            : _marketBannerGradient(b),
+      ),
+    );
+  }
+
+  Widget _marketBannerGradient(_HomeMarketBanner b) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: b.gradient,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: AppStyles.shadowMd,
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -16,
+            bottom: -24,
+            child: Icon(b.icon,
+                size: 168, color: Colors.white.withOpacity(0.14)),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  child: Text(
+                    b.tag,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  b.title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w950,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  b.subtitle,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.85),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -124,7 +551,10 @@ class _HomeScreenState extends State<HomeScreen> {
               onFlash: () => _open(const FlashDeliveryTypeScreen()),
               onMarket: () => _open(const MarketHomeScreen()),
             ),
-
+            const SizedBox(height: 26),
+            _buildFoodBanners(),
+            const SizedBox(height: 26),
+            _buildMarketBanners(),
           ]),
         ),
       ),
@@ -1108,3 +1538,24 @@ class CustomerDrawer extends StatelessWidget {
     );
   }
 }
+
+class _HomeMarketBanner {
+  final String tag;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final List<Color> gradient;
+  final String? image;
+  const _HomeMarketBanner(this.tag, this.title, this.subtitle, this.icon, this.gradient,
+      {this.image});
+}
+
+const _kHomeMarketBanners = <_HomeMarketBanner>[
+  _HomeMarketBanner('REGISTERED DEVICES', 'Now Available', 'Mobiles & accessories',
+      Icons.phone_iphone_rounded, [Color(0xFF172554), Color(0xFF1E40AF)]),
+  _HomeMarketBanner('FRESH DAILY', 'Groceries to your door', 'Delivered in minutes',
+      Icons.shopping_basket_rounded, [Color(0xFF0E7A52), Color(0xFF16A34A)]),
+  _HomeMarketBanner('SAVE BIG', 'Up to 50% off', 'On selected outlets today',
+      Icons.percent_rounded, [Color(0xFF7C3AED), Color(0xFF5B21B6)]),
+];
+
