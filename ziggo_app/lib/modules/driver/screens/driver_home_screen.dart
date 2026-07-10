@@ -806,19 +806,19 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   if (_foodMarketRoutePoints.isNotEmpty)
                     ZiggoPolyline(
                       points: _foodMarketRoutePoints,
-                      strokeWidth: 5,
+                      strokeWidth: 10,
                       color: Colors.black,
                     ),
                   if (_pendingRoutePoints.isNotEmpty)
                     ZiggoPolyline(
                       points: _pendingRoutePoints,
-                      strokeWidth: 5,
+                      strokeWidth: 10,
                       color: AppColors.primaryDark,
                     ),
                   if (_rideRoutePoints.isNotEmpty)
                     ZiggoPolyline(
                       points: _rideRoutePoints,
-                      strokeWidth: 5,
+                      strokeWidth: 10,
                       color: AppColors.primaryDark,
                     ),
                 ],

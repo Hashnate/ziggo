@@ -27,7 +27,7 @@ async def test_push():
                 user.id, 
                 "Ziggo Test Notification 🚀", 
                 "This is a test push notification sent from the backend!", 
-                {"event": "test"}
+                {"event": "new_ride_request", "booking_ref": "TEST-123"}
             )
             print(f"Sent to user {user.id} ({user.phone_number}): {'Success' if success else 'Failed'}")
     
