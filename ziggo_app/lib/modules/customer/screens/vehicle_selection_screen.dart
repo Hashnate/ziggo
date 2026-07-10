@@ -753,10 +753,10 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                   
                   // Vehicles horizontal list
                   if (_loadingEstimates)
-                    const SizedBox(height: 146, child: Center(child: CircularProgressIndicator()))
+                    const SizedBox(height: 165, child: Center(child: CircularProgressIndicator()))
                   else
                     SizedBox(
-                      height: 146,
+                      height: 165,
                       child: ListView(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1022,11 +1022,11 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
             customImageUrl != null
                 ? Image.network(
                     customImageUrl,
-                    height: 32,
+                    height: 52,
                     fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) => Image.asset(assetIcon, height: 32, fit: BoxFit.contain),
+                    errorBuilder: (context, error, stackTrace) => Image.asset(assetIcon, height: 52, fit: BoxFit.contain),
                   )
-                : Image.asset(assetIcon, height: 32, fit: BoxFit.contain),
+                : Image.asset(assetIcon, height: 52, fit: BoxFit.contain),
             const SizedBox(height: 6),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
