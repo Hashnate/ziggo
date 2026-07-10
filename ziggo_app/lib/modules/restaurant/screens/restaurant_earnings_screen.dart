@@ -399,6 +399,7 @@ class _Bar extends StatelessWidget {
       children: [
         Expanded(
           child: FractionallySizedBox(
+            alignment: Alignment.bottomCenter,
             heightFactor: value <= 0 ? 0.04 : pct,
             widthFactor: 1,
             child: Container(
