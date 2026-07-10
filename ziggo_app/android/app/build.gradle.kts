@@ -20,6 +20,11 @@ val localProps = Properties().apply {
 }
 val mapsApiKey: String = localProps.getProperty("MAPS_API_KEY") ?: ""
 
+val keystoreProperties = Properties().apply {
+    val f = rootProject.file("key.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+
 android {
     namespace = "lk.ziggo.app"
     compileSdk = flutter.compileSdkVersion
@@ -49,11 +54,31 @@ android {
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
+    signingConfigs {
+        create("release") {
+            val alias = keystoreProperties.getProperty("keyAlias")
+            val keyPass = keystoreProperties.getProperty("keyPassword")
+            val storePass = keystoreProperties.getProperty("storePassword")
+            val sFile = keystoreProperties.getProperty("storeFile")
+
+            if (alias != null && keyPass != null && storePass != null && sFile != null) {
+                keyAlias = alias
+                keyPassword = keyPass
+                storeFile = file(sFile)
+                storePassword = storePass
+            } else {
+                val debugConfig = signingConfigs.getByName("debug")
+                keyAlias = debugConfig.keyAlias
+                keyPassword = debugConfig.keyPassword
+                storeFile = debugConfig.storeFile
+                storePassword = debugConfig.storePassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }
