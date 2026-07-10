@@ -78,8 +78,10 @@ jobs:
           printf 'GOOGLE_MAPS_API_KEY=%s\n' "$MAPS_API_KEY" > .env
           printf 'MAPS_API_KEY=%s\n' "$MAPS_API_KEY" > ios/Flutter/Secrets.xcconfig
 
-          # Inject GoogleService-Info.plist for Firebase Cloud Messaging using Python to avoid platform-specific base64 CLI differences
-          python3 -c "import base64; open('ios/Runner/GoogleService-Info.plist', 'wb').write(base64.b64decode('${{ secrets.IOS_GOOGLE_SERVICE_INFO_BASE64 }}'))"
+          # Inject GoogleService-Info.plist for Firebase Cloud Messaging using a temp file to avoid python string literal escaping/newline issues
+          echo "${{ secrets.IOS_GOOGLE_SERVICE_INFO_BASE64 }}" > ios_base64_temp.txt
+          python3 -c "import base64; open('ios/Runner/GoogleService-Info.plist', 'wb').write(base64.b64decode(open('ios_base64_temp.txt', 'r').read().strip()))"
+          rm ios_base64_temp.txt
 
           # Archive unsigned, then sign at export time from ExportOptions.plist.
           flutter build ipa --release --no-codesign --build-number="$BUILD_NUMBER"
