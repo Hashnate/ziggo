@@ -46,7 +46,12 @@ jobs:
           MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
         run: |
           # 1. Decode keystore file from repository secrets into android/app/
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+          # Using -di to ignore newlines, whitespace, and carriage returns that may have been pasted into the secret.
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -di > android/app/upload-keystore.jks
+          
+          # Print size of the keystore to help verify it decoded correctly (should be >0 bytes)
+          echo "Decoded Keystore size:"
+          ls -lh android/app/upload-keystore.jks
           
           # 2. Write key.properties for Gradle release signing config
           echo "storePassword=$ANDROID_STORE_PASSWORD" > android/key.properties
