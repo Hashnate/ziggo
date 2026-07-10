@@ -337,12 +337,20 @@ class FcmService {
     // after launch doesn't no-op before Firebase is ready.
     await init();
     if (!_firebaseAvailable) return false;
-    try {
-      _cachedToken ??= await FirebaseMessaging.instance.getToken();
-    } catch (_) {
-      return false;
+    
+    String? token = _cachedToken;
+    // Retry up to 8 times with a 1-second delay if the token is null (very common on iOS startup/login)
+    for (int i = 0; i < 8; i++) {
+      if (token != null && token.isNotEmpty) break;
+      try {
+        token = await FirebaseMessaging.instance.getToken();
+      } catch (_) {}
+      if (token == null || token.isEmpty) {
+        await Future.delayed(const Duration(seconds: 1));
+      }
     }
-    final token = _cachedToken;
+    _cachedToken = token;
+    
     if (token == null || token.isEmpty) return false;
     return _sendToBackend(token);
   }
