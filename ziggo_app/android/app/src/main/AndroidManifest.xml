@@ -2,15 +2,16 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <!-- Required for call-style full-screen ride-request overlays (Android 14+) -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <application
-        android:label="ziggo_app"
+        android:label="Ziggo"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="false">
         <meta-data android:name="com.google.android.geo.API_KEY" android:value="${MAPS_API_KEY}"/>
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"

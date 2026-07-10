@@ -21,7 +21,7 @@ val localProps = Properties().apply {
 val mapsApiKey: String = localProps.getProperty("MAPS_API_KEY") ?: ""
 
 android {
-    namespace = "com.example.ziggo_app"
+    namespace = "lk.ziggo.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -37,7 +37,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.ziggo_app"
+        applicationId = "lk.ziggo.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

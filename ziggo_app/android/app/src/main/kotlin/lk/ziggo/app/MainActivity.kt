@@ -1,4 +1,4 @@
-package com.example.ziggo_app
+package lk.ziggo.app
 
 import io.flutter.embedding.android.FlutterActivity
 
