@@ -191,6 +191,7 @@ async def _send_to_token(
                     aps=messaging.Aps(
                         sound=ios_sound,
                         content_available=True,
+                        alert=messaging.ApsAlert(title=title, body=body),
                     ),
                 ),
             ),
