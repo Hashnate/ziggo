@@ -70,6 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
     
     context.read<FoodProvider>().fetchHome();
     context.read<MarketProvider>().fetchAds();
+    context.read<MarketProvider>().fetchCategories();
 
     _foodBannerTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
       if (_foodBannerCtrl.hasClients) {
@@ -323,6 +324,86 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildFoodCategories() {
+    final p = context.watch<FoodProvider>();
+    final categories = p.categories;
+    if (categories.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
+            'Popular Categories',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 100,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: categories.length,
+            itemBuilder: (context, index) {
+              final cat = categories[index];
+              final id = cat['id'] as int?;
+              final img = _resolveAsset(cat['icon_url']?.toString());
+              return GestureDetector(
+                onTap: () {
+                  if (id != null) {
+                    p.setCategoryFilter(id);
+                    _open(const FoodHomeScreen());
+                  }
+                },
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 16, left: 4),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.surfaceMuted,
+                          image: img != null
+                              ? DecorationImage(image: NetworkImage(img), fit: BoxFit.cover)
+                              : null,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: img == null
+                            ? const Icon(Icons.restaurant_rounded, color: AppColors.textTertiary, size: 28)
+                            : null,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        cat['name']?.toString() ?? '',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildMarketBanners() {
     final p = context.watch<MarketProvider>();
     final ads = p.ads;
@@ -488,6 +569,124 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildMarketCategories() {
+    final p = context.watch<MarketProvider>();
+    final categories = p.categories;
+    if (categories.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
+            'Popular Categories',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 100,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: categories.length,
+            itemBuilder: (context, index) {
+              final cat = categories[index];
+              final name = cat['name']?.toString() ?? '';
+              final rawImg = cat['image_url']?.toString() ?? '';
+              
+              Widget imageWidget;
+              if (rawImg.startsWith('local:')) {
+                final key = rawImg.replaceFirst('local:', '');
+                String assetPath;
+                switch (key) {
+                  case 'groceries': assetPath = 'assets/images/marketplace/groceries.png'; break;
+                  case 'pharmaceutical': assetPath = 'assets/images/marketplace/pharmaceutical.png'; break;
+                  case 'freshproduce': assetPath = 'assets/images/marketplace/freshproduce.png'; break;
+                  case 'household': assetPath = 'assets/images/marketplace/household.png'; break;
+                  case 'dairy': assetPath = 'assets/images/marketplace/dairy.png'; break;
+                  case 'babycare': assetPath = 'assets/images/marketplace/babycare.png'; break;
+                  case 'poultryandmeat': assetPath = 'assets/images/marketplace/poultryandmeat.png'; break;
+                  case 'personalcare': assetPath = 'assets/images/marketplace/personalcare.png'; break;
+                  case 'seafood': assetPath = 'assets/images/marketplace/seafood.png'; break;
+                  case 'petcare': assetPath = 'assets/images/marketplace/petcare.png'; break;
+                  case 'frozenfoods': assetPath = 'assets/images/marketplace/frozenfoods.png'; break;
+                  case 'cosmetics': assetPath = 'assets/images/marketplace/cosmetics.png'; break;
+                  case 'freshflower': assetPath = 'assets/images/marketplace/freshflower.png'; break;
+                  case 'bakery': assetPath = 'assets/images/marketplace/bakery-Photoroom.png'; break;
+                  case 'stationery': assetPath = 'assets/images/marketplace/stationery.png'; break;
+                  case 'electronics': assetPath = 'assets/images/marketplace/electronics.png'; break;
+                  case 'ayurvedic': assetPath = 'assets/images/marketplace/ayurvedic.png'; break;
+                  case '21+': assetPath = 'assets/images/marketplace/21+.png'; break;
+                  case 'intimacy': assetPath = 'assets/images/marketplace/intimacy.png'; break;
+                  default: assetPath = 'assets/images/marketplace/groceries.png';
+                }
+                imageWidget = Image.asset(assetPath, fit: BoxFit.contain);
+              } else {
+                final imageUrl = _resolveAsset(rawImg);
+                imageWidget = imageUrl != null
+                    ? Image.network(imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.shopping_bag_rounded, color: AppColors.primary, size: 28))
+                    : const Icon(Icons.shopping_bag_rounded, color: AppColors.primary, size: 28);
+              }
+
+              return GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => MarketGroupScreen(groupName: name)),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 16, left: 4),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.surfaceMuted,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: ClipOval(
+                          child: Center(
+                            child: SizedBox(
+                              width: 56,
+                              height: 56,
+                              child: imageWidget,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
@@ -557,7 +756,11 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 26),
             _buildFoodBanners(),
             const SizedBox(height: 26),
+            _buildFoodCategories(),
+            const SizedBox(height: 26),
             _buildMarketBanners(),
+            const SizedBox(height: 26),
+            _buildMarketCategories(),
           ]),
         ),
       ),
