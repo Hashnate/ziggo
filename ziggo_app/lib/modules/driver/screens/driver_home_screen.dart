@@ -633,18 +633,32 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   Future<void> _openNavigation(double lat, double lng) async {
-    final driver = context.read<DriverProvider>();
-    final driverLoc = driver.currentLocation;
-    final target = LatLng(lat, lng);
+    final googleMapsUrl = Uri.parse("google.navigation:q=$lat,$lng");
+    final mapUrl = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving");
 
-    setState(() {
-      _isNavigating = true;
-      _activeRideExpanded = false;
-      _requestSheetCollapsed = true;
-    });
-
-    final focusLoc = driverLoc ?? target;
-    _mapController.startNavigation(focusLoc, bearing: _heading);
+    try {
+      if (await canLaunchUrl(googleMapsUrl)) {
+        await launchUrl(googleMapsUrl, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(mapUrl)) {
+        await launchUrl(mapUrl, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open navigation application')),
+          );
+        }
+      }
+    } catch (_) {
+      try {
+        await launchUrl(mapUrl, mode: LaunchMode.externalApplication);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to launch navigation')),
+          );
+        }
+      }
+    }
   }
 
   @override
@@ -940,7 +954,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     _pendingPickupLatLng = pickup;
                     _pendingRoutePoints = routePoints;
                     _pendingPickupLabel = label;
-                    _requestSheetCollapsed = true;
+                    _requestSheetCollapsed = false;
                   });
                   if (loc != null) {
                     _mapController.fitBounds([loc, pickup]);
