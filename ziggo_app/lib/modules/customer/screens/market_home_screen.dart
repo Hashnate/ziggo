@@ -713,22 +713,11 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
 
     final itemCount = list != null ? list.length : _kCategories.length;
 
-    // Column-major fill: each on-screen column stacks two categories
-    // (item i on top, item i+1 below), scrolling horizontally for the rest.
-    final columns = <Widget>[];
-    for (var i = 0; i < itemCount; i += 2) {
-      columns.add(Padding(
+    final tiles = <Widget>[];
+    for (var i = 0; i < itemCount; i++) {
+      tiles.add(Padding(
         padding: const EdgeInsets.only(right: 12),
-        child: Column(
-          children: [
-            list != null ? _dynamicCategoryTile(list[i]) : _categoryTile(_kCategories[i]),
-            const SizedBox(height: 10),
-            if (i + 1 < itemCount)
-              list != null ? _dynamicCategoryTile(list[i + 1]) : _categoryTile(_kCategories[i + 1])
-            else
-              const SizedBox(width: 66, height: 86),
-          ],
-        ),
+        child: list != null ? _dynamicCategoryTile(list[i]) : _categoryTile(_kCategories[i]),
       ));
     }
     return Padding(
@@ -741,7 +730,7 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: columns,
+              children: tiles,
             ),
           ),
         ],
