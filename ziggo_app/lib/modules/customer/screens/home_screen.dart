@@ -94,7 +94,10 @@ class _HomeScreenState extends State<HomeScreen> {
         final itemsCount = p.ads.isNotEmpty ? p.ads.length : _kHomeMarketBanners.length;
         if (itemsCount == 0) return;
         
-        int nextPage = (_marketBannerPage + 1) % itemsCount;
+        int nextPage = _marketBannerPage - 1;
+        if (nextPage < 0) {
+          nextPage = itemsCount - 1;
+        }
         _marketBannerCtrl.animateToPage(
           nextPage,
           duration: const Duration(milliseconds: 400),
@@ -315,6 +318,86 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             );
           }),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFoodCategories() {
+    final p = context.watch<FoodProvider>();
+    final categories = p.categories;
+    if (categories.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
+            'Popular Categories',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 100,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: categories.length,
+            itemBuilder: (context, index) {
+              final cat = categories[index];
+              final id = cat['id'] as int?;
+              final img = _resolveAsset(cat['icon_url']?.toString());
+              return GestureDetector(
+                onTap: () {
+                  if (id != null) {
+                    p.setCategoryFilter(id);
+                    _open(const FoodHomeScreen());
+                  }
+                },
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 16, left: 4),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.surfaceMuted,
+                          image: img != null
+                              ? DecorationImage(image: NetworkImage(img), fit: BoxFit.cover)
+                              : null,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: img == null
+                            ? const Icon(Icons.restaurant_rounded, color: AppColors.textTertiary, size: 28)
+                            : null,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        cat['name']?.toString() ?? '',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
         ),
       ],
     );
@@ -553,6 +636,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 26),
             _buildFoodBanners(),
+            const SizedBox(height: 26),
+            _buildFoodCategories(),
             const SizedBox(height: 26),
             _buildMarketBanners(),
           ]),
