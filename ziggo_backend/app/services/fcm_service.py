@@ -150,14 +150,18 @@ async def _send_to_token(
     payload_data["body"] = body
 
     if event == "new_ride_request":
-        # Data-only payload for Android to force the OS to run the background Dart handler
-        # (firebaseMessagingBackgroundHandler) which displays the custom 30-second looping notification.
-        # iOS still gets the notification block via APNs.
+        # Hybrid payload (notification + data) to guarantee delivery in Doze/background states on Android,
+        # while client-side firebaseMessagingBackgroundHandler still runs to show the custom looping alert.
         msg = messaging.Message(
             token=token,
+            notification=messaging.Notification(title=title, body=body),
             data=payload_data,
             android=messaging.AndroidConfig(
                 priority="high",
+                notification=messaging.AndroidNotification(
+                    sound=android_sound,
+                    channel_id=android_channel,
+                ),
             ),
             apns=messaging.APNSConfig(
                 headers={"apns-priority": "10"},
