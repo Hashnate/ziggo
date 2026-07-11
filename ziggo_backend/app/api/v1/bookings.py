@@ -1392,6 +1392,54 @@ async def update_booking_status(
         b.completed_at = now
         b.payment_status = "paid"
 
+        if body.lat is not None and body.lng is not None:
+            cust_q = await db.execute(select(Customer).where(Customer.id == b.customer_id))
+            customer = cust_q.scalars().first()
+
+            from ...models import BookingStop
+            stops_q = await db.execute(
+                select(BookingStop).where(BookingStop.booking_id == b.id).order_by(BookingStop.order_index)
+            )
+            stops_models = stops_q.scalars().all()
+            stops_list = [{"lat": float(s.lat), "lng": float(s.lng), "address": s.address or ""} for s in stops_models]
+
+            fare = await calculate_fare(
+                db,
+                b.service_type,
+                float(b.pickup_lat),
+                float(b.pickup_lng),
+                body.lat,
+                body.lng,
+                b.promo_code,
+                trip_type=b.trip_type or "one_way",
+                is_flash=b.is_flash,
+                parcel_weight_kg=float(b.parcel_weight_kg) if b.parcel_weight_kg else None,
+                is_rental=b.is_rental,
+                rental_hours=b.rental_hours,
+                is_courier=b.is_courier,
+                customer=customer,
+                redeem_points=int(b.redeem_points) if b.redeem_points else 0,
+                stops=stops_list,
+                driver_accepted_lat=float(b.driver_accepted_lat) if b.driver_accepted_lat else None,
+                driver_accepted_lng=float(b.driver_accepted_lng) if b.driver_accepted_lng else None,
+            )
+
+            b.drop_lat = Decimal(str(body.lat))
+            b.drop_lng = Decimal(str(body.lng))
+            b.distance_km = to_decimal(fare["distance_km"])
+            b.duration_min = fare["duration_min"]
+            b.fare_amount = to_decimal(fare["fare_amount"])
+            b.discount_amount = to_decimal(fare["discount_amount"])
+            b.final_amount = to_decimal(fare["final_amount"])
+            b.platform_fee = to_decimal(fare["platform_fee"])
+            b.driver_earnings = to_decimal(fare["driver_earnings"])
+            b.pickup_distance_km = to_decimal(fare.get("pickup_distance_km", 0))
+            b.pickup_fee = to_decimal(fare.get("pickup_fee", 0))
+            b.boost = to_decimal(fare.get("boost", 0))
+            b.passenger_deductible = to_decimal(fare.get("passenger_deductible", 0))
+            b.app_usage_charges = to_decimal(fare.get("app_usage_charges", 0))
+            b.deductions = to_decimal(fare.get("deductions", 0))
+
         # BRD: CD-19 / BR-9 — sum excess waiting charges across all stops and
         # add them to the customer's final bill. Done BEFORE the wallet debit
         # so the wallet path withdraws the full inclusive amount.

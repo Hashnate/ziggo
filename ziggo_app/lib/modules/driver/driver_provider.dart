@@ -401,7 +401,16 @@ class DriverProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<bool> updateRideStatus(String status, {String? reason, String? otp}) async {
+  Map<String, dynamic>? _lastCompletedRide;
+  Map<String, dynamic>? get lastCompletedRide => _lastCompletedRide;
+
+  Future<bool> updateRideStatus(
+    String status, {
+    String? reason,
+    String? otp,
+    double? actualDropLat,
+    double? actualDropLng,
+  }) async {
     if (_activeRide == null) return false;
     final id = _activeRide!['id'];
     try {
@@ -411,9 +420,15 @@ class DriverProvider extends ChangeNotifier {
           'status': status,
           if (reason != null) 'reason': reason,
           if (otp != null) 'otp': otp,
+          if (actualDropLat != null) 'lat': actualDropLat,
+          if (actualDropLng != null) 'lng': actualDropLng,
         },
       );
-      _activeRide = Map<String, dynamic>.from(resp.data);
+      final updated = Map<String, dynamic>.from(resp.data);
+      _activeRide = updated;
+      if (status == 'completed') {
+        _lastCompletedRide = updated;
+      }
       if (status == 'completed' || status == 'cancelled') {
         _activeRide = null;
         await loadProfile();

@@ -2556,16 +2556,44 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   Future<void> _handleCompleteTrip(DriverProvider driver, Map<String, dynamic> ride) async {
-    final paymentMethod = (ride['payment_method'] ?? 'cash').toString().toLowerCase();
-    final amount = (ride['final_amount'] as num?)?.toDouble() ?? 0.0;
-    final pickupFee = (ride['pickup_fee'] as num?)?.toDouble() ?? 0.0;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
+      ),
+    );
 
-    final passDeductible = (ride['passenger_deductible'] as num?)?.toDouble() ?? 0.0;
-    final grossTotal = (ride['final_amount'] as num?)?.toDouble() ?? 0.0;
-    final tripFare = (ride['fare_amount'] as num?)?.toDouble() ?? (grossTotal - passDeductible);
-    final appUsage = (ride['app_usage_charges'] as num?)?.toDouble() ?? (ride['platform_fee'] as num?)?.toDouble() ?? 0.0;
-    final totalDeductions = (ride['deductions'] as num?)?.toDouble() ?? (appUsage + passDeductible);
-    final driverEarnings = (ride['driver_earnings'] as num?)?.toDouble() ?? (grossTotal - totalDeductions);
+    final success = await driver.updateRideStatus(
+      'completed',
+      actualDropLat: driver.currentLocation?.latitude,
+      actualDropLng: driver.currentLocation?.longitude,
+    );
+
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+
+    if (!success) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to complete trip. Please try again.')),
+        );
+      }
+      return;
+    }
+
+    final updatedRide = driver.lastCompletedRide ?? ride;
+    final paymentMethod = (updatedRide['payment_method'] ?? 'cash').toString().toLowerCase();
+    final amount = (updatedRide['final_amount'] as num?)?.toDouble() ?? 0.0;
+    final pickupFee = (updatedRide['pickup_fee'] as num?)?.toDouble() ?? 0.0;
+
+    final passDeductible = (updatedRide['passenger_deductible'] as num?)?.toDouble() ?? 0.0;
+    final grossTotal = (updatedRide['final_amount'] as num?)?.toDouble() ?? 0.0;
+    final tripFare = (updatedRide['fare_amount'] as num?)?.toDouble() ?? (grossTotal - passDeductible);
+    final appUsage = (updatedRide['app_usage_charges'] as num?)?.toDouble() ?? (updatedRide['platform_fee'] as num?)?.toDouble() ?? 0.0;
+    final totalDeductions = (updatedRide['deductions'] as num?)?.toDouble() ?? (appUsage + passDeductible);
+    final driverEarnings = (updatedRide['driver_earnings'] as num?)?.toDouble() ?? (grossTotal - totalDeductions);
 
     Widget buildItemizedRow(String label, String val, {bool isNegative = false, bool isBold = false, Color? customColor}) {
       return Padding(
@@ -2581,8 +2609,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     }
 
     if (paymentMethod == 'cash') {
-      final confirmed = await showDialog<bool>(
+      await showDialog<bool>(
         context: context,
+        barrierDismissible: false,
         builder: (ctx) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: const Text('Collect Cash', textAlign: TextAlign.center),
@@ -2615,10 +2644,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           ),
           actionsAlignment: MainAxisAlignment.center,
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
-            ),
             ElevatedButton(
               onPressed: () => Navigator.of(ctx).pop(true),
               style: ElevatedButton.styleFrom(
@@ -2631,10 +2656,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           ],
         ),
       );
-      if (confirmed != true) return;
     } else if (paymentMethod == 'wallet' || paymentMethod == 'card' || paymentMethod.startsWith('card')) {
-      final confirmed = await showDialog<bool>(
+      await showDialog<bool>(
         context: context,
+        barrierDismissible: false,
         builder: (ctx) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: const Text('Digital Payment', textAlign: TextAlign.center),
@@ -2679,11 +2704,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           ],
         ),
       );
-      if (confirmed != true) return;
     }
-    
-    final bookingId = ride['id'] as int;
-    await driver.updateRideStatus('completed');
+
+    final bookingId = updatedRide['id'] as int;
     if (mounted) {
       Navigator.push(
         context,

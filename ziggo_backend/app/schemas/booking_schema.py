@@ -212,6 +212,8 @@ class BookingStatusUpdate(BaseModel):
     status: BookingStatus
     reason: Optional[str] = None
     otp: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
 
 
 class BookingRateRequest(BaseModel):
