@@ -454,7 +454,7 @@ class _DriverHistoryScreenState extends State<DriverHistoryScreen> {
                                     ),
                                     const Spacer(),
                                     Text(
-                                      'Rs.${((r['driver_earnings'] as num?) ?? (r['final_amount'] as num?) ?? 0).toStringAsFixed(0)}',
+                                      'Rs.${r['status'] == 'cancelled' ? '0' : ((r['driver_earnings'] as num?) ?? (r['final_amount'] as num?) ?? 0).toStringAsFixed(0)}',
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 15,

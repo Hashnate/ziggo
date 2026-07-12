@@ -1166,11 +1166,11 @@ async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
     for o in [*foods, *markets]:
         df = _dec(o.delivery_fee)
         if hasattr(o, "restaurant_id"):
-            _, cut = _food_split(o)
+            earn, _ = _food_split(o)
         else:
-            _, cut = _market_split(o)
+            earn, _ = _market_split(o)
         delivery_collected += df
-        delivery_earnings += df - cut
+        delivery_earnings += earn
     delivery_count = len(delivery_bookings) + len(foods) + len(markets)
 
     collected = ride_collected + delivery_collected
