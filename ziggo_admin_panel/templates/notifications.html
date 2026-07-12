@@ -10,7 +10,7 @@
             <div class="stat-icon bg-blue-100 text-ziggo text-base"><i class="fas fa-bell"></i></div>
             <div>
                 <p class="text-[10px] text-ziggo-faint uppercase font-bold">Total</p>
-                <p class="text-xl font-black text-ziggo-ink">{{ notifications | length }}</p>
+                <p class="text-xl font-black text-ziggo-ink">{{ total_notifications }}</p>
             </div>
         </div>
     </div>
@@ -39,7 +39,7 @@
         <select id="typeFilter" class="px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-ziggo">
             <option value="">All types</option>
             {% for label in by_type.keys() %}
-            <option value="{{ label }}">{{ label }}</option>
+            <option value="{{ label }}" {% if label == selected_type %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
         </select>
     </div>
@@ -102,7 +102,7 @@
         </p>
         <div class="flex items-center gap-1.5">
             {% if page > 1 %}
-                <a href="/admin/notifications?page={{ page - 1 }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
+                <a href="/admin/notifications?page={{ page - 1 }}&notification_type={{ selected_type }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
             {% else %}
                 <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Previous</span>
             {% endif %}
@@ -111,12 +111,12 @@
                 {% if p == page %}
                     <span class="px-3 py-1.5 rounded-lg bg-ziggo text-white text-xs font-black">{{ p }}</span>
                 {% else %}
-                    <a href="/admin/notifications?page={{ p }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
+                    <a href="/admin/notifications?page={{ p }}&notification_type={{ selected_type }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
                 {% endif %}
             {% endfor %}
 
             {% if page < total_pages %}
-                <a href="/admin/notifications?page={{ page + 1 }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
+                <a href="/admin/notifications?page={{ page + 1 }}&notification_type={{ selected_type }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
             {% else %}
                 <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Next</span>
             {% endif %}
@@ -128,9 +128,7 @@
 <script>
     document.getElementById('typeFilter').addEventListener('change', (e) => {
         const v = e.target.value;
-        document.querySelectorAll('#notifTable tbody tr').forEach(tr => {
-            tr.style.display = !v || tr.dataset.type === v ? '' : 'none';
-        });
+        window.location.href = `/admin/notifications?page=1&notification_type=${v}`;
     });
 </script>
 {% endblock %}

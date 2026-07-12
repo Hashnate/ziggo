@@ -1443,6 +1443,7 @@ async def admin_bookings(
 async def admin_notifications(
     request: Request,
     page: int = 1,
+    notification_type: str = "",
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -1450,14 +1451,26 @@ async def admin_notifications(
     limit = 50
     offset = (page - 1) * limit
 
+    # Build query
+    stmt = select(Notification)
+    count_stmt = select(func.count(Notification.id))
+
+    if notification_type:
+        if notification_type == "other":
+            stmt = stmt.where(Notification.type == None)
+            count_stmt = count_stmt.where(Notification.type == None)
+        else:
+            stmt = stmt.where(Notification.type == notification_type)
+            count_stmt = count_stmt.where(Notification.type == notification_type)
+
     # Total count of notifications
-    total_q = await db.execute(select(func.count(Notification.id)))
+    total_q = await db.execute(count_stmt)
     total_notifications = total_q.scalar() or 0
     total_pages = (total_notifications + limit - 1) // limit
 
     # Paginated notifications
     q = await db.execute(
-        select(Notification)
+        stmt
         .options(selectinload(Notification.user))
         .order_by(desc(Notification.created_at))
         .offset(offset)
@@ -1495,6 +1508,7 @@ async def admin_notifications(
             "start_idx": start_idx,
             "end_idx": end_idx,
             "page_range": page_range,
+            "selected_type": notification_type,
         },
     )
 

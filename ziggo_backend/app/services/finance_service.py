@@ -1344,7 +1344,7 @@ async def get_restaurant_outstanding_commission(db: AsyncSession, restaurant_id:
 
 
 async def check_and_deactivate_restaurant(db: AsyncSession, restaurant_id: int) -> bool:
-    from app.models import Restaurant
+    from app.models import Restaurant, SystemSettings
     
     rq = await db.execute(select(Restaurant).where(Restaurant.id == restaurant_id))
     r = rq.scalars().first()
@@ -1352,7 +1352,12 @@ async def check_and_deactivate_restaurant(db: AsyncSession, restaurant_id: int) 
         return False
         
     outstanding = await get_restaurant_outstanding_commission(db, restaurant_id)
-    max_limit = r.max_settle_amount if r.max_settle_amount is not None else Decimal("1000.00")
+    
+    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    ss = ss_q.scalars().first()
+    global_limit = ss.max_settle_amount if (ss and ss.max_settle_amount is not None) else Decimal("1000.00")
+    
+    max_limit = r.max_settle_amount if r.max_settle_amount is not None else global_limit
         
     if outstanding > max_limit:
         if r.is_active:
@@ -1422,7 +1427,7 @@ async def get_market_outstanding_commission(db, vendor_id: int):
 async def check_and_deactivate_market_vendor(db, vendor_id: int) -> bool:
     from sqlalchemy import select
     from decimal import Decimal
-    from app.models import MarketVendor
+    from app.models import MarketVendor, SystemSettings
     
     vq = await db.execute(select(MarketVendor).where(MarketVendor.id == vendor_id))
     v = vq.scalars().first()
@@ -1430,7 +1435,12 @@ async def check_and_deactivate_market_vendor(db, vendor_id: int) -> bool:
         return False
         
     outstanding = await get_market_outstanding_commission(db, vendor_id)
-    max_limit = v.max_settle_amount if v.max_settle_amount is not None else Decimal("1000.00")
+    
+    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    ss = ss_q.scalars().first()
+    global_limit = ss.max_settle_amount if (ss and ss.max_settle_amount is not None) else Decimal("1000.00")
+    
+    max_limit = v.max_settle_amount if v.max_settle_amount is not None else global_limit
         
     if outstanding > max_limit:
         if v.is_active:
