@@ -151,7 +151,8 @@ async def calculate_fare(
 
         final = max(0, fare - discount)
         platform_fee = final * (platform_pct / 100.0)
-        driver_earnings = final - platform_fee
+        passenger_pays = final + platform_fee
+        driver_earnings = passenger_pays - platform_fee
 
         rental_dict = {
             "distance_km": 0.0,
@@ -159,7 +160,7 @@ async def calculate_fare(
             "duration_min": hours * 60,
             "fare_amount": round(fare, 2),
             "discount_amount": round(discount, 2),
-            "final_amount": round(final, 2),
+            "final_amount": round(passenger_pays, 2),
             "platform_fee": round(platform_fee, 2),
             "driver_earnings": round(driver_earnings, 2),
             "promo_code": promo_applied,
@@ -208,7 +209,8 @@ async def calculate_fare(
 
         final = max(0, fare - discount)
         platform_fee = final * (platform_pct / 100.0)
-        driver_earnings = final - platform_fee
+        passenger_pays = final + platform_fee
+        driver_earnings = passenger_pays - platform_fee
 
         courier_dict = {
             "distance_km": round(distance_km, 2),
@@ -216,7 +218,7 @@ async def calculate_fare(
             "duration_min": round(eta_days * 24 * 60),
             "fare_amount": round(fare, 2),
             "discount_amount": round(discount, 2),
-            "final_amount": round(final, 2),
+            "final_amount": round(passenger_pays, 2),
             "platform_fee": round(platform_fee, 2),
             "driver_earnings": round(driver_earnings, 2),
             "promo_code": promo_applied,
@@ -274,6 +276,12 @@ async def calculate_fare(
     pickup_distance_km = 0.0
     if driver_accepted_lat is not None and driver_accepted_lng is not None:
         pickup_distance_km = haversine_km(driver_accepted_lat, driver_accepted_lng, pickup_lat, pickup_lng)
+    else:
+        from .matching_service import find_nearest_driver
+        search_radius = float(setting.search_radius_km) if (setting and setting.search_radius_km is not None) else 10.0
+        nearest = await find_nearest_driver(db, pickup_lat, pickup_lng, service_type, max_distance_km=search_radius)
+        if nearest and nearest.current_lat is not None and nearest.current_lng is not None:
+            pickup_distance_km = haversine_km(float(nearest.current_lat), float(nearest.current_lng), pickup_lat, pickup_lng)
     
     # Recalculate pickup fee as percentage of distance * per_km rate
     base_pickup_fee = pickup_distance_km * per_km
@@ -298,7 +306,7 @@ async def calculate_fare(
         if in_surge:
             surge = mult
 
-    raw = (base + pickup_fee_val + per_km * distance_km + per_min * duration_min) * surge
+    raw = (base + per_km * distance_km + per_min * duration_min) * surge
     fare_val = max(raw, min_fare)
     
     # Apply category discount percentage before applying anything else
@@ -309,6 +317,7 @@ async def calculate_fare(
             fare_val = max(0.0, fare_val - category_discount)
 
     fare_val += boost_val
+    fare_val += pickup_fee_val
 
     # Peak hours surcharge check
     peak_surcharge = 0.0
@@ -391,7 +400,7 @@ async def calculate_fare(
     feeable_amount = max(0.0, final_pre_deductible - boost_val)
     app_usage_charges = feeable_amount * (platform_pct / 100.0)
     
-    gross_total = final_pre_deductible + passenger_deductible_val
+    gross_total = final_pre_deductible + passenger_deductible_val + app_usage_charges
     deductions = app_usage_charges + passenger_deductible_val
     driver_earnings = gross_total - deductions
 
