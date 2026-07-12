@@ -1043,8 +1043,8 @@ async def get_driver_outstanding_commission(db: AsyncSession, driver_id: int) ->
     cash_food_commission = Decimal("0")
     for o in cash_foods:
         df = _dec(o.delivery_fee)
-        _, cut = _food_split(o)
-        cash_food_commission += cut
+        earn, _ = _food_split(o)
+        cash_food_commission += (df - earn)
         
     # 3. Platform fee from completed cash market orders
     mq = await db.execute(
@@ -1058,8 +1058,8 @@ async def get_driver_outstanding_commission(db: AsyncSession, driver_id: int) ->
     cash_market_commission = Decimal("0")
     for o in cash_markets:
         df = _dec(o.delivery_fee)
-        _, cut = _market_split(o)
-        cash_market_commission += cut
+        earn, _ = _market_split(o)
+        cash_market_commission += (df - earn)
         
     total_owed = cash_booking_commission + cash_food_commission + cash_market_commission
     

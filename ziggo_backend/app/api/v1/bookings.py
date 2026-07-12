@@ -982,7 +982,6 @@ async def list_my_bookings(
             select(Booking)
             .where(Booking.driver_id == driver.id)
             .order_by(Booking.booked_at.desc())
-            .limit(limit)
         )
         bookings = q.scalars().all()
 
@@ -991,7 +990,6 @@ async def list_my_bookings(
             .options(selectinload(FoodOrder.restaurant))
             .where(FoodOrder.driver_id == driver.id)
             .order_by(FoodOrder.created_at.desc())
-            .limit(limit)
         )
         foods = fq.scalars().all()
 
@@ -1000,7 +998,6 @@ async def list_my_bookings(
             .options(selectinload(MarketOrder.vendor))
             .where(MarketOrder.driver_id == driver.id)
             .order_by(MarketOrder.created_at.desc())
-            .limit(limit)
         )
         markets = mq.scalars().all()
 
@@ -1013,7 +1010,7 @@ async def list_my_bookings(
             res.append((m.created_at, await _market_order_to_booking_response(db, m)))
 
         res.sort(key=lambda x: x[0].astimezone(timezone.utc) if x[0] else datetime.min.replace(tzinfo=timezone.utc), reverse=True)
-        final_res = [x[1] for x in res[:limit]]
+        final_res = [x[1] for x in res]
         return final_res
     else:
         q = await db.execute(select(Booking).order_by(Booking.booked_at.desc()).limit(limit))

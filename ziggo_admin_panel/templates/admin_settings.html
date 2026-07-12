@@ -43,12 +43,14 @@
     {% endif %}
 
     <form method="POST" action="/admin/settings" enctype="multipart/form-data">
+        <input type="hidden" name="active_tab" id="activeTabInput" value="general">
         <div class="settings-layout">
 
             <!-- Left tabs -->
             <aside class="settings-tabs" id="settingsTabs">
                 <button type="button" class="settings-tab active" data-tab="general"><i class="fas fa-globe"></i> General</button>
                 <button type="button" class="settings-tab" data-tab="pricing"><i class="fas fa-coins"></i> Pricing</button>
+                <button type="button" class="settings-tab" data-tab="peakhours"><i class="fas fa-clock"></i> Peak Hours</button>
                 <button type="button" class="settings-tab" data-tab="security"><i class="fas fa-shield-alt"></i> Security</button>
                 <button type="button" class="settings-tab" data-tab="notifications"><i class="fas fa-bell"></i> Notifications</button>
                 <button type="button" class="settings-tab" data-tab="loyalty"><i class="fas fa-medal"></i> Loyalty &amp; Membership</button>
@@ -139,9 +141,15 @@
                             <input type="number" min="1" name="driver_search_radius_km" value="{{ s.driver_search_radius_km if s.driver_search_radius_km is not none else 15 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                             <p class="text-[10px] text-ziggo-faint font-bold mt-1">Maximum distance to search for available drivers when a booking is created.</p>
                         </div>
-                        <hr class="border-ziggo-line my-4">
-                        <h4 class="text-sm font-black text-ziggo-ink mb-3">Peak Hours Settings</h4>
-                        
+                    </div>
+                </section>
+
+                <!-- Peak Hours -->
+                <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="peakhours">
+                    <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                        <i class="fas fa-clock text-ziggo"></i> Peak Hours Settings
+                    </h3>
+                    <div class="space-y-4">
                         <div class="bg-white rounded-2xl border border-ziggo-line overflow-hidden shadow-soft-sm mb-4">
                             <table class="w-full text-left border-collapse">
                                 <thead class="bg-gray-50 text-[11px] uppercase text-ziggo-muted font-black tracking-wider border-b border-ziggo-line">
@@ -186,7 +194,6 @@
                                 </tbody>
                             </table>
                         </div>
-
                     </div>
                 </section>
 
@@ -477,6 +484,10 @@
             var saveBar = document.getElementById('settingsSaveBar');
             if (saveBar) {
                 saveBar.style.display = (name === 'incentives') ? 'none' : 'flex';
+            }
+            var activeTabInput = document.getElementById('activeTabInput');
+            if (activeTabInput) {
+                activeTabInput.value = name;
             }
             try { sessionStorage.setItem('ziSettingsTab', name); } catch (e) {}
         }

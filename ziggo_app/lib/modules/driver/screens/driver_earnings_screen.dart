@@ -459,8 +459,8 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                         Text(
                           'Rs.${total.toStringAsFixed(2)}',
                           style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 26,
+                            color: Color(0xFF4ADE80),
+                            fontSize: 20,
                             fontWeight: FontWeight.w900,
                             letterSpacing: -0.6,
                           ),
@@ -482,17 +482,17 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                             'COMMISSION DUE',
                             style: TextStyle(
                               color: Colors.white70,
-                              fontSize: 9,
+                              fontSize: 10,
                               fontWeight: FontWeight.w900,
-                              letterSpacing: 1.0,
+                              letterSpacing: 1.4,
                             ),
                           ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 4),
                           Text(
                             'Rs.${outstanding.toStringAsFixed(2)}',
                             style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
+                              color: Color(0xFFF87171),
+                              fontSize: 20,
                               fontWeight: FontWeight.w900,
                             ),
                           ),

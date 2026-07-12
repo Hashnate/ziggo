@@ -2108,6 +2108,7 @@ async def admin_settings_get(
 
 @router.post("/settings")
 async def admin_settings_save(
+    active_tab: str = Form("pricing"),
     # General
     site_name: str = Form(""),
     admin_email: str = Form(""),
@@ -2187,7 +2188,7 @@ async def admin_settings_save(
         if not re.match(r"^\d{10}$", cleaned_phone):
             import urllib.parse
             err_msg = "Contact phone must be a 10-digit login phone number (e.g. 0773095788)"
-            return RedirectResponse(url=f"/admin/settings?error={urllib.parse.quote(err_msg)}", status_code=303)
+            return RedirectResponse(url=f"/admin/settings?tab={active_tab}&error={urllib.parse.quote(err_msg)}", status_code=303)
         
         # Check if another user already has this phone number
         q_dup = await db.execute(select(User).where(User.phone_number == cleaned_phone, User.id != admin.id))
@@ -2195,7 +2196,7 @@ async def admin_settings_save(
         if dup_user:
             import urllib.parse
             err_msg = f"Phone number {cleaned_phone} is already registered under another account (role: {dup_user.role.value}). Please use a different phone number."
-            return RedirectResponse(url=f"/admin/settings?error={urllib.parse.quote(err_msg)}", status_code=303)
+            return RedirectResponse(url=f"/admin/settings?tab={active_tab}&error={urllib.parse.quote(err_msg)}", status_code=303)
         
         # Update admin's login phone number
         admin.phone_number = cleaned_phone
@@ -2332,7 +2333,7 @@ async def admin_settings_save(
         s.favicon_url = new_favicon
 
     await db.commit()
-    return RedirectResponse(url="/admin/settings?tab=pricing&saved=1", status_code=303)
+    return RedirectResponse(url=f"/admin/settings?tab={active_tab}&saved=1", status_code=303)
 
 
 @router.post("/settings/peak-hours/{id}/toggle")
@@ -2348,7 +2349,7 @@ async def admin_peak_hours_toggle(
         raise HTTPException(status_code=404, detail="Peak hour setting not found")
     p.is_active = not bool(p.is_active)
     await db.commit()
-    return RedirectResponse(url="/admin/settings?tab=pricing&saved=1", status_code=303)
+    return RedirectResponse(url="/admin/settings?tab=peakhours&saved=1", status_code=303)
 
 
 
