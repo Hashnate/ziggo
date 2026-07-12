@@ -469,35 +469,28 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                     ),
                   ),
                   if (outstanding > 0)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          const Text(
-                            'COMMISSION DUE',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.4,
-                            ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        const Text(
+                          'COMMISSION DUE',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.4,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Rs.${outstanding.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              color: Color(0xFFF87171),
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900,
-                            ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Rs.${outstanding.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            color: Color(0xFFFF9B9B),
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                 ],
               ),
