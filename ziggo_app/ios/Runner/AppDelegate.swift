@@ -11,6 +11,7 @@ import FirebaseMessaging
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     FirebaseApp.configure()
+    application.registerForRemoteNotifications() // Force APNs registration on boot
     
     if let key = Bundle.main.object(forInfoDictionaryKey: "MAPS_API_KEY") as? String,
        !key.isEmpty,
