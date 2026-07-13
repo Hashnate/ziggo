@@ -48,7 +48,7 @@ class DriverRideDetailsScreen extends StatelessWidget {
   String _formatDate(String? dateStr) {
     if (dateStr == null || dateStr.isEmpty) return '';
     try {
-      final date = DateTime.parse(dateStr);
+      final date = DateTime.parse(dateStr).toLocal();
       return DateFormat('dd MMM yyyy, hh:mm a').format(date);
     } catch (_) {
       if (dateStr.length >= 16) return dateStr.substring(0, 16);
@@ -59,7 +59,7 @@ class DriverRideDetailsScreen extends StatelessWidget {
   String _formatTimeOnly(String? dateStr) {
     if (dateStr == null || dateStr.isEmpty) return '';
     try {
-      final date = DateTime.parse(dateStr);
+      final date = DateTime.parse(dateStr).toLocal();
       return DateFormat('hh:mm a').format(date);
     } catch (_) {
       return '';
@@ -535,7 +535,7 @@ class DriverRideDetailsScreen extends StatelessWidget {
                     _breakdownRow('Passenger deductibles', fmt.format((rideData['passenger_deductible'] as num?) ?? 0)),
                     
                     const Divider(height: 24),
-                    _breakdownRow('Gross total', fmt.format(((rideData['fare_amount'] as num?) ?? 0) + ((rideData['passenger_deductible'] as num?) ?? 0) + ((rideData['peak_surcharge'] as num?) ?? 0)), isBold: true),
+                    _breakdownRow('Gross total', fmt.format((rideData['final_amount'] as num?)?.toDouble() ?? 0.0), isBold: true),
                     const SizedBox(height: 16),
                     
                     _breakdownRow('App usage charges', fmt.format((rideData['app_usage_charges'] as num?) ?? (rideData['platform_fee'] as num?) ?? 0), isNegative: true),
