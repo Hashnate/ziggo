@@ -532,6 +532,7 @@ class DriverRideDetailsScreen extends StatelessWidget {
                       _breakdownRow('Pickup fee (included)', fmt.format((rideData['pickup_fee'] as num?) ?? 0)),
                     if (((rideData['peak_surcharge'] as num?) ?? 0) > 0)
                       _breakdownRow('Peak hours extra earnings', fmt.format((rideData['peak_surcharge'] as num?) ?? 0)),
+                    _breakdownRow('App usage charges', fmt.format((rideData['app_usage_charges'] as num?) ?? (rideData['platform_fee'] as num?) ?? 0)),
                     _breakdownRow('Passenger deductibles', fmt.format((rideData['passenger_deductible'] as num?) ?? 0)),
                     
                     const Divider(height: 24),
