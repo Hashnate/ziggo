@@ -83,13 +83,8 @@ jobs:
           python3 -c "import base64; open('ios/Runner/GoogleService-Info.plist', 'wb').write(base64.b64decode(open('ios_base64_temp.txt', 'r').read().strip()))"
           rm ios_base64_temp.txt
 
-          # Archive unsigned, then sign at export time from ExportOptions.plist.
-          flutter build ipa --release --no-codesign --build-number="$BUILD_NUMBER"
-
-          xcodebuild -exportArchive \
-            -archivePath build/ios/archive/Runner.xcarchive \
-            -exportPath build/ios/ipa \
-            -exportOptionsPlist ios/ExportOptions.plist
+          # Archive and sign using the official Flutter build ipa command which embeds entitlements properly
+          flutter build ipa --release --build-number="$BUILD_NUMBER" --export-options-plist=ios/ExportOptions.plist
 
           mv build/ios/ipa/*.ipa build/ios/ipa/app.ipa
 
