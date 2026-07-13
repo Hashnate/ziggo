@@ -10,6 +10,8 @@ import FirebaseMessaging
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    FirebaseApp.configure()
+    
     if let key = Bundle.main.object(forInfoDictionaryKey: "MAPS_API_KEY") as? String,
        !key.isEmpty,
        !key.contains("$") {
@@ -32,7 +34,22 @@ import FirebaseMessaging
     _ application: UIApplication,
     didFailToRegisterForRemoteNotificationsWithError error: Error
   ) {
-    NSLog("Failed to register for remote notifications: \(error.localizedDescription)")
+    let errorMessage = "Failed to register for remote notifications: \(error.localizedDescription)"
+    NSLog(errorMessage)
+    
+    // Post the error message back to the backend so we can see it in docker compose logs
+    let hosts = ["https://ziggo.lk", "http://187.127.152.141"]
+    for host in hosts {
+      if let url = URL(string: "\(host)/api/v1/public/log") {
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let json: [String: Any] = ["message": "[ios-native-error] \(errorMessage)"]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: json)
+        URLSession.shared.dataTask(with: request).resume()
+      }
+    }
+    
     super.application(application, didFailToRegisterForRemoteNotificationsWithError: error)
   }
 
