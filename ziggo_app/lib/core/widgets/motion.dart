@@ -57,8 +57,11 @@ class EntranceSlide extends StatefulWidget {
 }
 
 class _EntranceSlideState extends State<EntranceSlide>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late final AnimationController _ctrl;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -81,6 +84,7 @@ class _EntranceSlideState extends State<EntranceSlide>
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final curved = CurvedAnimation(parent: _ctrl, curve: widget.curve);
     return AnimatedBuilder(
       animation: curved,
