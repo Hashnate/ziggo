@@ -884,12 +884,32 @@ async def get_my_market_order_details(
     if order.delivered_at and order.picked_up_at:
         duration_min = max(0, int((order.delivered_at - order.picked_up_at).total_seconds() / 60))
 
+    driver_details = None
+    if order.driver_id:
+        drv_details_q = await db.execute(select(Driver).where(Driver.id == order.driver_id))
+        driver_obj = drv_details_q.scalars().first()
+        if driver_obj:
+            usr_q = await db.execute(select(User).where(User.id == driver_obj.user_id))
+            driver_user = usr_q.scalars().first()
+            driver_details = {
+                "id": driver_obj.id,
+                "full_name": driver_user.full_name if driver_user else "Driver",
+                "rating": float(driver_user.rating) if driver_user and driver_user.rating else 4.5,
+                "vehicle_type": driver_obj.vehicle_type,
+                "vehicle_number": driver_obj.vehicle_number,
+                "vehicle_model": driver_obj.vehicle_model,
+                "vehicle_color": driver_obj.vehicle_color,
+                "phone_number": driver_user.phone_number if driver_user else None,
+                "profile_photo": driver_user.profile_photo if driver_user else None,
+            }
+
     return {
         "items": items_details,
         "store_name": v.name if v else "Unknown Store",
         "store_address": v.address if v else "Unknown Address",
         "distance_km": round(dist_km, 2),
         "duration_min": duration_min,
+        "driver": driver_details,
     }
 
 # ---------------------------------------------------------------------------

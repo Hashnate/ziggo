@@ -263,6 +263,83 @@ class FoodOrderDetailsScreen extends StatelessWidget {
                         ),
                       ],
                     ),
+                    Builder(builder: (context) {
+                      final driverRaw = details['driver'];
+                      final driverData = driverRaw is Map ? driverRaw : null;
+                      if (driverData == null) return const SizedBox.shrink();
+
+                      final driverName = driverData['full_name']?.toString() ?? 'Driver';
+                      final driverRating = driverData['rating']?.toString() ?? '4.5';
+                      final vehiclePlate = driverData['vehicle_number']?.toString() ?? 'N/A';
+                      final serviceType = (driverData['vehicle_type'] ?? 'car').toString();
+                      String? driverPhoto = driverData['profile_photo']?.toString();
+                      if (driverPhoto != null && driverPhoto.isNotEmpty && driverPhoto.startsWith('/')) {
+                        driverPhoto = '${ApiConfig.baseHost}$driverPhoto';
+                      }
+
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 20),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 20, offset: const Offset(0, 4)),
+                            ],
+                            border: Border.all(color: AppColors.divider),
+                          ),
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 26,
+                                backgroundColor: Colors.grey.shade100,
+                                backgroundImage: driverPhoto != null && driverPhoto.isNotEmpty ? NetworkImage(driverPhoto) : null,
+                                child: driverPhoto == null || driverPhoto.isEmpty ? const Icon(Icons.person, color: Colors.black26, size: 28) : null,
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(driverName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.star_rounded, color: Colors.orange, size: 16),
+                                        const SizedBox(width: 4),
+                                        Text(driverRating, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.black54)),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(12)),
+                                child: Column(
+                                  children: [
+                                    Image.asset(
+                                      _vehicleAsset(serviceType),
+                                      width: 36,
+                                      height: 36,
+                                      errorBuilder: (context, error, stackTrace) => Icon(_vehicleIcon(serviceType), size: 24, color: Colors.black54),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(vehiclePlate, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900)),
+                                    if (serviceType.isNotEmpty)
+                                      Text(
+                                        '${serviceType[0].toUpperCase()}${serviceType.substring(1)}',
+                                        style: const TextStyle(fontSize: 11, color: Colors.black54, fontWeight: FontWeight.w600),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
                     const SizedBox(height: 24),
                     const Text(
                       'ORDER ITEMS',
@@ -346,5 +423,32 @@ class FoodOrderDetailsScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  IconData _vehicleIcon(String type) {
+    switch (type.toLowerCase()) {
+      case 'bike':
+        return Icons.motorcycle_rounded;
+      case 'tuk':
+        return Icons.electric_rickshaw_rounded;
+      case 'van':
+        return Icons.airport_shuttle_rounded;
+      case 'truck':
+        return Icons.local_shipping_rounded;
+      default:
+        return Icons.directions_car_rounded;
+    }
+  }
+
+  String _vehicleAsset(String? type) {
+    switch (type?.toLowerCase()) {
+      case 'bike': return 'assets/icons/bike.png';
+      case 'tuk': return 'assets/icons/tuk.png';
+      case 'truck': return 'assets/icons/truck.png';
+      case 'mini': return 'assets/icons/car.png';
+      case 'van':
+      case 'car':
+      default: return 'assets/icons/car.png';
+    }
   }
 }

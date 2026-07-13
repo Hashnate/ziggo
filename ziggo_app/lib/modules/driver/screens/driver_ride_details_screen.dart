@@ -23,6 +23,18 @@ class DriverRideDetailsScreen extends StatelessWidget {
     }
   }
 
+  String _vehicleAsset(String? type) {
+    switch (type?.toLowerCase()) {
+      case 'bike': return 'assets/icons/bike.png';
+      case 'tuk': return 'assets/icons/tuk.png';
+      case 'truck': return 'assets/icons/truck.png';
+      case 'mini': return 'assets/icons/car.png';
+      case 'van':
+      case 'car':
+      default: return 'assets/icons/car.png';
+    }
+  }
+
   IconData _getPaymentIcon(String method) {
     final m = method.toLowerCase();
     if (m.startsWith('card')) {
@@ -361,7 +373,12 @@ class DriverRideDetailsScreen extends StatelessWidget {
                     decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(12)),
                     child: Column(
                       children: [
-                        Icon(_vehicleIcon(isFood || isMarket ? 'bike' : serviceType), size: 24, color: Colors.black54),
+                        Image.asset(
+                          _vehicleAsset(isFood || isMarket ? 'bike' : serviceType),
+                          width: 36,
+                          height: 36,
+                          errorBuilder: (context, error, stackTrace) => Icon(_vehicleIcon(isFood || isMarket ? 'bike' : serviceType), size: 24, color: Colors.black54),
+                        ),
                         Builder(
                           builder: (context) {
                             String serviceLabel = serviceType;
