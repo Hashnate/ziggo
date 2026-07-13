@@ -1226,6 +1226,71 @@ async def decline_booking(
     return {"ok": True, "status": b.status.value}
 
 
+async def _reverse_geocode_coordinates(lat: float, lng: float) -> Optional[str]:
+    from ...config import settings
+    import httpx
+    import re
+
+    api_key = settings.GOOGLE_MAPS_API_KEY
+    if not api_key:
+        return None
+
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://maps.googleapis.com/maps/api/geocode/json",
+                params={
+                    "latlng": f"{lat},{lng}",
+                    "key": api_key,
+                },
+                timeout=5.0,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                results = data.get("results", [])
+
+                plus_code_re = re.compile(r"^[A-Z0-9]{4,8}\+[A-Z0-9]{2,3}\b")
+
+                for r in results:
+                    types = r.get("types", [])
+                    if "plus_code" in types:
+                        continue
+                    addr = r.get("formatted_address", "")
+                    if plus_code_re.match(addr):
+                        addr = plus_code_re.sub("", addr).strip()
+                        if addr.startswith(","):
+                            addr = addr[1:].strip()
+                    if addr:
+                        return addr
+
+                if results:
+                    comps = results[0].get("address_components", [])
+                    route, neighborhood, sublocality, locality = None, None, None, None
+                    for c in comps:
+                        t = c.get("types", [])
+                        name = c.get("long_name", "")
+                        if not name:
+                            continue
+                        if "route" in t:
+                            route = name
+                        if "neighborhood" in t:
+                            neighborhood = name
+                        if "sublocality" in t:
+                            sublocality = name
+                        if "locality" in t:
+                            locality = name
+
+                    primary = route or neighborhood or sublocality or locality
+                    secondary = locality or sublocality or neighborhood
+                    if primary:
+                        if secondary and secondary != primary:
+                            return f"{primary}, {secondary}"
+                        return primary
+    except Exception:
+        pass
+    return None
+
+
 VALID_TRANSITIONS = {
     BookingStatus.SEARCHING: {BookingStatus.ACCEPTED, BookingStatus.CANCELLED},
     BookingStatus.ACCEPTED: {BookingStatus.ARRIVED, BookingStatus.CANCELLED},
@@ -1423,6 +1488,11 @@ async def update_booking_status(
 
             b.drop_lat = Decimal(str(body.lat))
             b.drop_lng = Decimal(str(body.lng))
+
+            actual_addr = await _reverse_geocode_coordinates(body.lat, body.lng)
+            if actual_addr:
+                b.drop_address = actual_addr
+
             b.distance_km = to_decimal(fare["distance_km"])
             b.duration_min = fare["duration_min"]
             b.fare_amount = to_decimal(fare["fare_amount"])
