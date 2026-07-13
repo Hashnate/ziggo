@@ -104,16 +104,33 @@ class _Root extends StatefulWidget {
   State<_Root> createState() => _RootState();
 }
 
-class _RootState extends State<_Root> {
+class _RootState extends State<_Root> with WidgetsBindingObserver {
   bool _splashed = false;
   bool _fcmRegistered = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) setState(() => _splashed = true);
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final auth = context.read<AuthProvider>();
+      if (auth.status == AuthStatus.authenticated && auth.token != null) {
+        unawaited(FcmService.instance.registerWithBackend());
+      }
+    }
   }
 
   @override
@@ -136,7 +153,11 @@ class _RootState extends State<_Root> {
     // the device receives nothing. Idempotent and waits for FCM init; fire once.
     if (auth.token != null && !_fcmRegistered) {
       _fcmRegistered = true;
-      unawaited(FcmService.instance.registerWithBackend());
+      FcmService.instance.registerWithBackend().then((success) {
+        if (!success && mounted) {
+          setState(() => _fcmRegistered = false);
+        }
+      });
     }
     if (auth.role == 'driver' && !auth.isCustomerMode) return const DriverHomeScreen();
     if (auth.role == 'restaurant_owner') return const RestaurantHomeScreen();

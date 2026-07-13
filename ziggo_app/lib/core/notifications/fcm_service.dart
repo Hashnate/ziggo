@@ -121,7 +121,8 @@ class FcmService {
 
   Future<void>? _initFuture;
   bool _firebaseAvailable = false;
-  String? _cachedToken;
+   String? _cachedToken;
+  String? _lastUploadedToken;
   StreamSubscription<RemoteMessage>? _foregroundSub;
   StreamSubscription<String>? _tokenSub;
 
@@ -245,7 +246,16 @@ class FcmService {
       });
 
       // 6. Cache token + listen for rotations
-      _cachedToken = await messaging.getToken();
+      if (Platform.isIOS) {
+        final apns = await messaging.getAPNSToken();
+        if (apns != null) {
+          try {
+            _cachedToken = await messaging.getToken();
+          } catch (_) {}
+        }
+      } else {
+        _cachedToken = await messaging.getToken();
+      }
       unawaited(_logToServer('[fcm] init step 6 done, cachedToken: ${(_cachedToken != null && _cachedToken!.length > 15) ? _cachedToken!.substring(0, 15) : _cachedToken}...'));
       _tokenSub = messaging.onTokenRefresh.listen((t) {
         _cachedToken = t;
@@ -353,6 +363,23 @@ class FcmService {
     unawaited(_logToServer('[fcm] init finished inside registerWithBackend. firebaseAvailable: $_firebaseAvailable'));
     if (!_firebaseAvailable) return false;
     
+    if (Platform.isIOS && _cachedToken == null) {
+      unawaited(_logToServer('[fcm] iOS device: checking APNS token before retrieving FCM token...'));
+      String? apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+      int apnsRetries = 0;
+      while (apnsToken == null && apnsRetries < 15) {
+        unawaited(_logToServer('[fcm] APNS token is null, waiting... try $apnsRetries'));
+        await Future.delayed(const Duration(seconds: 1));
+        apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+        apnsRetries++;
+      }
+      if (apnsToken == null) {
+        unawaited(_logToServer('[fcm] APNS token failed to register after 15 seconds. Make sure your provisioning/certificates match.'));
+      } else {
+        unawaited(_logToServer('[fcm] APNS token successfully set: ${apnsToken.length > 10 ? apnsToken.substring(0, 10) : apnsToken}...'));
+      }
+    }
+
     String? token = _cachedToken;
     unawaited(_logToServer('[fcm] starting token retrieval loop. initial cached token: ${(token != null && token.length > 15) ? token.substring(0, 15) : token}'));
     // Retry up to 8 times with a 1-second delay if the token is null (very common on iOS startup/login)
@@ -372,6 +399,10 @@ class FcmService {
     unawaited(_logToServer('[fcm] token retrieval loop finished. cachedToken: ${(token != null && token.length > 15) ? token.substring(0, 15) : token}'));
     
     if (token == null || token.isEmpty) return false;
+    if (token == _lastUploadedToken) {
+      unawaited(_logToServer('[fcm] token already uploaded, skipping backend call'));
+      return true;
+    }
     return _sendToBackend(token);
   }
 
@@ -380,6 +411,7 @@ class FcmService {
   /// BEFORE the JWT is wiped so the auth header is still attached.
   Future<void> clearOnBackend() async {
     _cachedToken = null; // Also clear local cache so next login retrieves a fresh one!
+    _lastUploadedToken = null;
     if (!_firebaseAvailable) return;
     try {
       await ApiClient.instance.dio.put(
@@ -400,6 +432,9 @@ class FcmService {
       );
       final ok = resp.data is Map && resp.data['ok'] == true;
       unawaited(_logToServer('[fcm] PUT fcm-token resp status: ${resp.statusCode}, ok: $ok'));
+      if (ok) {
+        _lastUploadedToken = token;
+      }
       return ok;
     } on DioException catch (e) {
       unawaited(_logToServer('[fcm] PUT fcm-token threw DioException: ${e.message}, response: ${e.response?.data}'));
