@@ -72,6 +72,10 @@ async def create_and_send_otp(db: AsyncSession, phone_number: str) -> str:
 
 
 async def verify_otp_code(db: AsyncSession, phone_number: str, code: str) -> bool:
+    # App Store Reviewer test account bypass
+    if phone_number in ["0752572722", "0772000001"] and code == "123456":
+        return True
+        
     now = datetime.now(timezone.utc)
     result = await db.execute(
         select(OTPCode).where(
