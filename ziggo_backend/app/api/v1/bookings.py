@@ -1489,6 +1489,11 @@ async def update_booking_status(
                 driver_accepted_lng=float(b.driver_accepted_lng) if b.driver_accepted_lng else None,
             )
 
+            if not b.requested_drop_address:
+                b.requested_drop_address = b.drop_address
+                b.requested_drop_lat = b.drop_lat
+                b.requested_drop_lng = b.drop_lng
+
             b.drop_lat = Decimal(str(body.lat))
             b.drop_lng = Decimal(str(body.lng))
 
