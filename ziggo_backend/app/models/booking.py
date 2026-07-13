@@ -43,6 +43,10 @@ class Booking(Base):
     drop_lng = Column(DECIMAL(10, 7))
     drop_address = Column(Text)
     
+    requested_drop_lat = Column(DECIMAL(10, 7), nullable=True)
+    requested_drop_lng = Column(DECIMAL(10, 7), nullable=True)
+    requested_drop_address = Column(Text, nullable=True)
+    
     driver_accepted_lat = Column(DECIMAL(10, 7))
     driver_accepted_lng = Column(DECIMAL(10, 7))
 

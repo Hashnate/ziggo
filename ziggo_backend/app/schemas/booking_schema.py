@@ -146,6 +146,10 @@ class BookingResponse(BaseModel):
     drop_lng: float
     drop_address: str
 
+    requested_drop_lat: Optional[float] = None
+    requested_drop_lng: Optional[float] = None
+    requested_drop_address: Optional[str] = None
+
     distance_km: Optional[float] = None
     duration_min: Optional[int] = None
     fare_amount: Optional[float] = None

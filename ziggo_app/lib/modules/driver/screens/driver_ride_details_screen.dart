@@ -291,40 +291,85 @@ class DriverRideDetailsScreen extends StatelessWidget {
                     ),
                     const SizedBox(width: 16),
                     // Right address column
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          for (int i = 0; i < allPoints.length; i++) ...[
-                            if (i > 0) const SizedBox(height: 16),
-                            Text(
-                              allPoints[i]['address'] ?? '',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: i == 0 || i == allPoints.length - 1 ? Colors.black87 : Colors.black54,
-                              ),
-                            ),
-                            if (i == 0 && allPoints[i]['time'] != null && allPoints[i]['time']!.isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Text(allPoints[i]['time']!, style: const TextStyle(fontSize: 13, color: Colors.black45)),
-                            ] else if (i == allPoints.length - 1 && allPoints[i]['time'] != null && allPoints[i]['time']!.isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Text(allPoints[i]['time']!, style: const TextStyle(fontSize: 13, color: Colors.black45)),
-                            ] else if (i > 0 && i < allPoints.length - 1) ...[
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Icon(Icons.radio_button_checked_rounded, size: 11, color: Colors.orange.shade400),
-                                  const SizedBox(width: 4),
-                                  Text('Stop $i', style: TextStyle(fontSize: 11, color: Colors.orange.shade600, fontWeight: FontWeight.w600)),
-                                ],
-                              ),
+                    Builder(builder: (context) {
+                      final requestedDrop = rideData['requested_drop_address']?.toString() ?? '';
+                      final hasEndedEarly = requestedDrop.isNotEmpty && requestedDrop != drop;
+
+                      return Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            for (int i = 0; i < allPoints.length; i++) ...[
+                              if (i > 0) const SizedBox(height: 16),
+                              if (i == allPoints.length - 1 && hasEndedEarly) ...[
+                                Text(
+                                  'Actual Drop-off:',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green.shade700,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  allPoints[i]['address'] ?? '',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Selected Destination (Ended Early):',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.orange.shade800,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  requestedDrop,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.black54,
+                                  ),
+                                ),
+                              ] else ...[
+                                Text(
+                                  allPoints[i]['address'] ?? '',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: i == 0 || i == allPoints.length - 1 ? Colors.black87 : Colors.black54,
+                                  ),
+                                ),
+                              ],
+                              if (i == 0 && allPoints[i]['time'] != null && allPoints[i]['time']!.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(allPoints[i]['time']!, style: const TextStyle(fontSize: 13, color: Colors.black45)),
+                              ] else if (i == allPoints.length - 1 && allPoints[i]['time'] != null && allPoints[i]['time']!.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(allPoints[i]['time']!, style: const TextStyle(fontSize: 13, color: Colors.black45)),
+                              ] else if (i > 0 && i < allPoints.length - 1) ...[
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(Icons.radio_button_checked_rounded, size: 11, color: Colors.orange.shade400),
+                                    const SizedBox(width: 4),
+                                    Text('Stop $i', style: TextStyle(fontSize: 11, color: Colors.orange.shade600, fontWeight: FontWeight.w600)),
+                                  ],
+                                ),
+                              ],
                             ],
                           ],
-                        ],
-                      ),
-                    ),
+                        ),
+                      );
+                    }),
                   ],
                 ),
               );
