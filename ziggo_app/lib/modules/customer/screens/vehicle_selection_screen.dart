@@ -763,6 +763,55 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                         children: _serviceTypes.map((st) => _vehicleCard(st)).toList(),
                       ),
                     ),
+
+                  if (!_loadingEstimates && _serviceType != null) ...[
+                    Builder(
+                      builder: (context) {
+                        final typeDrivers = _nearbyDrivers.where((d) => d['vehicle_type'] == _serviceType).toList();
+                        if (typeDrivers.isEmpty) {
+                          final displayName = _categoryData[_serviceType]?['name'] as String? ?? 
+                              {
+                                'bike': 'Bike',
+                                'tuk': 'Tuk',
+                                'car': 'Flex',
+                                'mini': 'Mini',
+                                'van': 'Mini van',
+                                'truck': 'Truck',
+                              }[_serviceType] ?? (_serviceType!.isNotEmpty ? '${_serviceType![0].toUpperCase()}${_serviceType!.substring(1)}' : _serviceType!);
+                          return Padding(
+                            padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: AppColors.error.withOpacity(0.1),
+                                border: Border.all(color: AppColors.error.withOpacity(0.2)),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.info_outline_rounded, color: AppColors.error, size: 20),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      _nearbyDrivers.isEmpty 
+                                          ? 'No drivers online in your area currently.' 
+                                          : 'No $displayName drivers online currently.',
+                                      style: const TextStyle(
+                                        color: AppColors.error,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      }
+                    ),
+                  ],
                   
                   const SizedBox(height: 16),
                   
