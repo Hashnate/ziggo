@@ -759,7 +759,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                       height: 165,
                       child: ListView(
                         scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.only(left: 16, right: 16, top: 4),
                         children: _serviceTypes.map((st) => _vehicleCard(st)).toList(),
                       ),
                     ),
@@ -1044,22 +1044,25 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
         setState(() => _serviceType = st);
         _fetchNearbyDrivers();
       },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: widget.isTruckMode ? 115 : 100,
-        margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.surfaceMuted : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: selected ? Colors.black : AppColors.cardBorder,
-            width: selected ? 1.5 : 1,
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: widget.isTruckMode ? 115 : 100,
+          height: 148,
+          margin: const EdgeInsets.only(right: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.surfaceMuted : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected ? Colors.black : AppColors.cardBorder,
+              width: selected ? 1.5 : 1,
+            ),
           ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
             Opacity(
               opacity: etaMin != null ? 1.0 : 0.0,
               child: Text(
@@ -1103,8 +1106,9 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   String _getSelectedCardLabel() {
     final cards = context.read<PaymentMethodsProvider>().cards;
