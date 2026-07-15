@@ -76,3 +76,7 @@ class OTPVerify(BaseModel):
 class OTPResponse(BaseModel):
     message: str
     dev_otp: Optional[str] = None
+    otp_bypass: Optional[bool] = False
+    access_token: Optional[str] = None
+    user_id: Optional[int] = None
+    role: Optional[UserRole] = None

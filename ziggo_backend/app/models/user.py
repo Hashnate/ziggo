@@ -69,6 +69,7 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     referral_code = Column(String(16), unique=True, nullable=True, default=generate_referral_code)
     referred_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    is_preregistered = Column(Boolean, default=False)
 
     customer_profile = relationship("Customer", back_populates="user", uselist=False, cascade="all, delete-orphan")
     driver_profile = relationship("Driver", back_populates="user", uselist=False, cascade="all, delete-orphan")

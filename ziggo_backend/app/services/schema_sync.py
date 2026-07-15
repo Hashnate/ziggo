@@ -101,6 +101,7 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("bookings", "requested_drop_lat", "NUMERIC(10, 7)"),
     ("bookings", "requested_drop_lng", "NUMERIC(10, 7)"),
     ("bookings", "requested_drop_address", "TEXT"),
+    ("users", "is_preregistered", "BOOLEAN NOT NULL DEFAULT FALSE"),
 )
 
 

@@ -427,6 +427,22 @@
         </form>
       </div>
 
+      <!-- OTP PANEL -->
+      <div id="otpPanel" class="success-panel" style="display: none;">
+        <div class="success-icon" style="background: #E8F0FE; color: #1E3A8A;">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <h3>Verify Mobile Number</h3>
+        <p>We've sent an OTP verification code to your mobile number. Enter it below to register.</p>
+        <div class="form-row" style="margin-bottom: 20px;">
+          <div class="auth-input" style="justify-content: center;">
+            <input type="text" id="otp_code" placeholder="OTP Code" required style="text-align: center; font-size: 1.3rem; letter-spacing: 0.15em; padding-left: 14px;" />
+          </div>
+        </div>
+        <button class="btn" style="width:100%; background: linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%); color: white; border: none; padding: 14px; border-radius: 12px; font-weight: 700; cursor: pointer; margin-bottom: 12px;" onclick="verifyOtpSubmit()">Verify & Register</button>
+        <button class="btn btn-outline" style="width:100%; border: 1.5px solid #E2E8F0; background: transparent; padding: 12px; border-radius: 12px; font-weight: 600; cursor: pointer; color: #64748B;" onclick="cancelOtp()">Cancel</button>
+      </div>
+
       <!-- SUCCESS STATE -->
       <div id="successPanel" class="success-panel">
         <div class="success-icon">
@@ -498,68 +514,132 @@
     }
   }
 
+  let tempPayload = {};
+  let tempType = '';
+
   // Submit Forms
   async function submitForm(e, type) {
     e.preventDefault();
     const isUser = type === 'user';
     const submitBtn = document.getElementById(isUser ? 'userSubmitBtn' : 'driverSubmitBtn');
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';
 
-    const baseApi = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1') ? 'http://localhost:8000' : '';
-    const payload = {};
-    let url = '';
-
-    if (isUser) {
-      payload.full_name = document.getElementById('user_name').value;
-      payload.email = document.getElementById('user_email').value;
-      payload.mobile = document.getElementById('user_mobile').value;
-      payload.city = document.getElementById('user_city').value;
-      url = `${baseApi}/api/v1/public/user-preregister`;
-    } else {
-      payload.full_name = document.getElementById('driver_name').value;
-      payload.mobile = document.getElementById('driver_mobile').value;
-      payload.city = document.getElementById('driver_city').value;
-      payload.vehicle_type = document.getElementById('driver_vehicle').value;
-      payload.nic = document.getElementById('driver_nic').value;
-      url = `${baseApi}/api/v1/public/driver-application`;
+    // Normalize mobile
+    let mobile = document.getElementById(isUser ? 'user_mobile' : 'driver_mobile').value;
+    let cleanMobile = mobile.trim().replace(/\s/g, '').replace(/-/g, '');
+    if (cleanMobile.length > 10) {
+      cleanMobile = cleanMobile.slice(-10);
+    }
+    if (cleanMobile.length !== 10) {
+      alert('Please enter a valid 10-digit mobile number.');
+      return;
     }
 
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending OTP...';
+
+    const baseApi = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1') ? 'http://localhost:8000' : '';
+
     try {
-      const response = await fetch(url, {
+      const response = await fetch(`${baseApi}/api/v1/auth/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone_number: cleanMobile })
+      });
+
+      if (response.ok) {
+        const res = await response.json();
+        tempType = type;
+        tempPayload = {
+          role: type,
+          full_name: document.getElementById(isUser ? 'user_name' : 'driver_name').value,
+          mobile: cleanMobile,
+          city: document.getElementById(isUser ? 'user_city' : 'driver_city').value,
+        };
+        if (isUser) {
+          tempPayload.email = document.getElementById('user_email').value;
+        } else {
+          tempPayload.vehicle_type = document.getElementById('driver_vehicle').value;
+          tempPayload.nic = document.getElementById('driver_nic').value;
+        }
+
+        if (res.dev_otp) {
+          console.log("Dev OTP Code:", res.dev_otp);
+          document.getElementById('otp_code').value = res.dev_otp;
+        }
+
+        document.querySelector('.form-container').style.display = 'none';
+        document.getElementById('otpPanel').style.display = 'block';
+      } else {
+        const err = await response.json();
+        alert(err.detail || 'Failed to send OTP. Please check your number.');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Unable to connect to server. Please check your internet connection.');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = isUser ? '<span>Pre-Register Now</span> <i class="fa-solid fa-arrow-right"></i>' : '<span>Apply to Drive</span> <i class="fa-solid fa-arrow-right"></i>';
+    }
+  }
+
+  async function verifyOtpSubmit() {
+    const otp = document.getElementById('otp_code').value.trim();
+    if (!otp) {
+      alert('Please enter the OTP code.');
+      return;
+    }
+
+    const verifyBtn = document.querySelector('#otpPanel button:nth-of-type(1)');
+    verifyBtn.disabled = true;
+    verifyBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying...';
+
+    const baseApi = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1') ? 'http://localhost:8000' : '';
+
+    const payload = {
+      ...tempPayload,
+      otp: otp
+    };
+
+    try {
+      const response = await fetch(`${baseApi}/api/v1/public/verify-preregister`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
       if (response.ok) {
-        const result = await response.json();
-        document.querySelector('.form-container').style.display = 'none';
+        document.getElementById('otpPanel').style.display = 'none';
         
         const successPanel = document.getElementById('successPanel');
         successPanel.classList.add('active');
         
-        document.getElementById('successTitle').textContent = isUser ? 'Registration Successful!' : 'Application Submitted!';
-        document.getElementById('successText').textContent = result.message || 'Thank you! We will get in touch shortly.';
+        document.getElementById('successTitle').textContent = tempType === 'user' ? 'Registration Successful!' : 'Application Submitted!';
+        document.getElementById('successText').textContent = 'Your registration was successfully verified with OTP. You can now download the app and open it to log in automatically without OTP using your mobile number.';
       } else {
         const err = await response.json();
-        alert(err.detail || 'An error occurred during submission. Please try again.');
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = isUser ? '<span>Pre-Register Now</span> <i class="fa-solid fa-arrow-right"></i>' : '<span>Apply to Drive</span> <i class="fa-solid fa-arrow-right"></i>';
+        alert(err.detail || 'OTP verification failed. Please try again.');
       }
     } catch (error) {
-      alert('Unable to connect to server. Please check your internet connection.');
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = isUser ? '<span>Pre-Register Now</span> <i class="fa-solid fa-arrow-right"></i>' : '<span>Apply to Drive</span> <i class="fa-solid fa-arrow-right"></i>';
+      alert('Unable to connect to server.');
+    } finally {
+      verifyBtn.disabled = false;
+      verifyBtn.innerHTML = 'Verify & Register';
     }
+  }
+
+  function cancelOtp() {
+    document.getElementById('otpPanel').style.display = 'none';
+    document.querySelector('.form-container').style.display = 'block';
   }
 
   function resetFormState() {
     document.getElementById('userForm').reset();
     document.getElementById('driverForm').reset();
+    document.getElementById('otp_code').value = '';
     
     document.querySelector('.form-container').style.display = 'block';
     document.getElementById('successPanel').classList.remove('active');
+    document.getElementById('otpPanel').style.display = 'none';
     
     const userBtn = document.getElementById('userSubmitBtn');
     userBtn.disabled = false;

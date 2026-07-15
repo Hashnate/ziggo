@@ -6,12 +6,9 @@
 {% block content %}
 <!-- View Tabs -->
 <div class="flex border-b border-gray-200 mb-6 gap-6">
-    <a href="/admin/drivers?view=drivers" class="pb-3 text-sm font-black {% if view != 'applications' %}border-b-2 border-ziggo text-ziggo{% else %}text-gray-400 hover:text-gray-600{% endif %}">
+    <span class="pb-3 text-sm font-black border-b-2 border-ziggo text-ziggo">
         Registered Drivers ({{ stats.total }})
-    </a>
-    <a href="/admin/drivers?view=applications" class="pb-3 text-sm font-black {% if view == 'applications' %}border-b-2 border-ziggo text-ziggo{% else %}text-gray-400 hover:text-gray-600{% endif %}">
-        Public Applications ({{ stats.total_apps }}) {% if stats.unread_apps > 0 %}<span class="ml-1 px-1.5 py-0.5 text-[10px] bg-blue-500 text-white rounded-full font-black">{{ stats.unread_apps }}</span>{% endif %}
-    </a>
+    </span>
 </div>
 
 <!-- Driver Stats Bar -->

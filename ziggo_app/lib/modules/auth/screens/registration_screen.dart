@@ -64,6 +64,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       setState(() => _error = auth.lastError ?? 'Failed to send OTP');
       return;
     }
+    if (auth.status == AuthStatus.authenticated) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(

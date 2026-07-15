@@ -139,12 +139,9 @@
 
 <!-- View Tabs -->
 <div class="flex border-b border-gray-200 mb-6 gap-6">
-    <a href="/admin/riders?view=riders" class="pb-3 text-sm font-black {% if view != 'preregistrations' %}border-b-2 border-ziggo text-ziggo{% else %}text-gray-400 hover:text-gray-600{% endif %}">
+    <span class="pb-3 text-sm font-black border-b-2 border-ziggo text-ziggo">
         Registered Riders ({{ stats.total_riders }})
-    </a>
-    <a href="/admin/riders?view=preregistrations" class="pb-3 text-sm font-black {% if view == 'preregistrations' %}border-b-2 border-ziggo text-ziggo{% else %}text-gray-400 hover:text-gray-600{% endif %}">
-        Public Preregistrations ({{ stats.total_preregs }}) {% if stats.unread_preregs > 0 %}<span class="ml-1 px-1.5 py-0.5 text-[10px] bg-blue-500 text-white rounded-full font-black">{{ stats.unread_preregs }}</span>{% endif %}
-    </a>
+    </span>
 </div>
 
 <!-- ── Stat Cards ─────────────────────────────────────────────────────────── -->

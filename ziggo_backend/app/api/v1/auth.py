@@ -21,6 +21,28 @@ router = APIRouter()
 
 @router.post("/send-otp", response_model=OTPResponse)
 async def send_otp(request: OTPRequest, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(User).where(User.phone_number == request.phone_number)
+    )
+    user = result.scalars().first()
+    if user and getattr(user, "is_preregistered", False):
+        user.is_preregistered = False
+        await db.commit()
+        await db.refresh(user)
+
+        expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        token = create_access_token(
+            data={"sub": user.phone_number, "role": user.role.value},
+            expires_delta=expires,
+        )
+        return OTPResponse(
+            message="OTP bypassed for pre-registered user",
+            otp_bypass=True,
+            access_token=token,
+            user_id=user.id,
+            role=user.role,
+        )
+
     code = await create_and_send_otp(db, request.phone_number)
     return OTPResponse(
         message="OTP sent successfully",

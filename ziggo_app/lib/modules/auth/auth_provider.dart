@@ -94,6 +94,19 @@ class AuthProvider extends ChangeNotifier {
       );
       _devOtp = resp.data is Map ? resp.data['dev_otp'] as String? : null;
       _phoneNumber = phoneNumber;
+
+      if (resp.data is Map && resp.data['otp_bypass'] == true) {
+        _token = resp.data['access_token'] as String;
+        _role = resp.data['role'] as String;
+        _userId = resp.data['user_id'] as int;
+        _isNewUser = false;
+        await TokenStorage.save(token: _token!, role: _role!, userId: _userId!);
+        _status = AuthStatus.authenticated;
+        notifyListeners();
+        await _refreshMe();
+        return true;
+      }
+
       notifyListeners();
       return true;
     } on DioException catch (e) {

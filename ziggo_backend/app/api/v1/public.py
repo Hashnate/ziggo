@@ -404,3 +404,100 @@ async def public_demo_request(
         "id": row.id,
         "message": "Thanks! We'll reach out within 24 hours.",
     }
+
+
+class PublicVerifyPreregisterRequest(BaseModel):
+    role: str
+    full_name: str
+    email: str | None = None
+    mobile: str
+    city: str | None = None
+    otp: str
+    vehicle_type: str | None = None
+    nic: str | None = None
+
+
+@router.post("/verify-preregister")
+async def verify_preregister(
+    req: PublicVerifyPreregisterRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    from ...services.auth_service import verify_otp_code
+    from ...models import Customer
+    from fastapi import HTTPException
+
+    # Clean phone number (normally 10 digits in request)
+    phone = req.mobile.strip().replace(" ", "").replace("-", "")
+    if len(phone) > 10:
+        phone = phone[-10:]
+
+    ok = await verify_otp_code(db, phone, req.otp.strip())
+    if not ok:
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP")
+
+    # Check if user already exists
+    result = await db.execute(select(User).where(User.phone_number == phone))
+    user = result.scalars().first()
+
+    is_new = user is None
+    if is_new:
+        user_role = UserRole.CUSTOMER if req.role == "customer" else UserRole.DRIVER
+        user = User(
+            phone_number=phone,
+            role=user_role,
+            full_name=req.full_name.strip(),
+            email=req.email.strip() if req.email else None,
+            is_active=True,
+            is_preregistered=True,
+        )
+        db.add(user)
+        await db.flush()
+
+        if user_role == UserRole.CUSTOMER:
+            db.add(Customer(user_id=user.id))
+        elif user_role == UserRole.DRIVER:
+            db.add(Driver(
+                user_id=user.id,
+                nic_number=req.nic.strip() if req.nic else None,
+                vehicle_type=req.vehicle_type.strip() if req.vehicle_type else None,
+                is_approved=False,
+                status=DriverStatus.PENDING
+            ))
+    else:
+        # User already exists, make sure they are marked as preregistered so they can bypass OTP
+        user.is_preregistered = True
+        if req.role == "driver" and not getattr(user, "driver_profile", None):
+            # Fetch user with relations first to be sure
+            from sqlalchemy.orm import selectinload
+            res = await db.execute(
+                select(User)
+                .where(User.id == user.id)
+                .options(selectinload(User.driver_profile))
+            )
+            user = res.scalars().first()
+            if not user.driver_profile:
+                db.add(Driver(
+                    user_id=user.id,
+                    nic_number=req.nic.strip() if req.nic else None,
+                    vehicle_type=req.vehicle_type.strip() if req.vehicle_type else None,
+                    is_approved=False,
+                    status=DriverStatus.PENDING
+                ))
+        elif req.role == "customer" and not getattr(user, "customer_profile", None):
+            from sqlalchemy.orm import selectinload
+            res = await db.execute(
+                select(User)
+                .where(User.id == user.id)
+                .options(selectinload(User.customer_profile))
+            )
+            user = res.scalars().first()
+            if not user.customer_profile:
+                db.add(Customer(user_id=user.id))
+
+    await db.commit()
+    await db.refresh(user)
+
+    return {
+        "ok": True,
+        "message": "Verification successful! You can now log in via the mobile app."
+    }
