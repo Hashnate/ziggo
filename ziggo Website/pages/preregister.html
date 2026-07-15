@@ -450,7 +450,7 @@
         </div>
         <h3 id="successTitle">Pre-registration Successful!</h3>
         <p id="successText">Thank you for signing up. We will keep you updated about our launch in your city.</p>
-        <button class="btn btn-outline" style="width:100%;" onclick="resetFormState()">Done</button>
+        <button class="btn" style="width:100%; background: linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%); color: white; border: none; padding: 14px; border-radius: 12px; font-weight: 700; cursor: pointer;" onclick="resetFormState()">Done</button>
       </div>
     </div>
   </div>
@@ -535,9 +535,27 @@
     }
 
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending OTP...';
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking...';
 
     const baseApi = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1') ? 'http://localhost:8000' : '';
+
+    try {
+      // Check if mobile is already registered
+      const checkResponse = await fetch(`${baseApi}/api/v1/public/check-mobile?mobile=${cleanMobile}`);
+      if (checkResponse.ok) {
+        const checkResult = await checkResponse.json();
+        if (checkResult.registered) {
+          alert('This number is already registered.');
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = isUser ? '<span>Pre-Register Now</span> <i class="fa-solid fa-arrow-right"></i>' : '<span>Apply to Drive</span> <i class="fa-solid fa-arrow-right"></i>';
+          return;
+        }
+      }
+    } catch (checkError) {
+      console.error("Failed to check registration status:", checkError);
+    }
+
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending OTP...';
 
     try {
       const response = await fetch(`${baseApi}/api/v1/auth/send-otp`, {
@@ -614,7 +632,7 @@
         successPanel.classList.add('active');
         
         document.getElementById('successTitle').textContent = tempType === 'user' ? 'Registration Successful!' : 'Application Submitted!';
-        document.getElementById('successText').textContent = 'Your registration was successfully verified with OTP. You can now download the app and open it to log in automatically without OTP using your mobile number.';
+        document.getElementById('successText').textContent = 'Your registration was successfully verified with OTP. Once we launch, you can download the app and log in automatically without OTP using your mobile number.';
       } else {
         const err = await response.json();
         alert(err.detail || 'OTP verification failed. Please try again.');

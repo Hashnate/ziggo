@@ -441,7 +441,7 @@ async def verify_preregister(
 
     is_new = user is None
     if is_new:
-        user_role = UserRole.CUSTOMER if req.role == "customer" else UserRole.DRIVER
+        user_role = UserRole.CUSTOMER if req.role in ("customer", "user") else UserRole.DRIVER
         user = User(
             phone_number=phone,
             role=user_role,
@@ -483,7 +483,7 @@ async def verify_preregister(
                     is_approved=False,
                     status=DriverStatus.PENDING
                 ))
-        elif req.role == "customer" and not getattr(user, "customer_profile", None):
+        elif req.role in ("customer", "user") and not getattr(user, "customer_profile", None):
             from sqlalchemy.orm import selectinload
             res = await db.execute(
                 select(User)
@@ -501,3 +501,21 @@ async def verify_preregister(
         "ok": True,
         "message": "Verification successful! You can now log in via the mobile app."
     }
+
+
+@router.get("/check-mobile")
+async def check_mobile(
+    mobile: str,
+    db: AsyncSession = Depends(get_db),
+):
+    phone = mobile.strip().replace(" ", "").replace("-", "")
+    if len(phone) > 10:
+        phone = phone[-10:]
+
+    result = await db.execute(select(User).where(User.phone_number == phone))
+    user = result.scalars().first()
+
+    if user and not getattr(user, "is_preregistered", False):
+        return {"registered": True, "message": "This number is already registered."}
+
+    return {"registered": False}
