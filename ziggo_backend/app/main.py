@@ -17,6 +17,7 @@ from ziggo_admin_panel import routes as admin_panel_routes
 from ziggo_admin_panel.routes import _AdminRedirect, _AdminForbidden
 from .services.schema_sync import ensure_schema
 from .services.auto_cancel import auto_cancel_loop
+from .services.scheduled_dispatch import scheduled_dispatch_loop
 from .services import fcm_service
 
 app = FastAPI(
@@ -46,6 +47,10 @@ async def _launch_background_tasks() -> None:
     task = asyncio.create_task(auto_cancel_loop())
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
+
+    scheduled_task = asyncio.create_task(scheduled_dispatch_loop())
+    _background_tasks.add(scheduled_task)
+    scheduled_task.add_done_callback(_background_tasks.discard)
 
 app.add_middleware(
     CORSMiddleware,

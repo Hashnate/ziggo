@@ -29,6 +29,7 @@ class VehicleSelectionScreen extends StatefulWidget {
   final ({String name, String phone})? friend;
   final bool isTruckMode;
   final List<Place> stops;
+  final DateTime? scheduledTime;
 
   const VehicleSelectionScreen({
     super.key,
@@ -38,6 +39,7 @@ class VehicleSelectionScreen extends StatefulWidget {
     this.friend,
     this.isTruckMode = false,
     this.stops = const [],
+    this.scheduledTime,
   });
 
   @override
@@ -94,6 +96,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
   void initState() {
     super.initState();
     _secondaryPhone = widget.friend?.phone;
+    _scheduledTime = widget.scheduledTime;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<PromosProvider>().refresh();
       context.read<PaymentMethodsProvider>().fetchCards();
@@ -414,6 +417,30 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       return;
     }
     
+    if (_scheduledTime != null) {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          icon: const Icon(Icons.check_circle_outline_rounded, color: AppColors.primary, size: 36),
+          title: const Text('Ride Scheduled!', textAlign: TextAlign.center),
+          content: Text(
+            'Your ride has been scheduled for ${_formatDateTime(_scheduledTime!)}. We will start searching for a driver 10 minutes before your pickup time.',
+            textAlign: TextAlign.center,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      return;
+    }
+
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const RideTrackingScreen()),

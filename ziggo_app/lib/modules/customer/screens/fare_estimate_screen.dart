@@ -236,6 +236,7 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
           initialTripType: tripType,
           isTruckMode: widget.isTruckMode,
           initialStops: _stops,
+          initialScheduledTime: _scheduledTime,
         ),
       ),
     );

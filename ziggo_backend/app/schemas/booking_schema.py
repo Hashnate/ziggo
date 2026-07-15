@@ -110,6 +110,7 @@ class BookingCreate(BaseModel):
     redeem_points: int = 0
     # BRD: CD-19 — up to N intermediate stops (server clamps to admin limit)
     stops: List[StopRequest] = Field(default_factory=list)
+    scheduled_time: Optional[datetime] = None
 
 
 class DriverMini(BaseModel):
@@ -167,6 +168,8 @@ class BookingResponse(BaseModel):
     completed_at: Optional[datetime] = None
     cancelled_at: Optional[datetime] = None
     cancellation_reason: Optional[str] = None
+    scheduled_at: Optional[datetime] = None
+
 
     customer_rating: Optional[int] = None
     customer_feedback: Optional[str] = None

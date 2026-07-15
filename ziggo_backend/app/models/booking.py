@@ -132,6 +132,10 @@ class Booking(Base):
     is_corporate = Column(Boolean, default=False, index=True)
     corporate_id = Column(Integer, ForeignKey("corporate_accounts.id"), nullable=True)
 
+    scheduled_at = Column(DateTime(timezone=True), nullable=True)
+    scheduled_dispatch_sent = Column(Boolean, default=False, nullable=False)
+
+
     customer = relationship("Customer", back_populates="bookings")
     driver = relationship("Driver", back_populates="bookings")
     payments = relationship("Payment", back_populates="booking", cascade="all, delete-orphan")

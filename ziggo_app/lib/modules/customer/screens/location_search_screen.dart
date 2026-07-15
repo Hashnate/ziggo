@@ -25,6 +25,7 @@ class LocationSearchScreen extends StatefulWidget {
   final String initialTripType;
   final bool isTruckMode;
   final List<Place> initialStops;
+  final DateTime? initialScheduledTime;
 
   const LocationSearchScreen({
     super.key,
@@ -33,6 +34,7 @@ class LocationSearchScreen extends StatefulWidget {
     this.initialTripType = 'one_way',
     this.isTruckMode = false,
     this.initialStops = const [],
+    this.initialScheduledTime,
   });
 
   @override
@@ -217,6 +219,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
           friend: _friend,
           isTruckMode: widget.isTruckMode,
           stops: _stops,
+          scheduledTime: widget.initialScheduledTime,
         ),
       ),
     );

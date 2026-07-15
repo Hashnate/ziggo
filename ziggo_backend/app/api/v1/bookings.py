@@ -148,6 +148,7 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
         cancelled_at=b.cancelled_at,
         cancellation_reason=b.cancellation_reason,
         customer_rating=b.customer_rating,
+        scheduled_at=b.scheduled_at,
         driver=driver_obj,
         customer_name=customer_name,
         customer_phone=customer_phone,
@@ -661,6 +662,8 @@ async def create_booking(
         passenger_deductible=to_decimal(fare.get("passenger_deductible", 0)),
         app_usage_charges=to_decimal(fare.get("app_usage_charges", 0)),
         deductions=to_decimal(fare.get("deductions", 0)),
+        scheduled_at=req.scheduled_time,
+        scheduled_dispatch_sent=False,
     )
     db.add(booking)
     await db.flush()
@@ -708,9 +711,13 @@ async def create_booking(
 
     max_radius = await get_search_radius_for_service(db, dispatch_vehicle)
 
-    nearby = await find_all_nearby_drivers(
-        db, req.pickup_lat, req.pickup_lng, dispatch_vehicle, max_distance_km=max_radius
-    )
+    is_scheduled_future = booking.scheduled_at is not None and booking.scheduled_at > datetime.now(timezone.utc) + timedelta(minutes=2)
+
+    nearby = []
+    if not is_scheduled_future:
+        nearby = await find_all_nearby_drivers(
+            db, req.pickup_lat, req.pickup_lng, dispatch_vehicle, max_distance_km=max_radius
+        )
     if booking.is_courier:
         n_title = "New courier delivery"
         n_body = (
@@ -780,26 +787,27 @@ async def create_booking(
         ],
     }
 
-    for driver in nearby:
-        await manager.send(driver.user_id, "new_ride_request", ride_request_payload)
-        db.add(
-            Notification(
-                user_id=driver.user_id,
-                title=n_title,
-                body=n_body,
-                type=n_type,
-                data=f'{{"booking_id":{booking.id}}}',
+    if not is_scheduled_future:
+        for driver in nearby:
+            await manager.send(driver.user_id, "new_ride_request", ride_request_payload)
+            db.add(
+                Notification(
+                    user_id=driver.user_id,
+                    title=n_title,
+                    body=n_body,
+                    type=n_type,
+                    data=f'{{"booking_id":{booking.id}}}',
+                )
             )
-        )
 
-    if not nearby:
-        # No driver in range — tell the customer right away instead of leaving
-        # them on a spinner that will never resolve.
-        await manager.send(
-            user.id,
-            "no_drivers_available",
-            {"booking_id": booking.id, "booking_ref": booking.booking_ref},
-        )
+        if not nearby:
+            # No driver in range — tell the customer right away instead of leaving
+            # them on a spinner that will never resolve.
+            await manager.send(
+                user.id,
+                "no_drivers_available",
+                {"booking_id": booking.id, "booking_ref": booking.booking_ref},
+            )
 
     # Bump promo usage if applied
     if fare["promo_code"]:
@@ -1041,7 +1049,11 @@ async def get_active_booking(
         customer = await _get_customer(db, user)
         q = await db.execute(
             select(Booking)
-            .where(Booking.customer_id == customer.id, Booking.status.in_(active))
+            .where(
+                Booking.customer_id == customer.id,
+                Booking.status.in_(active),
+                (Booking.scheduled_at.is_(None) | (Booking.scheduled_dispatch_sent == True))
+            )
             .order_by(Booking.id.desc())
         )
     elif user.role == UserRole.DRIVER:
