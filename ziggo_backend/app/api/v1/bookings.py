@@ -711,7 +711,11 @@ async def create_booking(
 
     max_radius = await get_search_radius_for_service(db, dispatch_vehicle)
 
-    is_scheduled_future = booking.scheduled_at is not None and booking.scheduled_at > datetime.now(timezone.utc) + timedelta(minutes=2)
+    is_scheduled_future = False
+    if booking.scheduled_at is not None:
+        sched = booking.scheduled_at.astimezone(timezone.utc).replace(tzinfo=None) if booking.scheduled_at.tzinfo else booking.scheduled_at
+        now_naive = datetime.now(timezone.utc).replace(tzinfo=None)
+        is_scheduled_future = sched > now_naive + timedelta(minutes=2)
 
     nearby = []
     if not is_scheduled_future:

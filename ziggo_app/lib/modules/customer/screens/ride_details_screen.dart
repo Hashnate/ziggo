@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../../../app/app_colors.dart';
 import '../../../core/network/api_client.dart';
+import '../booking_provider.dart';
 
 class RideDetailsScreen extends StatelessWidget {
   final Map<String, dynamic> rideData;
@@ -697,6 +699,75 @@ class RideDetailsScreen extends StatelessWidget {
               ),
             ),
             
+            if (status.toLowerCase() == 'searching') ...[
+              const SizedBox(height: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          title: const Text('Cancel Ride?'),
+                          content: const Text('Are you sure you want to cancel this scheduled ride?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('No'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                              child: const Text('Yes, Cancel'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true) {
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (ctx) => const Center(child: CircularProgressIndicator()),
+                        );
+                        try {
+                          final bp = Provider.of<BookingProvider>(context, listen: false);
+                          await bp.updateStatus(rideData['id'] as int, 'cancelled', reason: 'Cancelled by user');
+                          if (context.mounted) {
+                            Navigator.pop(context); // pop loading
+                            Navigator.pop(context); // pop details
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Ride cancelled successfully')),
+                            );
+                          }
+                        } catch (_) {
+                          if (context.mounted) {
+                            Navigator.pop(context); // pop loading
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Failed to cancel ride')),
+                            );
+                          }
+                        }
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.error,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'CANCEL BOOKING',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+
             const SizedBox(height: 32),
             
             // --- BRANDING ---

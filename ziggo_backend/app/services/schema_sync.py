@@ -103,6 +103,7 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("bookings", "requested_drop_address", "TEXT"),
     ("users", "is_preregistered", "BOOLEAN NOT NULL DEFAULT FALSE"),
     ("bookings", "scheduled_dispatch_sent", "BOOLEAN NOT NULL DEFAULT FALSE"),
+    ("bookings", "scheduled_at", "TIMESTAMP WITH TIME ZONE"),
 )
 
 
