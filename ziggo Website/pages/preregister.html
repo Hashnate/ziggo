@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Preregister | Ziggo</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/images/logo/favicon.svg?v=2">
+  <link rel="apple-touch-icon" href="../assets/images/logo/favicon.svg?v=2">
+  <meta name="description" content="Pre-register as a rider or apply to drive with Ziggo Lanka. Join the future of mobility in Sri Lanka." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="../assets/css/premium.css?v=20260602-v46">
+  
+  <style>
+    .auth-bg {
+      min-height: 100vh;
+      padding: 130px 0 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 20%, rgba(96,165,250,.18), transparent 60%),
+        radial-gradient(ellipse 60% 50% at 85% 80%, rgba(147,197,253,.15), transparent 60%),
+        linear-gradient(180deg,#FBFCFE 0%,#F5F8FE 100%);
+    }
+    .auth-bg::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle at 1px 1px, rgba(30,58,138,.06) 1px, transparent 0);
+      background-size: 28px 28px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 30%, transparent 80%);
+      -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 30%, transparent 80%);
+    }
+    .auth-wrap { position: relative; z-index: 1; max-width: 540px; width: 100%; margin: 0 auto; padding: 0 24px; }
+    
+    .auth-card {
+      background: #fff;
+      border: 1px solid rgba(11,20,38,0.06);
+      border-radius: 24px;
+      padding: 40px;
+      box-shadow:
+        0 1px 2px rgba(11,20,38,0.04),
+        0 32px 70px -20px rgba(11,20,38,0.18);
+      position: relative;
+      overflow: hidden;
+    }
+    .auth-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #1E3A8A 0%, #3B82F6 50%, #60A5FA 100%);
+    }
+    .auth-card h2 {
+      font-family: var(--p-font-display);
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: -.03em;
+      color: var(--p-brand-dark);
+      margin: 0 0 6px;
+      text-align: center;
+    }
+    .auth-card .subtitle {
+      color: var(--p-text-light);
+      font-size: .95rem;
+      margin: 0 0 24px;
+      text-align: center;
+    }
+
+    /* Tabs Style */
+    .tab-container {
+      display: flex;
+      background: #F1F5F9;
+      padding: 6px;
+      border-radius: 14px;
+      margin-bottom: 28px;
+    }
+    .tab-btn {
+      flex: 1;
+      border: 0;
+      background: transparent;
+      padding: 12px;
+      font-family: var(--p-font-display);
+      font-weight: 700;
+      font-size: .95rem;
+      color: #64748B;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all .2s var(--p-ease);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .tab-btn.active {
+      background: #fff;
+      color: var(--p-brand-dark);
+      box-shadow: 0 4px 12px -2px rgba(11,20,38,0.08);
+    }
+
+    /* Forms */
+    .auth-form { display: none; }
+    .auth-form.active { display: block; }
+    .auth-form .form-row { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+    .auth-form label { font-size: .78rem; color: #475569; font-weight: 600; letter-spacing: .02em; }
+    
+    .auth-input { position: relative; display: flex; align-items: center; }
+    .auth-input i {
+      position: absolute;
+      left: 16px;
+      color: #94A3B8;
+      font-size: 0.92rem;
+      pointer-events: none;
+    }
+    .auth-input input, .auth-input select {
+      width: 100%;
+      padding: 14px 14px 14px 46px;
+      background: #F8FAFC;
+      border: 1.5px solid transparent;
+      border-radius: 12px;
+      font-size: .95rem;
+      font-family: var(--p-font-body);
+      color: var(--p-text);
+      transition: all .2s var(--p-ease);
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    .auth-input select {
+      cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394A3B8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 16px center;
+      background-size: 16px;
+      padding-right: 40px;
+    }
+    .auth-input input:focus, .auth-input select:focus {
+      outline: none;
+      border-color: #3B82F6;
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(59,130,246,0.12);
+    }
+    .auth-input:focus-within i { color: #3B82F6; }
+
+    .auth-form button[type="submit"] {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%);
+      color: #fff;
+      border: 0;
+      border-radius: 12px;
+      font-family: var(--p-font-display);
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: -.01em;
+      cursor: pointer;
+      box-shadow: 0 12px 24px -10px rgba(30,58,138,0.5);
+      transition: transform .2s var(--p-ease), box-shadow .25s var(--p-ease);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .auth-form button[type="submit"]:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 18px 32px -12px rgba(30,58,138,0.6);
+    }
+    .auth-form button[type="submit"]:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+
+    /* Success Card */
+    .success-panel {
+      display: none;
+      text-align: center;
+      padding: 20px 0;
+    }
+    .success-panel.active {
+      display: block;
+    }
+    .success-icon {
+      width: 80px; height: 80px;
+      background: #DCFCE7;
+      color: #15803D;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2.2rem;
+      margin: 0 auto 24px;
+      animation: pop .4s var(--p-spring);
+    }
+    .success-panel h3 {
+      font-family: var(--p-font-display);
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--p-brand-dark);
+      margin: 0 0 10px;
+    }
+    .success-panel p {
+      color: var(--p-text-light);
+      font-size: .98rem;
+      line-height: 1.5;
+      margin-bottom: 28px;
+    }
+
+    @keyframes pop {
+      0% { transform: scale(0.6); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    @media (max-width: 600px) {
+      .auth-card { padding: 32px 24px; }
+      .auth-card h2 { font-size: 1.55rem; }
+    }
+  </style>
+
+  <!-- ziggo:canonical:begin -->
+  <link rel="canonical" href="https://ziggo.lk/pages/preregister">
+  <meta property="og:site_name" content="Ziggo">
+  <meta property="og:url" content="https://ziggo.lk/pages/preregister">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Preregister | Ziggo">
+  <meta property="og:description" content="Pre-register as a rider or apply to drive with Ziggo Lanka.">
+  <meta property="og:locale" content="en_LK">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="https://ziggo.lk/pages/preregister">
+  <meta name="twitter:title" content="Preregister | Ziggo">
+  <meta name="twitter:description" content="Pre-register as a rider or apply to drive with Ziggo Lanka.">
+  <!-- ziggo:canonical:end -->
+</head>
+<body class="pm">
+
+<!-- ========== NAV (classic top bar) ========== -->
+<nav class="pm-topbar" id="pmTopbar">
+  <div class="pm-topbar-inner">
+    <a href="/" class="pm-nav-logo"><img src="../assets/images/logo/logo-dark.png?v=2" alt="Ziggo"></a>
+    <ul class="pm-nav-links">
+      <li class="pm-nav-has-dropdown">
+        <a href="#" class="pm-nav-link">Services <i class="fa-solid fa-chevron-down"></i></a>
+        <div class="pm-nav-dropdown">
+          <a href="services/ride" class="color-ride"><span class="ico ico-img"><img src="../assets/images/services/ride.png?v=pm108-realstudio" alt=""></span><div><strong>Ride</strong><small>Tuk, Mini, City, Flex, Lux</small></div></a>
+          <a href="services/food" class="color-food"><span class="ico ico-img"><img src="../assets/images/services/food.png?v=20260602nobg2" alt=""></span><div><strong>Food</strong><small>10,000+ restaurants</small></div></a>
+          <a href="services/flash" class="color-flash"><span class="ico ico-img"><img src="../assets/images/services/flash.png?v=20260602nobg" alt=""></span><div><strong>Flash</strong><small>Same-day parcel delivery</small></div></a>
+          <a href="services/truck" class="color-truck"><span class="ico ico-img"><img src="../assets/images/services/truck.png?v=20260520123" alt=""></span><div><strong>Truck</strong><small>Moving &amp; cargo, with helpers</small></div></a>
+          <a href="services/mart" class="color-mart">
+            <span class="ico ico-img"><img src="../assets/images/services/mart.png?v=pm115-cleanbag" alt=""></span>
+            <div><strong>Mart</strong><small>Groceries in 30 minutes</small></div>
+          </a>
+          <a href="signup" class="pm-mega-footer"><div class="text"><strong>Ziggo Pass</strong><small>Unlimited free delivery for Rs. 549/mo</small></div><span class="cta">Try free <i class="fa-solid fa-arrow-right"></i></span></a>
+        </div>
+      </li>
+      <li class="pm-nav-has-dropdown">
+        <a href="#" class="pm-nav-link">Partner <i class="fa-solid fa-chevron-down"></i></a>
+        <div class="pm-nav-dropdown">
+          <a href="drive" class="color-drive"><span class="ico ico-img"><img src="../assets/images/services/ride.png?v=pm108-realstudio" alt=""></span><div><strong>Drive with Ziggo</strong><small>Be your own boss</small></div></a>
+          <a href="partner" class="color-merchant"><span class="ico ico-img"><img src="../assets/images/services/food.png?v=20260602nobg2" alt=""></span><div><strong>Merchant partner</strong><small>List your restaurant or store</small></div></a>
+          <a href="business" class="color-biz"><span class="ico ico-img"><img src="../assets/images/services/truck.png?v=20260520123" alt=""></span><div><strong>For Business</strong><small>Corporate accounts</small></div></a>
+          <a href="drive" class="pm-mega-footer"><div class="text"><strong>Earn up to LKR 60K / week</strong><small>50,000 drivers already on Ziggo</small></div><span class="cta">Apply <i class="fa-solid fa-arrow-right"></i></span></a>
+        </div>
+      </li>
+      <li><a href="careers" class="pm-nav-link">Careers</a></li>
+      <li><a href="about" class="pm-nav-link">About</a></li>
+      <li><a href="preregister" class="pm-nav-link active">Preregister</a></li>
+    </ul>
+    <div class="pm-nav-cta"><a href="signup" class="signup">Get the app</a>
+    </div>
+    <button class="pm-nav-toggle" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
+  </div>
+</nav>
+
+<!-- ========== CONTENT ========== -->
+<div class="auth-bg">
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="form-container">
+        <h2>Join Ziggo Lanka</h2>
+        <p class="subtitle">Secure your early spot or join as a driver partner</p>
+        
+        <div class="tab-container">
+          <button class="tab-btn active" onclick="switchTab('user')">
+            <i class="fa-solid fa-user"></i> Customer
+          </button>
+          <button class="tab-btn" onclick="switchTab('driver')">
+            <i class="fa-solid fa-car"></i> Driver Partner
+          </button>
+        </div>
+
+        <!-- CUSTOMER FORM -->
+        <form id="userForm" class="auth-form active" onsubmit="submitForm(event, 'user')">
+          <div class="form-row">
+            <label for="user_name">FULL NAME</label>
+            <div class="auth-input">
+              <i class="fa-solid fa-user"></i>
+              <input type="text" id="user_name" placeholder="John Doe" required />
+            </div>
+          </div>
+          <div class="form-row">
+            <label for="user_email">EMAIL ADDRESS</label>
+            <div class="auth-input">
+              <i class="fa-solid fa-envelope"></i>
+              <input type="email" id="user_email" placeholder="john@example.com" required />
+            </div>
+          </div>
+          <div class="form-row">
+            <label for="user_mobile">MOBILE NUMBER</label>
+            <div class="auth-input">
+              <i class="fa-solid fa-phone"></i>
+              <input type="tel" id="user_mobile" placeholder="0771234567" required />
+            </div>
+          </div>
+          <div class="form-row">
+            <label for="user_city">DISTRICT / CITY</label>
+            <div class="auth-input">
+              <i class="fa-solid fa-location-dot"></i>
+              <select id="user_city" required>
+                <option value="" disabled selected>Select your district</option>
+                <option value="Ampara">Ampara</option>
+                <option value="Anuradhapura">Anuradhapura</option>
+                <option value="Badulla">Badulla</option>
+                <option value="Batticaloa">Batticaloa</option>
+                <option value="Colombo">Colombo</option>
+                <option value="Galle">Galle</option>
+                <option value="Gampaha">Gampaha</option>
+                <option value="Hambantota">Hambantota</option>
+                <option value="Jaffna">Jaffna</option>
+                <option value="Kalutara">Kalutara</option>
+                <option value="Kandy">Kandy</option>
+                <option value="Kegalle">Kegalle</option>
+                <option value="Kilinochchi">Kilinochchi</option>
+                <option value="Kurunegala">Kurunegala</option>
+                <option value="Mannar">Mannar</option>
+                <option value="Matale">Matale</option>
+                <option value="Matara">Matara</option>
+                <option value="Moneragala">Moneragala</option>
+                <option value="Mullaitivu">Mullaitivu</option>
+                <option value="Nuwara Eliya">Nuwara Eliya</option>
+                <option value="Polonnaruwa">Polonnaruwa</option>
+                <option value="Puttalam">Puttalam</option>
+                <option value="Ratnapura">Ratnapura</option>
+                <option value="Trincomalee">Trincomalee</option>
+                <option value="Vavuniya">Vavuniya</option>
+              </select>
+            </div>
+          </div>
+          
+          <button type="submit" id="userSubmitBtn">
+            <span>Pre-Register Now</span> <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </form>
+
+        <!-- DRIVER FORM -->
+        <form id="driverForm" class="auth-form" onsubmit="submitForm(event, 'driver')">
+          <div class="form-row">
+            <label for="driver_name">FULL NAME</label>
+            <div class="auth-input">
+              <i class="fa-solid fa-user"></i>
+              <input type="text" id="driver_name" placeholder="Driver Name" required />
+            </div>
+          </div>
+          <div class="form-row">
+            <label for="driver_mobile">MOBILE NUMBER</label>
+            <div class="auth-input">
+              <i class="fa-solid fa-phone"></i>
+              <input type="tel" id="driver_mobile" placeholder="0771234567" required />
+            </div>
+          </div>
+          <div class="form-row">
+            <label for="driver_city">DISTRICT / CITY</label>
+            <div class="auth-input">
+              <i class="fa-solid fa-location-dot"></i>
+              <select id="driver_city" required>
+                <option value="" disabled selected>Select your district</option>
+                <option value="Ampara">Ampara</option>
+                <option value="Anuradhapura">Anuradhapura</option>
+                <option value="Badulla">Badulla</option>
+                <option value="Batticaloa">Batticaloa</option>
+                <option value="Colombo">Colombo</option>
+                <option value="Galle">Galle</option>
+                <option value="Gampaha">Gampaha</option>
+                <option value="Hambantota">Hambantota</option>
+                <option value="Jaffna">Jaffna</option>
+                <option value="Kalutara">Kalutara</option>
+                <option value="Kandy">Kandy</option>
+                <option value="Kegalle">Kegalle</option>
+                <option value="Kilinochchi">Kilinochchi</option>
+                <option value="Kurunegala">Kurunegala</option>
+                <option value="Mannar">Mannar</option>
+                <option value="Matale">Matale</option>
+                <option value="Matara">Matara</option>
+                <option value="Moneragala">Moneragala</option>
+                <option value="Mullaitivu">Mullaitivu</option>
+                <option value="Nuwara Eliya">Nuwara Eliya</option>
+                <option value="Polonnaruwa">Polonnaruwa</option>
+                <option value="Puttalam">Puttalam</option>
+                <option value="Ratnapura">Ratnapura</option>
+                <option value="Trincomalee">Trincomalee</option>
+                <option value="Vavuniya">Vavuniya</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <label for="driver_vehicle">VEHICLE TYPE</label>
+            <div class="auth-input">
+              <i class="fa-solid fa-car-side"></i>
+              <select id="driver_vehicle" required>
+                <option value="" disabled selected>Select vehicle type</option>
+                <!-- Dynamic categories loaded on mount -->
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <label for="driver_nic">NIC NUMBER</label>
+            <div class="auth-input">
+              <i class="fa-solid fa-id-card"></i>
+              <input type="text" id="driver_nic" placeholder="e.g. 199512345678 or 951234567V" required />
+            </div>
+          </div>
+          
+          <button type="submit" id="driverSubmitBtn">
+            <span>Apply to Drive</span> <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </form>
+      </div>
+
+      <!-- SUCCESS STATE -->
+      <div id="successPanel" class="success-panel">
+        <div class="success-icon">
+          <i class="fa-solid fa-check"></i>
+        </div>
+        <h3 id="successTitle">Pre-registration Successful!</h3>
+        <p id="successText">Thank you for signing up. We will keep you updated about our launch in your city.</p>
+        <button class="btn btn-outline" style="width:100%;" onclick="resetFormState()">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== FOOTER ========== -->
+<footer class="pm-footer">
+  <div class="pm-footer-top">
+    <div class="pm-footer-brand">
+      <a href="/" class="pm-nav-logo pm-footer-logo"><img src="../assets/images/logo/logo-light.png?v=2" alt="Ziggo"></a>
+      <p>Sri Lanka's super app for rides, food, parcels and more &mdash; all in one place.</p>
+      <div class="socials">
+        <a href="https://www.facebook.com/profile.php?id=61590470438129" target="_blank" rel="noopener" aria-label="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
+        <a href="https://www.instagram.com/ziggo.lk?igsh=andzbWllcTV4ZXRt" target="_blank" rel="noopener" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
+        <a href="https://www.tiktok.com/@ziggo.lk?_r=1&amp;_t=ZS-96p4uTAYIK4" target="_blank" rel="noopener" aria-label="TikTok"><i class="fa-brands fa-tiktok"></i></a><a href="https://x.com/Ziggolk" target="_blank" rel="noopener" aria-label="Twitter"><i class="fa-brands fa-x-twitter"></i></a><a href="#" aria-label="LinkedIn"><i class="fa-brands fa-linkedin-in"></i></a><a href="https://www.youtube.com/@Ziggolk" target="_blank" rel="noopener" aria-label="YouTube"><i class="fa-brands fa-youtube"></i></a>
+      </div>
+    </div>
+    <div class="pm-footer-col"><h5>Services</h5><ul><li><a href="services/ride">Ride</a></li><li><a href="services/food">Food</a></li><li><a href="services/flash">Flash</a></li><li><a href="services/truck">Truck</a></li><li><a href="services/mart">Mart</a></li></ul></div>
+    <div class="pm-footer-col"><h5>Partner</h5><ul><li><a href="drive">Drive with Ziggo</a></li><li><a href="partner">Merchant partner</a></li><li><a href="business">For Business</a></li><li><a href="signup">Ziggo Pass</a></li></ul></div>
+    <div class="pm-footer-col"><h5>Company</h5><ul><li><a href="about">About</a></li><li><a href="news">News</a></li><li><a href="careers">Careers</a></li><li><a href="contact">Contact</a></li></ul></div>
+    <div class="pm-footer-col"><h5>Support</h5><ul><li><a href="help">Help Center</a></li><li><a href="safety">Safety</a></li><li><a href="privacy">Privacy</a></li><li><a href="terms">Terms</a></li></ul></div>
+  </div>
+  <div class="pm-footer-bottom">
+    <span>&copy; 2026 Ziggo.lk</span>
+    <div><a href="privacy">Privacy</a><a href="terms">Terms</a><a href="contact">Contact</a></div>
+  </div>
+</footer>
+
+<script>
+  // Tab Switching
+  function switchTab(type) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.auth-form').forEach(form => form.classList.remove('active'));
+    
+    if (type === 'user') {
+      document.querySelector('.tab-btn:first-child').classList.add('active');
+      document.getElementById('userForm').classList.add('active');
+    } else {
+      document.querySelector('.tab-btn:last-child').classList.add('active');
+      document.getElementById('driverForm').classList.add('active');
+    }
+  }
+
+  // Load Vehicle Categories dynamically
+  async function loadCategories() {
+    try {
+      const baseApi = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1') ? 'http://localhost:8000' : '';
+      const response = await fetch(`${baseApi}/api/v1/public/categories`);
+      if (response.ok) {
+        const categories = await response.json();
+        const select = document.getElementById('driver_vehicle');
+        categories.forEach(cat => {
+          const opt = document.createElement('option');
+          opt.value = cat.service_type;
+          opt.textContent = cat.name;
+          select.appendChild(opt);
+        });
+      }
+    } catch (e) {
+      console.error("Failed to load vehicle categories:", e);
+    }
+  }
+
+  // Submit Forms
+  async function submitForm(e, type) {
+    e.preventDefault();
+    const isUser = type === 'user';
+    const submitBtn = document.getElementById(isUser ? 'userSubmitBtn' : 'driverSubmitBtn');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting...';
+
+    const baseApi = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1') ? 'http://localhost:8000' : '';
+    const payload = {};
+    let url = '';
+
+    if (isUser) {
+      payload.full_name = document.getElementById('user_name').value;
+      payload.email = document.getElementById('user_email').value;
+      payload.mobile = document.getElementById('user_mobile').value;
+      payload.city = document.getElementById('user_city').value;
+      url = `${baseApi}/api/v1/public/user-preregister`;
+    } else {
+      payload.full_name = document.getElementById('driver_name').value;
+      payload.mobile = document.getElementById('driver_mobile').value;
+      payload.city = document.getElementById('driver_city').value;
+      payload.vehicle_type = document.getElementById('driver_vehicle').value;
+      payload.nic = document.getElementById('driver_nic').value;
+      url = `${baseApi}/api/v1/public/driver-application`;
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        document.querySelector('.form-container').style.display = 'none';
+        
+        const successPanel = document.getElementById('successPanel');
+        successPanel.classList.add('active');
+        
+        document.getElementById('successTitle').textContent = isUser ? 'Registration Successful!' : 'Application Submitted!';
+        document.getElementById('successText').textContent = result.message || 'Thank you! We will get in touch shortly.';
+      } else {
+        const err = await response.json();
+        alert(err.detail || 'An error occurred during submission. Please try again.');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = isUser ? '<span>Pre-Register Now</span> <i class="fa-solid fa-arrow-right"></i>' : '<span>Apply to Drive</span> <i class="fa-solid fa-arrow-right"></i>';
+      }
+    } catch (error) {
+      alert('Unable to connect to server. Please check your internet connection.');
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = isUser ? '<span>Pre-Register Now</span> <i class="fa-solid fa-arrow-right"></i>' : '<span>Apply to Drive</span> <i class="fa-solid fa-arrow-right"></i>';
+    }
+  }
+
+  function resetFormState() {
+    document.getElementById('userForm').reset();
+    document.getElementById('driverForm').reset();
+    
+    document.querySelector('.form-container').style.display = 'block';
+    document.getElementById('successPanel').classList.remove('active');
+    
+    const userBtn = document.getElementById('userSubmitBtn');
+    userBtn.disabled = false;
+    userBtn.innerHTML = '<span>Pre-Register Now</span> <i class="fa-solid fa-arrow-right"></i>';
+
+    const driverBtn = document.getElementById('driverSubmitBtn');
+    driverBtn.disabled = false;
+    driverBtn.innerHTML = '<span>Apply to Drive</span> <i class="fa-solid fa-arrow-right"></i>';
+  }
+
+  // On Load
+  (function() {
+    loadCategories();
+    
+    const topbar = document.getElementById('pmTopbar');
+    if (topbar) {
+      const onScroll = () => topbar.classList.toggle('scrolled', window.scrollY > 12);
+      window.addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+    }
+    
+    const navToggle = document.querySelector('.pm-nav-toggle');
+    if (navToggle && topbar) {
+      navToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        topbar.classList.toggle('nav-open');
+      });
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('.pm-topbar')) topbar.classList.remove('nav-open');
+      });
+    }
+  })();
+</script>
+</body>
+</html>

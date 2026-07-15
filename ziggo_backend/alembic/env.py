@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 from app.config import settings  # noqa: E402
 from app.database import Base  # noqa: E402
 from app import models  # noqa: F401,E402  -- ensure all models are registered
-from app.api.v1.public import ContactMessage, DriverApplication  # noqa: F401,E402
+from app.api.v1.public import ContactMessage, DriverApplication, UserPreregistration  # noqa: F401,E402
 
 
 config = context.config

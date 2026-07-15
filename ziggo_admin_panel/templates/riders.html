@@ -137,8 +137,18 @@
 
 {% block content %}
 
+<!-- View Tabs -->
+<div class="flex border-b border-gray-200 mb-6 gap-6">
+    <a href="/admin/riders?view=riders" class="pb-3 text-sm font-black {% if view != 'preregistrations' %}border-b-2 border-ziggo text-ziggo{% else %}text-gray-400 hover:text-gray-600{% endif %}">
+        Registered Riders ({{ stats.total_riders }})
+    </a>
+    <a href="/admin/riders?view=preregistrations" class="pb-3 text-sm font-black {% if view == 'preregistrations' %}border-b-2 border-ziggo text-ziggo{% else %}text-gray-400 hover:text-gray-600{% endif %}">
+        Public Preregistrations ({{ stats.total_preregs }}) {% if stats.unread_preregs > 0 %}<span class="ml-1 px-1.5 py-0.5 text-[10px] bg-blue-500 text-white rounded-full font-black">{{ stats.unread_preregs }}</span>{% endif %}
+    </a>
+</div>
 
 <!-- ── Stat Cards ─────────────────────────────────────────────────────────── -->
+{% if view != 'preregistrations' %}
 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
 
     <div class="rider-stat-card rsc-blue">
@@ -174,6 +184,33 @@
     </div>
 
 </div>
+{% else %}
+<div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+    <div class="rider-stat-card rsc-blue">
+        <div class="rsc-icon blue"><i class="fas fa-user-tag"></i></div>
+        <div>
+            <div class="rsc-val">{{ stats.total_preregs }}</div>
+            <div class="rsc-lbl">Total Preregistrations</div>
+        </div>
+    </div>
+
+    <div class="rider-stat-card rsc-purple">
+        <div class="rsc-icon purple"><i class="fas fa-envelope-open"></i></div>
+        <div>
+            <div class="rsc-val">{{ stats.unread_preregs }}</div>
+            <div class="rsc-lbl">New / Unread</div>
+        </div>
+    </div>
+
+    <div class="rider-stat-card rsc-green">
+        <div class="rsc-icon green"><i class="fas fa-check-double"></i></div>
+        <div>
+            <div class="rsc-val">{{ stats.total_preregs - stats.unread_preregs }}</div>
+            <div class="rsc-lbl">Processed</div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <!-- ── Main Card ──────────────────────────────────────────────────────────── -->
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -181,6 +218,8 @@
     <!-- Filter bar -->
     <div class="filter-bar">
         <form method="GET" action="/admin/riders" class="flex flex-wrap items-end gap-3 flex-1">
+            <input type="hidden" name="view" value="{{ view }}">
+            {% if view != 'preregistrations' %}
             <div>
                 <label>Status</label>
                 <select name="status" style="min-width:140px">
@@ -189,10 +228,11 @@
                     <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>⚫ Inactive</option>
                 </select>
             </div>
+            {% endif %}
             <div style="flex:1;min-width:200px;max-width:320px">
                 <label>Quick Search</label>
                 <input type="text" name="search" value="{{ search }}"
-                       placeholder="Search name / email / phone…"
+                       placeholder="{% if view == 'preregistrations' %}Search name / email / city / mobile…{% else %}Search name / email / phone…{% endif %}"
                        style="width:100%">
             </div>
             <button type="submit"
@@ -201,7 +241,7 @@
                 <i class="fas fa-search"></i> Search
             </button>
             {% if status != 'all' or search %}
-            <a href="/admin/riders"
+            <a href="/admin/riders?view={{ view }}"
                class="inline-flex items-center gap-1.5 px-4 bg-slate-100 border border-gray-200 text-gray-600 rounded-lg font-bold text-xs hover:bg-slate-200 transition"
                style="height:36px">
                 <i class="fas fa-times"></i> Clear
@@ -209,16 +249,80 @@
             {% endif %}
         </form>
 
+        {% if view != 'preregistrations' %}
         <a href="/admin/riders/export"
            class="inline-flex items-center gap-2 px-4 bg-white border border-gray-200 text-gray-600 rounded-xl font-bold text-sm hover:bg-gray-50 transition shadow-sm"
            style="height:36px">
             <i class="fas fa-download text-xs"></i> Export CSV
         </a>
+        {% endif %}
     </div>
 
     <!-- Table -->
     <div class="overflow-x-auto">
         <table class="w-full text-left">
+            {% if view == 'preregistrations' %}
+            <thead>
+                <tr>
+                    <th class="px-5 py-3">ID</th>
+                    <th class="px-5 py-3">Rider Name</th>
+                    <th class="px-5 py-3">Email</th>
+                    <th class="px-5 py-3">Mobile</th>
+                    <th class="px-5 py-3">City</th>
+                    <th class="px-5 py-3">Status</th>
+                    <th class="px-5 py-3">Registered At</th>
+                    <th class="px-5 py-3">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in preregistrations %}
+                <tr class="hover:bg-gray-50 transition-colors {% if not p.is_read %}bg-blue-50/20{% endif %}">
+                    <td class="px-5 py-3 text-sm font-medium">#{{ p.id }}</td>
+                    <td class="px-5 py-3">
+                        <div class="font-bold text-ziggo leading-tight">{{ p.full_name }}</div>
+                        {% if not p.is_read %}
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-blue-100 text-blue-600">New</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-5 py-3 text-sm text-gray-500">{{ p.email }}</td>
+                    <td class="px-5 py-3 text-sm font-semibold text-gray-700">{{ p.mobile }}</td>
+                    <td class="px-5 py-3 text-sm">{{ p.city or 'N/A' }}</td>
+                    <td class="px-5 py-3">
+                        <span class="status-pill {% if p.is_read %}status-inactive{% else %}status-active{% endif %}">
+                            <span class="dot"></span>{{ 'Processed' if p.is_read else 'New Prereg' }}
+                        </span>
+                    </td>
+                    <td class="px-5 py-3 text-xs text-gray-400 whitespace-nowrap">
+                        {{ p.created_at.strftime("%b %d, %Y · %H:%M") if p.created_at else '—' }}
+                    </td>
+                    <td class="px-5 py-3">
+                        <div class="flex items-center gap-1.5">
+                            <form method="post" action="/admin/riders/preregister/{{ p.id }}/read" style="display:inline">
+                                <button type="submit" class="act-btn act-activate">
+                                    {% if p.is_read %}Mark Unread{% else %}Mark Read{% endif %}
+                                </button>
+                            </form>
+                            <form method="post" action="/admin/riders/preregister/{{ p.id }}/delete" style="display:inline"
+                                  onsubmit="return confirm('Permanently delete this preregistration?');">
+                                <button type="submit" class="act-btn act-delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8">
+                        <div class="empty-state">
+                            <div class="icon"><i class="fas fa-user-tag"></i></div>
+                            <p>No preregistrations found.</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            {% else %}
             <thead>
                 <tr>
                     <th class="px-5 py-3">Rider</th>
@@ -311,6 +415,7 @@
                 </tr>
                 {% endfor %}
             </tbody>
+            {% endif %}
         </table>
     </div>
 
@@ -319,11 +424,11 @@
     <div class="px-5 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50/40">
         <p class="text-xs text-gray-400 font-medium">
             Showing <strong class="text-ziggo">{{ start_idx }}–{{ end_idx }}</strong> of
-            <strong class="text-ziggo">{{ total_riders }}</strong> riders
+            <strong class="text-ziggo">{{ total_riders }}</strong> {% if view == 'preregistrations' %}preregistrations{% else %}riders{% endif %}
         </p>
         <div class="flex items-center gap-1">
             {% if page > 1 %}
-                <a href="/admin/riders?page={{ page - 1 }}&status={{ status }}&search={{ search }}"
+                <a href="/admin/riders?page={{ page - 1 }}&status={{ status }}&search={{ search }}&view={{ view }}"
                    class="px-3 py-1 rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 text-xs font-bold transition">
                    <i class="fas fa-chevron-left text-[9px]"></i>
                 </a>
@@ -337,13 +442,13 @@
                 {% if p == page %}
                     <span class="px-3 py-1 rounded-lg bg-ziggo text-white text-xs font-black">{{ p }}</span>
                 {% else %}
-                    <a href="/admin/riders?page={{ p }}&status={{ status }}&search={{ search }}"
+                    <a href="/admin/riders?page={{ p }}&status={{ status }}&search={{ search }}&view={{ view }}"
                        class="px-3 py-1 rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
                 {% endif %}
             {% endfor %}
 
             {% if page < total_pages %}
-                <a href="/admin/riders?page={{ page + 1 }}&status={{ status }}&search={{ search }}"
+                <a href="/admin/riders?page={{ page + 1 }}&status={{ status }}&search={{ search }}&view={{ view }}"
                    class="px-3 py-1 rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 text-xs font-bold transition">
                    <i class="fas fa-chevron-right text-[9px]"></i>
                 </a>
@@ -357,7 +462,11 @@
     {% else %}
     <div class="px-5 py-3 border-t border-gray-100">
         <p class="text-xs text-gray-400">
-            {{ riders | length }} rider{{ '' if riders|length == 1 else 's' }} shown
+            {% if view == 'preregistrations' %}
+                {{ preregistrations | length }} preregistration{{ '' if preregistrations|length == 1 else 's' }} shown
+            {% else %}
+                {{ riders | length }} rider{{ '' if riders|length == 1 else 's' }} shown
+            {% endif %}
         </p>
     </div>
     {% endif %}

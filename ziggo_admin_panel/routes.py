@@ -464,68 +464,18 @@ async def admin_drivers(
     page: int = 1,
     status: str = "all",
     search: str = "",
+    view: str = "drivers",
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
     from sqlalchemy import or_
+    from app.api.v1.public import DriverApplication
 
     limit = 50
     offset = (page - 1) * limit
 
-    # Build filter conditions
-    where_clauses = []
-    
-    # Status filter
-    if status == "online":
-        where_clauses.append(Driver.is_online == True)
-    elif status == "offline":
-        where_clauses.append(Driver.is_online == False)
-        where_clauses.append(Driver.is_approved == True)
-    elif status == "pending":
-        where_clauses.append(Driver.status == DriverStatus.PENDING)
-        
-    # Search filter
-    if search:
-        search_term = f"%{search.strip()}%"
-        where_clauses.append(
-            or_(
-                User.full_name.ilike(search_term),
-                User.phone_number.ilike(search_term),
-                User.email.ilike(search_term),
-                Driver.vehicle_number.ilike(search_term),
-                Driver.vehicle_model.ilike(search_term),
-            )
-        )
-
-    # Base query for drivers
-    stmt = (
-        select(Driver)
-        .join(User, Driver.user_id == User.id)
-    )
-    if where_clauses:
-        stmt = stmt.where(*where_clauses)
-
-    # Total count of all drivers in system (for stats bar)
+    # Base counts for stats bar
     total_all = (await db.execute(select(func.count(Driver.id)))).scalar() or 0
-
-    # Total count under current filters (for list pagination)
-    count_stmt = select(func.count(Driver.id)).join(User, Driver.user_id == User.id)
-    if where_clauses:
-        count_stmt = count_stmt.where(*where_clauses)
-    total = (await db.execute(count_stmt)).scalar() or 0
-    total_pages = (total + limit - 1) // limit
-
-    # Query matching records
-    q = await db.execute(
-        stmt.options(selectinload(Driver.user))
-        .order_by(Driver.id.desc())
-        .offset(offset)
-        .limit(limit)
-    )
-    drivers = q.scalars().all()
-    for drv in drivers:
-        drv.settlement_amount = float(await fin.get_driver_outstanding_commission(db, drv.id))
-
     online = (
         await db.execute(select(func.count(Driver.id)).where(Driver.is_online == True))  # noqa: E712
     ).scalar() or 0
@@ -534,6 +484,15 @@ async def admin_drivers(
             select(func.count(Driver.id)).where(Driver.status == DriverStatus.PENDING)
         )
     ).scalar() or 0
+    
+    # Preregistered public apps count
+    total_apps = (await db.execute(select(func.count(DriverApplication.id)))).scalar() or 0
+    unread_apps = (
+        await db.execute(
+            select(func.count(DriverApplication.id)).where(DriverApplication.is_read == False)
+        )
+    ).scalar() or 0
+
     avg_rating_q = await db.execute(
         select(func.coalesce(func.avg(User.rating), 0)).where(User.role == UserRole.DRIVER)
     )
@@ -545,7 +504,90 @@ async def admin_drivers(
         "online_pct": int(round((online / total_all * 100) if total_all else 0)),
         "pending": pending,
         "avg_rating": avg_rating,
+        "total_apps": total_apps,
+        "unread_apps": unread_apps,
     }
+
+    if view == "applications":
+        # Search / filter conditions on public applications
+        stmt = select(DriverApplication)
+        if search:
+            search_term = f"%{search.strip()}%"
+            stmt = stmt.where(
+                or_(
+                    DriverApplication.full_name.ilike(search_term),
+                    DriverApplication.mobile.ilike(search_term),
+                    DriverApplication.city.ilike(search_term),
+                    DriverApplication.vehicle_type.ilike(search_term),
+                    DriverApplication.nic.ilike(search_term),
+                )
+            )
+            
+        count_stmt = select(func.count(DriverApplication.id))
+        if search:
+            search_term = f"%{search.strip()}%"
+            count_stmt = count_stmt.where(
+                or_(
+                    DriverApplication.full_name.ilike(search_term),
+                    DriverApplication.mobile.ilike(search_term),
+                    DriverApplication.city.ilike(search_term),
+                    DriverApplication.vehicle_type.ilike(search_term),
+                    DriverApplication.nic.ilike(search_term),
+                )
+            )
+        total = (await db.execute(count_stmt)).scalar() or 0
+        total_pages = (total + limit - 1) // limit
+
+        q = await db.execute(
+            stmt.order_by(DriverApplication.id.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        applications = q.scalars().all()
+        drivers = []
+    else:
+        # Build filter conditions on registered drivers
+        where_clauses = []
+        if status == "online":
+            where_clauses.append(Driver.is_online == True)
+        elif status == "offline":
+            where_clauses.append(Driver.is_online == False)
+            where_clauses.append(Driver.is_approved == True)
+        elif status == "pending":
+            where_clauses.append(Driver.status == DriverStatus.PENDING)
+            
+        if search:
+            search_term = f"%{search.strip()}%"
+            where_clauses.append(
+                or_(
+                    User.full_name.ilike(search_term),
+                    User.phone_number.ilike(search_term),
+                    User.email.ilike(search_term),
+                    Driver.vehicle_number.ilike(search_term),
+                    Driver.vehicle_model.ilike(search_term),
+                )
+            )
+
+        stmt = select(Driver).join(User, Driver.user_id == User.id)
+        if where_clauses:
+            stmt = stmt.where(*where_clauses)
+
+        count_stmt = select(func.count(Driver.id)).join(User, Driver.user_id == User.id)
+        if where_clauses:
+            count_stmt = count_stmt.where(*where_clauses)
+        total = (await db.execute(count_stmt)).scalar() or 0
+        total_pages = (total + limit - 1) // limit
+
+        q = await db.execute(
+            stmt.options(selectinload(Driver.user))
+            .order_by(Driver.id.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        drivers = q.scalars().all()
+        for drv in drivers:
+            drv.settlement_amount = float(await fin.get_driver_outstanding_commission(db, drv.id))
+        applications = []
 
     start_idx = (page - 1) * limit + 1 if total > 0 else 0
     end_idx = min(page * limit, total)
@@ -557,6 +599,7 @@ async def admin_drivers(
             "request": request,
             "active_page": "drivers",
             "drivers": drivers,
+            "applications": applications,
             "stats": stats,
             "page": page,
             "total_pages": total_pages,
@@ -566,6 +609,7 @@ async def admin_drivers(
             "page_range": page_range,
             "status": status,
             "search": search,
+            "view": view,
         },
     )
 
@@ -1090,6 +1134,38 @@ async def activate_driver_form(
     return RedirectResponse(url="/admin/drivers", status_code=303)
 
 
+@router.post("/drivers/applications/{id}/read")
+async def read_driver_application(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.api.v1.public import DriverApplication
+    q = await db.execute(select(DriverApplication).where(DriverApplication.id == id))
+    app = q.scalars().first()
+    if not app:
+        raise HTTPException(status_code=404, detail="Application not found")
+    app.is_read = not bool(app.is_read)
+    await db.commit()
+    return RedirectResponse(url="/admin/drivers?view=applications", status_code=303)
+
+
+@router.post("/drivers/applications/{id}/delete")
+async def delete_driver_application(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.api.v1.public import DriverApplication
+    q = await db.execute(select(DriverApplication).where(DriverApplication.id == id))
+    app = q.scalars().first()
+    if not app:
+        raise HTTPException(status_code=404, detail="Application not found")
+    await db.delete(app)
+    await db.commit()
+    return RedirectResponse(url="/admin/drivers?view=applications", status_code=303)
+
+
 @router.get("/customers", response_class=HTMLResponse)
 async def admin_customers(
     request: Request,
@@ -1140,54 +1216,18 @@ async def admin_riders(
     page: int = 1,
     status: str = "all",
     search: str = "",
+    view: str = "riders",
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
     from sqlalchemy import or_, and_
     from datetime import date
+    from app.api.v1.public import UserPreregistration
 
     limit = 50
     offset = (page - 1) * limit
 
-    # Build filter conditions on the User join
-    conditions = []
-    if status == "active":
-        conditions.append(User.is_active == True)
-    elif status == "inactive":
-        conditions.append(User.is_active == False)
-    if search:
-        s = f"%{search}%"
-        conditions.append(
-            or_(
-                User.full_name.ilike(s),
-                User.phone_number.ilike(s),
-                User.email.ilike(s),
-            )
-        )
-
-    base_stmt = (
-        select(Customer)
-        .join(Customer.user)
-        .options(selectinload(Customer.user))
-    )
-    if conditions:
-        base_stmt = base_stmt.where(and_(*conditions))
-
-    total = (await db.execute(
-        select(func.count()).select_from(base_stmt.subquery())
-    )).scalar() or 0
-
-    riders_q = await db.execute(
-        base_stmt.order_by(Customer.id.desc()).offset(offset).limit(limit)
-    )
-    riders = riders_q.scalars().all()
-
-    total_pages = (total + limit - 1) // limit
-    start_idx = (page - 1) * limit + 1 if total > 0 else 0
-    end_idx = min(page * limit, total)
-    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
-
-    # Stat counts (full table, ignore current filters)
+    # Base stat counts (full table, ignore current filters)
     total_riders = (await db.execute(select(func.count(Customer.id)))).scalar() or 0
     active_riders = (
         await db.execute(
@@ -1202,6 +1242,94 @@ async def admin_riders(
             select(func.count(Customer.id)).join(Customer.user).where(func.date(User.created_at) == today)
         )
     ).scalar() or 0
+    
+    total_preregs = (await db.execute(select(func.count(UserPreregistration.id)))).scalar() or 0
+    unread_preregs = (
+        await db.execute(
+            select(func.count(UserPreregistration.id)).where(UserPreregistration.is_read == False)
+        )
+    ).scalar() or 0
+
+    stats = {
+        "total_riders": total_riders,
+        "active_riders": active_riders,
+        "inactive_riders": inactive_riders,
+        "joined_today": joined_today,
+        "total_preregs": total_preregs,
+        "unread_preregs": unread_preregs,
+    }
+
+    if view == "preregistrations":
+        stmt = select(UserPreregistration)
+        if search:
+            s = f"%{search}%"
+            stmt = stmt.where(
+                or_(
+                    UserPreregistration.full_name.ilike(s),
+                    UserPreregistration.email.ilike(s),
+                    UserPreregistration.mobile.ilike(s),
+                    UserPreregistration.city.ilike(s),
+                )
+            )
+            
+        count_stmt = select(func.count(UserPreregistration.id))
+        if search:
+            s = f"%{search}%"
+            count_stmt = count_stmt.where(
+                or_(
+                    UserPreregistration.full_name.ilike(s),
+                    UserPreregistration.email.ilike(s),
+                    UserPreregistration.mobile.ilike(s),
+                    UserPreregistration.city.ilike(s),
+                )
+            )
+        total = (await db.execute(count_stmt)).scalar() or 0
+        total_pages = (total + limit - 1) // limit
+        
+        preregs_q = await db.execute(
+            stmt.order_by(UserPreregistration.id.desc()).offset(offset).limit(limit)
+        )
+        preregistrations = preregs_q.scalars().all()
+        riders = []
+    else:
+        # Build filter conditions on the User join
+        conditions = []
+        if status == "active":
+            conditions.append(User.is_active == True)
+        elif status == "inactive":
+            conditions.append(User.is_active == False)
+        if search:
+            s = f"%{search}%"
+            conditions.append(
+                or_(
+                    User.full_name.ilike(s),
+                    User.phone_number.ilike(s),
+                    User.email.ilike(s),
+                )
+            )
+
+        base_stmt = (
+            select(Customer)
+            .join(Customer.user)
+            .options(selectinload(Customer.user))
+        )
+        if conditions:
+            base_stmt = base_stmt.where(and_(*conditions))
+
+        total = (await db.execute(
+            select(func.count()).select_from(base_stmt.subquery())
+        )).scalar() or 0
+
+        riders_q = await db.execute(
+            base_stmt.order_by(Customer.id.desc()).offset(offset).limit(limit)
+        )
+        riders = riders_q.scalars().all()
+        total_pages = (total + limit - 1) // limit
+        preregistrations = []
+
+    start_idx = (page - 1) * limit + 1 if total > 0 else 0
+    end_idx = min(page * limit, total)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
 
     return templates.TemplateResponse(
         request, "riders.html",
@@ -1209,6 +1337,7 @@ async def admin_riders(
             "request": request,
             "active_page": "riders",
             "riders": riders,
+            "preregistrations": preregistrations,
             "page": page,
             "total_pages": total_pages,
             "total_riders": total_riders,
@@ -1220,8 +1349,42 @@ async def admin_riders(
             "page_range": page_range,
             "status": status,
             "search": search,
+            "view": view,
+            "stats": stats,
         },
     )
+
+
+@router.post("/riders/preregister/{id}/read")
+async def read_user_preregister(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.api.v1.public import UserPreregistration
+    q = await db.execute(select(UserPreregistration).where(UserPreregistration.id == id))
+    app = q.scalars().first()
+    if not app:
+        raise HTTPException(status_code=404, detail="Preregistration not found")
+    app.is_read = not bool(app.is_read)
+    await db.commit()
+    return RedirectResponse(url="/admin/riders?view=preregistrations", status_code=303)
+
+
+@router.post("/riders/preregister/{id}/delete")
+async def delete_user_preregister(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.api.v1.public import UserPreregistration
+    q = await db.execute(select(UserPreregistration).where(UserPreregistration.id == id))
+    app = q.scalars().first()
+    if not app:
+        raise HTTPException(status_code=404, detail="Preregistration not found")
+    await db.delete(app)
+    await db.commit()
+    return RedirectResponse(url="/admin/riders?view=preregistrations", status_code=303)
 
 
 @router.get("/riders/export")

@@ -80,6 +80,22 @@
       .cta-inner { grid-template-columns:1fr; padding:36px; } .cta-visual { display:none; }
     }
     @media (max-width:600px) { .cat-grid, .feat-grid, .step-grid { grid-template-columns:1fr; } }
+
+    /* Carousel styles */
+    .offers-section { padding: 130px 0 20px; }
+    .offers-container { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+    .offers-title { font-family: var(--p-font-display); font-size: 2rem; font-weight: 700; color: var(--p-brand-dark); margin-bottom: 0; letter-spacing: -0.03em; text-align: center; }
+    .offers-carousel { position: relative; width: 100%; max-width: 1000px; margin: 40px auto 0; border-radius: 24px; overflow: hidden; box-shadow: 0 20px 45px -15px rgba(11,20,38,0.15); background: #fff; }
+    .carousel-track { display: flex; transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1); width: 100%; }
+    .carousel-slide { width: 100%; min-width: 100%; max-width: 100%; flex-shrink: 0; height: 380px; position: relative; overflow: hidden; }
+    @media (max-width: 768px) {
+      .carousel-slide { height: 240px; }
+    }
+    .carousel-slide img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .carousel-slide a { display: block; width: 100%; height: 100%; }
+    .carousel-dots { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 18px; }
+    .carousel-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--p-border, #cbd5e1); cursor: pointer; transition: all 0.3s ease; }
+    .carousel-dot.active { width: 24px; border-radius: 4px; background: #C2410C; }
   </style>
 <!-- ziggo:canonical:begin -->
   <link rel="canonical" href="https://ziggo.lk/pages/services/food">
@@ -126,6 +142,7 @@
       </li>
       <li><a href="../careers" class="pm-nav-link">Careers</a></li>
       <li><a href="../about" class="pm-nav-link">About</a></li>
+      <li><a href="../preregister" class="pm-nav-link">Preregister</a></li>
     </ul>
     <div class="pm-nav-cta"><a href="../signup" class="signup">Get the app</a>
     </div>
@@ -156,6 +173,16 @@
         <div><strong>4.8&starf;</strong><small>avg rating</small></div>
       </div>
     </div>
+  </div>
+</section>
+
+<section class="offers-section" id="foodOffersSection" style="display: none;">
+  <div class="offers-container">
+    <h2 class="offers-title">Food Offers</h2>
+    <div class="offers-carousel" id="foodOffersCarousel">
+      <div class="carousel-track"></div>
+    </div>
+    <div class="carousel-dots"></div>
   </div>
 </section>
 
@@ -231,7 +258,8 @@
     </div>
     <div class="pm-footer-col"><h5>Services</h5><ul><li><a href="ride">Ride</a></li><li><a href="food">Food</a></li><li><a href="flash">Flash</a></li><li><a href="truck">Truck</a></li><li><a href="mart">Mart</a></li></ul></div>
     <div class="pm-footer-col"><h5>Partner</h5><ul><li><a href="../drive">Drive with Ziggo</a></li><li><a href="../partner">Merchant partner</a></li><li><a href="../business">For Business</a></li><li><a href="../signup">Ziggo Pass</a></li></ul></div>
-    <div class="pm-footer-col"><h5>Company</h5><ul><li><a href="../about">About</a></li><li><a href="../news">News</a></li><li><a href="../careers">Careers</a></li><li><a href="../contact">Contact</a></li></ul></div>
+    <div class="pm-footer-col"><h5>Company</h5><ul><li><a href="../about">About</a></li><li><a href="../news">News</a></li><li><a href="../careers">Careers</a></li><li><a href="../contact">Contact</a></li>
+<li><a href="../preregister">Preregister</a></li></ul></div>
     <div class="pm-footer-col"><h5>Support</h5><ul><li><a href="../help">Help Center</a></li><li><a href="../safety">Safety</a></li><li><a href="../privacy">Privacy</a></li><li><a href="../terms">Terms</a></li></ul></div>
   </div>
   <div class="pm-footer-bottom">
@@ -265,6 +293,89 @@
     document.querySelectorAll('.pm-nav-links a').forEach((a) => a.addEventListener('click', () => topbar.classList.remove('nav-open')));
     document.addEventListener('click', (e) => { if (!e.target.closest('.pm-topbar')) topbar.classList.remove('nav-open'); });
   }
+
+  // Dynamic Food Banners
+  (function() {
+    const track = document.querySelector('#foodOffersCarousel .carousel-track');
+    const dotsContainer = document.querySelector('#foodOffersSection .carousel-dots');
+    const section = document.getElementById('foodOffersSection');
+
+    if (track && dotsContainer && section) {
+      fetch('/api/v1/food/home')
+        .then(r => r.ok ? r.json() : Promise.reject(r.status))
+        .then(data => {
+          const banners = data.banners || [];
+          if (banners.length === 0) return;
+
+          section.style.display = 'block';
+          let currentIndex = 0;
+          let slideInterval = null;
+
+          track.replaceChildren();
+          dotsContainer.replaceChildren();
+
+          banners.forEach((banner, index) => {
+            const slide = document.createElement('div');
+            slide.className = 'carousel-slide';
+
+            const img = document.createElement('img');
+            img.src = banner.image_url;
+            img.alt = banner.title || 'Food Offer';
+            img.onerror = () => { img.src = '../../assets/images/services/food.png'; };
+
+            if (banner.link_type && banner.link_type !== 'none') {
+              const link = document.createElement('a');
+              link.href = '#';
+              link.appendChild(img);
+              slide.appendChild(link);
+            } else {
+              slide.appendChild(img);
+            }
+
+            track.appendChild(slide);
+
+            const dot = document.createElement('span');
+            dot.className = 'carousel-dot';
+            if (index === 0) dot.classList.add('active');
+            dot.addEventListener('click', () => {
+              goToSlide(index);
+              resetTimer();
+            });
+            dotsContainer.appendChild(dot);
+          });
+
+          function updateCarousel() {
+            track.style.transform = `translateX(-${currentIndex * 100}%)`;
+            const dots = dotsContainer.querySelectorAll('.carousel-dot');
+            dots.forEach((dot, idx) => {
+              dot.classList.toggle('active', idx === currentIndex);
+            });
+          }
+
+          function goToSlide(index) {
+            currentIndex = index;
+            updateCarousel();
+          }
+
+          function nextSlide() {
+            currentIndex = (currentIndex + 1) % banners.length;
+            updateCarousel();
+          }
+
+          function startTimer() {
+            slideInterval = setInterval(nextSlide, 5000);
+          }
+
+          function resetTimer() {
+            clearInterval(slideInterval);
+            startTimer();
+          }
+
+          startTimer();
+        })
+        .catch(err => console.error('Error loading food banners:', err));
+    }
+  })();
 })();
 </script>
 </body>

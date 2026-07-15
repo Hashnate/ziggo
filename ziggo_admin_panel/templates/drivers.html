@@ -4,7 +4,18 @@
 {% block page_title %}Driver Management{% endblock %}
 
 {% block content %}
+<!-- View Tabs -->
+<div class="flex border-b border-gray-200 mb-6 gap-6">
+    <a href="/admin/drivers?view=drivers" class="pb-3 text-sm font-black {% if view != 'applications' %}border-b-2 border-ziggo text-ziggo{% else %}text-gray-400 hover:text-gray-600{% endif %}">
+        Registered Drivers ({{ stats.total }})
+    </a>
+    <a href="/admin/drivers?view=applications" class="pb-3 text-sm font-black {% if view == 'applications' %}border-b-2 border-ziggo text-ziggo{% else %}text-gray-400 hover:text-gray-600{% endif %}">
+        Public Applications ({{ stats.total_apps }}) {% if stats.unread_apps > 0 %}<span class="ml-1 px-1.5 py-0.5 text-[10px] bg-blue-500 text-white rounded-full font-black">{{ stats.unread_apps }}</span>{% endif %}
+    </a>
+</div>
+
 <!-- Driver Stats Bar -->
+{% if view != 'applications' %}
 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
     <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
         <div class="flex items-center justify-between mb-4">
@@ -45,11 +56,44 @@
         <p class="text-2xl font-black text-ziggo">{{ "{:.2f}".format(stats.avg_rating) }}</p>
     </div>
 </div>
+{% else %}
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+            <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
+                <i class="fas fa-file-signature"></i>
+            </div>
+        </div>
+        <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Total Applications</p>
+        <p class="text-2xl font-black text-ziggo">{{ stats.total_apps }}</p>
+    </div>
+    <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+            <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
+                <i class="fas fa-envelope-open"></i>
+            </div>
+        </div>
+        <p class="text-xs font-black text-gray-400 uppercase tracking-widest">New / Unread</p>
+        <p class="text-2xl font-black text-blue-600">{{ stats.unread_apps }}</p>
+    </div>
+    <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+            <div class="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center">
+                <i class="fas fa-check-double"></i>
+            </div>
+        </div>
+        <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Processed</p>
+        <p class="text-2xl font-black text-ziggo">{{ stats.total_apps - stats.unread_apps }}</p>
+    </div>
+</div>
+{% endif %}
 
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
     <!-- Filters & Actions -->
     <div class="py-4 px-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-4 bg-gray-50/30">
         <form method="GET" action="/admin/drivers" class="flex flex-wrap items-end gap-4 flex-1 min-w-[300px]">
+            <input type="hidden" name="view" value="{{ view }}">
+            {% if view != 'applications' %}
             <div>
                 <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Status</label>
                 <select name="status" class="bg-white border border-gray-200 rounded-lg px-4 py-2 text-sm font-semibold outline-none shadow-soft-sm cursor-pointer hover:border-ziggo transition-all min-w-[140px]">
@@ -59,19 +103,21 @@
                     <option value="pending" {% if status == 'pending' %}selected{% endif %}>🟡 Pending</option>
                 </select>
             </div>
+            {% endif %}
             <div class="flex-1 max-w-sm">
                 <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Quick Search</label>
-                <input type="text" name="search" value="{{ search }}" placeholder="Search name / email / phone.." class="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg outline-none focus:border-ziggo transition-all text-sm font-semibold shadow-soft-sm">
+                <input type="text" name="search" value="{{ search }}" placeholder="{% if view == 'applications' %}Search name / city / type / nic..{% else %}Search name / email / phone..{% endif %}" class="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg outline-none focus:border-ziggo transition-all text-sm font-semibold shadow-soft-sm">
             </div>
             <button type="submit" class="px-4 py-2 bg-ziggo text-white rounded-lg font-black text-xs shadow-brand hover:bg-ziggo-light transition flex items-center gap-1.5 h-[38px] items-center">
                 <i class="fas fa-search"></i> Search
             </button>
             {% if status != 'all' or search %}
-            <a href="/admin/drivers" class="px-4 py-2 bg-slate-100 border border-gray-200 text-gray-700 rounded-lg font-black text-xs hover:bg-slate-200 transition flex items-center gap-1.5 h-[38px] items-center">
+            <a href="/admin/drivers?view={{ view }}" class="px-4 py-2 bg-slate-100 border border-gray-200 text-gray-700 rounded-lg font-black text-xs hover:bg-slate-200 transition flex items-center gap-1.5 h-[38px] items-center">
                 Clear Filter
             </a>
             {% endif %}
         </form>
+        {% if view != 'applications' %}
         <div class="flex gap-3 self-end mb-[2px]">
             <a href="/admin/drivers/export" class="bg-white border border-gray-200 text-gray-600 px-4 py-2 rounded-xl font-bold text-sm hover:bg-gray-50 transition-all shadow-sm inline-flex items-center">
                 <i class="fas fa-download mr-2"></i> Export
@@ -80,12 +126,71 @@
                 <i class="fas fa-plus mr-2"></i> Add New Driver
             </a>
         </div>
+        {% endif %}
     </div>
 
 
     <!-- Drivers Table -->
     <div class="overflow-x-auto">
         <table class="w-full text-left">
+            {% if view == 'applications' %}
+            <thead class="bg-ziggo-canvas/70 text-[11px] uppercase tracking-wider text-ziggo-faint font-black">
+                <tr>
+                    <th class="px-6 py-4">ID</th>
+                    <th class="px-6 py-4">Applicant Name</th>
+                    <th class="px-6 py-4">Mobile</th>
+                    <th class="px-6 py-4">City</th>
+                    <th class="px-6 py-4">Vehicle Type</th>
+                    <th class="px-6 py-4">NIC</th>
+                    <th class="px-6 py-4">Status</th>
+                    <th class="px-6 py-4">Applied At</th>
+                    <th class="px-6 py-4">Action</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for app in applications %}
+                <tr class="hover:bg-gray-50 transition-colors {% if not app.is_read %}bg-blue-50/25{% endif %}">
+                    <td class="px-6 py-4 text-sm font-medium">#{{ app.id }}</td>
+                    <td class="px-6 py-4">
+                        <div class="font-bold text-ziggo">{{ app.full_name }}</div>
+                        {% if not app.is_read %}
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-blue-100 text-blue-600">New</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-sm font-semibold">{{ app.mobile }}</td>
+                    <td class="px-6 py-4 text-sm">{{ app.city or 'N/A' }}</td>
+                    <td class="px-6 py-4 text-sm"><span class="px-2.5 py-1 rounded bg-slate-100 text-slate-700 text-xs font-black uppercase">{{ app.vehicle_type or 'N/A' }}</span></td>
+                    <td class="px-6 py-4 text-sm font-mono">{{ app.nic or 'N/A' }}</td>
+                    <td class="px-6 py-4 text-sm">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold {% if app.is_read %}bg-gray-100 text-gray-600{% else %}bg-blue-100 text-blue-700{% endif %}">
+                            {{ 'Processed' if app.is_read else 'New Application' }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-xs text-gray-400 font-semibold">{{ app.created_at.strftime("%b %d, %Y · %H:%M") if app.created_at else '—' }}</td>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-2">
+                            <form method="post" action="/admin/drivers/applications/{{ app.id }}/read" style="display:inline">
+                                <button class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 text-xs font-bold hover:bg-gray-50 transition" type="submit">
+                                    {% if app.is_read %}Mark Unread{% else %}Mark Read{% endif %}
+                                </button>
+                            </form>
+                            <form method="post" action="/admin/drivers/applications/{{ app.id }}/delete" style="display:inline" onsubmit="return confirm('Delete this application permanently?');">
+                                <button class="px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs font-bold hover:bg-red-600 hover:text-white hover:border-red-600 transition" type="submit">
+                                    <i class="far fa-trash-can mr-1"></i> Delete
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" class="px-6 py-10 text-center text-gray-400">
+                        <i class="fas fa-info-circle mr-2"></i> No applications found
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            {% else %}
             <thead class="bg-ziggo-canvas/70 text-[11px] uppercase tracking-wider text-ziggo-faint font-black">
                 <tr>
                     <th class="px-6 py-4">ID</th>
@@ -162,6 +267,7 @@
                 </tr>
                 {% endfor %}
             </tbody>
+            {% endif %}
         </table>
     </div>
 
@@ -171,11 +277,11 @@
         <p class="text-sm text-gray-500">
             Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
             <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
-            <span class="font-bold text-ziggo">{{ total_drivers }}</span> drivers
+            <span class="font-bold text-ziggo">{{ total_drivers }}</span> {% if view == 'applications' %}applications{% else %}drivers{% endif %}
         </p>
         <div class="flex items-center gap-1.5">
             {% if page > 1 %}
-                <a href="/admin/drivers?page={{ page - 1 }}&status={{ status }}&search={{ search }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
+                <a href="/admin/drivers?page={{ page - 1 }}&status={{ status }}&search={{ search }}&view={{ view }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
             {% else %}
                 <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Previous</span>
             {% endif %}
@@ -184,12 +290,12 @@
                 {% if p == page %}
                     <span class="px-3 py-1.5 rounded-lg bg-ziggo text-white text-xs font-black">{{ p }}</span>
                 {% else %}
-                    <a href="/admin/drivers?page={{ p }}&status={{ status }}&search={{ search }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
+                    <a href="/admin/drivers?page={{ p }}&status={{ status }}&search={{ search }}&view={{ view }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
                 {% endif %}
             {% endfor %}
 
             {% if page < total_pages %}
-                <a href="/admin/drivers?page={{ page + 1 }}&status={{ status }}&search={{ search }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
+                <a href="/admin/drivers?page={{ page + 1 }}&status={{ status }}&search={{ search }}&view={{ view }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
             {% else %}
                 <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Next</span>
             {% endif %}
@@ -197,7 +303,13 @@
     </div>
     {% else %}
     <div class="p-6 border-t border-gray-100">
-        <p class="text-sm text-gray-500">{{ drivers | length }} driver{{ '' if drivers|length == 1 else 's' }} shown</p>
+        <p class="text-sm text-gray-500">
+            {% if view == 'applications' %}
+                {{ applications | length }} application{{ '' if applications|length == 1 else 's' }} shown
+            {% else %}
+                {{ drivers | length }} driver{{ '' if drivers|length == 1 else 's' }} shown
+            {% endif %}
+        </p>
     </div>
     {% endif %}
 </div>

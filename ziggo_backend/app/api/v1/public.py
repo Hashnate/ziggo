@@ -289,6 +289,50 @@ async def public_driver_application(
     }
 
 
+class UserPreregistration(Base):
+    """Submissions from the public website "User/Customer Preregister" form.
+    Isolated table — not linked to the real users tables."""
+
+    __tablename__ = "user_preregistrations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    full_name = Column(String(120), nullable=False)
+    email = Column(String(200), nullable=False)
+    mobile = Column(String(40), nullable=False)
+    city = Column(String(80))
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class PublicUserPreregisterRequest(BaseModel):
+    full_name: str = Field(..., min_length=1, max_length=120)
+    email: str = Field(..., min_length=3, max_length=200)
+    mobile: str = Field(..., min_length=4, max_length=40)
+    city: str | None = Field(None, max_length=80)
+
+
+@router.post("/user-preregister")
+async def public_user_preregister(
+    req: PublicUserPreregisterRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Persist a customer preregistration submission. No auth."""
+    row = UserPreregistration(
+        full_name=req.full_name.strip(),
+        email=req.email.strip(),
+        mobile=req.mobile.strip(),
+        city=(req.city or "").strip() or None,
+    )
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
+    return {
+        "ok": True,
+        "id": row.id,
+        "message": "Thanks! We'll notify you as soon as we launch.",
+    }
+
+
 class PublicContactRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
     email: str = Field(..., min_length=3, max_length=200)
