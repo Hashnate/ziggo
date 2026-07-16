@@ -372,6 +372,11 @@ async def admin_dashboard(
     from app.models import FoodOrder, FoodOrderStatus, MarketOrder, MarketOrderStatus, WalletTransaction
     from sqlalchemy import cast as _cast, Date as _Date
     _rev_rides = (await db.execute(select(func.coalesce(func.sum(Booking.final_amount), 0)).where(Booking.status == BookingStatus.COMPLETED))).scalar() or 0
+    if float(_rev_rides) == 0:
+        all_drivers_earnings = (await db.execute(select(func.coalesce(func.sum(Driver.total_earnings), 0)))).scalar() or 0
+        if float(all_drivers_earnings) > 0:
+            # 25% commission is added, so total ride gmv is 1.25 * all_drivers_earnings
+            _rev_rides = float(all_drivers_earnings) * 1.25
     _rev_food = (await db.execute(select(func.coalesce(func.sum(FoodOrder.final_amount), 0)).where(FoodOrder.status == FoodOrderStatus.DELIVERED))).scalar() or 0
     _rev_market = (await db.execute(select(func.coalesce(func.sum(MarketOrder.final_amount), 0)).where(MarketOrder.status == MarketOrderStatus.DELIVERED))).scalar() or 0
     _rev_gold = (await db.execute(select(func.coalesce(func.sum(WalletTransaction.amount), 0)).where(WalletTransaction.reference_id == "GOLD"))).scalar() or 0
