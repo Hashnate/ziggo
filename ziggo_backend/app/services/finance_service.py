@@ -200,6 +200,14 @@ async def overview(db: AsyncSession) -> dict:
     vendor_q = await db.execute(select(MarketVendor))
     vendors_all = vendor_q.scalars().all()
 
+    all_drivers_earnings = sum((_dec(d.total_earnings) for d in drivers_all), Decimal("0"))
+    if ride_gmv == Decimal("0") and all_drivers_earnings > Decimal("0"):
+        ride_commission = (all_drivers_earnings * Decimal("0.25")).quantize(Decimal("0.01"))
+        ride_gmv = all_drivers_earnings + ride_commission
+        driver_ride_payouts = all_drivers_earnings
+    else:
+        driver_ride_payouts = max(driver_ride_payouts, all_drivers_earnings)
+
     total_gmv = ride_gmv + flash_gmv + food_gmv + market_gmv
     total_commission = (
         ride_commission + flash_commission + food_commission + market_commission
@@ -302,7 +310,7 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
         f_list = by_driver_f.get(d.id, [])
         m_list = by_driver_m.get(d.id, [])
 
-        total = Decimal("0")
+        calculated_total = Decimal("0")
         today_earn = Decimal("0")
         week_earn = Decimal("0")
         month_earn = Decimal("0")
@@ -314,7 +322,7 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
             if b.status != BookingStatus.COMPLETED:
                 continue
             earn = _dec(b.driver_earnings)
-            total += earn
+            calculated_total += earn
             
             ride_count += 1
             ts = b.completed_at or b.booked_at
@@ -331,7 +339,7 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
             if o.status != FoodOrderStatus.DELIVERED:
                 continue
             earn, _ = _food_split(o)
-            total += earn
+            calculated_total += earn
             food_count += 1
             ts = o.delivered_at or o.created_at
             if ts is not None:
@@ -347,7 +355,7 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
             if o.status != MarketOrderStatus.DELIVERED:
                 continue
             earn, _ = _market_split(o)
-            total += earn
+            calculated_total += earn
             market_count += 1
             ts = o.delivered_at or o.created_at
             if ts is not None:
@@ -359,6 +367,7 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
                 if ts_aware >= month:
                     month_earn += earn
 
+        total = max(calculated_total, _dec(d.total_earnings))
         outstanding = await get_driver_outstanding_commission(db, d.id)
         rows.append({
             "driver_id": d.id,

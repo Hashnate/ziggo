@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://ziggo.lk/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
-  <url><loc>https://ziggo.lk/pages/about.html</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://ziggo.lk/pages/business.html</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://ziggo.lk/pages/careers.html</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://ziggo.lk/pages/contact.html</loc><changefreq>yearly</changefreq><priority>0.5</priority></url>
-  <url><loc>https://ziggo.lk/pages/drive.html</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://ziggo.lk/pages/help.html</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
-  <url><loc>https://ziggo.lk/pages/login.html</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
-  <url><loc>https://ziggo.lk/pages/news.html</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://ziggo.lk/pages/partner.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://ziggo.lk/pages/privacy.html</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
-  <url><loc>https://ziggo.lk/pages/signup.html</loc><changefreq>yearly</changefreq><priority>0.4</priority></url>
-  <url><loc>https://ziggo.lk/pages/terms.html</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
-  <url><loc>https://ziggo.lk/pages/services/ride.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://ziggo.lk/pages/services/food.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://ziggo.lk/pages/services/mart.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://ziggo.lk/pages/services/flash.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://ziggo.lk/pages/services/truck.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://ziggo.lk/pages/about</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://ziggo.lk/pages/business</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://ziggo.lk/pages/careers</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://ziggo.lk/pages/contact</loc><changefreq>yearly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://ziggo.lk/pages/drive</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://ziggo.lk/pages/help</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://ziggo.lk/pages/login</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://ziggo.lk/pages/news</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://ziggo.lk/pages/partner</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://ziggo.lk/pages/privacy</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://ziggo.lk/pages/signup</loc><changefreq>yearly</changefreq><priority>0.4</priority></url>
+  <url><loc>https://ziggo.lk/pages/terms</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://ziggo.lk/pages/services/ride</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://ziggo.lk/pages/services/food</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://ziggo.lk/pages/services/mart</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://ziggo.lk/pages/services/flash</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://ziggo.lk/pages/services/truck</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
 </urlset>

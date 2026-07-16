@@ -1166,6 +1166,34 @@ async def delete_driver_application(
     return RedirectResponse(url="/admin/drivers?view=applications", status_code=303)
 
 
+@router.post("/drivers/{driver_id}/delete")
+async def delete_driver_form(
+    driver_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import MarketOrder
+    from sqlalchemy import update
+    q = await db.execute(
+        select(Driver).options(selectinload(Driver.user)).where(Driver.id == driver_id)
+    )
+    d = q.scalars().first()
+    if d:
+        # Avoid foreign key constraint violation in market_orders
+        await db.execute(
+            update(MarketOrder)
+            .where(MarketOrder.driver_id == driver_id)
+            .values(driver_id=None)
+        )
+        user = d.user
+        await db.delete(d)
+        if user:
+            await db.delete(user)
+        await db.commit()
+    return RedirectResponse(url="/admin/drivers", status_code=303)
+
+
+
 @router.get("/customers", response_class=HTMLResponse)
 async def admin_customers(
     request: Request,
