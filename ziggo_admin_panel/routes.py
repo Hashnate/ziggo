@@ -380,7 +380,7 @@ async def admin_dashboard(
     _rev_food = (await db.execute(select(func.coalesce(func.sum(FoodOrder.final_amount), 0)).where(FoodOrder.status == FoodOrderStatus.DELIVERED))).scalar() or 0
     _rev_market = (await db.execute(select(func.coalesce(func.sum(MarketOrder.final_amount), 0)).where(MarketOrder.status == MarketOrderStatus.DELIVERED))).scalar() or 0
     _rev_gold = (await db.execute(select(func.coalesce(func.sum(WalletTransaction.amount), 0)).where(WalletTransaction.reference_id == "GOLD"))).scalar() or 0
-    revenue = 0.0
+    revenue = float(_rev_rides) + float(_rev_food) + float(_rev_market) + float(_rev_gold)
     avg_surge = (
         await db.execute(
             select(func.coalesce(func.avg(FareSetting.surge_multiplier), 1))
@@ -420,7 +420,7 @@ async def admin_dashboard(
     )).all():
         _acc_rev(day, amt)
 
-    rev_by_day = {}
+
     labels = []
     data = []
     for i in range(days - 1, -1, -1):
@@ -6786,16 +6786,6 @@ async def admin_finance(
     _: User = Depends(current_admin),
 ):
     data = await fin.overview(db)
-    if data:
-        for k in data.get("gmv", {}):
-            data["gmv"][k] = 0.0
-        for k in data.get("commission", {}):
-            data["commission"][k] = 0.0
-        data["driver_payouts_rides"] = 0.0
-        if "wallet" in data:
-            data["wallet"]["held"] = 0.0
-            data["wallet"]["lifetime_topups"] = 0.0
-            data["wallet"]["lifetime_spend"] = 0.0
     return templates.TemplateResponse(
         request, "finance.html",
         {"request": request, "active_page": "finance", "fin": data},

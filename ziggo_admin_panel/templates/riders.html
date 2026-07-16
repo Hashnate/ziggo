@@ -360,7 +360,7 @@
                         {{ c.user.total_rides or 0 }}
                     </td>
                     <td class="px-5 py-3 text-sm font-bold text-gray-700">
-                        Rs.0.00
+                        Rs.{{ "{:,.2f}".format(c.wallet_balance or 0) }}
                     </td>
                     <td class="px-5 py-3">
                         {% if c.user.is_active %}

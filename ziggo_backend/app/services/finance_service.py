@@ -311,6 +311,7 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
         m_list = by_driver_m.get(d.id, [])
 
         calculated_total = Decimal("0")
+        online_earned = Decimal("0")
         today_earn = Decimal("0")
         week_earn = Decimal("0")
         month_earn = Decimal("0")
@@ -323,6 +324,8 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
                 continue
             earn = _dec(b.driver_earnings)
             calculated_total += earn
+            if b.payment_method != "cash":
+                online_earned += earn
             
             ride_count += 1
             ts = b.completed_at or b.booked_at
@@ -340,6 +343,8 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
                 continue
             earn, _ = _food_split(o)
             calculated_total += earn
+            if o.payment_method != "cash":
+                online_earned += earn
             food_count += 1
             ts = o.delivered_at or o.created_at
             if ts is not None:
@@ -356,6 +361,8 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
                 continue
             earn, _ = _market_split(o)
             calculated_total += earn
+            if o.payment_method != "cash":
+                online_earned += earn
             market_count += 1
             ts = o.delivered_at or o.created_at
             if ts is not None:
@@ -379,6 +386,7 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
             "status": d.status.value if d.status else None,
             "rating": float(u.rating or 0) if u else 0,
             "total_earnings": float(total),
+            "online_earnings": float(online_earned),
             "today": float(today_earn),
             "this_week": float(week_earn),
             "this_month": float(month_earn),
@@ -955,7 +963,7 @@ async def get_withdrawals_data(db: AsyncSession, page: int = 1, page_size: int =
     
     for r in all_driver_rows:
         drv_id = r["driver_id"]
-        earned = Decimal(str(r["total_earnings"]))
+        earned = Decimal(str(r["online_earnings"]))
         paid = payout_by_driver.get(drv_id, Decimal("0"))
         pending = earned - paid
         if pending < 0:
