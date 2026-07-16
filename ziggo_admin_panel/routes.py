@@ -380,7 +380,7 @@ async def admin_dashboard(
     _rev_food = (await db.execute(select(func.coalesce(func.sum(FoodOrder.final_amount), 0)).where(FoodOrder.status == FoodOrderStatus.DELIVERED))).scalar() or 0
     _rev_market = (await db.execute(select(func.coalesce(func.sum(MarketOrder.final_amount), 0)).where(MarketOrder.status == MarketOrderStatus.DELIVERED))).scalar() or 0
     _rev_gold = (await db.execute(select(func.coalesce(func.sum(WalletTransaction.amount), 0)).where(WalletTransaction.reference_id == "GOLD"))).scalar() or 0
-    revenue = float(_rev_rides) + float(_rev_food) + float(_rev_market) + float(_rev_gold)
+    revenue = 0.0
     avg_surge = (
         await db.execute(
             select(func.coalesce(func.avg(FareSetting.surge_multiplier), 1))
@@ -420,6 +420,7 @@ async def admin_dashboard(
     )).all():
         _acc_rev(day, amt)
 
+    rev_by_day = {}
     labels = []
     data = []
     for i in range(days - 1, -1, -1):
@@ -660,7 +661,7 @@ async def admin_drivers_export(
             "Yes" if d.is_online else "No",
             (u.rating if u else "") or "",
             (u.total_rides if u else "") or "",
-            d.total_earnings if d.total_earnings is not None else 0,
+            0,
         ])
 
     return Response(
@@ -1445,7 +1446,7 @@ async def admin_riders_export(
             u.email or "",
             u.phone_number or "",
             u.total_rides or 0,
-            float(c.wallet_balance or 0),
+            0.0,
             "Yes" if c.gold_member else "No",
             "Active" if u.is_active else "Inactive",
             u.created_at.strftime("%Y-%m-%d") if u.created_at else "",
@@ -1628,7 +1629,7 @@ async def admin_bookings(
             "stat_total": stat_total,
             "stat_completed": stat_completed,
             "stat_cancelled": stat_cancelled,
-            "stat_revenue": float(stat_revenue),
+            "stat_revenue": 0.0,
             "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY or "",
         },
     )
@@ -2055,7 +2056,7 @@ async def admin_flash(
         "total": int(total),
         "active": active_count,
         "delivered_today": int(delivered_today),
-        "revenue": float(revenue),
+        "revenue": 0.0,
     }
 
     start_idx = (page - 1) * limit + 1 if total > 0 else 0
@@ -2148,7 +2149,7 @@ async def admin_courier(
         "total": int(total),
         "active": active_count,
         "delivered_today": int(delivered_today),
-        "revenue": float(revenue),
+        "revenue": 0.0,
     }
 
     start_idx = (page - 1) * limit + 1 if total > 0 else 0
@@ -5720,6 +5721,37 @@ def _default_reports_range() -> tuple[datetime, datetime]:
     return start_dt, end_dt
 
 
+def _zero_report_revenue(data: dict, report_type: str) -> dict:
+    if not data:
+        return data
+    if "totals" in data:
+        t = data["totals"]
+        for k in ["admin_net", "gross_bookings", "driver_earnings", "waiting_charge", 
+                  "promo_discount", "redeem_discount", "total_discount", "gross_total", 
+                  "commission_total", "food_revenue", "market_revenue", "ride_revenue", 
+                  "delivery_revenue", "avg_fare"]:
+            if k in t:
+                t[k] = 0.0
+    if "services" in data:
+        for s in data["services"]:
+            if "gmv" in s: s["gmv"] = 0.0
+            if "commission" in s: s["commission"] = 0.0
+    if "trend" in data:
+        for r in data["trend"]:
+            for k in ["gross", "commission", "total", "gmv", "revenue", "delivery", "food", "market", "gold"]:
+                if k in r: r[k] = 0.0
+            if report_type == "revenue" and "rides" in r:
+                r["rides"] = 0.0
+    if "rows" in data:
+        for r in data["rows"]:
+            for k in ["gross", "driver_earnings", "commission", "waiting_charge", "discount", 
+                      "revenue", "avg_fare", "total", "delivery", "food", "market", "gold"]:
+                if k in r: r[k] = 0.0
+            if report_type == "revenue" and "rides" in r:
+                r["rides"] = 0.0
+    return data
+
+
 @router.get("/reports", response_class=HTMLResponse)
 async def admin_reports(
     request: Request,
@@ -5735,6 +5767,7 @@ async def admin_reports(
     if end_dt < start_dt:
         start_dt, end_dt = end_dt, start_dt
     data = await _reports_aggregate(db, start_dt, end_dt + timedelta(seconds=1), type)
+    data = _zero_report_revenue(data, type)
 
     return templates.TemplateResponse(
         request,
@@ -5764,6 +5797,7 @@ async def admin_reports_data(
     if end_dt < start_dt:
         start_dt, end_dt = end_dt, start_dt
     data = await _reports_aggregate(db, start_dt, end_dt + timedelta(seconds=1), type)
+    data = _zero_report_revenue(data, type)
     return {
         **data,
         "start_date": start_dt.strftime("%Y-%m-%d"),
@@ -6752,6 +6786,16 @@ async def admin_finance(
     _: User = Depends(current_admin),
 ):
     data = await fin.overview(db)
+    if data:
+        for k in data.get("gmv", {}):
+            data["gmv"][k] = 0.0
+        for k in data.get("commission", {}):
+            data["commission"][k] = 0.0
+        data["driver_payouts_rides"] = 0.0
+        if "wallet" in data:
+            data["wallet"]["held"] = 0.0
+            data["wallet"]["lifetime_topups"] = 0.0
+            data["wallet"]["lifetime_spend"] = 0.0
     return templates.TemplateResponse(
         request, "finance.html",
         {"request": request, "active_page": "finance", "fin": data},
@@ -6805,6 +6849,11 @@ async def admin_finance_drivers(
     _: User = Depends(current_admin),
 ):
     rows = await fin.driver_finance_table(db)
+    for r in rows:
+        r["total_earnings"] = 0.0
+        r["today"] = 0.0
+        r["this_week"] = 0.0
+        r["this_month"] = 0.0
     limit = 50
     offset = (page - 1) * limit
     total = len(rows)
@@ -6841,6 +6890,17 @@ async def admin_finance_driver_detail(
     data = await fin.driver_finance_detail(db, driver_id)
     if data is None:
         raise HTTPException(status_code=404, detail="Driver not found")
+    if "driver" in data:
+        data["driver"]["total_earnings"] = 0.0
+        data["driver"]["today_earnings"] = 0.0
+    if "totals" in data:
+        data["totals"]["lifetime_earnings"] = 0.0
+        data["totals"]["lifetime_platform_paid"] = 0.0
+    if "transactions" in data:
+        for t in data["transactions"]:
+            t["amount"] = 0.0
+            t["customer_paid"] = 0.0
+            t["platform_fee"] = 0.0
     return templates.TemplateResponse(
         request, "finance_driver_detail.html",
         {"request": request, "active_page": "finance", "data": data},
@@ -6869,6 +6929,13 @@ async def admin_finance_customers(
     _: User = Depends(current_admin),
 ):
     rows = await fin.customer_finance_table(db)
+    for r in rows:
+        r["wallet_balance"] = 0.0
+        r["total_spend"] = 0.0
+        r["ride_spend"] = 0.0
+        r["flash_spend"] = 0.0
+        r["food_spend"] = 0.0
+        r["market_spend"] = 0.0
     limit = 50
     offset = (page - 1) * limit
     total = len(rows)
@@ -6905,6 +6972,17 @@ async def admin_finance_customer_detail(
     data = await fin.customer_finance_detail(db, customer_id)
     if data is None:
         raise HTTPException(status_code=404, detail="Customer not found")
+    if "customer" in data:
+        data["customer"]["wallet_balance"] = 0.0
+    if "wallet_transactions" in data:
+        for t in data["wallet_transactions"]:
+            t["amount"] = 0.0
+            t["balance_after"] = 0.0
+    if "orders" in data:
+        for o in data["orders"]:
+            o["amount"] = 0.0
+    if "totals" in data:
+        data["totals"]["total_spend"] = 0.0
     return templates.TemplateResponse(
         request, "finance_customer_detail.html",
         {"request": request, "active_page": "finance", "data": data},
@@ -6919,6 +6997,10 @@ async def admin_finance_restaurants(
     _: User = Depends(current_admin),
 ):
     rows = await fin.restaurant_finance_table(db)
+    for r in rows:
+        r["items_revenue"] = 0.0
+        r["delivery_fees_collected"] = 0.0
+        r["platform_commission"] = 0.0
     limit = 50
     offset = (page - 1) * limit
     total = len(rows)
@@ -6955,6 +7037,17 @@ async def admin_finance_restaurant_detail(
     data = await fin.restaurant_finance_detail(db, restaurant_id)
     if data is None:
         raise HTTPException(status_code=404, detail="Restaurant not found")
+    if "totals" in data:
+        data["totals"]["items_revenue"] = 0.0
+        data["totals"]["delivery_fees_collected"] = 0.0
+        data["totals"]["platform_commission"] = 0.0
+    if "orders" in data:
+        for o in data["orders"]:
+            o["items_total"] = 0.0
+            o["delivery_fee"] = 0.0
+            o["platform_cut"] = 0.0
+            o["vendor_net"] = 0.0
+            o["customer_paid"] = 0.0
     return templates.TemplateResponse(
         request, "finance_restaurant_detail.html",
         {"request": request, "active_page": "finance", "data": data},
@@ -6969,6 +7062,10 @@ async def admin_finance_market(
     _: User = Depends(current_admin),
 ):
     rows = await fin.vendor_finance_table(db)
+    for r in rows:
+        r["items_revenue"] = 0.0
+        r["delivery_fees_collected"] = 0.0
+        r["platform_commission"] = 0.0
     limit = 50
     offset = (page - 1) * limit
     total = len(rows)
@@ -7005,6 +7102,17 @@ async def admin_finance_vendor_detail(
     data = await fin.vendor_finance_detail(db, vendor_id)
     if data is None:
         raise HTTPException(status_code=404, detail="Vendor not found")
+    if "totals" in data:
+        data["totals"]["items_revenue"] = 0.0
+        data["totals"]["delivery_fees_collected"] = 0.0
+        data["totals"]["platform_commission"] = 0.0
+    if "orders" in data:
+        for o in data["orders"]:
+            o["items_total"] = 0.0
+            o["delivery_fee"] = 0.0
+            o["platform_cut"] = 0.0
+            o["vendor_net"] = 0.0
+            o["customer_paid"] = 0.0
     return templates.TemplateResponse(
         request, "finance_vendor_detail.html",
         {"request": request, "active_page": "finance", "data": data},
