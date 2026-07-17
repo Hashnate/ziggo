@@ -213,6 +213,7 @@ async def loyalty_balance(
         min_redeem_points=int(settings.loyalty_min_redeem_points or 0),
         max_redeem_order_pct=float(settings.loyalty_max_redeem_order_pct or 0),
         self_pickup_app_usage_charge=float(settings.self_pickup_app_usage_charge if settings.self_pickup_app_usage_charge is not None else 15.0),
+        loyalty_is_active=settings.loyalty_is_active,
     )
 
 

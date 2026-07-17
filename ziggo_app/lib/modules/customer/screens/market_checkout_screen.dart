@@ -503,7 +503,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
               ),
             ),
           ),
-          if (promos.points > 0 && promos.points >= ((promos.loyalty['min_redeem_points'] as num?)?.toInt() ?? 100))
+          if (promos.isLoyaltyActive && promos.points > 0 && promos.points >= ((promos.loyalty['min_redeem_points'] as num?)?.toInt() ?? 100))
             _section(
               'LOYALTY POINTS',
               Row(

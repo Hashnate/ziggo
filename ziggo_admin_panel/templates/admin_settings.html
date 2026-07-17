@@ -255,6 +255,10 @@
                         <i class="fas fa-medal text-ziggo"></i> Loyalty &amp; Membership
                     </h3>
                     <div class="space-y-4">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" name="loyalty_is_active" {% if s.loyalty_is_active %}checked{% endif %} class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
+                            <span class="text-sm font-bold text-ziggo-ink">Enable Loyalty Points</span>
+                        </label>
                         <div>
                             <label class="block text-xs font-black text-ziggo-muted mb-1">Earn rate — Rs. spent per 1 point</label>
                             <input type="number" step="0.01" min="0.01" name="loyalty_earn_rupees_per_point" value="{{ s.loyalty_earn_rupees_per_point or 10 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">

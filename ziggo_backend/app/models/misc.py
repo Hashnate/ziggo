@@ -172,6 +172,7 @@ class SystemSettings(Base):
     loyalty_value_per_point = Column(DECIMAL(10, 4), nullable=False, default=Decimal("0.50"))
     loyalty_min_redeem_points = Column(Integer, nullable=False, default=100)
     loyalty_max_redeem_order_pct = Column(DECIMAL(5, 2), nullable=False, default=20)
+    loyalty_is_active = Column(Boolean, nullable=False, default=True)
     # Gold membership (BRD: RW-03)
     gold_delivery_discount_pct = Column(DECIMAL(5, 2), nullable=False, default=50)
     # Self-pickup app usage charge

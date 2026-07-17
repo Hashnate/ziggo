@@ -528,7 +528,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ),
           ),
-          if (promos.points > 0 && promos.points >= ((promos.loyalty['min_redeem_points'] as num?)?.toInt() ?? 100))
+          if (promos.isLoyaltyActive && promos.points > 0 && promos.points >= ((promos.loyalty['min_redeem_points'] as num?)?.toInt() ?? 100))
             _Section(
               title: 'LOYALTY POINTS',
               child: Row(

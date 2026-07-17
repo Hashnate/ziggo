@@ -47,6 +47,8 @@ async def points_earnable_for(db: AsyncSession, amount: Decimal | float | int) -
     Used to populate the per-vehicle 'Earn N points' badge (BRD: RS-07).
     """
     s = await _settings(db)
+    if not s.loyalty_is_active:
+        return 0
     rate = Decimal(str(s.loyalty_earn_rupees_per_point or 0))
     if rate <= 0:
         return 0
@@ -79,6 +81,8 @@ async def quote_redemption(
         return 0, Decimal("0.00"), None
 
     s = await _settings(db)
+    if not s.loyalty_is_active:
+        return 0, Decimal("0.00"), "Redemption disabled"
     balance = int(customer.loyalty_points or 0)
 
     reason = None
@@ -150,6 +154,9 @@ async def redeem_points(
     deduct. If the balance is somehow short we deduct only what's available
     and return the actual amount taken.
     """
+    s = await _settings(db)
+    if not s.loyalty_is_active:
+        return 0
     if points <= 0:
         return 0
     points = min(points, int(customer.loyalty_points or 0))

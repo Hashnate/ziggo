@@ -71,8 +71,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 16),
           _walletStrip(balance: wallet.balance, currency: wallet.currency),
-          const SizedBox(height: 10),
-          _loyaltyStrip(points: promos.points, value: promos.pointsValue),
+          if (promos.isLoyaltyActive) ...[
+            const SizedBox(height: 10),
+            _loyaltyStrip(points: promos.points, value: promos.pointsValue),
+          ],
           // BRD: CD-34 — profile completeness ring (only shown when there's
           // still work to do).
           if (auth.completeness != null &&

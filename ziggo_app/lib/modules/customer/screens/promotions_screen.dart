@@ -46,8 +46,10 @@ class _PromotionsScreenState extends State<PromotionsScreen> {
           padding: const EdgeInsets.all(16),
           children: [
             // BRD: RW-01 — loyalty balance card on top of the inbox.
-            _LoyaltyCard(loyalty: p.loyalty),
-            const SizedBox(height: 14),
+            if (p.isLoyaltyActive) ...[
+              _LoyaltyCard(loyalty: p.loyalty),
+              const SizedBox(height: 14),
+            ],
             // BRD: RW-04 — category filter chips + claimed-only toggle.
             _CategoryChips(provider: p),
             const SizedBox(height: 12),

@@ -19,6 +19,7 @@ class PromosProvider extends ChangeNotifier {
 
   int get points => (_loyalty['points'] as num?)?.toInt() ?? 0;
   double get pointsValue => (_loyalty['value'] as num?)?.toDouble() ?? 0;
+  bool get isLoyaltyActive => _loyalty['loyalty_is_active'] == true;
 
   set category(String c) {
     if (_category == c) return;
