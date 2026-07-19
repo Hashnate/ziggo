@@ -109,16 +109,38 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
     setState(() => _busy = true);
     final promos = context.read<PromosProvider>();
     final appUsagePct = _isSelfPickup ? ((promos.loyalty['self_pickup_app_usage_charge'] as num?)?.toDouble() ?? 5.0) : 0.0;
-    final appUsageCharge = _isSelfPickup ? (context.read<MarketProvider>().cartTotal * (appUsagePct / 100.0)) : 0.0;
+    final market = context.read<MarketProvider>();
+    final appUsageCharge = _isSelfPickup ? (market.cartTotal * (appUsagePct / 100.0)) : 0.0;
 
-    final order = await context.read<MarketProvider>().placeOrder(
+    int pointsToRedeem = 0;
+    if (_usePoints && promos.isLoyaltyActive) {
+      final double valPerPoint = (promos.loyalty['value_per_point'] as num?)?.toDouble() ?? 0.50;
+      final double maxPct = (promos.loyalty['max_redeem_order_pct'] as num?)?.toDouble() ?? 20.0;
+      final int minPoints = (promos.loyalty['min_redeem_points'] as num?)?.toInt() ?? 100;
+      final int balance = promos.points;
+
+      if (valPerPoint > 0) {
+        double subtotal = market.cartTotal + (_isSelfPickup ? 0.0 : ((market.quote?['delivery_fee'] as num?)?.toDouble() ?? 0.0)) + appUsageCharge;
+        double maxDiscount = subtotal * (maxPct / 100.0);
+        int allowed = balance;
+        double allowedVal = allowed * valPerPoint;
+        if (allowedVal > maxDiscount) {
+          allowed = (maxDiscount / valPerPoint).floor();
+        }
+        if (allowed >= minPoints) {
+          pointsToRedeem = allowed;
+        }
+      }
+    }
+
+    final order = await market.placeOrder(
       deliveryAddress: addr,
       lat: lat,
       lng: lng,
       paymentMethod: _payment,
       instructions: _instructionsCtrl.text.trim(),
-      redeemPoints: _usePoints ? promos.points : 0,
-      promoCode: context.read<MarketProvider>().pendingPromoCode,
+      redeemPoints: pointsToRedeem,
+      promoCode: market.pendingPromoCode,
       isSelfPickup: _isSelfPickup,
       appUsageCharge: appUsageCharge,
     );
@@ -158,11 +180,34 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
     final appUsageCharge = _isSelfPickup ? (p.cartTotal * (appUsagePct / 100.0)) : 0.0;
 
     double total = p.cartTotal + ((hasAddress && !_isSelfPickup) ? deliveryFee : 0.0) + appUsageCharge;
+    int maxRedeemablePoints = 0;
+    double potentialDiscount = 0.0;
     double discount = 0.0;
-    if (_usePoints) {
-      discount = promos.pointsValue;
-      if (discount > total) discount = total;
-      total -= discount;
+
+    if (promos.isLoyaltyActive) {
+      final double valPerPoint = (promos.loyalty['value_per_point'] as num?)?.toDouble() ?? 0.50;
+      final double maxPct = (promos.loyalty['max_redeem_order_pct'] as num?)?.toDouble() ?? 20.0;
+      final int minPoints = (promos.loyalty['min_redeem_points'] as num?)?.toInt() ?? 100;
+      final int balance = promos.points;
+
+      if (valPerPoint > 0) {
+        double maxDiscount = total * (maxPct / 100.0);
+        int allowed = balance;
+        double allowedVal = allowed * valPerPoint;
+        if (allowedVal > maxDiscount) {
+          allowed = (maxDiscount / valPerPoint).floor();
+          allowedVal = allowed * valPerPoint;
+        }
+        if (allowed >= minPoints) {
+          maxRedeemablePoints = allowed;
+          potentialDiscount = allowedVal;
+          if (_usePoints) {
+            discount = allowedVal;
+            if (discount > total) discount = total;
+            total -= discount;
+          }
+        }
+      }
     }
 
     return Scaffold(
@@ -503,7 +548,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
               ),
             ),
           ),
-          if (promos.isLoyaltyActive && promos.points > 0 && promos.points >= ((promos.loyalty['min_redeem_points'] as num?)?.toInt() ?? 100))
+          if (promos.isLoyaltyActive && maxRedeemablePoints > 0)
             _section(
               'LOYALTY POINTS',
               Row(
@@ -524,11 +569,11 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Use ${promos.points} Points',
+                          'Use $maxRedeemablePoints Points',
                           style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
                         ),
                         Text(
-                          '-Rs.${promos.pointsValue.toStringAsFixed(0)} discount',
+                          '-Rs.${potentialDiscount.toStringAsFixed(2)} discount',
                           style: const TextStyle(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.w700),
                         ),
                       ],

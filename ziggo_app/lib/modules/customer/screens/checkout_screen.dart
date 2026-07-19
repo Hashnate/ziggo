@@ -115,6 +115,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final appUsagePct = _isSelfPickup ? ((promos.loyalty['self_pickup_app_usage_charge'] as num?)?.toDouble() ?? 5.0) : 0.0;
     final appUsageCharge = _isSelfPickup ? (food.cartTotal * (appUsagePct / 100.0)) : 0.0;
 
+    int pointsToRedeem = 0;
+    if (_usePoints && promos.isLoyaltyActive) {
+      final double valPerPoint = (promos.loyalty['value_per_point'] as num?)?.toDouble() ?? 0.50;
+      final double maxPct = (promos.loyalty['max_redeem_order_pct'] as num?)?.toDouble() ?? 20.0;
+      final int minPoints = (promos.loyalty['min_redeem_points'] as num?)?.toInt() ?? 100;
+      final int balance = promos.points;
+
+      if (valPerPoint > 0) {
+        double subtotal = food.cartTotal + (_isSelfPickup ? 0.0 : ((food.quote?['delivery_fee'] as num?)?.toDouble() ?? (food.activeRestaurant?['delivery_fee'] as num?)?.toDouble() ?? 0.0)) + appUsageCharge;
+        double maxDiscount = subtotal * (maxPct / 100.0);
+        int allowed = balance;
+        double allowedVal = allowed * valPerPoint;
+        if (allowedVal > maxDiscount) {
+          allowed = (maxDiscount / valPerPoint).floor();
+        }
+        if (allowed >= minPoints) {
+          pointsToRedeem = allowed;
+        }
+      }
+    }
+
     setState(() => _busy = true);
     final order = await food.placeOrder(
       deliveryAddress: addr,
@@ -122,7 +143,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       lng: lng,
       paymentMethod: _payment,
       instructions: _instructionsCtrl.text.trim(),
-      redeemPoints: _usePoints ? promos.points : 0,
+      redeemPoints: pointsToRedeem,
       isSelfPickup: _isSelfPickup,
       appUsageCharge: appUsageCharge,
     );
@@ -156,11 +177,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final appUsageCharge = _isSelfPickup ? (food.cartTotal * (appUsagePct / 100.0)) : 0.0;
     
     double total = food.cartTotal + deliveryFee + appUsageCharge;
+    int maxRedeemablePoints = 0;
+    double potentialDiscount = 0.0;
     double discount = 0.0;
-    if (_usePoints) {
-      discount = promos.pointsValue;
-      if (discount > total) discount = total;
-      total -= discount;
+
+    if (promos.isLoyaltyActive) {
+      final double valPerPoint = (promos.loyalty['value_per_point'] as num?)?.toDouble() ?? 0.50;
+      final double maxPct = (promos.loyalty['max_redeem_order_pct'] as num?)?.toDouble() ?? 20.0;
+      final int minPoints = (promos.loyalty['min_redeem_points'] as num?)?.toInt() ?? 100;
+      final int balance = promos.points;
+
+      if (valPerPoint > 0) {
+        double maxDiscount = total * (maxPct / 100.0);
+        int allowed = balance;
+        double allowedVal = allowed * valPerPoint;
+        if (allowedVal > maxDiscount) {
+          allowed = (maxDiscount / valPerPoint).floor();
+          allowedVal = allowed * valPerPoint;
+        }
+        if (allowed >= minPoints) {
+          maxRedeemablePoints = allowed;
+          potentialDiscount = allowedVal;
+          if (_usePoints) {
+            discount = allowedVal;
+            if (discount > total) discount = total;
+            total -= discount;
+          }
+        }
+      }
     }
 
     return Scaffold(
@@ -528,7 +572,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ),
           ),
-          if (promos.isLoyaltyActive && promos.points > 0 && promos.points >= ((promos.loyalty['min_redeem_points'] as num?)?.toInt() ?? 100))
+          if (promos.isLoyaltyActive && maxRedeemablePoints > 0)
             _Section(
               title: 'LOYALTY POINTS',
               child: Row(
@@ -549,11 +593,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Use ${promos.points} Points',
+                          'Use $maxRedeemablePoints Points',
                           style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
                         ),
                         Text(
-                          '-Rs.${promos.pointsValue.toStringAsFixed(0)} discount',
+                          '-Rs.${potentialDiscount.toStringAsFixed(2)} discount',
                           style: const TextStyle(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.w700),
                         ),
                       ],
