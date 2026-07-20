@@ -82,6 +82,8 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("fare_settings", "discount_percentage", "DECIMAL(5, 2) DEFAULT 0"),
     ("fare_settings", "promo_message", "VARCHAR(255)"),
     ("fare_settings", "is_truck", "BOOLEAN NOT NULL DEFAULT 0"),
+    ("fare_settings", "is_delivery", "BOOLEAN NOT NULL DEFAULT FALSE"),
+    ("drivers", "driver_type", "VARCHAR(20) NOT NULL DEFAULT 'ride'"),
     ("system_settings", "driver_search_radius_km", "INTEGER"),
     ("bookings", "peak_surcharge", "NUMERIC(10, 2) DEFAULT 0"),
     ("users", "referral_code", "VARCHAR(16)"),

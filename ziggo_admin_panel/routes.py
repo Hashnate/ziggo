@@ -720,6 +720,7 @@ async def admin_drivers_new_submit(
     relative_name: str = Form(""),
     relative_contact: str = Form(""),
     relative_relationship: str = Form(""),
+    driver_type: str = Form("ride"),
     profile_photo: UploadFile | None = File(None),
     doc_nic_front: UploadFile | None = File(None),
     doc_nic_back: UploadFile | None = File(None),
@@ -751,6 +752,7 @@ async def admin_drivers_new_submit(
         "relative_name": relative_name,
         "relative_contact": relative_contact,
         "relative_relationship": relative_relationship,
+        "driver_type": driver_type,
     }
 
     # Construct docs list in case of error
@@ -828,6 +830,7 @@ async def admin_drivers_new_submit(
         nic_number=nic_number,
         license_number=license_number,
         vehicle_type=vehicle_type,
+        driver_type=driver_type,
         vehicle_number=vehicle_number,
         vehicle_model=vehicle_model,
         vehicle_color=vehicle_color,
@@ -943,6 +946,7 @@ async def admin_drivers_edit_submit(
     relative_name: str = Form(""),
     relative_contact: str = Form(""),
     relative_relationship: str = Form(""),
+    driver_type: str = Form("ride"),
     doc_nic_front: UploadFile | None = File(None),
     doc_nic_back: UploadFile | None = File(None),
     doc_license_front: UploadFile | None = File(None),
@@ -1024,6 +1028,7 @@ async def admin_drivers_edit_submit(
     d.relative_name = relative_name or None
     d.relative_contact = relative_contact or None
     d.relative_relationship = relative_relationship or None
+    d.driver_type = driver_type
 
     approved_now = bool(is_approved)
     if approved_now and not d.is_approved:
@@ -2622,6 +2627,7 @@ async def admin_categories_new(
     search_radius_km: int | None = Form(None),
     is_active: str = Form("on"),
     is_truck: str = Form("off"),
+    is_delivery: str = Form("off"),
     rental_hourly_rate: float | None = Form(None),
     image: UploadFile | None = File(None),
     preset_icon: str | None = Form(None),
@@ -2658,6 +2664,7 @@ async def admin_categories_new(
             discount_percentage=Decimal(str(discount_percentage)),
             is_active=(is_active == "on"),
             is_truck=(is_truck == "on"),
+            is_delivery=(is_delivery == "on"),
             base_fare=Decimal(str(base_fare)),
             per_km_rate=Decimal(str(per_km_rate)),
             per_minute_rate=Decimal(str(per_minute_rate)),
@@ -2696,6 +2703,7 @@ async def admin_categories_edit(
     search_radius_km: int | None = Form(None),
     is_active: str = Form(""),
     is_truck: str = Form("off"),
+    is_delivery: str = Form("off"),
     rental_hourly_rate: float | None = Form(None),
     image: UploadFile | None = File(None),
     preset_icon: str | None = Form(None),
@@ -2717,6 +2725,7 @@ async def admin_categories_edit(
     f.discount_percentage = Decimal(str(discount_percentage))
     f.is_active = (is_active == "on")
     f.is_truck = (is_truck == "on")
+    f.is_delivery = (is_delivery == "on")
     f.base_fare = Decimal(str(base_fare))
     f.per_km_rate = Decimal(str(per_km_rate))
     f.per_minute_rate = Decimal(str(per_minute_rate))

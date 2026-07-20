@@ -29,6 +29,7 @@ from ...models import (
     FoodCollection,
     FoodDeal,
     FavoriteRestaurant,
+    FareSetting,
 )
 from ...services.fare_service import haversine_km
 from ...schemas.food_schema import (
@@ -75,6 +76,17 @@ async def _broadcast_to_riders(
         vehicle_type=None,
         max_distance_km=10,
     )
+
+    # Filter to specific delivery driver only
+    delivery_cats_q = await db.execute(
+        select(FareSetting.service_type).where(FareSetting.is_delivery == True)
+    )
+    delivery_cats = {c for c in delivery_cats_q.scalars().all()}
+    qualified_drivers = [
+        d for d in nearby
+        if d.driver_type == "delivery" and d.vehicle_type in delivery_cats
+    ]
+    nearby = [qualified_drivers[0]] if qualified_drivers else []
 
     # Driver earnings = delivery fee * (1 - 0.20)
     driver_earnings = float(delivery_fee) * 0.80

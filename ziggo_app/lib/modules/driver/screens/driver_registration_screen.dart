@@ -34,6 +34,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
   final _referralCode = TextEditingController();
 
   String _vehicleType = 'car';
+  String _driverType = 'ride';
   bool _busy = false;
   String? _error;
 
@@ -139,6 +140,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
           nicNumber: _nic.text.trim(),
           licenseNumber: _license.text.trim(),
           vehicleType: _vehicleType,
+          driverType: _driverType,
           vehicleNumber: _vehicleNumber.text.trim(),
           vehicleModel: _vehicleModel.text.trim(),
           vehicleColor: _vehicleColor.text.trim(),
@@ -500,8 +502,10 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                     _card(
                       Column(
                         children: [
-                          _vehicleTypeRow(),
-                          const SizedBox(height: 12),
+                           _driverTypeRow(),
+                           const SizedBox(height: 16),
+                           _vehicleTypeRow(),
+                           const SizedBox(height: 12),
                           _field(_vehicleNumber, 'Vehicle Number',
                               Icons.confirmation_number_rounded, hint: 'WP-1234'),
                           const SizedBox(height: 10),
@@ -799,6 +803,65 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                 fontSize: 11,
                 color: AppColors.primary,
               )),
+        ),
+      ],
+    );
+  }
+
+  Widget _driverTypeRow() {
+    const dtypes = [
+      ('ride', Icons.directions_car_rounded, 'Ride Driver'),
+      ('delivery', Icons.local_shipping_rounded, 'Delivery Driver'),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'DRIVER TYPE',
+          style: TextStyle(
+            fontSize: 10,
+            color: AppColors.textTertiary,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.4,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: dtypes.map((t) {
+            final sel = _driverType == t.$1;
+            return GestureDetector(
+              onTap: () => setState(() => _driverType = t.$1),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: sel ? AppColors.primary : AppColors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      t.$2,
+                      color: sel ? Colors.white : AppColors.textSecondary,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      t.$3,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        color: sel ? Colors.white : AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
         ),
       ],
     );

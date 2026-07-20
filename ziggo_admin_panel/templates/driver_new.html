@@ -89,6 +89,15 @@
                     </select>
                 </div>
                 <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Driver Type</label>
+                    <select name="driver_type" required
+                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
+                        {% set d_type = form.driver_type or 'ride' %}
+                        <option value="ride" {% if d_type == 'ride' %}selected{% endif %}>Ride Driver</option>
+                        <option value="delivery" {% if d_type == 'delivery' %}selected{% endif %}>Delivery Driver</option>
+                    </select>
+                </div>
+                <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Vehicle Number</label>
                     <input name="vehicle_number" required value="{{ form.vehicle_number or '' }}"
                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo"

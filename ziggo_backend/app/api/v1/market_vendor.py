@@ -30,6 +30,7 @@ from ...models import (
     UserRole,
     WalletTransaction,
     MarketAd,
+    FareSetting,
 )
 from ...schemas.market_schema import (
     MarketVendorProfileResponse,
@@ -880,6 +881,17 @@ async def _broadcast_market_to_riders(
         vehicle_type=None,
         max_distance_km=float(delivery.vendor_radius_km(vendor.delivery_radius_km)),
     )
+
+    # Filter to specific delivery driver only
+    delivery_cats_q = await db.execute(
+        select(FareSetting.service_type).where(FareSetting.is_delivery == True)
+    )
+    delivery_cats = {c for c in delivery_cats_q.scalars().all()}
+    qualified_drivers = [
+        d for d in nearby
+        if d.driver_type == "delivery" and d.vehicle_type in delivery_cats
+    ]
+    nearby = [qualified_drivers[0]] if qualified_drivers else []
 
     # Driver earnings = delivery fee * (1 - 0.20)
     driver_earnings = float(delivery_fee) * 0.80

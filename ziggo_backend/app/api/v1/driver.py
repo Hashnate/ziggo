@@ -90,6 +90,7 @@ def _to_response(user: User, d: Driver, paid_payouts: float = 0.0, pending_payou
         phone_number=user.phone_number,
         profile_photo=user.profile_photo,
         vehicle_type=d.vehicle_type,
+        driver_type=d.driver_type,
         vehicle_number=d.vehicle_number,
         vehicle_model=d.vehicle_model,
         vehicle_color=d.vehicle_color,
@@ -341,6 +342,8 @@ async def register_driver(
     d.relative_name = body.relative_name
     d.relative_contact = body.relative_contact
     d.relative_relationship = body.relative_relationship
+    if body.driver_type:
+        d.driver_type = body.driver_type
     # Stay in PENDING; admin will approve.
     if d.status == DriverStatus.PENDING:
         pass

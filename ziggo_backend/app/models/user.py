@@ -127,6 +127,7 @@ class Driver(Base):
     nic_number = Column(String(20), unique=True)
     license_number = Column(String(50), unique=True)
     vehicle_type = Column(String(20))  # bike, tuk, car, van, truck
+    driver_type = Column(String(20), default="ride")
     vehicle_number = Column(String(20), unique=True)
     vehicle_model = Column(String(100))
     vehicle_color = Column(String(50))

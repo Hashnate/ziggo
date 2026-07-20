@@ -19,6 +19,7 @@ class DriverRegisterRequest(BaseModel):
     nic_number: str
     license_number: str
     vehicle_type: str  # bike | tuk | car | van | truck
+    driver_type: Optional[str] = "ride"
     vehicle_number: str
     vehicle_model: str
     vehicle_color: str
@@ -36,6 +37,7 @@ class AdminDriverCreateRequest(BaseModel):
     nic_number: str
     license_number: str
     vehicle_type: str
+    driver_type: Optional[str] = "ride"
     vehicle_number: str
     vehicle_model: str
     vehicle_color: str
@@ -48,6 +50,7 @@ class DriverProfileResponse(BaseModel):
     phone_number: Optional[str] = None
     profile_photo: Optional[str] = None
     vehicle_type: Optional[str] = None
+    driver_type: Optional[str] = None
     vehicle_number: Optional[str] = None
     vehicle_model: Optional[str] = None
     vehicle_color: Optional[str] = None

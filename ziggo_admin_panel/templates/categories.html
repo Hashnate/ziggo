@@ -104,6 +104,7 @@
                                         "search_radius_km": c.search_radius_km or "",
                                         "is_active": c.is_active,
                                         "is_truck": c.is_truck,
+                                        "is_delivery": c.is_delivery,
                                         "rental_hourly_rate": (c.rental_hourly_rate|float) if c.rental_hourly_rate is not none else "",
                                     }|tojson }})'
                                     class="px-3 py-1.5 bg-blue-50 text-ziggo border border-blue-100 rounded-lg text-xs font-bold hover:bg-blue-100 transition flex items-center gap-1.5">
@@ -234,50 +235,56 @@
                         <input type="checkbox" name="is_truck" id="catTruck" class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
                         <span class="text-sm font-black text-ziggo-ink">Is Truck Option?</span>
                     </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="is_delivery" id="catDelivery" onchange="togglePricingVisibility()" class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
+                        <span class="text-sm font-black text-ziggo-ink">Is Delivery Option?</span>
+                    </label>
                 </div>
 
-                <div class="col-span-2 pt-2">
-                    <p class="text-xs font-black text-ziggo uppercase tracking-wider">Pricing</p>
-                </div>
-                <div>
-                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Base fare (Rs)</label>
-                    <input type="number" step="0.01" min="0" name="base_fare" id="catBase" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                </div>
-                <div>
-                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Per km (Rs)</label>
-                    <input type="number" step="0.01" min="0" name="per_km_rate" id="catPerKm" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                </div>
-                <div>
-                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Per minute (Rs)</label>
-                    <input type="number" step="0.01" min="0" name="per_minute_rate" id="catPerMin" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                </div>
-                <div>
-                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Minimum fare (Rs)</label>
-                    <input type="number" step="0.01" min="0" name="min_fare" id="catMin" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                </div>
-                <div>
-                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Rental Hourly Rate (Rs)</label>
-                    <input type="number" step="0.01" min="0" name="rental_hourly_rate" id="catRentalRate" placeholder="e.g. 1200 (Optional)" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                </div>
-                <div>
-                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Platform fee (%)</label>
-                    <input type="number" step="0.01" min="0" max="100" name="platform_fee_percent" id="catFee" value="15" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                </div>
-                <div>
-                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Demand multiplier</label>
-                    <input type="number" step="0.01" min="0.1" name="surge_multiplier" id="catSurge" value="1.0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                </div>
-                <div>
-                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Pickup fee (%)</label>
-                    <input type="number" step="0.01" min="0" max="100" name="pickup_fee" id="catPickupFee" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                </div>
-                <div>
-                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Boost (Rs)</label>
-                    <input type="number" step="0.01" min="0" name="boost" id="catBoost" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
-                </div>
-                <div>
-                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Passenger Deductible (%)</label>
-                    <input type="number" step="0.01" min="0" max="100" name="passenger_deductible" id="catPassengerDeductible" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                <div id="pricingSection" class="col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="col-span-2 pt-2">
+                        <p class="text-xs font-black text-ziggo uppercase tracking-wider">Pricing</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Base fare (Rs)</label>
+                        <input type="number" step="0.01" min="0" name="base_fare" id="catBase" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Per km (Rs)</label>
+                        <input type="number" step="0.01" min="0" name="per_km_rate" id="catPerKm" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Per minute (Rs)</label>
+                        <input type="number" step="0.01" min="0" name="per_minute_rate" id="catPerMin" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Minimum fare (Rs)</label>
+                        <input type="number" step="0.01" min="0" name="min_fare" id="catMin" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Rental Hourly Rate (Rs)</label>
+                        <input type="number" step="0.01" min="0" name="rental_hourly_rate" id="catRentalRate" placeholder="e.g. 1200 (Optional)" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Platform fee (%)</label>
+                        <input type="number" step="0.01" min="0" max="100" name="platform_fee_percent" id="catFee" value="15" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Demand multiplier</label>
+                        <input type="number" step="0.01" min="0.1" name="surge_multiplier" id="catSurge" value="1.0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Pickup fee (%)</label>
+                        <input type="number" step="0.01" min="0" max="100" name="pickup_fee" id="catPickupFee" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Boost (Rs)</label>
+                        <input type="number" step="0.01" min="0" name="boost" id="catBoost" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Passenger Deductible (%)</label>
+                        <input type="number" step="0.01" min="0" max="100" name="passenger_deductible" id="catPassengerDeductible" value="0" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    </div>
                 </div>
             </div>
             <div class="pt-2 flex justify-end gap-3">
@@ -291,6 +298,24 @@
 </div>
 
 <script>
+function togglePricingVisibility() {
+    const isDelivery = document.getElementById('catDelivery').checked;
+    const pricingSection = document.getElementById('pricingSection');
+    if (pricingSection) {
+        pricingSection.style.display = isDelivery ? 'none' : 'grid';
+        const inputs = pricingSection.querySelectorAll('input');
+        inputs.forEach(input => {
+            if (isDelivery) {
+                input.removeAttribute('required');
+            } else {
+                if (input.id !== 'catRentalRate') {
+                    input.setAttribute('required', 'required');
+                }
+            }
+        });
+    }
+}
+
 function clearPresetSelection() {
     document.querySelectorAll('label[data-preset]').forEach(item => {
         item.classList.remove('border-ziggo', 'bg-blue-50/50');
@@ -346,6 +371,7 @@ function openCreateModal() {
     document.getElementById('catPassengerDeductible').value = 0;
     document.getElementById('catRentalRate').value = '';
     document.getElementById('catActive').checked = true;
+    document.getElementById('catDelivery').checked = false;
     
     // Reset image input and preview
     document.getElementById('catImageInput').value = '';
@@ -354,6 +380,7 @@ function openCreateModal() {
     document.getElementById('catNewImage').innerHTML = '<i class="fas fa-image text-ziggo-faint text-3xl"></i>';
     
     clearPresetSelection();
+    togglePricingVisibility();
     showModal();
 }
 
@@ -381,6 +408,7 @@ function openEditModal(c) {
     document.getElementById('catRentalRate').value = c.rental_hourly_rate || '';
     document.getElementById('catActive').checked = !!c.is_active;
     document.getElementById('catTruck').checked = !!c.is_truck;
+    document.getElementById('catDelivery').checked = !!c.is_delivery;
     
     // Reset image input and new preview
     document.getElementById('catImageInput').value = '';
@@ -408,6 +436,7 @@ function openEditModal(c) {
         prevCol.style.display = 'none';
     }
     
+    togglePricingVisibility();
     showModal();
 }
 
