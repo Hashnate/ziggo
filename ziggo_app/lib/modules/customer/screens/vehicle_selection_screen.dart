@@ -1093,7 +1093,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
             Opacity(
-              opacity: descriptionText.isNotEmpty ? 1.0 : 0.0,
+              opacity: (selected && descriptionText.isNotEmpty) ? 1.0 : 0.0,
               child: Text(
                 descriptionText,
                 style: TextStyle(
