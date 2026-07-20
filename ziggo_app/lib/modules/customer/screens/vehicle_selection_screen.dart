@@ -776,7 +776,31 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                         ],
                       ),
                     ),
-                  const SizedBox(height: 16),
+                  if (!_loadingEstimates && _serviceType != null) ...[
+                    Builder(
+                      builder: (context) {
+                        final category = _categoryData[_serviceType];
+                        final descriptionText = category?['description']?.toString() ?? '';
+                        if (descriptionText.isEmpty) return const SizedBox.shrink();
+                        
+                        final typeDrivers = _nearbyDrivers.where((d) => d['vehicle_type'] == _serviceType).toList();
+                        final isOnline = typeDrivers.isNotEmpty;
+                        
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12.0, left: 16, right: 16),
+                          child: Text(
+                            descriptionText,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: isOnline ? const Color(0xFF2E7D32) : AppColors.textSecondary,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        );
+                      }
+                    ),
+                  ],
                   
                   // Vehicles horizontal list
                   if (_loadingEstimates)
@@ -1093,16 +1117,10 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
             Opacity(
-              opacity: (selected && descriptionText.isNotEmpty) ? 1.0 : 0.0,
+              opacity: etaMin != null ? 1.0 : 0.0,
               child: Text(
-                descriptionText,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: etaMin != null ? const Color(0xFF2E7D32) : AppColors.textSecondary,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                'In ${etaMin ?? 0} min',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
               ),
             ),
             const SizedBox(height: 6),
