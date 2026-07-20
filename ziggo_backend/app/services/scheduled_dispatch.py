@@ -37,6 +37,21 @@ async def _dispatch_booking(db, booking: Booking) -> None:
     )
     # Only ride-type drivers receive scheduled ride-hailing/parcel booking dispatches
     nearby = [d for d in nearby if getattr(d, 'driver_type', 'ride') == 'ride']
+    if booking.is_flash or booking.is_courier:
+        weight = float(booking.parcel_weight_kg or 0)
+        filtered = []
+        for d in nearby:
+            vt = (d.vehicle_type or "").lower().strip()
+            if vt == "car":
+                continue
+            if vt == "bike" and weight > 5.0:
+                continue
+            if vt == "tuk" and weight > 15.0:
+                continue
+            if vt == "van" and weight > 100.0:
+                continue
+            filtered.append(d)
+        nearby = filtered
 
     if booking.is_courier:
         n_title = "New courier delivery"

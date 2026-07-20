@@ -12,6 +12,12 @@ class StopRequest(BaseModel):
     address: Optional[str] = None
 
 
+class PackageRequest(BaseModel):
+    """A package details entry for courier deliveries."""
+    weight_kg: float
+    type: Optional[str] = "Parcel"
+
+
 class FareEstimateRequest(BaseModel):
     service_type: str
     pickup_lat: float
@@ -32,6 +38,7 @@ class FareEstimateRequest(BaseModel):
     redeem_points: int = 0
     # BRD: CD-19 — up to N intermediate stops (server clamps to admin limit)
     stops: List[StopRequest] = Field(default_factory=list)
+    packages: List[PackageRequest] = Field(default_factory=list)
 
 
 class BulkFareEstimateRequest(BaseModel):
@@ -49,6 +56,7 @@ class BulkFareEstimateRequest(BaseModel):
     rental_hours: Optional[int] = Field(default=None, ge=1, le=24)
     redeem_points: int = 0
     stops: List[StopRequest] = Field(default_factory=list)
+    packages: List[PackageRequest] = Field(default_factory=list)
 
 
 class FareEstimateResponse(BaseModel):
@@ -108,6 +116,7 @@ class BookingCreate(BaseModel):
     rental_hours: Optional[int] = Field(default=None, ge=1, le=24)
     # BRD: RW-02 — points the customer wants to redeem at checkout
     redeem_points: int = 0
+    packages: List[PackageRequest] = Field(default_factory=list)
     # BRD: CD-19 — up to N intermediate stops (server clamps to admin limit)
     stops: List[StopRequest] = Field(default_factory=list)
     scheduled_time: Optional[datetime] = None

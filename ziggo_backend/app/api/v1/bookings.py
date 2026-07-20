@@ -452,6 +452,7 @@ async def estimate_fare(
         is_rental=req.is_rental,
         rental_hours=req.rental_hours,
         is_courier=req.is_courier,
+        packages=[p.model_dump() for p in (req.packages or [])],
         customer=customer,
         redeem_points=req.redeem_points or 0,
         stops=[s.model_dump() for s in (req.stops or [])],
@@ -492,6 +493,7 @@ async def estimate_fare_bulk(
                 is_rental=req.is_rental,
                 rental_hours=req.rental_hours,
                 is_courier=req.is_courier,
+                packages=[p.model_dump() for p in (req.packages or [])],
                 customer=customer,
                 redeem_points=req.redeem_points or 0,
                 stops=[s.model_dump() for s in (req.stops or [])],
@@ -551,6 +553,7 @@ async def create_booking(
         is_rental=req.is_rental,
         rental_hours=req.rental_hours,
         is_courier=req.is_courier,
+        packages=[p.model_dump() for p in (req.packages or [])],
         customer=customer,
         redeem_points=req.redeem_points or 0,
         stops=[s.model_dump() for s in incoming_stops],
@@ -724,6 +727,21 @@ async def create_booking(
         )
         # Only ride-type drivers receive ride-hailing/parcel booking dispatches
         nearby = [d for d in nearby if getattr(d, 'driver_type', 'ride') == 'ride']
+        if booking.is_flash or booking.is_courier:
+            weight = float(booking.parcel_weight_kg or 0)
+            filtered = []
+            for d in nearby:
+                vt = (d.vehicle_type or "").lower().strip()
+                if vt == "car":
+                    continue
+                if vt == "bike" and weight > 5.0:
+                    continue
+                if vt == "tuk" and weight > 15.0:
+                    continue
+                if vt == "van" and weight > 100.0:
+                    continue
+                filtered.append(d)
+            nearby = filtered
     if booking.is_courier:
         n_title = "New courier delivery"
         n_body = (

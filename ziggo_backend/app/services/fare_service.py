@@ -98,6 +98,7 @@ async def calculate_fare(
     is_rental: bool = False,
     rental_hours: Optional[int] = None,
     is_courier: bool = False,
+    packages: Optional[list] = None,
     # BRD: RW-01 (earn) + RW-02 (redeem) + RS-07 (display)
     customer=None,
     redeem_points: int = 0,
@@ -173,14 +174,18 @@ async def calculate_fare(
 
     if is_courier:
         setting_q = await db.execute(
-            select(FareSetting).where(FareSetting.service_type == service_type)
+            select(FareSetting).where(FareSetting.service_type == "courier")
         )
         setting = setting_q.scalars().first()
         platform_pct = float(setting.platform_fee_percent) if (setting and setting.platform_fee_percent is not None and float(setting.platform_fee_percent) > 0) else sys_commission
 
         distance_km = haversine_km(pickup_lat, pickup_lng, drop_lat, drop_lng)
         weight_surcharge = 0.0
-        if parcel_weight_kg is not None:
+        if packages:
+            for pkg in packages:
+                pkg_weight = float(pkg.get("weight_kg") or 0.0) if isinstance(pkg, dict) else float(getattr(pkg, "weight_kg", 0.0))
+                weight_surcharge += await _flash_surcharge(db, pkg_weight)
+        elif parcel_weight_kg is not None:
             weight_surcharge = await _flash_surcharge(db, float(parcel_weight_kg))
         
         courier_base = float(setting.base_fare) if setting and setting.base_fare is not None else COURIER_BASE

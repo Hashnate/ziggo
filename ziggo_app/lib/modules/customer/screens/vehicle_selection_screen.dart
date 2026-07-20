@@ -1066,6 +1066,8 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       etaMin = null;
     }
 
+    final descriptionText = category?['description']?.toString() ?? '';
+
     return GestureDetector(
       onTap: () {
         setState(() => _serviceType = st);
@@ -1091,10 +1093,16 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
             Opacity(
-              opacity: etaMin != null ? 1.0 : 0.0,
+              opacity: descriptionText.isNotEmpty ? 1.0 : 0.0,
               child: Text(
-                'In ${etaMin ?? 0} min',
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                descriptionText,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: etaMin != null ? const Color(0xFF2E7D32) : AppColors.textSecondary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
             const SizedBox(height: 6),
