@@ -171,17 +171,19 @@ async def public_earnings(
 
 
 @router.get("/categories")
-async def public_categories(db: AsyncSession = Depends(get_db)):
+async def public_categories(
+    include_delivery: bool = False,
+    db: AsyncSession = Depends(get_db),
+):
     """Active vehicle categories (from admin-managed FareSetting rows) so public
     forms — e.g. the driver application — can list the same categories as admin."""
+    stmt = select(FareSetting).where(FareSetting.is_active == True)  # noqa: E712
+    if not include_delivery:
+        stmt = stmt.where(FareSetting.is_delivery == False)
+
     rows = (
         await db.execute(
-            select(FareSetting)
-            .where(
-                FareSetting.is_active == True,  # noqa: E712
-                FareSetting.is_delivery == False
-            )
-            .order_by(FareSetting.display_order, FareSetting.id)
+            stmt.order_by(FareSetting.display_order, FareSetting.id)
         )
     ).scalars().all()
     return [

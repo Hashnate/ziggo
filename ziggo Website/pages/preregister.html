@@ -498,7 +498,7 @@
   async function loadCategories() {
     try {
       const baseApi = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1') ? 'http://localhost:8000' : '';
-      const response = await fetch(`${baseApi}/api/v1/public/categories`);
+      const response = await fetch(`${baseApi}/api/v1/public/categories?include_delivery=true`);
       if (response.ok) {
         const categories = await response.json();
         const select = document.getElementById('driver_vehicle');
