@@ -722,6 +722,8 @@ async def create_booking(
         nearby = await find_all_nearby_drivers(
             db, req.pickup_lat, req.pickup_lng, dispatch_vehicle, max_distance_km=max_radius
         )
+        # Only ride-type drivers receive ride-hailing/parcel booking dispatches
+        nearby = [d for d in nearby if getattr(d, 'driver_type', 'ride') == 'ride']
     if booking.is_courier:
         n_title = "New courier delivery"
         n_body = (

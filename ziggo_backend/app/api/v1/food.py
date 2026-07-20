@@ -78,13 +78,9 @@ async def _broadcast_to_riders(
     )
 
     # Filter to specific delivery driver only
-    delivery_cats_q = await db.execute(
-        select(FareSetting.service_type).where(FareSetting.is_delivery == True)
-    )
-    delivery_cats = {c for c in delivery_cats_q.scalars().all()}
     qualified_drivers = [
         d for d in nearby
-        if d.driver_type == "delivery" and d.vehicle_type in delivery_cats
+        if d.driver_type == "delivery"
     ]
     nearby = [qualified_drivers[0]] if qualified_drivers else []
 

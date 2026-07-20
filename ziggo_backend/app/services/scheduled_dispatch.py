@@ -35,6 +35,8 @@ async def _dispatch_booking(db, booking: Booking) -> None:
     nearby = await find_all_nearby_drivers(
         db, booking.pickup_lat, booking.pickup_lng, dispatch_vehicle, max_distance_km=max_radius
     )
+    # Only ride-type drivers receive scheduled ride-hailing/parcel booking dispatches
+    nearby = [d for d in nearby if getattr(d, 'driver_type', 'ride') == 'ride']
 
     if booking.is_courier:
         n_title = "New courier delivery"
