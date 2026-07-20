@@ -776,6 +776,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                         ],
                       ),
                     ),
+                  const SizedBox(height: 16),
                   if (!_loadingEstimates && _serviceType != null) ...[
                     Builder(
                       builder: (context) {
