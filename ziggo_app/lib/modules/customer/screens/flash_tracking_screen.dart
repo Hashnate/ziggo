@@ -15,6 +15,7 @@ import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/pulse_dot.dart';
 import '../booking_provider.dart';
 import 'rating_screen.dart';
+import '../../common/screens/ride_chat_screen.dart';
 
 /// Parcel-delivery tracker. Same status state-machine as a ride but labelled
 /// for couriers — the customer sees "Courier collecting parcel" / "Parcel in
@@ -585,6 +586,62 @@ class _FlashTrackingScreenState extends State<FlashTrackingScreen> with SingleTi
                                   const SizedBox(height: 14),
                                   // Stage timeline (dotted line + 5 dots)
                                   _StageTimeline(currentStage: currentStage, stages: _stages),
+                                  if ((status == 'accepted' || status == 'arrived') && active['otp'] != null) ...[
+                                    const SizedBox(height: 16),
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: const Color(0xFF2563EB), width: 2),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color(0xFF2563EB).withOpacity(0.08),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Text(
+                                            'Share PIN',
+                                            style: TextStyle(
+                                              color: Color(0xFF2563EB),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 15,
+                                            ),
+                                          ),
+                                          Row(
+                                            children: active['otp'].toString().split('').map((digit) => Container(
+                                              margin: const EdgeInsets.only(left: 6),
+                                              width: 28,
+                                              height: 32,
+                                              alignment: Alignment.center,
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF2563EB),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                digit,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 16,
+                                                ),
+                                              ),
+                                            )).toList(),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                  if (driver != null) ...[
+                                    const SizedBox(height: 16),
+                                    _DriverCard(d: driver),
+                                  ],
                                   const SizedBox(height: 16),
                                   // Parcel card
                                   if (isParcel)
@@ -864,3 +921,350 @@ class _StageTimeline extends StatelessWidget {
     );
   }
 }
+
+class _DriverCard extends StatelessWidget {
+  final Map<String, dynamic> d;
+  const _DriverCard({required this.d});
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = (d['full_name']?.toString().trim().isNotEmpty ?? false)
+        ? d['full_name'].toString().trim()[0].toUpperCase()
+        : 'D';
+    final photo = d['profile_photo']?.toString();
+    final photoUrl = (photo != null && photo.isNotEmpty)
+        ? (photo.startsWith('http') 
+            ? photo 
+            : (photo.startsWith('/') 
+                ? '${ApiConfig.baseHost}$photo' 
+                : '${ApiConfig.baseHost}/$photo'))
+        : null;
+
+    final vPhoto = d['vehicle_photo_url']?.toString();
+    final vehiclePhotoUrl = (vPhoto != null && vPhoto.isNotEmpty)
+        ? (vPhoto.startsWith('http') 
+            ? vPhoto 
+            : (vPhoto.startsWith('/') 
+                ? '${ApiConfig.baseHost}$vPhoto' 
+                : '${ApiConfig.baseHost}/$vPhoto'))
+        : null;
+
+    final fallback = Center(
+      child: Text(
+        initial,
+        style: const TextStyle(
+          color: AppColors.primary,
+          fontWeight: FontWeight.w900,
+          fontSize: 20,
+        ),
+      ),
+    );
+
+    final rating = (d['rating'] ?? 5.0).toString();
+    final vehicleType = (d['vehicle_type'] ?? 'vehicle').toString();
+    final vehicleModel = (d['vehicle_model'] ?? '').toString();
+    final vehicleNumber = (d['vehicle_number'] ?? '').toString();
+    final fullName = (d['full_name'] ?? 'Driver').toString();
+    final profile = d['profile'] as Map<String, dynamic>?;
+    final rawColor = (d['vehicle_color'] ?? profile?['vehicle_color'] ?? '').toString().trim();
+    final vehicleColor = rawColor.isNotEmpty 
+        ? '${rawColor[0].toUpperCase()}${rawColor.substring(1)}'
+        : '';
+
+    int parseTrips(dynamic val) {
+      if (val == null) return -1;
+      if (val is num) return val.toInt();
+      if (val is String) return int.tryParse(val.toString()) ?? -1;
+      return -1;
+    }
+
+    int trips = -1;
+    final keys = ['completed_trips', 'total_trips', 'total_rides', 'trips', 'rides', 'rides_completed', 'trips_completed', 'rides_count', 'completed_rides'];
+    for (final k in keys) {
+      final v = parseTrips(d[k]);
+      if (v >= 0) { trips = v; break; }
+    }
+    if (trips < 0 && profile != null) {
+      for (final k in keys..add('today_rides')) {
+        final v = parseTrips(profile[k]);
+        if (v >= 0) { trips = v; break; }
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              // Combined Driver Avatar + Rating Badge + Vehicle Photo (overlapping)
+              SizedBox(
+                width: 116,
+                height: 64,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    // 1. Vehicle Photo (Layered behind)
+                    Positioned(
+                      left: 42,
+                      top: 0,
+                      child: SizedBox(
+                        width: 76,
+                        height: 64,
+                        child: vehiclePhotoUrl != null
+                            ? Image.network(
+                                vehiclePhotoUrl,
+                                fit: BoxFit.contain,
+                                width: 76,
+                                height: 64,
+                                errorBuilder: (context, error, stackTrace) => Image.asset(
+                                  'assets/icons/${vehicleType == 'van' ? 'car' : (['bike', 'car', 'tuk', 'truck'].contains(vehicleType) ? vehicleType : 'car')}.png',
+                                  fit: BoxFit.contain,
+                                ),
+                              )
+                            : Image.asset(
+                                'assets/icons/${vehicleType == 'van' ? 'car' : (['bike', 'car', 'tuk', 'truck'].contains(vehicleType) ? vehicleType : 'car')}.png',
+                                fit: BoxFit.contain,
+                              ),
+                      ),
+                    ),
+                    // 2. Driver Avatar + Rating Badge (Layered on top)
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        alignment: Alignment.bottomCenter,
+                        children: [
+                          Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: photoUrl != null
+                                ? CircleAvatar(
+                                    radius: 27,
+                                    backgroundColor: AppColors.primary.withOpacity(0.1),
+                                    backgroundImage: NetworkImage(photoUrl),
+                                    onBackgroundImageError: (exception, stackTrace) {
+                                      debugPrint('Error loading driver photo: $exception');
+                                    },
+                                  )
+                                : fallback,
+                          ),
+                          // Rating Badge
+                          Positioned(
+                            bottom: -4,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.grey.shade200, width: 1),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.08),
+                                    blurRadius: 2,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.star_rounded, color: AppColors.accent, size: 12),
+                                  const SizedBox(width: 1),
+                                  Text(
+                                    rating,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 10,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              // Plate details
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black12,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      vehicleNumber,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                        letterSpacing: 0.5,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    vehicleColor.isNotEmpty ? '$vehicleColor $vehicleModel' : vehicleModel,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            fullName.toUpperCase(),
+            style: const TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 14,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          if (trips >= 0) ...[
+            const SizedBox(height: 2),
+            Text(
+              '$trips trips',
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 2),
+            Text(
+              'Backend not reloaded! Missing completed_trips key. Keys present: ${d.keys.join(", ")}',
+              maxLines: 10,
+              style: const TextStyle(
+                color: Colors.red,
+                fontWeight: FontWeight.bold,
+                fontSize: 10,
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _messageDriver(context, d['phone_number']?.toString()),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceMuted,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.chat_bubble_rounded, size: 16, color: AppColors.textPrimary),
+                        SizedBox(width: 8),
+                        Text(
+                          'Send a message',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              GestureDetector(
+                onTap: () => _callDriver(context, d['phone_number']?.toString()),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.phone_rounded, color: AppColors.textPrimary, size: 18),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+Future<void> _callDriver(BuildContext context, String? phone) async {
+  if (phone == null || phone.trim().isEmpty) {
+    _toast(context, 'Driver phone unavailable');
+    return;
+  }
+  final uri = Uri.parse('tel:${phone.trim()}');
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri);
+  } else {
+    if (context.mounted) _toast(context, 'No phone app available');
+  }
+}
+
+Future<void> _messageDriver(BuildContext context, String? phone) async {
+  final booking = context.read<BookingProvider>().activeBooking;
+  if (booking == null) return;
+  
+  final driver = booking['driver'];
+  final driverName = driver != null ? (driver['name'] ?? 'Driver') : 'Driver';
+
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => RideChatScreen(
+        bookingId: booking['id'],
+        otherParticipantName: driverName,
+        isDriver: false,
+      ),
+    ),
+  );
+}
+
+void _toast(BuildContext context, String msg) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(msg),
+      backgroundColor: AppColors.warning,
+      behavior: SnackBarBehavior.floating,
+    ),
+  );
+}
+
