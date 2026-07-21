@@ -352,16 +352,19 @@
 <body class="zi-canvas flex h-screen overflow-hidden text-ziggo-ink">
 
     <!-- Sidebar -->
-    <aside class="w-56 zi-sidebar text-ziggo-ink flex flex-col transition-all duration-300">
-        <a href="/admin/dashboard" class="px-5 py-4 flex items-center gap-3 border-b border-ziggo-line hover:bg-ziggo-canvas transition" title="Go to Dashboard">
-            <img id="sidebarLogo" src="/static/img/logo.jpeg" alt="Ziggo"
-                 class="w-10 h-10 rounded-xl object-cover flex-shrink-0"
-                 style="box-shadow: 0 8px 20px -8px rgba(30,58,138,0.45);">
-            <div class="flex flex-col leading-tight">
-                <span id="sidebarSiteName" class="font-display text-[18px] font-extrabold tracking-tight text-ziggo-ink leading-none">Ziggo</span>
-                <span class="text-[9px] uppercase tracking-[0.22em] text-ziggo-faint font-semibold mt-1">Admin Suite</span>
-            </div>
-        </a>
+    <aside id="adminSidebar" class="w-56 zi-sidebar text-ziggo-ink flex flex-col fixed md:static inset-y-0 left-0 z-[1001] bg-white transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out">
+        <div class="px-5 py-4 flex items-center justify-between border-b border-ziggo-line">
+            <a href="/admin/dashboard" class="flex items-center gap-3 hover:bg-ziggo-canvas transition" title="Go to Dashboard">
+                <img id="sidebarLogo" src="/static/img/logo.jpeg" alt="Ziggo"
+                     class="w-10 h-10 rounded-xl object-cover flex-shrink-0"
+                     style="box-shadow: 0 8px 20px -8px rgba(30,58,138,0.45);">
+                <div class="flex flex-col leading-tight">
+                    <span id="sidebarSiteName" class="font-display text-[18px] font-extrabold tracking-tight text-ziggo-ink leading-none">Ziggo</span>
+                    <span class="text-[9px] uppercase tracking-[0.22em] text-ziggo-faint font-semibold mt-1">Admin Suite</span>
+                </div>
+            </a>
+            <button id="sidebarClose" class="md:hidden text-ziggo-muted hover:text-ziggo p-1" aria-label="Close sidebar"><i class="fas fa-times text-lg"></i></button>
+        </div>
 
         <nav class="flex-1 mt-1 px-3 overflow-y-auto">
             <p class="zi-nav-group">Overview</p>
@@ -495,12 +498,15 @@
         </div>
     </aside>
 
+    <!-- Sidebar Overlay for mobile -->
+    <div id="sidebarOverlay" class="fixed inset-0 bg-black/40 z-[1000] hidden md:hidden transition-opacity"></div>
+
     <!-- Main Content -->
     <main class="flex-1 flex flex-col overflow-hidden">
         <!-- Header -->
         <header class="zi-topbar px-7 py-3.5 flex items-center justify-between border-b border-ziggo-line/60">
             <div class="flex items-center gap-4">
-                <button class="text-ziggo-muted md:hidden"><i class="fas fa-bars text-xl"></i></button>
+                <button id="sidebarToggle" class="text-ziggo-muted md:hidden" aria-label="Open sidebar"><i class="fas fa-bars text-xl"></i></button>
                 {% block top_title %}
                 <h1 class="text-[20px] font-bold tracking-tight text-ziggo-ink leading-none">{% block page_title %}Dashboard{% endblock %}</h1>
                 {% endblock %}
@@ -723,6 +729,33 @@
         var nav = document.querySelector('aside .sidebar-item.active');
         if (nav) {
           try { nav.scrollIntoView({ block: 'center' }); } catch (e) { nav.scrollIntoView(); }
+        }
+      })();
+
+      // Mobile sidebar toggle logic
+      (function () {
+        var sidebar = document.getElementById('adminSidebar');
+        var toggle = document.getElementById('sidebarToggle');
+        var close = document.getElementById('sidebarClose');
+        var overlay = document.getElementById('sidebarOverlay');
+
+        if (sidebar && toggle && overlay) {
+          toggle.addEventListener('click', function () {
+            sidebar.classList.remove('-translate-x-full');
+            sidebar.classList.add('translate-x-0');
+            overlay.classList.remove('hidden');
+          });
+
+          var closeSidebar = function () {
+            sidebar.classList.add('-translate-x-full');
+            sidebar.classList.remove('translate-x-0');
+            overlay.classList.add('hidden');
+          };
+
+          if (close) {
+            close.addEventListener('click', closeSidebar);
+          }
+          overlay.addEventListener('click', closeSidebar);
         }
       })();
     </script>
