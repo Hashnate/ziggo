@@ -20,10 +20,27 @@ String? _dioMessage(DioException e) {
     msg = data['detail']?.toString();
   } else if (data is String && data.trim().isNotEmpty && !data.contains('<')) {
     msg = data;
-  } else {
-    msg = e.message;
   }
-  return msg != null ? ApiClient.sanitizeString(msg) : null;
+  
+  if (msg == null || 
+      msg.trim().isEmpty || 
+      msg.contains('validateStatus') || 
+      msg.contains('exception') || 
+      msg.contains('status code') ||
+      e.response?.statusCode == 405 ||
+      e.response?.statusCode == 500 ||
+      e.response?.statusCode == 502 ||
+      e.response?.statusCode == 503 ||
+      e.response?.statusCode == 504) {
+    if (e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.receiveTimeout ||
+        e.type == DioExceptionType.sendTimeout ||
+        e.type == DioExceptionType.connectionError) {
+      return 'Connection timeout. Please check your internet connection.';
+    }
+    return 'An unexpected error occurred. Please try again later.';
+  }
+  return ApiClient.sanitizeString(msg);
 }
 
 class AuthProvider extends ChangeNotifier {

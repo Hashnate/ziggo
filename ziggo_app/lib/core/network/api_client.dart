@@ -61,7 +61,22 @@ class ApiClient {
             } catch (_) {}
           }
 
-          final cleanMessage = sanitizeString(e.message ?? '');
+          var cleanMessage = sanitizeString(e.message ?? '');
+          if (cleanMessage.isEmpty ||
+              cleanMessage.contains('validateStatus') || 
+              cleanMessage.contains('exception') || 
+              cleanMessage.contains('status code') ||
+              e.response?.statusCode == 405 ||
+              (e.response?.statusCode ?? 200) >= 500) {
+            if (e.type == DioExceptionType.connectionTimeout ||
+                e.type == DioExceptionType.receiveTimeout ||
+                e.type == DioExceptionType.sendTimeout ||
+                e.type == DioExceptionType.connectionError) {
+              cleanMessage = 'Connection timeout. Please check your internet connection.';
+            } else {
+              cleanMessage = 'An unexpected error occurred. Please try again later.';
+            }
+          }
           final cleanResponse = e.response != null
               ? Response(
                   requestOptions: e.response!.requestOptions,

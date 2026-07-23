@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="48" viewBox="0 0 160 48">
+  <rect x="0.5" y="0.5" width="159" height="47" rx="8" ry="8" fill="#0A0A0A" stroke="#a6a6a6" stroke-width="0.8"/>
+  <g id="play-logo">
+    <path fill="#00D2FF" d="M 13.5,10.2 C 13.2,10.6 13,11.2 13,12.0 L 13,36.0 C 13,36.8 13.2,37.4 13.5,37.8 L 13.6,37.9 L 27.1,24.4 L 27.1,23.6 Z"/>
+    <path fill="#00F076" d="M 31.6,28.9 L 27.1,24.4 L 13.5,37.9 C 14.0,38.4 14.8,38.5 15.7,38.0 L 31.6,28.9 Z"/>
+    <path fill="#FF3A44" d="M 31.6,19.1 L 15.7,10.0 C 14.8,9.5 14.0,9.6 13.5,10.1 L 27.1,23.6 L 31.6,19.1 Z"/>
+    <path fill="#FFC207" d="M 31.6,28.9 L 36.9,25.8 C 38.3,25.0 38.3,23.0 36.9,22.2 L 31.6,19.1 L 27.1,23.6 L 27.1,24.4 Z"/>
+  </g>
+  <text x="45" y="17" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="8.2" font-weight="500" letter-spacing="0.3">GET IT ON</text>
+  <text x="45" y="34" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="14.5" font-weight="700" letter-spacing="-0.2">Google Play</text>
+</svg>
