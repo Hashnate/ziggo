@@ -2324,6 +2324,7 @@ async def admin_settings_get(
 
 @router.post("/settings")
 async def admin_settings_save(
+    request: Request,
     active_tab: str = Form("pricing"),
     # General
     site_name: str = Form(""),
@@ -2458,54 +2459,55 @@ async def admin_settings_save(
     from app.models import PeakHourSetting
     peaks_q = await db.execute(select(PeakHourSetting).order_by(PeakHourSetting.id))
     peaks = peaks_q.scalars().all()
-    form_peaks = [
-        (peak_start_hour_1, peak_end_hour_1, peak_extra_amount_1),
-        (peak_start_hour_2, peak_end_hour_2, peak_extra_amount_2),
-        (peak_start_hour_3, peak_end_hour_3, peak_extra_amount_3),
-        (peak_start_hour_4, peak_end_hour_4, peak_extra_amount_4),
-        (peak_start_hour_5, peak_end_hour_5, peak_extra_amount_5),
-        (peak_start_hour_6, peak_end_hour_6, peak_extra_amount_6),
-    ]
+    
+    form_data = await request.form()
+    
     peak_changed = False
-    for idx, (sh, eh, amt) in enumerate(form_peaks):
-        if idx < len(peaks):
-            import re
-            time_pat = re.compile(r"^\d{2}:\d{2}$")
+    for pk in peaks:
+        sh = form_data.get(f"peak_start_hour_{pk.id}")
+        eh = form_data.get(f"peak_end_hour_{pk.id}")
+        amt = form_data.get(f"peak_extra_amount_{pk.id}")
+        
+        if sh is None or eh is None or amt is None:
+            continue
             
-            clean_sh = sh.strip() if isinstance(sh, str) else "09:00"
-            clean_eh = eh.strip() if isinstance(eh, str) else "11:00"
-            
-            if not time_pat.match(clean_sh):
-                try:
-                    clean_sh = f"{int(clean_sh):02d}:00"
-                except:
-                    clean_sh = "09:00"
-            if not time_pat.match(clean_eh):
-                try:
-                    clean_eh = f"{int(clean_eh):02d}:00"
-                except:
-                    clean_eh = "11:00"
-                    
+        import re
+        time_pat = re.compile(r"^\d{2}:\d{2}$")
+        
+        clean_sh = sh.strip() if isinstance(sh, str) else "09:00"
+        clean_eh = eh.strip() if isinstance(eh, str) else "11:00"
+        
+        if not time_pat.match(clean_sh):
             try:
-                new_sh = int(clean_sh.split(":")[0])
+                clean_sh = f"{int(clean_sh):02d}:00"
             except:
-                new_sh = 9
+                clean_sh = "09:00"
+        if not time_pat.match(clean_eh):
             try:
-                new_eh = int(clean_eh.split(":")[0])
+                clean_eh = f"{int(clean_eh):02d}:00"
             except:
-                new_eh = 11
+                clean_eh = "11:00"
+                
+        try:
+            new_sh = int(clean_sh.split(":")[0])
+        except:
+            new_sh = 9
+        try:
+            new_eh = int(clean_eh.split(":")[0])
+        except:
+            new_eh = 11
 
-            new_amt = Decimal(str(amt))
-            if (peaks[idx].start_time != clean_sh or 
-                peaks[idx].end_time != clean_eh or 
-                peaks[idx].extra_amount != new_amt):
-                peak_changed = True
-            
-            peaks[idx].start_time = clean_sh
-            peaks[idx].end_time = clean_eh
-            peaks[idx].start_hour = new_sh
-            peaks[idx].end_hour = new_eh
-            peaks[idx].extra_amount = new_amt
+        new_amt = Decimal(str(amt))
+        if (pk.start_time != clean_sh or 
+            pk.end_time != clean_eh or 
+            pk.extra_amount != new_amt):
+            peak_changed = True
+        
+        pk.start_time = clean_sh
+        pk.end_time = clean_eh
+        pk.start_hour = new_sh
+        pk.end_hour = new_eh
+        pk.extra_amount = new_amt
 
     peak_active = any(p.is_active for p in peaks)
     if len(peaks) > 0:
@@ -2566,6 +2568,42 @@ async def admin_peak_hours_toggle(
     if not p:
         raise HTTPException(status_code=404, detail="Peak hour setting not found")
     p.is_active = not bool(p.is_active)
+    await db.commit()
+    return RedirectResponse(url="/admin/settings?tab=peakhours&saved=1", status_code=303)
+
+
+@router.post("/settings/peak-hours/new")
+async def admin_peak_hours_new(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    from decimal import Decimal
+    from app.models import PeakHourSetting
+    p = PeakHourSetting(
+        start_hour=None,
+        end_hour=None,
+        start_time=None,
+        end_time=None,
+        extra_amount=Decimal("0.00"),
+        is_active=True
+    )
+    db.add(p)
+    await db.commit()
+    return RedirectResponse(url="/admin/settings?tab=peakhours&saved=1", status_code=303)
+
+
+@router.post("/settings/peak-hours/{id}/delete")
+async def admin_peak_hours_delete(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    from app.models import PeakHourSetting
+    q = await db.execute(select(PeakHourSetting).where(PeakHourSetting.id == id))
+    p = q.scalars().first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Peak hour setting not found")
+    await db.delete(p)
     await db.commit()
     return RedirectResponse(url="/admin/settings?tab=peakhours&saved=1", status_code=303)
 
