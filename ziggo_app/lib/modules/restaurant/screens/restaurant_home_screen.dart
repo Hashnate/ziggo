@@ -416,8 +416,8 @@ class _Header extends StatelessWidget {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
                   colors: coverUrl == null
                       ? const [
                           Color(0xFF172554),
@@ -425,16 +425,15 @@ class _Header extends StatelessWidget {
                           Color(0xFF3B82F6),
                         ]
                       : [
-                          const Color(0xFF0F172A).withOpacity(0.78),
-                          const Color(0xFF1E40AF).withOpacity(0.72),
-                          const Color(0xFF3B82F6).withOpacity(0.65),
+                          Colors.black.withOpacity(0.05),
+                          Colors.black.withOpacity(0.55),
                         ],
                 ),
               ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(18, 18, 14, 18),
+            padding: const EdgeInsets.fromLTRB(18, 30, 14, 30),
             child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1004,7 +1003,7 @@ class _ToggleStatusCard extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(AppStyles.radiusMd),
@@ -1047,28 +1046,31 @@ class _ToggleStatusCard extends StatelessWidget {
               ),
             ],
           ),
-          Opacity(
-            opacity: canToggle ? 1 : 0.5,
-            child: Switch.adaptive(
-              value: isOpen,
-              activeColor: Colors.white,
-              activeTrackColor: AppColors.success,
-              inactiveTrackColor: Colors.grey.shade300,
-              onChanged: canToggle
-                  ? (v) async {
-                      final ok = await context
-                          .read<RestaurantProvider>()
-                          .toggleOnline(v);
-                      if (!context.mounted || ok) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Could not update status'),
-                          backgroundColor: AppColors.error,
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    }
-                  : null,
+          Padding(
+            padding: const EdgeInsets.only(right: 4.0),
+            child: Opacity(
+              opacity: canToggle ? 1 : 0.5,
+              child: Switch.adaptive(
+                value: isOpen,
+                activeColor: Colors.white,
+                activeTrackColor: AppColors.success,
+                inactiveTrackColor: Colors.grey.shade300,
+                onChanged: canToggle
+                    ? (v) async {
+                        final ok = await context
+                            .read<RestaurantProvider>()
+                            .toggleOnline(v);
+                        if (!context.mounted || ok) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Could not update status'),
+                            backgroundColor: AppColors.error,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    : null,
+              ),
             ),
           ),
         ],
