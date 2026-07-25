@@ -279,6 +279,7 @@ class _RestaurantHomeScreenState extends State<RestaurantHomeScreen>
                 ),
               ),
             ),
+            const _ToggleStatusCard(),
             if (!r.isApproved) const _PendingApprovalBanner(),
             if (r.isApproved) const _TodayStatsCard(),
             Container(
@@ -572,79 +573,6 @@ class _Header extends StatelessWidget {
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: canToggle && isOpen
-                              ? AppColors.success
-                              : AppColors.warning,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: (canToggle && isOpen
-                                      ? AppColors.success
-                                      : AppColors.warning)
-                                  .withOpacity(0.6),
-                              blurRadius: 6,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        !canToggle
-                            ? 'Pending approval'
-                            : (isOpen ? 'Open for orders' : 'Currently closed'),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Opacity(
-                opacity: canToggle ? 1 : 0.5,
-                child: Switch.adaptive(
-                  value: isOpen,
-                  activeColor: Colors.white,
-                  activeTrackColor: AppColors.success,
-                  inactiveTrackColor: Colors.white24,
-                  onChanged: canToggle
-                      ? (v) async {
-                          final ok = await context
-                              .read<RestaurantProvider>()
-                              .toggleOnline(v);
-                          if (!context.mounted || ok) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Could not update status'),
-                              backgroundColor: AppColors.error,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      : null,
                 ),
               ),
             ],
@@ -1064,3 +992,88 @@ class _StatusPill extends StatelessWidget {
     return AppColors.textSecondary;
   }
 }
+
+class _ToggleStatusCard extends StatelessWidget {
+  const _ToggleStatusCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final r = context.watch<RestaurantProvider>();
+    final isOpen = r.isOpen;
+    final canToggle = r.isApproved;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppStyles.radiusMd),
+        boxShadow: AppStyles.shadowSm,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: canToggle && isOpen
+                      ? AppColors.success
+                      : AppColors.warning,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: (canToggle && isOpen
+                              ? AppColors.success
+                              : AppColors.warning)
+                          .withOpacity(0.4),
+                      blurRadius: 6,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                !canToggle
+                    ? 'Pending approval'
+                    : (isOpen ? 'Open for orders' : 'Currently closed'),
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+          Opacity(
+            opacity: canToggle ? 1 : 0.5,
+            child: Switch.adaptive(
+              value: isOpen,
+              activeColor: Colors.white,
+              activeTrackColor: AppColors.success,
+              inactiveTrackColor: Colors.grey.shade300,
+              onChanged: canToggle
+                  ? (v) async {
+                      final ok = await context
+                          .read<RestaurantProvider>()
+                          .toggleOnline(v);
+                      if (!context.mounted || ok) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Could not update status'),
+                          backgroundColor: AppColors.error,
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  : null,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
