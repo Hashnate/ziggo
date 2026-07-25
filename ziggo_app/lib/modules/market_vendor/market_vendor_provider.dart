@@ -79,6 +79,12 @@ class MarketVendorProvider extends ChangeNotifier {
 
   void _onWsEvent(Map<String, dynamic> msg) {
     final event = msg['event'];
+    if (event == 'admin_config_update') {
+      loadProfile();
+      loadTodayStats();
+      loadOrders();
+      return;
+    }
     if (event == 'new_market_order') {
       HapticFeedback.heavyImpact();
       AudioPlayer().play(AssetSource('sounds/ride_alert.mp3'));

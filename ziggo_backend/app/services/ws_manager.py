@@ -56,6 +56,12 @@ class WSManager:
         for uid in user_ids:
             await self.send(uid, event, payload)
 
+    async def broadcast_all(self, event: str, payload: dict) -> None:
+        async with self._lock:
+            uids = list(self._connections.keys())
+        for uid in uids:
+            await self.send(uid, event, payload)
+
     # -- topic channels (used by admin pages like live-tracking) -------------
 
     async def subscribe(self, topic: str, ws: WebSocket) -> None:

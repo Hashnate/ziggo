@@ -72,6 +72,14 @@ class DriverProvider extends ChangeNotifier {
   void _onWsEvent(Map<String, dynamic> msg) {
     final event = msg['event'];
     final data = msg['data'] as Map<String, dynamic>?;
+
+    if (event == 'admin_config_update') {
+      loadProfile();
+      loadIncentives();
+      loadSurgeZones();
+      return;
+    }
+
     if (data == null) return;
     
     // Aggressive catch-all: If it looks like a request, show it!

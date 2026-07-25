@@ -222,10 +222,10 @@ async def list_ads(
         .outerjoin(Restaurant, MarketAd.restaurant_id == Restaurant.id)
         .where(
             MarketAd.is_active == True,
+            MarketAd.restaurant_id == None,
             or_(
-                and_(MarketAd.vendor_id == None, MarketAd.restaurant_id == None),
-                and_(MarketVendor.id != None, MarketVendor.is_active == True),
-                and_(Restaurant.id != None, Restaurant.is_active == True)
+                MarketAd.vendor_id == None,
+                and_(MarketVendor.id != None, MarketVendor.is_active == True)
             )
         )
         .order_by(MarketAd.display_order, MarketAd.id)

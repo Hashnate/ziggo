@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
@@ -10,6 +12,9 @@ import '../../core/notifications/fcm_service.dart';
 class BookingProvider extends ChangeNotifier {
   final WsClient _ws = WsClient();
   WsClient get ws => _ws;
+
+  final _adminUpdateController = StreamController<Map<String, dynamic>>.broadcast();
+  Stream<Map<String, dynamic>> get adminUpdates => _adminUpdateController.stream;
 
   Map<String, dynamic>? _activeBooking;
   Map<String, dynamic>? get activeBooking => _activeBooking;
@@ -57,6 +62,8 @@ class BookingProvider extends ChangeNotifier {
           _activeBooking = {..._activeBooking!, 'driver': driverData};
           notifyListeners();
         }
+      } else if (event == 'admin_config_update') {
+        _adminUpdateController.add(data ?? {});
       }
     });
 
@@ -505,6 +512,7 @@ class BookingProvider extends ChangeNotifier {
   @override
   void dispose() {
     _ws.dispose();
+    _adminUpdateController.close();
     super.dispose();
   }
 }

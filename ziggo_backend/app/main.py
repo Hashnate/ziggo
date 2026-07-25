@@ -61,6 +61,18 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def broadcast_admin_changes_middleware(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    method = request.method
+    if (path.startswith("/admin") or path.startswith("/admin-api") or path.startswith("/api/v1/admin")) and method in ("POST", "PUT", "DELETE", "PATCH"):
+        if 200 <= response.status_code < 400:
+            from .services.ws_manager import manager
+            asyncio.create_task(manager.broadcast_all("admin_config_update", {"type": "settings", "path": path}))
+    return response
+
+
 @app.get("/")
 async def root():
     return RedirectResponse(url="/admin/login")

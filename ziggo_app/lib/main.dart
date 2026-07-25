@@ -107,6 +107,7 @@ class _Root extends StatefulWidget {
 class _RootState extends State<_Root> with WidgetsBindingObserver {
   bool _splashed = false;
   bool _fcmRegistered = false;
+  StreamSubscription? _adminSub;
 
   @override
   void initState() {
@@ -119,6 +120,7 @@ class _RootState extends State<_Root> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _adminSub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -138,6 +140,8 @@ class _RootState extends State<_Root> with WidgetsBindingObserver {
     if (!_splashed) return const SplashScreen();
     final auth = context.watch<AuthProvider>();
     if (auth.status != AuthStatus.authenticated) {
+      _adminSub?.cancel();
+      _adminSub = null;
       return const RoleSelectionScreen();
     }
     // Bootstrap booking realtime once authenticated
@@ -145,6 +149,19 @@ class _RootState extends State<_Root> with WidgetsBindingObserver {
     if (auth.token != null && !booking.ws.isConnected) {
       booking.connectRealtime(auth.token!);
       booking.loadActive();
+
+      _adminSub?.cancel();
+      _adminSub = booking.adminUpdates.listen((data) {
+        if (!mounted) return;
+        context.read<FoodProvider>().fetchHome();
+        context.read<FoodProvider>().fetchRestaurants();
+        context.read<MarketProvider>().refreshVendors();
+        context.read<MarketProvider>().fetchAds();
+        context.read<MarketProvider>().fetchDeals();
+        context.read<MarketProvider>().fetchCategories();
+        context.read<PromosProvider>().refresh();
+        context.read<AuthProvider>().bootstrap();
+      });
     }
     // Re-register the FCM token on every authenticated launch. A freshly built
     // / reinstalled APK is issued a NEW Firebase token; when the session is

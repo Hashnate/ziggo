@@ -2497,7 +2497,10 @@ async def admin_settings_save(
         except:
             new_eh = 11
 
-        new_amt = Decimal(str(amt))
+        try:
+            new_amt = Decimal(str(amt).strip() or "0")
+        except Exception:
+            new_amt = Decimal("0")
         if (pk.start_time != clean_sh or 
             pk.end_time != clean_eh or 
             pk.extra_amount != new_amt):

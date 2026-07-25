@@ -89,6 +89,12 @@ class RestaurantProvider extends ChangeNotifier {
       loadTodayStats();
       return;
     }
+    if (event == 'admin_config_update') {
+      loadProfile();
+      loadTodayStats();
+      loadOrders();
+      return;
+    }
     if (event == 'restaurant_approved' || event == 'restaurant_suspended') {
       loadProfile();
       loadTodayStats();
