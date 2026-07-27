@@ -71,6 +71,7 @@ class MenuItemCreate(BaseModel):
     prep_time_min: Optional[int] = Field(None, ge=0)
     has_portions: bool = False
     price_half: Optional[float] = None
+    packing_charge: float = 0.0
 
 
 class MenuItemUpdate(BaseModel):
@@ -84,6 +85,7 @@ class MenuItemUpdate(BaseModel):
     prep_time_min: Optional[int] = Field(None, ge=0)
     has_portions: Optional[bool] = None
     price_half: Optional[float] = None
+    packing_charge: Optional[float] = None
 
 
 class RestaurantProfileUpdate(BaseModel):

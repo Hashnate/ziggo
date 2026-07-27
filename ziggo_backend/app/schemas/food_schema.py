@@ -15,6 +15,7 @@ class MenuItemResponse(BaseModel):
     category_id: Optional[int] = None
     has_portions: bool = False
     price_half: Optional[float] = None
+    packing_charge: float = 0.0
 
     class Config:
         from_attributes = True
@@ -87,6 +88,7 @@ class FoodOrderResponse(BaseModel):
     total_amount: float
     delivery_fee: float
     app_usage_charge: float = 0.0
+    packing_charge: float = 0.0
     final_amount: float
     delivery_address: Optional[str] = None
     payment_method: str

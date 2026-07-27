@@ -3857,6 +3857,7 @@ async def admin_restaurant_add_item(
     prep_time_min: int = Form(15),
     has_portions: str = Form(""),
     price_half: Optional[float] = Form(None),
+    packing_charge: float = Form(0.0),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -3876,6 +3877,7 @@ async def admin_restaurant_add_item(
             prep_time_min=prep_time_min,
             has_portions=bool(has_portions),
             price_half=Decimal(str(price_half)) if price_half is not None else None,
+            packing_charge=Decimal(str(packing_charge)),
         )
     )
     await db.commit()
@@ -3928,6 +3930,7 @@ async def admin_restaurant_edit_item(
     prep_time_min: int = Form(15),
     has_portions: str = Form(""),
     price_half: Optional[float] = Form(None),
+    packing_charge: float = Form(0.0),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -3947,6 +3950,7 @@ async def admin_restaurant_edit_item(
             item.price_half = Decimal(str(price_half)) if price_half is not None else None
         else:
             item.price_half = None
+        item.packing_charge = Decimal(str(packing_charge))
         await db.commit()
     return RedirectResponse(url=f"/admin/restaurants/{restaurant_id}", status_code=303)
 

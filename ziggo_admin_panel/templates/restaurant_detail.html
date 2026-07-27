@@ -82,7 +82,7 @@
                                                 Rs.{{ "{:,.0f}".format(it.price) }}
                                             {% endif %}
                                         </span>
-                                        <button onclick='openEditItemModal({{ it.id }}, {{ it.name | tojson | safe }}, {{ (it.description or "") | tojson | safe }}, {{ it.price }}, {{ it.category_id }}, {{ (it.image_url or "") | tojson | safe }}, {{ "true" if it.is_veg else "false" }}, {{ it.prep_time_min }}, {{ "true" if it.has_portions else "false" }}, {{ it.price_half or 0 }})' class="opacity-0 group-hover:opacity-100 bg-white shadow-sm border border-gray-200 text-ziggo px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:bg-gray-50">
+                                        <button onclick='openEditItemModal({{ it.id }}, {{ it.name | tojson | safe }}, {{ (it.description or "") | tojson | safe }}, {{ it.price }}, {{ it.category_id }}, {{ (it.image_url or "") | tojson | safe }}, {{ "true" if it.is_veg else "false" }}, {{ it.prep_time_min }}, {{ "true" if it.has_portions else "false" }}, {{ it.price_half or 0 }}, {{ it.packing_charge or 0 }})' class="opacity-0 group-hover:opacity-100 bg-white shadow-sm border border-gray-200 text-ziggo px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:bg-gray-50">
                                             <i class="fas fa-edit"></i> Edit
                                         </button>
                                     </div>
@@ -159,6 +159,11 @@
                         <input name="prep_time_min" type="number" value="15" min="1"
                                class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                     </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Packing Charge (Rs.)</label>
+                    <input name="packing_charge" type="number" step="0.01" min="0" value="0.00" required
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                 </div>
                 <div class="p-4 bg-gray-50 rounded-2xl space-y-3">
                     <label class="inline-flex items-center gap-2 cursor-pointer">
@@ -278,6 +283,10 @@
                     <input id="editItemPrep" name="prep_time_min" type="number" min="1" class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                 </div>
             </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Packing Charge (Rs.)</label>
+                <input id="editItemPacking" name="packing_charge" type="number" step="0.01" min="0" required class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+            </div>
             <div class="p-4 bg-gray-50 rounded-2xl space-y-3">
                 <label class="inline-flex items-center gap-2 cursor-pointer">
                     <input id="editItemHasPortions" name="has_portions" type="checkbox" onchange="toggleEditPortionFields(this)" class="w-4 h-4 rounded border-gray-300 text-ziggo focus:ring-ziggo">
@@ -323,7 +332,7 @@ function deleteCategory() {
     }
 }
 
-function openEditItemModal(id, name, desc, price, cat_id, image, is_veg, prep_time, has_portions, price_half) {
+function openEditItemModal(id, name, desc, price, cat_id, image, is_veg, prep_time, has_portions, price_half, packing_charge) {
     document.getElementById('editItemForm').action = `/admin/restaurants/{{ restaurant.id }}/items/${id}/edit`;
     document.getElementById('deleteItemForm').action = `/admin/restaurants/{{ restaurant.id }}/items/${id}/delete`;
     document.getElementById('editItemName').value = name;
@@ -338,6 +347,7 @@ function openEditItemModal(id, name, desc, price, cat_id, image, is_veg, prep_ti
     hasPortionsCheckbox.checked = has_portions;
     toggleEditPortionFields(hasPortionsCheckbox);
     document.getElementById('editItemPriceHalf').value = price_half || '';
+    document.getElementById('editItemPacking').value = packing_charge || 0;
 
     document.getElementById('editItemModal').classList.remove('hidden');
 }

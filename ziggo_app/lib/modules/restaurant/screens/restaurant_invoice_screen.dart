@@ -474,17 +474,21 @@ class _RestaurantOrderDetailScreenState
                   '-Rs.${(_order['delivery_fee'] as num? ?? 0).toStringAsFixed(0)}',
                 ),
                 _kv(
+                  'Packing Charge',
+                  'Rs.${(_order['packing_charge'] as num? ?? 0).toStringAsFixed(0)}',
+                ),
+                _kv(
                   'Items total',
-                  'Rs.${((_order['final_amount'] as num? ?? 0) - (_order['delivery_fee'] as num? ?? 0)).toStringAsFixed(0)}',
+                  'Rs.${((_order['final_amount'] as num? ?? 0) - (_order['delivery_fee'] as num? ?? 0) - (_order['packing_charge'] as num? ?? 0)).toStringAsFixed(0)}',
                 ),
                 _kv(
                   'App usage charge',
-                  '-Rs.${(((_order['final_amount'] as num? ?? 0) - (_order['delivery_fee'] as num? ?? 0)) * ((_order['commission_percentage'] as num? ?? 20) / 100)).toStringAsFixed(0)}',
+                  '-Rs.${(((_order['final_amount'] as num? ?? 0) - (_order['delivery_fee'] as num? ?? 0) - (_order['packing_charge'] as num? ?? 0)) * ((_order['commission_percentage'] as num? ?? 20) / 100)).toStringAsFixed(0)}',
                 ),
                 const Divider(height: 18),
                 _kv(
                   'Net Earnings',
-                  'Rs.${(((_order['final_amount'] as num? ?? 0) - (_order['delivery_fee'] as num? ?? 0)) * (1 - ((_order['commission_percentage'] as num? ?? 20) / 100))).toStringAsFixed(0)}',
+                  'Rs.${(((_order['final_amount'] as num? ?? 0) - (_order['delivery_fee'] as num? ?? 0) - (_order['packing_charge'] as num? ?? 0)) * (1 - ((_order['commission_percentage'] as num? ?? 20) / 100)) + (_order['packing_charge'] as num? ?? 0)).toStringAsFixed(0)}',
                   bold: true,
                 ),
                 const SizedBox(height: 6),
@@ -573,10 +577,11 @@ class _RestaurantOrderDetailScreenState
     
     final finalAmount = (_order['final_amount'] as num?)?.toDouble() ?? 0.0;
     final deliveryFee = (_order['delivery_fee'] as num?)?.toDouble() ?? 0.0;
-    final itemTotal = finalAmount - deliveryFee;
+    final packingCharge = (_order['packing_charge'] as num?)?.toDouble() ?? 0.0;
+    final itemTotal = finalAmount - deliveryFee - packingCharge;
     final commPct = (_order['commission_percentage'] as num?)?.toDouble() ?? 20.0;
     final commission = itemTotal * (commPct / 100.0);
-    final netEarnings = itemTotal - commission;
+    final netEarnings = itemTotal - commission + packingCharge;
 
     pdf.addPage(
       pw.Page(
@@ -624,6 +629,14 @@ class _RestaurantOrderDetailScreenState
                 children: [
                   pw.Text('Gross Items Total'),
                   pw.Text(fmt.format(itemTotal)),
+                ],
+              ),
+              pw.SizedBox(height: 5),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Packing Charge'),
+                  pw.Text(fmt.format(packingCharge)),
                 ],
               ),
               pw.SizedBox(height: 5),

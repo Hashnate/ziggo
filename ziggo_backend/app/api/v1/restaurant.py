@@ -204,6 +204,7 @@ def _order_to_dict(o: FoodOrder, cust_user: Optional[User] = None, comm_pct: flo
         "driver_id": o.driver_id,
         "total_amount": float(o.total_amount or 0),
         "delivery_fee": float(o.delivery_fee or 0),
+        "packing_charge": float(o.packing_charge or 0),
         "final_amount": float(o.final_amount or 0),
         "commission_percentage": comm_pct,
         "delivery_address": o.delivery_address,
@@ -775,6 +776,7 @@ def _item_to_dict(it: MenuItem) -> dict:
         "prep_time_min": it.prep_time_min,
         "has_portions": bool(it.has_portions),
         "price_half": float(it.price_half) if it.price_half is not None else None,
+        "packing_charge": float(it.packing_charge or 0),
     }
 
 
@@ -824,6 +826,7 @@ async def create_item(
         prep_time_min=body.prep_time_min,
         has_portions=body.has_portions,
         price_half=Decimal(str(body.price_half)) if body.price_half is not None else None,
+        packing_charge=Decimal(str(body.packing_charge or 0.0)),
     )
     db.add(it)
     await db.commit()
@@ -887,6 +890,8 @@ async def update_item(
         it.price_half = Decimal(str(body.price_half))
     elif hasattr(body, 'price_half') and body.price_half is None:
         it.price_half = None
+    if body.packing_charge is not None:
+        it.packing_charge = Decimal(str(body.packing_charge))
     await db.commit()
     await db.refresh(it)
     return _item_to_dict(it)

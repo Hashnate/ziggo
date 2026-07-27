@@ -613,7 +613,11 @@ async def create_food_order(
                 promo_discount = Decimal(str(p.discount_value))
             promo_code_applied = p.code
 
-    subtotal_before_points = total + delivery_fee + app_usage_charge - promo_discount
+    packing_charge_total = Decimal("0")
+    for item, qty, price, notes, portion in line_items:
+        packing_charge_total += Decimal(str(item.packing_charge or 0)) * qty
+
+    subtotal_before_points = total + delivery_fee + app_usage_charge + packing_charge_total - promo_discount
     subtotal_before_points = max(Decimal("0.00"), subtotal_before_points)
 
     # BRD: RW-02 — quote redemption (clamps to balance, min, max%).
@@ -648,6 +652,7 @@ async def create_food_order(
         total_amount=total,
         delivery_fee=delivery_fee,
         app_usage_charge=app_usage_charge,
+        packing_charge=packing_charge_total,
         tax_amount=Decimal("0"),
         discount_amount=promo_discount,
         redeem_points=redeem_pts,
@@ -892,6 +897,8 @@ async def get_active_food_order(
         "customer_phone": cust_user.phone_number if cust_user else None,
         "final_amount": float(o.final_amount or 0),
         "delivery_fee": float(o.delivery_fee or 0),
+        "packing_charge": float(o.packing_charge or 0),
+        "app_usage_charge": float(o.app_usage_charge or 0),
         "payment_method": o.payment_method,
         "payment_status": o.payment_status,
         "instructions": o.instructions,
@@ -961,6 +968,7 @@ async def list_my_food_orders(
             total_amount=float(o.total_amount or 0),
             delivery_fee=float(o.delivery_fee or 0),
             app_usage_charge=float(o.app_usage_charge or 0),
+            packing_charge=float(o.packing_charge or 0),
             final_amount=float(o.final_amount or 0),
             delivery_address=o.delivery_address or "",
             payment_method=o.payment_method or "",

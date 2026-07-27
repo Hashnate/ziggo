@@ -105,9 +105,10 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("bookings", "requested_drop_address", "TEXT"),
     ("users", "is_preregistered", "BOOLEAN NOT NULL DEFAULT FALSE"),
     ("bookings", "scheduled_dispatch_sent", "BOOLEAN NOT NULL DEFAULT FALSE"),
-    ("bookings", "scheduled_at", "TIMESTAMP WITH TIME ZONE"),
     ("system_settings", "loyalty_is_active", "BOOLEAN NOT NULL DEFAULT TRUE"),
     ("peak_hour_settings", "vehicle_category", "VARCHAR(50)"),
+    ("menu_items", "packing_charge", "NUMERIC(10, 2) NOT NULL DEFAULT 0.00"),
+    ("food_orders", "packing_charge", "NUMERIC(10, 2) NOT NULL DEFAULT 0.00"),
 )
 
 
