@@ -567,6 +567,7 @@ class _PortionSelectorBottomSheetState extends State<PortionSelectorBottomSheet>
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
+                  minimumSize: Size.zero,
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppStyles.radiusSm)),
                 ),
