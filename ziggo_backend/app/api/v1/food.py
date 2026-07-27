@@ -415,6 +415,7 @@ async def get_restaurant(restaurant_id: int, db: AsyncSession = Depends(get_db))
                 "category_id": it.category_id,
                 "has_portions": bool(it.has_portions),
                 "price_half": float(it.price_half) if it.price_half is not None else None,
+                "packing_charge": float(it.packing_charge) if it.packing_charge is not None else 0.0,
             }
             for it in r.items
         ],
