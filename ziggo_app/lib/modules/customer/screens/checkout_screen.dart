@@ -123,7 +123,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final int balance = promos.points;
 
       if (valPerPoint > 0) {
-        double subtotal = food.cartTotal + (_isSelfPickup ? 0.0 : ((food.quote?['delivery_fee'] as num?)?.toDouble() ?? (food.activeRestaurant?['delivery_fee'] as num?)?.toDouble() ?? 0.0)) + appUsageCharge;
+        double subtotal = food.cartTotal + food.cartPackingCharge + (_isSelfPickup ? 0.0 : ((food.quote?['delivery_fee'] as num?)?.toDouble() ?? (food.activeRestaurant?['delivery_fee'] as num?)?.toDouble() ?? 0.0)) + appUsageCharge;
         double maxDiscount = subtotal * (maxPct / 100.0);
         int allowed = balance;
         double allowedVal = allowed * valPerPoint;
@@ -176,7 +176,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final appUsagePct = _isSelfPickup ? ((promos.loyalty['self_pickup_app_usage_charge'] as num?)?.toDouble() ?? 5.0) : 0.0;
     final appUsageCharge = _isSelfPickup ? (food.cartTotal * (appUsagePct / 100.0)) : 0.0;
     
-    double total = food.cartTotal + deliveryFee + appUsageCharge;
+    double total = food.cartTotal + deliveryFee + appUsageCharge + food.cartPackingCharge;
     int maxRedeemablePoints = 0;
     double potentialDiscount = 0.0;
     double discount = 0.0;
@@ -625,6 +625,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             child: Column(
               children: [
                 _row('Items total', formatRs(food.cartTotal)),
+                if (food.cartPackingCharge > 0) _row('Packing Charge', formatRs(food.cartPackingCharge)),
                 if (!_isSelfPickup) _row('Delivery fee', formatRs(deliveryFee)),
                 if (_isSelfPickup && appUsageCharge > 0)
                   _row('App usage charge', formatRs(appUsageCharge)),

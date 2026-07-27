@@ -70,6 +70,15 @@ class FoodProvider extends ChangeNotifier {
         },
       );
 
+  double get cartPackingCharge => _cart.values.fold(
+        0.0,
+        (s, e) {
+          final item = e['item'];
+          final packing = (item['packing_charge'] as num?)?.toDouble() ?? 0.0;
+          return s + (packing * (e['quantity'] as int));
+        },
+      );
+
   List<Map<String, dynamic>> _asList(dynamic raw) =>
       List<Map<String, dynamic>>.from(
         (raw as List? ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
