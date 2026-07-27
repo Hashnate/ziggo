@@ -36,8 +36,52 @@ VEHICLE_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "vehicles")
 os.makedirs(VEHICLE_UPLOAD_DIR, exist_ok=True)
 BRANDING_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "branding")
 os.makedirs(BRANDING_UPLOAD_DIR, exist_ok=True)
+RESTAURANT_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "restaurants")
+os.makedirs(RESTAURANT_UPLOAD_DIR, exist_ok=True)
+PRODUCT_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "items")
+os.makedirs(PRODUCT_UPLOAD_DIR, exist_ok=True)
 ALLOWED_PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".avif"}
 MAX_PHOTO_BYTES = 5 * 1024 * 1024  # 5 MB
+
+
+async def _save_restaurant_image(photo: UploadFile | None) -> str | None:
+    if photo is None or not photo.filename:
+        return None
+    ext = os.path.splitext(photo.filename)[1].lower()
+    if ext not in ALLOWED_PHOTO_EXTS:
+        raise HTTPException(status_code=400, detail="Image must be JPG, PNG, WEBP, or AVIF")
+    data = await photo.read()
+    if len(data) == 0:
+        return None
+    if len(data) > MAX_PHOTO_BYTES:
+        raise HTTPException(status_code=400, detail="Image must be under 5 MB")
+    import secrets
+    fname = f"{secrets.token_hex(8)}{ext}"
+    fpath = os.path.join(RESTAURANT_UPLOAD_DIR, fname)
+    with open(fpath, "wb") as f:
+        f.write(data)
+    return f"/static/uploads/restaurants/{fname}"
+
+
+async def _save_product_image(photo: UploadFile | None) -> str | None:
+    if photo is None or not photo.filename:
+        return None
+    ext = os.path.splitext(photo.filename)[1].lower()
+    if ext not in ALLOWED_PHOTO_EXTS:
+        raise HTTPException(status_code=400, detail="Image must be JPG, PNG, WEBP, or AVIF")
+    data = await photo.read()
+    if len(data) == 0:
+        return None
+    if len(data) > MAX_PHOTO_BYTES:
+        raise HTTPException(status_code=400, detail="Image must be under 5 MB")
+    import secrets
+    fname = f"{secrets.token_hex(8)}{ext}"
+    fpath = os.path.join(PRODUCT_UPLOAD_DIR, fname)
+    with open(fpath, "wb") as f:
+        f.write(data)
+    return f"/static/uploads/items/{fname}"
+
+
 
 DOC_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "driver_docs")
 os.makedirs(DOC_UPLOAD_DIR, exist_ok=True)
@@ -2300,12 +2344,14 @@ async def admin_settings_get(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_superadmin),
 ):
-    from app.models import DriverIncentive, PeakHourSetting
+    from app.models import DriverIncentive, PeakHourSetting, FareSetting
     s = await _get_or_create_settings(db)
     q = await db.execute(select(DriverIncentive).order_by(DriverIncentive.trips_required))
     incentives = q.scalars().all()
     peaks_q = await db.execute(select(PeakHourSetting).order_by(PeakHourSetting.id))
     peaks = peaks_q.scalars().all()
+    cat_q = await db.execute(select(FareSetting).order_by(FareSetting.display_order, FareSetting.id))
+    categories = cat_q.scalars().all()
     return templates.TemplateResponse(
         request,
         "admin_settings.html",
@@ -2315,6 +2361,7 @@ async def admin_settings_get(
             "s": s,
             "incentives": incentives,
             "peaks": peaks,
+            "categories": categories,
             "saved": request.query_params.get("saved") == "1",
             "error": request.query_params.get("error"),
         },
@@ -2467,6 +2514,7 @@ async def admin_settings_save(
         sh = form_data.get(f"peak_start_hour_{pk.id}")
         eh = form_data.get(f"peak_end_hour_{pk.id}")
         amt = form_data.get(f"peak_extra_amount_{pk.id}")
+        vcat = form_data.get(f"peak_vehicle_category_{pk.id}")
         
         if sh is None or eh is None or amt is None:
             continue
@@ -2501,9 +2549,15 @@ async def admin_settings_save(
             new_amt = Decimal(str(amt).strip() or "0")
         except Exception:
             new_amt = Decimal("0")
+            
+        clean_vcat = vcat.strip() if (vcat and isinstance(vcat, str)) else None
+        if not clean_vcat:
+            clean_vcat = None
+            
         if (pk.start_time != clean_sh or 
             pk.end_time != clean_eh or 
-            pk.extra_amount != new_amt):
+            pk.extra_amount != new_amt or
+            pk.vehicle_category != clean_vcat):
             peak_changed = True
         
         pk.start_time = clean_sh
@@ -2511,6 +2565,7 @@ async def admin_settings_save(
         pk.start_hour = new_sh
         pk.end_hour = new_eh
         pk.extra_amount = new_amt
+        pk.vehicle_category = clean_vcat
 
     peak_active = any(p.is_active for p in peaks)
     if len(peaks) > 0:
@@ -3293,7 +3348,7 @@ async def admin_restaurant_edit(
     lat: float = Form(6.9271),
     lng: float = Form(79.8612),
     phone_number: str = Form(""),
-    image_url: str = Form(""),
+    image: UploadFile | None = File(None),
     opening_time: str = Form(""),
     closing_time: str = Form(""),
     delivery_fee: float = Form(150),
@@ -3313,6 +3368,9 @@ async def admin_restaurant_edit(
     r = q.scalars().first()
     if not r:
         raise HTTPException(status_code=404, detail="Restaurant not found")
+
+    # Save uploaded image if provided
+    uploaded_url = await _save_restaurant_image(image)
 
     if owner_phone:
         phone = owner_phone.strip()
@@ -3353,7 +3411,8 @@ async def admin_restaurant_edit(
     r.lat = Decimal(str(lat))
     r.lng = Decimal(str(lng))
     r.phone_number = phone_number.strip() or r.phone_number
-    r.image_url = image_url.strip() or r.image_url
+    if uploaded_url:
+        r.image_url = uploaded_url
     r.opening_time = opening_time.strip() or r.opening_time
     r.closing_time = closing_time.strip() or r.closing_time
     r.delivery_fee = Decimal(str(delivery_fee))
@@ -3436,6 +3495,22 @@ async def admin_restaurant_suspend(
     return RedirectResponse(url="/admin/restaurants", status_code=303)
 
 
+@router.post("/restaurants/{restaurant_id}/delete")
+async def admin_restaurant_delete(
+    restaurant_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import Restaurant
+    q = await db.execute(select(Restaurant).where(Restaurant.id == restaurant_id))
+    r = q.scalars().first()
+    if r:
+        await db.delete(r)
+        await db.commit()
+    return RedirectResponse(url="/admin/restaurants", status_code=303)
+
+
+
 @router.get("/restaurants/new", response_class=HTMLResponse)
 async def admin_restaurant_new_form(
     request: Request,
@@ -3459,7 +3534,7 @@ async def admin_restaurant_new_submit(
     lat: float = Form(6.9271),
     lng: float = Form(79.8612),
     phone_number: str = Form(""),
-    image_url: str = Form(""),
+    image: UploadFile | None = File(None),
     opening_time: str = Form("09:00"),
     closing_time: str = Form("22:00"),
     delivery_fee: float = Form(150),
@@ -3478,6 +3553,9 @@ async def admin_restaurant_new_submit(
     from decimal import Decimal
     from app.models import Restaurant, UserRole
 
+    # Save uploaded image first
+    saved_image_url = await _save_restaurant_image(image)
+
     form_echo = {
         "owner_phone": owner_phone,
         "owner_full_name": owner_full_name,
@@ -3488,7 +3566,7 @@ async def admin_restaurant_new_submit(
         "lat": lat,
         "lng": lng,
         "phone_number": phone_number,
-        "image_url": image_url,
+        "image_url": saved_image_url or "",
         "opening_time": opening_time,
         "closing_time": closing_time,
         "delivery_fee": delivery_fee,
@@ -3551,7 +3629,7 @@ async def admin_restaurant_new_submit(
         lat=Decimal(str(lat)),
         lng=Decimal(str(lng)),
         phone_number=phone_number.strip() or phone,
-        image_url=image_url.strip() or None,
+        image_url=saved_image_url,
         opening_time=opening_time.strip() or None,
         closing_time=closing_time.strip() or None,
         delivery_fee=Decimal(str(delivery_fee)),
@@ -4335,12 +4413,15 @@ async def admin_market_add_product(
     unit: str = Form(""),
     stock_quantity: int = Form(0),
     weight_kg: str = Form(""),
-    image_url: str = Form(""),
+    image: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
     from decimal import Decimal
     from app.models import Product
+
+    # Save uploaded product image
+    saved_image_url = await _save_product_image(image)
 
     db.add(
         Product(
@@ -4351,7 +4432,7 @@ async def admin_market_add_product(
             unit=unit.strip() or None,
             stock_quantity=stock_quantity,
             weight_kg=Decimal(weight_kg.strip()) if weight_kg.strip() else None,
-            image_url=image_url.strip() or None,
+            image_url=saved_image_url,
             is_available=True,
         )
     )

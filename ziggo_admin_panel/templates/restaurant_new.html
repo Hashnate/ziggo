@@ -25,7 +25,7 @@
         <i class="fas fa-arrow-left mr-2"></i> Back to restaurants
     </a>
 
-    <form method="post" action="/admin/restaurants/new" class="space-y-6">
+    <form method="post" action="/admin/restaurants/new" enctype="multipart/form-data" class="space-y-6">
         {% if error %}
         <div class="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl font-bold text-sm">
             <i class="fas fa-exclamation-circle mr-1"></i> {{ error }}
@@ -91,9 +91,8 @@
                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-slate-50/50">
                 </div>
                 <div class="md:col-span-2">
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Image URL (optional)</label>
-                    <input name="image_url" value="{{ form.image_url or '' }}"
-                           placeholder="https://..."
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Image File (optional)</label>
+                    <input name="image" type="file" accept="image/*"
                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-xs bg-slate-50/50">
                 </div>
             </div>

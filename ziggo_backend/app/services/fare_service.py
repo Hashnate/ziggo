@@ -333,6 +333,8 @@ async def calculate_fare(
         colombo_tz = timezone(timedelta(hours=5, minutes=30))
         current_time_str = datetime.now(colombo_tz).strftime("%H:%M")
         for ap in active_peaks:
+            if ap.vehicle_category and ap.vehicle_category != service_type:
+                continue
             in_peak = False
             start = ap.start_time
             end = ap.end_time

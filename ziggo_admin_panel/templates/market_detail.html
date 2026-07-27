@@ -114,7 +114,7 @@
         </div>
 
         <!-- Right: add product form -->
-        <form method="post" action="/admin/market/{{ vendor.id }}/products/new"
+        <form method="post" action="/admin/market/{{ vendor.id }}/products/new" enctype="multipart/form-data"
               class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4 self-start">
             <h3 class="font-black text-ziggo">Add product</h3>
             <div>
@@ -150,9 +150,9 @@
                        class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
             </div>
             <div>
-                <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Image URL</label>
-                <input name="image_url" placeholder="optional"
-                       class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Image File (optional)</label>
+                <input name="image" type="file" accept="image/*"
+                       class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-xs bg-slate-50/50">
             </div>
             <button class="w-full px-4 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light">
                 <i class="fas fa-plus mr-2"></i> Add Product

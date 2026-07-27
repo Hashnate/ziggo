@@ -345,6 +345,7 @@ class PeakHourSetting(Base):
     end_time = Column(String(5), nullable=True, default="11:00")
     extra_amount = Column(DECIMAL(10, 2), nullable=False, default=50.00)
     is_active = Column(Boolean, nullable=False, default=True)
+    vehicle_category = Column(String(50), nullable=True)
 
 
 class SurgeZone(Base):
