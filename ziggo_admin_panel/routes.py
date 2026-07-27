@@ -1,5 +1,6 @@
 """Server-rendered admin panel with real DB queries + simple session auth."""
 from datetime import datetime, timezone, timedelta
+from typing import Optional
 import os
 from decimal import Decimal
 
@@ -3854,6 +3855,8 @@ async def admin_restaurant_add_item(
     image_url: str = Form(""),
     is_veg: str = Form(""),
     prep_time_min: int = Form(15),
+    has_portions: str = Form(""),
+    price_half: Optional[float] = Form(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -3871,6 +3874,8 @@ async def admin_restaurant_add_item(
             is_available=True,
             is_veg=bool(is_veg),
             prep_time_min=prep_time_min,
+            has_portions=bool(has_portions),
+            price_half=Decimal(str(price_half)) if price_half is not None else None,
         )
     )
     await db.commit()
@@ -3921,6 +3926,8 @@ async def admin_restaurant_edit_item(
     image_url: str = Form(""),
     is_veg: str = Form(""),
     prep_time_min: int = Form(15),
+    has_portions: str = Form(""),
+    price_half: Optional[float] = Form(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -3935,6 +3942,11 @@ async def admin_restaurant_edit_item(
         item.image_url = image_url.strip() or None
         item.is_veg = bool(is_veg)
         item.prep_time_min = prep_time_min
+        item.has_portions = bool(has_portions)
+        if item.has_portions:
+            item.price_half = Decimal(str(price_half)) if price_half is not None else None
+        else:
+            item.price_half = None
         await db.commit()
     return RedirectResponse(url=f"/admin/restaurants/{restaurant_id}", status_code=303)
 

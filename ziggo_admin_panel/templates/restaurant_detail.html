@@ -75,8 +75,14 @@
                                         {% if it.description %}<p class="text-xs text-gray-500">{{ it.description }}</p>{% endif %}
                                     </div>
                                     <div class="flex items-center gap-4">
-                                        <span class="font-black text-sm">Rs.{{ "{:,.0f}".format(it.price) }}</span>
-                                        <button onclick='openEditItemModal({{ it.id }}, {{ it.name | tojson | safe }}, {{ (it.description or "") | tojson | safe }}, {{ it.price }}, {{ it.category_id }}, {{ (it.image_url or "") | tojson | safe }}, {{ "true" if it.is_veg else "false" }}, {{ it.prep_time_min }})' class="opacity-0 group-hover:opacity-100 bg-white shadow-sm border border-gray-200 text-ziggo px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:bg-gray-50">
+                                        <span class="font-black text-sm">
+                                            {% if it.has_portions %}
+                                                Half: Rs.{{ "{:,.0f}".format(it.price_half or (it.price / 2)) }} / Full: Rs.{{ "{:,.0f}".format(it.price) }}
+                                            {% else %}
+                                                Rs.{{ "{:,.0f}".format(it.price) }}
+                                            {% endif %}
+                                        </span>
+                                        <button onclick='openEditItemModal({{ it.id }}, {{ it.name | tojson | safe }}, {{ (it.description or "") | tojson | safe }}, {{ it.price }}, {{ it.category_id }}, {{ (it.image_url or "") | tojson | safe }}, {{ "true" if it.is_veg else "false" }}, {{ it.prep_time_min }}, {{ "true" if it.has_portions else "false" }}, {{ it.price_half or 0 }})' class="opacity-0 group-hover:opacity-100 bg-white shadow-sm border border-gray-200 text-ziggo px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:bg-gray-50">
                                             <i class="fas fa-edit"></i> Edit
                                         </button>
                                     </div>
@@ -142,15 +148,28 @@
                     <input name="description" placeholder="optional"
                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Price (Rs.)</label>
-                    <input name="price" type="number" step="0.01" min="0" required
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Price (Rs.)</label>
+                        <input name="price" type="number" step="0.01" min="0" required
+                               class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Prep time (min)</label>
+                        <input name="prep_time_min" type="number" value="15" min="1"
+                               class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Prep time (min)</label>
-                    <input name="prep_time_min" type="number" value="15" min="1"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                <div class="p-4 bg-gray-50 rounded-2xl space-y-3">
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input name="has_portions" type="checkbox" onchange="toggleAddPortionFields(this)" class="w-4 h-4 rounded border-gray-300 text-ziggo focus:ring-ziggo">
+                        <span class="text-sm font-bold text-gray-700">Enable Half/Full Portions</span>
+                    </label>
+                    <div id="addPortionPriceDiv" class="hidden">
+                        <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Half Portion Price (Rs.)</label>
+                        <input name="price_half" type="number" step="0.01" min="0" placeholder="e.g. 150"
+                               class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
+                    </div>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Image URL</label>
@@ -259,6 +278,17 @@
                     <input id="editItemPrep" name="prep_time_min" type="number" min="1" class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                 </div>
             </div>
+            <div class="p-4 bg-gray-50 rounded-2xl space-y-3">
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+                    <input id="editItemHasPortions" name="has_portions" type="checkbox" onchange="toggleEditPortionFields(this)" class="w-4 h-4 rounded border-gray-300 text-ziggo focus:ring-ziggo">
+                    <span class="text-sm font-bold text-gray-700">Enable Half/Full Portions</span>
+                </label>
+                <div id="editPortionPriceDiv" class="hidden">
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Half Portion Price (Rs.)</label>
+                    <input id="editItemPriceHalf" name="price_half" type="number" step="0.01" min="0" placeholder="e.g. 150"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
+                </div>
+            </div>
             <div>
                 <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Image URL</label>
                 <input id="editItemImage" name="image_url" class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
@@ -293,7 +323,7 @@ function deleteCategory() {
     }
 }
 
-function openEditItemModal(id, name, desc, price, cat_id, image, is_veg, prep_time) {
+function openEditItemModal(id, name, desc, price, cat_id, image, is_veg, prep_time, has_portions, price_half) {
     document.getElementById('editItemForm').action = `/admin/restaurants/{{ restaurant.id }}/items/${id}/edit`;
     document.getElementById('deleteItemForm').action = `/admin/restaurants/{{ restaurant.id }}/items/${id}/delete`;
     document.getElementById('editItemName').value = name;
@@ -303,7 +333,31 @@ function openEditItemModal(id, name, desc, price, cat_id, image, is_veg, prep_ti
     document.getElementById('editItemImage').value = image || '';
     document.getElementById('editItemVeg').checked = is_veg;
     document.getElementById('editItemPrep').value = prep_time;
+    
+    const hasPortionsCheckbox = document.getElementById('editItemHasPortions');
+    hasPortionsCheckbox.checked = has_portions;
+    toggleEditPortionFields(hasPortionsCheckbox);
+    document.getElementById('editItemPriceHalf').value = price_half || '';
+
     document.getElementById('editItemModal').classList.remove('hidden');
+}
+
+function toggleAddPortionFields(chk) {
+    const div = document.getElementById('addPortionPriceDiv');
+    if (chk.checked) {
+        div.classList.remove('hidden');
+    } else {
+        div.classList.add('hidden');
+    }
+}
+
+function toggleEditPortionFields(chk) {
+    const div = document.getElementById('editPortionPriceDiv');
+    if (chk.checked) {
+        div.classList.remove('hidden');
+    } else {
+        div.classList.add('hidden');
+    }
 }
 function closeEditItemModal() {
     document.getElementById('editItemModal').classList.add('hidden');

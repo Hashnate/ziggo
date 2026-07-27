@@ -92,6 +92,8 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
       isVeg: result['is_veg'] as bool,
       isAvailable: result['is_available'] as bool,
       prepTimeMin: result['prep_time_min'] as int?,
+      hasPortions: result['has_portions'] as bool? ?? false,
+      priceHalf: result['price_half'] as double?,
     );
     if (!mounted) return;
     if (err != null) {
@@ -127,6 +129,8 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
       isVeg: result['is_veg'] as bool?,
       isAvailable: result['is_available'] as bool?,
       prepTimeMin: result['prep_time_min'] as int?,
+      hasPortions: result['has_portions'] as bool?,
+      priceHalf: result['price_half'] as double?,
     );
     if (!mounted) return;
     if (err != null) {
@@ -313,6 +317,11 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
             : ((initial['price'] as num?) ?? 0).toStringAsFixed(0));
     final prep = TextEditingController(
         text: initial?['prep_time_min']?.toString() ?? '');
+    bool hasPortions = initial?['has_portions'] == true;
+    final priceHalf = TextEditingController(
+        text: initial == null
+            ? ''
+            : ((initial['price_half'] as num?) ?? 0).toStringAsFixed(0));
     int? categoryId = initial?['category_id'] as int?;
     bool isVeg = initial?['is_veg'] == true;
     bool isAvailable = initial?['is_available'] != false;
@@ -480,6 +489,30 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
                     value: isAvailable,
                     onChanged: (v) => setLocal(() => isAvailable = v),
                   ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: const Text('Enable Half/Full portions', style: TextStyle(fontWeight: FontWeight.w600)),
+                    value: hasPortions,
+                    onChanged: (v) => setLocal(() => hasPortions = v),
+                  ),
+                  if (hasPortions) ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: priceHalf,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Half portion price (Rs.)',
+                        filled: true,
+                        fillColor: AppColors.surfaceMuted,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   Row(
                     children: [
@@ -516,6 +549,7 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
                             if (name.text.trim().isEmpty) return;
                             final p = double.tryParse(price.text.trim());
                             if (p == null || p < 0) return;
+                            final ph = hasPortions ? double.tryParse(priceHalf.text.trim()) : null;
                             Navigator.pop(ctx, {
                               'name': name.text.trim(),
                               'price': p,
@@ -524,6 +558,8 @@ class _RestaurantMenuScreenState extends State<RestaurantMenuScreen> {
                               'is_veg': isVeg,
                               'is_available': isAvailable,
                               'prep_time_min': int.tryParse(prep.text.trim()),
+                              'has_portions': hasPortions,
+                              'price_half': ph,
                               'picked_file': pickedFile,
                             });
                           },

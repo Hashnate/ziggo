@@ -69,6 +69,8 @@ class MenuItemCreate(BaseModel):
     is_available: bool = True
     is_veg: bool = False
     prep_time_min: Optional[int] = Field(None, ge=0)
+    has_portions: bool = False
+    price_half: Optional[float] = None
 
 
 class MenuItemUpdate(BaseModel):
@@ -80,6 +82,8 @@ class MenuItemUpdate(BaseModel):
     is_available: Optional[bool] = None
     is_veg: Optional[bool] = None
     prep_time_min: Optional[int] = Field(None, ge=0)
+    has_portions: Optional[bool] = None
+    price_half: Optional[float] = None
 
 
 class RestaurantProfileUpdate(BaseModel):

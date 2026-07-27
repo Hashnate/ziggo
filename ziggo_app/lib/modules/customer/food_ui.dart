@@ -186,9 +186,13 @@ class DishTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final food = context.watch<FoodProvider>();
     final id = item['id'] as int;
-    final qty = (food.cart[id]?['quantity'] as int?) ?? 0;
+    final qty = food.cart.values
+        .where((e) => (e['item'] as Map)['id'] == id)
+        .fold(0, (s, e) => s + (e['quantity'] as int));
     final available = item['is_available'] != false;
     final price = (item['price'] as num?) ?? 0;
+    final priceHalf = item['price_half'] as num?;
+    final hasPortions = item['has_portions'] == true;
     final desc = item['description']?.toString() ?? '';
 
     return Padding(
@@ -254,10 +258,15 @@ class DishTile extends StatelessWidget {
                         ),
                       ],
                       const SizedBox(height: 8),
-                      Text(
-                        formatRs(price),
-                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
-                      ),
+                      hasPortions
+                          ? Text(
+                              'Half: ${formatRs(priceHalf)}  |  Full: ${formatRs(price)}',
+                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: AppColors.primary),
+                            )
+                          : Text(
+                              formatRs(price),
+                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                            ),
                     ],
                   ),
                 ),
@@ -293,6 +302,10 @@ class DishTile extends StatelessWidget {
   }
 
   Widget _control(BuildContext context, bool available, int qty) {
+    final hasPortions = item['has_portions'] == true;
+    final id = item['id'] as int;
+    final food = context.read<FoodProvider>();
+
     if (!available) {
       return Container(
         height: 30,
@@ -311,9 +324,12 @@ class DishTile extends StatelessWidget {
     if (qty == 0) {
       return GestureDetector(
         onTap: () {
-          final food = context.read<FoodProvider>();
           food.setActiveRestaurant(restaurant);
-          food.addToCart(item);
+          if (hasPortions) {
+            _showPortionSelector(context, food, item, restaurant);
+          } else {
+            food.addToCart(item);
+          }
         },
         child: Container(
           height: 30,
@@ -331,6 +347,24 @@ class DishTile extends StatelessWidget {
         ),
       );
     }
+    if (hasPortions) {
+      return GestureDetector(
+        onTap: () => _showPortionSelector(context, food, item, restaurant),
+        child: Container(
+          height: 30,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: AppStyles.shadowSm,
+          ),
+          child: Text(
+            '$qty ADDED',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 0.5),
+          ),
+        ),
+      );
+    }
     return Container(
       height: 30,
       decoration: BoxDecoration(
@@ -341,9 +375,9 @@ class DishTile extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _stepBtn(Icons.remove_rounded, () => context.read<FoodProvider>().changeQty(item['id'] as int, -1)),
+          _stepBtn(Icons.remove_rounded, () => food.changeQty("${id}_none", -1)),
           Text('$qty', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13)),
-          _stepBtn(Icons.add_rounded, () => context.read<FoodProvider>().changeQty(item['id'] as int, 1)),
+          _stepBtn(Icons.add_rounded, () => food.addToCart(item)),
         ],
       ),
     );
@@ -431,4 +465,188 @@ class RestaurantCardSkeleton extends StatelessWidget {
       ),
     );
   }
+}
+
+class PortionSelectorBottomSheet extends StatefulWidget {
+  final Map<String, dynamic> item;
+  final Map<String, dynamic> restaurant;
+  final FoodProvider food;
+
+  const PortionSelectorBottomSheet({
+    super.key,
+    required this.item,
+    required this.restaurant,
+    required this.food,
+  });
+
+  @override
+  State<PortionSelectorBottomSheet> createState() => _PortionSelectorBottomSheetState();
+}
+
+class _PortionSelectorBottomSheetState extends State<PortionSelectorBottomSheet> {
+  String _selectedPortion = 'full';
+  int _quantity = 1;
+
+  @override
+  Widget build(BuildContext context) {
+    final price = _selectedPortion == 'half'
+        ? ((widget.item['price_half'] as num?)?.toDouble() ?? ((widget.item['price'] as num).toDouble() / 2.0))
+        : (widget.item['price'] as num).toDouble();
+    final priceHalf = widget.item['price_half'] as num?;
+    final priceFull = widget.item['price'] as num;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppStyles.radiusLg)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 38,
+              height: 4,
+              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            widget.item['name']?.toString() ?? '',
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+          ),
+          if (widget.item['description'] != null && widget.item['description'].toString().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              widget.item['description'].toString(),
+              style: const TextStyle(color: AppColors.textTertiary, fontSize: 13),
+            ),
+          ],
+          const SizedBox(height: 20),
+          const Text(
+            'CHOOSE PORTION',
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, color: AppColors.textSecondary, letterSpacing: 0.5),
+          ),
+          const SizedBox(height: 10),
+          _portionOption(
+            title: 'Half Portion',
+            price: priceHalf ?? (priceFull / 2),
+            value: 'half',
+          ),
+          const Divider(height: 1, color: AppColors.divider),
+          _portionOption(
+            title: 'Full Portion',
+            price: priceFull,
+            value: 'full',
+          ),
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey[300]!),
+                  borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.remove, size: 18),
+                      onPressed: _quantity > 1 ? () => setState(() => _quantity--) : null,
+                    ),
+                    Text(
+                      '$_quantity',
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.add, size: 18),
+                      onPressed: () => setState(() => _quantity++),
+                    ),
+                  ],
+                ),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppStyles.radiusSm)),
+                ),
+                onPressed: () {
+                  widget.food.setActiveRestaurant(widget.restaurant);
+                  for (var i = 0; i < _quantity; i++) {
+                    widget.food.addToCart(widget.item, portion: _selectedPortion);
+                  }
+                  Navigator.pop(context);
+                },
+                child: Text(
+                  'Add to Cart  ·  ${formatRs(price * _quantity)}',
+                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
+
+  Widget _portionOption({required String title, required num price, required String value}) {
+    final selected = _selectedPortion == value;
+    return InkWell(
+      onTap: () => setState(() => _selectedPortion = value),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(height: 2),
+                  Text(formatRs(price), style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                ],
+              ),
+            ),
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: selected ? AppColors.primary : Colors.grey[400]!, width: 2),
+              ),
+              child: selected
+                  ? Center(
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.primary),
+                      ),
+                    )
+                  : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+void _showPortionSelector(BuildContext context, FoodProvider food, Map<String, dynamic> item, Map<String, dynamic> restaurant) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) {
+      return PortionSelectorBottomSheet(
+        item: item,
+        restaurant: restaurant,
+        food: food,
+      );
+    },
+  );
 }

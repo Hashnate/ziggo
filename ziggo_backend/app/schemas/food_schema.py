@@ -13,6 +13,8 @@ class MenuItemResponse(BaseModel):
     is_veg: bool
     prep_time_min: Optional[int] = None
     category_id: Optional[int] = None
+    has_portions: bool = False
+    price_half: Optional[float] = None
 
     class Config:
         from_attributes = True
@@ -49,6 +51,7 @@ class FoodOrderItemRequest(BaseModel):
     menu_item_id: int
     quantity: int
     notes: Optional[str] = None
+    portion: Optional[str] = None
 
 
 class FoodOrderCreate(BaseModel):
@@ -71,6 +74,7 @@ class FoodOrderItemResponse(BaseModel):
     menu_item_id: int
     quantity: int
     price_at_order: float
+    portion: Optional[str] = None
 
     class Config:
         from_attributes = True

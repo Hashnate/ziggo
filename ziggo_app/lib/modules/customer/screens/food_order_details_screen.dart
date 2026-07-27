@@ -356,6 +356,10 @@ class FoodOrderDetailsScreen extends StatelessWidget {
                       final qty = item['quantity'] ?? 1;
                       final price =
                           (item['price_at_order'] as num?)?.toDouble() ?? 0.0;
+                      final portion = item['portion'] as String?;
+                      final displayName = portion != null && portion.isNotEmpty
+                          ? "$name ($portion portion)"
+                          : name;
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Row(
@@ -363,7 +367,7 @@ class FoodOrderDetailsScreen extends StatelessWidget {
                           children: [
                             Expanded(
                               child: Text(
-                                '${qty}x $name',
+                                '${qty}x $displayName',
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 14,

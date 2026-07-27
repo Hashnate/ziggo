@@ -587,6 +587,7 @@ async def get_order_detail(
                 "line_total": float((it.price_at_order or Decimal(0)) * it.quantity),
                 "is_veg": bool(m.is_veg) if m else False,
                 "notes": it.notes,
+                "portion": it.portion,
             }
         )
 
@@ -772,6 +773,8 @@ def _item_to_dict(it: MenuItem) -> dict:
         "is_available": bool(it.is_available),
         "is_veg": bool(it.is_veg),
         "prep_time_min": it.prep_time_min,
+        "has_portions": bool(it.has_portions),
+        "price_half": float(it.price_half) if it.price_half is not None else None,
     }
 
 
@@ -819,6 +822,8 @@ async def create_item(
         is_available=body.is_available,
         is_veg=body.is_veg,
         prep_time_min=body.prep_time_min,
+        has_portions=body.has_portions,
+        price_half=Decimal(str(body.price_half)) if body.price_half is not None else None,
     )
     db.add(it)
     await db.commit()
@@ -874,6 +879,14 @@ async def update_item(
         it.is_veg = body.is_veg
     if body.prep_time_min is not None:
         it.prep_time_min = body.prep_time_min
+    if body.has_portions is not None:
+        it.has_portions = body.has_portions
+        if not body.has_portions:
+            it.price_half = None
+    if body.price_half is not None:
+        it.price_half = Decimal(str(body.price_half))
+    elif hasattr(body, 'price_half') and body.price_half is None:
+        it.price_half = None
     await db.commit()
     await db.refresh(it)
     return _item_to_dict(it)

@@ -30,8 +30,8 @@ class FoodProvider extends ChangeNotifier {
   // Active search query for filtering restaurants/menu items
   String _searchQuery = '';
 
-  /// Cart keyed by menu_item_id: { menu_item_id: {item, quantity} }
-  final Map<int, Map<String, dynamic>> _cart = {};
+  /// Cart keyed by menu_item_id + portion: { "${id}_${portion}": {item, quantity, portion} }
+  final Map<String, Map<String, dynamic>> _cart = {};
   int? _activeRestaurantId;
   Map<String, dynamic>? _activeRestaurant;
 
@@ -48,7 +48,7 @@ class FoodProvider extends ChangeNotifier {
   String? get deliverySubtitle => _deliverySubtitle;
   double? get deliveryLat => _deliveryLat;
   double? get deliveryLng => _deliveryLng;
-  Map<int, Map<String, dynamic>> get cart => _cart;
+  Map<String, Map<String, dynamic>> get cart => _cart;
   int? get activeRestaurantId => _activeRestaurantId;
   Map<String, dynamic>? get activeRestaurant => _activeRestaurant;
   String get searchQuery => _searchQuery;
@@ -59,7 +59,15 @@ class FoodProvider extends ChangeNotifier {
 
   double get cartTotal => _cart.values.fold(
         0.0,
-        (s, e) => s + ((e['item']['price'] as num).toDouble() * (e['quantity'] as int)),
+        (s, e) {
+          final item = e['item'];
+          final portion = e['portion'] as String?;
+          double price = (item['price'] as num).toDouble();
+          if (item['has_portions'] == true && portion == 'half') {
+            price = (item['price_half'] as num?)?.toDouble() ?? (price / 2.0);
+          }
+          return s + (price * (e['quantity'] as int));
+        },
       );
 
   List<Map<String, dynamic>> _asList(dynamic raw) =>
@@ -204,24 +212,26 @@ class FoodProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void addToCart(Map<String, dynamic> item) {
+  void addToCart(Map<String, dynamic> item, {String? portion}) {
     final id = item['id'] as int;
-    final existing = _cart[id];
-    _cart[id] = {
+    final key = "${id}_${portion ?? 'none'}";
+    final existing = _cart[key];
+    _cart[key] = {
       'item': item,
       'quantity': (existing?['quantity'] as int? ?? 0) + 1,
+      'portion': portion,
     };
     notifyListeners();
   }
 
-  void changeQty(int itemId, int delta) {
-    final e = _cart[itemId];
+  void changeQty(String key, int delta) {
+    final e = _cart[key];
     if (e == null) return;
     final q = (e['quantity'] as int) + delta;
     if (q <= 0) {
-      _cart.remove(itemId);
+      _cart.remove(key);
     } else {
-      _cart[itemId] = {...e, 'quantity': q};
+      _cart[key] = {...e, 'quantity': q};
     }
     if (_cart.isEmpty) {
       _activeRestaurantId = null;
@@ -254,6 +264,7 @@ class FoodProvider extends ChangeNotifier {
         'items': _cart.values.map((e) => {
           'menu_item_id': (e['item'] as Map)['id'],
           'quantity': e['quantity'],
+          'portion': e['portion'],
         }).toList(),
       });
       _quote = Map<String, dynamic>.from(resp.data as Map);
@@ -281,6 +292,7 @@ class FoodProvider extends ChangeNotifier {
         .map((e) => {
               'menu_item_id': (e['item'] as Map)['id'],
               'quantity': e['quantity'],
+              'portion': e['portion'],
             })
         .toList();
     try {

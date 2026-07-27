@@ -346,6 +346,8 @@ class RestaurantProvider extends ChangeNotifier {
     bool isVeg = false,
     bool isAvailable = true,
     int? prepTimeMin,
+    bool hasPortions = false,
+    double? priceHalf,
   }) async {
     try {
       await ApiClient.instance.dio.post('/restaurant/items', data: {
@@ -356,6 +358,8 @@ class RestaurantProvider extends ChangeNotifier {
         'is_veg': isVeg,
         'is_available': isAvailable,
         if (prepTimeMin != null) 'prep_time_min': prepTimeMin,
+        'has_portions': hasPortions,
+        if (priceHalf != null) 'price_half': priceHalf,
       });
       await loadMenu();
       return null;
@@ -373,6 +377,8 @@ class RestaurantProvider extends ChangeNotifier {
     bool? isVeg,
     bool? isAvailable,
     int? prepTimeMin,
+    bool? hasPortions,
+    double? priceHalf,
   }) async {
     try {
       await ApiClient.instance.dio.patch('/restaurant/items/$id', data: {
@@ -383,6 +389,8 @@ class RestaurantProvider extends ChangeNotifier {
         if (isVeg != null) 'is_veg': isVeg,
         if (isAvailable != null) 'is_available': isAvailable,
         if (prepTimeMin != null) 'prep_time_min': prepTimeMin,
+        if (hasPortions != null) 'has_portions': hasPortions,
+        'price_half': priceHalf,
       });
       await loadMenu();
       return null;

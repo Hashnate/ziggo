@@ -100,6 +100,8 @@ class MenuItem(Base):
     is_veg = Column(Boolean, default=False)
     calories = Column(Integer)
     prep_time_min = Column(Integer)
+    has_portions = Column(Boolean, default=False, nullable=False)
+    price_half = Column(DECIMAL(10, 2), nullable=True)
 
     restaurant = relationship("Restaurant", back_populates="items")
     category = relationship("MenuCategory", back_populates="items")
@@ -163,6 +165,7 @@ class FoodOrderItem(Base):
     quantity = Column(Integer, nullable=False)
     price_at_order = Column(DECIMAL(10, 2), nullable=False)
     notes = Column(String(255))
+    portion = Column(String(20), nullable=True)
 
     order = relationship("FoodOrder", back_populates="items")
 

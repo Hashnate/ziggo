@@ -464,10 +464,17 @@ async def quote_delivery(
         try:
             item_id = int(item_data["menu_item_id"])
             qty = int(item_data["quantity"])
+            portion = item_data.get("portion")
             iq = await db.execute(select(MenuItem).where(MenuItem.id == item_id))
             mitem = iq.scalars().first()
             if mitem:
-                items_subtotal += Decimal(str(mitem.price)) * qty
+                price = mitem.price
+                if mitem.has_portions and portion == "half":
+                    if mitem.price_half is not None:
+                        price = mitem.price_half
+                    else:
+                        price = mitem.price / Decimal("2")
+                items_subtotal += Decimal(str(price)) * qty
         except Exception:
             pass
 
@@ -542,9 +549,17 @@ async def create_food_order(
             )
         if line.quantity < 1:
             raise HTTPException(status_code=400, detail="Quantity must be >= 1")
-        line_total = Decimal(str(item.price)) * line.quantity
+        
+        price = item.price
+        if item.has_portions and line.portion == "half":
+            if item.price_half is not None:
+                price = item.price_half
+            else:
+                price = item.price / Decimal("2")
+                
+        line_total = Decimal(str(price)) * line.quantity
         total += line_total
-        line_items.append((item, line.quantity, item.price, line.notes))
+        line_items.append((item, line.quantity, price, line.notes, line.portion))
 
     from ...services import loyalty_service as L
     app_usage_charge = Decimal("0.00")
@@ -666,7 +681,7 @@ async def create_food_order(
         if bp:
             bp.used_count = (bp.used_count or 0) + 1
 
-    for item, qty, price, notes in line_items:
+    for item, qty, price, notes, portion in line_items:
         db.add(
             FoodOrderItem(
                 order_id=order.id,
@@ -674,6 +689,7 @@ async def create_food_order(
                 quantity=qty,
                 price_at_order=price,
                 notes=notes,
+                portion=portion,
             )
         )
 
@@ -1006,7 +1022,8 @@ async def get_my_food_order_details(
         items_details.append({
             "name": m.name if m else "Removed item",
             "quantity": it.quantity,
-            "price_at_order": float(it.price_at_order)
+            "price_at_order": float(it.price_at_order),
+            "portion": it.portion,
         })
 
     r_q = await db.execute(select(Restaurant).where(Restaurant.id == order.restaurant_id))

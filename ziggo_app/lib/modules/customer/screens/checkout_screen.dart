@@ -329,6 +329,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ...food.cart.values.map((e) {
                   final it = e['item'] as Map<String, dynamic>;
                   final qty = e['quantity'] as int;
+                  final portion = e['portion'] as String?;
+                  double price = (it['price'] as num).toDouble();
+                  if (it['has_portions'] == true && portion == 'half') {
+                    price = (it['price_half'] as num?)?.toDouble() ?? (price / 2.0);
+                  }
+                  final displayName = portion != null && it['has_portions'] == true
+                      ? "${it['name']} ($portion portion)"
+                      : it['name'].toString();
+
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     child: Row(
@@ -349,9 +358,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        Expanded(child: Text(it['name'].toString())),
+                        Expanded(child: Text(displayName)),
                         Text(
-                          formatRs((it['price'] as num) * qty),
+                          formatRs(price * qty),
                           style: const TextStyle(fontWeight: FontWeight.w900),
                         ),
                       ],
