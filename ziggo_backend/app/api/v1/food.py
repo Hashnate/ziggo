@@ -413,6 +413,8 @@ async def get_restaurant(restaurant_id: int, db: AsyncSession = Depends(get_db))
                 "is_veg": it.is_veg,
                 "prep_time_min": it.prep_time_min,
                 "category_id": it.category_id,
+                "has_portions": bool(it.has_portions),
+                "price_half": float(it.price_half) if it.price_half is not None else None,
             }
             for it in r.items
         ],

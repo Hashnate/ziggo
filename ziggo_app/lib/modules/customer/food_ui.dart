@@ -495,12 +495,8 @@ class _PortionSelectorBottomSheetState extends State<PortionSelectorBottomSheet>
     final priceHalf = widget.item['price_half'] as num?;
     final priceFull = widget.item['price'] as num;
 
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppStyles.radiusLg)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -588,7 +584,6 @@ class _PortionSelectorBottomSheetState extends State<PortionSelectorBottomSheet>
               ),
             ],
           ),
-          const SizedBox(height: 12),
         ],
       ),
     );
@@ -639,8 +634,10 @@ class _PortionSelectorBottomSheetState extends State<PortionSelectorBottomSheet>
 void _showPortionSelector(BuildContext context, FoodProvider food, Map<String, dynamic> item, Map<String, dynamic> restaurant) {
   showModalBottomSheet(
     context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
     builder: (context) {
       return PortionSelectorBottomSheet(
         item: item,
