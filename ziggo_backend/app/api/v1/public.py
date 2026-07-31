@@ -64,6 +64,7 @@ async def public_estimate(
         "duration_min": fare["duration_min"],
         "fare_amount": fare["fare_amount"],
         "final_amount": fare["final_amount"],
+        "original_amount": fare.get("original_amount"),
     }
 
 

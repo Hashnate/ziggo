@@ -314,6 +314,7 @@ async def calculate_fare(
     raw = (base + per_km * distance_km + per_min * duration_min) * surge
     fare_val = max(raw, min_fare)
     
+    fare_val_original = fare_val
     # Apply category discount percentage before applying anything else
     if setting and setting.discount_percentage:
         discount_pct = float(setting.discount_percentage)
@@ -322,7 +323,9 @@ async def calculate_fare(
             fare_val = max(0.0, fare_val - category_discount)
 
     fare_val += boost_val
+    fare_val_original += boost_val
     fare_val += pickup_fee_val
+    fare_val_original += pickup_fee_val
 
     # Peak hours surcharge check
     peak_surcharge = 0.0
@@ -346,6 +349,7 @@ async def calculate_fare(
             if in_peak:
                 peak_surcharge += float(ap.extra_amount or 0.0)
         fare_val += peak_surcharge
+        fare_val_original += peak_surcharge
         
     # Geographic Surge Zones check
     zone_surcharge = 0.0
@@ -366,6 +370,7 @@ async def calculate_fare(
                 except Exception:
                     pass
         fare_val += zone_surcharge
+        fare_val_original += zone_surcharge
 
 
     # BRD: CD-19 — per-stop fee compensates the driver for the detour.
@@ -374,21 +379,25 @@ async def calculate_fare(
         per_stop = float(ss.multi_stop_fee_per_stop) if ss and ss.multi_stop_fee_per_stop is not None else 50.0
         stop_fee_total = per_stop * len(clean_stops)
         fare_val += stop_fee_total
+        fare_val_original += stop_fee_total
 
     flash_surcharge = 0.0
     if is_flash and parcel_weight_kg is not None:
         flash_surcharge = await _flash_surcharge(db, float(parcel_weight_kg))
         fare_val += flash_surcharge
+        fare_val_original += flash_surcharge
 
     is_return = trip_type == "return"
     if is_return:
         # Customer travels the route twice; fare gets a small return discount
         # (1.8x instead of 2x) to reflect that the driver doesn't drive empty back.
         fare_val *= RETURN_TRIP_MULTIPLIER
+        fare_val_original *= RETURN_TRIP_MULTIPLIER
         distance_km *= 2
         duration_min = round(duration_min * 2)
 
     discount = 0.0
+    discount_original = 0.0
     promo_applied = None
     if promo:
         promo_q = await db.execute(select(PromoCode).where(PromoCode.code == promo.upper()))
@@ -396,10 +405,13 @@ async def calculate_fare(
         if p and p.is_active and (p.usage_limit is None or p.used_count < p.usage_limit):
             if p.discount_type == "percentage":
                 discount = fare_val * (float(p.discount_value) / 100.0)
+                discount_original = fare_val_original * (float(p.discount_value) / 100.0)
                 if p.max_discount:
                     discount = min(discount, float(p.max_discount))
+                    discount_original = min(discount_original, float(p.max_discount))
             else:
                 discount = float(p.discount_value)
+                discount_original = float(p.discount_value)
             promo_applied = p.code
 
     final_pre_deductible = max(0.0, fare_val - discount)
@@ -411,6 +423,12 @@ async def calculate_fare(
     deductions = app_usage_charges + passenger_deductible_val
     driver_earnings = gross_total - deductions
 
+    final_pre_deductible_original = max(0.0, fare_val_original - discount_original)
+    passenger_deductible_val_original = final_pre_deductible_original * (passenger_deductible_pct / 100.0)
+    feeable_amount_original = max(0.0, final_pre_deductible_original - boost_val)
+    app_usage_charges_original = feeable_amount_original * (platform_pct / 100.0)
+    gross_total_original = final_pre_deductible_original + passenger_deductible_val_original + app_usage_charges_original
+
     fare_dict = {
         "distance_km": round(distance_km, 2),
         "pickup_distance_km": round(pickup_distance_km, 2),
@@ -418,6 +436,7 @@ async def calculate_fare(
         "fare_amount": round(fare_val, 2),
         "discount_amount": round(discount, 2),
         "final_amount": round(gross_total, 2),
+        "original_amount": round(gross_total_original, 2),
         "platform_fee": round(app_usage_charges, 2),
         "driver_earnings": round(driver_earnings, 2),
         "promo_code": promo_applied,
@@ -471,6 +490,7 @@ async def _enrich_with_loyalty(
 
     # `final_amount` here is post-promo, pre-redemption.
     pre_redemption_final = float(fare.get("final_amount", 0))
+    pre_redemption_original = float(fare.get("original_amount", pre_redemption_final))
     earnable = await L.points_earnable_for(db, pre_redemption_final)
 
     actual_points = 0
@@ -496,6 +516,7 @@ async def _enrich_with_loyalty(
                 platform_ratio = 0.0
             new_platform = round(new_final * platform_ratio, 2)
             fare["final_amount"] = round(new_final, 2)
+            fare["original_amount"] = round(max(0.0, pre_redemption_original - redeem_discount), 2)
             fare["platform_fee"] = new_platform
             fare["app_usage_charges"] = new_platform
             fare["deductions"] = round(new_platform + float(fare.get("passenger_deductible", 0)), 2)

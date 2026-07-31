@@ -300,6 +300,9 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
             if (resMap['final_amount'] != null) {
               resMap['final_amount'] = (resMap['final_amount'] as num) * 2;
             }
+            if (resMap['original_amount'] != null) {
+              resMap['original_amount'] = (resMap['original_amount'] as num) * 2;
+            }
             if (resMap['duration_min'] != null) {
               resMap['duration_min'] = (resMap['duration_min'] as num) * 2;
             }
@@ -1152,9 +1155,25 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
             const SizedBox(height: 2),
             FittedBox(
               fit: BoxFit.scaleDown,
-              child: Text(
-                'LKR ${(est['final_amount'] as num).toStringAsFixed(2)}',
-                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'LKR ${(est['final_amount'] as num).toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+                  ),
+                  if (est['original_amount'] != null &&
+                      (est['original_amount'] as num) > (est['final_amount'] as num))
+                    Text(
+                      'LKR ${(est['original_amount'] as num).toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.normal,
+                        fontSize: 10,
+                        color: Colors.grey,
+                        decoration: TextDecoration.lineThrough,
+                      ),
+                    ),
+                ],
               ),
             ),
           ],

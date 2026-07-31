@@ -66,6 +66,7 @@ class FareEstimateResponse(BaseModel):
     fare_amount: float
     discount_amount: float
     final_amount: float
+    original_amount: Optional[float] = None
     platform_fee: float
     driver_earnings: float
     promo_code: Optional[str] = None
