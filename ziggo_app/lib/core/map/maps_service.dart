@@ -226,8 +226,12 @@ class MapsService {
           'key': _apiKey,
         },
       );
+      final status = resp.data['status'] as String?;
       final routes = (resp.data['routes'] as List?) ?? const [];
-      if (routes.isEmpty) return null;
+      if (routes.isEmpty) {
+        print('MapsService directions response status: $status, error: ${resp.data['error_message']}');
+        return null;
+      }
       final route = routes.first;
       final legs = (route['legs'] as List?) ?? const [];
       if (legs.isEmpty) return null;
