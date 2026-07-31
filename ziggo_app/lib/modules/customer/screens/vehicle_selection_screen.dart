@@ -98,6 +98,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     super.initState();
     _secondaryPhone = widget.friend?.phone;
     _scheduledTime = widget.scheduledTime;
+    _fetchRoutePoints();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<PromosProvider>().refresh();
       context.read<PaymentMethodsProvider>().fetchCards();
@@ -332,7 +333,6 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
   Future<void> _recalculate() async {
     setState(() {
       _loadingEstimates = true;
-      _routePoints = const [];
     });
     
     final booking = context.read<BookingProvider>();
@@ -400,20 +400,33 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       pointsToVisit.add(widget.pickup.location);
     }
     _mapController.fitBounds(pointsToVisit, padding: 80);
- 
+  }
+
+  Future<void> _fetchRoutePoints() async {
+    final pointsToVisit = [
+      widget.pickup.location,
+      ...widget.stops.map((s) => s.location),
+      widget.drop.location
+    ];
+    if (widget.tripType == 'return') {
+      pointsToVisit.add(widget.pickup.location);
+    }
+
     List<LatLng> fullRoute = [];
     for (int i = 0; i < pointsToVisit.length - 1; i++) {
-      final dir = await MapsService.instance.directions(pointsToVisit[i], pointsToVisit[i+1]);
+      final dir = await MapsService.instance.directions(pointsToVisit[i], pointsToVisit[i + 1]);
       if (dir != null && dir.points.isNotEmpty) {
         fullRoute.addAll(dir.points);
       } else {
         fullRoute.add(pointsToVisit[i]);
-        fullRoute.add(pointsToVisit[i+1]);
+        fullRoute.add(pointsToVisit[i + 1]);
       }
     }
-    
+
     if (mounted && fullRoute.isNotEmpty) {
-      setState(() => _routePoints = fullRoute);
+      setState(() {
+        _routePoints = fullRoute;
+      });
     }
   }
 
