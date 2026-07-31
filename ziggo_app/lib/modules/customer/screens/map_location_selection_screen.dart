@@ -170,16 +170,6 @@ class _MapLocationSelectionScreenState extends State<MapLocationSelectionScreen>
   void _proceedToBooking() {
     if (_pickup == null || _drop == null) return;
 
-    // Prefetch estimates to load them instantly
-    final booking = context.read<BookingProvider>();
-    final serviceTypes = widget.isTruckMode ? <String>[] : ['tuk', 'bike', 'car', 'mini', 'van', 'truck'];
-    booking.prefetchEstimates(
-      serviceTypes: serviceTypes,
-      pickup: _pickup!.location,
-      drop: _drop!.location,
-      tripType: _tripType,
-    );
-
     Navigator.push(
       context,
       MaterialPageRoute(

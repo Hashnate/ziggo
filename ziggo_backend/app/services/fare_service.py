@@ -107,34 +107,21 @@ async def calculate_fare(
     stops: Optional[list] = None,
     driver_accepted_lat: Optional[float] = None,
     driver_accepted_lng: Optional[float] = None,
-    # Optional pre-fetched data to bypass database queries
-    system_settings=None,
-    fare_settings=None,
-    online_drivers=None,
-    active_peaks=None,
-    active_zones=None,
-    flash_settings=None,
 ) -> dict:
     from ..models import SystemSettings
     from datetime import datetime, timezone, timedelta
-    if system_settings is not None:
-        ss = system_settings
-    else:
-        ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
-        ss = ss_q.scalars().first()
+    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    ss = ss_q.scalars().first()
     sys_commission = float(ss.commission_rate) if (ss and ss.commission_rate is not None) else 15.0
 
     # Rental: short-circuit the distance-based math. Fare = hourly * hours,
     # promo discount still applies, platform-fee split still applies.
     if is_rental:
         hours = max(1, int(rental_hours or 1))
-        if fare_settings is not None:
-            setting = fare_settings.get(service_type)
-        else:
-            setting_q = await db.execute(
-                select(FareSetting).where(FareSetting.service_type == service_type)
-            )
-            setting = setting_q.scalars().first()
+        setting_q = await db.execute(
+            select(FareSetting).where(FareSetting.service_type == service_type)
+        )
+        setting = setting_q.scalars().first()
         platform_pct = float(setting.platform_fee_percent) if (setting and setting.platform_fee_percent is not None and float(setting.platform_fee_percent) > 0) else sys_commission
         
         # Use dynamic rental_hourly_rate if defined, otherwise fallback to RENTAL_HOURLY dictionary
@@ -186,13 +173,10 @@ async def calculate_fare(
         return await _enrich_with_loyalty(db, rental_dict, customer, redeem_points)
 
     if is_courier:
-        if fare_settings is not None:
-            setting = fare_settings.get("courier")
-        else:
-            setting_q = await db.execute(
-                select(FareSetting).where(FareSetting.service_type == "courier")
-            )
-            setting = setting_q.scalars().first()
+        setting_q = await db.execute(
+            select(FareSetting).where(FareSetting.service_type == "courier")
+        )
+        setting = setting_q.scalars().first()
         platform_pct = float(setting.platform_fee_percent) if (setting and setting.platform_fee_percent is not None and float(setting.platform_fee_percent) > 0) else sys_commission
 
         distance_km = haversine_km(pickup_lat, pickup_lng, drop_lat, drop_lng)
@@ -200,30 +184,9 @@ async def calculate_fare(
         if packages:
             for pkg in packages:
                 pkg_weight = float(pkg.get("weight_kg") or 0.0) if isinstance(pkg, dict) else float(getattr(pkg, "weight_kg", 0.0))
-                if flash_settings is not None:
-                    surch = 0.0
-                    for t in flash_settings:
-                        min_w = float(t.min_weight_kg or 0)
-                        max_w = float(t.max_weight_kg) if t.max_weight_kg is not None else None
-                        if pkg_weight >= min_w and (max_w is None or pkg_weight < max_w):
-                            surch = float(t.surcharge or 0)
-                            break
-                    weight_surcharge += surch
-                else:
-                    weight_surcharge += await _flash_surcharge(db, pkg_weight)
+                weight_surcharge += await _flash_surcharge(db, pkg_weight)
         elif parcel_weight_kg is not None:
-            if flash_settings is not None:
-                pkg_weight = float(parcel_weight_kg)
-                surch = 0.0
-                for t in flash_settings:
-                    min_w = float(t.min_weight_kg or 0)
-                    max_w = float(t.max_weight_kg) if t.max_weight_kg is not None else None
-                    if pkg_weight >= min_w and (max_w is None or pkg_weight < max_w):
-                        surch = float(t.surcharge or 0)
-                        break
-                weight_surcharge = surch
-            else:
-                weight_surcharge = await _flash_surcharge(db, float(parcel_weight_kg))
+            weight_surcharge = await _flash_surcharge(db, float(parcel_weight_kg))
         
         courier_base = float(setting.base_fare) if setting and setting.base_fare is not None else COURIER_BASE
         courier_per_km = float(setting.per_km_rate) if setting and setting.per_km_rate is not None else COURIER_PER_KM
@@ -268,7 +231,7 @@ async def calculate_fare(
             "flash_surcharge": round(weight_surcharge, 2),
             "courier_eta_days": eta_days,
         }
-        return await _enrich_with_loyalty(db, courier_dict, customer, redeem_points, system_settings=system_settings)
+        return await _enrich_with_loyalty(db, courier_dict, customer, redeem_points)
 
     # BRD: CD-19 — sum of leg distances when intermediate stops are present.
     # Stops are an ordered list between pickup and drop; legs cover every
@@ -293,13 +256,10 @@ async def calculate_fare(
     for (a_lat, a_lng), (b_lat, b_lng) in zip(waypoints, waypoints[1:]):
         distance_km += haversine_km(a_lat, a_lng, b_lat, b_lng)
     duration_min = estimate_duration_min(distance_km)
-    if fare_settings is not None:
-        setting = fare_settings.get(service_type)
-    else:
-        setting_q = await db.execute(
-            select(FareSetting).where(FareSetting.service_type == service_type)
-        )
-        setting = setting_q.scalars().first()
+    setting_q = await db.execute(
+        select(FareSetting).where(FareSetting.service_type == service_type)
+    )
+    setting = setting_q.scalars().first()
 
     if setting:
         base = float(setting.base_fare or 0)
@@ -322,24 +282,9 @@ async def calculate_fare(
     if driver_accepted_lat is not None and driver_accepted_lng is not None:
         pickup_distance_km = haversine_km(driver_accepted_lat, driver_accepted_lng, pickup_lat, pickup_lng)
     else:
+        from .matching_service import find_nearest_driver
         search_radius = float(setting.search_radius_km) if (setting and setting.search_radius_km is not None) else 10.0
-        if online_drivers is not None:
-            nearest = None
-            nearest_dist = float("inf")
-            for d in online_drivers:
-                if d.vehicle_type != service_type:
-                    continue
-                if d.current_lat is None or d.current_lng is None:
-                    continue
-                dist = haversine_km(pickup_lat, pickup_lng, float(d.current_lat), float(d.current_lng))
-                if dist > search_radius:
-                    continue
-                if dist < nearest_dist:
-                    nearest = d
-                    nearest_dist = dist
-        else:
-            from .matching_service import find_nearest_driver
-            nearest = await find_nearest_driver(db, pickup_lat, pickup_lng, service_type, max_distance_km=search_radius)
+        nearest = await find_nearest_driver(db, pickup_lat, pickup_lng, service_type, max_distance_km=search_radius)
         if nearest and nearest.current_lat is not None and nearest.current_lng is not None:
             pickup_distance_km = haversine_km(float(nearest.current_lat), float(nearest.current_lng), pickup_lat, pickup_lng)
     
@@ -385,15 +330,12 @@ async def calculate_fare(
     # Peak hours surcharge check
     peak_surcharge = 0.0
     from ..models import PeakHourSetting
-    if active_peaks is not None:
-        active_peaks_list = active_peaks
-    else:
-        peak_q = await db.execute(select(PeakHourSetting).where(PeakHourSetting.is_active == True))
-        active_peaks_list = peak_q.scalars().all()
-    if active_peaks_list:
+    peak_q = await db.execute(select(PeakHourSetting).where(PeakHourSetting.is_active == True))
+    active_peaks = peak_q.scalars().all()
+    if active_peaks:
         colombo_tz = timezone(timedelta(hours=5, minutes=30))
         current_time_str = datetime.now(colombo_tz).strftime("%H:%M")
-        for ap in active_peaks_list:
+        for ap in active_peaks:
             if ap.vehicle_category and ap.vehicle_category != service_type:
                 continue
             in_peak = False
@@ -411,15 +353,12 @@ async def calculate_fare(
         
     # Geographic Surge Zones check
     zone_surcharge = 0.0
-    if active_zones is not None:
-        active_zones_list = active_zones
-    else:
-        zone_q = await db.execute(select(SurgeZone).where(SurgeZone.is_active == True))
-        active_zones_list = zone_q.scalars().all()
-    if active_zones_list:
+    zone_q = await db.execute(select(SurgeZone).where(SurgeZone.is_active == True))
+    active_zones = zone_q.scalars().all()
+    if active_zones:
         now_local = datetime.now()
         pickup_point = Point(pickup_lng, pickup_lat)
-        for z in active_zones_list:
+        for z in active_zones:
             if is_time_in_range(z.start_time, z.end_time, now_local):
                 # Create a Shapely Polygon from the coordinates (lng, lat)
                 try:
@@ -444,16 +383,7 @@ async def calculate_fare(
 
     flash_surcharge = 0.0
     if is_flash and parcel_weight_kg is not None:
-        if flash_settings is not None:
-            weight_kg = float(parcel_weight_kg)
-            for t in flash_settings:
-                min_w = float(t.min_weight_kg or 0)
-                max_w = float(t.max_weight_kg) if t.max_weight_kg is not None else None
-                if weight_kg >= min_w and (max_w is None or weight_kg < max_w):
-                    flash_surcharge = float(t.surcharge or 0)
-                    break
-        else:
-            flash_surcharge = await _flash_surcharge(db, float(parcel_weight_kg))
+        flash_surcharge = await _flash_surcharge(db, float(parcel_weight_kg))
         fare_val += flash_surcharge
         fare_val_original += flash_surcharge
 
@@ -524,7 +454,7 @@ async def calculate_fare(
         "app_usage_charges": round(app_usage_charges, 2),
         "deductions": round(deductions, 2),
     }
-    return await _enrich_with_loyalty(db, fare_dict, customer, redeem_points, system_settings=system_settings)
+    return await _enrich_with_loyalty(db, fare_dict, customer, redeem_points)
 
 def to_decimal(x: float) -> Decimal:
     return Decimal(str(round(x, 2)))
@@ -535,7 +465,6 @@ async def _enrich_with_loyalty(
     fare: dict,
     customer,
     redeem_points: int,
-    system_settings=None,
 ) -> dict:
     """Add points-earnable + apply redemption to a fare dict.
 
@@ -562,7 +491,7 @@ async def _enrich_with_loyalty(
     # `final_amount` here is post-promo, pre-redemption.
     pre_redemption_final = float(fare.get("final_amount", 0))
     pre_redemption_original = float(fare.get("original_amount", pre_redemption_final))
-    earnable = await L.points_earnable_for(db, pre_redemption_final, settings=system_settings)
+    earnable = await L.points_earnable_for(db, pre_redemption_final)
 
     actual_points = 0
     redeem_discount = 0.0
@@ -570,7 +499,7 @@ async def _enrich_with_loyalty(
 
     if customer is not None and (redeem_points or 0) > 0:
         pts, val, reason = await L.quote_redemption(
-            db, customer, int(redeem_points), Decimal(str(pre_redemption_final)), settings=system_settings
+            db, customer, int(redeem_points), Decimal(str(pre_redemption_final))
         )
         actual_points = pts
         redeem_discount = float(val)

@@ -25,46 +25,6 @@ class BookingProvider extends ChangeNotifier {
   bool _busy = false;
   bool get busy => _busy;
 
-  // Cache for the latest bulk fare estimate to load it instantly
-  Map<String, dynamic>? _lastBulkEstimate;
-  Map<String, dynamic>? get lastBulkEstimate => _lastBulkEstimate;
-  LatLng? _lastEstimatePickup;
-  LatLng? _lastEstimateDrop;
-  String? _lastEstimateTripType;
-  List<Map<String, dynamic>>? _lastEstimateStops;
-  bool _prefetching = false;
-
-  bool hasCachedEstimates({
-    required LatLng pickup,
-    required LatLng drop,
-    required String tripType,
-    required List<Map<String, dynamic>> stops,
-  }) {
-    return _lastBulkEstimate != null &&
-        _lastEstimatePickup == pickup &&
-        _lastEstimateDrop == drop &&
-        _lastEstimateTripType == tripType &&
-        _listEquals(_lastEstimateStops, stops);
-  }
-
-  bool _listEquals(List? a, List? b) {
-    if (a == null && b == null) return true;
-    if (a == null || b == null) return false;
-    if (a.length != b.length) return false;
-    for (int i = 0; i < a.length; i++) {
-      final itemA = a[i];
-      final itemB = b[i];
-      if (itemA is Map && itemB is Map) {
-        if (itemA['lat'] != itemB['lat'] || itemA['lng'] != itemB['lng']) {
-          return false;
-        }
-      } else if (itemA != itemB) {
-        return false;
-      }
-    }
-    return true;
-  }
-
   void _setBusy(bool v) {
     _busy = v;
     notifyListeners();
@@ -196,18 +156,7 @@ class BookingProvider extends ChangeNotifier {
     int redeemPoints = 0,
     List<Map<String, dynamic>> stops = const [],
     List<Map<String, dynamic>> packages = const [],
-    bool forceRefresh = false,
   }) async {
-    if (!forceRefresh &&
-        _lastBulkEstimate != null &&
-        _lastEstimatePickup == pickup &&
-        _lastEstimateDrop == drop &&
-        _lastEstimateTripType == tripType &&
-        _listEquals(_lastEstimateStops, stops)) {
-      if (kDebugMode) debugPrint('Returning cached bulk estimate');
-      return _lastBulkEstimate;
-    }
-
     try {
       final resp = await ApiClient.instance.dio.post(
         '/bookings/estimate/bulk',
@@ -230,13 +179,7 @@ class BookingProvider extends ChangeNotifier {
         },
       );
       if (resp.data is! Map) return null;
-      final result = Map<String, dynamic>.from(resp.data as Map);
-      _lastBulkEstimate = result;
-      _lastEstimatePickup = pickup;
-      _lastEstimateDrop = drop;
-      _lastEstimateTripType = tripType;
-      _lastEstimateStops = stops;
-      return result;
+      return Map<String, dynamic>.from(resp.data as Map);
     } on DioException catch (e) {
       final detail = e.response?.data;
       if (detail is Map && detail['detail'] != null) {
@@ -253,30 +196,6 @@ class BookingProvider extends ChangeNotifier {
       notifyListeners();
       return null;
     }
-  }
-
-  Future<void> prefetchEstimates({
-    required List<String> serviceTypes,
-    required LatLng pickup,
-    required LatLng drop,
-    String? promoCode,
-    String tripType = 'one_way',
-    List<Map<String, dynamic>> stops = const [],
-  }) async {
-    if (_prefetching) return;
-    _prefetching = true;
-    try {
-      await estimateFaresBulk(
-        serviceTypes: serviceTypes,
-        pickup: pickup,
-        drop: drop,
-        promoCode: promoCode,
-        tripType: tripType,
-        stops: stops,
-        forceRefresh: true,
-      );
-    } catch (_) {}
-    _prefetching = false;
   }
 
   Future<Map<String, dynamic>?> createBooking({

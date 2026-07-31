@@ -331,24 +331,11 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
   }
 
   Future<void> _recalculate() async {
-    final booking = context.read<BookingProvider>();
-    final stopsList = widget.stops.map((s) => {
-      'lat': s.location.latitude,
-      'lng': s.location.longitude,
-      'address': s.name,
-    }).toList();
-
-    final isCached = booking.hasCachedEstimates(
-      pickup: widget.pickup.location,
-      drop: widget.drop.location,
-      tripType: widget.tripType,
-      stops: stopsList,
-    );
-
     setState(() {
-      _loadingEstimates = !isCached;
+      _loadingEstimates = true;
     });
     
+    final booking = context.read<BookingProvider>();
     _estimates.clear();
     
     if (_serviceTypes.isEmpty) {
@@ -363,8 +350,11 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       drop: widget.drop.location,
       promoCode: _promo.isEmpty ? null : _promo,
       tripType: widget.tripType,
-      stops: stopsList,
-      forceRefresh: false,
+      stops: widget.stops.map((s) => {
+        'lat': s.location.latitude,
+        'lng': s.location.longitude,
+        'address': s.name,
+      }).toList(),
     );
 
     if (bulkRes != null) {
