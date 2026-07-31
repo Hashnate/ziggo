@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:dio/io.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:geolocator/geolocator.dart';
@@ -64,7 +67,15 @@ class DirectionsResult {
 /// defence-in-depth, restrict the key in Google Cloud Console to your app's
 /// Android package / iOS bundle ID / web referrer + the specific APIs used.
 class MapsService {
-  MapsService._();
+  MapsService._() {
+    if (!kIsWeb) {
+      (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
+        final client = HttpClient();
+        client.badCertificateCallback = (cert, host, port) => true;
+        return client;
+      };
+    }
+  }
   static final MapsService instance = MapsService._();
 
   // Read at every call so a hot-reload that re-loads .env is picked up.
