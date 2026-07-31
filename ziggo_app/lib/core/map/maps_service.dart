@@ -82,10 +82,12 @@ class MapsService {
   // Falls back to empty string if the .env file is missing, in which case
   // every API call short-circuits to an empty result.
   String get _apiKey {
-    final key = dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
+    final key = (dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '').trim();
     if (key.isEmpty) {
+      print('MapsService: GOOGLE_MAPS_API_KEY not found in .env. Using fallback API Key.');
       return 'AIzaSyAFtdjwK5SdMdo7c4F7jvJHWE-OE2LDSCk';
     }
+    print('MapsService: GOOGLE_MAPS_API_KEY successfully loaded from .env.');
     return key;
   }
 
