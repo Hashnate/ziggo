@@ -477,6 +477,44 @@ async def estimate_fare_bulk(
     if "truck" not in req.service_types:
         req.service_types.append("truck")
         
+    # Prefetch settings & drivers to avoid N+1 queries
+    from ...models import FareSetting, PeakHourSetting, SurgeZone, FlashWeightSetting, DriverStatus
+    
+    # 1. SystemSettings
+    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    system_settings = ss_q.scalars().first()
+    
+    # 2. FareSettings for all service types
+    service_types_to_fetch = list(req.service_types)
+    if "courier" not in service_types_to_fetch:
+        service_types_to_fetch.append("courier")
+        
+    fs_q = await db.execute(select(FareSetting).where(FareSetting.service_type.in_(service_types_to_fetch)))
+    fare_settings = {fs.service_type: fs for fs in fs_q.scalars().all()}
+    
+    # 3. Online & Approved Drivers
+    d_q = await db.execute(
+        select(Driver).where(
+            Driver.is_online == True,
+            Driver.status == DriverStatus.APPROVED,
+        )
+    )
+    online_drivers = d_q.scalars().all()
+    
+    # 4. Active PeakHourSettings
+    peak_q = await db.execute(select(PeakHourSetting).where(PeakHourSetting.is_active == True))
+    active_peaks = peak_q.scalars().all()
+    
+    # 5. Active SurgeZones
+    zone_q = await db.execute(select(SurgeZone).where(SurgeZone.is_active == True))
+    active_zones = zone_q.scalars().all()
+    
+    # 6. FlashWeightSettings
+    flash_settings = None
+    if req.is_flash or req.is_courier:
+        flash_q = await db.execute(select(FlashWeightSetting))
+        flash_settings = flash_q.scalars().all()
+        
     for st in req.service_types:
         try:
             fare = await calculate_fare(
@@ -497,6 +535,12 @@ async def estimate_fare_bulk(
                 customer=customer,
                 redeem_points=req.redeem_points or 0,
                 stops=[s.model_dump() for s in (req.stops or [])],
+                system_settings=system_settings,
+                fare_settings=fare_settings,
+                online_drivers=online_drivers,
+                active_peaks=active_peaks,
+                active_zones=active_zones,
+                flash_settings=flash_settings,
             )
             fare.pop("hourly_rate", None)
             fare.pop("rental_hours", None)

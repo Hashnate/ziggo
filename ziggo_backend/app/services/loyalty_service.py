@@ -41,12 +41,12 @@ async def _settings(db: AsyncSession) -> SystemSettings:
 
 # ---------- Read helpers (used by fare estimate, checkout previews) ----------
 
-async def points_earnable_for(db: AsyncSession, amount: Decimal | float | int) -> int:
+async def points_earnable_for(db: AsyncSession, amount: Decimal | float | int, settings: Optional[SystemSettings] = None) -> int:
     """How many points the customer would earn for spending `amount` rupees.
 
     Used to populate the per-vehicle 'Earn N points' badge (BRD: RS-07).
     """
-    s = await _settings(db)
+    s = settings if settings is not None else await _settings(db)
     if not s.loyalty_is_active:
         return 0
     rate = Decimal(str(s.loyalty_earn_rupees_per_point or 0))
@@ -56,14 +56,14 @@ async def points_earnable_for(db: AsyncSession, amount: Decimal | float | int) -
     return int(amt // rate)
 
 
-async def value_of(db: AsyncSession, points: int) -> Decimal:
+async def value_of(db: AsyncSession, points: int, settings: Optional[SystemSettings] = None) -> Decimal:
     """Rupee value of `points` at the current redemption rate."""
-    s = await _settings(db)
+    s = settings if settings is not None else await _settings(db)
     return (Decimal(points or 0) * Decimal(str(s.loyalty_value_per_point or 0))).quantize(Decimal("0.01"))
 
 
 async def quote_redemption(
-    db: AsyncSession, customer: Customer, requested_points: int, order_amount: Decimal | float
+    db: AsyncSession, customer: Customer, requested_points: int, order_amount: Decimal | float, settings: Optional[SystemSettings] = None
 ) -> tuple[int, Decimal, Optional[str]]:
     """Resolve how many points actually get redeemed for this order.
 
@@ -80,7 +80,7 @@ async def quote_redemption(
     if requested == 0:
         return 0, Decimal("0.00"), None
 
-    s = await _settings(db)
+    s = settings if settings is not None else await _settings(db)
     if not s.loyalty_is_active:
         return 0, Decimal("0.00"), "Redemption disabled"
     balance = int(customer.loyalty_points or 0)

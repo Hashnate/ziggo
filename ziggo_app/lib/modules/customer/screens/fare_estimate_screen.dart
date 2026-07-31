@@ -269,6 +269,22 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
         _stops = List<Place>.from(result['stops']);
       });
       final drop = result['drop'] as Place;
+      
+      // Prefetch estimates to load them instantly
+      final booking = context.read<BookingProvider>();
+      final serviceTypes = widget.isTruckMode ? <String>[] : ['tuk', 'bike', 'car', 'mini', 'van', 'truck'];
+      booking.prefetchEstimates(
+        serviceTypes: serviceTypes,
+        pickup: _currentLocation!.location,
+        drop: drop.location,
+        tripType: _tripType,
+        stops: _stops.map((s) => {
+          'lat': s.location.latitude,
+          'lng': s.location.longitude,
+          'address': s.name,
+        }).toList(),
+      );
+
       Navigator.push(
         context,
         MaterialPageRoute(
