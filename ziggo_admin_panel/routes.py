@@ -2575,33 +2575,33 @@ async def admin_settings_save(
         s.peak_end_hour = peaks[0].end_hour
         s.peak_extra_amount = peaks[0].extra_amount
 
-    # Notify drivers if peak hours are active and configuration changed
-    if peak_active and peak_changed:
-        from app.models import Driver
-        drivers_q = await db.execute(select(Driver.user_id))
-        driver_user_ids = [row[0] for row in drivers_q.all()]
-        title = "Peak Hours Surcharge Active!"
-        body = f"Get ready! Peak hours settings have been updated. Extra surcharges will apply during peak hours."
-        
-        # Save system notifications
-        from app.models import Notification
-        for uid in driver_user_ids:
-            db.add(Notification(
-                user_id=uid,
-                title=title,
-                body=body,
-                type="system",
-                data="{}"
-            ))
-        
-        # Push notifications in background
-        from app.services import fcm_service
-        async def send_pushes():
-            from app.database import AsyncSessionLocal
-            async with AsyncSessionLocal() as push_db:
-                await fcm_service.send_to_users(push_db, driver_user_ids, title, body, {"event": "peak_hours_active"})
-        import asyncio
-        asyncio.create_task(send_pushes())
+    # # Notify drivers if peak hours are active and configuration changed
+    # if peak_active and peak_changed:
+    #     from app.models import Driver
+    #     drivers_q = await db.execute(select(Driver.user_id))
+    #     driver_user_ids = [row[0] for row in drivers_q.all()]
+    #     title = "Peak Hours Surcharge Active!"
+    #     body = f"Get ready! Peak hours settings have been updated. Extra surcharges will apply during peak hours."
+    #     
+    #     # Save system notifications
+    #     from app.models import Notification
+    #     for uid in driver_user_ids:
+    #         db.add(Notification(
+    #             user_id=uid,
+    #             title=title,
+    #             body=body,
+    #             type="system",
+    #             data="{}"
+    #         ))
+    #     
+    #     # Push notifications in background
+    #     from app.services import fcm_service
+    #     async def send_pushes():
+    #         from app.database import AsyncSessionLocal
+    #         async with AsyncSessionLocal() as push_db:
+    #             await fcm_service.send_to_users(push_db, driver_user_ids, title, body, {"event": "peak_hours_active"})
+    #     import asyncio
+    #     asyncio.create_task(send_pushes())
 
 
     new_logo = await _save_branding_asset(logo, "Logo")

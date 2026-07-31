@@ -57,19 +57,23 @@ def _to_response(user: User, d: Driver, paid_payouts: float = 0.0, pending_payou
     if peaks:
         from datetime import datetime, timezone, timedelta
         colombo_tz = timezone(timedelta(hours=5, minutes=30))
-        current_hour = datetime.now(colombo_tz).hour
+        current_time_str = datetime.now(colombo_tz).strftime("%H:%M")
         active_peaks = [p for p in peaks if p.is_active and (not p.vehicle_category or p.vehicle_category == d.vehicle_type)]
         peak_active = len(active_peaks) > 0
         curr_active_peaks = []
         for ap in active_peaks:
             in_peak = False
-            start = ap.start_hour
-            end = ap.end_hour
-            if start is not None and end is not None:
+            start = ap.start_time
+            end = ap.end_time
+            if not start and ap.start_hour is not None:
+                start = f"{ap.start_hour:02d}:00"
+            if not end and ap.end_hour is not None:
+                end = f"{ap.end_hour:02d}:00"
+            if start and end:
                 if start <= end:
-                    in_peak = start <= current_hour < end
+                    in_peak = start <= current_time_str < end
                 else:
-                    in_peak = current_hour >= start or current_hour < end
+                    in_peak = current_time_str >= start or current_time_str < end
             if in_peak:
                 curr_active_peaks.append(ap)
         
