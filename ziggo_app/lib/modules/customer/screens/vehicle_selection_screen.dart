@@ -1106,7 +1106,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           width: widget.isTruckMode ? 115 : 100,
-          height: 148,
+          height: 154,
           margin: const EdgeInsets.only(right: 8),
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
           decoration: BoxDecoration(
