@@ -65,6 +65,15 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
   }
 
   void _onMapPositionChanged(LatLng center) {
+    if (_currentLocation == null) {
+      return;
+    }
+    final latDiff = (center.latitude - _currentLocation!.location.latitude).abs();
+    final lngDiff = (center.longitude - _currentLocation!.location.longitude).abs();
+    if (latDiff < 0.00001 && lngDiff < 0.00001) {
+      return;
+    }
+
     setState(() {
       _isDragging = true;
       _currentLocation = Place(

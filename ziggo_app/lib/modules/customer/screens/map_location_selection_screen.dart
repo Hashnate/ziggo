@@ -75,6 +75,12 @@ class _MapLocationSelectionScreenState extends State<MapLocationSelectionScreen>
   void _onMapPositionChanged(LatLng center) {
     if (_currentPlace == null) return;
     
+    final latDiff = (center.latitude - _currentPlace!.location.latitude).abs();
+    final lngDiff = (center.longitude - _currentPlace!.location.longitude).abs();
+    if (latDiff < 0.00001 && lngDiff < 0.00001) {
+      return;
+    }
+    
     setState(() {
       _currentPlace = Place(
         _isSelectingPickup ? 'Pickup Location' : 'Dropoff Location',

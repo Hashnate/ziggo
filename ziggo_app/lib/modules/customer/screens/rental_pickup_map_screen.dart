@@ -33,6 +33,12 @@ class _RentalPickupMapScreenState extends State<RentalPickupMapScreen> {
   }
 
   void _onMapPositionChanged(LatLng center) {
+    final latDiff = (center.latitude - _currentPlace.location.latitude).abs();
+    final lngDiff = (center.longitude - _currentPlace.location.longitude).abs();
+    if (latDiff < 0.00001 && lngDiff < 0.00001) {
+      return;
+    }
+
     if (!_isMoving) {
       setState(() => _isMoving = true);
     }

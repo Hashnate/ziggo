@@ -48,7 +48,9 @@ Future<void> main() async {
   }
   // On web, inject the Google Maps JS SDK now that we have the key. No-op on
   // mobile/desktop where the SDK comes from native config.
-  injectGoogleMapsJs(dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '');
+  injectGoogleMapsJs((dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '').isNotEmpty
+      ? dotenv.env['GOOGLE_MAPS_API_KEY']!
+      : 'AIzaSyAFtdjwK5SdMdo7c4F7jvJHWE-OE2LDSCk');
   // Best-effort backend host discovery. This must NEVER prevent runApp:
   // .timeout() only guards the *duration*. ApiConfig falls back to its default
   // host, so screens still render and work.

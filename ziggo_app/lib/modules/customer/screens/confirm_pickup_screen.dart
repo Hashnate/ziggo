@@ -37,6 +37,12 @@ class _ConfirmPickupScreenState extends State<ConfirmPickupScreen> {
   }
 
   void _onMapPositionChanged(LatLng center) {
+    final latDiff = (center.latitude - _currentPlace.location.latitude).abs();
+    final lngDiff = (center.longitude - _currentPlace.location.longitude).abs();
+    if (latDiff < 0.00001 && lngDiff < 0.00001) {
+      return;
+    }
+
     // Only update position coordinates immediately to keep marker centered
     setState(() {
       _currentPlace = Place(

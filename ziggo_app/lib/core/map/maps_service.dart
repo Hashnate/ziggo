@@ -70,7 +70,13 @@ class MapsService {
   // Read at every call so a hot-reload that re-loads .env is picked up.
   // Falls back to empty string if the .env file is missing, in which case
   // every API call short-circuits to an empty result.
-  String get _apiKey => dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
+  String get _apiKey {
+    final key = dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
+    if (key.isEmpty) {
+      return 'AIzaSyAFtdjwK5SdMdo7c4F7jvJHWE-OE2LDSCk';
+    }
+    return key;
+  }
 
   final Dio _dio = Dio(
     BaseOptions(
@@ -252,7 +258,8 @@ class MapsService {
         durationMin: (((leg['duration']?['value'] as num?) ?? 0) / 60).round(),
         steps: steps,
       );
-    } catch (_) {
+    } catch (e, s) {
+      print('MapsService directions error: $e\n$s');
       return null;
     }
   }
