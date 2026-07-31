@@ -65,6 +65,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
 
   List<Map<String, dynamic>> _nearbyDrivers = const [];
   Timer? _nearbyTimer;
+  Timer? _fareUpdateTimer;
   List<String> _serviceTypes = [];
   Map<String, Map<String, dynamic>> _categoryData = {};
 
@@ -104,12 +105,14 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       _usePoints = false;
       _recalculate();
       _startNearbyDriverPolling();
+      _startFareUpdatePolling();
     });
   }
 
   @override
   void dispose() {
     _nearbyTimer?.cancel();
+    _fareUpdateTimer?.cancel();
     _promoController.dispose();
     super.dispose();
   }
@@ -224,6 +227,69 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       });
     } catch (_) {
       // Silent error
+    }
+  }
+
+  void _startFareUpdatePolling() {
+    _fareUpdateTimer?.cancel();
+    _fareUpdateTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _recalculateSilently(),
+    );
+  }
+
+  Future<void> _recalculateSilently() async {
+    if (_loadingEstimates) return;
+    if (_serviceTypes.isEmpty) return;
+    
+    final booking = context.read<BookingProvider>();
+    final bulkRes = await booking.estimateFaresBulk(
+      serviceTypes: _serviceTypes,
+      pickup: widget.pickup.location,
+      drop: widget.drop.location,
+      promoCode: _promo.isEmpty ? null : _promo,
+      tripType: widget.tripType,
+      stops: widget.stops.map((s) => {
+        'lat': s.location.latitude,
+        'lng': s.location.longitude,
+        'address': s.name,
+      }).toList(),
+    );
+
+    if (bulkRes != null && mounted) {
+      setState(() {
+        bulkRes.forEach((st, res) {
+          if (res is Map) {
+            final resMap = Map<String, dynamic>.from(res);
+            
+            if (widget.tripType == 'return') {
+              if (resMap['final_amount'] != null) {
+                resMap['final_amount'] = (resMap['final_amount'] as num) * 2;
+              }
+              if (resMap['original_amount'] != null) {
+                resMap['original_amount'] = (resMap['original_amount'] as num) * 2;
+              }
+              if (resMap['duration_min'] != null) {
+                resMap['duration_min'] = (resMap['duration_min'] as num) * 2;
+              }
+              if (resMap['distance_km'] != null) {
+                resMap['distance_km'] = (resMap['distance_km'] as num) * 2;
+              }
+            }
+
+            _estimates[st] = resMap;
+          }
+        });
+
+        if (_serviceType == null || !_estimates.containsKey(_serviceType)) {
+          for (final st in _serviceTypes) {
+            if (_estimates.containsKey(st)) {
+              _serviceType = st;
+              break;
+            }
+          }
+        }
+      });
     }
   }
 
