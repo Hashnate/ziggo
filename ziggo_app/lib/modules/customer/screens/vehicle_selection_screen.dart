@@ -769,6 +769,13 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
               center: widget.pickup.location,
               zoom: 13,
               showMyLocation: true,
+              onMapCreated: () {
+                final pointsToVisit = [widget.pickup.location, ...widget.stops.map((s) => s.location), widget.drop.location];
+                if (widget.tripType == 'return') {
+                  pointsToVisit.add(widget.pickup.location);
+                }
+                _mapController.fitBounds(pointsToVisit, padding: 80);
+              },
               markers: [
                 if (!_loadingEstimates && _serviceType != null)
                   for (final d in _nearbyDrivers)

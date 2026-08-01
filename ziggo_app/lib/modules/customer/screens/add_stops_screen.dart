@@ -277,6 +277,13 @@ class _AddStopsScreenState extends State<AddStopsScreen> {
                     center: widget.pickup.location,
                     zoom: 15,
                     showMyLocation: false,
+                    onMapCreated: () {
+                      final valid = _validDestinations;
+                      if (valid.isNotEmpty) {
+                        final pointsToVisit = [widget.pickup.location, ...valid.map((p) => p.location)];
+                        _mapController.fitBounds(pointsToVisit, padding: 60);
+                      }
+                    },
                     markers: [
                       pinMarker(
                         point: widget.pickup.location,

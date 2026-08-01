@@ -585,6 +585,7 @@ class ZiggoMap extends StatefulWidget {
   final bool darkMode;
   final void Function(LatLng)? onTap;
   final void Function(LatLng)? onPositionChanged;
+  final VoidCallback? onMapCreated;
 
   const ZiggoMap({
     super.key,
@@ -600,6 +601,7 @@ class ZiggoMap extends StatefulWidget {
     this.darkMode = false,
     this.onTap,
     this.onPositionChanged,
+    this.onMapCreated,
   });
 
   @override
@@ -833,7 +835,10 @@ class _ZiggoMapState extends State<ZiggoMap> {
       onCameraMove: widget.onPositionChanged == null
           ? null
           : (pos) => widget.onPositionChanged!(LatLng(pos.target.latitude, pos.target.longitude)),
-      onMapCreated: (c) => widget.controller?._attach(c),
+      onMapCreated: (c) {
+        widget.controller?._attach(c);
+        widget.onMapCreated?.call();
+      },
     );
   }
 }
