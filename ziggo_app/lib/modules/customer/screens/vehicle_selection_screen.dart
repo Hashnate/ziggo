@@ -423,7 +423,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     if (widget.tripType == 'return') {
       pointsToVisit.add(widget.pickup.location);
     }
-    _mapController.fitBounds(pointsToVisit, padding: 80);
+    _mapController.fitBounds(pointsToVisit, padding: 100);
   }
 
   Future<void> _fetchRoutePoints() async {
@@ -769,13 +769,13 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
               center: widget.pickup.location,
               zoom: 13,
               showMyLocation: true,
-              padding: const EdgeInsets.only(bottom: 340, top: 80, left: 24, right: 24),
+              padding: const EdgeInsets.only(bottom: 400, top: 80, left: 24, right: 24),
               onMapCreated: () {
                 final pointsToVisit = [widget.pickup.location, ...widget.stops.map((s) => s.location), widget.drop.location];
                 if (widget.tripType == 'return') {
                   pointsToVisit.add(widget.pickup.location);
                 }
-                _mapController.fitBounds(pointsToVisit, padding: 80);
+                _mapController.fitBounds(pointsToVisit, padding: 100);
               },
               markers: [
                 if (!_loadingEstimates && _serviceType != null)
