@@ -234,18 +234,41 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
   void _startFareUpdatePolling() {
     _fareUpdateTimer?.cancel();
     _fareUpdateTimer = Timer.periodic(
-      const Duration(seconds: 5),
+      const Duration(seconds: 3),
       (_) => _recalculateSilently(),
     );
   }
 
   Future<void> _recalculateSilently() async {
     if (_loadingEstimates) return;
-    if (_serviceTypes.isEmpty) return;
+    
+    List<String> currentServiceTypes = List<String>.from(_serviceTypes);
+    try {
+      final resp = await ApiClient.instance.dio.get('/public/categories');
+      if (resp.data is List && mounted) {
+        final list = List<Map<String, dynamic>>.from(resp.data as List);
+        final newServiceTypes = list
+            .where((item) => widget.isTruckMode ? (item['is_truck'] == true) : (item['is_truck'] != true))
+            .map((item) => item['service_type'] as String)
+            .toList();
+        final newCategoryData = {
+          for (var item in list) item['service_type'] as String: item
+        };
+        setState(() {
+          _serviceTypes = newServiceTypes;
+          _categoryData = newCategoryData;
+        });
+        currentServiceTypes = newServiceTypes;
+      }
+    } catch (e) {
+      debugPrint("Error fetching active services silently: $e");
+    }
+
+    if (currentServiceTypes.isEmpty) return;
     
     final booking = context.read<BookingProvider>();
     final bulkRes = await booking.estimateFaresBulk(
-      serviceTypes: _serviceTypes,
+      serviceTypes: currentServiceTypes,
       pickup: widget.pickup.location,
       drop: widget.drop.location,
       promoCode: _promo.isEmpty ? null : _promo,
@@ -259,6 +282,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
 
     if (bulkRes != null && mounted) {
       setState(() {
+        _estimates.removeWhere((key, value) => !currentServiceTypes.contains(key));
         bulkRes.forEach((st, res) {
           if (res is Map) {
             final resMap = Map<String, dynamic>.from(res);
@@ -283,7 +307,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
         });
 
         if (_serviceType == null || !_estimates.containsKey(_serviceType)) {
-          for (final st in _serviceTypes) {
+          for (final st in currentServiceTypes) {
             if (_estimates.containsKey(st)) {
               _serviceType = st;
               break;
