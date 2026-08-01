@@ -586,6 +586,7 @@ class ZiggoMap extends StatefulWidget {
   final void Function(LatLng)? onTap;
   final void Function(LatLng)? onPositionChanged;
   final VoidCallback? onMapCreated;
+  final EdgeInsets padding;
 
   const ZiggoMap({
     super.key,
@@ -602,6 +603,7 @@ class ZiggoMap extends StatefulWidget {
     this.onTap,
     this.onPositionChanged,
     this.onMapCreated,
+    this.padding = EdgeInsets.zero,
   });
 
   @override
@@ -813,6 +815,7 @@ class _ZiggoMapState extends State<ZiggoMap> {
     final showMe = widget.showMyLocation && _locationGranted;
 
     return gmaps.GoogleMap(
+      padding: widget.padding,
       initialCameraPosition:
           gmaps.CameraPosition(target: _g(widget.center), zoom: widget.zoom),
       style: widget.darkMode ? kDarkMapStyle : null,

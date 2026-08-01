@@ -769,6 +769,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
               center: widget.pickup.location,
               zoom: 13,
               showMyLocation: true,
+              padding: const EdgeInsets.only(bottom: 340, top: 80, left: 24, right: 24),
               onMapCreated: () {
                 final pointsToVisit = [widget.pickup.location, ...widget.stops.map((s) => s.location), widget.drop.location];
                 if (widget.tripType == 'return') {
