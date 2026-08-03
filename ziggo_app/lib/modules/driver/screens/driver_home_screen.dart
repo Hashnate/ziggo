@@ -322,9 +322,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       final food = driver.activeFoodOrder;
       final market = driver.activeMarketOrder;
       final currentLoc = LatLng(p.latitude, p.longitude);
-      if (_isNavigating) {
+      
+      // Update driver provider's location so that it is dynamic and matches the stream immediately
+      driver.updateCurrentLocation(currentLoc);
+
+      if (driver.activeRide != null || food != null || market != null) {
+        _isNavigating = true;
         _mapController.startNavigation(currentLoc, bearing: _heading);
+      } else {
+        _mapController.moveTo(currentLoc, zoom: 16);
       }
+
       if (food != null) {
         _updateFoodMarketRoute(currentLoc, food, false);
       } else if (market != null) {

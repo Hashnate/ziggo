@@ -411,6 +411,11 @@ class DriverProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
+  void updateCurrentLocation(LatLng location) {
+    _currentLocation = location;
+    notifyListeners();
+  }
+
   Map<String, dynamic>? _lastCompletedRide;
   Map<String, dynamic>? get lastCompletedRide => _lastCompletedRide;
 
