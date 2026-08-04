@@ -5,7 +5,9 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/map/place_search_sheet.dart';
 import '../../../core/map/places.dart';
+import '../../../core/widgets/guest_login_prompt.dart';
 import '../../../core/widgets/motion.dart';
+import '../../auth/auth_provider.dart';
 import '../addresses_provider.dart';
 import '../food_provider.dart';
 import '../food_ui.dart';
@@ -85,6 +87,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _placeOrder() async {
+    final auth = context.read<AuthProvider>();
+    if (auth.isGuest) {
+      final ok = await GuestLoginPrompt.ensureAuthenticated(
+        context,
+        message: 'Please sign in or create an account to place your order.',
+      );
+      if (!ok) return;
+    }
     final food = context.read<FoodProvider>();
     double? lat;
     double? lng;

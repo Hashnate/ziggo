@@ -226,6 +226,26 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                 busy: _busy,
                 onPressed: _sendOTP,
               ),
+              if (widget.role == 'customer') ...[
+                const SizedBox(height: 12),
+                Center(
+                  child: TextButton(
+                    onPressed: () {
+                      context.read<AuthProvider>().continueAsGuest();
+                      Navigator.of(context).popUntil((route) => route.isFirst);
+                    },
+                    child: const Text(
+                      'Browse as guest',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 18),
               const Center(
                 child: Text.rich(

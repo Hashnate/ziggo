@@ -141,7 +141,7 @@ class _RootState extends State<_Root> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     if (!_splashed) return const SplashScreen();
     final auth = context.watch<AuthProvider>();
-    if (auth.status != AuthStatus.authenticated) {
+    if (auth.status != AuthStatus.authenticated && !auth.isGuest) {
       _adminSub?.cancel();
       _adminSub = null;
       return const RoleSelectionScreen();

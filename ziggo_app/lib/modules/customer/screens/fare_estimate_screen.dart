@@ -11,6 +11,8 @@ import '../../../core/map/maps_service.dart';
 import '../../../core/map/places.dart';
 import '../../../core/map/ziggo_map.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/widgets/guest_login_prompt.dart';
+import '../../auth/auth_provider.dart';
 import 'add_stops_screen.dart';
 import 'customer_shell.dart';
 import 'location_search_screen.dart';
@@ -236,7 +238,16 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
     shell?.goToTab(2);
   }
 
-  void _openSearch({bool focusDrop = true, String tripType = 'one_way'}) {
+  void _openSearch({bool focusDrop = true, String tripType = 'one_way'}) async {
+    final auth = context.read<AuthProvider>();
+    if (auth.isGuest) {
+      final ok = await GuestLoginPrompt.ensureAuthenticated(
+        context,
+        message: 'Please sign in or create an account to book rides.',
+      );
+      if (!ok) return;
+    }
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(

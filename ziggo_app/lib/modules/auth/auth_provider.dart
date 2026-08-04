@@ -83,6 +83,14 @@ class AuthProvider extends ChangeNotifier {
   bool _isCustomerMode = false;
   bool get isCustomerMode => _isCustomerMode;
 
+  bool _isGuest = false;
+  bool get isGuest => _isGuest;
+
+  void continueAsGuest() {
+    _isGuest = true;
+    notifyListeners();
+  }
+
   void toggleCustomerMode() {
     _isCustomerMode = !_isCustomerMode;
     notifyListeners();
@@ -284,6 +292,7 @@ class AuthProvider extends ChangeNotifier {
     } catch (_) {}
 
     _status = AuthStatus.unauthenticated;
+    _isGuest = false;
     _token = null;
     _role = null;
     _userId = null;
