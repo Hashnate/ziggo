@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../core/widgets/curved_navbar.dart';
+import '../../../core/widgets/guest_login_prompt.dart';
+import '../../auth/auth_provider.dart';
 import 'fare_estimate_screen.dart';
 import 'home_screen.dart';
 import 'market_home_screen.dart';
@@ -141,9 +144,17 @@ class CustomerShellState extends State<CustomerShell> {
         ),
         bottomNavigationBar: CurvedNavbar(
           currentIndex: _index,
-          onTap: (i) {
+          onTap: (i) async {
             if (i == 2) {
               setState(() => _index = 2);
+              return;
+            }
+            final auth = context.read<AuthProvider>();
+            if (auth.isGuest && (i == 4 || i == 3)) {
+              await GuestLoginPrompt.ensureAuthenticated(
+                context,
+                message: 'Please sign in or create an account to access your profile, notifications, and account settings.',
+              );
               return;
             }
             setState(() => _index = 2);
