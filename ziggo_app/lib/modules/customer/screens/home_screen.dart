@@ -811,7 +811,7 @@ class _Header extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 2),
-              const ZiggoWordmark(size: 22),
+              const ZiggoWordmark(size: 38),
             ],
           ),
         ),

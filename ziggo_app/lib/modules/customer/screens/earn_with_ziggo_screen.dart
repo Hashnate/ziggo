@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/app_colors.dart';
@@ -52,22 +53,7 @@ class _EarnWithZiggoScreenState extends State<EarnWithZiggoScreen> {
   Future<void> _shareCode(String code, double amount) async {
     final formattedAmt = amount.toStringAsFixed(2);
     final message = "Sign up for Ziggo using my referral code $code and get Rs.$formattedAmt wallet credit on your first completed trip! Download the app now.";
-    final url = Uri.parse("whatsapp://send?text=${Uri.encodeComponent(message)}");
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url);
-    } else {
-      // Fallback to clipboard and alert
-      _copyToClipboard(code);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('WhatsApp not installed. Code copied to share!'),
-            backgroundColor: AppColors.info,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
+    await Share.share(message);
   }
 
   Future<void> _applyReferral() async {
