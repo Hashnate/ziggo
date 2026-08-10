@@ -4111,7 +4111,7 @@ class _Drawer extends StatelessWidget {
           const Padding(
             padding: EdgeInsets.only(bottom: 16),
             child: Text(
-              'Version 1.0.0',
+              'Version 1.0.1',
               style: TextStyle(
                 color: AppColors.textTertiary,
                 fontWeight: FontWeight.w600,

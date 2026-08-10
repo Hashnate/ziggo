@@ -237,7 +237,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 24),
           const Center(
             child: Text(
-              'Ziggo • v1.0.0',
+              'Ziggo • v1.0.1',
               style: TextStyle(
                 color: AppColors.textTertiary,
                 fontSize: 11,
