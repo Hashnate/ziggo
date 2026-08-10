@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Ziggo"
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = "change-me"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8  # 8 days
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 365 * 10  # 10 years
 
     DATABASE_URL: str
     SYNC_DATABASE_URL: str
