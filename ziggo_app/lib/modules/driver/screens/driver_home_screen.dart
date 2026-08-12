@@ -330,7 +330,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         _isNavigating = true;
         _mapController.startNavigation(currentLoc, bearing: _heading);
       } else if (_pendingPickupLatLng != null) {
-        _mapController.fitBounds([currentLoc, _pendingPickupLatLng!], padding: 160);
+        _centerMapOnDriverAndPickup(currentLoc, _pendingPickupLatLng!);
       } else {
         _mapController.moveTo(currentLoc, zoom: 16);
       }
@@ -542,6 +542,47 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       } catch (_) {
         // ignore
       }
+    }
+  }
+
+  void _centerMapOnDriverAndPickup(LatLng loc, LatLng pickup) {
+    try {
+      final double distanceInMeters = Geolocator.distanceBetween(
+        loc.latitude,
+        loc.longitude,
+        pickup.latitude,
+        pickup.longitude,
+      );
+      final double distanceInKm = distanceInMeters / 1000.0;
+      
+      // Calculate midpoint
+      final double midLat = (loc.latitude + pickup.latitude) / 2;
+      final double midLng = (loc.longitude + pickup.longitude) / 2;
+      final LatLng midpoint = LatLng(midLat, midLng);
+      
+      // Determine zoom level based on distance
+      double zoom = 14.0;
+      if (distanceInKm < 0.2) {
+        zoom = 16.5;
+      } else if (distanceInKm < 0.5) {
+        zoom = 15.5;
+      } else if (distanceInKm < 1.0) {
+        zoom = 14.5;
+      } else if (distanceInKm < 2.0) {
+        zoom = 13.8;
+      } else if (distanceInKm < 4.0) {
+        zoom = 13.0;
+      } else if (distanceInKm < 8.0) {
+        zoom = 12.0;
+      } else if (distanceInKm < 15.0) {
+        zoom = 11.0;
+      } else {
+        zoom = 10.0;
+      }
+      
+      _mapController.moveTo(midpoint, zoom: zoom);
+    } catch (e) {
+      _mapController.moveTo(pickup, zoom: 13);
     }
   }
 
@@ -976,7 +1017,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (!mounted) return;
                     if (loc != null) {
-                      _mapController.fitBounds([loc, pickup], padding: 160);
+                      _centerMapOnDriverAndPickup(loc, pickup);
                     } else {
                       _mapController.moveTo(pickup, zoom: 13);
                     }
@@ -3148,7 +3189,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
             if (loc != null) {
-              _mapController.fitBounds([loc, pickup], padding: 160);
+              _centerMapOnDriverAndPickup(loc, pickup);
             } else {
               _mapController.moveTo(pickup, zoom: 13);
             }
