@@ -266,7 +266,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         SizedBox(
-          height: 160,
+          height: 200,
           child: PageView.builder(
             controller: _foodBannerCtrl,
             padEnds: true,
@@ -425,7 +425,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         SizedBox(
-          height: 160,
+          height: 200,
           child: PageView.builder(
             controller: _marketBannerCtrl,
             onPageChanged: (i) => setState(() => _marketBannerPage = i),

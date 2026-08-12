@@ -560,7 +560,7 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
       child: Column(
         children: [
           SizedBox(
-            height: 188,
+            height: 200,
             child: PageView.builder(
               controller: _bannerCtrl,
               onPageChanged: (i) => setState(() => _bannerPage = i),

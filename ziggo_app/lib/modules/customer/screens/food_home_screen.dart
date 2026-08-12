@@ -393,7 +393,7 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
       child: Column(
         children: [
           SizedBox(
-            height: 160,
+            height: 200,
             child: PageView.builder(
               controller: _bannerController,
               padEnds: true,
