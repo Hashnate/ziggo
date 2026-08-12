@@ -825,6 +825,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 zoom: 15,
                 showMyLocation: true,
                 darkMode: false,
+                padding: _pendingPickupLatLng != null
+                    ? const EdgeInsets.only(bottom: 350)
+                    : (ride != null || food != null || market != null)
+                        ? const EdgeInsets.only(bottom: 260)
+                        : EdgeInsets.zero,
                 polygons: surgePolygons,
                 polylines: [
                   if (_foodMarketRoutePoints.isNotEmpty)
