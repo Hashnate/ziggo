@@ -329,6 +329,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       if (driver.activeRide != null || food != null || market != null) {
         _isNavigating = true;
         _mapController.startNavigation(currentLoc, bearing: _heading);
+      } else if (_pendingPickupLatLng != null) {
+        _mapController.fitBounds([currentLoc, _pendingPickupLatLng!], padding: 160);
       } else {
         _mapController.moveTo(currentLoc, zoom: 16);
       }
@@ -859,7 +861,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       icon: Icons.storefront_rounded,
                       color: AppColors.primary,
                       size: 30,
-                      label: 'Pickup | ${_pendingPickupLabel ?? "Shop"}',
+                      label: (_pendingPickupLabel == null || _pendingPickupLabel!.trim().isEmpty || _pendingPickupLabel == 'Pickup')
+                          ? 'Pickup'
+                          : 'Pickup | $_pendingPickupLabel',
                     ),
                   if (ride != null) ...[
                     pinMarker(
