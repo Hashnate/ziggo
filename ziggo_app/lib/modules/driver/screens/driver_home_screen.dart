@@ -965,9 +965,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     _requestSheetCollapsed = false;
                   });
                   if (loc != null) {
-                    _mapController.fitBounds([loc, pickup]);
+                    _mapController.fitBounds([loc, pickup], padding: 160);
                   } else {
-                    _mapController.moveTo(pickup);
+                    _mapController.moveTo(pickup, zoom: 13);
                   }
                 },
                 isCollapsed: _requestSheetCollapsed,
@@ -3134,9 +3134,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             _pendingPickupLabel = label;
           });
           if (loc != null) {
-            _mapController.fitBounds([loc, pickup]);
+            _mapController.fitBounds([loc, pickup], padding: 160);
           } else {
-            _mapController.moveTo(pickup);
+            _mapController.moveTo(pickup, zoom: 13);
           }
         },
       ),
