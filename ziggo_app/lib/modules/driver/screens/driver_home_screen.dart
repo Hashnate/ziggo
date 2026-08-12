@@ -3261,16 +3261,21 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
     final double? lng = (r['pickup_lng'] as num?)?.toDouble();
     if (lat != null && lng != null) {
       final pickup = LatLng(lat, lng);
-      List<LatLng> routePoints = [];
-      if (widget.driverLocation != null) {
-        final dir = await MapsService.instance.directions(widget.driverLocation!, pickup);
-        if (dir != null) {
-          routePoints = dir.points;
-        }
-      }
       final label = (r['restaurant_name'] ?? r['vendor_name'] ?? 'Pickup').toString();
+      
+      // Trigger camera centering immediately
       if (mounted) {
-        widget.onShowPickupOnMap(pickup, routePoints, label);
+        widget.onShowPickupOnMap(pickup, [], label);
+      }
+      
+      // Load directions route in the background
+      if (widget.driverLocation != null) {
+        try {
+          final dir = await MapsService.instance.directions(widget.driverLocation!, pickup);
+          if (dir != null && mounted) {
+            widget.onShowPickupOnMap(pickup, dir.points, label);
+          }
+        } catch (_) {}
       }
     }
   }
