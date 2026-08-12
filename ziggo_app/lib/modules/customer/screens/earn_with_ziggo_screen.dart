@@ -50,10 +50,19 @@ class _EarnWithZiggoScreenState extends State<EarnWithZiggoScreen> {
     );
   }
 
-  Future<void> _shareCode(String code, double amount) async {
+  Future<void> _shareCode(BuildContext context, String code, double amount) async {
     final formattedAmt = amount.toStringAsFixed(2);
     final message = "Sign up for Ziggo using my referral code $code and get Rs.$formattedAmt wallet credit on your first completed trip! Download the app now.";
-    await Share.share(message);
+    
+    final box = context.findRenderObject() as RenderBox?;
+    final sharePositionOrigin = box != null
+        ? box.localToGlobal(Offset.zero) & box.size
+        : null;
+
+    await Share.share(
+      message,
+      sharePositionOrigin: sharePositionOrigin,
+    );
   }
 
   Future<void> _applyReferral() async {
@@ -123,10 +132,12 @@ class _EarnWithZiggoScreenState extends State<EarnWithZiggoScreen> {
                               icon: const Icon(Icons.copy, color: AppColors.primary),
                               onPressed: () => _copyToClipboard(code),
                             ),
-                            IconButton(
-                               icon: const Icon(Icons.share, color: AppColors.primary),
-                               onPressed: () => _shareCode(code, r.referralAmount),
-                             ),
+                            Builder(
+                              builder: (buttonContext) => IconButton(
+                                icon: const Icon(Icons.share, color: AppColors.primary),
+                                onPressed: () => _shareCode(buttonContext, code, r.referralAmount),
+                              ),
+                            ),
                           ],
                         )
                       ],
