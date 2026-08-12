@@ -29,20 +29,23 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   static const int _len = 6;
   late final List<TextEditingController> _controllers;
   late final List<FocusNode> _focusNodes;
+  late final List<String> _previousValues;
   bool _busy = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _controllers = List.generate(_len, (_) => TextEditingController());
+    _controllers = List.generate(_len, (_) => TextEditingController(text: '\u200b'));
     _focusNodes = List.generate(_len, (_) => FocusNode());
+    _previousValues = List.filled(_len, '\u200b');
 
     final dev = context.read<AuthProvider>().devOtp;
     if (dev != null && dev.length == _len) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         for (int i = 0; i < _len; i++) {
           _controllers[i].text = dev[i];
+          _previousValues[i] = dev[i];
         }
         setState(() {});
       });
@@ -60,7 +63,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     super.dispose();
   }
 
-  String get _code => _controllers.map((c) => c.text).join();
+  String get _code => _controllers.map((c) => c.text.replaceAll('\u200b', '')).join();
 
   Future<void> _verify() async {
     if (_code.length != _len) {
@@ -106,6 +109,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     if (dev != null && dev.length == _len) {
       for (int i = 0; i < _len; i++) {
         _controllers[i].text = dev[i];
+        _previousValues[i] = dev[i];
       }
       setState(() {});
     }
@@ -197,7 +201,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: List.generate(_len, (i) {
-                      final has = _controllers[i].text.isNotEmpty;
+                      final has = _controllers[i].text.isNotEmpty && _controllers[i].text != '\u200b';
                       return Container(
                         width: 46,
                         height: 60,
@@ -230,11 +234,13 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                             contentPadding: EdgeInsets.zero,
                           ),
                           onChanged: (v) {
-                            if (v.length >= _len) {
-                              final digits = v.replaceAll(RegExp(r'\D'), '');
+                            final cleanV = v.replaceAll('\u200b', '');
+                            if (cleanV.length >= _len) {
+                              final digits = cleanV.replaceAll(RegExp(r'\D'), '');
                               if (digits.length >= _len) {
                                 for (int j = 0; j < _len; j++) {
                                   _controllers[j].text = digits[j];
+                                  _previousValues[j] = digits[j];
                                 }
                                 _focusNodes[_len - 1].requestFocus();
                                 setState(() {});
@@ -242,15 +248,27 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                               }
                             }
                             
-                            if (v.length > 1) {
-                              _controllers[i].text = v.substring(v.length - 1);
-                              if (i < _len - 1) {
-                                _focusNodes[i + 1].requestFocus();
+                            if (v.isEmpty) {
+                              _controllers[i].text = '\u200b';
+                              if (_previousValues[i] == '\u200b' && i > 0) {
+                                _controllers[i - 1].text = '\u200b';
+                                _previousValues[i - 1] = '\u200b';
+                                _focusNodes[i - 1].requestFocus();
                               }
-                            } else if (v.isNotEmpty && i < _len - 1) {
-                              _focusNodes[i + 1].requestFocus();
-                            } else if (v.isEmpty && i > 0) {
-                              _focusNodes[i - 1].requestFocus();
+                              _previousValues[i] = '\u200b';
+                            } else {
+                              final clean = v.replaceAll('\u200b', '');
+                              if (clean.isNotEmpty) {
+                                final char = clean[clean.length - 1];
+                                _controllers[i].text = char;
+                                _previousValues[i] = char;
+                                if (i < _len - 1) {
+                                  _focusNodes[i + 1].requestFocus();
+                                }
+                              } else {
+                                _controllers[i].text = '\u200b';
+                                _previousValues[i] = '\u200b';
+                              }
                             }
                             setState(() {});
                           },
