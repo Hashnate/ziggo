@@ -284,7 +284,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ? Container(color: AppColors.surfaceMuted)
                         : Image.network(
                             img,
-                            fit: BoxFit.cover,
+                            fit: BoxFit.fill,
                             width: double.infinity,
                             errorBuilder: (_, __, ___) => Container(color: AppColors.surfaceMuted),
                           ),
@@ -443,7 +443,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: imageUrl != null
                           ? Image.network(
                               imageUrl,
-                              fit: BoxFit.cover,
+                              fit: BoxFit.fill,
                               width: double.infinity,
                               errorBuilder: (_, __, ___) => Container(
                                 color: AppColors.surfaceMuted,
@@ -491,7 +491,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: b.image != null
             ? Image.asset(
                 b.image!,
-                fit: BoxFit.cover,
+                fit: BoxFit.fill,
                 width: double.infinity,
                 errorBuilder: (_, __, ___) => _marketBannerGradient(b),
               )

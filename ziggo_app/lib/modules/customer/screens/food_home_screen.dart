@@ -411,7 +411,7 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
                           ? Container(color: AppColors.surfaceMuted)
                           : Image.network(
                               img,
-                              fit: BoxFit.cover,
+                              fit: BoxFit.fill,
                               width: double.infinity,
                               errorBuilder: (_, __, ___) => Container(color: AppColors.surfaceMuted),
                             ),
