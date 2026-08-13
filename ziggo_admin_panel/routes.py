@@ -56,6 +56,8 @@ async def _save_restaurant_image(photo: UploadFile | None) -> str | None:
         return None
     if len(data) > MAX_PHOTO_BYTES:
         raise HTTPException(status_code=400, detail="Image must be under 5 MB")
+    from app.utils.image import process_image_upload
+    data = process_image_upload(data, is_profile=False)
     import secrets
     fname = f"{secrets.token_hex(8)}{ext}"
     fpath = os.path.join(RESTAURANT_UPLOAD_DIR, fname)
@@ -75,6 +77,8 @@ async def _save_product_image(photo: UploadFile | None) -> str | None:
         return None
     if len(data) > MAX_PHOTO_BYTES:
         raise HTTPException(status_code=400, detail="Image must be under 5 MB")
+    from app.utils.image import process_image_upload
+    data = process_image_upload(data, is_profile=False)
     import secrets
     fname = f"{secrets.token_hex(8)}{ext}"
     fpath = os.path.join(PRODUCT_UPLOAD_DIR, fname)
@@ -107,6 +111,8 @@ async def _save_uploaded_photo(photo: UploadFile | None) -> str | None:
         return None
     if len(data) > MAX_PHOTO_BYTES:
         raise HTTPException(status_code=400, detail="Image must be under 5 MB")
+    from app.utils.image import process_image_upload
+    data = process_image_upload(data, is_profile=True)
     import secrets
     fname = f"{secrets.token_hex(8)}{ext}"
     fpath = os.path.join(UPLOAD_DIR, fname)
@@ -166,6 +172,8 @@ async def _save_category_image(photo: UploadFile | None) -> str | None:
         return None
     if len(data) > MAX_PHOTO_BYTES:
         raise HTTPException(status_code=400, detail="Image must be under 5 MB")
+    from app.utils.image import process_image_upload
+    data = process_image_upload(data, is_profile=False)
     import secrets
     fname = f"{secrets.token_hex(8)}{ext}"
     fpath = os.path.join(CATEGORY_UPLOAD_DIR, fname)
@@ -185,6 +193,8 @@ async def _save_vehicle_photo(photo: UploadFile | None) -> str | None:
         return None
     if len(data) > MAX_PHOTO_BYTES:
         raise HTTPException(status_code=400, detail="Photo must be under 5 MB")
+    from app.utils.image import process_image_upload
+    data = process_image_upload(data, is_profile=False)
     import secrets
     fname = f"{secrets.token_hex(8)}{ext}"
     fpath = os.path.join(VEHICLE_UPLOAD_DIR, fname)
@@ -210,6 +220,9 @@ async def _save_branding_asset(asset: UploadFile | None, label: str) -> str | No
         return None
     if len(data) > MAX_PHOTO_BYTES:
         raise HTTPException(status_code=400, detail=f"{label} must be under 5 MB")
+    if ext not in {".svg", ".ico"}:
+        from app.utils.image import process_image_upload
+        data = process_image_upload(data, is_profile=False)
     import secrets
     fname = f"{secrets.token_hex(8)}{ext}"
     fpath = os.path.join(BRANDING_UPLOAD_DIR, fname)
@@ -4663,6 +4676,8 @@ async def _save_market_home_image(photo: UploadFile | None) -> str | None:
         return None
     if len(data) > MAX_PHOTO_BYTES:
         raise HTTPException(status_code=400, detail="Image must be under 5 MB")
+    from app.utils.image import process_image_upload
+    data = process_image_upload(data, is_profile=False)
     import secrets
     fname = f"{secrets.token_hex(8)}{ext}"
     fpath = os.path.join(MARKET_HOME_UPLOAD_DIR, fname)
@@ -7916,6 +7931,8 @@ async def _save_food_home_image(photo: UploadFile | None) -> str | None:
         return None
     if len(data) > MAX_PHOTO_BYTES:
         raise HTTPException(status_code=400, detail="Image must be under 5 MB")
+    from app.utils.image import process_image_upload
+    data = process_image_upload(data, is_profile=False)
     import secrets
     fname = f"{secrets.token_hex(8)}{ext}"
     fpath = os.path.join(FOOD_HOME_UPLOAD_DIR, fname)

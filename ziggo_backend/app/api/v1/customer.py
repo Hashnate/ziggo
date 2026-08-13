@@ -115,11 +115,14 @@ async def _save_profile_photo(asset: UploadFile) -> str:
         raise HTTPException(status_code=400, detail="Empty file")
     if len(data) > 5 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="Photo must be under 5 MB")
+    from ...utils.image import process_image_upload
+    data = process_image_upload(data, is_profile=True)
     fname = f"profile_{secrets.token_hex(8)}{ext}"
     fpath = os.path.join(_PROFILE_PHOTO_DIR, fname)
     with open(fpath, "wb") as f:
         f.write(data)
     return f"/static/uploads/customers/{fname}"
+
 
 
 @router.post("/profile-photo")

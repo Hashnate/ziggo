@@ -68,6 +68,8 @@ async def _save_image(photo: UploadFile, kind: str) -> str:
         raise HTTPException(status_code=400, detail="Empty file")
     if len(data) > _MAX_IMG_BYTES:
         raise HTTPException(status_code=400, detail="Image must be under 5 MB")
+    from ...utils.image import process_image_upload
+    data = process_image_upload(data, is_profile=False)
     target_dir = os.path.join(_UPLOAD_BASE, kind)
     os.makedirs(target_dir, exist_ok=True)
     fname = f"{secrets.token_hex(8)}{ext}"
@@ -75,6 +77,7 @@ async def _save_image(photo: UploadFile, kind: str) -> str:
     with open(fpath, "wb") as f:
         f.write(data)
     return f"/static/uploads/{kind}/{fname}"
+
 
 
 def _to_response(r: Restaurant) -> RestaurantProfileResponse:
