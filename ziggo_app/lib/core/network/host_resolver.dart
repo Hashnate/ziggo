@@ -8,23 +8,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Discovers the Ziggo backend's reachable URL at runtime.
 ///
-/// Production: uses the direct IP (DNS-free, works on all mobile carriers)
-/// as the guaranteed fallback. Prefers the domain if DNS resolves.
+/// Production: Uses the secure https://ziggo.lk endpoint exclusively.
 /// Dev: override with `--dart-define=API_HOST=http://your-dev-pc:8030`.
 class HostResolver {
   HostResolver._();
 
-  static const int _port = 8030;
+  static const String productionHost = 'https://ziggo.lk';
+  static const String fallbackHost = productionHost;
   static const String _prefsKey = 'ziggo_api_host';
   static const String _envHost =
       String.fromEnvironment('API_HOST', defaultValue: '');
-
-  // Direct IP on port 80 (nginx) — guaranteed to work on ALL carriers
-  // because it bypasses DNS resolution entirely.
-  static const String fallbackHost = 'http://187.127.152.141';
-
-  // Preferred HTTPS domain — used when the phone's DNS can resolve it.
-  static const String _preferredHost = 'https://ziggo.lk';
 
   static String? _cached;
   static Future<String>? _inFlight;
@@ -42,50 +35,38 @@ class HostResolver {
   }
 
   static Future<String> _resolve() async {
-    // 1. Explicit override via --dart-define
+    // 1. Explicit override via --dart-define (dev testing)
     if (_envHost.isNotEmpty && await _probe(_envHost)) {
       return _save(_envHost);
     }
 
-    // 2. Previously-resolved host from SharedPreferences (skip stale entries)
-    String? saved;
+    // 2. Wipe any stale raw-IP or legacy port entries from SharedPreferences
     try {
       final prefs = await SharedPreferences.getInstance();
-      saved = prefs.getString(_prefsKey);
-      // Wipe stale entries: old port-based URLs or plain-HTTP remote hosts
+      final saved = prefs.getString(_prefsKey);
       if (saved != null) {
-        if (saved.contains(':8000') || saved.contains(':8030')) {
+        if (saved.contains('187.127.152.141') ||
+            saved.contains(':8000') ||
+            saved.contains(':8030') ||
+            saved.startsWith('http://')) {
           await prefs.remove(_prefsKey);
-          saved = null;
         }
       }
     } catch (_) {}
-    if (saved != null && saved.isNotEmpty && await _probe(saved)) {
-      _cached = saved;
-      return saved;
-    }
 
-    // 3. Probe production hosts — IP first (DNS-free, fastest), then domain
-    final prodHosts = <String>[
-      fallbackHost,     // http://187.127.152.141 — no DNS needed, always works
-      _preferredHost,   // https://ziggo.lk — preferred but needs DNS
-    ];
-    final prodResult = await _probeMany(prodHosts);
-    if (prodResult != null) return _save(prodResult);
-
-    // 4. Dev-only: probe localhost / Android emulator gateway
-    if (!kIsWeb) {
+    // 3. Dev-only: probe localhost / Android emulator gateway in debug mode
+    if (!kIsWeb && kDebugMode) {
       final devHosts = <String>[
-        'http://localhost:$_port',
-        'http://10.0.2.2:$_port',
+        'http://localhost:8030',
+        'http://10.0.2.2:8030',
       ];
       final devResult = await _probeMany(devHosts);
       if (devResult != null) return _save(devResult);
     }
 
-    // 5. Last resort — use the IP directly (don't waste time scanning subnet)
-    _cached = fallbackHost;
-    return fallbackHost;
+    // 4. Default to secure production HTTPS domain
+    _cached = productionHost;
+    return productionHost;
   }
 
   static Future<String> _save(String host) async {

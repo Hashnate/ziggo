@@ -39,7 +39,7 @@ import FirebaseMessaging
     NSLog(errorMessage)
     
     // Post the error message back to the backend so we can see it in docker compose logs
-    let hosts = ["https://ziggo.lk", "http://187.127.152.141"]
+    let hosts = ["https://ziggo.lk"]
     for host in hosts {
       if let url = URL(string: "\(host)/api/v1/public/log") {
         var request = URLRequest(url: url)

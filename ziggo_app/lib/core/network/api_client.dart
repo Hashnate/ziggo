@@ -44,22 +44,6 @@ class ApiClient {
           if (e.response?.statusCode == 401) {
             await TokenStorage.clear();
           }
-          final isConn = e.type == DioExceptionType.connectionError ||
-              e.type == DioExceptionType.connectionTimeout;
-          final alreadyRetried = e.requestOptions.extra['ziggo_retry'] == true;
-          if (isConn && !alreadyRetried) {
-            // Directly use the IP fallback — no DNS, no probing, instant.
-            final ipBase = '${HostResolver.fallbackHost}/api/v1';
-            try {
-              final req = e.requestOptions;
-              req.baseUrl = ipBase;
-              req.extra['ziggo_retry'] = true;
-              final r = await _dio.fetch(req);
-          // Direct IP worked — cache it for future requests
-              HostResolver.override(HostResolver.fallbackHost);
-              return handler.resolve(r);
-            } catch (_) {}
-          }
 
           var cleanMessage = sanitizeString(e.message ?? '');
           if (cleanMessage.isEmpty ||
