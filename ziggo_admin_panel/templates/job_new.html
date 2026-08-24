@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}New Job Role | Ziggo Admin{% endblock %}
+{% block page_title %}New Job Role{% endblock %}
+
+{% block content %}
+<form method="post" action="/admin/jobs/new" class="max-w-4xl mx-auto space-y-6">
+
+    <div class="flex items-center justify-between">
+        <a href="/admin/jobs" class="inline-flex items-center text-sm font-bold text-ziggo-muted hover:text-ziggo transition">
+            <i class="fas fa-arrow-left mr-2"></i> Back to Careers &amp; Jobs
+        </a>
+        <button type="submit" class="px-6 py-2.5 rounded-xl bg-ziggo text-white font-bold text-sm hover:bg-ziggo-light transition shadow-sm flex items-center gap-2">
+            <i class="fas fa-save"></i> Publish Job Role
+        </button>
+    </div>
+
+    {% if error %}
+    <div class="p-4 rounded-xl bg-red-50 text-red-700 text-sm font-bold border border-red-200 flex items-center gap-2">
+        <i class="fas fa-exclamation-circle"></i> {{ error }}
+    </div>
+    {% endif %}
+
+    <!-- Basic Job Info -->
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-sm p-6 space-y-5">
+        <h3 class="font-black text-ziggo-ink text-lg border-b border-ziggo-line pb-3 flex items-center gap-2">
+            <i class="fas fa-briefcase text-ziggo"></i> Basic Information
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="md:col-span-2">
+                <label class="block text-xs font-bold text-ziggo-muted mb-1.5 uppercase tracking-wider">Job Title *</label>
+                <input name="title" required value="{{ form.title or '' }}"
+                       placeholder="e.g. Senior Business Analyst – Search Experience"
+                       class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-medium">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-ziggo-muted mb-1.5 uppercase tracking-wider">Department *</label>
+                <input name="department" list="department-options" required value="{{ form.department or '' }}"
+                       placeholder="e.g. Product Engineering, Engineering, Operations"
+                       class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-medium">
+                <datalist id="department-options">
+                    <option value="Product Engineering">
+                    <option value="Engineering">
+                    <option value="Operations">
+                    <option value="Design">
+                    <option value="Marketing & Growth">
+                    <option value="Data Science & Analytics">
+                    <option value="Customer Support">
+                    <option value="Finance & Legal">
+                    <option value="People & Culture">
+                </datalist>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-ziggo-muted mb-1.5 uppercase tracking-wider">Location *</label>
+                <input name="location" required value="{{ form.location or 'Colombo' }}"
+                       placeholder="e.g. Colombo, Colombo / Hybrid, Remote"
+                       class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-medium">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-ziggo-muted mb-1.5 uppercase tracking-wider">Employment Type *</label>
+                <select name="employment_type" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white text-sm font-medium">
+                    <option value="Full Time" {% if form.employment_type == 'Full Time' %}selected{% endif %}>Full Time</option>
+                    <option value="Part Time" {% if form.employment_type == 'Part Time' %}selected{% endif %}>Part Time</option>
+                    <option value="Contract" {% if form.employment_type == 'Contract' %}selected{% endif %}>Contract</option>
+                    <option value="Internship" {% if form.employment_type == 'Internship' %}selected{% endif %}>Internship</option>
+                    <option value="Remote" {% if form.employment_type == 'Remote' %}selected{% endif %}>Remote</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-ziggo-muted mb-1.5 uppercase tracking-wider">Display Order</label>
+                <input name="display_order" type="number" value="{{ form.display_order or '0' }}"
+                       placeholder="0"
+                       class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-medium">
+                <p class="text-[11px] text-ziggo-muted mt-1">Lower numbers appear first on the website listing.</p>
+            </div>
+        </div>
+
+        <div class="pt-2">
+            <label class="flex items-center gap-3 cursor-pointer select-none">
+                <input type="checkbox" name="is_active" {% if form.is_active %}checked{% endif %}
+                       class="w-4 h-4 text-ziggo rounded border-ziggo-line focus:ring-ziggo">
+                <span class="text-sm font-bold text-ziggo-ink">Publish role immediately on the website</span>
+            </label>
+        </div>
+    </div>
+
+    <!-- Overview / Short Introduction -->
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-sm p-6 space-y-4">
+        <h3 class="font-black text-ziggo-ink text-lg border-b border-ziggo-line pb-3 flex items-center gap-2">
+            <i class="fas fa-file-alt text-ziggo"></i> Overview &amp; Introduction
+        </h3>
+
+        <div>
+            <label class="block text-xs font-bold text-ziggo-muted mb-1.5 uppercase tracking-wider">Role Overview / Summary</label>
+            <textarea name="overview" rows="4"
+                      placeholder="We are seeking a highly analytical and product-oriented Senior Business Analyst to own the evolution of the Search Experience..."
+                      class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-medium leading-relaxed">{{ form.overview or '' }}</textarea>
+            <p class="text-[11px] text-ziggo-muted mt-1">Displayed in the header banner of the job detail page below the title.</p>
+        </div>
+    </div>
+
+    <!-- Detailed Responsibilities & Requirements -->
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-sm p-6 space-y-5">
+        <h3 class="font-black text-ziggo-ink text-lg border-b border-ziggo-line pb-3 flex items-center gap-2">
+            <i class="fas fa-list-check text-ziggo"></i> Responsibilities &amp; Requirements
+        </h3>
+
+        <div>
+            <label class="block text-xs font-bold text-ziggo-muted mb-1.5 uppercase tracking-wider">You will be responsible for</label>
+            <textarea name="responsibilities" rows="8"
+                      placeholder="Search Product Ownership
+• Own and maintain the roadmap for the Ziggo Search experience.
+• Gather business requirements and convert them into product specs.
+
+Search Analytics & Insights
+• Continuously monitor search performance metrics.
+• Analyze search behaviour to identify trends."
+                      class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-mono leading-relaxed">{{ form.responsibilities or '' }}</textarea>
+            <p class="text-[11px] text-ziggo-muted mt-1">Add subheadings and bullet lines starting with • or -. They will render as styled checkmark items on the website.</p>
+        </div>
+
+        <div>
+            <label class="block text-xs font-bold text-ziggo-muted mb-1.5 uppercase tracking-wider">You might be a fit if you have (Requirements)</label>
+            <textarea name="requirements" rows="6"
+                      placeholder="• Bachelor's degree in Business, IT, Computer Science or related discipline.
+• Minimum 3+ years of experience as a Business Analyst / Product Analyst.
+• Strong analytical skills with experience interpreting data to drive product decisions.
+• Excellent communication and stakeholder management skills."
+                      class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-mono leading-relaxed">{{ form.requirements or '' }}</textarea>
+            <p class="text-[11px] text-ziggo-muted mt-1">Add bullet points starting with • or -.</p>
+        </div>
+
+        <div>
+            <label class="block text-xs font-bold text-ziggo-muted mb-1.5 uppercase tracking-wider">Preferred Qualifications (Optional)</label>
+            <textarea name="preferred_qualifications" rows="4"
+                      placeholder="1. Experience with search platforms such as Algolia, Elasticsearch, OpenSearch.
+2. Experience in e-commerce, marketplaces, food delivery, or consumer apps.
+3. Knowledge of search relevance and ranking strategies."
+                      class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-mono leading-relaxed">{{ form.preferred_qualifications or '' }}</textarea>
+            <p class="text-[11px] text-ziggo-muted mt-1">Numbered or bulleted preferred qualifications list.</p>
+        </div>
+    </div>
+
+    <!-- Application Settings -->
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-sm p-6 space-y-4">
+        <h3 class="font-black text-ziggo-ink text-lg border-b border-ziggo-line pb-3 flex items-center gap-2">
+            <i class="fas fa-paper-plane text-ziggo"></i> Application Settings
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs font-bold text-ziggo-muted mb-1.5 uppercase tracking-wider">Application Email Address</label>
+                <input name="apply_email" value="{{ form.apply_email or 'careers@ziggo.lk' }}"
+                       placeholder="careers@ziggo.lk"
+                       class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-medium">
+                <p class="text-[11px] text-ziggo-muted mt-1">When applicants click "Apply Now", an email will open addressed to this recipient.</p>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-ziggo-muted mb-1.5 uppercase tracking-wider">External Application URL (Optional)</label>
+                <input name="apply_url" value="{{ form.apply_url or '' }}"
+                       placeholder="https://..."
+                       class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-medium">
+            </div>
+        </div>
+    </div>
+
+    <div class="flex justify-end gap-3 pt-2">
+        <a href="/admin/jobs" class="px-6 py-3 rounded-xl border border-ziggo-line text-ziggo-muted font-bold text-sm hover:bg-ziggo-canvas transition">
+            Cancel
+        </a>
+        <button type="submit" class="px-8 py-3 rounded-xl bg-ziggo text-white font-bold text-sm hover:bg-ziggo-light transition shadow-sm">
+            <i class="fas fa-plus mr-1.5"></i> Save &amp; Publish Job Role
+        </button>
+    </div>
+
+</form>
+{% endblock %}

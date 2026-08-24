@@ -21,6 +21,8 @@ from ...models import (
     Restaurant,
     User,
     UserRole,
+    JobOpening,
+    JobApplication,
 )
 from ...services.fare_service import calculate_fare
 
@@ -526,3 +528,117 @@ async def check_mobile(
         return {"registered": True, "message": "This number is already registered."}
 
     return {"registered": False}
+
+
+@router.get("/jobs")
+async def get_public_jobs(
+    department: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """List active job openings for the marketing website careers page."""
+    stmt = select(JobOpening).where(JobOpening.is_active == True)  # noqa: E712
+    if department and department.strip():
+        stmt = stmt.where(JobOpening.department.ilike(f"%{department.strip()}%"))
+    stmt = stmt.order_by(JobOpening.display_order.asc(), JobOpening.created_at.desc())
+
+    res = await db.execute(stmt)
+    jobs = res.scalars().all()
+
+    return [
+        {
+            "id": j.id,
+            "title": j.title,
+            "slug": j.slug,
+            "department": j.department,
+            "location": j.location,
+            "employment_type": j.employment_type,
+            "overview": j.overview,
+            "apply_email": j.apply_email,
+            "created_at": j.created_at.isoformat() if j.created_at else None,
+        }
+        for j in jobs
+    ]
+
+
+@router.get("/jobs/{slug_or_id}")
+async def get_public_job_detail(
+    slug_or_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get full details of a specific job role by slug or ID."""
+    from fastapi import HTTPException
+
+    stmt = select(JobOpening)
+    if slug_or_id.isdigit():
+        stmt = stmt.where(JobOpening.id == int(slug_or_id))
+    else:
+        stmt = stmt.where(JobOpening.slug == slug_or_id.strip())
+
+    res = await db.execute(stmt)
+    job = res.scalars().first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job opening not found")
+
+    return {
+        "id": job.id,
+        "title": job.title,
+        "slug": job.slug,
+        "department": job.department,
+        "location": job.location,
+        "employment_type": job.employment_type,
+        "overview": job.overview,
+        "responsibilities": job.responsibilities,
+        "requirements": job.requirements,
+        "preferred_qualifications": job.preferred_qualifications,
+        "apply_email": job.apply_email,
+        "apply_url": job.apply_url,
+        "is_active": job.is_active,
+        "created_at": job.created_at.isoformat() if job.created_at else None,
+    }
+
+
+class PublicJobApplyRequest(BaseModel):
+    full_name: str = Field(..., min_length=1, max_length=120)
+    email: str = Field(..., min_length=3, max_length=200)
+    phone: str = Field(..., min_length=4, max_length=40)
+    resume_url: str | None = Field(None, max_length=500)
+    linkedin_url: str | None = Field(None, max_length=300)
+    cover_note: str | None = Field(None, max_length=5000)
+
+
+@router.post("/jobs/{job_id}/apply")
+async def apply_for_job(
+    job_id: int,
+    req: PublicJobApplyRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Submit a job application from the website careers page."""
+    from fastapi import HTTPException
+
+    job_res = await db.execute(select(JobOpening).where(JobOpening.id == job_id))
+    job = job_res.scalars().first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job opening not found")
+
+    application = JobApplication(
+        job_id=job.id,
+        job_title=job.title,
+        full_name=req.full_name.strip(),
+        email=req.email.strip(),
+        phone=req.phone.strip(),
+        resume_url=req.resume_url.strip() if req.resume_url else None,
+        linkedin_url=req.linkedin_url.strip() if req.linkedin_url else None,
+        cover_note=req.cover_note.strip() if req.cover_note else None,
+        status="new",
+        is_read=False,
+    )
+    db.add(application)
+    await db.commit()
+    await db.refresh(application)
+
+    return {
+        "ok": True,
+        "id": application.id,
+        "message": f"Thank you, {application.full_name}! Your application for '{job.title}' has been received.",
+    }
+

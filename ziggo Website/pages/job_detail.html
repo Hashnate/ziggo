@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title id="pageTitle">Job Opening | Ziggo Careers</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/images/logo/favicon.svg?v=2">
+  <link rel="apple-touch-icon" href="../assets/images/logo/favicon.svg?v=2">
+  <meta name="description" id="metaDesc" content="Explore job openings and build the future of mobility, delivery, and services at Ziggo." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="../assets/css/premium.css?v=20260602-v46">
+  <style>
+    /* High Specificity Hero Banner */
+    body.pm .job-hero,
+    .job-hero {
+      position: relative;
+      padding: 130px 0 90px;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse 90% 70% at 10% 20%, rgba(37, 99, 235, 0.45), transparent 65%),
+        radial-gradient(ellipse 70% 60% at 85% 75%, rgba(30, 58, 138, 0.7), transparent 60%),
+        linear-gradient(135deg, #0B1426 0%, #131C3D 50%, #1E3A8A 100%);
+      color: #FFFFFF !important;
+    }
+    .job-hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.1) 1px, transparent 0);
+      background-size: 28px 28px;
+      pointer-events: none;
+    }
+    .job-hero-inner {
+      position: relative;
+      z-index: 2;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 52px;
+      align-items: start;
+    }
+    body.pm .job-hero a.job-hero-back,
+    .job-hero-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #93C5FD !important;
+      font-size: 0.92rem;
+      font-weight: 700;
+      text-decoration: none;
+      margin-bottom: 22px;
+      transition: all 0.2s ease;
+    }
+    body.pm .job-hero a.job-hero-back:hover,
+    .job-hero-back:hover {
+      color: #FFFFFF !important;
+      transform: translateX(-3px);
+    }
+    body.pm .job-hero h1,
+    body.pm .job-hero .job-hero-title,
+    .job-hero-title {
+      font-family: var(--p-font-display, 'Bricolage Grotesque', sans-serif);
+      font-size: clamp(2.3rem, 4.2vw, 3.4rem) !important;
+      font-weight: 800 !important;
+      letter-spacing: -0.035em !important;
+      line-height: 1.15 !important;
+      color: #FFFFFF !important;
+      margin: 0 0 22px 0 !important;
+      text-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+    }
+    body.pm .job-hero p,
+    body.pm .job-hero .job-hero-overview,
+    .job-hero-overview {
+      font-size: clamp(1.02rem, 1.15vw, 1.12rem) !important;
+      line-height: 1.7 !important;
+      color: rgba(255, 255, 255, 0.94) !important;
+      max-width: 65ch;
+      margin: 0 !important;
+    }
+
+    /* Floating Card */
+    .job-float-card {
+      box-sizing: border-box !important;
+      background: #FFFFFF;
+      border-radius: 24px;
+      padding: 32px 28px;
+      box-shadow: 0 24px 60px -15px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.15);
+      color: #0F172A;
+      width: 100%;
+    }
+    .job-float-card * {
+      box-sizing: border-box !important;
+    }
+    .job-info-list {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      margin-bottom: 24px;
+      padding-bottom: 22px;
+      border-bottom: 1px solid #E2E8F0;
+    }
+    .job-info-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 0.98rem;
+      font-weight: 600;
+      color: #1E293B;
+    }
+    .job-info-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: #EFF6FF;
+      color: #2563EB;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.05rem;
+      flex-shrink: 0;
+    }
+    .job-apply-btn {
+      box-sizing: border-box !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      height: 52px;
+      padding: 0 20px !important;
+      margin: 0 !important;
+      border-radius: 9999px;
+      background: linear-gradient(135deg, #1E40AF 0%, #1D4ED8 100%);
+      color: #FFFFFF !important;
+      font-weight: 700;
+      font-size: 1.02rem;
+      border: none;
+      cursor: pointer;
+      display: flex !important;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      text-decoration: none;
+      box-shadow: 0 10px 25px -5px rgba(30, 64, 175, 0.45);
+      transition: all 0.25s ease;
+    }
+    .job-apply-btn:hover {
+      background: linear-gradient(135deg, #1D4ED8 0%, #2563EB 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 14px 30px -5px rgba(37, 99, 235, 0.55);
+      color: #FFFFFF !important;
+    }
+    .job-share-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 22px;
+      padding-top: 18px;
+      border-top: 1px solid #F1F5F9;
+      color: #64748B;
+      font-size: 0.88rem;
+      font-weight: 600;
+    }
+    .job-share-icons {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .job-share-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      color: #475569;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      padding: 0;
+    }
+    .job-share-icon:hover {
+      background: #EFF6FF;
+      color: #2563EB;
+      border-color: #BFDBFE;
+      transform: translateY(-1px);
+    }
+
+    /* Content Body */
+    .job-body-section {
+      padding: 80px 0 100px;
+      background: #FFFFFF;
+    }
+    .job-body-inner {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+    .job-content-block {
+      margin-bottom: 56px;
+    }
+    body.pm .job-body-section h2.job-section-title,
+    .job-section-title {
+      font-family: var(--p-font-display, 'Bricolage Grotesque', sans-serif);
+      font-size: clamp(1.75rem, 2.6vw, 2.2rem) !important;
+      font-weight: 800 !important;
+      letter-spacing: -0.03em !important;
+      color: #0F172A !important;
+      margin: 0 0 24px 0 !important;
+    }
+    body.pm .job-body-section h3.job-subheading,
+    .job-subheading {
+      font-family: var(--p-font-display, 'Bricolage Grotesque', sans-serif);
+      font-size: 1.25rem !important;
+      font-weight: 700 !important;
+      color: #0F172A !important;
+      margin: 32px 0 16px 0 !important;
+    }
+    .job-check-list {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    .job-check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      font-size: 1.02rem;
+      line-height: 1.65;
+      color: #334155;
+    }
+    .job-check-icon {
+      color: #2563EB;
+      font-size: 1.25rem;
+      margin-top: 3px;
+      flex-shrink: 0;
+    }
+    .job-num-list {
+      padding-left: 24px;
+      margin: 16px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      font-size: 1.02rem;
+      line-height: 1.65;
+      color: #334155;
+    }
+
+    /* Bottom Apply Banner */
+    .job-bottom-cta {
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      border-radius: 24px;
+      padding: 48px 36px;
+      text-align: center;
+      margin-top: 64px;
+    }
+    body.pm .job-bottom-cta h3,
+    .job-bottom-cta h3 {
+      font-family: var(--p-font-display);
+      font-size: 1.75rem !important;
+      font-weight: 800 !important;
+      color: #0F172A !important;
+      margin: 0 0 12px 0 !important;
+    }
+    body.pm .job-bottom-cta p,
+    .job-bottom-cta p {
+      color: #64748B !important;
+      font-size: 1.02rem !important;
+      max-width: 52ch;
+      margin: 0 auto 28px !important;
+      line-height: 1.6;
+    }
+
+    /* Toast Notification */
+    .job-toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #0B1426;
+      color: #FFFFFF;
+      padding: 12px 20px;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+      z-index: 9999;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: all 0.3s;
+      pointer-events: none;
+    }
+    .job-toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 960px) {
+      .job-hero-inner {
+        grid-template-columns: 1fr;
+        gap: 40px;
+      }
+      body.pm .job-hero,
+      .job-hero {
+        padding: 110px 0 60px;
+      }
+      .job-float-card {
+        max-width: 500px;
+      }
+    }
+  </style>
+</head>
+<body class="pm">
+
+<nav class="pm-topbar" id="pmTopbar">
+  <div class="pm-topbar-inner">
+    <a href="/" class="pm-nav-logo"><img src="../assets/images/logo/logo-dark.png?v=2" alt="Ziggo"></a>
+    <ul class="pm-nav-links">
+      <li class="pm-nav-has-dropdown">
+        <a href="#" class="pm-nav-link">Services <i class="fa-solid fa-chevron-down"></i></a>
+        <div class="pm-nav-dropdown">
+          <a href="services/ride" class="color-ride"><span class="ico ico-img"><img src="../assets/images/services/ride.png?v=pm108-realstudio" alt=""></span><div><strong>Ride</strong><small>Tuk, Mini, City, Flex, Lux</small></div></a>
+          <a href="services/food" class="color-food"><span class="ico ico-img"><img src="../assets/images/services/food.png?v=20260602nobg2" alt=""></span><div><strong>Food</strong><small>10,000+ restaurants</small></div></a>
+          <a href="services/flash" class="color-flash"><span class="ico ico-img"><img src="../assets/images/services/flash.png?v=20260602nobg" alt=""></span><div><strong>Flash</strong><small>Same-day parcel delivery</small></div></a>
+          <a href="services/truck" class="color-truck"><span class="ico ico-img"><img src="../assets/images/services/truck.png?v=20260520123" alt=""></span><div><strong>Truck</strong><small>Moving &amp; cargo, with helpers</small></div></a>
+          <a href="services/mart" class="color-mart">
+            <span class="ico ico-img"><img src="../assets/images/services/mart.png?v=pm115-cleanbag" alt=""></span>
+            <div><strong>Mart</strong><small>Groceries in 30 minutes</small></div>
+          </a>
+          <a href="signup" class="pm-mega-footer"><div class="text"><strong>Ziggo Pass</strong><small>Unlimited free delivery for Rs. 549/mo</small></div><span class="cta">Try free <i class="fa-solid fa-arrow-right"></i></span></a>
+        </div>
+      </li>
+      <li class="pm-nav-has-dropdown">
+        <a href="#" class="pm-nav-link">Partner <i class="fa-solid fa-chevron-down"></i></a>
+        <div class="pm-nav-dropdown">
+          <a href="drive" class="color-drive"><span class="ico ico-img"><img src="../assets/images/services/ride.png?v=pm108-realstudio" alt=""></span><div><strong>Drive with Ziggo</strong><small>Be your own boss</small></div></a>
+          <a href="partner" class="color-merchant"><span class="ico ico-img"><img src="../assets/images/services/food.png?v=20260602nobg2" alt=""></span><div><strong>Merchant partner</strong><small>List your restaurant or store</small></div></a>
+          <a href="business" class="color-biz"><span class="ico ico-img"><img src="../assets/images/services/truck.png?v=20260520123" alt=""></span><div><strong>For Business</strong><small>Corporate accounts</small></div></a>
+          <a href="drive" class="pm-mega-footer"><div class="text"><strong>Earn up to LKR 60K / week</strong><small>50,000 drivers already on Ziggo</small></div><span class="cta">Apply <i class="fa-solid fa-arrow-right"></i></span></a>
+        </div>
+      </li>
+      <li><a href="careers" class="pm-nav-link active">Careers</a></li>
+      <li><a href="about" class="pm-nav-link">About</a></li>
+      <li><a href="preregister" class="pm-nav-link">Preregister</a></li>
+    </ul>
+    <div class="pm-nav-cta"><a href="signup" class="signup">Get the app</a></div>
+    <button class="pm-nav-toggle" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
+  </div>
+</nav>
+
+<!-- Hero Section with Ziggo Royal Blue Theme -->
+<section class="job-hero">
+  <div class="job-hero-inner">
+    <div>
+      <a href="careers.html#openings" class="job-hero-back">
+        <i class="fa-solid fa-arrow-left"></i> Back to all openings
+      </a>
+      <h1 class="job-hero-title" id="jobTitle">Loading position...</h1>
+      <p class="job-hero-overview" id="jobOverview"></p>
+    </div>
+
+    <!-- Floating Top-Right White Card -->
+    <div class="job-float-card">
+      <div class="job-info-list">
+        <div class="job-info-item">
+          <div class="job-info-icon"><i class="fa-solid fa-location-dot"></i></div>
+          <span id="jobLocation">Colombo</span>
+        </div>
+        <div class="job-info-item">
+          <div class="job-info-icon"><i class="fa-solid fa-briefcase"></i></div>
+          <span id="jobDepartment">Department</span>
+        </div>
+        <div class="job-info-item">
+          <div class="job-info-icon"><i class="fa-regular fa-clock"></i></div>
+          <span id="jobType">Full Time</span>
+        </div>
+      </div>
+
+      <a id="applyBtn" href="mailto:careers@ziggo.lk" class="job-apply-btn">
+        Apply Now <i class="fa-solid fa-arrow-up-right-from-square text-sm"></i>
+      </a>
+
+      <div class="job-share-row">
+        <span>Share</span>
+        <div class="job-share-icons">
+          <a id="shareFb" href="#" target="_blank" class="job-share-icon" title="Share on Facebook"><i class="fa-brands fa-facebook-f"></i></a>
+          <a id="shareX" href="#" target="_blank" class="job-share-icon" title="Share on X"><i class="fa-brands fa-x-twitter"></i></a>
+          <a id="shareIn" href="#" target="_blank" class="job-share-icon" title="Share on LinkedIn"><i class="fa-brands fa-linkedin-in"></i></a>
+          <a id="shareMail" href="#" class="job-share-icon" title="Share via Email"><i class="fa-solid fa-envelope"></i></a>
+          <button id="shareCopy" class="job-share-icon" title="Copy link"><i class="fa-solid fa-link"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Main Body Description Content -->
+<section class="job-body-section">
+  <div class="job-body-inner">
+
+    <!-- Responsibilities Section -->
+    <div class="job-content-block" id="respContainer">
+      <h2 class="job-section-title">You will be responsible for</h2>
+      <div id="respContent">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+
+    <!-- Requirements Section -->
+    <div class="job-content-block" id="reqContainer">
+      <h2 class="job-section-title">You might be a fit if you have</h2>
+      <div id="reqContent">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+
+    <!-- Bottom Apply CTA -->
+    <div class="job-bottom-cta">
+      <h3>Ready to shape the future of Ziggo?</h3>
+      <p>Send your CV and a brief introduction to our talent acquisition team. We look forward to hearing from you!</p>
+      <a id="bottomApplyBtn" href="mailto:careers@ziggo.lk" class="job-apply-btn" style="display:inline-flex; width:auto; padding:0 36px; height:52px;">
+        Apply for this position <i class="fa-solid fa-envelope ml-2"></i>
+      </a>
+    </div>
+
+  </div>
+</section>
+
+<footer class="pm-footer">
+  <div class="pm-footer-top">
+    <div class="pm-footer-brand">
+      <a href="/" class="pm-nav-logo pm-footer-logo"><img src="../assets/images/logo/logo-light.png?v=2" alt="Ziggo"></a>
+      <p>Sri Lanka's super app for rides, food, parcels and more &mdash; all in one place.</p>
+      <div class="socials">
+        <a href="https://www.facebook.com/profile.php?id=61590470438129" target="_blank" rel="noopener" aria-label="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
+        <a href="https://www.instagram.com/ziggo.lk?igsh=andzbWllcTV4ZXRt" target="_blank" rel="noopener" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
+        <a href="https://www.tiktok.com/@ziggo.lk?_r=1&amp;_t=ZS-96p4uTAYIK4" target="_blank" rel="noopener" aria-label="TikTok"><i class="fa-brands fa-tiktok"></i></a><a href="https://x.com/Ziggolk" target="_blank" rel="noopener" aria-label="Twitter"><i class="fa-brands fa-x-twitter"></i></a><a href="#" aria-label="LinkedIn"><i class="fa-brands fa-linkedin-in"></i></a><a href="https://www.youtube.com/@Ziggolk" target="_blank" rel="noopener" aria-label="YouTube"><i class="fa-brands fa-youtube"></i></a>
+      </div>
+    </div>
+    <div class="pm-footer-col"><h5>Services</h5><ul><li><a href="services/ride">Ride</a></li><li><a href="services/food">Food</a></li><li><a href="services/flash">Flash</a></li><li><a href="services/truck">Truck</a></li><li><a href="services/mart">Mart</a></li></ul></div>
+    <div class="pm-footer-col"><h5>Partner</h5><ul><li><a href="drive">Drive with Ziggo</a></li><li><a href="partner">Merchant partner</a></li><li><a href="business">For Business</a></li><li><a href="signup">Ziggo Pass</a></li></ul></div>
+    <div class="pm-footer-col"><h5>Company</h5><ul><li><a href="about">About</a></li><li><a href="news">News</a></li><li><a href="careers">Careers</a></li><li><a href="contact">Contact</a></li>
+<li><a href="preregister">Preregister</a></li></ul></div>
+    <div class="pm-footer-col"><h5>Support</h5><ul><li><a href="help">Help Center</a></li><li><a href="safety">Safety</a></li><li><a href="privacy">Privacy</a></li><li><a href="terms">Terms</a></li></ul></div>
+  </div>
+  <div class="pm-footer-bottom">
+    <span>&copy; 2026 Ziggo.lk</span>
+    <div><a href="privacy">Privacy</a><a href="terms">Terms</a><a href="contact">Contact</a></div>
+  </div>
+</footer>
+
+<div id="toast" class="job-toast">Link copied to clipboard!</div>
+
+<script>
+(function() {
+  const topbar = document.getElementById('pmTopbar');
+  if (topbar) {
+    const onScroll = () => topbar.classList.toggle('scrolled', window.scrollY > 12);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  }
+  const navToggle = document.querySelector('.pm-nav-toggle');
+  const navLinks = document.querySelector('.pm-nav-links');
+  if (navToggle && topbar) {
+    navToggle.addEventListener('click', (e) => { e.stopPropagation(); topbar.classList.toggle('nav-open'); });
+    document.querySelectorAll('.pm-nav-links a').forEach((a) => a.addEventListener('click', () => topbar.classList.remove('nav-open')));
+    document.addEventListener('click', (e) => { if (!e.target.closest('.pm-topbar')) topbar.classList.remove('nav-open'); });
+  }
+
+  // Parse Query Param (slug or id)
+  const urlParams = new URLSearchParams(window.location.search);
+  const jobId = urlParams.get('id');
+  const jobSlug = urlParams.get('slug') || urlParams.get('job');
+
+  async function loadJobDetail() {
+    try {
+      let target = jobId || jobSlug;
+      if (!target) {
+        // If no parameter in URL, automatically load the first active job
+        const listRes = await fetch('/api/v1/public/jobs');
+        if (listRes.ok) {
+          const list = await listRes.json();
+          if (list && list.length > 0) {
+            target = list[0].id || list[0].slug;
+          }
+        }
+      }
+      if (!target) throw new Error('No open positions found');
+
+      const res = await fetch(`/api/v1/public/jobs/${encodeURIComponent(target)}`);
+      if (!res.ok) throw new Error('Job not found');
+      const job = await res.json();
+      renderJob(job);
+    } catch (err) {
+      console.error('Error loading job:', err);
+      document.getElementById('jobTitle').textContent = 'Position Not Found';
+      document.getElementById('jobOverview').textContent = 'Please select a valid open role from our careers page.';
+      document.getElementById('respContainer').style.display = 'none';
+      document.getElementById('reqContainer').style.display = 'none';
+    }
+  }
+
+  function renderJob(job) {
+    document.title = `${job.title} | Ziggo Careers`;
+    document.getElementById('pageTitle').textContent = `${job.title} | Ziggo Careers`;
+    document.getElementById('jobTitle').textContent = job.title;
+    document.getElementById('jobOverview').textContent = job.overview || '';
+    document.getElementById('jobLocation').textContent = job.location || 'Colombo';
+    document.getElementById('jobDepartment').textContent = job.department || 'Department';
+    document.getElementById('jobType').textContent = job.employment_type || 'Full Time';
+
+    // Email Apply Setup (Opens user's email client directly as requested)
+    const emailTo = job.apply_email || 'careers@ziggo.lk';
+    const emailSubject = encodeURIComponent(`Application for ${job.title} - [Your Full Name]`);
+    const emailBody = encodeURIComponent(
+      `Dear Hiring Team at Ziggo,\n\n` +
+      `I am writing to express my strong interest in the ${job.title} role (${job.department}) located in ${job.location}.\n\n` +
+      `Please find attached my resume / CV for your review.\n\n` +
+      `Full Name: \n` +
+      `Phone Number: \n` +
+      `LinkedIn / Portfolio: \n\n` +
+      `Thank you for your time and consideration.\n\n` +
+      `Best regards,\n`
+    );
+    const mailtoUrl = `mailto:${emailTo}?subject=${emailSubject}&body=${emailBody}`;
+
+    const applyBtn = document.getElementById('applyBtn');
+    const bottomApplyBtn = document.getElementById('bottomApplyBtn');
+    if (applyBtn) applyBtn.href = mailtoUrl;
+    if (bottomApplyBtn) bottomApplyBtn.href = mailtoUrl;
+
+    // Social Sharing Links
+    const currentUrl = encodeURIComponent(window.location.href);
+    const shareTitle = encodeURIComponent(`Join Ziggo as ${job.title}`);
+    document.getElementById('shareFb').href = `https://www.facebook.com/sharer/sharer.php?u=${currentUrl}`;
+    document.getElementById('shareX').href = `https://twitter.com/intent/tweet?text=${shareTitle}&url=${currentUrl}`;
+    document.getElementById('shareIn').href = `https://www.linkedin.com/sharing/share-offsite/?url=${currentUrl}`;
+    document.getElementById('shareMail').href = `mailto:?subject=${shareTitle}&body=Check out this open role at Ziggo: ${currentUrl}`;
+
+    document.getElementById('shareCopy').addEventListener('click', () => {
+      navigator.clipboard.writeText(window.location.href).then(() => {
+        showToast('Link copied to clipboard!');
+      });
+    });
+
+    // Render Responsibilities (Subsections + Checkmarks)
+    const respEl = document.getElementById('respContent');
+    if (job.responsibilities) {
+      respEl.innerHTML = parseStructuredText(job.responsibilities);
+    } else {
+      document.getElementById('respContainer').style.display = 'none';
+    }
+
+    // Render Requirements
+    const reqEl = document.getElementById('reqContent');
+    let reqHtml = '';
+    if (job.requirements) {
+      reqHtml += parseStructuredText(job.requirements);
+    }
+    if (job.preferred_qualifications) {
+      reqHtml += `<h3 class="job-subheading">Preferred Qualifications:</h3>`;
+      reqHtml += parseNumberedList(job.preferred_qualifications);
+    }
+    if (reqHtml) {
+      reqEl.innerHTML = reqHtml;
+    } else {
+      document.getElementById('reqContainer').style.display = 'none';
+    }
+  }
+
+  function parseStructuredText(text) {
+    if (!text) return '';
+    const lines = text.split('\n');
+    let html = '';
+    let currentList = [];
+
+    function flushList() {
+      if (currentList.length > 0) {
+        html += '<ul class="job-check-list">';
+        currentList.forEach(item => {
+          html += `
+            <li class="job-check-item">
+              <i class="fa-solid fa-circle-check job-check-icon"></i>
+              <div>${escapeHtml(item)}</div>
+            </li>
+          `;
+        });
+        html += '</ul>';
+        currentList = [];
+      }
+    }
+
+    lines.forEach(line => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        flushList();
+        return;
+      }
+
+      // Check if line is a bullet item
+      if (trimmed.startsWith('•') || trimmed.startsWith('-') || trimmed.startsWith('*')) {
+        const itemText = trimmed.replace(/^[•\-\*]\s*/, '');
+        currentList.push(itemText);
+      } else {
+        // Subheading
+        flushList();
+        html += `<h3 class="job-subheading">${escapeHtml(trimmed)}</h3>`;
+      }
+    });
+
+    flushList();
+    return html;
+  }
+
+  function parseNumberedList(text) {
+    if (!text) return '';
+    const lines = text.split('\n');
+    let html = '<ol class="job-num-list">';
+    lines.forEach(line => {
+      const trimmed = line.trim();
+      if (trimmed) {
+        const item = trimmed.replace(/^\d+[\.\)]\s*/, '');
+        html += `<li>${escapeHtml(item)}</li>`;
+      }
+    });
+    html += '</ol>';
+    return html;
+  }
+
+  function showToast(msg) {
+    const toast = document.getElementById('toast');
+    if (!toast) return;
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2500);
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>"']/g, function(m) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m];
+    });
+  }
+
+  loadJobDetail();
+})();
+</script>
+</body>
+</html>

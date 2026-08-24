@@ -41,22 +41,32 @@
     .perk-card h4 { font-family:var(--p-font-display); font-size:1.1rem; font-weight:700; letter-spacing:-.02em; color:var(--p-brand-dark); margin:0 0 6px; }
     .perk-card p { color:var(--p-text-light); font-size:.9rem; line-height:1.5; margin:0; }
 
-    .roles-wrap { max-width:880px; margin:0 auto; padding:0 24px; }
-    .role-item { background:#fff; border:1px solid var(--p-border); border-radius:18px; padding:0; margin-bottom:12px; overflow:hidden; transition:border-color .3s var(--p-ease); }
-    .role-item:hover { border-color:rgba(30,58,138,.25); }
-    .role-q { padding:18px 22px; display:flex; align-items:center; justify-content:space-between; gap:16px; cursor:pointer; font-family:var(--p-font-display); font-size:1rem; font-weight:600; color:var(--p-brand-dark); }
-    .role-q i { color:var(--p-brand); transition:transform .3s var(--p-ease); }
-    .role-item.open .role-q i { transform:rotate(45deg); }
-    .role-a { padding:0 22px; max-height:0; overflow:hidden; transition:max-height .35s var(--p-ease), padding .3s var(--p-ease); }
-    .role-item.open .role-a { padding:0 22px 18px; max-height:200px; }
-    .role-a p { color:var(--p-text-light); font-size:.92rem; line-height:1.55; margin:0; }
-    .roles-foot { text-align:center; margin-top:30px; }
+    .roles-wrap { max-width:960px; margin:0 auto; padding:0 24px; }
+    .job-card { background:#fff; border:1px solid var(--p-border); border-radius:20px; padding:28px 32px; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; gap:20px; transition:all .3s var(--p-ease); box-shadow:0 2px 8px rgba(11,20,38,.03); text-decoration:none; color:inherit; }
+    .job-card:hover { transform:translateY(-3px); box-shadow:0 16px 36px -12px rgba(11,20,38,.12); border-color:rgba(30,58,138,.28); }
+    .job-card-info { flex:1; min-width:0; }
+    .job-card-dept { font-size:.88rem; font-weight:600; color:#64748B; margin-bottom:6px; letter-spacing:-.01em; }
+    .job-card-title { font-family:var(--p-font-display); font-size:1.35rem; font-weight:700; letter-spacing:-.025em; color:var(--p-brand-dark); margin:0 0 10px; line-height:1.25; }
+    .job-card-meta { display:flex; align-items:center; gap:16px; font-size:.9rem; color:#64748B; font-weight:500; }
+    .job-card-meta span { display:inline-flex; align-items:center; gap:6px; }
+    .job-card-meta svg, .job-card-meta i { color:#94A3B8; font-size:.85rem; }
+    .job-view-btn { display:inline-flex; align-items:center; gap:8px; padding:10px 22px; border:1px solid #CBD5E1; border-radius:999px; font-size:.9rem; font-weight:600; color:var(--p-brand-dark); background:#fff; white-space:nowrap; transition:all .25s var(--p-ease); flex-shrink:0; }
+    .job-card:hover .job-view-btn { background:var(--p-brand); color:#fff; border-color:var(--p-brand); }
+    .job-filter-bar { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-bottom:32px; }
+    .job-filter-btn { padding:8px 18px; border-radius:999px; font-size:.85rem; font-weight:600; border:1px solid var(--p-border); background:#fff; color:#64748B; cursor:pointer; transition:all .2s; }
+    .job-filter-btn:hover { border-color:var(--p-brand); color:var(--p-brand); }
+    .job-filter-btn.active { background:var(--p-brand); color:#fff; border-color:var(--p-brand); }
+
     .role-empty { text-align:center; background:#fff; border:1px solid var(--p-border); border-radius:20px; padding:50px 28px; max-width:620px; margin:0 auto; box-shadow:0 1px 2px rgba(11,20,38,.04), 0 8px 28px -16px rgba(11,20,38,.10); }
     .role-empty i { font-size:2.4rem; color:var(--p-brand-light); margin-bottom:16px; display:block; }
     .role-empty h3 { font-family:var(--p-font-display); font-size:1.35rem; font-weight:700; color:var(--p-brand-dark); margin:0 0 10px; letter-spacing:-.02em; }
     .role-empty p { color:var(--p-text-light); font-size:.98rem; line-height:1.6; max-width:48ch; margin:0 auto 22px; }
 
     @media (max-width:1080px) { .perk-grid { grid-template-columns:repeat(2,1fr); } }
+    @media (max-width:700px)  {
+      .job-card { flex-direction:column; align-items:flex-start; padding:20px; }
+      .job-view-btn { width:100%; justify-content:center; }
+    }
     @media (max-width:600px)  { .perk-grid { grid-template-columns:1fr; } }
   </style>
 <!-- ziggo:canonical:begin -->
@@ -137,13 +147,13 @@
 </section>
 
 <section class="pm-block alt" id="openings">
-  <div class="pm-block-head" data-reveal>
+  <div class="pm-block-head" id="openingsHead" data-reveal>
     <span class="pm-eyebrow"><span class="dot"></span> Open roles</span>
-    <h2>No open roles right now</h2>
-    <p>We don't have any positions open at the moment &mdash; but we're growing fast, so check back soon.</p>
+    <h2 id="openingsTitle">No open roles right now</h2>
+    <p id="openingsSubtitle">We don't have any positions open at the moment &mdash; but we're growing fast, so check back soon.</p>
   </div>
-  <div class="roles-wrap" data-reveal>
-    <div class="role-empty">
+  <div class="roles-wrap" id="jobsContainer" data-reveal>
+    <div class="role-empty" id="emptyState">
       <i class="fa-regular fa-folder-open"></i>
       <h3>No job openings currently</h3>
       <p>There are no vacancies at the moment. New roles will appear here as soon as they open. In the meantime, feel free to send us your CV &mdash; we'll reach out when something fits.</p>
@@ -211,9 +221,64 @@
     document.addEventListener('click', (e) => { if (!e.target.closest('.pm-topbar')) topbar.classList.remove('nav-open'); });
   }
 
-  document.querySelectorAll('.role-item').forEach(item => {
-    item.querySelector('.role-q').addEventListener('click', () => item.classList.toggle('open'));
-  });
+  // Dynamic Jobs Fetching & Rendering
+  async function loadJobs() {
+    const container = document.getElementById('jobsContainer');
+    const titleEl = document.getElementById('openingsTitle');
+    const subtitleEl = document.getElementById('openingsSubtitle');
+    if (!container) return;
+
+    try {
+      const res = await fetch('/api/v1/public/jobs');
+      if (!res.ok) throw new Error('Failed to fetch jobs');
+      const jobs = await res.json();
+
+      if (!jobs || jobs.length === 0) {
+        return; // Keep default empty state
+      }
+
+      // Update Section Header to match Screenshot 2
+      if (titleEl) titleEl.textContent = 'Current Job Openings';
+      if (subtitleEl) subtitleEl.textContent = 'Find your next role and build the future of mobility, delivery, and services with Ziggo.';
+
+      let html = '';
+      jobs.forEach(job => {
+        const detailUrl = `job-detail.html?id=${encodeURIComponent(job.id)}&slug=${encodeURIComponent(job.slug || '')}`;
+        html += `
+          <a href="${detailUrl}" class="job-card" data-reveal>
+            <div class="job-card-info">
+              <div class="job-card-dept">${escapeHtml(job.department || 'General')}</div>
+              <h3 class="job-card-title">${escapeHtml(job.title)}</h3>
+              <div class="job-card-meta">
+                <span><i class="fa-solid fa-location-dot"></i> ${escapeHtml(job.location || 'Colombo')}</span>
+                ${job.employment_type ? `<span><i class="fa-regular fa-clock"></i> ${escapeHtml(job.employment_type)}</span>` : ''}
+              </div>
+            </div>
+            <div class="job-view-btn">
+              View Position <i class="fa-solid fa-arrow-right"></i>
+            </div>
+          </a>
+        `;
+      });
+
+      container.innerHTML = html;
+
+      // Re-observe new reveals
+      container.querySelectorAll('[data-reveal]').forEach(el => observer.observe(el));
+    } catch (err) {
+      console.warn('Jobs API error:', err);
+      // Fallback stays as empty state
+    }
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>"']/g, function(m) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m];
+    });
+  }
+
+  loadJobs();
 })();
 </script>
 </body>

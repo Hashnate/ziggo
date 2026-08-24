@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block title %}Careers & Job Roles | Ziggo Admin{% endblock %}
+{% block page_title %}Careers & Job Roles{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    {% if saved %}
+    <div class="p-4 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-bold border border-emerald-200 flex items-center justify-between">
+        <span><i class="fas fa-check-circle mr-2"></i> Job role saved successfully!</span>
+        <button onclick="this.parentElement.remove()" class="text-emerald-700 hover:text-emerald-900">&times;</button>
+    </div>
+    {% endif %}
+
+    {% if deleted %}
+    <div class="p-4 rounded-xl bg-amber-50 text-amber-700 text-sm font-bold border border-amber-200 flex items-center justify-between">
+        <span><i class="fas fa-trash-alt mr-2"></i> Job role deleted successfully.</span>
+        <button onclick="this.parentElement.remove()" class="text-amber-700 hover:text-amber-900">&times;</button>
+    </div>
+    {% endif %}
+
+    <!-- Top Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h2 class="text-2xl font-black text-ziggo-ink">Careers &amp; Job Openings</h2>
+            <p class="text-sm text-ziggo-muted">Manage job roles displayed on the Ziggo website careers page.</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <a href="/admin/jobs/applications"
+               class="px-4 py-2.5 rounded-xl border border-ziggo-line bg-white text-ziggo-ink font-bold text-sm hover:bg-ziggo-canvas transition inline-flex items-center gap-2">
+                <i class="fas fa-users-viewfinder text-ziggo"></i> Applications ({{ total_apps }})
+            </a>
+            <a href="/admin/jobs/new"
+               class="px-5 py-2.5 rounded-xl bg-ziggo text-white font-bold text-sm hover:bg-ziggo-light transition inline-flex items-center gap-2 shadow-sm">
+                <i class="fas fa-plus"></i> Add New Job Role
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="bg-white p-5 rounded-2xl border border-ziggo-line shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl font-black">
+                <i class="fas fa-briefcase"></i>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-ziggo-muted uppercase tracking-wider">Total Job Roles</p>
+                <p class="text-2xl font-black text-ziggo-ink">{{ total_jobs }}</p>
+            </div>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-ziggo-line shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl font-black">
+                <i class="fas fa-circle-check"></i>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-ziggo-muted uppercase tracking-wider">Active Openings</p>
+                <p class="text-2xl font-black text-emerald-600">{{ active_jobs }}</p>
+            </div>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-ziggo-line shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl font-black">
+                <i class="fas fa-file-lines"></i>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-ziggo-muted uppercase tracking-wider">Total Applications</p>
+                <p class="text-2xl font-black text-indigo-600">{{ total_apps }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters & Search -->
+    <div class="bg-white p-4 rounded-2xl border border-ziggo-line shadow-sm">
+        <form method="get" action="/admin/jobs" class="flex flex-col md:flex-row gap-3">
+            <div class="flex-1 relative flex items-center">
+                <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-ziggo-muted pointer-events-none flex items-center justify-center">
+                    <i class="fas fa-search text-xs"></i>
+                </span>
+                <input type="text" name="q" value="{{ q }}" placeholder="Search by title, department, location..."
+                       style="padding-left: 38px !important;"
+                       class="w-full pr-4 py-2.5 rounded-xl border border-ziggo-line text-sm outline-none focus:border-ziggo">
+            </div>
+            <div class="w-full md:w-48">
+                <select name="department" class="w-full px-3 py-2.5 rounded-xl border border-ziggo-line text-sm outline-none focus:border-ziggo bg-white">
+                    <option value="">All Departments</option>
+                    {% for dept in departments %}
+                    <option value="{{ dept }}" {% if selected_department == dept %}selected{% endif %}>{{ dept }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="w-full md:w-40">
+                <select name="status" class="w-full px-3 py-2.5 rounded-xl border border-ziggo-line text-sm outline-none focus:border-ziggo bg-white">
+                    <option value="">All Statuses</option>
+                    <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Active</option>
+                    <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Inactive</option>
+                </select>
+            </div>
+            <button type="submit" class="px-5 py-2.5 rounded-xl bg-ziggo text-white text-sm font-bold hover:bg-ziggo-light transition">
+                Filter
+            </button>
+            {% if q or selected_department or selected_status %}
+            <a href="/admin/jobs" class="px-4 py-2.5 rounded-xl border border-ziggo-line text-ziggo-muted text-sm font-bold hover:bg-ziggo-canvas transition text-center">
+                Clear
+            </a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Jobs Table -->
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-ziggo-canvas/70 text-[11px] uppercase tracking-wider text-ziggo-faint font-black">
+                    <tr>
+                        <th class="px-6 py-3.5">Job Title &amp; Department</th>
+                        <th class="px-6 py-3.5">Location &amp; Type</th>
+                        <th class="px-6 py-3.5">Applications</th>
+                        <th class="px-6 py-3.5">Status</th>
+                        <th class="px-6 py-3.5">Order</th>
+                        <th class="px-6 py-3.5 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-ziggo-line/70">
+                    {% for job in jobs %}
+                    <tr class="hover:bg-ziggo-soft/30 transition">
+                        <td class="px-6 py-4">
+                            <div>
+                                <span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-100 mb-1">
+                                    {{ job.department }}
+                                </span>
+                                <h4 class="font-bold text-ziggo-ink text-base">{{ job.title }}</h4>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-sm">
+                            <div class="flex items-center gap-1.5 text-ziggo-ink font-medium">
+                                <i class="fas fa-location-dot text-ziggo-muted text-xs"></i> {{ job.location }}
+                            </div>
+                            <div class="text-xs text-ziggo-muted mt-0.5 flex items-center gap-1.5">
+                                <i class="fas fa-clock text-ziggo-muted text-[11px]"></i> {{ job.employment_type }}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-sm">
+                            <a href="/admin/jobs/applications?job_id={{ job.id }}" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-xs hover:bg-indigo-100 transition">
+                                <i class="fas fa-user-tie text-[11px]"></i>
+                                {{ job.applications|length }} candidates
+                            </a>
+                        </td>
+                        <td class="px-6 py-4">
+                            <form method="post" action="/admin/jobs/{{ job.id }}/toggle-status" class="inline">
+                                <button type="submit" class="px-3 py-1 rounded-full text-xs font-bold transition flex items-center gap-1.5
+                                       {% if job.is_active %}bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100{% else %}bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200{% endif %}"
+                                       title="Click to toggle status">
+                                    <span class="w-1.5 h-1.5 rounded-full {% if job.is_active %}bg-emerald-500{% else %}bg-gray-400{% endif %}"></span>
+                                    {{ 'Active' if job.is_active else 'Inactive' }}
+                                </button>
+                            </form>
+                        </td>
+                        <td class="px-6 py-4 text-sm font-mono text-ziggo-muted">
+                            {{ job.display_order }}
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <div class="flex gap-2 justify-end items-center">
+                                <a href="/pages/job-detail.html?id={{ job.id }}&slug={{ job.slug }}" target="_blank"
+                                   class="p-2 rounded-lg border border-ziggo-line text-ziggo-muted hover:text-ziggo hover:border-ziggo transition" title="Preview on Website">
+                                    <i class="fas fa-arrow-up-right-from-square text-xs"></i>
+                                </a>
+                                <a href="/admin/jobs/{{ job.id }}/edit"
+                                   class="px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 text-xs font-bold hover:bg-blue-100 transition flex items-center gap-1.5">
+                                    <i class="fas fa-pen-to-square text-[11px]"></i> Edit
+                                </a>
+                                <form method="post" action="/admin/jobs/{{ job.id }}/delete" onsubmit="return confirm('Are you sure you want to delete this job role?');" class="inline">
+                                    <button type="submit" class="p-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition" title="Delete Job">
+                                        <i class="fas fa-trash-alt text-xs"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center text-ziggo-muted">
+                            <div class="max-w-sm mx-auto">
+                                <div class="w-12 h-12 rounded-2xl bg-ziggo-canvas flex items-center justify-center mx-auto text-ziggo-muted text-xl mb-3">
+                                    <i class="fas fa-briefcase"></i>
+                                </div>
+                                <p class="font-bold text-ziggo-ink">No job roles found</p>
+                                <p class="text-xs text-ziggo-muted mt-1">Get started by creating your first job opening to display on the careers page.</p>
+                                <a href="/admin/jobs/new" class="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-ziggo text-white text-xs font-bold hover:bg-ziggo-light transition">
+                                    <i class="fas fa-plus"></i> Add New Job Role
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

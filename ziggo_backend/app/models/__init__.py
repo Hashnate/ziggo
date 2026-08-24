@@ -58,6 +58,7 @@ from .market import (
     MarketCategory,
 )
 from .event import Event, EventTicketTier, EventOrder, EventOrderItem, EventOrderStatus
+from .job import JobOpening, JobApplication
 __all__ = [
     "User",
     "UserRole",
@@ -121,4 +122,6 @@ __all__ = [
     "EventOrderStatus",
     "CorporateAccount",
     "CorporateMember",
+    "JobOpening",
+    "JobApplication",
 ]

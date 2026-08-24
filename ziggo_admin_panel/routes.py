@@ -8733,3 +8733,314 @@ async def admin_referrals_settings_save(
     await db.commit()
     return RedirectResponse(url="/admin/referrals?saved=1", status_code=303)
 
+
+# ============================================================================
+# CAREERS & JOB ROLES MANAGEMENT
+# ============================================================================
+
+def _slugify(text: str) -> str:
+    import re
+    s = re.sub(r"[^\w\s-]", "", text.lower()).strip()
+    return re.sub(r"[-\s]+", "-", s)
+
+
+@router.get("/jobs", response_class=HTMLResponse)
+async def admin_jobs_list(
+    request: Request,
+    q: str | None = None,
+    department: str | None = None,
+    status: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import JobOpening, JobApplication
+    from sqlalchemy.orm import selectinload
+
+    stmt = select(JobOpening).options(selectinload(JobOpening.applications))
+
+    if q and q.strip():
+        term = f"%{q.strip()}%"
+        stmt = stmt.where((JobOpening.title.ilike(term)) | (JobOpening.department.ilike(term)) | (JobOpening.location.ilike(term)))
+
+    if department and department.strip():
+        stmt = stmt.where(JobOpening.department == department.strip())
+
+    if status == "active":
+        stmt = stmt.where(JobOpening.is_active == True)
+    elif status == "inactive":
+        stmt = stmt.where(JobOpening.is_active == False)
+
+    stmt = stmt.order_by(JobOpening.display_order.asc(), JobOpening.created_at.desc())
+    res = await db.execute(stmt)
+    jobs = res.scalars().all()
+
+    # Get distinct departments for filter dropdown
+    dept_res = await db.execute(select(JobOpening.department).distinct())
+    departments = [d[0] for d in dept_res.all() if d[0]]
+
+    # Stats
+    total_jobs = (await db.execute(select(func.count(JobOpening.id)))).scalar() or 0
+    active_jobs = (await db.execute(select(func.count(JobOpening.id)).where(JobOpening.is_active == True))).scalar() or 0
+    total_apps = (await db.execute(select(func.count(JobApplication.id)))).scalar() or 0
+
+    return templates.TemplateResponse(
+        request,
+        "jobs.html",
+        {
+            "request": request,
+            "active_page": "jobs",
+            "jobs": jobs,
+            "departments": departments,
+            "q": q or "",
+            "selected_department": department or "",
+            "selected_status": status or "",
+            "total_jobs": total_jobs,
+            "active_jobs": active_jobs,
+            "total_apps": total_apps,
+            "saved": request.query_params.get("saved") == "1",
+            "deleted": request.query_params.get("deleted") == "1",
+        },
+    )
+
+
+@router.get("/jobs/new", response_class=HTMLResponse)
+async def admin_jobs_new_form(
+    request: Request,
+    _: User = Depends(current_admin),
+):
+    return templates.TemplateResponse(
+        request,
+        "job_new.html",
+        {
+            "request": request,
+            "active_page": "jobs",
+            "error": None,
+            "form": {
+                "location": "Colombo",
+                "employment_type": "Full Time",
+                "apply_email": "careers@ziggo.lk",
+                "display_order": 0,
+                "is_active": "on",
+            },
+        },
+    )
+
+
+@router.post("/jobs/new")
+async def admin_jobs_new_submit(
+    request: Request,
+    title: str = Form(...),
+    department: str = Form(...),
+    location: str = Form("Colombo"),
+    employment_type: str = Form("Full Time"),
+    overview: str = Form(""),
+    responsibilities: str = Form(""),
+    requirements: str = Form(""),
+    preferred_qualifications: str = Form(""),
+    apply_email: str = Form("careers@ziggo.lk"),
+    apply_url: str = Form(""),
+    display_order: int = Form(0),
+    is_active: str | None = Form(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import JobOpening
+    import secrets
+
+    title_clean = title.strip()
+    if not title_clean:
+        return templates.TemplateResponse(
+            request, "job_new.html",
+            {"request": request, "active_page": "jobs", "error": "Job title is required", "form": dict(await request.form())},
+            status_code=400,
+        )
+
+    base_slug = _slugify(title_clean)
+    if not base_slug:
+        base_slug = f"job-{secrets.token_hex(4)}"
+
+    # Ensure unique slug
+    slug = base_slug
+    idx = 1
+    while True:
+        existing = (await db.execute(select(JobOpening).where(JobOpening.slug == slug))).scalars().first()
+        if not existing:
+            break
+        idx += 1
+        slug = f"{base_slug}-{idx}"
+
+    job = JobOpening(
+        title=title_clean,
+        slug=slug,
+        department=department.strip(),
+        location=location.strip() or "Colombo",
+        employment_type=employment_type.strip() or "Full Time",
+        overview=overview.strip() or None,
+        responsibilities=responsibilities.strip() or None,
+        requirements=requirements.strip() or None,
+        preferred_qualifications=preferred_qualifications.strip() or None,
+        apply_email=apply_email.strip() or "careers@ziggo.lk",
+        apply_url=apply_url.strip() or None,
+        display_order=display_order,
+        is_active=bool(is_active),
+    )
+    db.add(job)
+    await db.commit()
+
+    return RedirectResponse(url="/admin/jobs?saved=1", status_code=303)
+
+
+@router.get("/jobs/{job_id}/edit", response_class=HTMLResponse)
+async def admin_jobs_edit_form(
+    request: Request,
+    job_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import JobOpening
+
+    res = await db.execute(select(JobOpening).where(JobOpening.id == job_id))
+    job = res.scalars().first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    return templates.TemplateResponse(
+        request,
+        "job_edit.html",
+        {
+            "request": request,
+            "active_page": "jobs",
+            "job": job,
+            "error": None,
+        },
+    )
+
+
+@router.post("/jobs/{job_id}/edit")
+async def admin_jobs_edit_submit(
+    request: Request,
+    job_id: int,
+    title: str = Form(...),
+    department: str = Form(...),
+    location: str = Form("Colombo"),
+    employment_type: str = Form("Full Time"),
+    overview: str = Form(""),
+    responsibilities: str = Form(""),
+    requirements: str = Form(""),
+    preferred_qualifications: str = Form(""),
+    apply_email: str = Form("careers@ziggo.lk"),
+    apply_url: str = Form(""),
+    display_order: int = Form(0),
+    is_active: str | None = Form(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import JobOpening
+
+    res = await db.execute(select(JobOpening).where(JobOpening.id == job_id))
+    job = res.scalars().first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    new_title = title.strip()
+    if new_title and new_title != job.title:
+        base_slug = _slugify(new_title)
+        if not base_slug:
+            base_slug = f"job-{job.id}"
+        slug = base_slug
+        idx = 1
+        while True:
+            existing = (await db.execute(select(JobOpening).where(JobOpening.slug == slug, JobOpening.id != job.id))).scalars().first()
+            if not existing:
+                break
+            idx += 1
+            slug = f"{base_slug}-{idx}"
+        job.slug = slug
+
+    job.title = new_title
+    job.department = department.strip()
+    job.location = location.strip() or "Colombo"
+    job.employment_type = employment_type.strip() or "Full Time"
+    job.overview = overview.strip() or None
+    job.responsibilities = responsibilities.strip() or None
+    job.requirements = requirements.strip() or None
+    job.preferred_qualifications = preferred_qualifications.strip() or None
+    job.apply_email = apply_email.strip() or "careers@ziggo.lk"
+    job.apply_url = apply_url.strip() or None
+    job.display_order = display_order
+    job.is_active = bool(is_active)
+
+    await db.commit()
+    return RedirectResponse(url="/admin/jobs?saved=1", status_code=303)
+
+
+@router.post("/jobs/{job_id}/toggle-status")
+async def admin_jobs_toggle_status(
+    job_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import JobOpening
+
+    res = await db.execute(select(JobOpening).where(JobOpening.id == job_id))
+    job = res.scalars().first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    job.is_active = not job.is_active
+    await db.commit()
+    return RedirectResponse(url="/admin/jobs?saved=1", status_code=303)
+
+
+@router.post("/jobs/{job_id}/delete")
+async def admin_jobs_delete(
+    job_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import JobOpening
+
+    res = await db.execute(select(JobOpening).where(JobOpening.id == job_id))
+    job = res.scalars().first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    await db.delete(job)
+    await db.commit()
+    return RedirectResponse(url="/admin/jobs?deleted=1", status_code=303)
+
+
+@router.get("/jobs/applications", response_class=HTMLResponse)
+async def admin_jobs_applications(
+    request: Request,
+    job_id: int | None = None,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import JobOpening, JobApplication
+    from sqlalchemy.orm import joinedload
+
+    stmt = select(JobApplication).options(joinedload(JobApplication.job)).order_by(JobApplication.created_at.desc())
+    if job_id:
+        stmt = stmt.where(JobApplication.job_id == job_id)
+
+    res = await db.execute(stmt)
+    applications = res.scalars().all()
+
+    # Get list of jobs for filtering
+    jobs_res = await db.execute(select(JobOpening).order_by(JobOpening.title.asc()))
+    all_jobs = jobs_res.scalars().all()
+
+    return templates.TemplateResponse(
+        request,
+        "job_applications.html",
+        {
+            "request": request,
+            "active_page": "jobs",
+            "applications": applications,
+            "all_jobs": all_jobs,
+            "selected_job_id": job_id,
+        },
+    )
+
+

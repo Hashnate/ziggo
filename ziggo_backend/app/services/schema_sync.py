@@ -23,7 +23,7 @@ from sqlalchemy import inspect, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from ..database import Base
-from ..models import Event, EventTicketTier, EventOrder, EventOrderItem, FlashWeightTier, CorporateAccount, CorporateMember, DriverPayout, MarketAd, MarketDeal, DriverIncentive, ReferralBonus, PeakHourSetting  # noqa: F401 — ensures import for create_all
+from ..models import Event, EventTicketTier, EventOrder, EventOrderItem, FlashWeightTier, CorporateAccount, CorporateMember, DriverPayout, MarketAd, MarketDeal, DriverIncentive, ReferralBonus, PeakHourSetting, JobOpening, JobApplication  # noqa: F401 — ensures import for create_all
 
 # (table_name, column_name, column_ddl)
 PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
@@ -247,6 +247,7 @@ async def ensure_schema(engine: AsyncEngine) -> None:
         await _seed_market_categories(conn)
         await _seed_incentives(conn)
         await _seed_peak_hours(conn)
+        await _seed_sample_jobs(conn)
         await _cleanup_bad_payouts(conn)
 
 
@@ -461,3 +462,125 @@ async def _cleanup_bad_payouts(conn) -> None:
         )
     )
     print("[schema_sync] Cleaned up bad test commission payouts from DB")
+
+
+async def _seed_sample_jobs(conn) -> None:
+    """Seed initial sample job roles matching the careers layout if none exist."""
+    existing = await conn.execute(select(JobOpening))
+    if existing.scalars().first() is not None:
+        return
+
+    sample_jobs = [
+        {
+            "title": "Senior Business Analyst – Search Experience",
+            "slug": "senior-business-analyst-search-experience",
+            "department": "Product Engineering",
+            "location": "Colombo",
+            "employment_type": "Full Time",
+            "overview": (
+                "We are seeking a highly analytical and product-oriented Senior Business Analyst to own the evolution "
+                "of the Search Experience for Ziggo. This role bridges Product, Business, and Search Operations to ensure "
+                "customers can easily discover relevant merchants, dishes, and products while driving business growth "
+                "through improved search performance and monetization. The successful candidate will own the Search roadmap, "
+                "identify opportunities to improve search relevance and conversion, provide actionable business insights, "
+                "and lead a small Search Operations team responsible for maintaining high-quality search data."
+            ),
+            "responsibilities": (
+                "Search Product Ownership\n"
+                "• Own and maintain the roadmap for the Ziggo Food Search experience, aligning initiatives with business priorities and customer needs.\n"
+                "• Gather business requirements and convert them into product requirements, user stories, and functional specifications.\n"
+                "• Work closely with Engineering, Design, Data Science, and Business teams to prioritize and deliver search enhancements.\n"
+                "• Define success metrics and monitor the performance of launched features to ensure expected business outcomes are achieved.\n"
+                "• Communicate roadmap progress, feature impact, and search performance to senior stakeholders.\n\n"
+                "Search Analytics & Business Insights\n"
+                "• Continuously monitor search performance across key business metrics including search conversion, click-through rate, no-result searches, keyword performance, and ranking quality.\n"
+                "• Analyze search behaviour to identify trends, customer intent, and opportunities for improving discoverability.\n"
+                "• Provide regular performance reports and actionable recommendations to Product, Commercial, and Operations leadership.\n"
+                "• Design and execute A/B tests to validate search algorithm changes, UI improvements, and ranking optimizations."
+            ),
+            "requirements": (
+                "• Bachelor's degree in Business, Information Technology, Computer Science, Marketing, Engineering, or a related discipline.\n"
+                "• Minimum 3+ years of experience as a Business Analyst, Product Analyst, Product Owner or similar role.\n"
+                "• Strong analytical skills with experience interpreting data to drive product decisions.\n"
+                "• Experience working in Agile product development environments.\n"
+                "• Excellent communication and stakeholder management skills."
+            ),
+            "preferred_qualifications": (
+                "1. Experience with search platforms such as Algolia, Elasticsearch, OpenSearch, or similar search technologies.\n"
+                "2. Experience in e-commerce, marketplaces, food delivery, or other consumer digital products.\n"
+                "3. Knowledge of search relevance, ranking strategies, taxonomy management, and metadata enrichment."
+            ),
+            "apply_email": "careers@ziggo.lk",
+            "is_active": True,
+            "display_order": 1,
+        },
+        {
+            "title": "Senior Project Manager",
+            "slug": "senior-project-manager",
+            "department": "Engineering",
+            "location": "Colombo",
+            "employment_type": "Full Time",
+            "overview": (
+                "We are looking for a Senior Project Manager to drive cross-functional engineering initiatives across Ziggo's "
+                "core mobility, deliveries, and super-app platforms. You will coordinate between technical leads, product managers, "
+                "and operations teams to deliver mission-critical software on time with high quality."
+            ),
+            "responsibilities": (
+                "Project Delivery & Governance\n"
+                "• Lead end-to-end execution of large engineering programs and product launches.\n"
+                "• Maintain sprint velocity, unblock engineering teams, and manage project dependencies across squads.\n"
+                "• Define clear milestone schedules, risk mitigation plans, and stakeholder status communications.\n"
+                "• Facilitate agile ceremonies including sprint planning, standups, and retrospectives."
+            ),
+            "requirements": (
+                "• 5+ years of technical project or program management experience in high-scale tech companies.\n"
+                "• PMP, Scrum Master, or equivalent Agile certifications preferred.\n"
+                "• Strong leadership, problem-solving, and cross-team collaboration skills.\n"
+                "• Proven track record of shipping complex multi-platform software systems."
+            ),
+            "preferred_qualifications": (
+                "1. Prior experience in mobility, logistics, or on-demand consumer technology apps.\n"
+                "2. Hands-on familiarity with Jira, Confluence, and CI/CD development pipelines."
+            ),
+            "apply_email": "careers@ziggo.lk",
+            "is_active": True,
+            "display_order": 2,
+        },
+        {
+            "title": "Executive – Airport Business",
+            "slug": "executive-airport-business",
+            "department": "Operations",
+            "location": "Colombo",
+            "employment_type": "Full Time",
+            "overview": (
+                "Join our Airport Operations division to manage and optimize Ziggo's airport shuttle, tourist rides, "
+                "and driver concierge operations at Bandaranaike International Airport (BIA). You will ensure seamless arrival "
+                "and departure pickups for local and international travelers."
+            ),
+            "responsibilities": (
+                "Airport Hub Operations\n"
+                "• Oversee daily airport ground operations, driver marshalling, and passenger pickup queues.\n"
+                "• Coordinate with airport authorities, tourism partners, and fleet operators.\n"
+                "• Ensure high customer service ratings and prompt turnaround times for airport bookings.\n"
+                "• Resolve on-ground driver queries and passenger logistics efficiently."
+            ),
+            "requirements": (
+                "• Degree or Diploma in Business Management, Hospitality, Logistics, or related field.\n"
+                "• 2+ years of on-ground operations, airport logistics, or hospitality experience.\n"
+                "• Fluency in English and Sinhala (Tamil or additional languages is a plus).\n"
+                "• Willingness to work flexible shifts based on flight arrival peaks."
+            ),
+            "preferred_qualifications": (
+                "1. Prior experience with transportation or tourism hubs in Sri Lanka.\n"
+                "2. Excellent customer engagement and problem-resolution abilities."
+            ),
+            "apply_email": "careers@ziggo.lk",
+            "is_active": True,
+            "display_order": 3,
+        },
+    ]
+
+    for job in sample_jobs:
+        await conn.execute(JobOpening.__table__.insert().values(**job))
+    print(f"[schema_sync] Seeded {len(sample_jobs)} default job roles")
+
