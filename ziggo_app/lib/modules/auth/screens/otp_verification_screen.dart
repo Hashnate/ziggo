@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:smart_auth/smart_auth.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
@@ -29,6 +30,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   static const int _len = 6;
   late final TextEditingController _otpCtrl;
   late final FocusNode _focusNode;
+  final SmartAuth _smartAuth = SmartAuth.instance;
   bool _busy = false;
   String? _error;
 
@@ -41,11 +43,54 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     final dev = context.read<AuthProvider>().devOtp;
     if (dev != null && dev.length == _len) {
       _otpCtrl.text = dev;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_busy) {
+          _verify();
+        }
+      });
+    } else {
+      _listenForSms();
+    }
+  }
+
+  void _listenForSms() {
+    // 1. Listen via SMS Retriever API (silent 0-click auto-fill if app hash present)
+    _smartAuth.getSmsWithRetrieverApi().then((res) {
+      if (!mounted) return;
+      if (res.hasData && res.data?.code != null) {
+        _onAutoFilledCode(res.data!.code!);
+      }
+    }).catchError((_) {});
+
+    // 2. Also listen via SMS User Consent API (system 1-tap sheet if hash is missing)
+    _smartAuth.getSmsWithUserConsentApi().then((res) {
+      if (!mounted) return;
+      if (res.hasData && res.data?.code != null) {
+        _onAutoFilledCode(res.data!.code!);
+      }
+    }).catchError((_) {});
+  }
+
+  void _onAutoFilledCode(String rawCode) {
+    final digits = rawCode.replaceAll(RegExp(r'\D'), '');
+    if (digits.length >= _len) {
+      final code = digits.substring(0, _len);
+      _otpCtrl.text = code;
+      setState(() {
+        _error = null;
+      });
+      if (!_busy) {
+        _verify();
+      }
     }
   }
 
   @override
   void dispose() {
+    try {
+      _smartAuth.removeSmsRetrieverApiListener();
+      _smartAuth.removeUserConsentApiListener();
+    } catch (_) {}
     _otpCtrl.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -97,6 +142,11 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     if (dev != null && dev.length == _len) {
       _otpCtrl.text = dev;
       setState(() {});
+      if (!_busy) {
+        _verify();
+      }
+    } else {
+      _listenForSms();
     }
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(

@@ -546,57 +546,57 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
     final qrData = 'ziggopay://pay?type=restaurant&id=${restaurant['id']}';
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 12),
-            Text(
-              restaurant['name']?.toString() ?? 'Merchant',
-              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Scan to Pay QR Code',
-              style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
-            ),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.cardBorder),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Text(
+                restaurant['name']?.toString() ?? 'Merchant',
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                textAlign: TextAlign.center,
               ),
-              child: QrImageView(
-                data: qrData,
-                version: QrVersions.auto,
-                size: 200.0,
+              const SizedBox(height: 4),
+              const Text(
+                'Scan to Pay QR Code',
+                style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
               ),
-            ),
-            const SizedBox(height: 12),
-          ],
-        ),
-        actions: [
-          Center(
-            child: SizedBox(
-              width: 130,
-              height: 46,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.cardBorder),
                 ),
-                child: const Text('Close', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                child: QrImageView(
+                  data: qrData,
+                  version: QrVersions.auto,
+                  size: 200.0,
+                ),
               ),
-            ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: 130,
+                height: 46,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Close', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
