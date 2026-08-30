@@ -1115,7 +1115,7 @@ class _SearchBar extends StatelessWidget {
                 color: AppColors.surfaceMuted,
                 borderRadius: BorderRadius.circular(AppStyles.radiusSm),
               ),
-              child: const Icon(Icons.tune_rounded,
+              child: const Icon(Icons.search_rounded,
                   color: AppColors.textSecondary, size: 18),
             ),
           ],

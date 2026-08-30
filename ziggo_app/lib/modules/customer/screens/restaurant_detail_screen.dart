@@ -290,26 +290,37 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
           Container(
             height: 48,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surfaceMuted,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.divider),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Row(
               children: [
-                const Icon(Icons.search_rounded, color: AppColors.textTertiary),
-                const SizedBox(width: 12),
+                const Icon(Icons.search_rounded, color: AppColors.textTertiary, size: 22),
+                const SizedBox(width: 10),
                 Expanded(
                   child: TextField(
                     controller: _searchCtrl,
                     onChanged: (v) => setState(() => _search = v.trim()),
                     textInputAction: TextInputAction.search,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
                     decoration: InputDecoration(
                       isDense: true,
+                      filled: false,
+                      contentPadding: EdgeInsets.zero,
                       border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
                       hintText: 'Search in ${r['name']}',
-                      hintStyle: const TextStyle(color: AppColors.textTertiary, fontSize: 14, fontWeight: FontWeight.w600),
+                      hintStyle: const TextStyle(
+                        color: AppColors.textTertiary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                 ),
@@ -320,7 +331,10 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                       setState(() => _search = '');
                       FocusScope.of(context).unfocus();
                     },
-                    child: const Icon(Icons.close_rounded, color: AppColors.textTertiary, size: 20),
+                    child: const Padding(
+                      padding: EdgeInsets.only(left: 8),
+                      child: Icon(Icons.close_rounded, color: AppColors.textTertiary, size: 20),
+                    ),
                   ),
               ],
             ),
@@ -562,31 +576,23 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                 size: 200.0,
               ),
             ),
-            const SizedBox(height: 16),
-            SelectableText(
-              qrData,
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 10,
-                color: Colors.grey[600],
-              ),
-              textAlign: TextAlign.center,
-            ),
             const SizedBox(height: 12),
           ],
         ),
         actions: [
           Center(
             child: SizedBox(
-              width: 120,
+              width: 130,
+              height: 46,
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(ctx),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  foregroundColor: AppColors.primary,
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('Close', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
               ),
             ),
           ),

@@ -542,32 +542,33 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
       child: Container(
+        height: 48,
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(100),
-          border: Border.all(color: AppColors.cardBorder, width: 1.2),
+          color: AppColors.surfaceMuted,
+          borderRadius: BorderRadius.circular(12),
         ),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
         child: Row(
           children: [
-            const SizedBox(width: 14),
             const Icon(Icons.search_rounded,
-                color: AppColors.textTertiary, size: 21),
-            const SizedBox(width: 8),
+                color: AppColors.textTertiary, size: 22),
+            const SizedBox(width: 10),
             Expanded(
               child: TextField(
                 controller: _searchCtrl,
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppColors.textPrimary),
                 decoration: InputDecoration(
                   hintText: 'Search in $_vendorName$addressStr',
                   hintStyle: const TextStyle(
                     color: AppColors.textTertiary,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13.5,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
                   ),
+                  filled: false,
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                  contentPadding: EdgeInsets.zero,
                   isDense: true,
                 ),
                 onChanged: (v) => setState(() => _search = v),
@@ -803,17 +804,19 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
         actions: [
           Center(
             child: SizedBox(
-              width: 120,
+              width: 130,
+              height: 46,
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(ctx),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  foregroundColor: AppColors.primary,
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Text('Close',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
               ),
             ),
           ),

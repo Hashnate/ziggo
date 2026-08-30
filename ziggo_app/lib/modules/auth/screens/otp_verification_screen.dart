@@ -27,43 +27,31 @@ class OTPVerificationScreen extends StatefulWidget {
 
 class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   static const int _len = 6;
-  late final List<TextEditingController> _controllers;
-  late final List<FocusNode> _focusNodes;
-  late final List<String> _previousValues;
+  late final TextEditingController _otpCtrl;
+  late final FocusNode _focusNode;
   bool _busy = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _controllers = List.generate(_len, (_) => TextEditingController(text: '\u200b'));
-    _focusNodes = List.generate(_len, (_) => FocusNode());
-    _previousValues = List.filled(_len, '\u200b');
+    _otpCtrl = TextEditingController();
+    _focusNode = FocusNode();
 
     final dev = context.read<AuthProvider>().devOtp;
     if (dev != null && dev.length == _len) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        for (int i = 0; i < _len; i++) {
-          _controllers[i].text = dev[i];
-          _previousValues[i] = dev[i];
-        }
-        setState(() {});
-      });
+      _otpCtrl.text = dev;
     }
   }
 
   @override
   void dispose() {
-    for (final c in _controllers) {
-      c.dispose();
-    }
-    for (final f in _focusNodes) {
-      f.dispose();
-    }
+    _otpCtrl.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
-  String get _code => _controllers.map((c) => c.text.replaceAll('\u200b', '')).join();
+  String get _code => _otpCtrl.text.replaceAll(RegExp(r'\D'), '');
 
   Future<void> _verify() async {
     if (_code.length != _len) {
@@ -107,10 +95,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     if (!mounted) return;
     final dev = auth.devOtp;
     if (dev != null && dev.length == _len) {
-      for (int i = 0; i < _len; i++) {
-        _controllers[i].text = dev[i];
-        _previousValues[i] = dev[i];
-      }
+      _otpCtrl.text = dev;
       setState(() {});
     }
     ScaffoldMessenger.of(context).showSnackBar(
@@ -198,83 +183,87 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
               EntranceSlide(
                 delay: const Duration(milliseconds: 120),
                 child: AutofillGroup(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: List.generate(_len, (i) {
-                      final has = _controllers[i].text.isNotEmpty && _controllers[i].text != '\u200b';
-                      return Container(
-                        width: 46,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: has ? AppColors.primary : AppColors.cardBorder,
-                            width: has ? 2 : 1,
+                  child: GestureDetector(
+                    onTap: () => _focusNode.requestFocus(),
+                    behavior: HitTestBehavior.opaque,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Offstage/transparent single TextField handling OS SMS autofill & keyboard input
+                        Opacity(
+                          opacity: 0.0,
+                          child: TextField(
+                            controller: _otpCtrl,
+                            focusNode: _focusNode,
+                            autofocus: true,
+                            keyboardType: TextInputType.number,
+                            textInputAction: TextInputAction.done,
+                            maxLength: _len,
+                            autofillHints: const [AutofillHints.oneTimeCode],
+                            enableSuggestions: true,
+                            onChanged: (v) {
+                              final digits = v.replaceAll(RegExp(r'\D'), '');
+                              if (digits != v) {
+                                _otpCtrl.value = TextEditingValue(
+                                  text: digits,
+                                  selection: TextSelection.collapsed(offset: digits.length),
+                                );
+                              }
+                              setState(() {});
+                              if (digits.length == _len && !_busy) {
+                                _verify();
+                              }
+                            },
+                            decoration: const InputDecoration(
+                              counterText: '',
+                              contentPadding: EdgeInsets.zero,
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              filled: false,
+                            ),
                           ),
-                          boxShadow: has ? AppStyles.shadowSm : null,
                         ),
-                        child: TextField(
-                          controller: _controllers[i],
-                          focusNode: _focusNodes[i],
-                          keyboardType: TextInputType.number,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.textPrimary,
-                          ),
-                          autofillHints: const [AutofillHints.oneTimeCode],
-                          decoration: const InputDecoration(
-                            counterText: '',
-                            filled: false,
-                            border: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            focusedBorder: InputBorder.none,
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                          onChanged: (v) {
-                            final cleanV = v.replaceAll('\u200b', '');
-                            if (cleanV.length >= _len) {
-                              final digits = cleanV.replaceAll(RegExp(r'\D'), '');
-                              if (digits.length >= _len) {
-                                for (int j = 0; j < _len; j++) {
-                                  _controllers[j].text = digits[j];
-                                  _previousValues[j] = digits[j];
-                                }
-                                _focusNodes[_len - 1].requestFocus();
-                                setState(() {});
-                                return;
-                              }
-                            }
-                            
-                            if (v.isEmpty) {
-                              _controllers[i].text = '\u200b';
-                              if (_previousValues[i] == '\u200b' && i > 0) {
-                                _controllers[i - 1].text = '\u200b';
-                                _previousValues[i - 1] = '\u200b';
-                                _focusNodes[i - 1].requestFocus();
-                              }
-                              _previousValues[i] = '\u200b';
-                            } else {
-                              final clean = v.replaceAll('\u200b', '');
-                              if (clean.isNotEmpty) {
-                                final char = clean[clean.length - 1];
-                                _controllers[i].text = char;
-                                _previousValues[i] = char;
-                                if (i < _len - 1) {
-                                  _focusNodes[i + 1].requestFocus();
-                                }
-                              } else {
-                                _controllers[i].text = '\u200b';
-                                _previousValues[i] = '\u200b';
-                              }
-                            }
-                            setState(() {});
-                          },
+                        // Visual 6-cell PIN display
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: List.generate(_len, (i) {
+                            final code = _code;
+                            final isFilled = i < code.length;
+                            final isCurrent = _focusNode.hasFocus && i == code.length;
+                            final char = isFilled ? code[i] : '';
+
+                            return AnimatedContainer(
+                              duration: const Duration(milliseconds: 150),
+                              width: 48,
+                              height: 60,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isCurrent
+                                      ? AppColors.primary
+                                      : isFilled
+                                          ? AppColors.primary.withOpacity(0.6)
+                                          : AppColors.cardBorder,
+                                  width: isCurrent || isFilled ? 2 : 1,
+                                ),
+                                boxShadow: isCurrent || isFilled ? AppStyles.shadowSm : null,
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                char,
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            );
+                          }),
                         ),
-                      );
-                    }),
+                      ],
+                    ),
                   ),
                 ),
               ),
