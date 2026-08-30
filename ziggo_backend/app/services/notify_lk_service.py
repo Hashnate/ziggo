@@ -51,7 +51,7 @@ async def send_otp(phone_number: str, code: str, site_name: str) -> bool:
         return False
 
     to = _normalize(phone_number)
-    msg = f"Your {site_name} verification code is {code}. It expires in 5 minutes."
+    msg = f"<#> Your {site_name} verification code is {code}. It expires in 5 minutes."
     params = {
         "user_id": settings.NOTIFY_LK_USER_ID,
         "api_key": settings.NOTIFY_LK_API_KEY,
