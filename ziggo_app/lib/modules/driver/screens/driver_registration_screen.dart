@@ -8,6 +8,7 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/widgets/motion.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/services/referral_tracker.dart';
 import '../../auth/auth_provider.dart';
 import '../driver_provider.dart';
 import '../driver_theme.dart';
@@ -32,6 +33,21 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
   final _relativeContact = TextEditingController();
   final _relativeRelationship = TextEditingController();
   final _referralCode = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPendingReferral();
+  }
+
+  Future<void> _loadPendingReferral() async {
+    final pending = await ReferralTracker.getPendingReferralCode();
+    if (pending != null && pending.isNotEmpty && mounted) {
+      setState(() {
+        _referralCode.text = pending;
+      });
+    }
+  }
 
   String _vehicleType = 'car';
   String _driverType = 'ride';
@@ -197,6 +213,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
 
       // Load profile to trigger the pending screen status check
       await context.read<DriverProvider>().loadProfile();
+      await ReferralTracker.markAttributed();
 
       if (mounted) {
         setState(() {

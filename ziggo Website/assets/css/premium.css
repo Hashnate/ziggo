@@ -528,7 +528,7 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
   color: var(--p-text);
   transition: background 0.3s var(--p-ease), transform 0.35s var(--p-spring);
   position: relative;
-  border: 1px solid transparent;
+
 }
 .pm-nav-dropdown a::after {
   content: '\f054';
@@ -545,7 +545,6 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
 }
 .pm-nav-dropdown a:hover {
   background: linear-gradient(135deg, rgba(59,130,246,0.06), rgba(30,58,138,0.03));
-  border-color: rgba(30, 58, 138, 0.08);
   transform: translateX(2px);
 }
 .pm-nav-dropdown a:hover::after {
@@ -607,7 +606,7 @@ body.pm ::selection { background: var(--p-brand); color: #fff; }
   height: 100%;
 }
 .pm-nav-dropdown a.color-drive .ico.ico-img    { background: linear-gradient(160deg, #F5F9FF 0%, #DBEAFE 100%); }
-.pm-nav-dropdown a.color-merchant .ico.ico-img { background: linear-gradient(160deg, #FDF2F8 0%, #FCE7F3 100%); }
+.pm-nav-dropdown a.color-merchant .ico.ico-img { background: transparent; box-shadow: none; padding: 0; }
 .pm-nav-dropdown a.color-biz .ico.ico-img      { background: linear-gradient(160deg, #F0F9FF 0%, #E0F2FE 100%); }
 /* Mart photo — use the same blend/fit treatment as the other service icons */
 /* Mart inline-SVG building icon — fills the tile cleanly */

@@ -3510,17 +3510,28 @@ async def admin_restaurant_suspend(
 
 
 @router.post("/restaurants/{restaurant_id}/delete")
+@router.get("/restaurants/{restaurant_id}/delete")
 async def admin_restaurant_delete(
     restaurant_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
     from app.models import Restaurant
-    q = await db.execute(select(Restaurant).where(Restaurant.id == restaurant_id))
-    r = q.scalars().first()
-    if r:
-        await db.delete(r)
-        await db.commit()
+    try:
+        q = await db.execute(select(Restaurant).where(Restaurant.id == restaurant_id))
+        r = q.scalars().first()
+        if r:
+            await db.delete(r)
+            await db.commit()
+    except Exception:
+        await db.rollback()
+        # Fallback: deactivate if hard delete encountered unexpected lock
+        q = await db.execute(select(Restaurant).where(Restaurant.id == restaurant_id))
+        r = q.scalars().first()
+        if r:
+            r.is_active = False
+            r.is_open = False
+            await db.commit()
     return RedirectResponse(url="/admin/restaurants", status_code=303)
 
 

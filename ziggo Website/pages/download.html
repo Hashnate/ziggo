@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Download Ziggo | Claim Your Referral Bonus</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/images/logo/favicon.svg?v=2">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(circle at 50% 20%, #0d1e56 0%, #04091a 100%);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .card {
+      background: rgba(13, 27, 72, 0.7);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 28px;
+      padding: 40px 32px;
+      max-width: 460px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+    }
+    .logo-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .brand-name {
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .headline {
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #f8fafc;
+    }
+    .subtext {
+      color: #94a3b8;
+      font-size: 14px;
+      line-height: 1.5;
+      margin-bottom: 28px;
+    }
+    .referral-card {
+      background: rgba(37, 99, 235, 0.12);
+      border: 1.5px dashed rgba(59, 130, 246, 0.4);
+      border-radius: 20px;
+      padding: 20px 16px;
+      margin-bottom: 28px;
+      position: relative;
+    }
+    .referral-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: #93c5fd;
+      margin-bottom: 6px;
+    }
+    .code-display {
+      font-family: monospace;
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: 3px;
+      color: #60a5fa;
+      margin-bottom: 6px;
+    }
+    .bonus-note {
+      font-size: 12px;
+      color: #34d399;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .store-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      padding: 16px;
+      border-radius: 16px;
+      font-size: 15px;
+      font-weight: 700;
+      text-decoration: none;
+      margin-bottom: 12px;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .store-btn:active { transform: scale(0.98); }
+    .btn-google {
+      background: #2563eb;
+      color: #fff;
+      box-shadow: 0 8px 24px rgba(37, 99, 235, 0.35);
+    }
+    .btn-google:hover { background: #1d4ed8; }
+    .btn-apple {
+      background: rgba(255, 255, 255, 0.08);
+      color: #f1f5f9;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+    .btn-apple:hover { background: rgba(255, 255, 255, 0.14); }
+    .redirect-alert {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-top: 16px;
+    }
+    .toast {
+      display: none;
+      position: fixed;
+      bottom: 24px;
+      background: #10b981;
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-weight: 700;
+      font-size: 14px;
+      box-shadow: 0 10px 25px rgba(16, 185, 129, 0.4);
+      z-index: 100;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo-badge">
+      <span class="brand-name">Ziggo</span>
+    </div>
+    <h1 class="headline">Claim Your Welcome Reward</h1>
+    <p class="subtext">Sri Lanka's direct on-demand ride, food delivery and logistics service.</p>
+
+    <div class="referral-card" id="refCard" style="display: none;">
+      <div class="referral-label">Your Referral Invite Code</div>
+      <div class="code-display" id="refCode"></div>
+      <div class="bonus-note">
+        <i class="fa-solid fa-gift"></i>
+        <span>Rs. 50 wallet credit credited on your first completed trip!</span>
+      </div>
+    </div>
+
+    <a href="#" id="playBtn" class="store-btn btn-google">
+      <i class="fa-brands fa-google-play fa-lg"></i>
+      <span>Get it on Google Play</span>
+    </a>
+
+    <a href="https://apps.apple.com/app/ziggo-app/id6778739956" id="appleBtn" class="store-btn btn-apple">
+      <i class="fa-brands fa-apple fa-lg"></i>
+      <span>Download on App Store</span>
+    </a>
+
+    <p class="redirect-alert" id="redirectStatus">Redirecting to app store...</p>
+  </div>
+
+  <div class="toast" id="toast">Referral code copied to clipboard!</div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const code = (params.get('ref') || params.get('code') || '').trim().toUpperCase();
+
+    const playBase = "https://play.google.com/store/apps/details?id=lk.ziggo.app";
+    const appleUrl = "https://apps.apple.com/app/ziggo-app/id6778739956";
+
+    const playUrl = code ? `${playBase}&referrer=ref%3D${encodeURIComponent(code)}` : playBase;
+    document.getElementById('playBtn').href = playUrl;
+
+    if (code) {
+      document.getElementById('refCard').style.display = 'block';
+      document.getElementById('refCode').innerText = code;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(code).then(() => {
+          showToast();
+        }).catch(() => {});
+      }
+    }
+
+    function showToast() {
+      const t = document.getElementById('toast');
+      t.style.display = 'block';
+      setTimeout(() => { t.style.display = 'none'; }, 3000);
+    }
+
+    // Auto-redirect mobile devices to respective stores
+    const ua = navigator.userAgent || navigator.vendor || window.opera;
+    const isAndroid = /android/i.test(ua);
+    const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+
+    if (isAndroid) {
+      document.getElementById('redirectStatus').innerText = "Opening Google Play Store...";
+      setTimeout(() => { window.location.href = playUrl; }, 1000);
+    } else if (isIOS) {
+      document.getElementById('redirectStatus').innerText = "Opening Apple App Store...";
+      setTimeout(() => { window.location.href = appleUrl; }, 1000);
+    } else {
+      document.getElementById('redirectStatus').style.display = 'none';
+    }
+  </script>
+</body>
+</html>

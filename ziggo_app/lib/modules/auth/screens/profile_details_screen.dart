@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/widgets/motion.dart';
+import '../../../core/services/referral_tracker.dart';
 import '../auth_provider.dart';
 
 /// Shown once, right after a new user verifies their OTP (signup). Captures the
@@ -22,6 +23,7 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
   late final TextEditingController _emailCtrl;
   late final TextEditingController _referralCtrl;
   bool _busy = false;
+  bool _referralAutoDetected = false;
   String? _error;
 
   @override
@@ -35,6 +37,17 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
     _lastCtrl = TextEditingController(text: last);
     _emailCtrl = TextEditingController(text: auth.email ?? '');
     _referralCtrl = TextEditingController();
+    _loadPendingReferral();
+  }
+
+  Future<void> _loadPendingReferral() async {
+    final pending = await ReferralTracker.getPendingReferralCode();
+    if (pending != null && pending.isNotEmpty && mounted) {
+      setState(() {
+        _referralCtrl.text = pending;
+        _referralAutoDetected = true;
+      });
+    }
   }
 
   @override
@@ -81,6 +94,9 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
         email: email,
         referredByCode: referral.isNotEmpty ? referral : null,
       );
+      if (referral.isNotEmpty) {
+        await ReferralTracker.markAttributed();
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -169,10 +185,34 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
               const SizedBox(height: 14),
               EntranceSlide(
                 delay: const Duration(milliseconds: 150),
-                child: _field(
-                  label: 'Referral Code (Optional)',
-                  controller: _referralCtrl,
-                  capitalize: true,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _field(
+                      label: 'Referral Code (Optional)',
+                      controller: _referralCtrl,
+                      capitalize: true,
+                    ),
+                    if (_referralAutoDetected && _referralCtrl.text.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 16),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Referral code ${_referralCtrl.text} applied from your invite! Wallet reward will be credited on your first completed trip.',
+                              style: const TextStyle(
+                                color: AppColors.success,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
                 ),
               ),
               if (_error != null) ...[

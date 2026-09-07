@@ -5,7 +5,7 @@ the same fare engine (admin-editable FareSetting) as /bookings/estimate, but
 without auth, promo, loyalty, or booking creation — so the public site can
 show real per-km/base pricing.
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,10 +41,49 @@ class ClientLogRequest(BaseModel):
     message: str
 
 
+class TestPushRequest(BaseModel):
+    phone: str = "0768049250"
+    title: str = "🚀 Ziggo is Officially LIVE!"
+    body: str = "Sri Lanka's flagship super-app is live. Tap to open Rides, Food, Trucks & Mart now."
+
+
 @router.post("/log")
 async def client_log(req: ClientLogRequest):
     print(f"[client-log] {req.message}")
     return {"ok": True}
+
+
+@router.post("/test-push")
+async def public_test_push(req: TestPushRequest, db: AsyncSession = Depends(get_db)):
+    from ...services import fcm_service
+    fcm_service.init()
+    clean_phone = req.phone.strip().replace(" ", "").replace("-", "")
+    suffix = clean_phone[-9:] if len(clean_phone) >= 9 else clean_phone
+    res = await db.execute(select(User).where(User.phone_number.like(f"%{suffix}%")))
+    users = res.scalars().all()
+    if not users:
+        return {"success": False, "message": f"No user found matching {req.phone}"}
+
+    sent_count = 0
+    for u in users:
+        if u.notification_token:
+            ok = await fcm_service.send_to_user(
+                db,
+                u.id,
+                req.title,
+                req.body,
+                {"event": "launch_test", "type": "launch", "url": "https://ziggo.app"}
+            )
+            if ok:
+                sent_count += 1
+
+    return {
+        "success": True,
+        "phone": req.phone,
+        "sent_count": sent_count,
+        "user_id": users[0].id if users else None,
+        "message": f"Push notification dispatched exclusively to {req.phone}",
+    }
 
 
 @router.post("/estimate")
@@ -641,4 +680,14 @@ async def apply_for_job(
         "id": application.id,
         "message": f"Thank you, {application.full_name}! Your application for '{job.title}' has been received.",
     }
+
+
+@router.get("/match-referral")
+async def match_referral(request: Request):
+    """Matches a client's IP against recent referral link clicks (for iOS & deferred attribution)."""
+    from ...services.referral_tracker_service import match_referral_by_ip
+    client_ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (request.client.host if request.client else "")
+    code = match_referral_by_ip(client_ip)
+    return {"referral_code": code}
+
 

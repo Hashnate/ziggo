@@ -91,7 +91,7 @@ class MenuItem(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     restaurant_id = Column(Integer, ForeignKey("restaurants.id", ondelete="CASCADE"))
-    category_id = Column(Integer, ForeignKey("menu_categories.id"))
+    category_id = Column(Integer, ForeignKey("menu_categories.id", ondelete="SET NULL"), nullable=True)
     name = Column(String(200), nullable=False)
     description = Column(Text)
     price = Column(DECIMAL(10, 2), nullable=False)
@@ -163,7 +163,7 @@ class FoodOrderItem(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     order_id = Column(Integer, ForeignKey("food_orders.id", ondelete="CASCADE"))
-    menu_item_id = Column(Integer, ForeignKey("menu_items.id"))
+    menu_item_id = Column(Integer, ForeignKey("menu_items.id", ondelete="SET NULL"), nullable=True)
     quantity = Column(Integer, nullable=False)
     price_at_order = Column(DECIMAL(10, 2), nullable=False)
     notes = Column(String(255))

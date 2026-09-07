@@ -9,6 +9,7 @@ import '../../../app/app_styles.dart';
 import '../../../core/widgets/ambient_orbs.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/motion.dart';
+import '../../../core/services/referral_tracker.dart';
 import '../../auth/auth_provider.dart';
 import '../referrals_provider.dart';
 
@@ -28,8 +29,12 @@ class _EarnWithZiggoScreenState extends State<EarnWithZiggoScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       context.read<ReferralsProvider>().refresh();
+      final pending = await ReferralTracker.getPendingReferralCode();
+      if (pending != null && pending.isNotEmpty && mounted) {
+        _codeCtrl.text = pending;
+      }
     });
   }
 
@@ -52,7 +57,12 @@ class _EarnWithZiggoScreenState extends State<EarnWithZiggoScreen> {
 
   Future<void> _shareCode(BuildContext context, String code, double amount) async {
     final formattedAmt = amount.toStringAsFixed(2);
-    final message = "Sign up for Ziggo using my referral code $code and get Rs.$formattedAmt wallet credit on your first completed trip! Download the app now.";
+    final downloadUrl = "https://ziggo.lk/download?ref=$code";
+    final playStoreUrl = "https://play.google.com/store/apps/details?id=lk.ziggo.app&referrer=ref%3D$code";
+    final message = "Sign up for Ziggo using my referral code $code and get Rs.$formattedAmt wallet credit on your first completed trip!\n\n"
+        "Download the app now:\n"
+        "Link: $downloadUrl\n"
+        "Google Play: $playStoreUrl";
     
     final box = context.findRenderObject() as RenderBox?;
     final sharePositionOrigin = box != null
@@ -81,6 +91,7 @@ class _EarnWithZiggoScreenState extends State<EarnWithZiggoScreen> {
     if (mounted) {
       setState(() => _applying = false);
       if (ok) {
+        await ReferralTracker.markAttributed();
         setState(() => _applySuccess = 'Referral code applied successfully!');
         _codeCtrl.clear();
         context.read<AuthProvider>().bootstrap(); // Refresh user state
@@ -143,6 +154,72 @@ class _EarnWithZiggoScreenState extends State<EarnWithZiggoScreen> {
                       ],
                     ),
                   ),
+                  if (!hasReferrer) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.cardBorder),
+                        boxShadow: AppStyles.shadowSm,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Have a referral code?',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Enter your invite code to get Rs.${r.referralAmount.toStringAsFixed(2)} wallet credit on your first completed trip.',
+                            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _codeCtrl,
+                                  textCapitalization: TextCapitalization.characters,
+                                  decoration: InputDecoration(
+                                    hintText: 'Enter referral code',
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                    isDense: true,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              ElevatedButton(
+                                onPressed: _applying ? null : _applyReferral,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                ),
+                                child: _applying
+                                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                    : const Text('Apply', style: TextStyle(fontWeight: FontWeight.bold)),
+                              ),
+                            ],
+                          ),
+                          if (_applySuccess != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(_applySuccess!, style: const TextStyle(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.bold)),
+                            ),
+                          if (_applyError != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(_applyError!, style: const TextStyle(color: AppColors.error, fontSize: 12, fontWeight: FontWeight.bold)),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   Row(
                     children: [

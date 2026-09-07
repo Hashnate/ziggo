@@ -1,0 +1,406 @@
+@import "tailwindcss";
+
+/* ============================================================
+   ZIGGO LAUNCH PAGE — Global Styles & Design System
+   ============================================================ */
+
+@theme {
+  --font-display: "Outfit", system-ui, sans-serif;
+  --font-body: "DM Sans", "Inter", system-ui, sans-serif;
+
+  --color-brand: #1E3A8A;
+  --color-brand-dark: #131C3D;
+  --color-brand-light: #3B82F6;
+  --color-brand-bright: #60A5FA;
+  --color-gold: #C9A961;
+  --color-navy-deep: #0A0F1F;
+}
+
+/* ---------- Base ---------- */
+html {
+  -webkit-text-size-adjust: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Lenis Smooth Scroll CSS Rules */
+html.lenis, html.lenis body {
+  height: 100%;
+  overflow: hidden;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.lenis.lenis-scrolling iframe {
+  pointer-events: none;
+}
+
+body {
+  font-family: "DM Sans", "Inter", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+  height: 100%;
+  background: #060A17;
+  color: #F8FAFC;
+}
+
+
+/* ---------- Custom Animations ---------- */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-16px); }
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0px) translateX(0px); }
+  33%      { transform: translateY(-12px) translateX(6px); }
+  66%      { transform: translateY(-6px) translateX(-4px); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50%      { opacity: 0.75; transform: scale(1.08); }
+}
+
+@keyframes fade-up {
+  0%   { opacity: 0; transform: translateY(28px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-pop {
+  0%   { transform: scale(0.88); opacity: 0; }
+  60%  { transform: scale(1.03); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes digit-flip {
+  0%   { transform: translateY(-35%); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes orb-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25%       { transform: translate(25px, -20px) scale(1.06); }
+  50%       { transform: translate(-20px, 25px) scale(0.96); }
+  75%       { transform: translate(20px, 10px) scale(1.04); }
+}
+
+@keyframes border-glow {
+  0%, 100% { border-color: rgba(96, 165, 250, 0.3); box-shadow: 0 0 25px rgba(59, 130, 246, 0.2); }
+  50%      { border-color: rgba(96, 165, 250, 0.6); box-shadow: 0 0 45px rgba(59, 130, 246, 0.45); }
+}
+
+/* ---------- Utility classes ---------- */
+.animate-float       { animation: float 5s ease-in-out infinite; }
+.animate-float-slow  { animation: float-slow 8s ease-in-out infinite; }
+.animate-pulse-glow  { animation: pulse-glow 3.5s ease-in-out infinite; }
+.animate-fade-up     { animation: fade-up 0.7s cubic-bezier(0.34,1.56,0.64,1) both; }
+.animate-scale-pop   { animation: scale-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) both; }
+.animate-digit-flip  { animation: digit-flip 0.3s cubic-bezier(0.34,1.56,0.64,1) both; }
+.animate-orb-drift   { animation: orb-drift 12s ease-in-out infinite; }
+.animate-border-glow { animation: border-glow 3s ease-in-out infinite; }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.animate-spin { animation: spin 1s linear infinite; }
+
+/* ---------- Glassmorphism ---------- */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.glass-luxury {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* ---------- Premium Countdown Box ---------- */
+.countdown-box {
+  background: linear-gradient(180deg, rgba(26, 38, 77, 0.7) 0%, rgba(13, 20, 44, 0.9) 100%);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(96, 165, 250, 0.25);
+  border-radius: 20px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(59, 130, 246, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  padding: 18px 16px 14px;
+  min-width: 84px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.countdown-box:hover {
+  transform: translateY(-3px);
+  border-color: rgba(96, 165, 250, 0.5);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 40px rgba(59, 130, 246, 0.35);
+}
+
+.countdown-box::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+}
+
+.countdown-number {
+  font-family: "Outfit", system-ui, sans-serif;
+  font-size: clamp(2.2rem, 6.5vw, 3.6rem);
+  font-weight: 800;
+  line-height: 1;
+  color: #FFFFFF;
+  letter-spacing: -0.02em;
+  display: block;
+  text-shadow: 0 0 25px rgba(96, 165, 250, 0.4);
+}
+
+.countdown-label {
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(147, 197, 253, 0.85);
+  margin-top: 8px;
+  display: block;
+}
+
+/* ---------- Radiant CTA Button ---------- */
+.btn-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 18px 42px;
+  background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 50%, #1E3A8A 100%);
+  color: #FFFFFF;
+  font-family: "Outfit", system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 1.12rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 16px 45px -10px rgba(59, 130, 246, 0.6), 0 0 35px rgba(59, 130, 246, 0.35);
+  transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1),
+              box-shadow 0.25s ease;
+}
+
+.btn-cta::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+  transition: left 0.6s ease;
+}
+
+.btn-cta:hover {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow: 0 24px 60px -10px rgba(59, 130, 246, 0.8), 0 0 50px rgba(96, 165, 250, 0.5);
+}
+
+.btn-cta:hover::before {
+  left: 100%;
+}
+
+.btn-cta:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------- Scrollbar ---------- */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #060A17; }
+::-webkit-scrollbar-thumb {
+  background: rgba(30, 58, 138, 0.6);
+  border-radius: 9999px;
+}
+
+/* ============================================================
+   BIG SCREEN / STAGE PRESENTATION DESIGN SYSTEM
+   ============================================================ */
+
+/* Sweeping Stage Spotlight Beams */
+@keyframes stage-beam-left {
+  0%, 100% { transform: rotate(-28deg) scaleY(1); opacity: 0.25; }
+  50%      { transform: rotate(-8deg) scaleY(1.15); opacity: 0.55; }
+}
+
+@keyframes stage-beam-right {
+  0%, 100% { transform: rotate(28deg) scaleY(1); opacity: 0.25; }
+  50%      { transform: rotate(8deg) scaleY(1.15); opacity: 0.55; }
+}
+
+@keyframes text-shimmer {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes laser-sweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+@keyframes beacon-ping {
+  0%   { transform: scale(1); opacity: 1; }
+  75%, 100% { transform: scale(2.6); opacity: 0; }
+}
+
+.animate-stage-beam-left {
+  animation: stage-beam-left 14s ease-in-out infinite;
+  transform-origin: top left;
+}
+
+.animate-stage-beam-right {
+  animation: stage-beam-right 16s ease-in-out infinite;
+  transform-origin: top right;
+}
+
+.animate-text-shimmer {
+  background-size: 250% auto;
+  animation: text-shimmer 6s linear infinite;
+}
+
+.animate-laser-sweep {
+  animation: laser-sweep 4s ease-in-out infinite;
+}
+
+.animate-beacon-ping {
+  animation: beacon-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Big Screen Grand Chronometer Box */
+.stage-countdown-card {
+  background: radial-gradient(130% 130% at 50% 0%, rgba(30, 58, 138, 0.55) 0%, rgba(10, 17, 40, 0.85) 60%, rgba(3, 7, 18, 0.95) 100%);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  border-radius: 24px;
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    0 24px 60px -12px rgba(0, 0, 0, 0.8),
+    0 0 45px rgba(59, 130, 246, 0.22),
+    inset 0 1px 2px rgba(255, 255, 255, 0.4),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.5);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.35s ease,
+              box-shadow 0.35s ease;
+}
+
+.stage-countdown-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), rgba(96, 165, 250, 0.9), transparent);
+}
+
+.stage-countdown-card:hover {
+  transform: translateY(-6px) scale(1.02);
+  border-color: rgba(147, 197, 253, 0.7);
+  box-shadow:
+    0 32px 70px -10px rgba(0, 0, 0, 0.9),
+    0 0 60px rgba(59, 130, 246, 0.45),
+    inset 0 1px 3px rgba(255, 255, 255, 0.6);
+}
+
+/* Service Glass HUD Card */
+.service-hud-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.service-hud-card:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.03) 100%);
+  transform: translateY(-4px);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Stage VIP Gold Button */
+.btn-stage-vip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 36px;
+  background: linear-gradient(135deg, #F59E0B 0%, #D97706 50%, #B45309 100%);
+  color: #030712;
+  font-family: "Outfit", system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+  border-radius: 9999px;
+  border: 1px solid rgba(254, 240, 138, 0.6);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 16px 45px -8px rgba(245, 158, 11, 0.6), 0 0 30px rgba(245, 158, 11, 0.3);
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.btn-stage-vip:hover {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow: 0 24px 60px -8px rgba(245, 158, 11, 0.8), 0 0 50px rgba(251, 191, 36, 0.5);
+  border-color: #FFFFFF;
+}
+
+.btn-stage-vip::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  transition: left 0.6s ease;
+}
+
+.btn-stage-vip:hover::before {
+  left: 100%;
+}
+

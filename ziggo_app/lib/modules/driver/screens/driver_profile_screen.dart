@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../core/network/api_client.dart';
@@ -849,14 +850,15 @@ class DriverProfileScreen extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () {
+                  onPressed: () async {
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Referral code $referralCode copied!'),
-                        backgroundColor: AppColors.success,
-                      ),
-                    );
+                    final downloadUrl = "https://ziggo.lk/download?ref=$referralCode";
+                    final playStoreUrl = "https://play.google.com/store/apps/details?id=lk.ziggo.app&referrer=ref%3D$referralCode";
+                    final message = "Drive with Ziggo and earn more! Sign up using my referral code $referralCode to receive bonuses.\n\n"
+                        "Download the app now:\n"
+                        "Link: $downloadUrl\n"
+                        "Google Play: $playStoreUrl";
+                    await Share.share(message);
                   },
                   icon: const Icon(Icons.share_rounded),
                   label: const Text('Share Code'),

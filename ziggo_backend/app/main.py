@@ -88,6 +88,73 @@ async def health():
     return {"status": "ok", "service": settings.PROJECT_NAME}
 
 
+@app.get("/download")
+async def download_redirect(request: Request, ref: str = "", code: str = ""):
+    """Smart download router that logs referral clicks for deferred attribution
+    and redirects user to Google Play or Apple App Store."""
+    referral_code = (ref or code).strip().upper()
+    client_ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (request.client.host if request.client else "")
+    user_agent = request.headers.get("user-agent", "")
+
+    if referral_code:
+        from .services.referral_tracker_service import record_referral_click
+        record_referral_click(client_ip, user_agent, referral_code)
+
+    ua_lower = user_agent.lower()
+    play_url = f"https://play.google.com/store/apps/details?id=lk.ziggo.app&referrer=ref%3D{referral_code}" if referral_code else "https://play.google.com/store/apps/details?id=lk.ziggo.app"
+    app_store_url = "https://apps.apple.com/app/ziggo-app/id6778739956"
+
+    if "android" in ua_lower:
+        return RedirectResponse(url=play_url, status_code=302)
+    elif "iphone" in ua_lower or "ipad" in ua_lower or "ipod" in ua_lower:
+        return RedirectResponse(url=app_store_url, status_code=302)
+
+    from fastapi.responses import HTMLResponse
+    ref_box = f"""<div class="badge-box">
+      <div class="badge-title">Invited Referral Code</div>
+      <div class="ref-code">{referral_code}</div>
+      <div style="font-size: 12px; color: #38bdf8; margin-top: 6px;">Rs. 50 bonus wallet credit upon first ride!</div>
+    </div>""" if referral_code else ""
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Download Ziggo - Super App</title>
+  <style>
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a1026; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }}
+    .card {{ background: #131b38; border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; padding: 40px; max-width: 440px; width: 100%; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }}
+    .logo {{ font-size: 32px; font-weight: 900; color: #1e88e5; letter-spacing: -1px; margin-bottom: 8px; }}
+    .sub {{ color: #94a3b8; font-size: 15px; margin-bottom: 28px; line-height: 1.5; }}
+    .badge-box {{ background: rgba(30,136,229,0.1); border: 1px solid rgba(30,136,229,0.3); border-radius: 16px; padding: 16px; margin-bottom: 24px; }}
+    .badge-title {{ font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; font-weight: 700; margin-bottom: 4px; }}
+    .ref-code {{ font-size: 26px; font-weight: 900; color: #60a5fa; letter-spacing: 3px; font-family: monospace; }}
+    .btn {{ display: block; padding: 15px; border-radius: 14px; text-decoration: none; font-weight: 700; font-size: 15px; margin-bottom: 12px; transition: all 0.2s; }}
+    .btn-play {{ background: #1e88e5; color: #fff; }}
+    .btn-play:hover {{ background: #1976d2; }}
+    .btn-app {{ background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.15); }}
+    .btn-app:hover {{ background: rgba(255,255,255,0.15); }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">Ziggo</div>
+    <p class="sub">Ride, Food, Market & Flash Delivery — All in one super app for Sri Lanka.</p>
+    {ref_box}
+    <a href="{play_url}" class="btn btn-play">Get it on Google Play</a>
+    <a href="{app_store_url}" class="btn btn-app">Download on App Store</a>
+  </div>
+  <script>
+    if (navigator.clipboard && '{referral_code}') {{
+      navigator.clipboard.writeText('{referral_code}').catch(() => {{}});
+    }}
+  </script>
+</body>
+</html>"""
+    return HTMLResponse(content=html)
+
+
 @app.exception_handler(_AdminRedirect)
 async def admin_redirect_handler(request: Request, exc: _AdminRedirect):
     return RedirectResponse(url="/admin/login", status_code=303)

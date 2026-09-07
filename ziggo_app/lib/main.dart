@@ -12,6 +12,7 @@ import 'core/map/maps_web_loader_stub.dart'
     if (dart.library.html) 'core/map/maps_web_loader.dart';
 import 'core/network/api_client.dart';
 import 'core/notifications/fcm_service.dart';
+import 'core/services/referral_tracker.dart';
 import 'modules/auth/auth_provider.dart';
 import 'modules/auth/screens/role_selection_screen.dart';
 import 'modules/common/screens/splash_screen.dart';
@@ -67,6 +68,8 @@ Future<void> main() async {
   try {
     await ApiClient.init().timeout(const Duration(seconds: 4));
   } catch (_) {}
+  // Initialize referral tracking (Android Play Install Referrer, iOS match, clipboard)
+  ReferralTracker.init();
   runApp(const ZiggoApp());
   // Initialise Firebase (FCM) AFTER the first frame. APNs/token retrieval must
   // never gate runApp — on iOS getToken() blocks until APNs registration
