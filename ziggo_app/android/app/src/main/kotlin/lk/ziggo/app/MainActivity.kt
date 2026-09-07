@@ -30,7 +30,7 @@ class MainActivity : FlutterActivity() {
             referrerClient = InstallReferrerClient.newBuilder(this).build()
             referrerClient?.startConnection(object : InstallReferrerStateListener {
                 override fun onInstallReferrerSetupFinished(responseCode: Int) {
-                    if (responseCode == InstallReferrerClient.InstallReferrerResponseCode.OK) {
+                    if (responseCode == InstallReferrerClient.InstallReferrerResponse.OK) {
                         try {
                             val response = referrerClient?.installReferrer
                             referrerUrl = response?.installReferrer
