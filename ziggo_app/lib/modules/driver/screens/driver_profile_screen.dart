@@ -852,11 +852,9 @@ class DriverProfileScreen extends StatelessWidget {
                 child: ElevatedButton.icon(
                   onPressed: () async {
                     Navigator.pop(ctx);
-                    final downloadUrl = "https://ziggo.lk/download?ref=$referralCode";
                     final playStoreUrl = "https://play.google.com/store/apps/details?id=lk.ziggo.app&referrer=ref%3D$referralCode";
                     final message = "Drive with Ziggo and earn more! Sign up using my referral code $referralCode to receive bonuses.\n\n"
                         "Download the app now:\n"
-                        "Link: $downloadUrl\n"
                         "Google Play: $playStoreUrl";
                     await Share.share(message);
                   },

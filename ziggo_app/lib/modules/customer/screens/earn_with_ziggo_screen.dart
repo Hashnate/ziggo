@@ -2,13 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
-
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
-import '../../../core/widgets/ambient_orbs.dart';
-import '../../../core/widgets/glass_card.dart';
-import '../../../core/widgets/motion.dart';
 import '../../../core/services/referral_tracker.dart';
 import '../../auth/auth_provider.dart';
 import '../referrals_provider.dart';
@@ -57,11 +52,9 @@ class _EarnWithZiggoScreenState extends State<EarnWithZiggoScreen> {
 
   Future<void> _shareCode(BuildContext context, String code, double amount) async {
     final formattedAmt = amount.toStringAsFixed(2);
-    final downloadUrl = "https://ziggo.lk/download?ref=$code";
     final playStoreUrl = "https://play.google.com/store/apps/details?id=lk.ziggo.app&referrer=ref%3D$code";
     final message = "Sign up for Ziggo using my referral code $code and get Rs.$formattedAmt wallet credit on your first completed trip!\n\n"
         "Download the app now:\n"
-        "Link: $downloadUrl\n"
         "Google Play: $playStoreUrl";
     
     final box = context.findRenderObject() as RenderBox?;
@@ -192,17 +185,22 @@ class _EarnWithZiggoScreenState extends State<EarnWithZiggoScreen> {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              ElevatedButton(
-                                onPressed: _applying ? null : _applyReferral,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              SizedBox(
+                                height: 46,
+                                child: ElevatedButton(
+                                  onPressed: _applying ? null : _applyReferral,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    foregroundColor: Colors.white,
+                                    minimumSize: const Size(80, 46),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                                    elevation: 0,
+                                  ),
+                                  child: _applying
+                                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                      : const Text('Apply', style: TextStyle(fontWeight: FontWeight.bold)),
                                 ),
-                                child: _applying
-                                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                    : const Text('Apply', style: TextStyle(fontWeight: FontWeight.bold)),
                               ),
                             ],
                           ),
