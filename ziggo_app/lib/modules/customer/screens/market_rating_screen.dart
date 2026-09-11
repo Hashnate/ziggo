@@ -108,213 +108,248 @@ class _MarketRatingScreenState extends State<MarketRatingScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Confetti(
-        trigger: true,
-        particleCount: 80,
-        child: GestureDetector(
-          onTap: () => FocusScope.of(context).unfocus(),
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: Confetti(
+          trigger: true,
+          particleCount: 80,
           child: SafeArea(
-            child: CustomScrollView(
-              slivers: [
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const SizedBox(height: 28),
-                        // Animated success icon with market teal gradient
-                        Center(
-                          child: ScaleTransition(
-                            scale: _checkScale,
-                            child: Container(
-                              width: 110,
-                              height: 110,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [_kTeal, _kTealDark],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: _kTeal.withOpacity(0.4),
-                                    blurRadius: 24,
-                                    offset: const Offset(0, 8),
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.shopping_bag_rounded,
-                                color: Colors.white,
-                                size: 56,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 28),
-                        const Text(
-                          'Order Delivered!',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'How was your delivery for ${widget.orderRef}?',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 36),
-                        // Star rating card
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(22),
-                            boxShadow: AppStyles.shadowSm,
-                          ),
+            child: Stack(
+              children: [
+                GestureDetector(
+                  onTap: () => FocusScope.of(context).unfocus(),
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
                           child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceEvenly,
-                                children: List.generate(5, (i) {
-                                  final filled = i < _stars;
-                                  return GestureDetector(
-                                    onTap: () =>
-                                        setState(() => _stars = i + 1),
-                                    child: AnimatedContainer(
-                                      duration:
-                                          const Duration(milliseconds: 200),
-                                      curve: Curves.easeOutBack,
-                                      padding: const EdgeInsets.all(2),
-                                      child: Icon(
-                                        filled
-                                            ? Icons.star_rounded
-                                            : Icons.star_outline_rounded,
-                                        color: filled
-                                            ? Colors.amber
-                                            : Colors.grey.shade300,
-                                        size: filled ? 44 : 40,
+                              const SizedBox(height: 28),
+                              // Animated success icon with market teal gradient
+                              Center(
+                                child: ScaleTransition(
+                                  scale: _checkScale,
+                                  child: Container(
+                                    width: 110,
+                                    height: 110,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [_kTeal, _kTealDark],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
                                       ),
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: _kTeal.withOpacity(0.4),
+                                          blurRadius: 24,
+                                          offset: const Offset(0, 8),
+                                        ),
+                                      ],
                                     ),
-                                  );
-                                }),
-                              ),
-                              if (_stars > 0) ...[
-                                const SizedBox(height: 14),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 14, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: _ratingColor.withOpacity(0.12),
-                                    borderRadius: BorderRadius.circular(100),
-                                  ),
-                                  child: Text(
-                                    _ratingLabel,
-                                    style: TextStyle(
-                                      color: _ratingColor,
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 13,
-                                      letterSpacing: 0.5,
+                                    child: const Icon(
+                                      Icons.shopping_bag_rounded,
+                                      color: Colors.white,
+                                      size: 56,
                                     ),
                                   ),
                                 ),
-                              ],
+                              ),
+                              const SizedBox(height: 28),
+                              const Text(
+                                'Order Delivered!',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'How was your delivery for ${widget.orderRef}?',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 36),
+                              // Star rating card
+                              Container(
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(22),
+                                  boxShadow: AppStyles.shadowSm,
+                                ),
+                                child: Column(
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceEvenly,
+                                      children: List.generate(5, (i) {
+                                        final filled = i < _stars;
+                                        return GestureDetector(
+                                          onTap: () =>
+                                              setState(() => _stars = i + 1),
+                                          child: AnimatedContainer(
+                                            duration:
+                                                const Duration(milliseconds: 200),
+                                            curve: Curves.easeOutBack,
+                                            padding: const EdgeInsets.all(2),
+                                            child: Icon(
+                                              filled
+                                                  ? Icons.star_rounded
+                                                  : Icons.star_outline_rounded,
+                                              color: filled
+                                                  ? Colors.amber
+                                                  : Colors.grey.shade300,
+                                              size: filled ? 44 : 40,
+                                            ),
+                                          ),
+                                        );
+                                      }),
+                                    ),
+                                    if (_stars > 0) ...[
+                                      const SizedBox(height: 14),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 14, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: _ratingColor.withOpacity(0.12),
+                                          borderRadius:
+                                              BorderRadius.circular(100),
+                                        ),
+                                        child: Text(
+                                          _ratingLabel,
+                                          style: TextStyle(
+                                            color: _ratingColor,
+                                            fontWeight: FontWeight.w900,
+                                            fontSize: 13,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              const Padding(
+                                padding: EdgeInsets.only(left: 4, bottom: 8),
+                                child: Text(
+                                  'FEEDBACK (OPTIONAL)',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textTertiary,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 1.4,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(color: AppColors.cardBorder),
+                                ),
+                                child: TextField(
+                                  controller: _feedbackCtrl,
+                                  maxLines: 4,
+                                  decoration: const InputDecoration(
+                                    hintText:
+                                        'Anything to share about the delivery?',
+                                    filled: false,
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    contentPadding: EdgeInsets.all(16),
+                                  ),
+                                ),
+                              ),
+                              const Spacer(),
+                              // Submit button styled in market teal
+                              SizedBox(
+                                height: 56,
+                                child: ElevatedButton.icon(
+                                  onPressed: _stars == 0 || _busy ? null : _submit,
+                                  icon: _busy
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white),
+                                        )
+                                      : const Icon(Icons.send_rounded,
+                                          color: Colors.white),
+                                  label: const Text(
+                                    'SUBMIT',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 16,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _kTeal,
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(AppStyles.radiusMd),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextButton(
+                                onPressed: _goHome,
+                                child: const Text(
+                                  'Skip for now',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 20),
-                        const Padding(
-                          padding: EdgeInsets.only(left: 4, bottom: 8),
-                          child: Text(
-                            'FEEDBACK (OPTIONAL)',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textTertiary,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.4,
-                            ),
-                          ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Top-right corner close button
+                Positioned(
+                  top: 12,
+                  right: 16,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _goHome,
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: AppStyles.shadowSm,
                         ),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: AppColors.cardBorder),
-                          ),
-                          child: TextField(
-                            controller: _feedbackCtrl,
-                            maxLines: 4,
-                            decoration: const InputDecoration(
-                              hintText: 'Anything to share about the delivery?',
-                              filled: false,
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              contentPadding: EdgeInsets.all(16),
-                            ),
-                          ),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          size: 22,
+                          color: AppColors.textPrimary,
                         ),
-                        const Spacer(),
-                        SizedBox(
-                          height: 56,
-                          child: ElevatedButton.icon(
-                            onPressed: _stars == 0 || _busy ? null : _submit,
-                            icon: _busy
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white),
-                                  )
-                                : const Icon(Icons.send_rounded,
-                                    color: Colors.white),
-                            label: const Text(
-                              'SUBMIT',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 16,
-                                color: Colors.white,
-                              ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _kTeal,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.circular(AppStyles.radiusMd),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextButton(
-                          onPressed: _goHome,
-                          child: const Text(
-                            'Skip for now',
-                            style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                      ],
+                      ),
                     ),
                   ),
                 ),

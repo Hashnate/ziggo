@@ -107,32 +107,36 @@ class _FoodRatingScreenState extends State<FoodRatingScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Confetti(
-        trigger: true,
-        particleCount: 80,
-        child: GestureDetector(
-          onTap: () => FocusScope.of(context).unfocus(),
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: Confetti(
+          trigger: true,
+          particleCount: 80,
           child: SafeArea(
-            child: CustomScrollView(
-              slivers: [
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const SizedBox(height: 28),
-                        // Animated success icon with food orange gradient
-                        Center(
-                          child: ScaleTransition(
-                            scale: _checkScale,
-                            child: Container(
-                              width: 110,
-                              height: 110,
-                              alignment: Alignment.center,
+            child: Stack(
+              children: [
+                GestureDetector(
+                  onTap: () => FocusScope.of(context).unfocus(),
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const SizedBox(height: 28),
+                              // Animated success icon with food orange gradient
+                              Center(
+                                child: ScaleTransition(
+                                  scale: _checkScale,
+                                  child: Container(
+                                    width: 110,
+                                    height: 110,
+                                    alignment: Alignment.center,
                               decoration: BoxDecoration(
                                 gradient: const LinearGradient(
                                   colors: [_kOrange, _kOrangeDark],
@@ -321,8 +325,36 @@ class _FoodRatingScreenState extends State<FoodRatingScreen>
               ],
             ),
           ),
-        ),
+          // Top-right corner close button
+          Positioned(
+            top: 12,
+            right: 16,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _goHome,
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: AppStyles.shadowSm,
+                  ),
+                  child: const Icon(
+                    Icons.close_rounded,
+                    size: 22,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  ),
+),
+);
+}
 }

@@ -454,6 +454,55 @@ async def public_demo_request(
     }
 
 
+class PartnerApplication(Base):
+    """Submissions from the public website "Become a Ziggo partner" form."""
+
+    __tablename__ = "partner_applications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    business_name = Column(String(120), nullable=False)
+    contact_person = Column(String(120), nullable=False)
+    mobile = Column(String(40), nullable=False)
+    email = Column(String(200), nullable=False)
+    business_type = Column(String(80), nullable=False)
+    city = Column(String(80), nullable=False)
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class PublicPartnerApplicationRequest(BaseModel):
+    business_name: str = Field(..., min_length=1, max_length=120)
+    contact_person: str = Field(..., min_length=1, max_length=120)
+    mobile: str = Field(..., min_length=4, max_length=40)
+    email: str = Field(..., min_length=3, max_length=200)
+    business_type: str = Field(..., min_length=1, max_length=80)
+    city: str = Field(..., min_length=1, max_length=80)
+
+
+@router.post("/partner-application")
+async def public_partner_application(
+    req: PublicPartnerApplicationRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Persist a partner application from the public Become a partner form. No auth."""
+    row = PartnerApplication(
+        business_name=req.business_name.strip(),
+        contact_person=req.contact_person.strip(),
+        mobile=req.mobile.strip(),
+        email=req.email.strip().lower(),
+        business_type=req.business_type.strip(),
+        city=req.city.strip(),
+    )
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
+    return {
+        "ok": True,
+        "id": row.id,
+        "message": "Thank you! Your partner application has been submitted. We'll reach out within 24 hours.",
+    }
+
+
 class PublicVerifyPreregisterRequest(BaseModel):
     role: str
     full_name: str
@@ -593,6 +642,7 @@ async def get_public_jobs(
             "employment_type": j.employment_type,
             "overview": j.overview,
             "apply_email": j.apply_email,
+            "poster_image": j.poster_image,
             "created_at": j.created_at.isoformat() if j.created_at else None,
         }
         for j in jobs
@@ -631,6 +681,7 @@ async def get_public_job_detail(
         "preferred_qualifications": job.preferred_qualifications,
         "apply_email": job.apply_email,
         "apply_url": job.apply_url,
+        "poster_image": job.poster_image,
         "is_active": job.is_active,
         "created_at": job.created_at.isoformat() if job.created_at else None,
     }

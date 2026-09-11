@@ -4,7 +4,7 @@
 {% block page_title %}New Job Role{% endblock %}
 
 {% block content %}
-<form method="post" action="/admin/jobs/new" class="max-w-4xl mx-auto space-y-6">
+<form method="post" action="/admin/jobs/new" enctype="multipart/form-data" class="max-w-4xl mx-auto space-y-6">
 
     <div class="flex items-center justify-between">
         <a href="/admin/jobs" class="inline-flex items-center text-sm font-bold text-ziggo-muted hover:text-ziggo transition">
@@ -89,6 +89,60 @@
         </div>
     </div>
 
+    <!-- Job Poster Image Banner -->
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-sm p-6 space-y-4">
+        <h3 class="font-black text-ziggo-ink text-lg border-b border-ziggo-line pb-3 flex items-center justify-between">
+            <span class="flex items-center gap-2">
+                <i class="fas fa-image text-ziggo"></i> Job Poster / Hiring Banner
+            </span>
+            <span class="text-xs font-bold text-ziggo-muted uppercase tracking-wider">Optional Visual Poster</span>
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+            <!-- 1st Part: Uploaded / Selected Poster Display -->
+            <div class="md:col-span-6 flex flex-col items-center justify-center">
+                <div id="posterPreviewContainer" class="w-full h-64 rounded-2xl border-2 border-dashed border-ziggo-line bg-slate-50/70 overflow-hidden flex flex-col items-center justify-center text-center p-3 relative group transition hover:border-ziggo">
+                    <img id="posterPreviewImg" src="" alt="Job Poster" class="hidden w-full h-full object-contain rounded-xl">
+                    <div id="posterPlaceholder" class="flex flex-col items-center justify-center p-4">
+                        <div class="w-16 h-16 rounded-2xl bg-ziggo-soft flex items-center justify-center text-ziggo text-2xl mb-2.5 shadow-sm">
+                            <i class="fas fa-image"></i>
+                        </div>
+                        <p class="text-sm font-bold text-ziggo-ink">No poster uploaded</p>
+                        <p class="text-xs text-ziggo-muted mt-1 max-w-xs">Upload a role flyer or hiring poster to showcase this position on the website.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2nd Part: Upload Button & Controls -->
+            <div class="md:col-span-6 space-y-4">
+                <div>
+                    <h4 class="text-sm font-bold text-ziggo-ink">Poster &amp; Recruitment Graphics</h4>
+                    <p class="text-xs text-ziggo-muted mt-1 leading-relaxed">
+                        Add an eye-catching hiring poster or flyer. It will be showcased prominently on the public career role page.
+                    </p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-3 pt-1">
+                    <label for="poster_image" class="cursor-pointer inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-ziggo text-white font-bold text-sm hover:bg-ziggo-light transition shadow-sm">
+                        <i class="fas fa-cloud-arrow-up"></i>
+                        <span id="posterBtnLabel">Upload Poster Image</span>
+                    </label>
+                    <input id="poster_image" name="poster_image" type="file" accept="image/jpeg,image/png,image/webp,image/avif" class="hidden" onchange="previewPoster(this)">
+
+                    <button type="button" id="clearPosterBtn" onclick="clearSelectedPoster()" class="hidden px-4 py-2.5 rounded-xl border border-red-200 text-red-600 font-bold text-xs hover:bg-red-50 transition">
+                        <i class="fas fa-trash-can mr-1"></i> Remove
+                    </button>
+                </div>
+
+                <div class="bg-blue-50/70 border border-blue-100 rounded-xl p-3.5 text-xs text-blue-950 space-y-1">
+                    <div class="font-bold flex items-center gap-1.5 text-ziggo"><i class="fas fa-circle-info"></i> Image Guidelines:</div>
+                    <div class="text-slate-600">• Supported formats: JPG, PNG, WEBP (Max 5 MB)</div>
+                    <div class="text-slate-600">• Recommended resolution: 1200 &times; 630 px or standard flyer ratio</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Overview / Short Introduction -->
     <div class="bg-white rounded-2xl border border-ziggo-line shadow-sm p-6 space-y-4">
         <h3 class="font-black text-ziggo-ink text-lg border-b border-ziggo-line pb-3 flex items-center gap-2">
@@ -155,8 +209,8 @@ Search Analytics & Insights
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
                 <label class="block text-xs font-bold text-ziggo-muted mb-1.5 uppercase tracking-wider">Application Email Address</label>
-                <input name="apply_email" value="{{ form.apply_email or 'careers@ziggo.lk' }}"
-                       placeholder="careers@ziggo.lk"
+                <input name="apply_email" value="{{ form.apply_email or 'mail@ziggo.lk' }}"
+                       placeholder="mail@ziggo.lk"
                        class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-medium">
                 <p class="text-[11px] text-ziggo-muted mt-1">When applicants click "Apply Now", an email will open addressed to this recipient.</p>
             </div>
@@ -180,4 +234,43 @@ Search Analytics & Insights
     </div>
 
 </form>
+
+<script>
+function previewPoster(input) {
+    const file = input.files && input.files[0];
+    const previewImg = document.getElementById('posterPreviewImg');
+    const placeholder = document.getElementById('posterPlaceholder');
+    const label = document.getElementById('posterBtnLabel');
+    const clearBtn = document.getElementById('clearPosterBtn');
+
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            previewImg.src = e.target.result;
+            previewImg.classList.remove('hidden');
+            if (placeholder) placeholder.classList.add('hidden');
+            if (label) label.textContent = 'Change Poster (' + file.name.substring(0, 18) + (file.name.length > 18 ? '...' : '') + ')';
+            if (clearBtn) clearBtn.classList.remove('hidden');
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+function clearSelectedPoster() {
+    const input = document.getElementById('poster_image');
+    const previewImg = document.getElementById('posterPreviewImg');
+    const placeholder = document.getElementById('posterPlaceholder');
+    const label = document.getElementById('posterBtnLabel');
+    const clearBtn = document.getElementById('clearPosterBtn');
+
+    if (input) input.value = '';
+    if (previewImg) {
+        previewImg.src = '';
+        previewImg.classList.add('hidden');
+    }
+    if (placeholder) placeholder.classList.remove('hidden');
+    if (label) label.textContent = 'Upload Poster Image';
+    if (clearBtn) clearBtn.classList.add('hidden');
+}
+</script>
 {% endblock %}

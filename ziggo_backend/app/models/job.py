@@ -31,8 +31,9 @@ class JobOpening(Base):
     responsibilities = Column(Text, nullable=True)  # Formatted text / bullet points
     requirements = Column(Text, nullable=True)  # "You might be a fit if you have" items
     preferred_qualifications = Column(Text, nullable=True)  # "Preferred Qualifications" list
-    apply_email = Column(String(200), default="careers@ziggo.lk", nullable=False)
+    apply_email = Column(String(200), default="mail@ziggo.lk", nullable=False)
     apply_url = Column(String(500), nullable=True)
+    poster_image = Column(String(500), nullable=True)
     is_active = Column(Boolean, default=True, index=True, nullable=False)
     display_order = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

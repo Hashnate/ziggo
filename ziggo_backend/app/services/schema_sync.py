@@ -109,6 +109,7 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("peak_hour_settings", "vehicle_category", "VARCHAR(50)"),
     ("menu_items", "packing_charge", "NUMERIC(10, 2) NOT NULL DEFAULT 0.00"),
     ("food_orders", "packing_charge", "NUMERIC(10, 2) NOT NULL DEFAULT 0.00"),
+    ("job_openings", "poster_image", "VARCHAR(500)"),
 )
 
 
@@ -510,7 +511,7 @@ async def _seed_sample_jobs(conn) -> None:
                 "2. Experience in e-commerce, marketplaces, food delivery, or other consumer digital products.\n"
                 "3. Knowledge of search relevance, ranking strategies, taxonomy management, and metadata enrichment."
             ),
-            "apply_email": "careers@ziggo.lk",
+            "apply_email": "mail@ziggo.lk",
             "is_active": True,
             "display_order": 1,
         },
@@ -542,7 +543,7 @@ async def _seed_sample_jobs(conn) -> None:
                 "1. Prior experience in mobility, logistics, or on-demand consumer technology apps.\n"
                 "2. Hands-on familiarity with Jira, Confluence, and CI/CD development pipelines."
             ),
-            "apply_email": "careers@ziggo.lk",
+            "apply_email": "mail@ziggo.lk",
             "is_active": True,
             "display_order": 2,
         },
@@ -574,7 +575,7 @@ async def _seed_sample_jobs(conn) -> None:
                 "1. Prior experience with transportation or tourism hubs in Sri Lanka.\n"
                 "2. Excellent customer engagement and problem-resolution abilities."
             ),
-            "apply_email": "careers@ziggo.lk",
+            "apply_email": "mail@ziggo.lk",
             "is_active": True,
             "display_order": 3,
         },

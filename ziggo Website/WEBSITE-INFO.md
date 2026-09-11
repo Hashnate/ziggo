@@ -19,7 +19,7 @@
 - **WhatsApp:** +94 77 770 0700 (chat only) — `wa.me/94777700700`
 - **General email:** hello@ziggo.lk
 - **Press / media:** press@ziggo.lk
-- **Careers:** careers@ziggo.lk
+- **Careers:** mail@ziggo.lk
 - **Privacy / DPO:** privacy@ziggo.lk
 - **Security:** security@ziggo.lk
 - **Legal:** legal@ziggo.lk
@@ -344,7 +344,7 @@ Business name · Contact person · Mobile · Email · Business type (Restaurant/
 5. **Data Analyst** — Colombo — SQL + Python; Looker/Metabase a plus.
 6. **Customer Support Lead** — Colombo — leads 20+ agents; trilingual a plus.
 
-Apply: **careers@ziggo.lk**
+Apply: **mail@ziggo.lk**
 
 ---
 

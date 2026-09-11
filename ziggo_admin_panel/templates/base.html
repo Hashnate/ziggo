@@ -284,12 +284,33 @@
         }
 
         /* ===== Scrollbar ===== */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-thumb {
-            background: #E2E8F0;
-            border-radius: 10px;
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: #64748B #EEF2F6;
         }
-        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar {
+            width: 10px !important;
+            height: 10px !important;
+        }
+        ::-webkit-scrollbar-track {
+            background: #EEF2F6 !important;
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #94A3B8 !important;
+            border-radius: 8px;
+            border: 2px solid #EEF2F6 !important;
+            transition: background 0.15s ease;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748B !important;
+        }
+        ::-webkit-scrollbar-thumb:active {
+            background: #334155 !important;
+        }
+        ::-webkit-scrollbar-corner {
+            background: #EEF2F6 !important;
+        }
 
         /* ===== Premium Form Elements ===== */
         input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),
@@ -464,6 +485,9 @@
             </a>
             <a href="/admin/demo-requests" class="sidebar-item {% if active_page == 'demo_requests' %}active{% endif %}">
                 <i class="fas fa-laptop-code"></i><span>Demo Requests</span>
+            </a>
+            <a href="/admin/partner-applications" class="sidebar-item {% if active_page == 'partner_applications' %}active{% endif %}">
+                <i class="fas fa-handshake"></i><span>Partner Leads</span>
             </a>
             <a href="/admin/jobs" class="sidebar-item {% if active_page == 'jobs' %}active{% endif %}">
                 <i class="fas fa-briefcase"></i><span>Careers &amp; Jobs</span>

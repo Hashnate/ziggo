@@ -48,28 +48,37 @@
 
     <!-- Filter row -->
     <form method="GET" action="/admin/vehicles" class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-3.5 flex flex-wrap items-end gap-3">
-        <div class="flex-1 min-w-[180px]">
+        <div class="flex-1 min-w-[220px]">
+            <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Search</label>
+            <div class="relative flex items-center">
+                <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-ziggo-muted pointer-events-none flex items-center justify-center z-10">
+                    <i class="fas fa-search text-xs"></i>
+                </span>
+                <input type="text" name="search" value="{{ filter_search or search or '' }}" placeholder="Search vehicle, reg no, owner, phone..." style="padding-left: 38px !important;" class="w-full text-sm border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white pr-3 py-2">
+            </div>
+        </div>
+        <div class="w-48 min-w-[160px]">
             <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Verification status</label>
-            <select name="status" class="w-full text-sm border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white">
+            <select name="status" class="w-full text-sm border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white px-3 py-2">
                 <option value="">All Status</option>
                 {% for s in statuses %}
                 <option value="{{ s }}" {% if filter_status == s %}selected{% endif %}>{{ s|title }}</option>
                 {% endfor %}
             </select>
         </div>
-        <div class="flex-1 min-w-[180px]">
+        <div class="w-48 min-w-[160px]">
             <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Vehicle category</label>
-            <select name="category" class="w-full text-sm border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white">
+            <select name="category" class="w-full text-sm border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white px-3 py-2">
                 <option value="">All Categories</option>
                 {% for c in categories %}
                 <option value="{{ c.service_type }}" {% if filter_category == c.service_type %}selected{% endif %}>{{ c.display_name or c.service_type|title }}</option>
                 {% endfor %}
             </select>
         </div>
-        <button type="submit" class="px-4 py-2 text-sm bg-ziggo text-white rounded-xl font-bold shadow-brand hover:bg-ziggo-light transition flex items-center gap-2">
+        <button type="submit" class="px-4 py-2 text-sm bg-ziggo text-white rounded-xl font-bold shadow-brand hover:bg-ziggo-light transition flex items-center gap-2 h-[38px]">
             <i class="fas fa-filter text-xs"></i> Filter
         </button>
-        <a href="/admin/vehicles" class="px-4 py-2 text-sm border border-ziggo-line rounded-xl font-bold text-ziggo-muted hover:bg-gray-50 transition">Clear Filter</a>
+        <a href="/admin/vehicles" class="px-4 py-2 text-sm border border-ziggo-line rounded-xl font-bold text-ziggo-muted hover:bg-gray-50 transition h-[38px] flex items-center">Clear Filter</a>
     </form>
 
     <!-- Table -->
@@ -109,7 +118,7 @@
                                 <svg viewBox="0 0 24 24" class="w-5 h-5 -my-0.5" fill="currentColor" aria-hidden="true"><path d="M20 14.05V12.73C20 12.26 19.84 11.8 19.54 11.44L15.6 6.72C15.22 6.26 14.66 6 14.06 6H4C2.9 6 2 6.9 2 8V15C2 16.1 2.9 17 4 17H4.05C4.28 18.14 5.29 19 6.5 19S8.72 18.14 8.95 17H17.05C17.28 18.14 18.29 19 19.5 19C20.88 19 22 17.88 22 16.5C22 15.29 21.14 14.28 20 14.05M3.5 8C3.5 7.73 3.73 7.5 4 7.5H7V12H3.5V8M6.5 17.5C5.95 17.5 5.5 17.05 5.5 16.5S5.95 15.5 6.5 15.5 7.5 15.95 7.5 16.5 7.05 17.5 6.5 17.5M13 15.5H9V14H11V12H9V7.5H13V15.5M15 8.34L18.05 12H15V8.34M19.5 17.5C18.95 17.5 18.5 17.05 18.5 16.5S18.95 15.5 19.5 15.5 20.5 15.95 20.5 16.5 20.05 17.5 19.5 17.5Z"/></svg>
                                 {% else %}
                                 <i class="fas
-                                    {% if 'bike' in vt or 'moto' in vt %}fa-motorcycle
+                                     {% if 'bike' in vt or 'moto' in vt %}fa-motorcycle
                                     {% elif 'van' in vt %}fa-shuttle-van
                                     {% elif 'truck' in vt or 'lorry' in vt %}fa-truck
                                     {% else %}fa-car{% endif %}"></i>
@@ -186,7 +195,7 @@
             </p>
             <div class="flex items-center gap-1.5">
                 {% if page > 1 %}
-                    <a href="/admin/vehicles?page={{ page - 1 }}&status={{ filter_status }}&category={{ filter_category }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
+                    <a href="/admin/vehicles?page={{ page - 1 }}&status={{ filter_status or '' }}&category={{ filter_category or '' }}&search={{ filter_search or search or '' }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
                 {% else %}
                     <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Previous</span>
                 {% endif %}
@@ -195,12 +204,12 @@
                     {% if p == page %}
                         <span class="px-3 py-1.5 rounded-lg bg-ziggo text-white text-xs font-black">{{ p }}</span>
                     {% else %}
-                        <a href="/admin/vehicles?page={{ p }}&status={{ filter_status }}&category={{ filter_category }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
+                        <a href="/admin/vehicles?page={{ p }}&status={{ filter_status or '' }}&category={{ filter_category or '' }}&search={{ filter_search or search or '' }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
                     {% endif %}
                 {% endfor %}
 
                 {% if page < total_pages %}
-                    <a href="/admin/vehicles?page={{ page + 1 }}&status={{ filter_status }}&category={{ filter_category }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
+                    <a href="/admin/vehicles?page={{ page + 1 }}&status={{ filter_status or '' }}&category={{ filter_category or '' }}&search={{ filter_search or search or '' }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
                 {% else %}
                     <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Next</span>
                 {% endif %}

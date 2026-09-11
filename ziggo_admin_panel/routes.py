@@ -41,8 +41,31 @@ RESTAURANT_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "restaura
 os.makedirs(RESTAURANT_UPLOAD_DIR, exist_ok=True)
 PRODUCT_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "items")
 os.makedirs(PRODUCT_UPLOAD_DIR, exist_ok=True)
+JOB_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "jobs")
+os.makedirs(JOB_UPLOAD_DIR, exist_ok=True)
 ALLOWED_PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".avif"}
 MAX_PHOTO_BYTES = 5 * 1024 * 1024  # 5 MB
+
+
+async def _save_job_poster_image(photo: UploadFile | None) -> str | None:
+    if photo is None or not photo.filename:
+        return None
+    ext = os.path.splitext(photo.filename)[1].lower()
+    if ext not in ALLOWED_PHOTO_EXTS:
+        raise HTTPException(status_code=400, detail="Poster image must be JPG, PNG, WEBP, or AVIF")
+    data = await photo.read()
+    if len(data) == 0:
+        return None
+    if len(data) > MAX_PHOTO_BYTES:
+        raise HTTPException(status_code=400, detail="Poster image must be under 5 MB")
+    from app.utils.image import process_image_upload
+    data = process_image_upload(data, is_profile=False)
+    import secrets
+    fname = f"{secrets.token_hex(8)}{ext}"
+    fpath = os.path.join(JOB_UPLOAD_DIR, fname)
+    with open(fpath, "wb") as f:
+        f.write(data)
+    return f"/static/uploads/jobs/{fname}"
 
 
 async def _save_restaurant_image(photo: UploadFile | None) -> str | None:
@@ -2971,26 +2994,44 @@ async def admin_vehicles(
     page: int = 1,
     status: str = "",
     category: str = "",
+    search: str = "",
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
+    from sqlalchemy import or_, and_
     from app.models import FareSetting
 
     limit = 50
     offset = (page - 1) * limit
 
-    q = select(Driver).options(selectinload(Driver.user)).order_by(Driver.id)
-    count_q = select(func.count(Driver.id))
+    q = select(Driver).outerjoin(User, Driver.user_id == User.id).options(selectinload(Driver.user)).order_by(Driver.id)
+    count_q = select(func.count(Driver.id)).outerjoin(User, Driver.user_id == User.id)
 
+    conditions = []
     if status:
         try:
-            q = q.where(Driver.status == DriverStatus(status))
-            count_q = count_q.where(Driver.status == DriverStatus(status))
+            conditions.append(Driver.status == DriverStatus(status))
         except ValueError:
             pass
     if category:
-        q = q.where(Driver.vehicle_type == category)
-        count_q = count_q.where(Driver.vehicle_type == category)
+        conditions.append(Driver.vehicle_type == category)
+    if search.strip():
+        s = f"%{search.strip()}%"
+        conditions.append(
+            or_(
+                Driver.vehicle_number.ilike(s),
+                Driver.vehicle_model.ilike(s),
+                Driver.vehicle_color.ilike(s),
+                Driver.vehicle_type.ilike(s),
+                User.full_name.ilike(s),
+                User.phone_number.ilike(s),
+                User.email.ilike(s),
+            )
+        )
+
+    if conditions:
+        q = q.where(and_(*conditions))
+        count_q = count_q.where(and_(*conditions))
 
     total_filtered = (await db.execute(count_q)).scalar() or 0
     total_pages = (total_filtered + limit - 1) // limit
@@ -3029,6 +3070,8 @@ async def admin_vehicles(
             "category_count": len(categories),
             "filter_status": status,
             "filter_category": category,
+            "filter_search": search,
+            "search": search,
             "statuses": [s.value for s in DriverStatus],
             "page": page,
             "total_pages": total_pages,
@@ -6527,7 +6570,76 @@ async def admin_demo_request_delete(
     return RedirectResponse(url="/admin/demo-requests", status_code=303)
 
 
+# ---------- Partner applications ----------
+@router.get("/partner-applications", response_class=HTMLResponse)
+async def admin_partner_applications(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.api.v1.public import PartnerApplication
 
+    rows = (
+        await db.execute(
+            select(PartnerApplication).order_by(PartnerApplication.id.desc()).limit(500)
+        )
+    ).scalars().all()
+    total = (await db.execute(select(func.count(PartnerApplication.id)))).scalar() or 0
+    unread = (
+        await db.execute(
+            select(func.count(PartnerApplication.id)).where(
+                PartnerApplication.is_read == False
+            )
+        )
+    ).scalar() or 0
+    return templates.TemplateResponse(
+        request,
+        "partner_applications.html",
+        {
+            "request": request,
+            "active_page": "partner_applications",
+            "requests": rows,
+            "total": total,
+            "unread": unread,
+            "read": total - unread,
+        },
+    )
+
+
+@router.post("/partner-applications/{req_id}/read")
+async def admin_partner_application_toggle_read(
+    req_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.api.v1.public import PartnerApplication
+
+    r = (
+        await db.execute(select(PartnerApplication).where(PartnerApplication.id == req_id))
+    ).scalars().first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Application not found")
+    r.is_read = not bool(r.is_read)
+    await db.commit()
+    return RedirectResponse(url="/admin/partner-applications", status_code=303)
+
+
+@router.post("/partner-applications/{req_id}/delete")
+async def admin_partner_application_delete(
+    req_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.api.v1.public import PartnerApplication
+
+    r = (
+        await db.execute(select(PartnerApplication).where(PartnerApplication.id == req_id))
+    ).scalars().first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Application not found")
+    await db.delete(r)
+    await db.commit()
+    return RedirectResponse(url="/admin/partner-applications", status_code=303)
 
 
 # ---------- Live notification feed for the top-bar bell ----------
@@ -6538,7 +6650,7 @@ async def admin_notif_feed(
 ):
     """Real-time admin alerts for the bell popup. Read-only aggregate over
     existing tables — adds nothing to and changes nothing in the rest of the app."""
-    from app.api.v1.public import ContactMessage, DemoRequest
+    from app.api.v1.public import ContactMessage, DemoRequest, PartnerApplication
     from app.models import Complaint
 
     def plural(n, word):
@@ -6572,6 +6684,20 @@ async def admin_notif_feed(
             "title": plural(unread_demos, "corporate demo request"),
             "subtitle": "From business page",
             "icon": "fa-laptop-code", "url": "/admin/demo-requests", "count": unread_demos,
+        })
+
+    unread_partners = (
+        await db.execute(
+            select(func.count(PartnerApplication.id)).where(
+                PartnerApplication.is_read == False
+            )
+        )
+    ).scalar() or 0
+    if unread_partners:
+        items.append({
+            "title": plural(unread_partners, "partner application"),
+            "subtitle": "From partner page",
+            "icon": "fa-handshake", "url": "/admin/partner-applications", "count": unread_partners,
         })
 
 
@@ -8829,7 +8955,7 @@ async def admin_jobs_new_form(
             "form": {
                 "location": "Colombo",
                 "employment_type": "Full Time",
-                "apply_email": "careers@ziggo.lk",
+                "apply_email": "mail@ziggo.lk",
                 "display_order": 0,
                 "is_active": "on",
             },
@@ -8848,10 +8974,11 @@ async def admin_jobs_new_submit(
     responsibilities: str = Form(""),
     requirements: str = Form(""),
     preferred_qualifications: str = Form(""),
-    apply_email: str = Form("careers@ziggo.lk"),
+    apply_email: str = Form("mail@ziggo.lk"),
     apply_url: str = Form(""),
     display_order: int = Form(0),
     is_active: str | None = Form(None),
+    poster_image: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -8880,6 +9007,8 @@ async def admin_jobs_new_submit(
         idx += 1
         slug = f"{base_slug}-{idx}"
 
+    poster_url = await _save_job_poster_image(poster_image)
+
     job = JobOpening(
         title=title_clean,
         slug=slug,
@@ -8890,8 +9019,9 @@ async def admin_jobs_new_submit(
         responsibilities=responsibilities.strip() or None,
         requirements=requirements.strip() or None,
         preferred_qualifications=preferred_qualifications.strip() or None,
-        apply_email=apply_email.strip() or "careers@ziggo.lk",
+        apply_email=apply_email.strip() or "mail@ziggo.lk",
         apply_url=apply_url.strip() or None,
+        poster_image=poster_url,
         display_order=display_order,
         is_active=bool(is_active),
     )
@@ -8939,10 +9069,12 @@ async def admin_jobs_edit_submit(
     responsibilities: str = Form(""),
     requirements: str = Form(""),
     preferred_qualifications: str = Form(""),
-    apply_email: str = Form("careers@ziggo.lk"),
+    apply_email: str = Form("mail@ziggo.lk"),
     apply_url: str = Form(""),
     display_order: int = Form(0),
     is_active: str | None = Form(None),
+    poster_image: UploadFile | None = File(None),
+    remove_poster: str | None = Form(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -8968,6 +9100,13 @@ async def admin_jobs_edit_submit(
             slug = f"{base_slug}-{idx}"
         job.slug = slug
 
+    if remove_poster:
+        job.poster_image = None
+    if poster_image and poster_image.filename:
+        new_poster_url = await _save_job_poster_image(poster_image)
+        if new_poster_url:
+            job.poster_image = new_poster_url
+
     job.title = new_title
     job.department = department.strip()
     job.location = location.strip() or "Colombo"
@@ -8976,7 +9115,7 @@ async def admin_jobs_edit_submit(
     job.responsibilities = responsibilities.strip() or None
     job.requirements = requirements.strip() or None
     job.preferred_qualifications = preferred_qualifications.strip() or None
-    job.apply_email = apply_email.strip() or "careers@ziggo.lk"
+    job.apply_email = apply_email.strip() or "mail@ziggo.lk"
     job.apply_url = apply_url.strip() or None
     job.display_order = display_order
     job.is_active = bool(is_active)
