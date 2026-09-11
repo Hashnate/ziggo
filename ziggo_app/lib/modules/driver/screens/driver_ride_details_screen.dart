@@ -155,7 +155,6 @@ class DriverRideDetailsScreen extends StatelessWidget {
 
     // In Driver view, we show Customer Details in the profile card
     final customerName = rideData['customer_name']?.toString() ?? 'Customer';
-    final customerPhone = rideData['customer_phone']?.toString() ?? 'N/A';
     
     // Check if customer_photo is available, otherwise use a placeholder
     String? customerPhoto = rideData['customer_photo']?.toString();
@@ -398,19 +397,11 @@ class DriverRideDetailsScreen extends StatelessWidget {
                   ),
                   const SizedBox(width: 16),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(customerName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87), maxLines: 1, overflow: TextOverflow.ellipsis),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(Icons.phone, color: Colors.blueGrey, size: 14),
-                            const SizedBox(width: 4),
-                            Text(customerPhone, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.black54)),
-                          ],
-                        ),
-                      ],
+                    child: Text(
+                      customerName,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   Container(
