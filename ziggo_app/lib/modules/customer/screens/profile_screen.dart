@@ -233,6 +233,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               subtitle: 'Chat with our team',
               onTap: () => _open(const SupportScreen()),
             ),
+            if (auth.hasDriverProfile)
+              _MenuItem(
+                icon: Icons.swap_horiz_rounded,
+                color: AppColors.primary,
+                label: 'Switch to Driver Mode',
+                subtitle: 'Go online and accept trips',
+                onTap: () async {
+                  await auth.switchRole('driver');
+                },
+              ),
           ]),
           const SizedBox(height: 24),
           const Center(

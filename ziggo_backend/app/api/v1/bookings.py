@@ -412,7 +412,10 @@ async def _get_customer(db: AsyncSession, user: User) -> Customer:
     q = await db.execute(select(Customer).where(Customer.user_id == user.id))
     c = q.scalars().first()
     if not c:
-        raise HTTPException(status_code=404, detail="Customer profile not found")
+        c = Customer(user_id=user.id)
+        db.add(c)
+        await db.commit()
+        await db.refresh(c)
     return c
 
 

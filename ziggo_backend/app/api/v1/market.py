@@ -398,7 +398,10 @@ async def create_market_order(
     cust_q = await db.execute(select(Customer).where(Customer.user_id == user.id))
     customer = cust_q.scalars().first()
     if not customer:
-        raise HTTPException(status_code=404, detail="Customer profile not found")
+        customer = Customer(user_id=user.id)
+        db.add(customer)
+        await db.commit()
+        await db.refresh(customer)
 
     v_q = await db.execute(select(MarketVendor).where(MarketVendor.id == body.vendor_id))
     vendor = v_q.scalars().first()

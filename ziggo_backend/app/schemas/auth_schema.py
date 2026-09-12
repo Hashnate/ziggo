@@ -44,6 +44,10 @@ class ProfileCompleteness(BaseModel):
     missing: List[str]            # field keys still needed
 
 
+class SwitchRoleRequest(BaseModel):
+    role: UserRole
+
+
 class UserResponse(UserBase):
     id: int
     role: UserRole
@@ -55,6 +59,8 @@ class UserResponse(UserBase):
     referred_by_user_id: Optional[int] = None
     # BRD: CD-34 — populated server-side from the user record
     profile_completeness: Optional[ProfileCompleteness] = None
+    has_driver_profile: Optional[bool] = False
+    has_customer_profile: Optional[bool] = False
 
     class Config:
         from_attributes = True

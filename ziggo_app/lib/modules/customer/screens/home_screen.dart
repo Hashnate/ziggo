@@ -815,10 +815,10 @@ class _Header extends StatelessWidget {
             ],
           ),
         ),
-        if (auth.role == 'driver') ...[
+        if (auth.hasDriverProfile || auth.role == 'driver') ...[
           _IconBubble(
             icon: Icons.swap_horiz_rounded,
-            onTap: () => auth.toggleCustomerMode(),
+            onTap: () => auth.switchRole('driver'),
           ),
           const SizedBox(width: 10),
         ],

@@ -80,6 +80,15 @@ class AuthProvider extends ChangeNotifier {
   String? get emergencyContact => _emergencyContact;
   String? get profilePhoto => _profilePhoto;
 
+  bool _hasDriverProfile = false;
+  bool get hasDriverProfile => _hasDriverProfile;
+
+  bool _hasCustomerProfile = false;
+  bool get hasCustomerProfile => _hasCustomerProfile;
+
+  bool _isSwitchingRole = false;
+  bool get isSwitchingRole => _isSwitchingRole;
+
   bool _isCustomerMode = false;
   bool get isCustomerMode => _isCustomerMode;
 
@@ -91,9 +100,45 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void toggleCustomerMode() {
-    _isCustomerMode = !_isCustomerMode;
+  Future<bool> switchRole(String targetRole) async {
+    _lastError = null;
+    _isSwitchingRole = true;
     notifyListeners();
+    try {
+      final resp = await ApiClient.instance.dio.post(
+        '/auth/switch-role',
+        data: {'role': targetRole},
+      );
+      if (resp.data is Map) {
+        _token = resp.data['access_token'] as String;
+        _role = resp.data['role'] as String;
+        _userId = resp.data['user_id'] as int;
+        _isCustomerMode = (_role == 'customer');
+        await TokenStorage.save(token: _token!, role: _role!, userId: _userId!);
+        await _refreshMe();
+        _isSwitchingRole = false;
+        notifyListeners();
+        return true;
+      }
+      _isSwitchingRole = false;
+      notifyListeners();
+      return false;
+    } on DioException catch (e) {
+      _lastError = _dioMessage(e);
+      _isSwitchingRole = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _lastError = e.toString();
+      _isSwitchingRole = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> toggleCustomerMode() async {
+    final target = (_role == 'driver') ? 'customer' : 'driver';
+    return await switchRole(target);
   }
 
   Future<void> bootstrap() async {
@@ -203,6 +248,8 @@ class AuthProvider extends ChangeNotifier {
       _profilePhoto = resp.data['profile_photo'] as String? ?? _profilePhoto;
       _referralCode = resp.data['referral_code'] as String? ?? _referralCode;
       _referredByUserId = resp.data['referred_by_user_id'] as int? ?? _referredByUserId;
+      _hasDriverProfile = resp.data['has_driver_profile'] == true;
+      _hasCustomerProfile = resp.data['has_customer_profile'] == true;
       _completeness = resp.data['profile_completeness'] is Map
           ? Map<String, dynamic>.from(resp.data['profile_completeness'] as Map)
           : null;
