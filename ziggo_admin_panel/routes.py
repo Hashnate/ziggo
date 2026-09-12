@@ -8829,19 +8829,103 @@ async def surge_zones_page(request: Request, db: AsyncSession = Depends(get_db),
 @router.get("/referrals", response_class=HTMLResponse)
 async def admin_referrals(
     request: Request,
+    page: int = 1,
+    search: str = "",
+    status: str = "all",
+    start: str = "",
+    end: str = "",
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from app.models import ReferralBonus
-    from sqlalchemy.orm import joinedload
+    from app.models import ReferralBonus, User, ReferralStatus
+    from sqlalchemy.orm import joinedload, aliased
+    from sqlalchemy import and_, or_, func, select, desc
     
-    q = await db.execute(
+    ReferrerUser = aliased(User, name="referrer_user")
+    ReferredUser = aliased(User, name="referred_user")
+
+    # Global summary stats
+    stats_q = await db.execute(
+        select(
+            func.count(ReferralBonus.id),
+            func.count(ReferralBonus.id).filter(ReferralBonus.status == ReferralStatus.completed),
+            func.count(ReferralBonus.id).filter(ReferralBonus.status == ReferralStatus.pending),
+            func.coalesce(func.sum(ReferralBonus.referrer_amount).filter(ReferralBonus.status == ReferralStatus.completed), 0),
+        )
+    )
+    stat_total, stat_completed, stat_pending, stat_paid_amount = stats_q.one()
+
+    # Filter conditions
+    conditions = []
+
+    if search and search.strip():
+        s_term = f"%{search.strip()}%"
+        conditions.append(
+            or_(
+                ReferrerUser.full_name.ilike(s_term),
+                ReferrerUser.phone_number.ilike(s_term),
+                ReferredUser.full_name.ilike(s_term),
+                ReferredUser.phone_number.ilike(s_term),
+            )
+        )
+
+    if status and status != "all":
+        try:
+            status_enum = ReferralStatus(status.lower())
+            conditions.append(ReferralBonus.status == status_enum)
+        except ValueError:
+            pass
+
+    if start:
+        try:
+            start_dt = datetime.strptime(start.strip(), "%Y-%m-%d").replace(tzinfo=timezone.utc, hour=0, minute=0, second=0, microsecond=0)
+            conditions.append(ReferralBonus.created_at >= start_dt)
+        except ValueError:
+            pass
+    if end:
+        try:
+            end_dt = datetime.strptime(end.strip(), "%Y-%m-%d").replace(tzinfo=timezone.utc, hour=23, minute=59, second=59, microsecond=0)
+            conditions.append(ReferralBonus.created_at <= end_dt)
+        except ValueError:
+            pass
+
+    # Count matching query
+    count_stmt = (
+        select(func.count(ReferralBonus.id))
+        .outerjoin(ReferrerUser, ReferralBonus.referrer_user_id == ReferrerUser.id)
+        .outerjoin(ReferredUser, ReferralBonus.referred_user_id == ReferredUser.id)
+    )
+    if conditions:
+        count_stmt = count_stmt.where(and_(*conditions))
+    
+    total_count = (await db.execute(count_stmt)).scalar() or 0
+
+    limit = 20
+    page = max(1, page)
+    total_pages = max(1, (total_count + limit - 1) // limit)
+    if page > total_pages and total_count > 0:
+        page = total_pages
+    offset = (page - 1) * limit
+
+    data_stmt = (
         select(ReferralBonus)
+        .outerjoin(ReferrerUser, ReferralBonus.referrer_user_id == ReferrerUser.id)
+        .outerjoin(ReferredUser, ReferralBonus.referred_user_id == ReferredUser.id)
         .options(joinedload(ReferralBonus.referrer), joinedload(ReferralBonus.referred))
         .order_by(ReferralBonus.created_at.desc())
-        .limit(500)
+        .offset(offset)
+        .limit(limit)
     )
+    if conditions:
+        data_stmt = data_stmt.where(and_(*conditions))
+
+    q = await db.execute(data_stmt)
     bonuses = q.scalars().all()
+
+    start_idx = (page - 1) * limit + 1 if total_count > 0 else 0
+    end_idx = min(page * limit, total_count)
+    page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
+
     s = await _get_or_create_settings(db)
     
     return templates.TemplateResponse(
@@ -8852,6 +8936,20 @@ async def admin_referrals(
             "bonuses": bonuses,
             "s": s,
             "saved": request.query_params.get("saved") == "1",
+            "page": page,
+            "total_pages": total_pages,
+            "total_count": total_count,
+            "start_idx": start_idx,
+            "end_idx": end_idx,
+            "page_range": page_range,
+            "search": search,
+            "status": status,
+            "start_date": start,
+            "end_date": end,
+            "stat_total": stat_total,
+            "stat_completed": stat_completed,
+            "stat_pending": stat_pending,
+            "stat_paid_amount": stat_paid_amount,
         },
     )
 

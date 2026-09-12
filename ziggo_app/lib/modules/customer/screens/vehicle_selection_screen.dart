@@ -285,24 +285,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
         _estimates.removeWhere((key, value) => !currentServiceTypes.contains(key));
         bulkRes.forEach((st, res) {
           if (res is Map) {
-            final resMap = Map<String, dynamic>.from(res);
-            
-            if (widget.tripType == 'return') {
-              if (resMap['final_amount'] != null) {
-                resMap['final_amount'] = (resMap['final_amount'] as num) * 2;
-              }
-              if (resMap['original_amount'] != null) {
-                resMap['original_amount'] = (resMap['original_amount'] as num) * 2;
-              }
-              if (resMap['duration_min'] != null) {
-                resMap['duration_min'] = (resMap['duration_min'] as num) * 2;
-              }
-              if (resMap['distance_km'] != null) {
-                resMap['distance_km'] = (resMap['distance_km'] as num) * 2;
-              }
-            }
-
-            _estimates[st] = resMap;
+            _estimates[st] = Map<String, dynamic>.from(res);
           }
         });
 
@@ -384,24 +367,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     if (bulkRes != null) {
       bulkRes.forEach((st, res) {
         if (res is Map) {
-          final resMap = Map<String, dynamic>.from(res);
-          
-          if (widget.tripType == 'return') {
-            if (resMap['final_amount'] != null) {
-              resMap['final_amount'] = (resMap['final_amount'] as num) * 2;
-            }
-            if (resMap['original_amount'] != null) {
-              resMap['original_amount'] = (resMap['original_amount'] as num) * 2;
-            }
-            if (resMap['duration_min'] != null) {
-              resMap['duration_min'] = (resMap['duration_min'] as num) * 2;
-            }
-            if (resMap['distance_km'] != null) {
-              resMap['distance_km'] = (resMap['distance_km'] as num) * 2;
-            }
-          }
-
-          _estimates[st] = resMap;
+          _estimates[st] = Map<String, dynamic>.from(res);
         }
       });
     }

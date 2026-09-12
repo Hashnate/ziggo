@@ -60,7 +60,7 @@ def estimate_duration_min(distance_km: float) -> int:
     return max(5, round(distance_km / 25.0 * 60))
 
 
-RETURN_TRIP_MULTIPLIER = 1.8
+RETURN_TRIP_MULTIPLIER = 2.1
 
 
 async def _flash_surcharge(db: AsyncSession, weight_kg: float) -> float:
