@@ -89,9 +89,11 @@
         <form method="GET" action="/admin/referrals" class="bg-ziggo-canvas/50 border-b border-ziggo-line p-4 flex flex-wrap items-end gap-3">
             <div class="flex-1 min-w-[200px] max-w-sm">
                 <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Search</label>
-                <div class="relative">
-                    <input type="text" name="search" value="{{ search }}" placeholder="Search name or phone..." class="w-full pl-9 pr-3 py-2 border border-ziggo-line rounded-lg text-sm outline-none focus:border-ziggo bg-white">
-                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-ziggo-muted text-xs"></i>
+                <div class="relative flex items-center">
+                    <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-ziggo-muted pointer-events-none flex items-center justify-center z-10">
+                        <i class="fas fa-search text-xs"></i>
+                    </span>
+                    <input type="text" name="search" value="{{ search }}" placeholder="Search name or phone..." style="padding-left: 38px !important;" class="w-full pr-3 py-2 border border-ziggo-line rounded-lg text-sm outline-none focus:border-ziggo bg-white">
                 </div>
             </div>
             <div class="min-w-[130px]">

@@ -130,16 +130,22 @@ def _to_response(user: User, d: Driver, paid_payouts: float = 0.0, pending_payou
 async def list_nearby_drivers(
     lat: float = Query(...),
     lng: float = Query(...),
-    radius_km: float = Query(5.0, ge=0.5, le=30.0),
+    radius_km: float | None = Query(None, ge=0.5, le=50.0),
     vehicle_type: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    """Return online + approved drivers within `radius_km` of the given point.
+    """Return online + approved drivers within `radius_km` (or category search radius) of the given point.
 
     Used by the customer map to render moving vehicle pins around the pickup.
     Returns minimal data — id, vehicle_type, coords, distance — no PII.
     """
+    if radius_km is not None:
+        effective_radius = radius_km
+    else:
+        from .bookings import get_search_radius_for_service
+        effective_radius = float(await get_search_radius_for_service(db, vehicle_type))
+
     stmt = select(Driver).where(
         Driver.is_online == True,  # noqa: E712
         Driver.status == DriverStatus.APPROVED,
@@ -154,7 +160,7 @@ async def list_nearby_drivers(
         if d.current_lat is None or d.current_lng is None:
             continue
         dist = haversine_km(lat, lng, float(d.current_lat), float(d.current_lng))
-        if dist > radius_km:
+        if dist > effective_radius:
             continue
         out.append({
             "id": d.id,

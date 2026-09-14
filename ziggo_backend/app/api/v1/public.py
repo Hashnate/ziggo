@@ -239,6 +239,7 @@ async def public_categories(
             "capacity": c.capacity if c.capacity is not None else 0,
             "is_truck": bool(c.is_truck),
             "description": c.description,
+            "search_radius_km": c.search_radius_km,
         }
         for c in rows
     ]

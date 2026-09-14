@@ -219,7 +219,6 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
         queryParameters: {
           'lat': loc.latitude,
           'lng': loc.longitude,
-          'radius_km': 5,
         },
       );
       if (!mounted) return;

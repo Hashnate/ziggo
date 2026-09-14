@@ -213,14 +213,22 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
 
   Future<void> _fetchNearbyDrivers() async {
     final pickup = widget.pickup.location;
+    final catRadius = _serviceType != null ? _categoryData[_serviceType]?['search_radius_km'] : null;
+    final queryParams = <String, dynamic>{
+      'lat': pickup.latitude,
+      'lng': pickup.longitude,
+    };
+    if (catRadius != null && (catRadius as num) > 0) {
+      queryParams['radius_km'] = catRadius;
+    }
+    if (_serviceType != null) {
+      queryParams['vehicle_type'] = _serviceType;
+    }
+
     try {
       final resp = await ApiClient.instance.dio.get(
         '/driver/nearby',
-        queryParameters: {
-          'lat': pickup.latitude,
-          'lng': pickup.longitude,
-          'radius_km': 5,
-        },
+        queryParameters: queryParams,
       );
       if (!mounted) return;
       setState(() {
