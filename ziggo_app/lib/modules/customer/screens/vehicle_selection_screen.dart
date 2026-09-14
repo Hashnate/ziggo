@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
@@ -60,6 +62,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
   bool _loadingEstimates = false;
   bool _usePoints = false;
   bool _truckTermsAccepted = false;
+  late final TapGestureRecognizer _termsRecognizer;
   DateTime? _scheduledTime;
   List<LatLng> _routePoints = const [];
 
@@ -96,6 +99,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
   @override
   void initState() {
     super.initState();
+    _termsRecognizer = TapGestureRecognizer()..onTap = _launchTermsUrl;
     _secondaryPhone = widget.friend?.phone;
     _scheduledTime = widget.scheduledTime;
     _fetchRoutePoints();
@@ -112,10 +116,18 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
 
   @override
   void dispose() {
+    _termsRecognizer.dispose();
     _nearbyTimer?.cancel();
     _fareUpdateTimer?.cancel();
     _promoController.dispose();
     super.dispose();
+  }
+
+  Future<void> _launchTermsUrl() async {
+    final uri = Uri.parse('https://ziggo.lk/pages/terms');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   Future<void> _animateToUserLocation() async {
@@ -1060,11 +1072,18 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                           controlAffinity: ListTileControlAffinity.leading,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                           title: RichText(
-                            text: const TextSpan(
+                            text: TextSpan(
                               text: 'I confirm that I have read, consent and agree to the ',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                               children: [
-                                TextSpan(text: 'Terms and Conditions', style: TextStyle(color: Colors.blue)),
+                                TextSpan(
+                                  text: 'Terms and Conditions',
+                                  style: const TextStyle(
+                                    color: Colors.blue,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                  recognizer: _termsRecognizer,
+                                ),
                               ],
                             ),
                           ),
