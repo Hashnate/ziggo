@@ -34,67 +34,79 @@ class _DriverNotificationsScreenState extends State<DriverNotificationsScreen> {
 
   ({IconData icon, Color color, String category}) _getNotificationStyle(
       String type, String body, String title) {
-    final lower = '$type $title $body'.toLowerCase();
+    final t = type.toLowerCase().trim();
+    final titleLower = title.toLowerCase().trim();
 
-    if (lower.contains('payout') ||
-        lower.contains('earning') ||
-        lower.contains('wallet') ||
-        lower.contains('commission') ||
-        lower.contains('cash') ||
-        lower.contains('fee') ||
-        lower.contains('tip') ||
-        type == 'payment') {
+    // 1. Explicit payment / earnings / payout
+    if (t == 'payment' ||
+        t == 'earnings' ||
+        t == 'payout' ||
+        t == 'wallet' ||
+        titleLower.contains('payout') ||
+        titleLower.contains('commission deducted') ||
+        titleLower.contains('wallet top') ||
+        titleLower.contains('tip received') ||
+        titleLower.contains('cancellation fee')) {
       return (
         icon: Icons.account_balance_wallet_rounded,
         color: AppColors.success,
         category: 'earnings',
       );
-    } else if (lower.contains('ride') ||
-        lower.contains('trip') ||
-        lower.contains('booking') ||
-        lower.contains('passenger') ||
-        lower.contains('customer') ||
-        lower.contains('order') ||
-        lower.contains('delivery') ||
-        lower.contains('pickup') ||
-        lower.contains('drop') ||
-        type == 'ride_update' ||
-        type == 'order_update' ||
-        type == 'market_order_update') {
+    }
+
+    // 2. Rides, deliveries, and bookings
+    if (t == 'ride_update' ||
+        t == 'order_update' ||
+        t == 'market_order_update' ||
+        t == 'booking' ||
+        titleLower.contains('ride') ||
+        titleLower.contains('trip') ||
+        titleLower.contains('booking') ||
+        titleLower.contains('delivery') ||
+        titleLower.contains('pickup')) {
       return (
         icon: Icons.directions_car_filled_rounded,
         color: AppColors.primary,
         category: 'rides',
       );
-    } else if (lower.contains('document') ||
-        lower.contains('kyc') ||
-        lower.contains('license') ||
-        lower.contains('approved') ||
-        lower.contains('rejected') ||
-        lower.contains('verification') ||
-        lower.contains('nic')) {
+    }
+
+    // 3. KYC and verification documents
+    if (t == 'kyc' ||
+        t == 'document' ||
+        t == 'verification' ||
+        titleLower.contains('document') ||
+        titleLower.contains('kyc') ||
+        titleLower.contains('license') ||
+        titleLower.contains('nic verification') ||
+        titleLower.contains('approval')) {
       return (
         icon: Icons.verified_user_rounded,
         color: AppColors.warning,
         category: 'system',
       );
-    } else if (lower.contains('promo') ||
-        lower.contains('bonus') ||
-        lower.contains('incentive') ||
-        lower.contains('surge') ||
-        type == 'promo') {
+    }
+
+    // 4. Promos and surge incentives
+    if (t == 'promo' ||
+        t == 'surge' ||
+        t == 'bonus' ||
+        titleLower.contains('promo') ||
+        titleLower.contains('surge') ||
+        titleLower.contains('incentive')) {
       return (
         icon: Icons.local_fire_department_rounded,
         color: AppColors.flash,
         category: 'system',
       );
-    } else {
-      return (
-        icon: Icons.campaign_rounded,
-        color: AppColors.primaryDark,
-        category: 'system',
-      );
     }
+
+    // 5. General announcements / system notices / welcome messages
+    return (
+      icon: Icons.campaign_rounded,
+      color: const Color(0xFF2563EB),
+      category: 'system',
+    );
   }
 
   String _formatDate(dynamic rawDate) {
@@ -228,18 +240,23 @@ class _DriverNotificationsScreenState extends State<DriverNotificationsScreen> {
   }
 
   Widget _buildFilterChips(List<Map<String, dynamic>> items) {
-    int countRides = 0;
-    int countEarnings = 0;
-    int countSystem = 0;
+    int unreadTotal = 0;
+    int unreadRides = 0;
+    int unreadEarnings = 0;
+    int unreadSystem = 0;
 
     for (final item in items) {
-      final type = (item['type'] ?? '').toString();
-      final body = (item['body'] ?? '').toString();
-      final title = (item['title'] ?? '').toString();
-      final cat = _getNotificationStyle(type, body, title).category;
-      if (cat == 'rides') countRides++;
-      if (cat == 'earnings') countEarnings++;
-      if (cat == 'system') countSystem++;
+      final isUnread = item['is_read'] != true;
+      if (isUnread) {
+        unreadTotal++;
+        final type = (item['type'] ?? '').toString();
+        final body = (item['body'] ?? '').toString();
+        final title = (item['title'] ?? '').toString();
+        final cat = _getNotificationStyle(type, body, title).category;
+        if (cat == 'rides') unreadRides++;
+        if (cat == 'earnings') unreadEarnings++;
+        if (cat == 'system') unreadSystem++;
+      }
     }
 
     return SingleChildScrollView(
@@ -247,19 +264,19 @@ class _DriverNotificationsScreenState extends State<DriverNotificationsScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          _chip('all', 'All', items.length),
+          _chip('all', 'All', unreadTotal),
           const SizedBox(width: 8),
-          _chip('rides', 'Rides & Trips', countRides),
+          _chip('rides', 'Rides & Trips', unreadRides),
           const SizedBox(width: 8),
-          _chip('earnings', 'Earnings & Wallet', countEarnings),
+          _chip('earnings', 'Earnings & Wallet', unreadEarnings),
           const SizedBox(width: 8),
-          _chip('system', 'System & KYC', countSystem),
+          _chip('system', 'System & KYC', unreadSystem),
         ],
       ),
     );
   }
 
-  Widget _chip(String key, String label, int count) {
+  Widget _chip(String key, String label, int unreadCount) {
     final isSelected = _selectedFilter == key;
     return GestureDetector(
       onTap: () => setState(() => _selectedFilter = key),
@@ -286,22 +303,22 @@ class _DriverNotificationsScreenState extends State<DriverNotificationsScreen> {
                 fontSize: 12.5,
               ),
             ),
-            if (count > 0) ...[
+            if (unreadCount > 0) ...[
               const SizedBox(width: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? Colors.white.withOpacity(0.25)
-                      : AppColors.surfaceMuted,
+                      : AppColors.error,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  '$count',
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : AppColors.textSecondary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                  '$unreadCount',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
@@ -329,17 +346,17 @@ class _DriverNotificationsScreenState extends State<DriverNotificationsScreen> {
     final String? refCode = refMatch?.group(0);
 
     return GestureDetector(
-      onTap: () => _handleItemTap(context, item),
+      onTap: () => _handleItemTap(context, item, style.category),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: kDriverCard,
+          color: isUnread ? Colors.white : kDriverCard,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isUnread
-                ? style.color.withOpacity(0.4)
+                ? style.color.withOpacity(0.5)
                 : AppColors.divider.withOpacity(0.6),
             width: isUnread ? 1.5 : 1.0,
           ),
@@ -356,7 +373,7 @@ class _DriverNotificationsScreenState extends State<DriverNotificationsScreen> {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    style.color.withOpacity(0.9),
+                    style.color.withOpacity(0.85),
                     style.color,
                   ],
                   begin: Alignment.topLeft,
@@ -420,7 +437,7 @@ class _DriverNotificationsScreenState extends State<DriverNotificationsScreen> {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(Icons.access_time_rounded,
+                      const Icon(Icons.access_time_rounded,
                           size: 11, color: AppColors.textTertiary),
                       const SizedBox(width: 4),
                       Text(
@@ -499,7 +516,7 @@ class _DriverNotificationsScreenState extends State<DriverNotificationsScreen> {
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 40),
                 child: Text(
-                  'Trip requests, payout updates, KYC alerts, and system notices will appear here.',
+                  'Trip updates, payout alerts, KYC status, and system notices will appear here.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: AppColors.textSecondary,
@@ -516,58 +533,53 @@ class _DriverNotificationsScreenState extends State<DriverNotificationsScreen> {
   }
 
   void _handleItemTap(
-      BuildContext context, Map<String, dynamic> item) async {
+      BuildContext context, Map<String, dynamic> item, String category) async {
     final notifs = context.read<NotificationsProvider>();
     final id = item['id'];
     if (id is int) {
       notifs.markRead(id);
     }
 
-    final type = (item['type'] ?? '').toString();
+    final type = (item['type'] ?? '').toString().toLowerCase().trim();
+    final title = (item['title'] ?? '').toString().toLowerCase().trim();
     final body = (item['body'] ?? '').toString();
-    final title = (item['title'] ?? '').toString();
-    final lower = '$type $title $body'.toLowerCase();
 
     // Check for trip/order ref
     final match =
         RegExp(r'\b(ZG|CR|FL|RT|FO|MK|EV)[0-9A-Z]{8}\b').firstMatch(body);
     final String? ref = match?.group(0);
 
-    // Smart deep-linking based on content
-    if (lower.contains('payout') ||
-        lower.contains('earning') ||
-        lower.contains('commission') ||
-        lower.contains('wallet') ||
-        type == 'payment') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const DriverEarningsScreen()),
-      );
-    } else if (lower.contains('document') ||
-        lower.contains('kyc') ||
-        lower.contains('license') ||
-        lower.contains('approved') ||
-        lower.contains('rejected') ||
-        lower.contains('verification')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const DriverDocumentsScreen()),
-      );
-    } else if (ref != null ||
+    // Deep-linking based on explicit categorization
+    if (ref != null ||
         type == 'ride_update' ||
         type == 'order_update' ||
         type == 'market_order_update' ||
-        lower.contains('trip') ||
-        lower.contains('ride')) {
+        category == 'rides') {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const DriverHistoryScreen()),
       );
-    } else if (lower.contains('profile') || lower.contains('account')) {
+    } else if (type == 'payment' ||
+        type == 'earnings' ||
+        type == 'payout' ||
+        (category == 'earnings' &&
+            (title.contains('payout') ||
+                title.contains('commission') ||
+                title.contains('wallet')))) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const DriverProfileScreen()),
+        MaterialPageRoute(builder: (_) => const DriverEarningsScreen()),
+      );
+    } else if (type == 'kyc' ||
+        type == 'document' ||
+        title.contains('document') ||
+        title.contains('kyc') ||
+        title.contains('license')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const DriverDocumentsScreen()),
       );
     }
+    // General system announcements stay in the notifications screen and simply mark as read.
   }
 }

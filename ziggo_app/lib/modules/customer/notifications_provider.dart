@@ -26,14 +26,19 @@ class NotificationsProvider extends ChangeNotifier {
   }
 
   Future<void> markRead(int id) async {
-    try {
-      await ApiClient.instance.dio.post('/customer/notifications/$id/read');
+    final idx = _items.indexWhere((n) => n['id'] == id);
+    if (idx != -1 && _items[idx]['is_read'] != true) {
       _items = _items
           .map((n) => n['id'] == id ? {...n, 'is_read': true} : n)
           .toList();
       notifyListeners();
+    }
+    try {
+      await ApiClient.instance.dio.post('/customer/notifications/$id/read');
     } on DioException {
-      // ignore
+      try {
+        await ApiClient.instance.dio.post('/driver/notifications/$id/read');
+      } catch (_) {}
     }
   }
 
