@@ -40,15 +40,21 @@ class NotificationsProvider extends ChangeNotifier {
   Future<void> markAllAsRead() async {
     final unreads = _items.where((n) => n['is_read'] != true).toList();
     if (unreads.isEmpty) return;
+    _items = _items.map((n) => {...n, 'is_read': true}).toList();
+    notifyListeners();
     try {
-      for (final n in unreads) {
-        final id = n['id'] as int;
-        await ApiClient.instance.dio.post('/customer/notifications/$id/read');
-      }
-      _items = _items.map((n) => {...n, 'is_read': true}).toList();
-      notifyListeners();
+      await ApiClient.instance.dio.post('/customer/notifications/read-all');
     } on DioException {
-      // ignore
+      try {
+        await ApiClient.instance.dio.post('/driver/notifications/read-all');
+      } catch (_) {
+        for (final n in unreads) {
+          final id = n['id'] as int;
+          try {
+            await ApiClient.instance.dio.post('/customer/notifications/$id/read');
+          } catch (_) {}
+        }
+      }
     }
   }
 }

@@ -32,6 +32,8 @@ import 'driver_rating_screen.dart';
 import 'driver_food_rating_screen.dart';
 import 'driver_market_rating_screen.dart';
 import 'driver_ride_details_screen.dart';
+import 'driver_notifications_screen.dart';
+import '../../customer/notifications_provider.dart';
 import '../../customer/screens/food_order_details_screen.dart';
 import '../../customer/screens/market_order_details_screen.dart';
 
@@ -301,6 +303,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       await driver.bootstrap(auth.token!);
       _centerOnDriver();
     }
+    context.read<NotificationsProvider>().refresh();
     // BRD: live speed read-out — subscribe once, convert m/s → km/h.
     _speedSub ??= Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
@@ -1094,6 +1097,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   Widget _buildTopBar(DriverProvider driver) {
     final auth = context.read<AuthProvider>();
+    final notifs = context.watch<NotificationsProvider>();
     final profile = driver.profile ?? const <String, dynamic>{};
     final name = auth.fullName ?? 'Driver';
     final initial = name.isNotEmpty ? name[0].toUpperCase() : 'D';
@@ -1197,6 +1201,63 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       ),
                     ],
                   ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const DriverNotificationsScreen()),
+                ),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _kPanel,
+                        boxShadow: AppStyles.shadowSm,
+                      ),
+                      child: Icon(
+                        notifs.unreadCount > 0
+                            ? Icons.notifications_active_rounded
+                            : Icons.notifications_outlined,
+                        color: notifs.unreadCount > 0
+                            ? AppColors.primary
+                            : AppColors.textSecondary,
+                        size: 24,
+                      ),
+                    ),
+                    if (notifs.unreadCount > 0)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: AppColors.error,
+                            shape: BoxShape.circle,
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 18,
+                            minHeight: 18,
+                          ),
+                          child: Text(
+                            '${notifs.unreadCount > 99 ? '99+' : notifs.unreadCount}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
               const SizedBox(width: 8),
@@ -4132,6 +4193,19 @@ class _Drawer extends StatelessWidget {
                   },
                 ),
                 _drawerTile(
+                  icon: Icons.notifications_outlined,
+                  label: 'Notifications',
+                  badgeCount: context.watch<NotificationsProvider>().unreadCount,
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const DriverNotificationsScreen()),
+                    );
+                  },
+                ),
+                _drawerTile(
                   icon: Icons.insights_rounded,
                   label: 'My performance',
                   onTap: onHistory,
@@ -4199,6 +4273,7 @@ class _Drawer extends StatelessWidget {
     required VoidCallback onTap,
     bool accent = false,
     bool chevronDown = false,
+    int badgeCount = 0,
   }) {
     return Material(
       color: Colors.transparent,
@@ -4229,6 +4304,24 @@ class _Drawer extends StatelessWidget {
                     if (accent) ...[
                       const SizedBox(width: 8),
                       const Icon(Icons.auto_awesome, color: AppColors.primaryLight, size: 14),
+                    ],
+                    if (badgeCount > 0) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.error,
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: Text(
+                          '$badgeCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
                     ],
                   ],
                 ),

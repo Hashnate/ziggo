@@ -12,6 +12,10 @@ import '../../modules/customer/screens/promotions_screen.dart';
 import '../../modules/customer/screens/ride_history_screen.dart';
 import '../../modules/customer/screens/ride_tracking_screen.dart';
 import '../../modules/customer/screens/wallet_screen.dart';
+import '../../modules/driver/screens/driver_documents_screen.dart';
+import '../../modules/driver/screens/driver_earnings_screen.dart';
+import '../../modules/driver/screens/driver_history_screen.dart';
+import '../../modules/driver/screens/driver_notifications_screen.dart';
 import '../../modules/driver/driver_provider.dart';
 import 'fcm_service.dart';
 
@@ -33,9 +37,14 @@ class NotificationRouter {
     final event = (data['event'] ?? data['type'] ?? '').toString();
     final body = (data['body'] ?? '').toString();
     final title = (data['title'] ?? '').toString();
+    final combinedLower = '$event $title $body'.toLowerCase();
 
     // ── DRIVER SPECIFIC ROUTING ──────────────────────────────────────────────
     if (role == 'driver') {
+      try {
+        navContext.read<NotificationsProvider>().refresh();
+      } catch (_) {}
+
       final isRequestEvent = event == 'new_ride_request' ||
           event == 'new_ride' ||
           event == 'new_market_order' ||
@@ -57,7 +66,7 @@ class NotificationRouter {
             MaterialPageRoute(
               builder: (_) => RideChatScreen(
                 bookingId: bookingId,
-                otherParticipantName: 'Customer',
+                otherParticipantName: data['sender_name']?.toString() ?? 'Customer',
                 isDriver: true,
               ),
             ),
@@ -65,6 +74,51 @@ class NotificationRouter {
           return;
         }
       }
+
+      // Earnings / Payout / Commission / Cash / Tip
+      if (combinedLower.contains('payout') ||
+          combinedLower.contains('earning') ||
+          combinedLower.contains('wallet') ||
+          combinedLower.contains('commission') ||
+          combinedLower.contains('tip') ||
+          event == 'payment') {
+        rootNavigatorKey.currentState?.push(
+          MaterialPageRoute(builder: (_) => const DriverEarningsScreen()),
+        );
+        return;
+      }
+
+      // KYC / Documents / Approvals
+      if (combinedLower.contains('document') ||
+          combinedLower.contains('kyc') ||
+          combinedLower.contains('license') ||
+          combinedLower.contains('approved') ||
+          combinedLower.contains('rejected') ||
+          combinedLower.contains('verification')) {
+        rootNavigatorKey.currentState?.push(
+          MaterialPageRoute(builder: (_) => const DriverDocumentsScreen()),
+        );
+        return;
+      }
+
+      // Ride / Trip updates
+      if (event == 'ride_update' ||
+          event == 'booking_update' ||
+          event == 'order_update' ||
+          event == 'market_order_update' ||
+          combinedLower.contains('ride') ||
+          combinedLower.contains('trip') ||
+          combinedLower.contains('booking')) {
+        rootNavigatorKey.currentState?.push(
+          MaterialPageRoute(builder: (_) => const DriverHistoryScreen()),
+        );
+        return;
+      }
+
+      // Fallback: Open Driver Notifications Screen
+      rootNavigatorKey.currentState?.push(
+        MaterialPageRoute(builder: (_) => const DriverNotificationsScreen()),
+      );
       return;
     }
 

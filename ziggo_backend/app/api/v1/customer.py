@@ -347,6 +347,22 @@ async def mark_notification_read(
     return {"ok": True}
 
 
+@router.post("/notifications/read-all")
+async def mark_all_notifications_read(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer", "driver")),
+):
+    from sqlalchemy import update
+    await db.execute(
+        update(Notification)
+        .where(Notification.user_id == user.id, Notification.is_read == False)
+        .values(is_read=True)
+    )
+    await db.commit()
+    return {"ok": True}
+
+
+
 @router.get("/referrals")
 async def get_referral_summary(
     db: AsyncSession = Depends(get_db),

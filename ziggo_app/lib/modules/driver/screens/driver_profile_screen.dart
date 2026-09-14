@@ -12,6 +12,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../app/app_styles.dart';
 import 'driver_documents_screen.dart';
 import 'driver_history_screen.dart';
+import 'driver_notifications_screen.dart';
+import '../../customer/notifications_provider.dart';
 import '../../customer/screens/earn_with_ziggo_screen.dart';
 
 // Local light tokens — mirror the customer/user light theme.
@@ -273,6 +275,19 @@ class DriverProfileScreen extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                             builder: (_) => const DriverDocumentsScreen()),
+                      ),
+                    ),
+                    _divider(),
+                    _listTile(
+                      icon: Icons.notifications_rounded,
+                      title: 'Notifications',
+                      trailing: context.watch<NotificationsProvider>().unreadCount > 0
+                          ? '${context.watch<NotificationsProvider>().unreadCount} unread'
+                          : null,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const DriverNotificationsScreen()),
                       ),
                     ),
                     _divider(),

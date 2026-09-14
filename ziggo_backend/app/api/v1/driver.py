@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from ...database import get_db
-from ...models import Driver, DriverDocument, DriverStatus, FareSetting, User
+from ...models import Driver, DriverDocument, DriverStatus, FareSetting, Notification, User
 from ...schemas import (
     DriverLocationUpdate,
     DriverOnlineToggle,
@@ -817,6 +817,65 @@ async def update_bank_details(
     peaks_q = await db.execute(select(PeakHourSetting))
     peaks = peaks_q.scalars().all()
     return _to_response(user, d, paid_payouts=stats["paid"], pending_payout=stats["pending"], peaks=peaks)
+
+
+@router.get("/notifications")
+async def list_driver_notifications(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("driver")),
+):
+    q = await db.execute(
+        select(Notification)
+        .where(Notification.user_id == user.id)
+        .order_by(Notification.id.desc())
+        .limit(100)
+    )
+    rows = q.scalars().all()
+    return [
+        {
+            "id": n.id,
+            "title": n.title,
+            "body": n.body,
+            "type": n.type,
+            "data": n.data,
+            "is_read": n.is_read,
+            "created_at": n.created_at.isoformat() if n.created_at else None,
+        }
+        for n in rows
+    ]
+
+
+@router.post("/notifications/{nid}/read")
+async def mark_driver_notification_read(
+    nid: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("driver")),
+):
+    q = await db.execute(
+        select(Notification).where(Notification.id == nid, Notification.user_id == user.id)
+    )
+    n = q.scalars().first()
+    if not n:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    n.is_read = True
+    await db.commit()
+    return {"status": "ok"}
+
+
+@router.post("/notifications/read-all")
+async def mark_all_driver_notifications_read(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("driver")),
+):
+    from sqlalchemy import update
+    await db.execute(
+        update(Notification)
+        .where(Notification.user_id == user.id, Notification.is_read == False)
+        .values(is_read=True)
+    )
+    await db.commit()
+    return {"status": "ok"}
+
 
 
 
