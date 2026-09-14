@@ -213,7 +213,8 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
 
   Future<void> _fetchNearbyDrivers() async {
     final pickup = widget.pickup.location;
-    final catRadius = _serviceType != null ? _categoryData[_serviceType]?['search_radius_km'] : null;
+    final catInfo = _serviceType != null ? _categoryData[_serviceType] : null;
+    final catRadius = catInfo != null ? catInfo['search_radius_km'] : null;
     final queryParams = <String, dynamic>{
       'lat': pickup.latitude,
       'lng': pickup.longitude,
