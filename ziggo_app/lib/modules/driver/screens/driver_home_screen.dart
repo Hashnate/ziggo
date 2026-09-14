@@ -277,8 +277,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                            event == 'new_ride' || 
                            event == 'new_market_order' || 
                            event == 'new_market_request' || 
-                           event.toString().contains('request') ||
-                           event.toString().contains('broadcast') ||
+                           (event.toString().contains('request') && !event.toString().contains('broadcast')) ||
                            (data.containsKey('pickup_lat') && data.containsKey('fare'));
                            
     if (isRequestEvent) {

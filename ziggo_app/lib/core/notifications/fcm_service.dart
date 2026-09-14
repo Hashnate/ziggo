@@ -20,6 +20,7 @@
 // without push.
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -30,6 +31,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../network/api_client.dart';
+import 'notification_router.dart';
 
 // Must match the channel_id the backend sends in FCM payloads
 // (see fcm_service.py `channel_id="ziggo_ride_alerts"`). Bumping this id
@@ -159,6 +161,21 @@ class FcmService {
       );
       await _local.initialize(
         const InitializationSettings(android: androidInit, iOS: iosInit),
+        onDidReceiveNotificationResponse: (NotificationResponse response) {
+          final payload = response.payload;
+          if (payload != null && payload.isNotEmpty) {
+            try {
+              final decoded = jsonDecode(payload);
+              if (decoded is Map<String, dynamic>) {
+                _handleNotificationDataClick(decoded);
+                return;
+              }
+            } catch (e) {
+              if (kDebugMode) debugPrint('[fcm] local notif payload decode error: $e');
+            }
+          }
+          _handleNotificationDataClick({'event': 'broadcast_message'});
+        },
       );
 
       // 2. Register the Android channels.
@@ -284,6 +301,7 @@ class FcmService {
   final StreamController<RemoteMessage> _clickController = StreamController<RemoteMessage>.broadcast();
   Stream<RemoteMessage> get onNotificationClicked => _clickController.stream;
   RemoteMessage? _pendingClick;
+  Map<String, dynamic>? _pendingDataClick;
 
   final StreamController<Map<String, dynamic>> _foregroundEventsController = StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get onForegroundEvent => _foregroundEventsController.stream;
@@ -294,9 +312,22 @@ class FcmService {
     return msg;
   }
 
+  Map<String, dynamic>? consumePendingDataClick() {
+    final d = _pendingDataClick;
+    _pendingDataClick = null;
+    return d;
+  }
+
   void _handleNotificationClick(RemoteMessage message) {
     _pendingClick = message;
+    _pendingDataClick = message.data;
     _clickController.add(message);
+    NotificationRouter.handleNotification(message.data);
+  }
+
+  void _handleNotificationDataClick(Map<String, dynamic> data) {
+    _pendingDataClick = data;
+    NotificationRouter.handleNotification(data);
   }
   /// Parses a Map<String, dynamic> FCM data payload into typed fields suitable for DriverProvider/BookingProvider.
   Map<String, dynamic> parseFcmData(Map<String, dynamic> data) {
@@ -517,7 +548,6 @@ class FcmService {
             playSound: true,
             sound: androidSound,
             enableVibration: true,
-            // Tap → opens the app (since we don't set a payload route)
           ),
           iOS: DarwinNotificationDetails(
             presentAlert: true,
@@ -526,6 +556,7 @@ class FcmService {
             sound: iosSound,
           ),
         ),
+        payload: jsonEncode(message.data),
       );
     } catch (e) {
       if (kDebugMode) debugPrint('[fcm] failed to show foreground notification: $e');
@@ -541,8 +572,9 @@ class FcmService {
   }
 
   /// Show a local notification for an incoming chat message.
-  Future<void> showChatNotification(String title, String body) async {
+  Future<void> showChatNotification(String title, String body, {Map<String, dynamic>? data}) async {
     try {
+      final payloadData = data ?? {'event': 'chat_message', 'title': title, 'body': body};
       await _local.show(
         DateTime.now().millisecondsSinceEpoch.hashCode,
         title,
@@ -563,6 +595,7 @@ class FcmService {
             presentSound: true,
           ),
         ),
+        payload: jsonEncode(payloadData),
       );
     } catch (e) {
       if (kDebugMode) debugPrint('[fcm] failed to show chat notification: $e');

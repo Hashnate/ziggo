@@ -3,6 +3,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
+import '../../../core/notifications/fcm_service.dart';
+import '../../../core/notifications/notification_router.dart';
 import '../../../core/widgets/curved_navbar.dart';
 import '../../../core/widgets/guest_login_prompt.dart';
 import '../../auth/auth_provider.dart';
@@ -49,7 +51,18 @@ class CustomerShellState extends State<CustomerShell> {
       const NotificationsScreen(),
       const ProfileScreen(),
     ];
-    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureLocationReady());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ensureLocationReady();
+      final pending = FcmService.instance.consumePendingClick();
+      if (pending != null) {
+        NotificationRouter.handleNotification(pending.data);
+      } else {
+        final pendingData = FcmService.instance.consumePendingDataClick();
+        if (pendingData != null) {
+          NotificationRouter.handleNotification(pendingData);
+        }
+      }
+    });
   }
 
   void _open(Widget screen) {

@@ -12,6 +12,7 @@ import 'core/map/maps_web_loader_stub.dart'
     if (dart.library.html) 'core/map/maps_web_loader.dart';
 import 'core/network/api_client.dart';
 import 'core/notifications/fcm_service.dart';
+import 'core/notifications/notification_router.dart';
 import 'core/services/referral_tracker.dart';
 import 'modules/auth/auth_provider.dart';
 import 'modules/auth/screens/role_selection_screen.dart';
@@ -100,6 +101,7 @@ class ZiggoApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ReferralsProvider()),
       ],
       child: MaterialApp(
+        navigatorKey: rootNavigatorKey,
         title: 'Ziggo',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
@@ -141,8 +143,25 @@ class _RootState extends State<_Root> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) setState(() => _splashed = true);
+      if (mounted) {
+        setState(() => _splashed = true);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _checkPendingNotification();
+        });
+      }
     });
+  }
+
+  void _checkPendingNotification() {
+    final pendingMessage = FcmService.instance.consumePendingClick();
+    if (pendingMessage != null) {
+      NotificationRouter.handleNotification(pendingMessage.data);
+    } else {
+      final pendingData = FcmService.instance.consumePendingDataClick();
+      if (pendingData != null) {
+        NotificationRouter.handleNotification(pendingData);
+      }
+    }
   }
 
   @override
