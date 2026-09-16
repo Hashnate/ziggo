@@ -4,7 +4,7 @@ publish_to: 'none'
 version: 1.0.8+19
 
 environment:
-  sdk: '>=3.11.0 <4.0.0'
+  sdk: '>=3.1.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -65,11 +65,14 @@ dependencies:
   # notification firing / notification permission being granted — those only
   # cover the backgrounded/killed case. Asset: assets/sounds/ride_alert.mp3.
   audioplayers: ^6.1.0
-  flutter_contacts: ^2.1.0
-  pdf: ^3.12.0
+  flutter_contacts: ^1.1.9+2
+  pdf: 3.11.1
   printing: ^5.14.3
   share_plus: ^10.0.2
   smart_auth: ^3.2.0
+
+dependency_overrides:
+  vector_math: 2.1.4
 
 dev_dependencies:
   flutter_test:

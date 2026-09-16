@@ -3,7 +3,7 @@ import os
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from fastapi import Request
@@ -222,6 +222,25 @@ if os.path.isdir(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 app.include_router(admin_panel_routes.router, prefix="/admin", tags=["admin_panel"])
+
+@app.get("/download/apk", tags=["download"])
+@app.get(f"{settings.API_V1_STR}/download/apk", tags=["download"])
+async def download_apk():
+    apk_path = os.path.abspath(
+        os.path.join(current_dir, "..", "ziggo_admin_panel", "static", "downloads", "ziggo-app.apk")
+    )
+    if not os.path.exists(apk_path):
+        apk_path = os.path.abspath(
+            os.path.join(current_dir, "..", "ziggo_app", "build", "app", "outputs", "flutter-apk", "app-release.apk")
+        )
+    if not os.path.exists(apk_path):
+        raise HTTPException(status_code=404, detail="APK file not found")
+    return FileResponse(
+        path=apk_path,
+        media_type="application/vnd.android.package-archive",
+        filename="ziggo-app.apk",
+        headers={"Content-Disposition": 'attachment; filename="ziggo-app.apk"'}
+    )
 
 # JSON API for the new React admin (separate, read-only; live /admin unaffected)
 from ziggo_admin_panel import api_react as admin_react_api  # noqa: E402

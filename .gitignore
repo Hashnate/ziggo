@@ -52,6 +52,9 @@ ziggo_app/macos/.symlinks/
 
 # Admin uploads (kept in docker volume, not git)
 ziggo_backend/app/admin_panel/static/uploads/
+ziggo_admin_panel/static/uploads/
+ziggo_admin_panel/static/downloads/
+*.apk
 
 # OS junk
 .DS_Store

@@ -2,8 +2,10 @@
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from typing import List
+import os
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -35,6 +37,23 @@ from ...services.auth_service import get_current_user, require_role
 from ...services import loyalty_service as L
 
 router = APIRouter()
+
+
+@router.get("/download/apk")
+async def download_apk():
+    apk_path = "/var/www/ziggo/ziggo_admin_panel/static/downloads/ziggo-app.apk"
+    if not os.path.exists(apk_path):
+        apk_path = "/app/ziggo_admin_panel/static/downloads/ziggo-app.apk"
+    if not os.path.exists(apk_path):
+        apk_path = "/var/www/ziggo/ziggo_app/build/app/outputs/flutter-apk/app-release.apk"
+    if not os.path.exists(apk_path):
+        raise HTTPException(status_code=404, detail="APK file not found")
+    return FileResponse(
+        path=apk_path,
+        media_type="application/vnd.android.package-archive",
+        filename="ziggo-app.apk",
+        headers={"Content-Disposition": 'attachment; filename="ziggo-app.apk"'}
+    )
 
 
 # ---------- Flash pricing tiers (public — used by the customer flash screen) ----------

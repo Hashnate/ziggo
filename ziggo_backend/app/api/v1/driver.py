@@ -9,12 +9,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from ...database import get_db
-from ...models import Driver, DriverDocument, DriverStatus, FareSetting, Notification, User
+from ...models import Driver, DriverDocument, DriverStatus, FareSetting, Notification, User, DriverVehicle, Booking, BookingStatus
 from ...schemas import (
     DriverLocationUpdate,
     DriverOnlineToggle,
     DriverProfileResponse,
     DriverRegisterRequest,
+    DriverVehicleCreate,
+    DriverVehicleResponse,
+    DriverVehicleSelectRequest,
 )
 from ...services.auth_service import get_current_user, require_role
 from ...services.fare_service import haversine_km
@@ -354,6 +357,31 @@ async def register_driver(
     d.relative_relationship = body.relative_relationship
     if body.driver_type:
         d.driver_type = body.driver_type
+
+    # Ensure primary DriverVehicle record is synced
+    v_stmt = select(DriverVehicle).where(
+        DriverVehicle.driver_id == d.id,
+        DriverVehicle.vehicle_number == body.vehicle_number,
+    )
+    v_obj = (await db.execute(v_stmt)).scalars().first()
+    if not v_obj:
+        v_obj = DriverVehicle(
+            driver_id=d.id,
+            vehicle_type=body.vehicle_type,
+            vehicle_number=body.vehicle_number,
+            vehicle_model=body.vehicle_model,
+            vehicle_color=body.vehicle_color,
+            is_approved=bool(d.is_approved),
+            is_active=True,
+            approved_at=d.approved_at,
+        )
+        db.add(v_obj)
+    else:
+        v_obj.vehicle_type = body.vehicle_type
+        v_obj.vehicle_model = body.vehicle_model
+        v_obj.vehicle_color = body.vehicle_color
+        v_obj.is_active = True
+
     # Stay in PENDING; admin will approve.
     if d.status == DriverStatus.PENDING:
         pass
@@ -875,6 +903,274 @@ async def mark_all_driver_notifications_read(
     )
     await db.commit()
     return {"status": "ok"}
+
+
+# ---------- Multi-Vehicle Management APIs ----------
+
+def _vehicle_to_dict(v: DriverVehicle) -> dict:
+    return {
+        "id": v.id,
+        "driver_id": v.driver_id,
+        "vehicle_type": v.vehicle_type,
+        "vehicle_number": v.vehicle_number,
+        "vehicle_model": v.vehicle_model,
+        "vehicle_color": v.vehicle_color,
+        "vehicle_year": v.vehicle_year,
+        "vehicle_photo_url": v.vehicle_photo_url,
+        "registration_doc_url": v.registration_doc_url,
+        "insurance_doc_url": v.insurance_doc_url,
+        "revenue_license_doc_url": v.revenue_license_doc_url,
+        "is_approved": bool(v.is_approved),
+        "is_active": bool(v.is_active),
+        "rejection_reason": v.rejection_reason,
+        "approved_at": v.approved_at.isoformat() if v.approved_at else None,
+        "created_at": v.created_at.isoformat() if v.created_at else None,
+    }
+
+
+@router.get("/vehicles")
+async def get_driver_vehicles(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("driver")),
+):
+    """List all vehicles registered under the authenticated driver."""
+    d = await _get_driver(db, user)
+    stmt = select(DriverVehicle).where(DriverVehicle.driver_id == d.id).order_by(DriverVehicle.created_at.asc())
+    res = await db.execute(stmt)
+    vehicles = res.scalars().all()
+
+    # Legacy fallback: if driver has vehicle details but no driver_vehicles row yet, auto-create it
+    if not vehicles and d.vehicle_number and d.vehicle_type:
+        new_v = DriverVehicle(
+            driver_id=d.id,
+            vehicle_type=d.vehicle_type,
+            vehicle_number=d.vehicle_number,
+            vehicle_model=d.vehicle_model,
+            vehicle_color=d.vehicle_color,
+            vehicle_year=d.vehicle_year,
+            vehicle_photo_url=d.vehicle_photo_url,
+            is_approved=bool(d.is_approved),
+            is_active=True,
+            approved_at=d.approved_at,
+        )
+        db.add(new_v)
+        await db.commit()
+        await db.refresh(new_v)
+        vehicles = [new_v]
+
+    return [_vehicle_to_dict(v) for v in vehicles]
+
+
+@router.post("/vehicles")
+async def add_driver_vehicle(
+    body: DriverVehicleCreate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("driver")),
+):
+    """Driver adds a new vehicle (e.g. Tuk-Tuk or Bike) to their profile for admin review."""
+    vt = body.vehicle_type.lower().strip()
+    if vt not in VALID_VEHICLE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"vehicle_type must be one of {sorted(VALID_VEHICLE_TYPES)}",
+        )
+
+    v_num = body.vehicle_number.strip().upper()
+    if not v_num:
+        raise HTTPException(status_code=400, detail="vehicle_number is required")
+
+    d = await _get_driver(db, user)
+
+    # Plate collision check across other drivers
+    existing_veh = await db.execute(
+        select(DriverVehicle).where(
+            DriverVehicle.vehicle_number == v_num,
+            DriverVehicle.driver_id != d.id,
+        )
+    )
+    if existing_veh.scalars().first():
+        raise HTTPException(
+            status_code=409,
+            detail=f"Vehicle number '{v_num}' is already registered to another driver",
+        )
+
+    # Check if driver already registered this exact plate
+    my_veh = await db.execute(
+        select(DriverVehicle).where(
+            DriverVehicle.driver_id == d.id,
+            DriverVehicle.vehicle_number == v_num,
+        )
+    )
+    if my_veh.scalars().first():
+        raise HTTPException(
+            status_code=409,
+            detail=f"You have already added vehicle '{v_num}' to your profile",
+        )
+
+    all_my_veh = (await db.execute(select(DriverVehicle).where(DriverVehicle.driver_id == d.id))).scalars().all()
+    is_first = len(all_my_veh) == 0
+
+    new_vehicle = DriverVehicle(
+        driver_id=d.id,
+        vehicle_type=vt,
+        vehicle_number=v_num,
+        vehicle_model=body.vehicle_model.strip() if body.vehicle_model else None,
+        vehicle_color=body.vehicle_color.strip() if body.vehicle_color else None,
+        vehicle_year=body.vehicle_year,
+        vehicle_photo_url=body.vehicle_photo_url,
+        registration_doc_url=body.registration_doc_url,
+        insurance_doc_url=body.insurance_doc_url,
+        revenue_license_doc_url=body.revenue_license_doc_url,
+        is_approved=False,
+        is_active=is_first,
+    )
+    db.add(new_vehicle)
+    await db.commit()
+    await db.refresh(new_vehicle)
+    return _vehicle_to_dict(new_vehicle)
+
+
+@router.post("/vehicles/{vehicle_id}/select")
+async def select_active_vehicle(
+    vehicle_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("driver")),
+):
+    """Switch active vehicle. Only allowed when driver is not currently on an active trip."""
+    d = await _get_driver(db, user)
+
+    # Ensure no active rides
+    active_b = await db.execute(
+        select(Booking).where(
+            Booking.driver_id == d.id,
+            Booking.status.in_([BookingStatus.ACCEPTED, BookingStatus.ARRIVED, BookingStatus.STARTED]),
+        )
+    )
+    if active_b.scalars().first():
+        raise HTTPException(status_code=400, detail="Cannot switch vehicle while on an active trip")
+
+    v_q = await db.execute(
+        select(DriverVehicle).where(
+            DriverVehicle.id == vehicle_id,
+            DriverVehicle.driver_id == d.id,
+        )
+    )
+    v = v_q.scalars().first()
+    if not v:
+        raise HTTPException(status_code=404, detail="Vehicle not found on your profile")
+
+    if not v.is_approved:
+        raise HTTPException(
+            status_code=400,
+            detail="This vehicle is pending admin approval and cannot be activated yet",
+        )
+
+    # Set all other vehicles to inactive, this one to active
+    all_veh_q = await db.execute(
+        select(DriverVehicle).where(DriverVehicle.driver_id == d.id)
+    )
+    for other_v in all_veh_q.scalars().all():
+        other_v.is_active = (other_v.id == v.id)
+
+    # Sync to Driver table for backward-compatible dispatch & tracking
+    d.vehicle_type = v.vehicle_type
+    d.vehicle_number = v.vehicle_number
+    if v.vehicle_model:
+        d.vehicle_model = v.vehicle_model
+    if v.vehicle_color:
+        d.vehicle_color = v.vehicle_color
+    if v.vehicle_year:
+        d.vehicle_year = v.vehicle_year
+    if v.vehicle_photo_url:
+        d.vehicle_photo_url = v.vehicle_photo_url
+
+    await db.commit()
+    await db.refresh(v)
+    await db.refresh(d)
+    return {
+        "status": "success",
+        "message": f"Active vehicle switched to {v.vehicle_type.upper()} ({v.vehicle_number})",
+        "active_vehicle": _vehicle_to_dict(v),
+    }
+
+
+@router.post("/vehicles/{vehicle_id}/documents")
+async def upload_vehicle_document(
+    vehicle_id: int,
+    doc_type: str = Form(..., description="registration | insurance | revenue_license | vehicle_photo"),
+    document: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("driver")),
+):
+    """Upload a vehicle-specific document (CR book, insurance, revenue license, or photo)."""
+    d = await _get_driver(db, user)
+    v_q = await db.execute(
+        select(DriverVehicle).where(
+            DriverVehicle.id == vehicle_id,
+            DriverVehicle.driver_id == d.id,
+        )
+    )
+    v = v_q.scalars().first()
+    if not v:
+        raise HTTPException(status_code=404, detail="Vehicle not found on your profile")
+
+    kind = doc_type.strip().lower()
+    valid_kinds = {"registration", "insurance", "revenue_license", "vehicle_photo"}
+    if kind not in valid_kinds:
+        raise HTTPException(status_code=400, detail=f"doc_type must be one of {sorted(valid_kinds)}")
+
+    url = await _save_doc(document, f"vehicle_{v.id}_{kind}")
+
+    if kind == "registration":
+        v.registration_doc_url = url
+    elif kind == "insurance":
+        v.insurance_doc_url = url
+    elif kind == "revenue_license":
+        v.revenue_license_doc_url = url
+    elif kind == "vehicle_photo":
+        v.vehicle_photo_url = url
+
+    # If updating docs, require re-approval
+    v.is_approved = False
+    await db.commit()
+    await db.refresh(v)
+    return {
+        "status": "success",
+        "doc_type": kind,
+        "url": url,
+        "vehicle": _vehicle_to_dict(v),
+    }
+
+
+@router.delete("/vehicles/{vehicle_id}")
+async def delete_driver_vehicle(
+    vehicle_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("driver")),
+):
+    """Delete an unapproved or inactive secondary vehicle."""
+    d = await _get_driver(db, user)
+
+    v_q = await db.execute(
+        select(DriverVehicle).where(
+            DriverVehicle.id == vehicle_id,
+            DriverVehicle.driver_id == d.id,
+        )
+    )
+    v = v_q.scalars().first()
+    if not v:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+
+    if v.is_active:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete your currently active vehicle. Switch to another vehicle first.",
+        )
+
+    await db.delete(v)
+    await db.commit()
+    return {"status": "success", "message": "Vehicle removed successfully"}
+
 
 
 

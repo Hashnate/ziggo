@@ -13,6 +13,7 @@ import '../../../app/app_styles.dart';
 import 'driver_documents_screen.dart';
 import 'driver_history_screen.dart';
 import 'driver_notifications_screen.dart';
+import 'driver_vehicles_screen.dart';
 import '../../customer/notifications_provider.dart';
 import '../../customer/screens/earn_with_ziggo_screen.dart';
 
@@ -266,6 +267,17 @@ class DriverProfileScreen extends StatelessWidget {
                           MaterialPageRoute(builder: (_) => const EarnWithZiggoScreen()),
                         );
                       },
+                    ),
+                    _divider(),
+                    _listTile(
+                      icon: Icons.directions_car_filled_rounded,
+                      title: 'My Vehicles',
+                      trailing: (profile['vehicle_type'] ?? '').toString().toUpperCase(),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const DriverVehiclesScreen()),
+                      ),
                     ),
                     _divider(),
                     _listTile(

@@ -834,10 +834,10 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                   children: [
                     ListTile(
                       onTap: () async {
-                        if (await FlutterContacts.permissions.request(PermissionType.read) == PermissionStatus.granted) {
-                          final contact = await FlutterContacts.native.showPicker(properties: {ContactProperty.phone});
+                        if (await FlutterContacts.requestPermission(readonly: true)) {
+                          final contact = await FlutterContacts.openExternalPick();
                           if (contact != null && contact.phones.isNotEmpty) {
-                            setState(() => _friend = (name: contact.displayName ?? 'Unknown', phone: contact.phones.first.number));
+                            setState(() => _friend = (name: contact.displayName, phone: contact.phones.first.number));
                           }
                         }
                         if (context.mounted) Navigator.pop(ctx);

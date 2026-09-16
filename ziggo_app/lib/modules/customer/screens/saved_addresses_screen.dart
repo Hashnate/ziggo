@@ -164,7 +164,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   value: makeDefault,
-                  activeThumbColor: AppColors.primary,
+                  activeColor: AppColors.primary,
                   onChanged: (v) => setSheetState(() => makeDefault = v),
                   title: const Text(
                     'Set as default',

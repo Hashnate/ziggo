@@ -312,29 +312,37 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     ).listen((p) {
       final kmh = (p.speed.isNaN || p.speed < 0) ? 0.0 : p.speed * 3.6;
       if (!mounted) return;
-      setState(() {
-        if ((kmh - _speedKmh).abs() >= 1) {
-          _speedKmh = kmh;
-        }
-        if (p.heading >= 0 && p.heading <= 360) {
-          _heading = p.heading;
-        }
-      });
+      
+      final bool speedChanged = (kmh - _speedKmh).abs() >= 1.5;
+      final bool headingChanged = (p.heading >= 0 && p.heading <= 360) && (p.heading - _heading).abs() >= 5.0;
+      
+      if (speedChanged || headingChanged) {
+        setState(() {
+          if (speedChanged) _speedKmh = kmh;
+          if (headingChanged) _heading = p.heading;
+        });
+      }
+      
       final driver = context.read<DriverProvider>();
       final food = driver.activeFoodOrder;
       final market = driver.activeMarketOrder;
       final currentLoc = LatLng(p.latitude, p.longitude);
       
-      // Update driver provider's location so that it is dynamic and matches the stream immediately
-      driver.updateCurrentLocation(currentLoc);
+      final lastLoc = driver.currentLocation;
+      final bool movedSignificantly = lastLoc == null || 
+          Geolocator.distanceBetween(lastLoc.latitude, lastLoc.longitude, currentLoc.latitude, currentLoc.longitude) >= 10;
+      
+      if (movedSignificantly) {
+        driver.updateCurrentLocation(currentLoc);
 
-      if (driver.activeRide != null || food != null || market != null) {
-        _isNavigating = true;
-        _mapController.startNavigation(currentLoc, bearing: _heading);
-      } else if (_pendingPickupLatLng != null) {
-        _centerMapOnDriverAndPickup(currentLoc, _pendingPickupLatLng!);
-      } else {
-        _mapController.moveTo(currentLoc, zoom: 16);
+        if (driver.activeRide != null || food != null || market != null) {
+          _isNavigating = true;
+          _mapController.startNavigation(currentLoc, bearing: _heading);
+        } else if (_pendingPickupLatLng != null) {
+          _centerMapOnDriverAndPickup(currentLoc, _pendingPickupLatLng!);
+        } else {
+          _mapController.moveTo(currentLoc, zoom: 16);
+        }
       }
 
       if (food != null) {
@@ -591,6 +599,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   Future<void> _handleToggleOnline(bool goingOnline) async {
     final driver = context.read<DriverProvider>();
     if (goingOnline) {
+      await driver.loadVehicles();
+      final approvedVehicles = driver.approvedVehicles;
+      if (approvedVehicles.length > 1) {
+        if (!mounted) return;
+        final selected = await _showVehicleSelectorModal(context, driver);
+        if (!selected) return; // Driver cancelled or closed modal
+      }
+
       if (!await Geolocator.isLocationServiceEnabled()) {
         if (!mounted) return;
         final open = await _showLocationDialog(
@@ -636,6 +652,156 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       );
     }
   }
+
+  Future<bool> _showVehicleSelectorModal(BuildContext context, DriverProvider driver) async {
+    final approved = driver.approvedVehicles;
+    if (approved.length <= 1) return true;
+
+    int selectedId = driver.activeVehicle?['id'] ?? (approved.isNotEmpty ? approved.first['id'] : 0);
+
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Select Vehicle for Today',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.grey),
+                        onPressed: () => Navigator.pop(ctx, false),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Which vehicle will you be driving for this session?',
+                    style: TextStyle(fontSize: 13, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 16),
+                  ...approved.map((v) {
+                    final isSelected = v['id'] == selectedId;
+                    final vType = (v['vehicle_type'] ?? 'car').toString().toUpperCase();
+                    final vNum = v['vehicle_number'] ?? '';
+                    final vModel = v['vehicle_model'] ?? '';
+                    IconData iconData = Icons.directions_car;
+                    if (vType.contains('BIKE')) iconData = Icons.two_wheeler;
+                    if (vType.contains('TUK')) iconData = Icons.electric_rickshaw;
+                    if (vType.contains('VAN')) iconData = Icons.airport_shuttle;
+                    if (vType.contains('TRUCK')) iconData = Icons.local_shipping;
+
+                    return GestureDetector(
+                      onTap: () {
+                        setModalState(() {
+                          selectedId = v['id'];
+                        });
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: isSelected ? const Color(0xFFFFFBEB) : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isSelected ? const Color(0xFFF59E0B) : const Color(0xFFE2E8F0),
+                            width: isSelected ? 2 : 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: isSelected ? const Color(0xFFFDE68A) : Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(iconData, color: isSelected ? const Color(0xFFB45309) : Colors.grey[700]),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '$vType • $vNum',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                      color: isSelected ? const Color(0xFF92400E) : Colors.black87,
+                                    ),
+                                  ),
+                                  if (vModel.isNotEmpty)
+                                    Text(
+                                      vModel,
+                                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            if (isSelected)
+                              const Icon(Icons.check_circle, color: Color(0xFFF59E0B))
+                            else
+                              const Icon(Icons.radio_button_unchecked, color: Colors.grey),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1E293B),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      onPressed: () async {
+                        try {
+                          await driver.selectActiveVehicle(selectedId);
+                          if (ctx.mounted) Navigator.pop(ctx, true);
+                        } catch (e) {
+                          if (ctx.mounted) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              SnackBar(content: Text(e.toString())),
+                            );
+                          }
+                        }
+                      },
+                      child: const Text('Confirm & Go Online', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    return result ?? false;
+  }
+
 
   Future<void> _callPhone(String? phone) async {
     if (phone == null || phone.trim().isEmpty) {

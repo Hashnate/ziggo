@@ -23,7 +23,7 @@ from sqlalchemy import inspect, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from ..database import Base
-from ..models import Event, EventTicketTier, EventOrder, EventOrderItem, FlashWeightTier, CorporateAccount, CorporateMember, DriverPayout, MarketAd, MarketDeal, DriverIncentive, ReferralBonus, PeakHourSetting, JobOpening, JobApplication  # noqa: F401 — ensures import for create_all
+from ..models import Event, EventTicketTier, EventOrder, EventOrderItem, FlashWeightTier, CorporateAccount, CorporateMember, DriverPayout, MarketAd, MarketDeal, DriverIncentive, ReferralBonus, PeakHourSetting, JobOpening, JobApplication, Driver, DriverVehicle  # noqa: F401 — ensures import for create_all
 
 # (table_name, column_name, column_ddl)
 PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
@@ -250,6 +250,7 @@ async def ensure_schema(engine: AsyncEngine) -> None:
         await _seed_peak_hours(conn)
         await _seed_sample_jobs(conn)
         await _cleanup_bad_payouts(conn)
+        await _backfill_driver_vehicles(conn)
 
 
 async def _seed_flash_tiers(conn) -> None:
@@ -584,4 +585,65 @@ async def _seed_sample_jobs(conn) -> None:
     for job in sample_jobs:
         await conn.execute(JobOpening.__table__.insert().values(**job))
     print(f"[schema_sync] Seeded {len(sample_jobs)} default job roles")
+
+
+async def _backfill_driver_vehicles(conn) -> None:
+    """Safe idempotent backfill: for any driver with a vehicle_number who has no
+    rows in `driver_vehicles`, automatically create their initial active vehicle record.
+    """
+    try:
+        stmt = select(
+            Driver.id,
+            Driver.vehicle_type,
+            Driver.vehicle_number,
+            Driver.vehicle_model,
+            Driver.vehicle_color,
+            Driver.vehicle_year,
+            Driver.vehicle_photo_url,
+            Driver.is_approved,
+            Driver.approved_at,
+        ).where(Driver.vehicle_number.isnot(None))
+        res = await conn.execute(stmt)
+        drivers = res.fetchall()
+        count = 0
+        for d in drivers:
+            d_id = d[0]
+            v_type = d[1]
+            v_num = d[2]
+            v_model = d[3]
+            v_color = d[4]
+            v_year = d[5]
+            v_photo = d[6]
+            is_app = bool(d[7])
+            app_at = d[8]
+
+            if not v_num or not v_type:
+                continue
+
+            v_check = await conn.execute(
+                select(DriverVehicle.id).where(
+                    DriverVehicle.driver_id == d_id,
+                    DriverVehicle.vehicle_number == v_num,
+                )
+            )
+            if v_check.first() is None:
+                await conn.execute(
+                    DriverVehicle.__table__.insert().values(
+                        driver_id=d_id,
+                        vehicle_type=v_type,
+                        vehicle_number=v_num,
+                        vehicle_model=v_model,
+                        vehicle_color=v_color,
+                        vehicle_year=v_year,
+                        vehicle_photo_url=v_photo,
+                        is_approved=is_app,
+                        is_active=True,
+                        approved_at=app_at,
+                    )
+                )
+                count += 1
+        if count > 0:
+            print(f"[schema_sync] Backfilled {count} driver vehicle records into driver_vehicles table")
+    except Exception as ex:
+        print(f"[schema_sync] Error during _backfill_driver_vehicles: {ex}")
 

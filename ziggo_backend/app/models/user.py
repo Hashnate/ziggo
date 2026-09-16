@@ -157,7 +157,31 @@ class Driver(Base):
 
     user = relationship("User", back_populates="driver_profile")
     documents = relationship("DriverDocument", back_populates="driver", cascade="all, delete-orphan")
+    vehicles = relationship("DriverVehicle", back_populates="driver", cascade="all, delete-orphan")
     bookings = relationship("Booking", back_populates="driver")
+
+
+class DriverVehicle(Base):
+    __tablename__ = "driver_vehicles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    driver_id = Column(Integer, ForeignKey("drivers.id", ondelete="CASCADE"), index=True, nullable=False)
+    vehicle_type = Column(String(20), nullable=False)  # bike, tuk, car, van, truck
+    vehicle_number = Column(String(20), index=True, nullable=False)
+    vehicle_model = Column(String(100), nullable=True)
+    vehicle_color = Column(String(50), nullable=True)
+    vehicle_year = Column(Integer, nullable=True)
+    vehicle_photo_url = Column(String(255), nullable=True)
+    registration_doc_url = Column(String(255), nullable=True)
+    insurance_doc_url = Column(String(255), nullable=True)
+    revenue_license_doc_url = Column(String(255), nullable=True)
+    is_approved = Column(Boolean, default=False, nullable=False)
+    is_active = Column(Boolean, default=False, nullable=False)
+    rejection_reason = Column(String(255), nullable=True)
+    approved_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    driver = relationship("Driver", back_populates="vehicles")
 
 
 class DriverDocument(Base):

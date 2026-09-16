@@ -84,3 +84,42 @@ class DriverProfileResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class DriverVehicleCreate(BaseModel):
+    vehicle_type: str = Field(..., description="bike | tuk | car | van | truck")
+    vehicle_number: str = Field(..., description="Plate / Registration number")
+    vehicle_model: Optional[str] = None
+    vehicle_color: Optional[str] = None
+    vehicle_year: Optional[int] = None
+    vehicle_photo_url: Optional[str] = None
+    registration_doc_url: Optional[str] = None
+    insurance_doc_url: Optional[str] = None
+    revenue_license_doc_url: Optional[str] = None
+
+
+class DriverVehicleResponse(BaseModel):
+    id: int
+    driver_id: int
+    vehicle_type: str
+    vehicle_number: str
+    vehicle_model: Optional[str] = None
+    vehicle_color: Optional[str] = None
+    vehicle_year: Optional[int] = None
+    vehicle_photo_url: Optional[str] = None
+    registration_doc_url: Optional[str] = None
+    insurance_doc_url: Optional[str] = None
+    revenue_license_doc_url: Optional[str] = None
+    is_approved: bool
+    is_active: bool
+    rejection_reason: Optional[str] = None
+    approved_at: Optional[str] = None
+    created_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class DriverVehicleSelectRequest(BaseModel):
+    vehicle_id: int
+

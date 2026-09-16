@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Edit Driver | Ziggo Admin{% endblock %}
-{% block page_title %}Edit Driver — {{ user.full_name or user.phone_number }}{% endblock %}
+{% block page_title %}Edit Driver — {{ (user.full_name if user else None) or (user.phone_number if user else None) or ('Driver #' ~ driver.id) }}{% endblock %}
 
 {% block content %}
 <div class="max-w-3xl mx-auto bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -17,7 +17,7 @@
             <div class="flex items-center gap-3 text-sm">
                 <span class="font-black text-ziggo">#{{ driver.id }}</span>
                 <span class="text-ziggo-faint">•</span>
-                <span class="font-bold text-ziggo-muted">{{ driver.status.value | upper }}</span>
+                <span class="font-bold text-ziggo-muted">{{ (driver.status.value if driver.status and driver.status.value is defined else (driver.status or 'PENDING')) | upper }}</span>
                 {% if driver.is_online %}
                 <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black tracking-wider">ONLINE</span>
                 {% endif %}
@@ -31,7 +31,7 @@
             <h3 class="text-lg font-black text-ziggo mb-4">Profile Photo</h3>
             <div class="flex items-center gap-5">
                 <div id="photoPreview" class="w-24 h-24 rounded-2xl bg-ziggo-soft/50 border-2 border-dashed border-ziggo-line flex items-center justify-center overflow-hidden">
-                    {% if user.profile_photo %}
+                    {% if user and user.profile_photo %}
                     <a href="{{ user.profile_photo }}" target="_blank" class="w-full h-full block">
                         <img src="{{ user.profile_photo }}" class="w-full h-full object-cover hover:opacity-80 transition">
                     </a>
@@ -42,10 +42,10 @@
                 <div class="flex-1">
                     <label for="profile_photo" class="inline-flex items-center gap-2 cursor-pointer px-4 py-2.5 bg-ziggo-soft text-ziggo rounded-xl font-bold text-sm hover:bg-ziggo-soft/70 transition">
                         <i class="fas fa-upload"></i>
-                        <span id="photoLabel">{% if user.profile_photo %}Replace photo{% else %}Choose photo{% endif %}</span>
+                        <span id="photoLabel">{% if user and user.profile_photo %}Replace photo{% else %}Choose photo{% endif %}</span>
                     </label>
                     <input id="profile_photo" name="profile_photo" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="previewPhoto(this)">
-                    {% if user.profile_photo %}
+                    {% if user and user.profile_photo %}
                     <label class="ml-3 inline-flex items-center gap-2 cursor-pointer text-sm font-bold text-red-500">
                         <input name="remove_photo" type="checkbox" value="1" class="w-4 h-4 text-red-500 border-gray-300 rounded">
                         Remove existing photo
@@ -61,19 +61,19 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Phone Number</label>
-                    <input name="phone_number" required value="{{ user.phone_number or '' }}"
+                    <input name="phone_number" required value="{{ user.phone_number if user else '' }}"
                            type="tel" maxlength="13" minlength="10"
                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                     <p class="text-[10px] text-amber-600 font-bold mt-1">⚠️ Changing this changes the driver's login</p>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Full Name</label>
-                    <input name="full_name" required value="{{ user.full_name or '' }}"
+                    <input name="full_name" required value="{{ user.full_name if user else '' }}"
                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Email (optional)</label>
-                    <input name="email" type="email" value="{{ user.email or '' }}"
+                    <input name="email" type="email" value="{{ user.email if user else '' }}"
                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                 </div>
                 <div>
@@ -186,7 +186,7 @@
                     <div class="flex-1 min-w-0">
                         <p class="font-black text-sm text-ziggo-ink">{{ doc.label }}</p>
                         {% if doc.document_url %}
-                        <p class="text-[11px] text-ziggo-muted truncate" id="{{ doc.kind }}Status">Uploaded {{ doc.uploaded_at.strftime("%Y-%m-%d") if doc.uploaded_at else '' }}</p>
+                        <p class="text-[11px] text-ziggo-muted truncate" id="{{ doc.kind }}Status">Uploaded {{ doc.uploaded_at or '' }}</p>
                         {% if doc.is_verified %}
                         <span class="px-2 py-0.5 mt-1 inline-block text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700 rounded-full" id="{{ doc.kind }}VerifyBadge">Verified</span>
                         {% else %}
@@ -219,6 +219,92 @@
             </div>
         </div>
 
+        {# Multi-Vehicle Management #}
+        <div class="pt-6 border-t border-gray-100">
+            <div class="flex items-center justify-between mb-4">
+                <h4 class="font-black text-ziggo-ink flex items-center gap-2">
+                    <i class="fas fa-car-side text-ziggo"></i> Registered Vehicles ({{ vehicles | length if vehicles else 0 }})
+                </h4>
+                <button type="button" onclick="document.getElementById('addVehicleModal').classList.remove('hidden')" class="px-3.5 py-1.5 bg-ziggo text-white rounded-xl text-xs font-black hover:bg-ziggo-light shadow-sm flex items-center gap-1.5 transition">
+                    <i class="fas fa-plus"></i> Add Vehicle
+                </button>
+            </div>
+
+            {% if vehicles %}
+            <div class="space-y-3">
+                {% for veh in vehicles %}
+                <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-xl text-ziggo">
+                            {% if veh.vehicle_type == 'bike' %}
+                                <i class="fas fa-motorcycle"></i>
+                            {% elif veh.vehicle_type == 'tuk' %}
+                                <i class="fas fa-cubes"></i>
+                            {% elif veh.vehicle_type == 'car' %}
+                                <i class="fas fa-car"></i>
+                            {% elif veh.vehicle_type == 'van' %}
+                                <i class="fas fa-shuttle-van"></i>
+                            {% else %}
+                                <i class="fas fa-truck"></i>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="font-black text-sm text-gray-900 uppercase">{{ veh.vehicle_number }}</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-gray-200 text-gray-700">{{ veh.vehicle_type }}</span>
+                                {% if veh.is_active %}
+                                <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700">ACTIVE NOW</span>
+                                {% endif %}
+                                {% if veh.is_approved %}
+                                <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700">APPROVED</span>
+                                {% else %}
+                                <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-700">PENDING APPROVAL</span>
+                                {% endif %}
+                            </div>
+                            <p class="text-xs text-gray-500 mt-0.5">
+                                {{ veh.vehicle_model or 'Model not specified' }} • {{ veh.vehicle_color or 'Color not specified' }} • {{ veh.vehicle_year or 'Year N/A' }}
+                            </p>
+                            {% if veh.rejection_reason %}
+                            <p class="text-xs text-rose-500 font-bold mt-0.5"><i class="fas fa-info-circle mr-1"></i>Rejection: {{ veh.rejection_reason }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 flex-wrap">
+                        {% if veh.registration_doc_url %}
+                        <a href="{{ veh.registration_doc_url }}" target="_blank" class="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-100 transition">
+                            <i class="fas fa-file-alt mr-1"></i> CR Book
+                        </a>
+                        {% endif %}
+                        {% if veh.insurance_doc_url %}
+                        <a href="{{ veh.insurance_doc_url }}" target="_blank" class="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-100 transition">
+                            <i class="fas fa-shield-alt mr-1"></i> Insurance
+                        </a>
+                        {% endif %}
+
+                        {% if not veh.is_approved %}
+                        <button form="approve_veh_{{ veh.id }}" type="submit" class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-black hover:bg-emerald-700 transition">
+                            <i class="fas fa-check mr-1"></i> Approve
+                        </button>
+                        <button form="reject_veh_{{ veh.id }}" type="submit" class="px-3 py-1.5 border border-rose-300 text-rose-600 rounded-lg text-xs font-black hover:bg-rose-50 transition">
+                            <i class="fas fa-times mr-1"></i> Reject
+                        </button>
+                        {% else %}
+                        <button form="reject_veh_{{ veh.id }}" type="submit" class="px-3 py-1.5 border border-amber-300 text-amber-700 rounded-lg text-xs font-black hover:bg-amber-50 transition">
+                            <i class="fas fa-ban mr-1"></i> Revoke
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="p-4 bg-gray-50 border border-dashed border-gray-200 rounded-xl text-center text-xs text-gray-400 font-bold">
+                No secondary vehicles registered yet.
+            </div>
+            {% endif %}
+        </div>
+
         <div class="pt-6 border-t border-gray-100 flex justify-end gap-3">
             <a href="/admin/drivers" class="px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50">Cancel</a>
             <button type="submit" class="px-8 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light shadow-brand">
@@ -234,6 +320,13 @@
     <form id="verify_doc_{{ doc.id }}" method="POST" action="/admin/drivers/{{ driver.id }}/documents/{{ doc.id }}/verify" class="hidden"></form>
     <form id="revoke_doc_{{ doc.id }}" method="POST" action="/admin/drivers/{{ driver.id }}/documents/{{ doc.id }}/reject" class="hidden" onsubmit="return confirm('Mark this document as not verified? The driver will need to re-upload.');"></form>
     {% endif %}
+{% endfor %}
+{% endif %}
+
+{% if vehicles %}
+{% for veh in vehicles %}
+    <form id="approve_veh_{{ veh.id }}" method="POST" action="/admin/drivers/{{ driver.id }}/vehicles/{{ veh.id }}/approve" class="hidden"></form>
+    <form id="reject_veh_{{ veh.id }}" method="POST" action="/admin/drivers/{{ driver.id }}/vehicles/{{ veh.id }}/reject" class="hidden" onsubmit="return confirm('Reject this vehicle for the driver?');"></form>
 {% endfor %}
 {% endif %}
 
@@ -287,4 +380,65 @@ function previewDoc(input, kind) {
     }
 }
 </script>
+<!-- Add Vehicle Modal -->
+<div id="addVehicleModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-gray-100">
+        <div class="flex items-center justify-between">
+            <h3 class="text-base font-black text-ziggo-ink flex items-center gap-2">
+                <i class="fas fa-plus-circle text-ziggo"></i> Add Vehicle for Driver
+            </h3>
+            <button type="button" onclick="document.getElementById('addVehicleModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 text-lg">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <form method="POST" action="/admin/drivers/{{ driver.id }}/vehicles/new" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Vehicle Type</label>
+                <select name="vehicle_type" required class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                    <option value="bike">🛵 Bike / Motorcycle</option>
+                    <option value="tuk">🛺 Three-Wheeler (Tuk-Tuk)</option>
+                    <option value="car">🚗 Car / Sedan / Hatchback</option>
+                    <option value="van">🚐 Van</option>
+                    <option value="truck">🚚 Truck / Lorry</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Plate Number</label>
+                <input name="vehicle_number" required placeholder="e.g. WP BXX-1234" class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm uppercase">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Model</label>
+                    <input name="vehicle_model" placeholder="e.g. Bajaj RE" class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Color</label>
+                    <input name="vehicle_color" placeholder="e.g. Red" class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Manufacture Year</label>
+                <input name="vehicle_year" type="number" placeholder="2022" class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+            </div>
+
+            <div class="flex items-center gap-2 pt-2">
+                <input type="checkbox" id="auto_approve_chk" name="auto_approve" value="true" checked class="w-4 h-4 text-ziggo rounded border-gray-300">
+                <label for="auto_approve_chk" class="text-xs font-bold text-gray-700">Approve immediately (Ready to drive)</label>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-4 border-t border-gray-100">
+                <button type="button" onclick="document.getElementById('addVehicleModal').classList.add('hidden')" class="px-4 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button type="submit" class="px-5 py-2 bg-ziggo text-white rounded-xl text-xs font-black hover:bg-ziggo-light shadow-brand">
+                    Save & Add Vehicle
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}

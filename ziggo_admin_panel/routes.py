@@ -1,4 +1,5 @@
 """Server-rendered admin panel with real DB queries + simple session auth."""
+import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 import os
@@ -12,6 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 from sqlalchemy.orm import selectinload
 
+logger = logging.getLogger(__name__)
+
 from app.config import settings
 from app.database import get_db
 from app.models import (
@@ -23,6 +26,38 @@ from app.models import (
     Booking,
     BookingStatus,
 )
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from app.models.user import Base
+
+try:
+    from app.models.user import DriverVehicle
+except ImportError:
+    try:
+        from app.models import DriverVehicle
+    except ImportError:
+        DriverVehicle = None
+
+if DriverVehicle is None:
+    class DriverVehicle(Base):
+        __tablename__ = "driver_vehicles"
+        __table_args__ = {'extend_existing': True}
+
+        id = Column(Integer, primary_key=True, index=True)
+        driver_id = Column(Integer, ForeignKey("drivers.id", ondelete="CASCADE"), index=True, nullable=False)
+        vehicle_type = Column(String(20), nullable=False)  # bike, tuk, car, van, truck
+        vehicle_number = Column(String(20), index=True, nullable=False)
+        vehicle_model = Column(String(100), nullable=True)
+        vehicle_color = Column(String(50), nullable=True)
+        vehicle_year = Column(Integer, nullable=True)
+        vehicle_photo_url = Column(String(255), nullable=True)
+        registration_doc_url = Column(String(255), nullable=True)
+        insurance_doc_url = Column(String(255), nullable=True)
+        revenue_license_doc_url = Column(String(255), nullable=True)
+        is_approved = Column(Boolean, default=False, nullable=False)
+        is_active = Column(Boolean, default=False, nullable=False)
+        rejection_reason = Column(String(255), nullable=True)
+        approved_at = Column(DateTime(timezone=True), nullable=True)
+        created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 router = APIRouter()
 
@@ -957,55 +992,122 @@ async def admin_drivers_edit_form(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    q = await db.execute(
-        select(Driver).options(selectinload(Driver.user)).where(Driver.id == driver_id)
-    )
-    d = q.scalars().first()
-    if not d:
-        raise HTTPException(status_code=404, detail="Driver not found")
+    try:
+        q = await db.execute(
+            select(Driver).options(selectinload(Driver.user)).where(Driver.id == driver_id)
+        )
+        d = q.scalars().first()
+        if not d:
+            raise HTTPException(status_code=404, detail="Driver not found")
 
-    # BRD: load uploaded KYC documents so the admin can verify them inline
-    from app.models import DriverDocument
-    dq = await db.execute(
-        select(DriverDocument).where(DriverDocument.driver_id == d.id)
-    )
-    docs_by_kind = {row.document_type: row for row in dq.scalars().all()}
+        # BRD: load uploaded KYC documents so the admin can verify them inline
+        from app.models import DriverDocument
+        docs_by_kind = {}
+        try:
+            dq = await db.execute(
+                select(DriverDocument).where(DriverDocument.driver_id == d.id)
+            )
+            docs_by_kind = {row.document_type: row for row in dq.scalars().all()}
+        except Exception as ex:
+            logger.warning(f"Error loading DriverDocuments: {ex}")
 
-    docs = []
-    for kind, label in [
-        ("nic_front", "NIC Front"),
-        ("nic_back", "NIC Back"),
-        ("license_front", "Driving License Front"),
-        ("license_back", "Driving License Back"),
-        ("vehicle_reg", "Vehicle Registration"),
-        ("insurance", "Insurance"),
-        ("year_license", "Year License"),
-        ("eco_test", "Eco Test Report"),
-        ("vehicle_front", "Vehicle Photo — Front"),
-        ("vehicle_back", "Vehicle Photo — Back"),
-        ("vehicle_side", "Vehicle Photo — Side"),
-    ]:
-        row = docs_by_kind.get(kind)
-        docs.append({
-            "kind": kind,
-            "label": label,
-            "id": row.id if row else None,
-            "document_url": row.document_url if row else None,
-            "is_verified": bool(row.is_verified) if row else False,
-            "uploaded_at": row.uploaded_at if row else None,
-        })
+        docs = []
+        for kind, label in [
+            ("nic_front", "NIC Front"),
+            ("nic_back", "NIC Back"),
+            ("license_front", "Driving License Front"),
+            ("license_back", "Driving License Back"),
+            ("vehicle_reg", "Vehicle Registration"),
+            ("insurance", "Insurance"),
+            ("year_license", "Year License"),
+            ("eco_test", "Eco Test Report"),
+            ("vehicle_front", "Vehicle Photo — Front"),
+            ("vehicle_back", "Vehicle Photo — Back"),
+            ("vehicle_side", "Vehicle Photo — Side"),
+        ]:
+            row = docs_by_kind.get(kind)
+            up_str = ""
+            if row and row.uploaded_at:
+                if hasattr(row.uploaded_at, "strftime"):
+                    up_str = row.uploaded_at.strftime("%Y-%m-%d")
+                else:
+                    up_str = str(row.uploaded_at)[:10]
 
-    return templates.TemplateResponse(
-        request, "driver_edit.html",
-        {
-            "request": request,
-            "active_page": "drivers",
-            "driver": d,
-            "user": d.user,
-            "documents": docs,
-            "error": None,
-        },
-    )
+            docs.append({
+                "kind": kind,
+                "label": label,
+                "id": row.id if row else None,
+                "document_url": row.document_url if row else None,
+                "is_verified": bool(row.is_verified) if row else False,
+                "uploaded_at": up_str,
+            })
+
+        # BRD: load registered vehicles for multi-vehicle management
+        driver_vehicles = []
+        try:
+            vq = await db.execute(
+                select(DriverVehicle).where(DriverVehicle.driver_id == d.id).order_by(DriverVehicle.created_at.asc())
+            )
+            driver_vehicles = list(vq.scalars().all())
+            if not driver_vehicles and d.vehicle_number and d.vehicle_type:
+                try:
+                    yr_val = None
+                    if d.vehicle_year:
+                        try:
+                            yr_val = int(d.vehicle_year)
+                        except (ValueError, TypeError):
+                            yr_val = None
+
+                    new_v = DriverVehicle(
+                        driver_id=d.id,
+                        vehicle_type=d.vehicle_type,
+                        vehicle_number=d.vehicle_number,
+                        vehicle_model=d.vehicle_model,
+                        vehicle_color=d.vehicle_color,
+                        vehicle_year=yr_val,
+                        vehicle_photo_url=d.vehicle_photo_url,
+                        is_approved=bool(d.is_approved),
+                        is_active=True,
+                        approved_at=d.approved_at,
+                    )
+                    db.add(new_v)
+                    await db.commit()
+                    await db.refresh(new_v)
+                    driver_vehicles = [new_v]
+                except Exception as ex:
+                    await db.rollback()
+                    logger.warning(f"Could not auto-create primary DriverVehicle: {ex}")
+        except Exception as ex:
+            logger.error(f"Error querying DriverVehicle: {ex}")
+            driver_vehicles = []
+
+        return templates.TemplateResponse(
+            request, "driver_edit.html",
+            {
+                "request": request,
+                "active_page": "drivers",
+                "driver": d,
+                "user": d.user if d else None,
+                "documents": docs,
+                "vehicles": driver_vehicles,
+                "error": None,
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        err_msg = traceback.format_exc()
+        logger.error(f"Exception in admin_drivers_edit_form: {err_msg}")
+        return HTMLResponse(
+            f"<div style='padding:30px;font-family:sans-serif;max-width:800px;margin:auto;'>"
+            f"<h2 style='color:#b91c1c;'>Error Loading Driver #{driver_id}</h2>"
+            f"<p style='color:#64748b;'>An error occurred while loading this driver details:</p>"
+            f"<pre style='background:#f8fafc;border:1px solid #e2e8f0;padding:15px;border-radius:12px;overflow-x:auto;font-size:12px;'>{err_msg}</pre>"
+            f"<p><a href='/admin/drivers' style='color:#2563eb;text-decoration:none;font-weight:bold;'>← Back to Driver List</a></p>"
+            f"</div>",
+            status_code=500,
+        )
 
 
 @router.post("/drivers/{driver_id}/edit")
@@ -6772,6 +6874,126 @@ async def admin_driver_doc_reject(
     doc.is_verified = False
     doc.verified_by = None
     doc.verified_at = None
+    await db.commit()
+    return RedirectResponse(url=f"/admin/drivers/{driver_id}/edit", status_code=303)
+
+
+# ---------- Driver Multi-Vehicle verification ----------
+@router.post("/drivers/{driver_id}/vehicles/{vehicle_id}/approve")
+async def admin_driver_vehicle_approve(
+    driver_id: int,
+    vehicle_id: int,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(current_admin),
+):
+    q = await db.execute(
+        select(DriverVehicle).where(
+            DriverVehicle.id == vehicle_id, DriverVehicle.driver_id == driver_id
+        )
+    )
+    v = q.scalars().first()
+    if not v:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    v.is_approved = True
+    v.rejection_reason = None
+    v.approved_at = datetime.now(timezone.utc)
+
+    dq = await db.execute(select(Driver).where(Driver.id == driver_id))
+    d = dq.scalars().first()
+    if d and not d.vehicle_number:
+        v.is_active = True
+        d.vehicle_type = v.vehicle_type
+        d.vehicle_number = v.vehicle_number
+        d.vehicle_model = v.vehicle_model
+        d.vehicle_color = v.vehicle_color
+
+    await db.commit()
+    return RedirectResponse(url=f"/admin/drivers/{driver_id}/edit", status_code=303)
+
+
+@router.post("/drivers/{driver_id}/vehicles/new")
+async def admin_driver_vehicle_add(
+    driver_id: int,
+    vehicle_type: str = Form(...),
+    vehicle_number: str = Form(...),
+    vehicle_model: str = Form(""),
+    vehicle_color: str = Form(""),
+    vehicle_year: str = Form(""),
+    auto_approve: bool = Form(True),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    v_num = vehicle_number.strip().upper()
+    vt = vehicle_type.strip().lower()
+
+    dq = await db.execute(select(Driver).where(Driver.id == driver_id))
+    d = dq.scalars().first()
+    if not d:
+        raise HTTPException(status_code=404, detail="Driver not found")
+
+    # Plate collision check across other drivers
+    clash = (await db.execute(
+        select(DriverVehicle).where(
+            DriverVehicle.vehicle_number == v_num,
+            DriverVehicle.driver_id != driver_id,
+        )
+    )).scalars().first()
+    if clash:
+        return RedirectResponse(
+            url=f"/admin/drivers/{driver_id}/edit?error=Vehicle+plate+already+registered+to+another+driver",
+            status_code=303,
+        )
+
+    yr = int(vehicle_year.strip()) if (vehicle_year and vehicle_year.strip().isdigit()) else None
+
+    # Check if this is the first vehicle
+    all_veh = (await db.execute(select(DriverVehicle).where(DriverVehicle.driver_id == driver_id))).scalars().all()
+    is_first = len(all_veh) == 0
+
+    new_veh = DriverVehicle(
+        driver_id=driver_id,
+        vehicle_type=vt,
+        vehicle_number=v_num,
+        vehicle_model=vehicle_model.strip() if vehicle_model else None,
+        vehicle_color=vehicle_color.strip() if vehicle_color else None,
+        vehicle_year=yr,
+        is_approved=auto_approve,
+        is_active=is_first,
+        approved_at=datetime.now(timezone.utc) if auto_approve else None,
+    )
+    db.add(new_veh)
+
+    if is_first or not d.vehicle_number:
+        d.vehicle_type = vt
+        d.vehicle_number = v_num
+        d.vehicle_model = vehicle_model.strip() if vehicle_model else None
+        d.vehicle_color = vehicle_color.strip() if vehicle_color else None
+        d.vehicle_year = yr
+
+    await db.commit()
+    return RedirectResponse(url=f"/admin/drivers/{driver_id}/edit", status_code=303)
+
+
+@router.post("/drivers/{driver_id}/vehicles/{vehicle_id}/reject")
+async def admin_driver_vehicle_reject(
+    driver_id: int,
+    vehicle_id: int,
+    reason: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    q = await db.execute(
+        select(DriverVehicle).where(
+            DriverVehicle.id == vehicle_id, DriverVehicle.driver_id == driver_id
+        )
+    )
+    v = q.scalars().first()
+    if not v:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    v.is_approved = False
+    v.is_active = False
+    v.rejection_reason = reason.strip() if reason else "Rejected by admin"
+    v.approved_at = None
     await db.commit()
     return RedirectResponse(url=f"/admin/drivers/{driver_id}/edit", status_code=303)
 

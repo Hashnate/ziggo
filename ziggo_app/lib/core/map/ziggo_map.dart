@@ -618,8 +618,9 @@ class _ZiggoMapState extends State<ZiggoMap> {
   static final Map<String, gmaps.BitmapDescriptor> _iconCache = {};
   static final Map<String, gmaps.BitmapDescriptor> _customLabelCache = {};
   static final Map<String, Offset> _customLabelAnchors = {};
-  final Set<String> _loadingAssets = {};
-  final Set<String> _loadingLabels = {};
+  static final Set<String> _loadingAssets = {};
+  static final Set<String> _loadingLabels = {};
+  static final Set<String> _failedKeys = {};
 
   @override
   void initState() {
@@ -635,7 +636,7 @@ class _ZiggoMapState extends State<ZiggoMap> {
 
   Future<void> _ensureLabelIcon(String label, Color color, IconData? icon, double pixelRatio) async {
     final key = '$label-${color.value}-$pixelRatio-${icon?.codePoint}';
-    if (_customLabelCache.containsKey(key) || _loadingLabels.contains(key)) {
+    if (_customLabelCache.containsKey(key) || _loadingLabels.contains(key) || _failedKeys.contains(key)) {
       return;
     }
     _loadingLabels.add(key);
@@ -645,6 +646,7 @@ class _ZiggoMapState extends State<ZiggoMap> {
       _customLabelAnchors[key] = data.anchor;
       if (mounted) setState(() {});
     } catch (_) {
+      _failedKeys.add(key);
     } finally {
       _loadingLabels.remove(key);
     }
@@ -652,7 +654,7 @@ class _ZiggoMapState extends State<ZiggoMap> {
 
   Future<void> _ensureIconMarker(IconData icon, Color color, double size, double pixelRatio) async {
     final key = 'icon-${icon.codePoint}-${color.value}-$size-$pixelRatio';
-    if (_customLabelCache.containsKey(key) || _loadingLabels.contains(key)) {
+    if (_customLabelCache.containsKey(key) || _loadingLabels.contains(key) || _failedKeys.contains(key)) {
       return;
     }
     _loadingLabels.add(key);
@@ -662,6 +664,7 @@ class _ZiggoMapState extends State<ZiggoMap> {
       _customLabelAnchors[key] = data.anchor;
       if (mounted) setState(() {});
     } catch (_) {
+      _failedKeys.add(key);
     } finally {
       _loadingLabels.remove(key);
     }
@@ -680,7 +683,7 @@ class _ZiggoMapState extends State<ZiggoMap> {
 
   Future<void> _ensureIcon(String assetPath, int width) async {
     final key = '$assetPath-$width';
-    if (_iconCache.containsKey(key) || _loadingAssets.contains(key)) {
+    if (_iconCache.containsKey(key) || _loadingAssets.contains(key) || _failedKeys.contains(key)) {
       return;
     }
     _loadingAssets.add(key);
@@ -690,8 +693,7 @@ class _ZiggoMapState extends State<ZiggoMap> {
       _iconCache[key] = desc;
       if (mounted) setState(() {});
     } catch (_) {
-      // Asset missing or decode failed — leave the slot empty so the marker
-      // falls back to the default colored pin.
+      _failedKeys.add(key);
     } finally {
       _loadingAssets.remove(key);
     }

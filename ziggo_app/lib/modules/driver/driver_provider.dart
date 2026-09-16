@@ -40,6 +40,14 @@ class DriverProvider extends ChangeNotifier {
   List<Map<String, dynamic>> _surgeZones = [];
   List<Map<String, dynamic>> get surgeZones => _surgeZones;
 
+  List<Map<String, dynamic>> _vehicles = [];
+  List<Map<String, dynamic>> get vehicles => _vehicles;
+  List<Map<String, dynamic>> get approvedVehicles => _vehicles.where((v) => v['is_approved'] == true).toList();
+  Map<String, dynamic>? get activeVehicle => _vehicles.firstWhere(
+        (v) => v['is_active'] == true,
+        orElse: () => _vehicles.isNotEmpty ? _vehicles.first : {},
+      );
+
   Timer? _locationTimer;
   Timer? _profileTimer;
 
@@ -47,6 +55,7 @@ class DriverProvider extends ChangeNotifier {
     _ws.connect(token);
     _ws.events.listen(_onWsEvent);
     await loadProfile();
+    await loadVehicles();
     await loadActive();
     await loadActiveFoodOrder();
     await loadActiveMarketOrder();
@@ -259,6 +268,73 @@ class DriverProvider extends ChangeNotifier {
       notifyListeners();
     } on DioException {
       // ignore
+    }
+  }
+
+  Future<void> loadVehicles() async {
+    try {
+      final resp = await ApiClient.instance.dio.get('/driver/vehicles');
+      if (resp.data is List) {
+        _vehicles = List<Map<String, dynamic>>.from(resp.data);
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  Future<bool> selectActiveVehicle(int vehicleId) async {
+    try {
+      await ApiClient.instance.dio.post('/driver/vehicles/$vehicleId/select');
+      await loadVehicles();
+      await loadProfile();
+      return true;
+    } on DioException catch (e) {
+      if (e.response?.data != null && e.response!.data is Map && e.response!.data['detail'] != null) {
+        throw Exception(e.response!.data['detail']);
+      }
+      return false;
+    }
+  }
+
+  Future<bool> addVehicle({
+    required String vehicleType,
+    required String vehicleNumber,
+    String? vehicleModel,
+    String? vehicleColor,
+    int? vehicleYear,
+    String? vehiclePhotoUrl,
+    String? registrationDocUrl,
+    String? insuranceDocUrl,
+    String? revenueLicenseDocUrl,
+  }) async {
+    try {
+      await ApiClient.instance.dio.post('/driver/vehicles', data: {
+        'vehicle_type': vehicleType,
+        'vehicle_number': vehicleNumber,
+        if (vehicleModel != null) 'vehicle_model': vehicleModel,
+        if (vehicleColor != null) 'vehicle_color': vehicleColor,
+        if (vehicleYear != null) 'vehicle_year': vehicleYear,
+        if (vehiclePhotoUrl != null) 'vehicle_photo_url': vehiclePhotoUrl,
+        if (registrationDocUrl != null) 'registration_doc_url': registrationDocUrl,
+        if (insuranceDocUrl != null) 'insurance_doc_url': insuranceDocUrl,
+        if (revenueLicenseDocUrl != null) 'revenue_license_doc_url': revenueLicenseDocUrl,
+      });
+      await loadVehicles();
+      return true;
+    } on DioException catch (e) {
+      if (e.response?.data != null && e.response!.data is Map && e.response!.data['detail'] != null) {
+        throw Exception(e.response!.data['detail']);
+      }
+      return false;
+    }
+  }
+
+  Future<bool> deleteVehicle(int vehicleId) async {
+    try {
+      await ApiClient.instance.dio.delete('/driver/vehicles/$vehicleId');
+      await loadVehicles();
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
