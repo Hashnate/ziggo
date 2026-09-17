@@ -33,6 +33,7 @@ import 'location_search_screen.dart';
 import 'promotions_screen.dart';
 import 'ride_history_screen.dart';
 import 'ride_tracking_screen.dart';
+import 'rating_screen.dart';
 import 'saved_addresses_screen.dart';
 import 'subscription_screen.dart';
 import 'support_screen.dart';
@@ -50,6 +51,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _autoRedirected = false;
+  bool _ratingPromptOpen = false;
 
   final PageController _foodBannerCtrl = PageController(viewportFraction: 0.93);
   final PageController _marketBannerCtrl = PageController(viewportFraction: 0.93);
@@ -65,7 +67,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _bootstrap() {
     context.read<WalletProvider>().refresh();
-    context.read<BookingProvider>().loadActive();
+    context.read<BookingProvider>().loadActive().then((_) {
+      _checkPendingRating();
+    });
     context.read<NotificationsProvider>().refresh();
     
     context.read<FoodProvider>().fetchHome();
@@ -106,6 +110,31 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     });
+  }
+
+  Future<void> _checkPendingRating() async {
+    if (!mounted) return;
+    final bp = context.read<BookingProvider>();
+    if (bp.activeBooking != null) {
+      final s = bp.activeBooking!['status'];
+      if (s == 'searching' || s == 'accepted' || s == 'arrived' || s == 'started') {
+        return;
+      }
+    }
+    final pending = await bp.checkPendingRating();
+    if (pending != null && mounted && !_ratingPromptOpen) {
+      final isCurrent = ModalRoute.of(context)?.isCurrent ?? false;
+      if (isCurrent) {
+        _ratingPromptOpen = true;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RatingScreen(bookingId: pending['id'] as int),
+          ),
+        );
+        _ratingPromptOpen = false;
+      }
+    }
   }
 
   @override
@@ -708,6 +737,22 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     } else if (!isRideActive) {
       _autoRedirected = false;
+    }
+
+    final pendingRating = booking.pendingRatingBooking;
+    if (!isRideActive && pendingRating != null && !_ratingPromptOpen && isCurrent) {
+      _ratingPromptOpen = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RatingScreen(bookingId: pendingRating['id'] as int),
+          ),
+        ).then((_) {
+          _ratingPromptOpen = false;
+        });
+      });
     }
 
     return Scaffold(

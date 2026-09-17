@@ -1097,6 +1097,32 @@ async def get_active_booking(
     return await _booking_to_response(db, b) if b else None
 
 
+@router.get("/pending-rating", response_model=Optional[BookingResponse])
+async def get_pending_rating(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Return the customer's most recent completed booking that has not been rated yet."""
+    if user.role != UserRole.CUSTOMER:
+        return None
+    customer = await _get_customer(db, user)
+    if not customer:
+        return None
+
+    q = await db.execute(
+        select(Booking)
+        .where(
+            Booking.customer_id == customer.id,
+            Booking.status == BookingStatus.COMPLETED,
+            Booking.customer_rating.is_(None),
+        )
+        .order_by(Booking.completed_at.desc(), Booking.id.desc())
+        .limit(1)
+    )
+    b = q.scalars().first()
+    return await _booking_to_response(db, b) if b else None
+
+
 @router.get("/{booking_id}", response_model=BookingResponse)
 async def get_booking(
     booking_id: int,

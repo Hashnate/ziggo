@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/network/ws_client.dart';
@@ -18,6 +19,9 @@ class BookingProvider extends ChangeNotifier {
 
   Map<String, dynamic>? _activeBooking;
   Map<String, dynamic>? get activeBooking => _activeBooking;
+
+  Map<String, dynamic>? _pendingRatingBooking;
+  Map<String, dynamic>? get pendingRatingBooking => _pendingRatingBooking;
 
   String? _lastError;
   String? get lastError => _lastError;
@@ -320,6 +324,16 @@ class BookingProvider extends ChangeNotifier {
       }
       notifyListeners();
     } catch (_) {}
+
+    final isRideUnderway = _activeBooking != null &&
+        (_activeBooking!['status'] == 'searching' ||
+         _activeBooking!['status'] == 'accepted' ||
+         _activeBooking!['status'] == 'arrived' ||
+         _activeBooking!['status'] == 'started');
+
+    if (!isRideUnderway) {
+      await checkPendingRating();
+    }
   }
 
   Future<Map<String, dynamic>?> updateStatus(int bookingId, String status, {String? reason}) async {
@@ -362,12 +376,59 @@ class BookingProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
+  Future<Map<String, dynamic>?> checkPendingRating() async {
+    try {
+      final resp = await ApiClient.instance.dio.get('/bookings/pending-rating');
+      if (resp.data == null || (resp.data is String && resp.data == '')) {
+        _pendingRatingBooking = null;
+        notifyListeners();
+        return null;
+      }
+      final data = Map<String, dynamic>.from(resp.data as Map);
+      final bookingId = data['id'] as int?;
+      if (bookingId == null) {
+        _pendingRatingBooking = null;
+        return null;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final dismissedId = prefs.getInt('dismissed_rating_booking_id');
+      if (dismissedId == bookingId) {
+        _pendingRatingBooking = null;
+        return null;
+      }
+
+      _pendingRatingBooking = data;
+      notifyListeners();
+      return _pendingRatingBooking;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> dismissRating(int bookingId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('dismissed_rating_booking_id', bookingId);
+    } catch (_) {}
+    if (_pendingRatingBooking != null && _pendingRatingBooking!['id'] == bookingId) {
+      _pendingRatingBooking = null;
+    }
+    clearActiveBookingLocally();
+    notifyListeners();
+  }
+
   Future<bool> rate({required int bookingId, required int rating, String? feedback}) async {
     try {
       await ApiClient.instance.dio.post(
         '/bookings/$bookingId/rate',
         data: {'rating': rating, if (feedback != null) 'feedback': feedback},
       );
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('dismissed_rating_booking_id');
+      } catch (_) {}
+      _pendingRatingBooking = null;
       _activeBooking = null;
       _lastError = null;
       notifyListeners();
