@@ -724,8 +724,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final active = booking.activeBooking;
 
     final isRideActive = active != null &&
-        (active['status'] == 'searching' ||
-         active['status'] == 'accepted' ||
+        (active['status'] == 'accepted' ||
          active['status'] == 'arrived' ||
          active['status'] == 'started');
 

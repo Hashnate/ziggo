@@ -14,6 +14,8 @@ from sqlalchemy import select, update
 
 from ..database import AsyncSessionLocal
 from ..models import (
+    Booking,
+    BookingStatus,
     Customer,
     FoodOrder,
     FoodOrderStatus,
@@ -25,6 +27,7 @@ from .ws_manager import manager
 
 # Customer-visible timeout. 5 minutes matches the locked design decision.
 STALE_AFTER_SECONDS = 300
+BOOKING_SEARCH_TIMEOUT_SECONDS = 120
 TICK_SECONDS = 30
 
 
@@ -71,6 +74,7 @@ async def _run_once() -> None:
         except Exception as e:
             print(f"[auto_cancel] failed to check/reset daily stats: {e!r}")
 
+    # 1. Sweep stale PENDING food orders
     cutoff = datetime.now(timezone.utc) - timedelta(seconds=STALE_AFTER_SECONDS)
     async with AsyncSessionLocal() as db:
         q = await db.execute(
@@ -80,68 +84,137 @@ async def _run_once() -> None:
             )
         )
         stale = q.scalars().all()
-        if not stale:
-            return
-        cancelled = 0
-        for order in stale:
-            order.status = FoodOrderStatus.CANCELLED
-            order.cancellation_reason = "Restaurant did not respond in 5 minutes"
+        if stale:
+            cancelled = 0
+            for order in stale:
+                order.status = FoodOrderStatus.CANCELLED
+                order.cancellation_reason = "Restaurant did not respond in 5 minutes"
 
-            # Wallet refund
-            if order.payment_method == "wallet" and order.payment_status == "paid":
+                # Wallet refund
+                if order.payment_method == "wallet" and order.payment_status == "paid":
+                    cq = await db.execute(
+                        select(Customer).where(Customer.id == order.customer_id)
+                    )
+                    customer = cq.scalars().first()
+                    if customer:
+                        customer.wallet_balance = (
+                            customer.wallet_balance or Decimal(0)
+                        ) + (order.final_amount or Decimal(0))
+                        db.add(
+                            WalletTransaction(
+                                user_id=customer.user_id,
+                                amount=order.final_amount,
+                                type="credit",
+                                description=(
+                                    f"Refund for auto-cancelled food order "
+                                    f"{order.order_ref}"
+                                ),
+                                reference_id=order.order_ref,
+                                balance_after=customer.wallet_balance,
+                            )
+                        )
+                        order.payment_status = "refunded"
+
+                # Notify customer
                 cq = await db.execute(
                     select(Customer).where(Customer.id == order.customer_id)
                 )
-                customer = cq.scalars().first()
-                if customer:
-                    customer.wallet_balance = (
-                        customer.wallet_balance or Decimal(0)
-                    ) + (order.final_amount or Decimal(0))
+                c = cq.scalars().first()
+                if c:
+                    await manager.send(
+                        c.user_id,
+                        "order_update",
+                        {
+                            "food_order_id": order.id,
+                            "status": order.status.value,
+                            "reason": "auto_cancel",
+                        },
+                    )
                     db.add(
-                        WalletTransaction(
-                            user_id=customer.user_id,
-                            amount=order.final_amount,
-                            type="credit",
-                            description=(
-                                f"Refund for auto-cancelled food order "
-                                f"{order.order_ref}"
+                        Notification(
+                            user_id=c.user_id,
+                            title="Order auto-cancelled",
+                            body=(
+                                f"Order {order.order_ref} was cancelled because the "
+                                "restaurant didn't respond. Wallet payments have "
+                                "been refunded."
                             ),
-                            reference_id=order.order_ref,
-                            balance_after=customer.wallet_balance,
+                            type="order_update",
                         )
                     )
-                    order.payment_status = "refunded"
+                cancelled += 1
+            await db.commit()
+            print(f"[auto_cancel] cancelled {cancelled} stale PENDING food order(s)")
 
-            # Notify customer
-            cq = await db.execute(
-                select(Customer).where(Customer.id == order.customer_id)
+    # 2. Sweep stale SEARCHING ride & delivery bookings older than 2 minutes
+    booking_cutoff = datetime.now(timezone.utc) - timedelta(seconds=BOOKING_SEARCH_TIMEOUT_SECONDS)
+    async with AsyncSessionLocal() as db:
+        bq = await db.execute(
+            select(Booking).where(
+                Booking.status == BookingStatus.SEARCHING,
+                Booking.booked_at < booking_cutoff,
+                (Booking.scheduled_at.is_(None) | (Booking.scheduled_dispatch_sent == True)),
             )
-            c = cq.scalars().first()
-            if c:
-                await manager.send(
-                    c.user_id,
-                    "order_update",
-                    {
-                        "food_order_id": order.id,
-                        "status": order.status.value,
-                        "reason": "auto_cancel",
-                    },
-                )
-                db.add(
-                    Notification(
-                        user_id=c.user_id,
-                        title="Order auto-cancelled",
-                        body=(
-                            f"Order {order.order_ref} was cancelled because the "
-                            "restaurant didn't respond. Wallet payments have "
-                            "been refunded."
-                        ),
-                        type="order_update",
+        )
+        stale_bookings = bq.scalars().all()
+        if stale_bookings:
+            cancelled_b = 0
+            for b in stale_bookings:
+                b.status = BookingStatus.CANCELLED
+                b.cancelled_by = "system"
+                b.cancellation_reason = "No driver available within search window"
+                b.cancelled_at = datetime.now(timezone.utc)
+
+                # Refund wallet payments if paid
+                if b.payment_method == "wallet" and b.payment_status == "paid":
+                    cq = await db.execute(
+                        select(Customer).where(Customer.id == b.customer_id)
                     )
+                    customer = cq.scalars().first()
+                    if customer:
+                        customer.wallet_balance = (
+                            customer.wallet_balance or Decimal(0)
+                        ) + (b.final_amount or Decimal(0))
+                        db.add(
+                            WalletTransaction(
+                                user_id=customer.user_id,
+                                amount=b.final_amount,
+                                type="credit",
+                                description=f"Refund for auto-cancelled booking {b.booking_ref}",
+                                reference_id=b.booking_ref,
+                                balance_after=customer.wallet_balance,
+                            )
+                        )
+                        b.payment_status = "refunded"
+
+                cq = await db.execute(
+                    select(Customer).where(Customer.id == b.customer_id)
                 )
-            cancelled += 1
-        await db.commit()
-        print(f"[auto_cancel] cancelled {cancelled} stale PENDING food order(s)")
+                c = cq.scalars().first()
+                if c:
+                    await manager.send(
+                        c.user_id,
+                        "no_drivers_available",
+                        {"booking_id": b.id, "booking_ref": b.booking_ref},
+                    )
+                    await manager.send(
+                        c.user_id,
+                        "booking_update",
+                        {"booking_id": b.id, "status": "cancelled", "reason": "search_timeout"},
+                    )
+                    db.add(
+                        Notification(
+                            user_id=c.user_id,
+                            title="Ride search timed out",
+                            body="No nearby driver accepted the ride. Please try booking again.",
+                            type="ride_update",
+                            data=f'{{"booking_id":{b.id}}}',
+                        )
+                    )
+                cancelled_b += 1
+            await db.commit()
+            print(f"[auto_cancel] cancelled {cancelled_b} stale SEARCHING booking(s)")
+
 
 
 async def auto_cancel_loop() -> None:

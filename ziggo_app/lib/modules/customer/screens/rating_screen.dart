@@ -105,7 +105,10 @@ class _RatingScreenState extends State<RatingScreen> with TickerProviderStateMix
   }
 
   void _dismiss() {
-    context.read<BookingProvider>().clearActiveBookingLocally();
+    // snoozeRating() clears from memory only — no SharedPreferences write.
+    // The rating screen disappears for this session but will reappear the
+    // next time the app is opened so the customer can still rate later.
+    context.read<BookingProvider>().snoozeRating();
     Navigator.popUntil(context, (r) => r.isFirst);
   }
 

@@ -1094,6 +1094,33 @@ async def get_active_booking(
         return None
 
     b = q.scalars().first()
+    if b and b.status == BookingStatus.SEARCHING and (b.scheduled_at is None or b.scheduled_dispatch_sent == True):
+        # Check if searching has timed out (older than 120 seconds)
+        now_utc = datetime.now(timezone.utc)
+        booked_time = b.booked_at.astimezone(timezone.utc) if b.booked_at and b.booked_at.tzinfo else (b.booked_at.replace(tzinfo=timezone.utc) if b.booked_at else None)
+        if booked_time and (now_utc - booked_time).total_seconds() > 120:
+            b.status = BookingStatus.CANCELLED
+            b.cancelled_by = "system"
+            b.cancellation_reason = "No driver available within search window"
+            b.cancelled_at = now_utc
+            if b.payment_method == "wallet" and b.payment_status == "paid":
+                customer = await _get_customer(db, user) if user.role == UserRole.CUSTOMER else None
+                if customer:
+                    customer.wallet_balance = (customer.wallet_balance or Decimal(0)) + (b.final_amount or Decimal(0))
+                    db.add(
+                        WalletTransaction(
+                            user_id=customer.user_id,
+                            amount=b.final_amount,
+                            type="credit",
+                            description=f"Refund for auto-cancelled booking {b.booking_ref}",
+                            reference_id=b.booking_ref,
+                            balance_after=customer.wallet_balance,
+                        )
+                    )
+                    b.payment_status = "refunded"
+            await db.commit()
+            return None
+
     return await _booking_to_response(db, b) if b else None
 
 

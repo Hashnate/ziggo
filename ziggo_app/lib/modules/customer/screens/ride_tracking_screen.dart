@@ -48,6 +48,11 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
   Timer? _nearbyTimer;
   List<Map<String, dynamic>> _nearbyDrivers = const [];
 
+  // Safety-net poll: every 5 s we fetch the real booking status from the API.
+  // This catches cases where a WebSocket event (e.g. 'completed', 'accepted')
+  // was missed due to poor network or the app being in the background.
+  Timer? _statusPollTimer;
+
   StreamSubscription<Position>? _positionSubscription;
   LatLng? _customerLatLng;
   double? _customerHeading;
@@ -91,6 +96,10 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<BookingProvider>().loadActive();
+    });
+    // Start polling every 5 s as a WS fallback.
+    _statusPollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) context.read<BookingProvider>().loadActive();
     });
     _startPositionUpdates();
     _wsSub = WsClient.instance.events.listen((msg) {
@@ -167,6 +176,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
     _markerAnimController?.dispose();
     _wsSub?.cancel();
     _nearbyTimer?.cancel();
+    _statusPollTimer?.cancel();
     _positionSubscription?.cancel();
     super.dispose();
   }
@@ -359,6 +369,11 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
       if (_driverCancelled) {
         return const Scaffold(body: SizedBox.shrink());
       }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && ModalRoute.of(context)?.isCurrent == true) {
+          Navigator.of(context).popUntil((r) => r.isFirst);
+        }
+      });
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 

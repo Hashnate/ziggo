@@ -18,7 +18,17 @@ val localProps = Properties().apply {
     val f = rootProject.file("local.properties")
     if (f.exists()) f.inputStream().use { load(it) }
 }
-val mapsApiKey: String = localProps.getProperty("MAPS_API_KEY") ?: ""
+var mapsApiKey: String = localProps.getProperty("MAPS_API_KEY") ?: ""
+if (mapsApiKey.isBlank()) {
+    val envFile = rootProject.file("../.env")
+    if (envFile.exists()) {
+        val envProps = Properties().apply { envFile.inputStream().use { load(it) } }
+        mapsApiKey = envProps.getProperty("GOOGLE_MAPS_API_KEY") ?: ""
+    }
+}
+if (mapsApiKey.isBlank()) {
+    mapsApiKey = "AIzaSyAFtdjwK5SdMdo7c4F7jvJHWE-OE2LDSCk"
+}
 
 val keystoreProperties = Properties().apply {
     val f = rootProject.file("key.properties")
@@ -45,7 +55,7 @@ android {
         applicationId = "lk.ziggo.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 23
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

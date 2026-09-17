@@ -42,19 +42,28 @@ class BookingProvider extends ChangeNotifier {
       if (data == null) return;
       if (event == 'booking_update') {
         final bid = data['booking_id'];
+        final newStatus = data['status'];
         if (_activeBooking != null && _activeBooking!['id'] == bid) {
-          final newStatus = data['status'];
-          _activeBooking = {
-            ..._activeBooking!,
-            'status': newStatus,
-            if (data['otp'] != null) 'otp': data['otp'],
-          };
+          if (newStatus == 'cancelled') {
+            _activeBooking = null;
+          } else {
+            _activeBooking = {
+              ..._activeBooking!,
+              'status': newStatus,
+              if (data['otp'] != null) 'otp': data['otp'],
+            };
+          }
           notifyListeners();
         }
         // Lazy refresh
-        final newStatus = data['status'];
         if (newStatus != 'cancelled' && newStatus != 'completed') {
           loadActive();
+        }
+      } else if (event == 'no_drivers_available') {
+        final bid = data['booking_id'];
+        if (_activeBooking != null && (bid == null || _activeBooking!['id'] == bid)) {
+          _activeBooking = null;
+          notifyListeners();
         }
       } else if (event == 'driver_location_update') {
         final bid = data['booking_id'];
@@ -74,7 +83,16 @@ class BookingProvider extends ChangeNotifier {
     // Fallback: If WebSocket drops a message, FCM push notifications act as a secondary trigger
     FcmService.instance.onForegroundEvent.listen((data) {
       if (data['event'] == 'booking_update') {
-        loadActive();
+        final s = data['status']?.toString();
+        // Skip loadActive() for terminal statuses — the WS handler already
+        // updated _activeBooking inline. Calling loadActive() here could
+        // race with the API and restore a stale completed booking.
+        if (s != 'cancelled' && s != 'completed') {
+          loadActive();
+        } else if (s == 'cancelled') {
+          _activeBooking = null;
+          notifyListeners();
+        }
       }
     });
   }
@@ -313,21 +331,44 @@ class BookingProvider extends ChangeNotifier {
     try {
       final resp = await ApiClient.instance.dio.get('/bookings/active');
       if (resp.data == null || (resp.data is String && resp.data == '')) {
-        if (_activeBooking != null &&
-            (_activeBooking!['status'] == 'completed' ||
-             _activeBooking!['status'] == 'cancelled')) {
-          return;
-        }
         _activeBooking = null;
       } else {
-        _activeBooking = Map<String, dynamic>.from(resp.data);
+        final data = Map<String, dynamic>.from(resp.data);
+        final status = data['status']?.toString();
+        if (status == 'cancelled' || status == 'completed') {
+          _activeBooking = null;
+        } else if (status == 'searching') {
+          // Check if searching booking has expired (> 60s)
+          final bookedAtStr = data['booked_at']?.toString();
+          bool isExpired = false;
+          if (bookedAtStr != null && bookedAtStr.isNotEmpty) {
+            try {
+              final bookedAt = DateTime.parse(bookedAtStr);
+              final now = DateTime.now().toUtc();
+              final diff = now.difference(bookedAt.toUtc()).inSeconds;
+              if (diff > 60) {
+                isExpired = true;
+              }
+            } catch (_) {}
+          }
+          if (isExpired) {
+            final bid = data['id'] as int?;
+            if (bid != null) {
+              unawaited(cancelActiveSilently(bookingId: bid, reason: 'Search expired'));
+            }
+            _activeBooking = null;
+          } else {
+            _activeBooking = data;
+          }
+        } else {
+          _activeBooking = data;
+        }
       }
       notifyListeners();
     } catch (_) {}
 
     final isRideUnderway = _activeBooking != null &&
-        (_activeBooking!['status'] == 'searching' ||
-         _activeBooking!['status'] == 'accepted' ||
+        (_activeBooking!['status'] == 'accepted' ||
          _activeBooking!['status'] == 'arrived' ||
          _activeBooking!['status'] == 'started');
 
@@ -415,6 +456,16 @@ class BookingProvider extends ChangeNotifier {
       _pendingRatingBooking = null;
     }
     clearActiveBookingLocally();
+    notifyListeners();
+  }
+
+  /// Clears the pending rating from memory ONLY (no SharedPreferences write).
+  /// Use this when the customer presses ✕ or "Skip" — the rating disappears
+  /// for the current session but will reappear the next time the app is opened
+  /// because the API still has the unrated booking.
+  void snoozeRating() {
+    _pendingRatingBooking = null;
+    _activeBooking = null;
     notifyListeners();
   }
 
