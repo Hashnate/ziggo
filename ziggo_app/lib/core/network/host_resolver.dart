@@ -13,7 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class HostResolver {
   HostResolver._();
 
-  static const String productionHost = 'https://test.ziggo.lk';
+  static const String productionHost = 'https://ziggo.lk';
   static const String fallbackHost = productionHost;
   static const String _prefsKey = 'ziggo_api_host';
   static const String _envHost =
