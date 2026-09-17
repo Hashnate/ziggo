@@ -1,0 +1,95 @@
+# Ziggo — STAGING stack. Runs alongside production on the same host.
+#
+# Production lives in /var/www/ziggo (branch main, port 8030).
+# Staging   lives in /var/www/ziggo-staging (branch dev, port 8031).
+#
+# Everything here is named *_staging and the project name is pinned below, so
+# `docker compose down -v` in this directory can never touch a production
+# container, volume or network.
+#
+#   Up:    cd /var/www/ziggo-staging && docker compose up -d --build
+#   Logs:  cd /var/www/ziggo-staging && docker compose logs -f
+#   DB:    docker exec -it ziggo_postgres_staging psql -U ziggo_staging -d ziggo_staging
+#   Down:  cd /var/www/ziggo-staging && docker compose down
+#
+# .env in this directory pins COMPOSE_FILE and COMPOSE_PROJECT_NAME, so a bare
+# `docker compose` command here always targets staging, never prod.
+
+name: ziggo_staging
+
+services:
+  ziggo_postgres_staging:
+    image: postgres:16-alpine
+    container_name: ziggo_postgres_staging
+    restart: unless-stopped
+    # Hard cap. Staging can never starve production of memory — if a test
+    # runs away, staging dies and production carries on.
+    mem_limit: 512m
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ziggo_staging}
+      POSTGRES_USER: ${POSTGRES_USER:-ziggo_staging}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+    volumes:
+      - ziggo_staging_pgdata:/var/lib/postgresql/data
+    networks:
+      - ziggo_staging_net
+    ports:
+      # Loopback only — reachable from this host, never from the internet.
+      - "127.0.0.1:5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ziggo_staging} -d ${POSTGRES_DB:-ziggo_staging}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  ziggo_backend_staging:
+    build:
+      context: .
+      dockerfile: ziggo_backend/Dockerfile
+    image: ziggo-staging-backend
+    container_name: ziggo_backend_staging
+    restart: unless-stopped
+    mem_limit: 512m
+    depends_on:
+      ziggo_postgres_staging:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ziggo_staging}:${POSTGRES_PASSWORD}@ziggo_postgres_staging:5432/${POSTGRES_DB:-ziggo_staging}
+      SYNC_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-ziggo_staging}:${POSTGRES_PASSWORD}@ziggo_postgres_staging:5432/${POSTGRES_DB:-ziggo_staging}
+      TZ: Asia/Colombo
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set in .env}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-11520}
+      DEV_MODE: ${DEV_MODE:-true}
+      PROJECT_NAME: ${PROJECT_NAME:-Ziggo Staging}
+      API_V1_STR: ${API_V1_STR:-/api/v1}
+      # Blank on purpose — see .env. Staging must not reach real customers.
+      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-}
+      NOTIFY_LK_USER_ID: ${NOTIFY_LK_USER_ID:-}
+      NOTIFY_LK_API_KEY: ${NOTIFY_LK_API_KEY:-}
+      NOTIFY_LK_SENDER_ID: ${NOTIFY_LK_SENDER_ID:-}
+      PAYHERE_MERCHANT_ID: ${PAYHERE_MERCHANT_ID:-}
+      PAYHERE_MERCHANT_SECRET: ${PAYHERE_MERCHANT_SECRET:-}
+      PAYHERE_APP_ID: ${PAYHERE_APP_ID:-}
+      PAYHERE_APP_SECRET: ${PAYHERE_APP_SECRET:-}
+      PAYHERE_MODE: ${PAYHERE_MODE:-sandbox}
+      PAYHERE_NOTIFY_URL: ${PAYHERE_NOTIFY_URL:-}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+    volumes:
+      - ziggo_staging_uploads:/app/ziggo_admin_panel/static/uploads
+      # Mirrors production: admin templates are editable without a rebuild.
+      # Safe here because this is the staging checkout, not the prod one.
+      - ./ziggo_admin_panel:/app/ziggo_admin_panel
+    ports:
+      # Loopback only. nginx (test.ziggo.lk) will front this.
+      - "127.0.0.1:${ZIGGO_STAGING_PORT:-8031}:8000"
+    networks:
+      - ziggo_staging_net
+
+networks:
+  ziggo_staging_net:
+    driver: bridge
+
+volumes:
+  ziggo_staging_pgdata:
+  ziggo_staging_uploads:
