@@ -37,10 +37,10 @@ import 'notification_router.dart';
 // (see fcm_service.py `channel_id="ziggo_ride_alerts"`). Bumping this id
 // here forces Android to create a fresh channel (use this trick if you ever
 // swap the sound file — Android won't update an existing channel's sound).
-const String _rideAlertChannelId = 'ziggo_ride_alerts_v7';
-const String _rideAlertChannelName = 'Ride alerts';
+const String _rideAlertChannelId = 'ziggo_ride_calls_v8';
+const String _rideAlertChannelName = 'Incoming Ride Calls';
 const String _rideAlertChannelDesc =
-    'New ride requests. Plays continuous custom sound.';
+    'New ride requests with continuous incoming call ringtone.';
 
 const String _foodAlertChannelId = 'ziggo_food_alerts_v3';
 const String _foodAlertChannelName = 'Food and order alerts';
@@ -69,22 +69,42 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     await Firebase.initializeApp();
   } catch (_) {}
 
-  // Hybrid messages now carry a notification block, which the OS displays
-  // itself while the app is backgrounded / killed. Rendering our own here too
-  // would duplicate it — so only handle pure data-only payloads manually.
-  // EXCEPT for new_ride_request, which requires a custom looping insistent alarm
-  // that the OS default handler cannot provide.
   final data = message.data;
   final event = data['event'];
-  if (message.notification != null && event != 'new_ride_request') return;
 
   if (event == 'new_ride_request') {
-    final title = data['title'] ?? 'New ride request';
-    final body = data['body'] ?? 'Tap to accept';
+    final title = data['title'] ?? 'Incoming Ride Request';
+    final body = data['body'] ?? 'Tap to view and accept the ride';
 
     final local = FlutterLocalNotificationsPlugin();
     const androidInit = AndroidInitializationSettings('@mipmap/launcher_icon');
-    await local.initialize(const InitializationSettings(android: androidInit));
+    await local.initialize(
+      const InitializationSettings(android: androidInit),
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        if (response.actionId == 'decline_ride') {
+          local.cancel(_rideAlertNotificationId);
+        }
+      },
+    );
+
+    // Ensure the call channel exists in the background isolate before showing
+    final androidPlugin = local.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin != null) {
+      await androidPlugin.createNotificationChannel(
+        const AndroidNotificationChannel(
+          _rideAlertChannelId,
+          _rideAlertChannelName,
+          description: _rideAlertChannelDesc,
+          importance: Importance.max,
+          playSound: true,
+          sound: RawResourceAndroidNotificationSound('ride_alert'),
+          audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+          enableVibration: true,
+          vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
+        ),
+      );
+    }
 
     await local.show(
       _rideAlertNotificationId,
@@ -96,14 +116,15 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           _rideAlertChannelName,
           channelDescription: _rideAlertChannelDesc,
           importance: Importance.max,
-          priority: Priority.high,
+          priority: Priority.max,
           playSound: true,
           sound: const RawResourceAndroidNotificationSound('ride_alert'),
-          audioAttributesUsage: AudioAttributesUsage.alarm,
-          category: AndroidNotificationCategory.alarm,
-          // FLAG_INSISTENT (4) — loops the sound until the notification is cancelled.
+          audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+          category: AndroidNotificationCategory.call,
+          // FLAG_INSISTENT (4) — loops the sound until the notification is cancelled/answered.
           additionalFlags: Int32List.fromList(<int>[4]),
           enableVibration: true,
+          vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
           // Call-style behaviour: pop a full-screen overlay over any other app
           // (like an incoming phone call), keep it alive until the driver acts,
           // and auto-cancel once the 30-second booking window has elapsed.
@@ -111,8 +132,23 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           ongoing: true,
           autoCancel: false,
           timeoutAfter: 30000, // matches expires_in_seconds: 30 from backend
+          visibility: NotificationVisibility.public,
+          actions: const <AndroidNotificationAction>[
+            AndroidNotificationAction(
+              'accept_ride',
+              'Accept',
+              showsUserInterface: true,
+              cancelNotification: true,
+            ),
+            AndroidNotificationAction(
+              'decline_ride',
+              'Decline',
+              cancelNotification: true,
+            ),
+          ],
         ),
       ),
+      payload: jsonEncode(data),
     );
   }
 }
@@ -162,6 +198,10 @@ class FcmService {
       await _local.initialize(
         const InitializationSettings(android: androidInit, iOS: iosInit),
         onDidReceiveNotificationResponse: (NotificationResponse response) {
+          if (response.actionId == 'decline_ride') {
+            cancelRideAlert();
+            return;
+          }
           final payload = response.payload;
           if (payload != null && payload.isNotEmpty) {
             try {
@@ -186,15 +226,16 @@ class FcmService {
                 AndroidFlutterLocalNotificationsPlugin>();
         if (androidPlugin != null) {
           await androidPlugin.createNotificationChannel(
-            const AndroidNotificationChannel(
+            AndroidNotificationChannel(
               _rideAlertChannelId,
               _rideAlertChannelName,
               description: _rideAlertChannelDesc,
               importance: Importance.max,
               playSound: true,
-              sound: RawResourceAndroidNotificationSound('ride_alert'),
-              audioAttributesUsage: AudioAttributesUsage.alarm,
+              sound: const RawResourceAndroidNotificationSound('ride_alert'),
+              audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
               enableVibration: true,
+              vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
             ),
           );
           await androidPlugin.createNotificationChannel(

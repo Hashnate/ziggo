@@ -131,37 +131,31 @@ async def _send_to_token(
             ios_sound = "food_alert.caf"
         else:
             android_sound = "ride_alert"
-            android_channel = "ziggo_ride_alerts_v7"
+            android_channel = "ziggo_ride_calls_v8"
             ios_sound = "ride_alert.caf"
     else:
         android_sound = "default"
         android_channel = None
         ios_sound = "default"
 
-    # Always send a notification block so the OS displays the alert even when
-    # the app is KILLED — a data-only message is dropped in that state (the
-    # Dart isolate never runs). We ALSO mirror title/body into `data` so the
-    # foreground handler can render its own custom looping-sound notification
-    # while the app is open. Net effect:
-    #   foreground      -> Flutter shows it (looping insistent custom sound)
-    #   background/dead -> OS shows the notification block (single custom sound)
+    # Always mirror title/body into `data` so the client-side background
+    # and foreground handlers have access to complete notification information.
     payload_data = {k: str(v) for k, v in (data or {}).items()}
     payload_data["title"] = title
     payload_data["body"] = body
 
     if event == "new_ride_request":
-        # Hybrid payload (notification + data) to guarantee delivery in Doze/background states on Android,
-        # while client-side firebaseMessagingBackgroundHandler still runs to show the custom looping alert.
+        # Android: High-priority DATA-ONLY payload so that Android's FCM client
+        # immediately wakes up firebaseMessagingBackgroundHandler to display a
+        # full-screen incoming call overlay with insistent looping ringtone.
+        # Omitting the top-level notification block prevents Google Play Services
+        # from intercepting and downgrading the call to a static silent tray notification.
+        # iOS: Uses APNs alert payload to ensure iOS displays the alert with sound.
         msg = messaging.Message(
             token=token,
-            notification=messaging.Notification(title=title, body=body),
             data=payload_data,
             android=messaging.AndroidConfig(
                 priority="high",
-                notification=messaging.AndroidNotification(
-                    sound=android_sound,
-                    channel_id=android_channel,
-                ),
             ),
             apns=messaging.APNSConfig(
                 headers={"apns-priority": "10"},
@@ -187,6 +181,8 @@ async def _send_to_token(
                     sound=android_sound,
                     # Channel id — once created, the channel's sound is fixed.
                     channel_id=android_channel,
+                    priority="max" if urgent else "default",
+                    visibility="public" if urgent else "private",
                 ),
             ),
             apns=messaging.APNSConfig(
