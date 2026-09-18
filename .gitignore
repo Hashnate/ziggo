@@ -59,3 +59,6 @@ ziggo_admin_panel/static/downloads/
 # OS junk
 .DS_Store
 Thumbs.db
+
+# APNs .p8 auth key — never commit
+secrets/

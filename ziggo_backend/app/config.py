@@ -38,6 +38,17 @@ class Settings(BaseSettings):
     PAYHERE_MODE: Optional[str] = "sandbox"  # "sandbox" or "live"
     PAYHERE_NOTIFY_URL: Optional[str] = None
 
+    # APNs VoIP (PushKit) — drives the CallKit incoming-call screen on iOS.
+    # FCM cannot deliver VoIP pushes, so these go straight to Apple over HTTP/2
+    # using token-based auth (a .p8 key from Apple Developer > Keys > APNs).
+    # When APNS_AUTH_KEY_PATH is empty the service no-ops and iOS drivers just
+    # get the ordinary FCM banner, exactly as before.
+    APNS_AUTH_KEY_PATH: Optional[str] = None
+    APNS_KEY_ID: Optional[str] = None
+    APNS_TEAM_ID: Optional[str] = None
+    APNS_BUNDLE_ID: Optional[str] = "lk.ziggo.app"
+    APNS_USE_SANDBOX: bool = False
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
 

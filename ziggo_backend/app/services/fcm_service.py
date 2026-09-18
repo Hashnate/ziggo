@@ -124,15 +124,18 @@ async def _send_to_token(
         "market_order_update",
     }
 
+    # iOS uses the system sound: the app bundle ships no .caf assets, so naming
+    # ride_alert.caf / food_alert.caf points APNs at files that aren't there.
+    # Restore the custom names once the .caf files are added to Runner.
     if urgent:
         if is_food:
             android_sound = "food_alert"
             android_channel = "ziggo_food_alerts_v3"
-            ios_sound = "food_alert.caf"
+            ios_sound = "default"
         else:
             android_sound = "ride_alert"
             android_channel = "ziggo_ride_calls_v8"
-            ios_sound = "ride_alert.caf"
+            ios_sound = "default"
     else:
         android_sound = "default"
         android_channel = None
@@ -288,6 +291,17 @@ def fire_and_forget(user_id: int, event: str, payload: dict) -> None:
     async def _run() -> None:
         try:
             async with AsyncSessionLocal() as db:
+                # iOS: a ride offer must ring like a call, which a normal push
+                # can't do. Try PushKit/CallKit first; if the driver has no VoIP
+                # token (Android, or iOS before this build) fall through to FCM.
+                if event == "new_ride_request":
+                    try:
+                        from . import apns_voip_service
+                        if await apns_voip_service.send_ride_call(db, user_id, payload):
+                            return
+                    except Exception as e:
+                        print(f"[apns] voip piggyback failed user_id={user_id}: {type(e).__name__}: {e}")
+
                 await send_to_user(
                     db, user_id, title, body,
                     {"event": event, **{k: v for k, v in payload.items() if isinstance(v, (str, int, float, bool))}},

@@ -73,6 +73,15 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final event = data['event'];
 
   if (event == 'new_ride_request') {
+    // Android only. Everything below — fullScreenIntent, category.call,
+    // FLAG_INSISTENT, vibrationPattern, the raw-resource ringtone — is
+    // Android-specific, and this initialises the plugin with Android-only
+    // settings and shows with Android-only details. iOS reaches this path
+    // because the backend sets content-available on ride requests, and running
+    // it there configures nothing the platform can use. iOS renders the alert
+    // from the APNs payload itself, so bail out before touching the plugin.
+    if (!Platform.isAndroid) return;
+
     final title = data['title'] ?? 'Incoming Ride Request';
     final body = data['body'] ?? 'Tap to view and accept the ride';
 
@@ -359,6 +368,13 @@ class FcmService {
     final id = _pendingAcceptBookingId;
     _pendingAcceptBookingId = null;
     return id;
+  }
+
+  /// Queue a booking to be claimed once providers exist. Used by CallService
+  /// when the driver answers the CallKit screen, so both the notification
+  /// shade and the call screen converge on the same drain in _Root.
+  void queueAcceptBookingId(int bookingId) {
+    _pendingAcceptBookingId = bookingId;
   }
 
   final StreamController<Map<String, dynamic>> _foregroundEventsController = StreamController<Map<String, dynamic>>.broadcast();

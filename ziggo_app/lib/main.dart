@@ -12,6 +12,7 @@ import 'core/map/maps_web_loader_stub.dart'
     if (dart.library.html) 'core/map/maps_web_loader.dart';
 import 'core/network/api_client.dart';
 import 'core/notifications/fcm_service.dart';
+import 'core/notifications/call_service.dart';
 import 'core/notifications/notification_router.dart';
 import 'core/services/referral_tracker.dart';
 import 'modules/auth/auth_provider.dart';
@@ -200,6 +201,9 @@ class _RootState extends State<_Root> with WidgetsBindingObserver {
       // A notification tapped while the app was merely backgrounded resumes it
       // instead of rebuilding _Root, so initState's drain never runs.
       if (_splashed) _checkPendingNotification();
+      if (auth.status == AuthStatus.authenticated && auth.role == 'driver') {
+        unawaited(CallService.instance.registerToken());
+      }
     }
   }
 
@@ -243,6 +247,11 @@ class _RootState extends State<_Root> with WidgetsBindingObserver {
           setState(() => _fcmRegistered = false);
         }
       });
+    }
+    // Drivers additionally register for PushKit so a ride offer can ring the
+    // CallKit screen on a locked iPhone. No-ops on Android.
+    if (auth.role == 'driver' && auth.token != null) {
+      unawaited(CallService.instance.init());
     }
     if (auth.role == 'driver') return const DriverHomeScreen();
     if (auth.role == 'restaurant_owner') return const RestaurantHomeScreen();

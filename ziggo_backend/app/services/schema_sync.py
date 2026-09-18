@@ -112,6 +112,7 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("job_openings", "poster_image", "VARCHAR(500)"),
     ("bookings", "dispatch_started_at", "TIMESTAMP WITH TIME ZONE"),
     ("system_settings", "last_daily_reset_date", "VARCHAR(10)"),
+    ("users", "voip_token", "VARCHAR(255)"),
 )
 
 
