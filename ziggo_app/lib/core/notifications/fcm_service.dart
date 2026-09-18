@@ -73,13 +73,9 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final event = data['event'];
 
   if (event == 'new_ride_request') {
-    // Android only. Everything below — fullScreenIntent, category.call,
-    // FLAG_INSISTENT, vibrationPattern, the raw-resource ringtone — is
-    // Android-specific, and this initialises the plugin with Android-only
-    // settings and shows with Android-only details. iOS reaches this path
-    // because the backend sets content-available on ride requests, and running
-    // it there configures nothing the platform can use. iOS renders the alert
-    // from the APNs payload itself, so bail out before touching the plugin.
+    // Android only: iOS renders the banner itself from the APNs alert payload.
+    // This path initialises the plugin with Android-only settings, and iOS
+    // reaches it because the backend sets content-available on ride requests.
     if (!Platform.isAndroid) return;
 
     final title = data['title'] ?? 'Incoming Ride Request';
@@ -87,14 +83,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
     final local = FlutterLocalNotificationsPlugin();
     const androidInit = AndroidInitializationSettings('@mipmap/launcher_icon');
-    await local.initialize(
-      const InitializationSettings(android: androidInit),
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
-        if (response.actionId == 'decline_ride') {
-          local.cancel(_rideAlertNotificationId);
-        }
-      },
-    );
+    await local.initialize(const InitializationSettings(android: androidInit));
 
     // Ensure the call channel exists in the background isolate before showing
     final androidPlugin = local.resolvePlatformSpecificImplementation<
@@ -131,31 +120,15 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           playSound: true,
           sound: const RawResourceAndroidNotificationSound('ride_alert'),
           audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
-          category: AndroidNotificationCategory.call,
-          // FLAG_INSISTENT (4) — loops the sound until the notification is cancelled/answered.
-          additionalFlags: Int32List.fromList(<int>[4]),
           enableVibration: true,
           vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
-          // Call-style behaviour: pop a full-screen overlay over any other app
-          // (like an incoming phone call), keep it alive until the driver acts,
-          // and auto-cancel once the 30-second booking window has elapsed.
-          fullScreenIntent: true,
-          ongoing: true,
-          autoCancel: false,
+          // A heads-up banner, not a call: no full-screen takeover, no looping
+          // ringtone, no Accept/Decline buttons. Tapping it opens the app on
+          // the request sheet, which is the only place a driver can act. It
+          // shows on the lock screen and expires with the 30 s accept window.
+          autoCancel: true,
           timeoutAfter: 30000, // matches expires_in_seconds: 30 from backend
           visibility: NotificationVisibility.public,
-          // Only Accept. A Decline button is handled in a background isolate
-          // with no Dio or auth token, so it could never reach the backend —
-          // it just dismissed the banner while the driver believed the ride had
-          // been passed on. Declining now happens in the app.
-          actions: const <AndroidNotificationAction>[
-            AndroidNotificationAction(
-              'accept_ride',
-              'Accept',
-              showsUserInterface: true,
-              cancelNotification: true,
-            ),
-          ],
         ),
       ),
       payload: jsonEncode(data),
@@ -208,20 +181,11 @@ class FcmService {
       await _local.initialize(
         const InitializationSettings(android: androidInit, iOS: iosInit),
         onDidReceiveNotificationResponse: (NotificationResponse response) {
-          if (response.actionId == 'decline_ride') {
-            // Legacy: banners posted before this build may still carry it.
-            cancelRideAlert();
-            return;
-          }
           final payload = response.payload;
           if (payload != null && payload.isNotEmpty) {
             try {
               final decoded = jsonDecode(payload);
               if (decoded is Map<String, dynamic>) {
-                if (response.actionId == 'accept_ride') {
-                  final bid = int.tryParse('${decoded['booking_id'] ?? ''}');
-                  if (bid != null) _pendingAcceptBookingId = bid;
-                }
                 _handleNotificationDataClick(decoded);
                 return;
               }
@@ -358,24 +322,6 @@ class FcmService {
   Stream<RemoteMessage> get onNotificationClicked => _clickController.stream;
   RemoteMessage? _pendingClick;
   Map<String, dynamic>? _pendingDataClick;
-
-  int? _pendingAcceptBookingId;
-
-  /// Booking the driver tapped "Accept" on from the notification shade. The
-  /// action itself can't claim the ride — it may fire before the app (and its
-  /// providers) exist — so the root widget drains this once they're ready.
-  int? consumePendingAcceptBookingId() {
-    final id = _pendingAcceptBookingId;
-    _pendingAcceptBookingId = null;
-    return id;
-  }
-
-  /// Queue a booking to be claimed once providers exist. Used by CallService
-  /// when the driver answers the CallKit screen, so both the notification
-  /// shade and the call screen converge on the same drain in _Root.
-  void queueAcceptBookingId(int bookingId) {
-    _pendingAcceptBookingId = bookingId;
-  }
 
   final StreamController<Map<String, dynamic>> _foregroundEventsController = StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get onForegroundEvent => _foregroundEventsController.stream;

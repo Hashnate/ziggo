@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/notifications/fcm_service.dart';
-import '../../core/notifications/call_service.dart';
 import '../../core/storage/token_storage.dart';
 
 enum AuthStatus { unauthenticated, authenticating, authenticated, error }
@@ -337,11 +336,6 @@ class AuthProvider extends ChangeNotifier {
     // not block logout.
     try {
       await FcmService.instance.clearOnBackend();
-    } catch (_) {}
-    // Same for the PushKit token, or this iPhone keeps ringing for a driver
-    // who has signed out.
-    try {
-      await CallService.instance.clearToken();
     } catch (_) {}
 
     _status = AuthStatus.unauthenticated;

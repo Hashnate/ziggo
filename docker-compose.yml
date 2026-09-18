@@ -79,13 +79,6 @@ services:
       PAYHERE_APP_SECRET: ${PAYHERE_APP_SECRET:-}
       PAYHERE_MODE: ${PAYHERE_MODE:-sandbox}
       PAYHERE_NOTIFY_URL: ${PAYHERE_NOTIFY_URL:-}
-      # APNs VoIP (PushKit) — iOS incoming-call screen for ride offers.
-      # Empty = disabled, iOS drivers keep the plain FCM banner.
-      APNS_AUTH_KEY_PATH: ${APNS_AUTH_KEY_PATH:-}
-      APNS_KEY_ID: ${APNS_KEY_ID:-}
-      APNS_TEAM_ID: ${APNS_TEAM_ID:-}
-      APNS_BUNDLE_ID: ${APNS_BUNDLE_ID:-lk.ziggo.app}
-      APNS_USE_SANDBOX: ${APNS_USE_SANDBOX:-false}
       # Legacy stubs (kept for backwards compatibility; safe to delete):
       # TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
       # TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
@@ -98,8 +91,6 @@ services:
       # rebuilds. The named volume's contents survive the path change so
       # existing uploads keep working after the admin_panel move.
       - ziggo_uploads:/app/ziggo_admin_panel/static/uploads
-      # APNs .p8 auth key, read-only. Safe when the dir doesn't exist yet.
-      - ./secrets/apns:/app/secrets/apns:ro
       - ./ziggo_admin_panel:/app/ziggo_admin_panel
     ports:
       # Public binding — accepts traffic from outside the server on

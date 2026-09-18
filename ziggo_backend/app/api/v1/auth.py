@@ -232,25 +232,6 @@ async def update_fcm_token(
     return {"ok": True, "saved": bool(token)}
 
 
-@router.put("/voip-token")
-async def update_voip_token(
-    payload: dict = Body(...),
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    """Save the device's APNs PushKit token (iOS only).
-
-    Registered separately from the FCM token because VoIP pushes go direct to
-    Apple on the `<bundle>.voip` topic. Clearing it on logout stops this device
-    ringing for a driver who is no longer signed in.
-    Body: {"token": "<pushkit-token>" | null}
-    """
-    token = (payload.get("token") or "").strip() or None
-    user.voip_token = token
-    await db.commit()
-    return {"ok": True, "saved": bool(token)}
-
-
 @router.get("/me", response_model=UserResponse)
 async def get_me(
     db: AsyncSession = Depends(get_db),

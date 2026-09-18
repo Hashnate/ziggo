@@ -52,11 +52,6 @@ dependencies:
   # ride-alert channel that pins our custom sound.
   flutter_local_notifications: ^17.2.3
 
-  # CallKit / PushKit. iOS has no fullScreenIntent equivalent, so an incoming
-  # ride is reported to CallKit and rings like a real call even on a locked,
-  # silenced phone. Android keeps using the full-screen-intent notification.
-  flutter_callkit_incoming: ^3.1.5
-
   # PayHere hosted checkout — opened in an in-app WebView. Returns to the
   # app via PayHere's `return_url` (a deep link we control).
   webview_flutter: ^4.10.0

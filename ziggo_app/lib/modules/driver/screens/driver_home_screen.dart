@@ -11,7 +11,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:audioplayers/audioplayers.dart';
 
 import '../../../core/notifications/fcm_service.dart';
-import '../../../core/notifications/full_screen_alert_permission.dart';
 import '../../common/screens/ride_chat_screen.dart';
 
 import '../../../app/app_colors.dart';
@@ -305,11 +304,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       _centerOnDriver();
     }
     context.read<NotificationsProvider>().refresh();
-
-    // Android 14+ won't show the full-screen incoming-ride alert unless the
-    // driver grants USE_FULL_SCREEN_INTENT. Ask once, right after the driver
-    // home is up.
-    if (mounted) await FullScreenAlertPermission.ensureGranted(context);
 
     // BRD: live speed read-out — subscribe once, convert m/s → km/h.
     _speedSub ??= Geolocator.getPositionStream(

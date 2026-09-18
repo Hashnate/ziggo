@@ -1236,6 +1236,15 @@ async def accept_booking(
             detail="This ride has already been taken or cancelled",
         )
 
+    # Dispatch already skips busy drivers, but a request can be in flight when
+    # the driver picks up another job — never let one driver hold two rides.
+    from ...services.matching_service import busy_driver_ids
+    if driver.id in await busy_driver_ids(db):
+        raise HTTPException(
+            status_code=409,
+            detail="Finish your current trip before accepting another ride",
+        )
+
     # Claim the ride
     now = datetime.now(timezone.utc)
     b.driver_id = driver.id

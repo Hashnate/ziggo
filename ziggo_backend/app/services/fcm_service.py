@@ -153,7 +153,10 @@ async def _send_to_token(
         # full-screen incoming call overlay with insistent looping ringtone.
         # Omitting the top-level notification block prevents Google Play Services
         # from intercepting and downgrading the call to a static silent tray notification.
-        # iOS: Uses APNs alert payload to ensure iOS displays the alert with sound.
+        # iOS: a normal alert banner the driver taps to open the request sheet.
+        # "time-sensitive" lets it break through Focus modes and stay on the
+        # lock screen; it needs the Time Sensitive Notifications capability on
+        # the Runner target, and degrades to a normal alert without it.
         msg = messaging.Message(
             token=token,
             data=payload_data,
@@ -167,6 +170,7 @@ async def _send_to_token(
                         sound=ios_sound,
                         content_available=True,
                         alert=messaging.ApsAlert(title=title, body=body),
+                        custom_data={"interruption-level": "time-sensitive"},
                     ),
                 ),
             ),
@@ -291,17 +295,6 @@ def fire_and_forget(user_id: int, event: str, payload: dict) -> None:
     async def _run() -> None:
         try:
             async with AsyncSessionLocal() as db:
-                # iOS: a ride offer must ring like a call, which a normal push
-                # can't do. Try PushKit/CallKit first; if the driver has no VoIP
-                # token (Android, or iOS before this build) fall through to FCM.
-                if event == "new_ride_request":
-                    try:
-                        from . import apns_voip_service
-                        if await apns_voip_service.send_ride_call(db, user_id, payload):
-                            return
-                    except Exception as e:
-                        print(f"[apns] voip piggyback failed user_id={user_id}: {type(e).__name__}: {e}")
-
                 await send_to_user(
                     db, user_id, title, body,
                     {"event": event, **{k: v for k, v in payload.items() if isinstance(v, (str, int, float, bool))}},
