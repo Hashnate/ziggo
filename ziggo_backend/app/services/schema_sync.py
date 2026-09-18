@@ -110,6 +110,8 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("menu_items", "packing_charge", "NUMERIC(10, 2) NOT NULL DEFAULT 0.00"),
     ("food_orders", "packing_charge", "NUMERIC(10, 2) NOT NULL DEFAULT 0.00"),
     ("job_openings", "poster_image", "VARCHAR(500)"),
+    ("bookings", "dispatch_started_at", "TIMESTAMP WITH TIME ZONE"),
+    ("system_settings", "last_daily_reset_date", "VARCHAR(10)"),
 )
 
 

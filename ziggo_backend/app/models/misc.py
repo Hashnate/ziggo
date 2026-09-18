@@ -153,6 +153,10 @@ class SystemSettings(Base):
     rider_penalty = Column(DECIMAL(10, 2), default=0)
     # Search Radius
     driver_search_radius_km = Column(Integer, default=15)
+    # Colombo-date (YYYY-MM-DD) of the last driver daily-stats reset. Lives in
+    # the DB rather than a file on the container filesystem, which is wiped on
+    # every image rebuild and silently skipped that day's reset.
+    last_daily_reset_date = Column(String(10), nullable=True)
     # Security
     min_password_length = Column(Integer, default=6)
     session_timeout_minutes = Column(Integer, default=30)

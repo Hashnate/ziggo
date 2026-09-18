@@ -6,11 +6,10 @@ shouldn't be stuck on a "waiting" screen forever — so we sweep every 30 s and
 cancel anything older than `STALE_AFTER_SECONDS`. Wallet payments are
 refunded; cash orders are simply marked CANCELLED.
 """
-import os
 import asyncio
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 
 from ..database import AsyncSessionLocal
 from ..models import (
@@ -22,6 +21,7 @@ from ..models import (
     Notification,
     WalletTransaction,
     Driver,
+    SystemSettings,
 )
 from .ws_manager import manager
 
@@ -34,37 +34,26 @@ TICK_SECONDS = 30
 async def _check_and_reset_daily_stats(db) -> None:
     colombo_tz = timezone(timedelta(hours=5, minutes=30))
     today_str = datetime.now(colombo_tz).strftime("%Y-%m-%d")
-    
-    file_path = "last_reset_date.txt"
-    
-    last_date = None
-    if os.path.exists(file_path):
-        try:
-            with open(file_path, "r") as f:
-                last_date = f.read().strip()
-        except Exception:
-            pass
-            
-    if not last_date:
-        try:
-            with open(file_path, "w") as f:
-                f.write(today_str)
-        except Exception:
-            pass
+
+    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    ss = ss_q.scalars().first()
+    if ss is None:
         return
-        
-    if last_date != today_str:
+
+    last_date = ss.last_daily_reset_date
+    if last_date == today_str:
+        return
+
+    # First run after this column was introduced: adopt today as the baseline
+    # without resetting, so deploying mid-day doesn't wipe drivers' earnings.
+    if last_date:
         print(f"[daily_reset] Date changed from {last_date} to {today_str}. Resetting driver daily stats.")
         await db.execute(
             update(Driver).values(today_rides=0, today_earnings=Decimal("0.00"))
         )
-        await db.commit()
-        
-        try:
-            with open(file_path, "w") as f:
-                f.write(today_str)
-        except Exception:
-            pass
+
+    ss.last_daily_reset_date = today_str
+    await db.commit()
 
 
 async def _run_once() -> None:
@@ -146,13 +135,17 @@ async def _run_once() -> None:
             await db.commit()
             print(f"[auto_cancel] cancelled {cancelled} stale PENDING food order(s)")
 
-    # 2. Sweep stale SEARCHING ride & delivery bookings older than 2 minutes
-    booking_cutoff = datetime.now(timezone.utc) - timedelta(seconds=BOOKING_SEARCH_TIMEOUT_SECONDS)
+    # 2. Sweep stale SEARCHING ride & delivery bookings older than 2 minutes.
+    # The clock starts when dispatch actually began, which for a scheduled ride
+    # is dispatch_started_at, not booked_at.
+    now_sweep = datetime.now(timezone.utc)
+    booking_cutoff = now_sweep - timedelta(seconds=BOOKING_SEARCH_TIMEOUT_SECONDS)
     async with AsyncSessionLocal() as db:
+        search_started = func.coalesce(Booking.dispatch_started_at, Booking.booked_at)
         bq = await db.execute(
             select(Booking).where(
                 Booking.status == BookingStatus.SEARCHING,
-                Booking.booked_at < booking_cutoff,
+                search_started < booking_cutoff,
                 (Booking.scheduled_at.is_(None) | (Booking.scheduled_dispatch_sent == True)),
             )
         )
@@ -160,15 +153,33 @@ async def _run_once() -> None:
         if stale_bookings:
             cancelled_b = 0
             for b in stale_bookings:
-                b.status = BookingStatus.CANCELLED
-                b.cancelled_by = "system"
-                b.cancellation_reason = "No driver available within search window"
-                b.cancelled_at = datetime.now(timezone.utc)
+                # Claim the booking atomically. GET /bookings/active runs this
+                # same timeout check on the customer's 5s poll, so without the
+                # status guard both can refund the same booking.
+                claim = await db.execute(
+                    update(Booking)
+                    .where(
+                        Booking.id == b.id,
+                        Booking.status == BookingStatus.SEARCHING,
+                    )
+                    .values(
+                        status=BookingStatus.CANCELLED,
+                        cancelled_by="system",
+                        cancellation_reason="No driver available within search window",
+                        cancelled_at=datetime.now(timezone.utc),
+                    )
+                    .execution_options(synchronize_session=False)
+                )
+                if claim.rowcount == 0:
+                    continue
 
                 # Refund wallet payments if paid
                 if b.payment_method == "wallet" and b.payment_status == "paid":
                     cq = await db.execute(
-                        select(Customer).where(Customer.id == b.customer_id)
+                        select(Customer)
+                        .where(Customer.id == b.customer_id)
+                        .with_for_update()
+                        .execution_options(populate_existing=True)
                     )
                     customer = cq.scalars().first()
                     if customer:
@@ -185,7 +196,12 @@ async def _run_once() -> None:
                                 balance_after=customer.wallet_balance,
                             )
                         )
-                        b.payment_status = "refunded"
+                        await db.execute(
+                            update(Booking)
+                            .where(Booking.id == b.id)
+                            .values(payment_status="refunded")
+                            .execution_options(synchronize_session=False)
+                        )
 
                 cq = await db.execute(
                     select(Customer).where(Customer.id == b.customer_id)

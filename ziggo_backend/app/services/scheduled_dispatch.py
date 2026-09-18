@@ -13,8 +13,11 @@ TICK_SECONDS = 30
 LEAD_TIME_MINUTES = 10
 
 async def _dispatch_booking(db, booking: Booking) -> None:
-    # Mark as sent immediately so we don't duplicate dispatch on network delay
+    # Mark as sent immediately so we don't duplicate dispatch on network delay.
+    # dispatch_started_at is what the 120s search timeout is measured from —
+    # booked_at is when the customer scheduled the ride, which may be days ago.
     booking.scheduled_dispatch_sent = True
+    booking.dispatch_started_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(booking)
 

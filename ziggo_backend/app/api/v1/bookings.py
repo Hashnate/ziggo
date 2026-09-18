@@ -5,7 +5,7 @@ import secrets
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel
 
@@ -1095,16 +1095,43 @@ async def get_active_booking(
 
     b = q.scalars().first()
     if b and b.status == BookingStatus.SEARCHING and (b.scheduled_at is None or b.scheduled_dispatch_sent == True):
-        # Check if searching has timed out (older than 120 seconds)
+        # Time out from when dispatch actually started. For a scheduled ride
+        # booked_at is the time the customer placed the order — possibly days
+        # ago — so measuring against it cancels the ride the instant it starts
+        # searching.
         now_utc = datetime.now(timezone.utc)
-        booked_time = b.booked_at.astimezone(timezone.utc) if b.booked_at and b.booked_at.tzinfo else (b.booked_at.replace(tzinfo=timezone.utc) if b.booked_at else None)
-        if booked_time and (now_utc - booked_time).total_seconds() > 120:
-            b.status = BookingStatus.CANCELLED
-            b.cancelled_by = "system"
-            b.cancellation_reason = "No driver available within search window"
-            b.cancelled_at = now_utc
+        started = b.dispatch_started_at or b.booked_at
+        search_started = (
+            started.astimezone(timezone.utc)
+            if started and started.tzinfo
+            else (started.replace(tzinfo=timezone.utc) if started else None)
+        )
+        if search_started and (now_utc - search_started).total_seconds() > 120:
+            # Claim the booking atomically — the auto_cancel sweeper applies the
+            # same rule every 30s and both would otherwise issue a refund.
+            claim = await db.execute(
+                update(Booking)
+                .where(Booking.id == b.id, Booking.status == BookingStatus.SEARCHING)
+                .values(
+                    status=BookingStatus.CANCELLED,
+                    cancelled_by="system",
+                    cancellation_reason="No driver available within search window",
+                    cancelled_at=now_utc,
+                )
+                .execution_options(synchronize_session=False)
+            )
+            if claim.rowcount == 0:
+                await db.rollback()
+                return None
+
             if b.payment_method == "wallet" and b.payment_status == "paid":
-                customer = await _get_customer(db, user) if user.role == UserRole.CUSTOMER else None
+                cq = await db.execute(
+                    select(Customer)
+                    .where(Customer.id == b.customer_id)
+                    .with_for_update()
+                    .execution_options(populate_existing=True)
+                )
+                customer = cq.scalars().first()
                 if customer:
                     customer.wallet_balance = (customer.wallet_balance or Decimal(0)) + (b.final_amount or Decimal(0))
                     db.add(
@@ -1117,7 +1144,12 @@ async def get_active_booking(
                             balance_after=customer.wallet_balance,
                         )
                     )
-                    b.payment_status = "refunded"
+                    await db.execute(
+                        update(Booking)
+                        .where(Booking.id == b.id)
+                        .values(payment_status="refunded")
+                        .execution_options(synchronize_session=False)
+                    )
             await db.commit()
             return None
 

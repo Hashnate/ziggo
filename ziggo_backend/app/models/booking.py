@@ -134,6 +134,10 @@ class Booking(Base):
 
     scheduled_at = Column(DateTime(timezone=True), nullable=True)
     scheduled_dispatch_sent = Column(Boolean, default=False, nullable=False)
+    # Set when dispatch actually begins. The search timeout is measured from
+    # this, not booked_at — a ride scheduled yesterday has a booked_at that is
+    # already hours past the timeout the moment it starts searching.
+    dispatch_started_at = Column(DateTime(timezone=True), nullable=True)
 
 
     customer = relationship("Customer", back_populates="bookings")
