@@ -69,11 +69,17 @@ jobs:
           # Using -di to ignore newlines/whitespace safely
           echo "${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_BASE64 }}" | base64 -di > android/app/google-services.json
 
+      # Play rejects any versionCode it has seen before. pubspec's "+N" never
+      # changes on its own, so derive a monotonically increasing code from the
+      # run number — same scheme the iOS workflow uses for its build number.
+      - name: Compute version code
+        run: echo "BUILD_NUMBER=$(( ${{ github.run_number }} + 100 ))" >> "$GITHUB_ENV"
+
       - name: Build Android App Bundle (AAB)
-        run: flutter build appbundle --release
+        run: flutter build appbundle --release --build-number="$BUILD_NUMBER"
 
       - name: Build Android APK
-        run: flutter build apk --release
+        run: flutter build apk --release --build-number="$BUILD_NUMBER"
 
       - name: Upload Android App Bundle (AAB) Artifact
         uses: actions/upload-artifact@v4
