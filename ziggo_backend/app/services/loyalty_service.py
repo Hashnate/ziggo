@@ -193,6 +193,47 @@ async def _post_ledger(
     return abs(delta)
 
 
+async def refund_redeemed_points(
+    db: AsyncSession,
+    entity,
+    *,
+    source_kind: str,
+    description: str,
+) -> int:
+    """Credit back points redeemed on a booking/order that never happened.
+
+    Deliberately not gated on `loyalty_is_active`: points spent while the
+    programme was running must still come back if an admin later switches it
+    off, otherwise the customer is simply out of pocket.
+
+    Zeroes the snapshot on `entity` so a second cancel path can't refund the
+    same points twice. Returns the number of points credited.
+    """
+    points = int(getattr(entity, "redeem_points", 0) or 0)
+    if points <= 0:
+        return 0
+
+    cq = await db.execute(
+        select(Customer)
+        .where(Customer.id == entity.customer_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    customer = cq.scalars().first()
+    if not customer:
+        return 0
+
+    await _post_ledger(
+        db, customer,
+        delta=points, kind="adjust",
+        source_kind=source_kind, source_id=entity.id,
+        description=description,
+    )
+    entity.redeem_points = 0
+    entity.redeem_discount = Decimal("0.00")
+    return points
+
+
 # ---------- Gold membership helpers (BRD: RW-03) ----------
 
 def is_gold_active(customer: Customer) -> bool:

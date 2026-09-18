@@ -24,6 +24,7 @@ from ..models import (
     SystemSettings,
 )
 from .ws_manager import manager
+from .loyalty_service import refund_redeemed_points
 
 # Customer-visible timeout. 5 minutes matches the locked design decision.
 STALE_AFTER_SECONDS = 300
@@ -103,6 +104,12 @@ async def _run_once() -> None:
                             )
                         )
                         order.payment_status = "refunded"
+
+                await refund_redeemed_points(
+                    db, order,
+                    source_kind="food_order",
+                    description=f"Refund — {order.order_ref} auto-cancelled",
+                )
 
                 # Notify customer
                 cq = await db.execute(
@@ -202,6 +209,12 @@ async def _run_once() -> None:
                             .values(payment_status="refunded")
                             .execution_options(synchronize_session=False)
                         )
+
+                await refund_redeemed_points(
+                    db, b,
+                    source_kind="booking",
+                    description=f"Refund — {b.booking_ref} auto-cancelled",
+                )
 
                 cq = await db.execute(
                     select(Customer).where(Customer.id == b.customer_id)

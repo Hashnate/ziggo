@@ -1150,6 +1150,13 @@ async def get_active_booking(
                         .values(payment_status="refunded")
                         .execution_options(synchronize_session=False)
                     )
+
+            from ...services.loyalty_service import refund_redeemed_points
+            await refund_redeemed_points(
+                db, b,
+                source_kind="booking",
+                description=f"Refund — {b.booking_ref} auto-cancelled",
+            )
             await db.commit()
             return None
 
@@ -1817,24 +1824,12 @@ async def update_booking_status(
                         ))
 
         # BRD: RW-02 — refund any redeemed points if the trip never happened.
-        if b.redeem_points and b.redeem_points > 0:
-            cq = await db.execute(select(Customer).where(Customer.id == b.customer_id))
-            cust_refund = cq.scalars().first()
-            if cust_refund:
-                cust_refund.loyalty_points = int(cust_refund.loyalty_points or 0) + int(b.redeem_points)
-                from ...models import LoyaltyTransaction
-                db.add(LoyaltyTransaction(
-                    customer_id=cust_refund.id,
-                    points=int(b.redeem_points),
-                    kind="adjust",
-                    source_kind="booking",
-                    source_id=b.id,
-                    description=f"Refund — {b.booking_ref} cancelled",
-                    balance_after=cust_refund.loyalty_points,
-                ))
-                # Zero out the snapshot so a re-cancellation doesn't double-refund.
-                b.redeem_points = 0
-                b.redeem_discount = Decimal("0.00")
+        from ...services.loyalty_service import refund_redeemed_points
+        await refund_redeemed_points(
+            db, b,
+            source_kind="booking",
+            description=f"Refund — {b.booking_ref} cancelled",
+        )
 
     await db.commit()
     await db.refresh(b)
