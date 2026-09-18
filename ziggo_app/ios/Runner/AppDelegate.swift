@@ -1,4 +1,5 @@
 import Flutter
+import Foundation
 import UIKit
 import GoogleMaps
 import FirebaseCore
@@ -33,7 +34,7 @@ import flutter_callkit_incoming
 
   override func application(
     _ application: UIApplication,
-    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Foundation.Data
   ) {
     Messaging.messaging().apnsToken = deviceToken
     super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
