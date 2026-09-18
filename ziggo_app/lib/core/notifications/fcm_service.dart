@@ -61,6 +61,19 @@ const String _generalAlertChannelName = 'General updates';
 const String _generalAlertChannelDesc =
     'Status updates and general notifications. Plays system default sound.';
 
+/// Server-side breadcrumb from the background isolate, where ApiClient isn't
+/// initialised. Fire-and-forget; must never throw into the handler.
+Future<void> _bgLog(String message) async {
+  try {
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
+    final req = await client.postUrl(Uri.parse('https://ziggo.lk/api/v1/public/log'));
+    req.headers.contentType = ContentType.json;
+    req.write(jsonEncode({'message': message}));
+    await (await req.close()).drain<void>();
+    client.close();
+  } catch (_) {}
+}
+
 /// Required for background message handling on Android — Firebase invokes a
 /// top-level function in an isolated Dart isolate.
 @pragma('vm:entry-point')
@@ -73,6 +86,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
   final data = message.data;
   final event = data['event'];
+  unawaited(_bgLog('[fcm-bg] handler invoked event=$event booking_id=${data['booking_id']} platform=${Platform.operatingSystem}'));
 
   if (event == 'new_ride_request') {
     // Android only: iOS renders the banner itself from the APNs alert payload.
@@ -108,7 +122,12 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       );
     }
 
-    await showRideAlarm(local, title, body, data);
+    try {
+      await showRideAlarm(local, title, body, data);
+      unawaited(_bgLog('[fcm-bg] alarm shown booking_id=${data['booking_id']}'));
+    } catch (e) {
+      unawaited(_bgLog('[fcm-bg] alarm FAILED booking_id=${data['booking_id']}: $e'));
+    }
   }
 }
 
@@ -274,6 +293,11 @@ class FcmService {
         await messaging.requestPermission(alert: true, badge: true, sound: true);
       }
 
+      if (Platform.isAndroid) {
+        final st = await messaging.getNotificationSettings();
+        unawaited(_logToServer('[fcm] android notification permission: ${st.authorizationStatus}'));
+      }
+
       // 4. Foreground display behaviour
       //    iOS: tell the OS to show the banner + play sound when the app is
       //    in the foreground (otherwise iOS suppresses everything by default).
@@ -362,6 +386,7 @@ class FcmService {
   }
 
   void _handleNotificationClick(RemoteMessage message) {
+    unawaited(_logToServer('[fcm] notification tapped event=${message.data['event']} booking_id=${message.data['booking_id']}'));
     _pendingClick = message;
     _pendingDataClick = message.data;
     _clickController.add(message);
@@ -642,6 +667,7 @@ class FcmService {
       final title = (data['title'] ?? 'Incoming Ride Request').toString();
       final body = (data['body'] ?? 'Tap to view and accept the ride').toString();
       await showRideAlarm(_local, title, body, data);
+      unawaited(_logToServer('[fcm] app-side alarm shown booking_id=${data['booking_id']}'));
     } catch (e) {
       if (kDebugMode) debugPrint('[fcm] showRideAlarmFromApp failed: $e');
     }

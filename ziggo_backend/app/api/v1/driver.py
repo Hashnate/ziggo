@@ -1,6 +1,7 @@
+import json
 import os
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
@@ -1175,3 +1176,104 @@ async def delete_driver_vehicle(
 
 
 
+
+
+# ── Outstanding ride offer ──────────────────────────────────────────────────
+#
+# A ride request otherwise exists only as a transient WebSocket event or a
+# notification tap. If the app was asleep when the request came in and the
+# tap didn't route (or the driver just opened the app from the home screen),
+# there was no way to see the offer at all. Dispatch already records one
+# Notification row per driver per offer, so the app can ask for its current
+# one whenever it opens or resumes — the way Uber's driver app does.
+
+_REQUEST_NOTIFICATION_TYPES = ("ride_request", "flash_request", "rental_request", "courier_request")
+_OFFER_WINDOW_SECONDS = 120   # matches the search auto-cancel window
+_OFFER_ACCEPT_SECONDS = 30    # matches expires_in_seconds at dispatch
+
+
+@router.get("/pending-request")
+async def get_pending_request(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("driver")),
+):
+    """The driver's most recent still-open ride offer, in the same shape as the
+    `new_ride_request` WebSocket payload, or null."""
+    from sqlalchemy.orm import selectinload
+    from ...models import Customer
+    from ...services.matching_service import busy_driver_ids
+
+    driver = await _get_driver(db, user)
+    if driver.id in await busy_driver_ids(db):
+        return None
+
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(seconds=_OFFER_WINDOW_SECONDS)
+    nq = await db.execute(
+        select(Notification)
+        .where(
+            Notification.user_id == user.id,
+            Notification.type.in_(_REQUEST_NOTIFICATION_TYPES),
+            Notification.created_at >= since,
+        )
+        .order_by(Notification.created_at.desc())
+        .limit(5)
+    )
+    for n in nq.scalars().all():
+        try:
+            booking_id = int(json.loads(n.data or "{}").get("booking_id"))
+        except (TypeError, ValueError):
+            continue
+
+        bq = await db.execute(
+            select(Booking)
+            .options(selectinload(Booking.stops), selectinload(Booking.customer).selectinload(Customer.user))
+            .where(Booking.id == booking_id)
+        )
+        b = bq.scalars().first()
+        if not b or b.status != BookingStatus.SEARCHING:
+            continue
+
+        offered_at = n.created_at if n.created_at.tzinfo else n.created_at.replace(tzinfo=timezone.utc)
+        elapsed = (now - offered_at).total_seconds()
+        # A driver opening the app late still gets a usable countdown rather
+        # than a sheet that dismisses itself the instant it appears.
+        remaining = max(10, int(_OFFER_ACCEPT_SECONDS - elapsed))
+
+        cu = b.customer.user if b.customer else None
+        return {
+            "booking_id": b.id,
+            "booking_ref": b.booking_ref,
+            "pickup_address": b.pickup_address,
+            "pickup_lat": float(b.pickup_lat),
+            "pickup_lng": float(b.pickup_lng),
+            "drop_address": b.drop_address,
+            "drop_lat": float(b.drop_lat),
+            "drop_lng": float(b.drop_lng),
+            "distance_km": float(b.distance_km or 0),
+            "duration_min": b.duration_min,
+            "service_type": b.service_type,
+            "trip_type": b.trip_type or "one_way",
+            "fare": float(b.final_amount or 0),
+            "driver_earnings": float(b.driver_earnings or 0),
+            "payment_method": b.payment_method,
+            "customer_name": cu.full_name if cu else "Customer",
+            "customer_phone": cu.phone_number if cu else "",
+            "expires_in_seconds": remaining,
+            "is_flash": bool(b.is_flash),
+            "parcel_type": b.parcel_type,
+            "parcel_weight_kg": float(b.parcel_weight_kg) if b.parcel_weight_kg else None,
+            "receiver_name": b.receiver_name,
+            "receiver_phone": b.receiver_phone,
+            "parcel_instructions": b.parcel_instructions,
+            "is_rental": bool(b.is_rental),
+            "rental_hours": b.rental_hours,
+            "is_courier": bool(b.is_courier),
+            "courier_eta_days": b.courier_eta_days,
+            "stop_count": b.stop_count or 0,
+            "stops": [
+                {"order_index": s.order_index, "lat": float(s.lat), "lng": float(s.lng), "address": s.address or ""}
+                for s in (b.stops or [])
+            ],
+        }
+    return None

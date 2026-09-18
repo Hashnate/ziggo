@@ -62,6 +62,7 @@ class DriverProvider extends ChangeNotifier {
     await loadActive();
     await loadActiveFoodOrder();
     await loadActiveMarketOrder();
+    await loadPendingRequest();
     await loadIncentives();
     await loadSurgeZones();
     await _pushLocationOnce();
@@ -646,6 +647,26 @@ class DriverProvider extends ChangeNotifier {
     } catch (_) {
       return false;
     }
+  }
+
+  /// Recover an outstanding ride offer from the server. A request normally
+  /// arrives as a WebSocket event or a notification tap; if the app was asleep
+  /// for the first and the second didn't route, the offer was invisible. Now
+  /// it's fetched on every open and resume — the way Uber's driver app does.
+  Future<void> loadPendingRequest() async {
+    if (_activeRide != null || _activeFoodOrder != null || _activeMarketOrder != null) return;
+    try {
+      final resp = await ApiClient.instance.dio.get('/driver/pending-request');
+      final data = resp.data;
+      if (data == null || data is! Map) return;
+      final request = Map<String, dynamic>.from(data);
+      final incoming = request['booking_id'];
+      final current = _pendingRequest?['booking_id'];
+      // Same offer already on screen — leave its countdown alone.
+      if (current != null && incoming != null && current == incoming) return;
+      _pendingRequest = request;
+      notifyListeners();
+    } catch (_) {}
   }
 
   void setPendingRequest(Map<String, dynamic> request) {

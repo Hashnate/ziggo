@@ -313,10 +313,42 @@ def fire_and_forget(user_id: int, event: str, payload: dict) -> None:
 # Map WS events → user-visible notification text. Add new entries as new
 # realtime events are introduced. Events not in this map skip FCM entirely
 # (they still go via WebSocket as normal).
+def _short_addr(value) -> str:
+    """First segment of an address, trimmed — banners have little room."""
+    if not value:
+        return ""
+    first = str(value).split(",")[0].strip()
+    return first[:28] + "…" if len(first) > 28 else first
+
+
 def _format(event: str, payload: dict) -> tuple[str, str]:
     if event == "new_ride_request":
-        ref = payload.get("booking_ref", "")
-        return ("New ride request", f"Tap to accept — booking {ref}")
+        # Short ride summary on the banner so the driver knows what they're
+        # being offered before tapping. Falls back gracefully — food/market
+        # dispatches ride the same event but carry no fare/distance.
+        if payload.get("is_food") or payload.get("is_market"):
+            title = "New delivery request"
+            vendor = payload.get("restaurant_name") or payload.get("vendor_name") or ""
+            pickup = vendor or _short_addr(payload.get("pickup_address"))
+            drop = _short_addr(payload.get("drop_address"))
+            body = " → ".join(x for x in (pickup, drop) if x) or "Tap to view"
+        else:
+            title = "New ride request"
+            bits = []
+            fare = payload.get("fare")
+            if fare:
+                bits.append(f"Rs.{int(float(fare))}")
+            dist = payload.get("distance_km")
+            if dist:
+                bits.append(f"{float(dist):.1f} km")
+            route = " → ".join(
+                x for x in (_short_addr(payload.get("pickup_address")),
+                            _short_addr(payload.get("drop_address"))) if x
+            )
+            if route:
+                bits.append(route)
+            body = " • ".join(bits) or "Tap to accept"
+        return (title, body)
     if event == "destination_updated":
         return ("Trip Updated", "The customer has added a stop or changed the destination.")
     if event == "booking_update":
