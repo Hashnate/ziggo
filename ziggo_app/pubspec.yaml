@@ -51,6 +51,10 @@ dependencies:
   # plugin fills that gap. It also lets us pre-create the high-importance
   # ride-alert channel that pins our custom sound.
   flutter_local_notifications: ^17.2.3
+  # Used to install the .caf ride/food alert sounds into Library/Sounds on iOS
+  # so APNs can play them (custom notification sounds must live there or in the
+  # bundle root — Flutter assets are neither).
+  path_provider: ^2.1.5
 
   # PayHere hosted checkout — opened in an in-app WebView. Returns to the
   # app via PayHere's `return_url` (a deep link we control).

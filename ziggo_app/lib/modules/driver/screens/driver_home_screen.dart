@@ -3463,6 +3463,9 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
   @override
   void initState() {
     super.initState();
+    // The in-app sheet takes over alerting: silence the (looping) notification
+    // alarm so the two sounds don't overlap when the driver taps in.
+    FcmService.instance.cancelRideAlert();
     _startAlertSound();
     _secondsLeft = (widget.request['expires_in_seconds'] as num?)?.toInt() ?? 30;
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {

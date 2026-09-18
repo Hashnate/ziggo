@@ -28,6 +28,8 @@ import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../network/api_client.dart';
@@ -37,10 +39,10 @@ import 'notification_router.dart';
 // (see fcm_service.py `channel_id="ziggo_ride_alerts"`). Bumping this id
 // here forces Android to create a fresh channel (use this trick if you ever
 // swap the sound file — Android won't update an existing channel's sound).
-const String _rideAlertChannelId = 'ziggo_ride_calls_v8';
-const String _rideAlertChannelName = 'Incoming Ride Calls';
+const String _rideAlertChannelId = 'ziggo_ride_alarm_v9';
+const String _rideAlertChannelName = 'Ride alarms';
 const String _rideAlertChannelDesc =
-    'New ride requests with continuous incoming call ringtone.';
+    'New ride requests. Sounds like an alarm until you respond or it expires.';
 
 const String _foodAlertChannelId = 'ziggo_food_alerts_v3';
 const String _foodAlertChannelName = 'Food and order alerts';
@@ -99,41 +101,61 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           importance: Importance.max,
           playSound: true,
           sound: const RawResourceAndroidNotificationSound('ride_alert'),
-          audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+          audioAttributesUsage: AudioAttributesUsage.alarm,
           enableVibration: true,
           vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
         ),
       );
     }
 
-    await local.show(
-      _rideAlertNotificationId,
-      title,
-      body,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          _rideAlertChannelId,
-          _rideAlertChannelName,
-          channelDescription: _rideAlertChannelDesc,
-          importance: Importance.max,
-          priority: Priority.max,
-          playSound: true,
-          sound: const RawResourceAndroidNotificationSound('ride_alert'),
-          audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
-          enableVibration: true,
-          vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
-          // A heads-up banner, not a call: no full-screen takeover, no looping
-          // ringtone, no Accept/Decline buttons. Tapping it opens the app on
-          // the request sheet, which is the only place a driver can act. It
-          // shows on the lock screen and expires with the 30 s accept window.
-          autoCancel: true,
-          timeoutAfter: 30000, // matches expires_in_seconds: 30 from backend
-          visibility: NotificationVisibility.public,
-        ),
-      ),
-      payload: jsonEncode(data),
-    );
+    await showRideAlarm(local, title, body, data);
   }
+}
+
+/// The Android ride alarm. Shared by the FCM background isolate (app killed or
+/// suspended) and the main isolate (app alive on its WebSocket in the
+/// background) — both use the same notification id, so whichever fires second
+/// replaces the first instead of stacking a duplicate.
+Future<void> showRideAlarm(
+  FlutterLocalNotificationsPlugin plugin,
+  String title,
+  String body,
+  Map<String, dynamic> data,
+) async {
+  await plugin.show(
+    _rideAlertNotificationId,
+    title,
+    body,
+    NotificationDetails(
+      android: AndroidNotificationDetails(
+        _rideAlertChannelId,
+        _rideAlertChannelName,
+        channelDescription: _rideAlertChannelDesc,
+        importance: Importance.max,
+        priority: Priority.max,
+        playSound: true,
+        sound: const RawResourceAndroidNotificationSound('ride_alert'),
+        // Alarm stream: audible even with the ringer on silent, like a clock
+        // alarm. Volume follows the phone's alarm slider, not the ringer.
+        audioAttributesUsage: AudioAttributesUsage.alarm,
+        category: AndroidNotificationCategory.alarm,
+        // FLAG_INSISTENT (4) — loop the sound until the notification clears.
+        additionalFlags: Int32List.fromList(<int>[4]),
+        enableVibration: true,
+        vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
+        // Alarm-style banner: heads-up, can't be swiped away, and keeps
+        // sounding until the driver opens it (the in-app sheet then takes
+        // over), acts on it, or the 30 s accept window expires. No Accept /
+        // Decline buttons — acting happens in the app only. No full-screen
+        // takeover either; it shows on the lock screen as a banner.
+        ongoing: true,
+        autoCancel: false,
+        timeoutAfter: 30000, // matches expires_in_seconds: 30 from backend
+        visibility: NotificationVisibility.public,
+      ),
+    ),
+    payload: jsonEncode(data),
+  );
 }
 
 class FcmService {
@@ -162,6 +184,7 @@ class FcmService {
       await Firebase.initializeApp();
       _firebaseAvailable = true;
       unawaited(_logToServer('[fcm] Firebase initialized successfully on iOS/Android.'));
+      await _installIosNotificationSounds();
     } catch (e) {
       unawaited(_logToServer('[fcm] Firebase.initializeApp failed: $e'));
       if (kDebugMode) {
@@ -212,7 +235,7 @@ class FcmService {
               importance: Importance.max,
               playSound: true,
               sound: const RawResourceAndroidNotificationSound('ride_alert'),
-              audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+              audioAttributesUsage: AudioAttributesUsage.alarm,
               enableVibration: true,
               vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
             ),
@@ -585,6 +608,45 @@ class FcmService {
 
   /// Cancel the active ride-alert notification — call this the moment a request
   /// is accepted, declined, or expires so the looping insistent sound stops.
+  /// iOS only plays a custom notification sound from the main bundle or from
+  /// the app's Library/Sounds folder. Flutter assets are in neither, so copy
+  /// the .caf files there on every launch (cheap, and picks up replacements).
+  /// Without this the backend's `sound: ride_alert.caf` silently falls back to
+  /// the quiet default tone — the "silent" ride request.
+  Future<void> _installIosNotificationSounds() async {
+    if (!Platform.isIOS) return;
+    try {
+      final lib = await getLibraryDirectory();
+      final dir = Directory('${lib.path}/Sounds');
+      if (!await dir.exists()) await dir.create(recursive: true);
+      for (final name in const ['ride_alert.caf', 'food_alert.caf']) {
+        final data = await rootBundle.load('assets/sounds/$name');
+        await File('${dir.path}/$name').writeAsBytes(
+          data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+          flush: true,
+        );
+      }
+      if (kDebugMode) debugPrint('[fcm] iOS notification sounds installed');
+    } catch (e) {
+      if (kDebugMode) debugPrint('[fcm] iOS sound install failed: $e');
+    }
+  }
+
+  /// Raise the ride alarm from the live app. Used when a request arrives over
+  /// the WebSocket while the app is alive but not on screen (backgrounded or
+  /// phone locked during an online session). Android only: iOS shows the
+  /// APNs banner itself and a local one on top would duplicate it.
+  Future<void> showRideAlarmFromApp(Map<String, dynamic> data) async {
+    if (!Platform.isAndroid) return;
+    try {
+      final title = (data['title'] ?? 'Incoming Ride Request').toString();
+      final body = (data['body'] ?? 'Tap to view and accept the ride').toString();
+      await showRideAlarm(_local, title, body, data);
+    } catch (e) {
+      if (kDebugMode) debugPrint('[fcm] showRideAlarmFromApp failed: $e');
+    }
+  }
+
   Future<void> cancelRideAlert() async {
     try {
       await _local.cancel(_rideAlertNotificationId);

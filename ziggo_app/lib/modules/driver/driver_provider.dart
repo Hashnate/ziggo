@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart' show SchedulerBinding, AppLifecycleState;
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -48,7 +50,8 @@ class DriverProvider extends ChangeNotifier {
         orElse: () => _vehicles.isNotEmpty ? _vehicles.first : {},
       );
 
-  Timer? _locationTimer;
+  StreamSubscription<Position>? _locationSub;
+  DateTime? _lastLocationPush;
   Timer? _profileTimer;
 
   Future<void> bootstrap(String token) async {
@@ -121,6 +124,13 @@ class DriverProvider extends ChangeNotifier {
       // and market orders (is_market) all flow through this listener.
       _pendingRequest = data;
       notifyListeners();
+      // App alive but off-screen (backgrounded or locked mid-session, kept
+      // running by the location stream): sound the alarm now instead of
+      // waiting on FCM. Same notification id as the push path, so if FCM
+      // lands a second later it replaces this rather than stacking.
+      if (SchedulerBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+        unawaited(FcmService.instance.showRideAlarmFromApp(data));
+      }
     } else if (event == 'booking_update' || event == 'destination_updated') {
       loadActive();
       // If the booking was cancelled by the customer while the driver still has
@@ -450,15 +460,94 @@ class DriverProvider extends ChangeNotifier {
     }
   }
 
+  /// Keeps the app alive for the whole online session — the way Uber does it.
+  ///
+  /// A plain Timer dies the moment the OS suspends the app, which on iOS is
+  /// seconds after the driver switches apps or locks the phone. A continuous
+  /// location stream is different: with the `location` background mode (iOS)
+  /// or a location foreground service (Android) the OS lets the process keep
+  /// running, so the WebSocket stays connected, location keeps reaching
+  /// dispatch, and a ride request lands in the app the instant it's sent.
   Future<void> _startLocationStream() async {
     _stopLocationStream();
+
+    LocationPermission perm = await Geolocator.checkPermission();
+    if (perm == LocationPermission.denied) {
+      perm = await Geolocator.requestPermission();
+    }
+    if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+      return;
+    }
+
     await _pushLocationOnce();
-    _locationTimer = Timer.periodic(const Duration(seconds: 15), (_) => _pushLocationOnce());
+
+    final LocationSettings settings;
+    if (Platform.isAndroid) {
+      settings = AndroidSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,
+        intervalDuration: const Duration(seconds: 10),
+        // The foreground service is what stops Android killing the process
+        // while the driver is online. Its notification is mandatory and is
+        // the "You're online" card the driver sees.
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: "You're online",
+          notificationText: 'Ziggo is listening for ride requests',
+          notificationChannelName: 'Online status',
+          enableWakeLock: true,
+          setOngoing: true,
+        ),
+      );
+    } else if (Platform.isIOS) {
+      settings = AppleSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,
+        activityType: ActivityType.automotiveNavigation,
+        // Never let iOS pause updates when it decides the phone is stationary;
+        // a parked driver waiting for a request is exactly who we need alive.
+        pauseLocationUpdatesAutomatically: false,
+        allowBackgroundLocationUpdates: true,
+        showBackgroundLocationIndicator: true,
+      );
+    } else {
+      settings = const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 10);
+    }
+
+    _locationSub = Geolocator.getPositionStream(locationSettings: settings).listen(
+      (pos) {
+        _currentLocation = LatLng(pos.latitude, pos.longitude);
+        notifyListeners();
+        // Every fix keeps the process alive; only some need to reach the server.
+        final now = DateTime.now();
+        if (_lastLocationPush == null ||
+            now.difference(_lastLocationPush!) >= const Duration(seconds: 10)) {
+          _lastLocationPush = now;
+          unawaited(_sendLocation(pos));
+        }
+      },
+      onError: (e) {
+        if (kDebugMode) debugPrint('[driver] location stream error: $e');
+      },
+    );
   }
 
   void _stopLocationStream() {
-    _locationTimer?.cancel();
-    _locationTimer = null;
+    _locationSub?.cancel();
+    _locationSub = null;
+    _lastLocationPush = null;
+  }
+
+  Future<void> _sendLocation(Position pos) async {
+    try {
+      await ApiClient.instance.dio.post(
+        '/driver/location',
+        data: {
+          'lat': pos.latitude,
+          'lng': pos.longitude,
+          if (pos.heading >= 0.0 && pos.heading <= 360.0) 'heading': pos.heading,
+        },
+      );
+    } catch (_) {}
   }
 
   Future<void> _pushLocationOnce() async {
@@ -475,15 +564,8 @@ class DriverProvider extends ChangeNotifier {
       );
       _currentLocation = LatLng(pos.latitude, pos.longitude);
       notifyListeners();
-
-      await ApiClient.instance.dio.post(
-        '/driver/location',
-        data: {
-          'lat': pos.latitude,
-          'lng': pos.longitude,
-          if (pos.heading >= 0.0 && pos.heading <= 360.0) 'heading': pos.heading,
-        },
-      );
+      _lastLocationPush = DateTime.now();
+      await _sendLocation(pos);
     } catch (_) {}
   }
 

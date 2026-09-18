@@ -7,6 +7,7 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
+		<string>location</string>
 	</array>
 	<key>MAPS_API_KEY</key>
 	<string>$(MAPS_API_KEY)</string>

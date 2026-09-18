@@ -124,18 +124,19 @@ async def _send_to_token(
         "market_order_update",
     }
 
-    # iOS uses the system sound: the app bundle ships no .caf assets, so naming
-    # ride_alert.caf / food_alert.caf points APNs at files that aren't there.
-    # Restore the custom names once the .caf files are added to Runner.
+    # iOS: the app installs ride_alert.caf / food_alert.caf into its
+    # Library/Sounds folder at launch (FcmService._installIosNotificationSounds),
+    # which is where APNs looks for custom sounds. Older builds without the
+    # files just get the default tone — APNs falls back rather than failing.
     if urgent:
         if is_food:
             android_sound = "food_alert"
             android_channel = "ziggo_food_alerts_v3"
-            ios_sound = "default"
+            ios_sound = "food_alert.caf"
         else:
             android_sound = "ride_alert"
-            android_channel = "ziggo_ride_calls_v8"
-            ios_sound = "default"
+            android_channel = "ziggo_ride_alarm_v9"
+            ios_sound = "ride_alert.caf"
     else:
         android_sound = "default"
         android_channel = None
