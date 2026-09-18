@@ -162,6 +162,16 @@ class _RootState extends State<_Root> with WidgetsBindingObserver {
   }
 
   void _checkPendingNotification() {
+    // "Accept" tapped in the notification shade. The action can only open the
+    // app, so the actual claim happens here, once providers and auth exist.
+    final acceptId = FcmService.instance.consumePendingAcceptBookingId();
+    if (acceptId != null) {
+      final auth = context.read<AuthProvider>();
+      if (auth.role == 'driver') {
+        context.read<DriverProvider>().acceptRide(acceptId);
+      }
+    }
+
     final pendingMessage = FcmService.instance.consumePendingClick();
     if (pendingMessage != null) {
       NotificationRouter.handleNotification(pendingMessage.data);
@@ -187,6 +197,9 @@ class _RootState extends State<_Root> with WidgetsBindingObserver {
       if (auth.status == AuthStatus.authenticated && auth.token != null) {
         unawaited(FcmService.instance.registerWithBackend());
       }
+      // A notification tapped while the app was merely backgrounded resumes it
+      // instead of rebuilding _Root, so initState's drain never runs.
+      if (_splashed) _checkPendingNotification();
     }
   }
 

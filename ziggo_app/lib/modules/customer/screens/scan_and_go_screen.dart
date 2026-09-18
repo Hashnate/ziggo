@@ -168,9 +168,11 @@ class _ScanAndGoScreenState extends State<ScanAndGoScreen> {
             }
 
             if (bookingResponse != null && mounted) {
-              // Reload active booking
-              context.read<BookingProvider>().loadActive();
-              // Navigate to active ride screen
+              // Scan & Go posts straight to the API, so the provider has no
+              // active booking yet. Await the reload before navigating or the
+              // tracking screen opens on a null booking.
+              await context.read<BookingProvider>().loadActive();
+              if (!mounted) return;
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (_) => const RideTrackingScreen()),
@@ -341,7 +343,6 @@ class _ScanAndGoScreenState extends State<ScanAndGoScreen> {
     int driverId,
   ) async {
     try {
-      final bookingProv = context.read<BookingProvider>();
       final resp = await ApiClient.instance.dio.post(
         '/bookings/scan-and-go',
         queryParameters: {'driver_id': driverId},

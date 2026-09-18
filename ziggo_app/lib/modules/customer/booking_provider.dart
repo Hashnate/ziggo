@@ -17,6 +17,10 @@ class BookingProvider extends ChangeNotifier {
   final _adminUpdateController = StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get adminUpdates => _adminUpdateController.stream;
 
+  // Backend cancels a stale search at 120 s (swept every 30 s, so up to ~150 s).
+  // The client only steps in if that clearly didn't happen.
+  static const int _searchFailsafeSeconds = 180;
+
   Map<String, dynamic>? _activeBooking;
   Map<String, dynamic>? get activeBooking => _activeBooking;
 
@@ -338,15 +342,23 @@ class BookingProvider extends ChangeNotifier {
         if (status == 'cancelled' || status == 'completed') {
           _activeBooking = null;
         } else if (status == 'searching') {
-          // Check if searching booking has expired (> 60s)
+          // Failsafe only. The backend owns the search timeout (120 s) and will
+          // cancel + push the update itself; this fires well after that so we
+          // never kill a search the server is still dispatching.
+          //
+          // Scheduled rides are exempt: their booked_at is when the customer
+          // scheduled the trip, possibly days before dispatch even starts, so
+          // it says nothing about how long we've been searching.
           final bookedAtStr = data['booked_at']?.toString();
+          final isScheduled = data['scheduled_at'] != null &&
+              data['scheduled_at'].toString().isNotEmpty;
           bool isExpired = false;
-          if (bookedAtStr != null && bookedAtStr.isNotEmpty) {
+          if (!isScheduled && bookedAtStr != null && bookedAtStr.isNotEmpty) {
             try {
               final bookedAt = DateTime.parse(bookedAtStr);
               final now = DateTime.now().toUtc();
               final diff = now.difference(bookedAt.toUtc()).inSeconds;
-              if (diff > 60) {
+              if (diff > _searchFailsafeSeconds) {
                 isExpired = true;
               }
             } catch (_) {}
@@ -368,7 +380,8 @@ class BookingProvider extends ChangeNotifier {
     } catch (_) {}
 
     final isRideUnderway = _activeBooking != null &&
-        (_activeBooking!['status'] == 'accepted' ||
+        (_activeBooking!['status'] == 'searching' ||
+         _activeBooking!['status'] == 'accepted' ||
          _activeBooking!['status'] == 'arrived' ||
          _activeBooking!['status'] == 'started');
 

@@ -723,8 +723,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final booking = context.watch<BookingProvider>();
     final active = booking.activeBooking;
 
+    // 'searching' counts as active: the customer is waiting on a driver, so we
+    // must not offer a rating prompt over it or let them book a second ride.
     final isRideActive = active != null &&
-        (active['status'] == 'accepted' ||
+        (active['status'] == 'searching' ||
+         active['status'] == 'accepted' ||
          active['status'] == 'arrived' ||
          active['status'] == 'started');
 

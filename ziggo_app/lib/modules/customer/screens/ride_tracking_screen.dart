@@ -31,6 +31,11 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
   final ZiggoMapController _mapController = ZiggoMapController();
   bool _navigatedToRating = false;
   bool _driverCancelled = false;
+  // The first /bookings/active round-trip hasn't landed yet. Until it does a
+  // null activeBooking means "not loaded", not "no ride" — popping on it would
+  // eject the user the moment they arrive from a flow that didn't prime the
+  // provider (e.g. Scan & Go).
+  bool _initialLoadDone = false;
   bool _userCancelled = false;
   List<LatLng> _routePoints = const [];
   List<DirectionStep> _routeSteps = const [];
@@ -94,8 +99,9 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
       }
     });
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<BookingProvider>().loadActive();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await context.read<BookingProvider>().loadActive();
+      if (mounted) setState(() => _initialLoadDone = true);
     });
     // Start polling every 5 s as a WS fallback.
     _statusPollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
@@ -368,6 +374,9 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
     if (active == null) {
       if (_driverCancelled) {
         return const Scaffold(body: SizedBox.shrink());
+      }
+      if (!_initialLoadDone) {
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
       }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && ModalRoute.of(context)?.isCurrent == true) {

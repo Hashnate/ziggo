@@ -92,13 +92,15 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         AndroidFlutterLocalNotificationsPlugin>();
     if (androidPlugin != null) {
       await androidPlugin.createNotificationChannel(
-        const AndroidNotificationChannel(
+        // Not const: vibrationPattern needs Int64List.fromList, a non-const
+        // factory. Mirrors the main-isolate channel below.
+        AndroidNotificationChannel(
           _rideAlertChannelId,
           _rideAlertChannelName,
           description: _rideAlertChannelDesc,
           importance: Importance.max,
           playSound: true,
-          sound: RawResourceAndroidNotificationSound('ride_alert'),
+          sound: const RawResourceAndroidNotificationSound('ride_alert'),
           audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
           enableVibration: true,
           vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
@@ -133,16 +135,15 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           autoCancel: false,
           timeoutAfter: 30000, // matches expires_in_seconds: 30 from backend
           visibility: NotificationVisibility.public,
+          // Only Accept. A Decline button is handled in a background isolate
+          // with no Dio or auth token, so it could never reach the backend —
+          // it just dismissed the banner while the driver believed the ride had
+          // been passed on. Declining now happens in the app.
           actions: const <AndroidNotificationAction>[
             AndroidNotificationAction(
               'accept_ride',
               'Accept',
               showsUserInterface: true,
-              cancelNotification: true,
-            ),
-            AndroidNotificationAction(
-              'decline_ride',
-              'Decline',
               cancelNotification: true,
             ),
           ],
@@ -199,6 +200,7 @@ class FcmService {
         const InitializationSettings(android: androidInit, iOS: iosInit),
         onDidReceiveNotificationResponse: (NotificationResponse response) {
           if (response.actionId == 'decline_ride') {
+            // Legacy: banners posted before this build may still carry it.
             cancelRideAlert();
             return;
           }
@@ -207,6 +209,10 @@ class FcmService {
             try {
               final decoded = jsonDecode(payload);
               if (decoded is Map<String, dynamic>) {
+                if (response.actionId == 'accept_ride') {
+                  final bid = int.tryParse('${decoded['booking_id'] ?? ''}');
+                  if (bid != null) _pendingAcceptBookingId = bid;
+                }
                 _handleNotificationDataClick(decoded);
                 return;
               }
@@ -343,6 +349,17 @@ class FcmService {
   Stream<RemoteMessage> get onNotificationClicked => _clickController.stream;
   RemoteMessage? _pendingClick;
   Map<String, dynamic>? _pendingDataClick;
+
+  int? _pendingAcceptBookingId;
+
+  /// Booking the driver tapped "Accept" on from the notification shade. The
+  /// action itself can't claim the ride — it may fire before the app (and its
+  /// providers) exist — so the root widget drains this once they're ready.
+  int? consumePendingAcceptBookingId() {
+    final id = _pendingAcceptBookingId;
+    _pendingAcceptBookingId = null;
+    return id;
+  }
 
   final StreamController<Map<String, dynamic>> _foregroundEventsController = StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get onForegroundEvent => _foregroundEventsController.stream;
