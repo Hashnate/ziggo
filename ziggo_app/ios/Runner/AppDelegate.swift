@@ -9,6 +9,12 @@ import flutter_callkit_incoming
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate, PKPushRegistryDelegate {
+  // MUST be retained for the app's lifetime. PushKit delivers the VoIP token
+  // (and every push) to this exact object asynchronously; if it's a local that
+  // dies when didFinishLaunching returns, the system's callback lands on freed
+  // memory and the app crashes seconds after launch.
+  private var voipRegistry: PKPushRegistry?
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -18,9 +24,10 @@ import flutter_callkit_incoming
 
     // PushKit: the VoIP channel that lets a ride offer ring like a real call.
     // Separate token and separate APNs topic (<bundle>.voip) from the FCM one.
-    let voipRegistry = PKPushRegistry(queue: DispatchQueue.main)
-    voipRegistry.delegate = self
-    voipRegistry.desiredPushTypes = [PKPushType.voIP]
+    let registry = PKPushRegistry(queue: DispatchQueue.main)
+    registry.delegate = self
+    registry.desiredPushTypes = [PKPushType.voIP]
+    voipRegistry = registry
     
     if let key = Bundle.main.object(forInfoDictionaryKey: "MAPS_API_KEY") as? String,
        !key.isEmpty,
@@ -78,6 +85,19 @@ import flutter_callkit_incoming
     // Hand it to the plugin; Dart reads it via getDevicePushTokenVoIP() and
     // PUTs it to /api/v1/auth/voip-token.
     SwiftFlutterCallkitIncomingPlugin.sharedInstance?.setDevicePushTokenVoIP(deviceToken)
+    // Breadcrumb to the backend: proves the registry survived long enough for
+    // PushKit to call back. If this line never appears in server logs after an
+    // iOS launch, the registry is being freed before the token arrives.
+    postNativeLog("[ios-native] voip token received (\(deviceToken.count) chars)")
+  }
+
+  private func postNativeLog(_ message: String) {
+    guard let url = URL(string: "https://ziggo.lk/api/v1/public/log") else { return }
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.httpBody = try? JSONSerialization.data(withJSONObject: ["message": message])
+    URLSession.shared.dataTask(with: request).resume()
   }
 
   func pushRegistry(
@@ -113,10 +133,13 @@ import flutter_callkit_incoming
     data.extra = extra
     data.duration = 30000 // matches the backend's 30 s accept window
 
-    SwiftFlutterCallkitIncomingPlugin.sharedInstance?.showCallkitIncoming(
-      data,
-      fromPushKit: true
-    )
+    if let plugin = SwiftFlutterCallkitIncomingPlugin.sharedInstance {
+      plugin.showCallkitIncoming(data, fromPushKit: true)
+    } else {
+      // Plugin not registered yet (engine still booting). Surface it loudly —
+      // an unreported VoIP push is exactly what gets an app terminated.
+      NSLog("[callkit] VoIP push arrived before plugin registration — call NOT reported")
+    }
     completion()
   }
 }
