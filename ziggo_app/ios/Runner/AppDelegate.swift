@@ -100,7 +100,8 @@ import flutter_callkit_incoming
     let id = dict["id"] as? String ?? UUID().uuidString
     let nameCaller = dict["nameCaller"] as? String ?? "Ziggo"
     let handle = dict["handle"] as? String ?? "New ride request"
-    let extra = dict["extra"] as? [String: Any] ?? [:]
+    // Data.extra is an NSDictionary, so read it as one rather than bridging.
+    let extra = (dict["extra"] as? NSDictionary) ?? NSDictionary()
 
     let data = flutter_callkit_incoming.Data(
       id: id,

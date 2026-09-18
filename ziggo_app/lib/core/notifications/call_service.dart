@@ -73,16 +73,9 @@ class CallService {
     } catch (_) {}
   }
 
-  Map? _extraFrom(CallEvent event) {
-    final body = event.body;
-    if (body is! Map) return null;
-    final extra = body['extra'];
-    return extra is Map ? extra : null;
-  }
-
   /// Food and market dispatches ride on the same `new_ride_request` event as
   /// hails, but are accepted on different endpoints — mirror DriverProvider.
-  String? _actionPath(Map? extra, String action) {
+  String? _actionPath(Map<String, dynamic>? extra, String action) {
     if (extra == null) return null;
     if (extra['is_food'] == true || extra['is_food'] == 'true') {
       final id = extra['food_order_id'];
@@ -98,48 +91,44 @@ class CallService {
 
   Future<void> _onEvent(CallEvent? event) async {
     if (event == null) return;
-    final extra = _extraFrom(event);
 
-    switch (event.event) {
-      case Event.actionCallAccept:
-        final path = _actionPath(extra, 'accept');
-        if (path == null) return;
-        // Queue a plain ride on the same slot the notification-shade Accept
-        // uses, so the claim still happens if this call fails while the app is
-        // waking. Then try immediately — the booking's status guards the
-        // server side, so a duplicate is rejected rather than double-applied.
-        final bookingId = int.tryParse('${extra?['booking_id'] ?? ''}');
-        if (bookingId != null && path.startsWith('/bookings/')) {
-          FcmService.instance.queueAcceptBookingId(bookingId);
-        }
-        try {
-          await ApiClient.instance.dio.post(path);
-          FcmService.instance.consumePendingAcceptBookingId();
-        } catch (e) {
-          if (kDebugMode) debugPrint('[callkit] immediate accept failed, queued: $e');
-        }
-        break;
-
-      case Event.actionCallDecline:
-        final path = _actionPath(extra, 'decline');
-        if (path == null) return;
-        try {
-          // Tell the backend so it forwards to the next driver instead of
-          // letting the request sit until the search times out.
-          await ApiClient.instance.dio.post(path);
-        } catch (e) {
-          if (kDebugMode) debugPrint('[callkit] decline failed: $e');
-        }
-        break;
-
-      case Event.actionCallTimeout:
-        // Driver never answered. The backend's own 30 s window handles
-        // forwarding, so there's nothing to send here.
-        break;
-
-      default:
-        break;
+    // CallEvent is a sealed hierarchy — each action is its own type.
+    if (event is CallEventActionCallAccept) {
+      final extra = event.callKitParams.extra;
+      final path = _actionPath(extra, 'accept');
+      if (path == null) return;
+      // Queue a plain ride on the same slot the notification-shade Accept
+      // uses, so the claim still happens if this call fails while the app is
+      // waking. Then try immediately — the booking's status guards the server
+      // side, so a duplicate is rejected rather than double-applied.
+      final bookingId = int.tryParse('${extra?['booking_id'] ?? ''}');
+      if (bookingId != null && path.startsWith('/bookings/')) {
+        FcmService.instance.queueAcceptBookingId(bookingId);
+      }
+      try {
+        await ApiClient.instance.dio.post(path);
+        FcmService.instance.consumePendingAcceptBookingId();
+      } catch (e) {
+        if (kDebugMode) debugPrint('[callkit] immediate accept failed, queued: $e');
+      }
+      return;
     }
+
+    if (event is CallEventActionCallDecline) {
+      final path = _actionPath(event.callKitParams.extra, 'decline');
+      if (path == null) return;
+      try {
+        // Tell the backend so it forwards to the next driver instead of
+        // letting the request sit until the search times out.
+        await ApiClient.instance.dio.post(path);
+      } catch (e) {
+        if (kDebugMode) debugPrint('[callkit] decline failed: $e');
+      }
+      return;
+    }
+
+    // actionCallTimeout and the rest need no server call — the backend's own
+    // 30 s window already forwards an unanswered request.
   }
 
   Future<void> dispose() async {
