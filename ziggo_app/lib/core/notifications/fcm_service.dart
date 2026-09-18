@@ -39,7 +39,7 @@ import 'notification_router.dart';
 // (see fcm_service.py `channel_id="ziggo_ride_alerts"`). Bumping this id
 // here forces Android to create a fresh channel (use this trick if you ever
 // swap the sound file — Android won't update an existing channel's sound).
-const String _rideAlertChannelId = 'ziggo_ride_alarm_v9';
+const String _rideAlertChannelId = 'ziggo_ride_alarm_v10';
 const String _rideAlertChannelName = 'Ride alarms';
 const String _rideAlertChannelDesc =
     'New ride requests. Sounds like an alarm until you respond or it expires.';
@@ -105,21 +105,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     final androidPlugin = local.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
     if (androidPlugin != null) {
-      await androidPlugin.createNotificationChannel(
-        // Not const: vibrationPattern needs Int64List.fromList, a non-const
-        // factory. Mirrors the main-isolate channel below.
-        AndroidNotificationChannel(
-          _rideAlertChannelId,
-          _rideAlertChannelName,
-          description: _rideAlertChannelDesc,
-          importance: Importance.max,
-          playSound: true,
-          sound: const RawResourceAndroidNotificationSound('ride_alert'),
-          audioAttributesUsage: AudioAttributesUsage.alarm,
-          enableVibration: true,
-          vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
-        ),
-      );
+      await createRideAlarmChannel(androidPlugin);
     }
 
     try {
@@ -128,6 +114,40 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     } catch (e) {
       unawaited(_bgLog('[fcm-bg] alarm FAILED booking_id=${data['booking_id']}: $e'));
     }
+  }
+}
+
+/// Create (or re-create) the ride alarm channel. Tries the custom alarm sound
+/// first and silently falls back to the system default if the raw resource
+/// can't be resolved — a missing asset should cost us the ringtone, never the
+/// alert itself.
+Future<void> createRideAlarmChannel(
+  AndroidFlutterLocalNotificationsPlugin plugin,
+) async {
+  AndroidNotificationChannel build({required bool customSound}) =>
+      AndroidNotificationChannel(
+        _rideAlertChannelId,
+        _rideAlertChannelName,
+        description: _rideAlertChannelDesc,
+        importance: Importance.max,
+        playSound: true,
+        sound: customSound
+            ? const RawResourceAndroidNotificationSound('ride_alert')
+            : null,
+        // Alarm stream: audible even with the ringer on silent, like a clock
+        // alarm. Volume follows the phone's alarm slider, not the ringer.
+        audioAttributesUsage: AudioAttributesUsage.alarm,
+        enableVibration: true,
+        vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
+      );
+
+  try {
+    await plugin.createNotificationChannel(build(customSound: true));
+  } catch (e) {
+    unawaited(_bgLog('[fcm-bg] custom alarm sound unavailable, using default: $e'));
+    try {
+      await plugin.createNotificationChannel(build(customSound: false));
+    } catch (_) {}
   }
 }
 
@@ -152,10 +172,13 @@ Future<void> showRideAlarm(
         channelDescription: _rideAlertChannelDesc,
         importance: Importance.max,
         priority: Priority.max,
+        // Sound deliberately NOT set here. On Android 8+ the channel owns the
+        // sound and this field is ignored — but the plugin still validates it
+        // and throws `invalid_sound` if the raw resource can't be resolved,
+        // which killed the whole notification. Channel-only is both correct
+        // and crash-proof: a missing asset degrades to the default tone
+        // instead of no alert at all.
         playSound: true,
-        sound: const RawResourceAndroidNotificationSound('ride_alert'),
-        // Alarm stream: audible even with the ringer on silent, like a clock
-        // alarm. Volume follows the phone's alarm slider, not the ringer.
         audioAttributesUsage: AudioAttributesUsage.alarm,
         category: AndroidNotificationCategory.alarm,
         // FLAG_INSISTENT (4) — loop the sound until the notification clears.
@@ -246,19 +269,8 @@ class FcmService {
             .resolvePlatformSpecificImplementation<
                 AndroidFlutterLocalNotificationsPlugin>();
         if (androidPlugin != null) {
-          await androidPlugin.createNotificationChannel(
-            AndroidNotificationChannel(
-              _rideAlertChannelId,
-              _rideAlertChannelName,
-              description: _rideAlertChannelDesc,
-              importance: Importance.max,
-              playSound: true,
-              sound: const RawResourceAndroidNotificationSound('ride_alert'),
-              audioAttributesUsage: AudioAttributesUsage.alarm,
-              enableVibration: true,
-              vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
-            ),
-          );
+          // Same definition and same fallback as the background isolate.
+          await createRideAlarmChannel(androidPlugin);
           await androidPlugin.createNotificationChannel(
             const AndroidNotificationChannel(
               _foodAlertChannelId,
