@@ -792,10 +792,16 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
                   children: [
                     ListTile(
                       onTap: () async {
-                        if (await FlutterContacts.requestPermission(readonly: true)) {
-                          final contact = await FlutterContacts.openExternalPick();
+                        final status = await FlutterContacts.permissions.request(PermissionType.read);
+                        if (status == PermissionStatus.granted || status == PermissionStatus.limited) {
+                          final contact = await FlutterContacts.native.showPicker(
+                            properties: {ContactProperty.phone},
+                          );
                           if (contact != null && contact.phones.isNotEmpty) {
-                            setState(() => _friend = (name: contact.displayName, phone: contact.phones.first.number));
+                            setState(() => _friend = (
+                              name: contact.displayName ?? '',
+                              phone: contact.phones.first.number,
+                            ));
                           }
                         }
                         if (context.mounted) Navigator.pop(ctx);

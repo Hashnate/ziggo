@@ -70,7 +70,10 @@ dependencies:
   # notification firing / notification permission being granted — those only
   # cover the backgrounded/killed case. Asset: assets/sounds/ride_alert.mp3.
   audioplayers: ^6.1.0
-  flutter_contacts: ^1.1.9+2
+  # 2.x is required on iOS 27. 1.x force-unwrapped
+  # UIApplication.shared.delegate!.window!!.rootViewController! at plugin
+  # registration, which is nil under the scene-based engine → SIGTRAP on launch.
+  flutter_contacts: ^2.5.0
   pdf: 3.11.1
   printing: ^5.14.3
   share_plus: ^10.0.2
