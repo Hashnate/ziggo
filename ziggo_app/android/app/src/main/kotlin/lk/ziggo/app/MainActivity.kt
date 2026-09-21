@@ -1,7 +1,10 @@
 package lk.ziggo.app
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.view.WindowManager
 import com.android.installreferrer.api.InstallReferrerClient
 import com.android.installreferrer.api.InstallReferrerStateListener
@@ -22,6 +25,49 @@ class MainActivity : FlutterActivity() {
                 result.success(referrerUrl)
             } else {
                 result.notImplemented()
+            }
+        }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "lk.ziggo.app/floating_widget").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "canDrawOverlays" -> {
+                    val canDraw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        Settings.canDrawOverlays(this)
+                    } else {
+                        true
+                    }
+                    result.success(canDraw)
+                }
+                "requestOverlayPermission" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+                        try {
+                            val intent = Intent(
+                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse("package:$packageName")
+                            )
+                            startActivity(intent)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("PERMISSION_ERROR", e.message, null)
+                        }
+                    } else {
+                        result.success(true)
+                    }
+                }
+                "showFloatingWidget" -> {
+                    FloatingWidgetService.show(this)
+                    result.success(true)
+                }
+                "hideFloatingWidget" -> {
+                    FloatingWidgetService.hide(this)
+                    result.success(true)
+                }
+                "isFloatingWidgetShowing" -> {
+                    result.success(FloatingWidgetService.isShowing)
+                }
+                else -> {
+                    result.notImplemented()
+                }
             }
         }
 

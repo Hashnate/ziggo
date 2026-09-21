@@ -203,9 +203,11 @@
                                                     <i class="fas fa-play"></i> Activate
                                                     {% endif %}
                                                 </button>
+                                                {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
                                                 <button type="button" onclick="deletePeak({{ pk.id }})" class="px-3 py-1.5 rounded-xl text-xs font-bold transition bg-gray-50 text-gray-500 border border-gray-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 flex items-center gap-1.5">
                                                     <i class="fas fa-trash-alt"></i> Delete
                                                 </button>
+                                                {% endif %}
                                             </div>
                                         </td>
                                     </tr>
@@ -386,9 +388,11 @@
                                                     class="px-3 py-1.5 bg-blue-50 text-ziggo border border-blue-100 rounded-lg text-xs font-bold hover:bg-blue-100 transition flex items-center gap-1.5">
                                                     <i class="fas fa-edit"></i> Edit
                                                 </button>
+                                                {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
                                                 <button type="button" onclick="confirmDelete({{ inc.id }})" title="Delete" class="px-2.5 py-1.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-lg text-xs font-bold hover:bg-rose-100 transition flex items-center">
                                                     <i class="fas fa-trash"></i>
                                                 </button>
+                                                {% endif %}
                                             </div>
                                         </td>
                                     </tr>

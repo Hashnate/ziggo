@@ -299,12 +299,14 @@
                                     {% if p.is_read %}Mark Unread{% else %}Mark Read{% endif %}
                                 </button>
                             </form>
+                            {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
                             <form method="post" action="/admin/riders/preregister/{{ p.id }}/delete" style="display:inline"
                                   onsubmit="return confirm('Permanently delete this preregistration?');">
                                 <button type="submit" class="act-btn act-delete">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </form>
+                            {% endif %}
                         </div>
                     </td>
                 </tr>
@@ -389,12 +391,14 @@
                                 </button>
                             </form>
                             {% endif %}
+                            {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
                             <form method="post" action="/admin/riders/{{ c.id }}/delete" style="display:inline"
                                   onsubmit="return confirm('Permanently delete this rider?');">
                                 <button type="submit" class="act-btn act-delete">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </form>
+                            {% endif %}
                         </div>
                     </td>
                 </tr>

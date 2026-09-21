@@ -1,7 +1,7 @@
 name: ziggo_app
 description: Complete Ride & Delivery Platform
 publish_to: 'none'
-version: 1.0.9+21
+version: 1.0.10+22
 
 environment:
   sdk: '>=3.1.0 <4.0.0'
@@ -26,6 +26,7 @@ dependencies:
 
   # Location (uses OS GPS, not Google APIs)
   geolocator: ^13.0.1
+  wakelock_plus: ^1.2.8
 
   # UX polish
   animated_text_kit: ^4.2.2

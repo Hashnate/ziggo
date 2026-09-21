@@ -73,12 +73,14 @@
                 </button>
             </form>
             {% endif %}
+            {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
             <form method="post" action="/admin/market/{{ vendor.id }}/delete"
                   onsubmit="return confirm('Permanently delete {{ vendor.name }} and all associated products/orders? This action is irreversible.');">
                 <button type="submit" class="px-5 py-2.5 rounded-xl bg-red-600 text-white font-bold text-sm hover:bg-red-700">
                     <i class="fas fa-trash-alt mr-1"></i> Remove
                 </button>
             </form>
+            {% endif %}
         </div>
     </div>
 

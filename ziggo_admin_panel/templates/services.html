@@ -82,12 +82,14 @@
                                     class="px-3 py-1.5 bg-blue-50 text-ziggo border border-blue-100 rounded-lg text-xs font-bold hover:bg-blue-100 transition flex items-center gap-1.5">
                                     <i class="fas fa-edit"></i> Edit
                                 </button>
+                                {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
                                 <form method="POST" action="/admin/categories/{{ c.id }}/delete" onsubmit="return confirmDelete({{ driver_counts.get(c.service_type, 0) }}, '{{ c.display_name or c.service_type }}')">
                                     <input type="hidden" name="next" value="/admin/services">
                                     <button type="submit" class="px-3 py-1.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-lg text-xs font-bold hover:bg-rose-100 transition">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </form>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

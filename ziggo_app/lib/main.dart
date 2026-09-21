@@ -13,6 +13,7 @@ import 'core/map/maps_web_loader_stub.dart'
 import 'core/network/api_client.dart';
 import 'core/notifications/fcm_service.dart';
 import 'core/notifications/notification_router.dart';
+import 'core/services/floating_overlay_service.dart';
 import 'core/services/referral_tracker.dart';
 import 'modules/auth/auth_provider.dart';
 import 'modules/auth/screens/role_selection_screen.dart';
@@ -183,6 +184,9 @@ class _RootState extends State<_Root> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      // Hide floating overlay icon when returning to foreground
+      FloatingOverlayService.hideFloatingWidget();
+
       final auth = context.read<AuthProvider>();
       if (auth.status == AuthStatus.authenticated && auth.token != null) {
         unawaited(FcmService.instance.registerWithBackend());
@@ -194,6 +198,16 @@ class _RootState extends State<_Root> with WidgetsBindingObserver {
       // whether or not a notification tap brought them back.
       if (auth.status == AuthStatus.authenticated && auth.role == 'driver') {
         unawaited(context.read<DriverProvider>().loadPendingRequest());
+      }
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
+      final auth = context.read<AuthProvider>();
+      if (auth.status == AuthStatus.authenticated && auth.role == 'driver') {
+        final driver = context.read<DriverProvider>();
+        if (driver.isOnline) {
+          FloatingOverlayService.showFloatingWidget();
+        }
       }
     }
   }

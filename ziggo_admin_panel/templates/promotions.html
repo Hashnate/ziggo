@@ -71,12 +71,14 @@
                                         <i class="fas {{ 'fa-pause' if p.is_active else 'fa-play' }}"></i>
                                     </button>
                                 </form>
+                                {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
                                 <form method="POST" action="/admin/promotions/{{ p.id }}/delete" onsubmit="return confirm('Delete promo {{ p.code }}? Bookings that already used it keep the discount.');">
                                     <button title="Delete" type="submit"
                                             class="px-2.5 py-1.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-lg text-xs font-bold hover:bg-rose-100 transition flex items-center">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </form>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

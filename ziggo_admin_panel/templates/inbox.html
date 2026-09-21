@@ -82,12 +82,14 @@
                                     {% if m.is_read %}<i class="far fa-circle mr-1"></i> Mark unread{% else %}<i class="far fa-circle-check mr-1"></i> Mark read{% endif %}
                                 </button>
                             </form>
+                            {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
                             <form method="POST" action="/admin/inbox/{{ m.id }}/delete"
                                   onsubmit="return confirm('Delete this message permanently?');" class="ml-auto">
                                 <button class="px-3 py-1.5 border border-red-100 rounded-lg text-xs font-black text-red-500 hover:bg-red-50 transition">
                                     <i class="far fa-trash-can mr-1"></i> Delete
                                 </button>
                             </form>
+                            {% endif %}
                         </div>
                     </div>
                 </div>

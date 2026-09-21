@@ -6,10 +6,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart' show SchedulerBinding, AppLifecycleState;
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/network/ws_client.dart';
 import '../../core/notifications/fcm_service.dart';
+import '../../core/services/floating_overlay_service.dart';
 
 class DriverProvider extends ChangeNotifier {
   final WsClient _ws = WsClient();
@@ -451,6 +453,7 @@ class DriverProvider extends ChangeNotifier {
         await _startLocationStream();
       } else {
         _stopLocationStream();
+        unawaited(FloatingOverlayService.hideFloatingWidget());
       }
       return true;
     } on DioException catch (e) {
@@ -713,7 +716,29 @@ class DriverProvider extends ChangeNotifier {
   }
 
   @override
+  void notifyListeners() {
+    _updateWakelock();
+    super.notifyListeners();
+  }
+
+  void _updateWakelock() {
+    final bool hasActiveTrip = (_activeRide != null && !['completed', 'cancelled'].contains(_activeRide?['status'])) ||
+        (_activeFoodOrder != null && !['delivered', 'cancelled'].contains(_activeFoodOrder?['status'])) ||
+        (_activeMarketOrder != null && !['delivered', 'cancelled'].contains(_activeMarketOrder?['status']));
+    try {
+      if (hasActiveTrip) {
+        WakelockPlus.enable();
+      } else {
+        WakelockPlus.disable();
+      }
+    } catch (_) {}
+  }
+
+  @override
   void dispose() {
+    try {
+      WakelockPlus.disable();
+    } catch (_) {}
     _stopLocationStream();
     _profileTimer?.cancel();
     _ws.dispose();

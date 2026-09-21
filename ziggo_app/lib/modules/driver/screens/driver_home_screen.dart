@@ -11,6 +11,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:audioplayers/audioplayers.dart';
 
 import '../../../core/notifications/fcm_service.dart';
+import '../../../core/services/floating_overlay_service.dart';
 import '../../common/screens/ride_chat_screen.dart';
 
 import '../../../app/app_colors.dart';
@@ -49,7 +50,7 @@ class DriverHomeScreen extends StatefulWidget {
   State<DriverHomeScreen> createState() => _DriverHomeScreenState();
 }
 
-class _DriverHomeScreenState extends State<DriverHomeScreen> {
+class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBindingObserver {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ZiggoMapController _mapController = ZiggoMapController();
   bool _bootstrapped = false;
@@ -235,6 +236,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
 
     _notificationSubscription = FcmService.instance.onNotificationClicked.listen((message) {
@@ -356,11 +358,29 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    FloatingOverlayService.hideFloatingWidget();
     _wsSub?.cancel();
     _speedSub?.cancel();
     _notificationSubscription?.cancel();
     _incentivePageController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      FloatingOverlayService.hideFloatingWidget();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
+      if (mounted) {
+        final driver = context.read<DriverProvider>();
+        if (driver.isOnline) {
+          FloatingOverlayService.showFloatingWidget();
+        }
+      }
+    }
   }
 
   /// BRD: Incident reporting — driver taps a chip from a bottom sheet,
@@ -635,6 +655,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         );
         return;
       }
+
+      if (FloatingOverlayService.isSupported) {
+        final hasOverlayPerm = await FloatingOverlayService.isPermissionGranted();
+        if (!hasOverlayPerm && mounted) {
+          await _showFloatingOverlayPermissionSheet(context);
+        }
+      }
+    } else {
+      FloatingOverlayService.hideFloatingWidget();
     }
     try {
       final success = await driver.toggleOnline(goingOnline);
@@ -652,6 +681,138 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
       );
     }
+  }
+
+  Future<void> _showFloatingOverlayPermissionSheet(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              width: 68,
+              height: 68,
+              decoration: BoxDecoration(
+                color: const Color(0xFF070E28),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFFBBF24), width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFBBF24).withOpacity(0.35),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Center(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.asset(
+                        'assets/images/app_icon_fixed_1.png',
+                        width: 42,
+                        height: 42,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.local_taxi_rounded,
+                          color: Color(0xFFFBBF24),
+                          size: 30,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: -2,
+                    right: -2,
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFF070E28), width: 2),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'Floating App Icon',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF111827),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Show the floating Ziggo icon over other apps (like Google Maps or Spotify) while you are online. Tap it anytime to instantly jump back to Ziggo.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Color(0xFF6B7280),
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF051347),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  elevation: 0,
+                ),
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await FloatingOverlayService.requestPermission();
+                },
+                child: const Text(
+                  'Enable Display Over Apps',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text(
+                'Maybe later',
+                style: TextStyle(
+                  color: Color(0xFF6B7280),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<bool> _showVehicleSelectorModal(BuildContext context, DriverProvider driver) async {
@@ -4415,7 +4576,7 @@ class _Drawer extends StatelessWidget {
           const Padding(
             padding: EdgeInsets.only(bottom: 16),
             child: Text(
-              'Version 1.0.1',
+              'Version 1.0.10',
               style: TextStyle(
                 color: AppColors.textTertiary,
                 fontWeight: FontWeight.w600,

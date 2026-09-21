@@ -77,11 +77,13 @@
                                         <i class="fas {% if t.is_active %}fa-eye-slash{% else %}fa-eye{% endif %}"></i>
                                     </button>
                                 </form>
+                                {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
                                 <form action="/admin/flash-pricing/{{ t.id }}/delete" method="POST" class="inline" onsubmit="return confirm('Delete tier &quot;{{ t.label }}&quot;? This cannot be undone.');">
                                     <button type="submit" class="p-2 text-red-500 hover:bg-red-50 rounded-lg transition" title="Delete">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </form>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

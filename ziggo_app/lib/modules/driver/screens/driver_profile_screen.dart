@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/services/floating_overlay_service.dart';
 import '../../auth/auth_provider.dart';
 import '../../customer/screens/support_screen.dart';
 import '../driver_provider.dart';
@@ -327,6 +328,31 @@ class DriverProfileScreen extends StatelessWidget {
                               (profile['relative_contact'] ?? '—').toString(),
                         },
                       ),
+                    ),
+                    _divider(),
+                    _listTile(
+                      icon: Icons.picture_in_picture_alt_rounded,
+                      title: 'Floating App Icon',
+                      trailing: FloatingOverlayService.isSupported ? 'Manage' : 'Android only',
+                      onTap: () async {
+                        if (!FloatingOverlayService.isSupported) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Floating app icon is supported on Android devices.')),
+                          );
+                          return;
+                        }
+                        final hasPerm = await FloatingOverlayService.isPermissionGranted();
+                        if (!hasPerm) {
+                          await FloatingOverlayService.requestPermission();
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Display over other apps is enabled for Ziggo.'),
+                              backgroundColor: AppColors.success,
+                            ),
+                          );
+                        }
+                      },
                     ),
                     _divider(),
                     _listTile(

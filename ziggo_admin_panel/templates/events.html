@@ -86,6 +86,7 @@
                                         {{ 'Hide' if e.is_published else 'Publish' }}
                                     </button>
                                 </form>
+                                {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
                                 <form method="post" action="/admin/events/{{ e.id }}/delete"
                                       onsubmit="return confirm('Delete {{ e.name }} permanently?');">
                                     <button type="submit"
@@ -93,6 +94,7 @@
                                         <i class="fas fa-trash mr-1"></i> Delete
                                     </button>
                                 </form>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

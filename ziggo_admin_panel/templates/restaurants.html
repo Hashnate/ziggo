@@ -173,11 +173,13 @@
                                 title="Edit Restaurant">
                                 <i class="fas fa-pen text-[10px]"></i>
                             </button>
+                            {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
                             <form method="post" action="/admin/restaurants/{{ r.id }}/delete" onsubmit="return confirm('Are you sure you want to delete this restaurant? This action cannot be undone.');" class="inline">
                                 <button type="submit" class="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-bold hover:bg-red-600 hover:text-white transition inline-flex items-center gap-1" title="Delete Restaurant">
                                     <i class="fas fa-trash text-[10px]"></i>
                                 </button>
                             </form>
+                            {% endif %}
                             <a href="/admin/restaurants/{{ r.id }}" class="px-3 py-1.5 rounded-lg bg-ziggo-soft text-ziggo text-xs font-bold inline-flex items-center gap-1.5 hover:bg-ziggo hover:text-white transition">Manage →</a>
                         </div>
                     </td>

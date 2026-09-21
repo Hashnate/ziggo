@@ -99,11 +99,13 @@
                                     class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-50 text-amber-600 hover:bg-amber-100 transition">
                                 <i class="fas fa-edit mr-0.5"></i> Edit
                             </button>
+                            {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
                             <button data-id="{{ a.id }}" data-name="{{ a.company_name }}"
                                     onclick="openDelete(this)"
                                     class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-red-50 text-red-600 hover:bg-red-100 transition">
                                 <i class="fas fa-trash-alt mr-0.5"></i> Delete
                             </button>
+                            {% endif %}
                         </div>
                     </td>
                 </tr>

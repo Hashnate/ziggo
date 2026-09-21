@@ -242,7 +242,9 @@
             </div>
             <div class="flex gap-3 pt-2">
                 <button type="submit" class="flex-1 px-4 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light">Save Changes</button>
+                {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
                 <button type="button" onclick="deleteCategory()" class="px-4 py-3 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100"><i class="fas fa-trash"></i></button>
+                {% endif %}
             </div>
         </form>
         <form id="deleteCatForm" method="post" class="hidden"></form>
@@ -308,7 +310,9 @@
             </label>
             <div class="flex gap-3 pt-2">
                 <button type="submit" class="flex-1 px-4 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light">Save Changes</button>
+                {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
                 <button type="button" onclick="deleteItem()" class="px-4 py-3 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100"><i class="fas fa-trash"></i></button>
+                {% endif %}
             </div>
         </form>
         <form id="deleteItemForm" method="post" class="hidden"></form>

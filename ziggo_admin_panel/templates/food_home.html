@@ -92,9 +92,11 @@
                     <form method="post" action="/admin/food-home/banners/{{ b.id }}/toggle">
                         <button class="px-3 py-1.5 rounded-full text-[11px] font-black uppercase {% if b.is_active %}bg-emerald-50 text-emerald-600{% else %}bg-gray-100 text-gray-500{% endif %}">{{ 'Active' if b.is_active else 'Off' }}</button>
                     </form>
+                    {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
                     <form method="post" action="/admin/food-home/banners/{{ b.id }}/delete" onsubmit="return confirm('Delete this banner?')">
                         <button class="px-2.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-xs"><i class="fas fa-trash"></i></button>
                     </form>
+                    {% endif %}
                 </div>
             </div>
             {% else %}
@@ -224,9 +226,11 @@
                     <form method="post" action="/admin/market-home/ads/{{ ad.id }}/toggle">
                         <button class="px-3 py-1.5 rounded-full text-[11px] font-black uppercase {% if ad.is_active %}bg-emerald-50 text-emerald-600{% else %}bg-gray-100 text-gray-500{% endif %}">{{ 'Active' if ad.is_active else 'Off' }}</button>
                     </form>
+                    {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
                     <form method="post" action="/admin/market-home/ads/{{ ad.id }}/delete" onsubmit="return confirm('Delete this advertisement?')">
                         <button class="px-2.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-xs"><i class="fas fa-trash"></i></button>
                     </form>
+                    {% endif %}
                 </div>
             </div>
             {% else %}
@@ -323,9 +327,11 @@
                     <form method="post" action="/admin/food-home/categories/{{ c.id }}/toggle">
                         <button class="px-3 py-1.5 rounded-full text-[11px] font-black uppercase {% if c.is_active %}bg-emerald-50 text-emerald-600{% else %}bg-gray-100 text-gray-500{% endif %}">{{ 'Active' if c.is_active else 'Off' }}</button>
                     </form>
+                    {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
                     <form method="post" action="/admin/food-home/categories/{{ c.id }}/delete" onsubmit="return confirm('Delete this category?')">
                         <button class="px-2.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-xs"><i class="fas fa-trash"></i></button>
                     </form>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}
@@ -418,9 +424,11 @@
                     <form method="post" action="/admin/food-home/deals/{{ d.id }}/toggle">
                         <button class="px-3 py-1.5 rounded-full text-[11px] font-black uppercase {% if d.is_active %}bg-emerald-50 text-emerald-600{% else %}bg-gray-100 text-gray-500{% endif %}">{{ 'Active' if d.is_active else 'Off' }}</button>
                     </form>
+                    {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
                     <form method="post" action="/admin/food-home/deals/{{ d.id }}/delete" onsubmit="return confirm('Delete this deal?')">
                         <button class="px-2.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-xs"><i class="fas fa-trash"></i></button>
                     </form>
+                    {% endif %}
                 </div>
             </div>
             {% else %}

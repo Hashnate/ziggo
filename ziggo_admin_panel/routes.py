@@ -1348,7 +1348,7 @@ async def read_driver_application(
 async def delete_driver_application(
     id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     from app.api.v1.public import DriverApplication
     q = await db.execute(select(DriverApplication).where(DriverApplication.id == id))
@@ -1364,7 +1364,7 @@ async def delete_driver_application(
 async def delete_driver_form(
     driver_id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     from app.models import MarketOrder
     from sqlalchemy import update
@@ -1597,7 +1597,7 @@ async def read_user_preregister(
 async def delete_user_preregister(
     id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     from app.api.v1.public import UserPreregistration
     q = await db.execute(select(UserPreregistration).where(UserPreregistration.id == id))
@@ -1684,7 +1684,7 @@ async def admin_rider_activate(
 async def admin_rider_delete(
     customer_id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     q = await db.execute(
         select(Customer).options(selectinload(Customer.user)).where(Customer.id == customer_id)
@@ -2989,7 +2989,7 @@ async def admin_categories_delete(
     id: int,
     next: str = Form(""),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     from app.models import FareSetting, Driver, Booking
 
@@ -3375,7 +3375,7 @@ async def admin_flash_pricing_toggle(
 async def admin_flash_pricing_delete(
     tier_id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     from app.models import FlashWeightTier
 
@@ -3659,7 +3659,7 @@ async def admin_restaurant_suspend(
 async def admin_restaurant_delete(
     restaurant_id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     from app.models import Restaurant
     try:
@@ -4076,7 +4076,7 @@ async def admin_restaurant_delete_category(
     restaurant_id: int,
     category_id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     from app.models import MenuCategory
     cat = (await db.execute(select(MenuCategory).where(MenuCategory.id == category_id, MenuCategory.restaurant_id == restaurant_id))).scalars().first()
@@ -4129,7 +4129,7 @@ async def admin_restaurant_delete_item(
     restaurant_id: int,
     item_id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     from app.models import MenuItem
     item = (await db.execute(select(MenuItem).where(MenuItem.id == item_id, MenuItem.restaurant_id == restaurant_id))).scalars().first()
@@ -4791,7 +4791,7 @@ async def admin_market_activate(
 async def admin_market_delete(
     vendor_id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     """Permanently delete a market vendor, associated products, and orders."""
     from sqlalchemy import delete
@@ -4982,7 +4982,7 @@ async def admin_market_category_toggle(
 async def admin_market_category_delete(
     id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     from app.models import MarketCategory
 
@@ -5093,7 +5093,7 @@ async def admin_market_ad_toggle(
 async def admin_market_ad_delete(
     id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     from app.models import MarketAd
 
@@ -5212,7 +5212,7 @@ async def admin_market_deal_toggle(
 async def admin_market_deal_delete(
     id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     from app.models import MarketDeal
 
@@ -6296,7 +6296,7 @@ async def admin_promotions_toggle(
 async def admin_promotions_delete(
     promo_id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     from app.models import PromoCode
 
@@ -6586,7 +6586,7 @@ async def admin_inbox_toggle_read(
 async def admin_inbox_delete(
     msg_id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     from app.api.v1.public import ContactMessage
 
@@ -6658,7 +6658,7 @@ async def admin_demo_request_toggle_read(
 async def admin_demo_request_delete(
     req_id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     from app.api.v1.public import DemoRequest
 
@@ -6730,7 +6730,7 @@ async def admin_partner_application_toggle_read(
 async def admin_partner_application_delete(
     req_id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     from app.api.v1.public import PartnerApplication
 
@@ -7972,7 +7972,7 @@ async def admin_events_toggle_publish(
 async def admin_events_delete(
     event_id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     from app.models import Event as _E
 
@@ -8259,7 +8259,7 @@ async def admin_corporate_delete(
     account_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     from app.models import CorporateAccount
     aq = await db.execute(select(CorporateAccount).where(CorporateAccount.id == account_id))
@@ -8487,7 +8487,7 @@ async def admin_food_banner_toggle(
 async def admin_food_banner_delete(
     id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     from app.models import FoodBanner
 
@@ -8571,7 +8571,7 @@ async def admin_food_category_toggle(
 async def admin_food_category_delete(
     id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     from app.models import FoodCategory
 
@@ -8680,7 +8680,7 @@ async def admin_food_collection_toggle(
 async def admin_food_collection_delete(
     id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     from app.models import FoodCollection
 
@@ -8784,7 +8784,7 @@ async def admin_food_deal_toggle(
 async def admin_food_deal_delete(
     id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     from app.models import FoodDeal
 
@@ -9466,7 +9466,7 @@ async def admin_jobs_toggle_status(
 async def admin_jobs_delete(
     job_id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(current_admin),
+    _: User = Depends(require_superadmin_or_admin),
 ):
     from app.models import JobOpening
 

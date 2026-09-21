@@ -147,35 +147,8 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
     setState(() {
       _busy = true;
       _error = null;
-      _uploadStatus = 'Saving details...';
+      _uploadStatus = 'Uploading profile photo...';
     });
-
-    final err = await context.read<DriverProvider>().register(
-          fullName: _fullName.text.trim(),
-          email: _email.text.trim().isEmpty ? null : _email.text.trim(),
-          nicNumber: _nic.text.trim(),
-          licenseNumber: _license.text.trim(),
-          vehicleType: _vehicleType,
-          driverType: _driverType,
-          vehicleNumber: _vehicleNumber.text.trim(),
-          vehicleModel: _vehicleModel.text.trim(),
-          vehicleColor: _vehicleColor.text.trim(),
-          relativeName: _relativeName.text.trim(),
-          relativeContact: _relativeContact.text.trim(),
-          relativeRelationship: _relativeRelationship.text.trim(),
-          referralCode: _referralCode.text.trim(),
-        );
-
-    if (err != null) {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _error = err;
-          _uploadStatus = null;
-        });
-      }
-      return;
-    }
 
     try {
       // 1. Upload Profile Photo
@@ -185,7 +158,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
       });
       await ApiClient.instance.dio.post('/driver/profile-photo', data: photoForm);
 
-      // 3. Upload KYC Documents
+      // 2. Upload KYC Documents
       final docs = {
         'nic_front': _nicFrontDoc,
         'nic_back': _nicBackDoc,
@@ -200,9 +173,12 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
         'vehicle_side': _vehicleSideDoc,
       };
 
+      int idx = 0;
       for (final entry in docs.entries) {
+        idx++;
+        final label = _typeLabels[entry.key] ?? entry.key;
         if (mounted) {
-          setState(() => _uploadStatus = 'Uploading ${_typeLabels[entry.key]}...');
+          setState(() => _uploadStatus = 'Uploading $label ($idx/${docs.length})...');
         }
         final docForm = FormData.fromMap({
           'document_type': entry.key,
@@ -211,8 +187,35 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
         await ApiClient.instance.dio.post('/driver/documents', data: docForm);
       }
 
-      // Load profile to trigger the pending screen status check
-      await context.read<DriverProvider>().loadProfile();
+      // 3. Submit registration details (triggers state transition to awaiting approval)
+      if (mounted) setState(() => _uploadStatus = 'Saving details...');
+      final err = await context.read<DriverProvider>().register(
+            fullName: _fullName.text.trim(),
+            email: _email.text.trim().isEmpty ? null : _email.text.trim(),
+            nicNumber: _nic.text.trim(),
+            licenseNumber: _license.text.trim(),
+            vehicleType: _vehicleType,
+            driverType: _driverType,
+            vehicleNumber: _vehicleNumber.text.trim(),
+            vehicleModel: _vehicleModel.text.trim(),
+            vehicleColor: _vehicleColor.text.trim(),
+            relativeName: _relativeName.text.trim(),
+            relativeContact: _relativeContact.text.trim(),
+            relativeRelationship: _relativeRelationship.text.trim(),
+            referralCode: _referralCode.text.trim(),
+          );
+
+      if (err != null) {
+        if (mounted) {
+          setState(() {
+            _busy = false;
+            _error = err;
+            _uploadStatus = null;
+          });
+        }
+        return;
+      }
+
       await ReferralTracker.markAttributed();
 
       if (mounted) {
@@ -236,9 +239,13 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
       }
     } catch (e) {
       if (mounted) {
+        String msg = e.toString();
+        if (e is DioException) {
+          msg = e.response?.data?['detail']?.toString() ?? e.message ?? e.toString();
+        }
         setState(() {
           _busy = false;
-          _error = 'Documents upload failed: $e';
+          _error = 'Upload failed: $msg';
           _uploadStatus = null;
         });
       }
