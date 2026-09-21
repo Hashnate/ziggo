@@ -1,9 +1,14 @@
 package lk.ziggo.app
 
 import android.animation.ValueAnimator
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
@@ -13,9 +18,9 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.view.animation.DecelerateInterpolator
-import kotlin.math.abs
 import kotlin.math.hypot
 
 class FloatingWidgetService : Service() {
@@ -23,7 +28,10 @@ class FloatingWidgetService : Service() {
     companion object {
         const val ACTION_SHOW = "lk.ziggo.app.ACTION_SHOW_FLOATING_WIDGET"
         const val ACTION_HIDE = "lk.ziggo.app.ACTION_HIDE_FLOATING_WIDGET"
+        private const val NOTIFICATION_ID = 8891
+        private const val CHANNEL_ID = "ziggo_floating_overlay_v2"
 
+        @Volatile
         var isShowing: Boolean = false
             private set
 
@@ -35,18 +43,22 @@ class FloatingWidgetService : Service() {
                 action = ACTION_SHOW
             }
             try {
-                context.startService(intent)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
             } catch (e: Exception) {
-                // Ignore if background start restriction on Android 12+
+                try {
+                    context.startService(intent)
+                } catch (_: Exception) {}
             }
         }
 
         fun hide(context: Context) {
-            val intent = Intent(context, FloatingWidgetService::class.java).apply {
-                action = ACTION_HIDE
-            }
             try {
-                context.startService(intent)
+                val intent = Intent(context, FloatingWidgetService::class.java)
+                context.stopService(intent)
             } catch (e: Exception) {
                 // Ignore
             }
@@ -61,7 +73,9 @@ class FloatingWidgetService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        windowManager = getSystemService(Context.WINDOW_SERVICE) as? WindowManager
+        windowManager = (getSystemService(Context.WINDOW_SERVICE) as? WindowManager)
+            ?: (getSystemService(WindowManager::class.java))
+        createNotificationChannel()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -69,6 +83,14 @@ class FloatingWidgetService : Service() {
 
         if (action == ACTION_HIDE) {
             removeFloatingWidget()
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                }
+            } catch (_: Exception) {}
             stopSelf()
             return START_NOT_STICKY
         }
@@ -78,22 +100,107 @@ class FloatingWidgetService : Service() {
                 stopSelf()
                 return START_NOT_STICKY
             }
+
+            try {
+                val notification = buildForegroundNotification()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(
+                        NOTIFICATION_ID,
+                        notification,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                    )
+                } else {
+                    startForeground(NOTIFICATION_ID, notification)
+                }
+            } catch (e: Exception) {
+                try {
+                    startForeground(NOTIFICATION_ID, buildForegroundNotification())
+                } catch (_: Exception) {}
+            }
+
             addOrUpdateFloatingWidget()
         }
 
-        return START_NOT_STICKY
+        return START_STICKY
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Ziggo Driver Overlay",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Shows floating shortcut when driver is online"
+                setShowBadge(false)
+                enableLights(false)
+                enableVibration(false)
+                setSound(null, null)
+            }
+            val manager = getSystemService(NotificationManager::class.java)
+            manager?.createNotificationChannel(channel)
+        }
+    }
+
+    private fun buildForegroundNotification(): Notification {
+        createNotificationChannel()
+
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+        }
+        val pendingIntent = if (launchIntent != null) {
+            PendingIntent.getActivity(
+                this,
+                0,
+                launchIntent,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                } else {
+                    PendingIntent.FLAG_UPDATE_CURRENT
+                }
+            )
+        } else null
+
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this, CHANNEL_ID)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(this)
+        }
+
+        builder
+            .setContentTitle("Ziggo Driver Online")
+            .setContentText("Tap to return to Ziggo")
+            .setSmallIcon(R.mipmap.launcher_icon)
+            .setOngoing(true)
+
+        if (pendingIntent != null) {
+            builder.setContentIntent(pendingIntent)
+        }
+
+        return builder.build()
     }
 
     private fun addOrUpdateFloatingWidget() {
+        val wm = (getSystemService(Context.WINDOW_SERVICE) as? WindowManager)
+            ?: windowManager
+            ?: return
+        windowManager = wm
+
         if (floatingView != null && isShowing) {
             return
         }
 
-        val wm = windowManager ?: return
+        if (floatingView != null) {
+            try {
+                if (floatingView?.isAttachedToWindow == true) {
+                    wm.removeView(floatingView)
+                }
+            } catch (_: Exception) {}
+            floatingView = null
+        }
 
-        val displayMetrics = DisplayMetrics()
-        @Suppress("DEPRECATION")
-        wm.defaultDisplay.getMetrics(displayMetrics)
+        val displayMetrics = resources.displayMetrics
         val screenHeight = displayMetrics.heightPixels
 
         val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -123,6 +230,7 @@ class FloatingWidgetService : Service() {
         floatingView = view
 
         val bubbleContainer = view.findViewById<View>(R.id.floating_bubble_container)
+        val touchSlop = ViewConfiguration.get(this).scaledTouchSlop
 
         view.setOnTouchListener(object : View.OnTouchListener {
             private var initialX = 0
@@ -167,7 +275,7 @@ class FloatingWidgetService : Service() {
                         )
                         val duration = System.currentTimeMillis() - touchStartTime
 
-                        if (deltaDist < 25 && duration < 350) {
+                        if (deltaDist <= (touchSlop * 1.5) && duration < 500) {
                             // Click event — Bring Ziggo Driver app to front
                             openApp()
                         } else {
@@ -194,9 +302,7 @@ class FloatingWidgetService : Service() {
         val view = floatingView ?: return
         val params = layoutParams ?: return
 
-        val displayMetrics = DisplayMetrics()
-        @Suppress("DEPRECATION")
-        wm.defaultDisplay.getMetrics(displayMetrics)
+        val displayMetrics = resources.displayMetrics
         val screenWidth = displayMetrics.widthPixels
         val screenHeight = displayMetrics.heightPixels
 
@@ -232,11 +338,20 @@ class FloatingWidgetService : Service() {
     }
 
     private fun openApp() {
-        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        }
-        if (launchIntent != null) {
+        try {
+            val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+                )
+            } ?: Intent(this, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
             startActivity(launchIntent)
+        } catch (e: Exception) {
+            // ignore
         }
     }
 
@@ -257,6 +372,14 @@ class FloatingWidgetService : Service() {
 
     override fun onDestroy() {
         removeFloatingWidget()
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+        } catch (_: Exception) {}
         super.onDestroy()
     }
 }
