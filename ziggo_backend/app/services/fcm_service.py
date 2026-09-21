@@ -135,7 +135,7 @@ async def _send_to_token(
             ios_sound = "food_alert.caf"
         else:
             android_sound = "ride_alert"
-            android_channel = "ziggo_ride_alarm_v13"
+            android_channel = "ziggo_ride_alarm_v14"
             ios_sound = "ride_alert.caf"
     else:
         android_sound = "default"

@@ -36,9 +36,10 @@ import '../network/api_client.dart';
 import 'notification_router.dart';
 
 // Must match the channel_id the backend sends in FCM payloads
-// (see fcm_service.py `channel_id="ziggo_ride_alarm_v13"`). Bumping this id
+// (see fcm_service.py `channel_id="ziggo_ride_alarm_v14"`). Bumping this id
 // forces Android to create a fresh channel with custom sound and ringtone usage.
-const String _rideAlertChannelId = 'ziggo_ride_alarm_v13';
+// v13 → v14: fixed silent fallback (null sound → system default ringtone).
+const String _rideAlertChannelId = 'ziggo_ride_alarm_v14';
 const String _rideAlertChannelName = 'Ride alarms';
 const String _rideAlertChannelDesc =
     'New ride requests. Rings like an incoming call until you respond or it expires.';
@@ -129,7 +130,8 @@ Future<void> createRideAlarmChannel(
   for (final oldId in const [
     'ziggo_ride_alarm_v10',
     'ziggo_ride_alarm_v11',
-    'ziggo_ride_alarm_v12',  // v12 → retired because some devices got it without custom sound
+    'ziggo_ride_alarm_v12',
+    'ziggo_ride_alarm_v13',  // v13 → retired: fallback used null sound (silent)
     'ziggo_ride_calls_v8',
     'ziggo_ride_alerts',
   ]) {
@@ -138,30 +140,48 @@ Future<void> createRideAlarmChannel(
     } catch (_) {}
   }
 
-  AndroidNotificationChannel build({required bool customSound}) =>
-      AndroidNotificationChannel(
-        _rideAlertChannelId,
-        _rideAlertChannelName,
-        description: _rideAlertChannelDesc,
-        importance: Importance.max,
-        playSound: true,
-        sound: customSound
-            ? const RawResourceAndroidNotificationSound('ride_alert')
-            : null,
-        // Ringtone stream: sounds like an incoming phone call and follows the
-        // phone's ringtone volume slider.
-        audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
-        enableVibration: true,
-        vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
-      );
+  // Channel with our custom ride_alert.mp3 ringtone.
+  final channelWithCustomSound = AndroidNotificationChannel(
+    _rideAlertChannelId,
+    _rideAlertChannelName,
+    description: _rideAlertChannelDesc,
+    importance: Importance.max,
+    playSound: true,
+    sound: const RawResourceAndroidNotificationSound('ride_alert'),
+    // Use the ringtone audio stream so it rings through silent/vibrate modes
+    // exactly like an incoming phone call.
+    audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+    enableVibration: true,
+    vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
+  );
+
+  // Fallback: if our custom .mp3 can't be resolved, use the system default
+  // ringtone — the driver will ALWAYS hear a sound, never silence.
+  // Sound: null means Android picks the channel's default, which for
+  // Importance.max + notificationRingtone is the device's ringtone.
+  final channelWithDefaultSound = AndroidNotificationChannel(
+    _rideAlertChannelId,
+    _rideAlertChannelName,
+    description: _rideAlertChannelDesc,
+    importance: Importance.max,
+    playSound: true,
+    sound: null, // null = Android system default ringtone for this importance level
+    audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+    enableVibration: true,
+    vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
+  );
 
   try {
-    await plugin.createNotificationChannel(build(customSound: true));
+    await plugin.createNotificationChannel(channelWithCustomSound);
+    unawaited(_bgLog('[fcm-bg] ride alarm channel created with custom sound ride_alert.mp3'));
   } catch (e) {
-    unawaited(_bgLog('[fcm-bg] custom alarm sound unavailable, using default: $e'));
+    unawaited(_bgLog('[fcm-bg] custom sound FAILED ($e) — falling back to system default ringtone'));
     try {
-      await plugin.createNotificationChannel(build(customSound: false));
-    } catch (_) {}
+      await plugin.createNotificationChannel(channelWithDefaultSound);
+      unawaited(_bgLog('[fcm-bg] ride alarm channel created with system default ringtone'));
+    } catch (e2) {
+      unawaited(_bgLog('[fcm-bg] channel creation COMPLETELY FAILED: $e2'));
+    }
   }
 }
 
