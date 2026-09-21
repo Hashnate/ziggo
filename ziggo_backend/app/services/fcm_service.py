@@ -171,7 +171,16 @@ async def _send_to_token(
                         sound=ios_sound,
                         content_available=True,
                         alert=messaging.ApsAlert(title=title, body=body),
-                        custom_data={"interruption-level": "time-sensitive"},
+                        # NOTE: interruption-level: time-sensitive removed until
+                        # the Apple Developer portal provisioning profile is
+                        # updated to include the Time Sensitive Notifications
+                        # capability. To re-enable:
+                        # 1. developer.apple.com → App IDs → ziggo → Edit →
+                        #    Time Sensitive Notifications → Enable → Save
+                        # 2. Regenerate "Ziggo Profile" provisioning profile
+                        # 3. Add com.apple.developer.usernotifications.time-sensitive
+                        #    back to ios/Runner/Runner.entitlements
+                        # custom_data={"interruption-level": "time-sensitive"},
                     ),
                 ),
             ),
