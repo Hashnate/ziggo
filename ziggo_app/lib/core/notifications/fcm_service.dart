@@ -36,13 +36,12 @@ import '../network/api_client.dart';
 import 'notification_router.dart';
 
 // Must match the channel_id the backend sends in FCM payloads
-// (see fcm_service.py `channel_id="ziggo_ride_alerts"`). Bumping this id
-// here forces Android to create a fresh channel (use this trick if you ever
-// swap the sound file — Android won't update an existing channel's sound).
-const String _rideAlertChannelId = 'ziggo_ride_alarm_v10';
+// (see fcm_service.py `channel_id="ziggo_ride_alarm_v12"`). Bumping this id
+// forces Android to create a fresh channel with custom sound and ringtone usage.
+const String _rideAlertChannelId = 'ziggo_ride_alarm_v12';
 const String _rideAlertChannelName = 'Ride alarms';
 const String _rideAlertChannelDesc =
-    'New ride requests. Sounds like an alarm until you respond or it expires.';
+    'New ride requests. Rings like an incoming call until you respond or it expires.';
 
 const String _foodAlertChannelId = 'ziggo_food_alerts_v3';
 const String _foodAlertChannelName = 'Food and order alerts';
@@ -117,13 +116,24 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   }
 }
 
-/// Create (or re-create) the ride alarm channel. Tries the custom alarm sound
+/// Create (or re-create) the ride alarm channel. Tries the custom ringtone sound
 /// first and silently falls back to the system default if the raw resource
 /// can't be resolved — a missing asset should cost us the ringtone, never the
 /// alert itself.
 Future<void> createRideAlarmChannel(
   AndroidFlutterLocalNotificationsPlugin plugin,
 ) async {
+  // Remove stale obsolete channels from earlier iterations so they don't linger on device
+  for (final oldId in const [
+    'ziggo_ride_alarm_v10',
+    'ziggo_ride_calls_v8',
+    'ziggo_ride_alerts',
+  ]) {
+    try {
+      await plugin.deleteNotificationChannel(oldId);
+    } catch (_) {}
+  }
+
   AndroidNotificationChannel build({required bool customSound}) =>
       AndroidNotificationChannel(
         _rideAlertChannelId,
@@ -134,9 +144,9 @@ Future<void> createRideAlarmChannel(
         sound: customSound
             ? const RawResourceAndroidNotificationSound('ride_alert')
             : null,
-        // Alarm stream: audible even with the ringer on silent, like a clock
-        // alarm. Volume follows the phone's alarm slider, not the ringer.
-        audioAttributesUsage: AudioAttributesUsage.alarm,
+        // Ringtone stream: sounds like an incoming phone call and follows the
+        // phone's ringtone volume slider.
+        audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
         enableVibration: true,
         vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
       );
@@ -161,43 +171,69 @@ Future<void> showRideAlarm(
   String body,
   Map<String, dynamic> data,
 ) async {
-  await plugin.show(
-    _rideAlertNotificationId,
-    title,
-    body,
-    NotificationDetails(
-      android: AndroidNotificationDetails(
-        _rideAlertChannelId,
-        _rideAlertChannelName,
-        channelDescription: _rideAlertChannelDesc,
-        importance: Importance.max,
-        priority: Priority.max,
-        // Sound deliberately NOT set here. On Android 8+ the channel owns the
-        // sound and this field is ignored — but the plugin still validates it
-        // and throws `invalid_sound` if the raw resource can't be resolved,
-        // which killed the whole notification. Channel-only is both correct
-        // and crash-proof: a missing asset degrades to the default tone
-        // instead of no alert at all.
-        playSound: true,
-        audioAttributesUsage: AudioAttributesUsage.alarm,
-        category: AndroidNotificationCategory.alarm,
-        // FLAG_INSISTENT (4) — loop the sound until the notification clears.
-        additionalFlags: Int32List.fromList(<int>[4]),
-        enableVibration: true,
-        vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
-        // Alarm-style banner: heads-up, can't be swiped away, and keeps
-        // sounding until the driver opens it (the in-app sheet then takes
-        // over), acts on it, or the 30 s accept window expires. No Accept /
-        // Decline buttons — acting happens in the app only. No full-screen
-        // takeover either; it shows on the lock screen as a banner.
-        ongoing: true,
-        autoCancel: false,
-        timeoutAfter: 30000, // matches expires_in_seconds: 30 from backend
-        visibility: NotificationVisibility.public,
+  final vibrationPattern = Int64List.fromList([0, 1000, 500, 1000, 500, 1000]);
+
+  try {
+    await plugin.show(
+      _rideAlertNotificationId,
+      title,
+      body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _rideAlertChannelId,
+          _rideAlertChannelName,
+          channelDescription: _rideAlertChannelDesc,
+          importance: Importance.max,
+          priority: Priority.max,
+          playSound: true,
+          sound: const RawResourceAndroidNotificationSound('ride_alert'),
+          audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+          category: AndroidNotificationCategory.call,
+          // fullScreenIntent wakes the screen when locked and displays heads-up
+          fullScreenIntent: true,
+          // FLAG_INSISTENT (4) — loop the sound until the notification clears.
+          additionalFlags: Int32List.fromList(<int>[4]),
+          enableVibration: true,
+          vibrationPattern: vibrationPattern,
+          ongoing: true,
+          autoCancel: false,
+          timeoutAfter: 30000, // matches expires_in_seconds: 30 from backend
+          visibility: NotificationVisibility.public,
+        ),
       ),
-    ),
-    payload: jsonEncode(data),
-  );
+      payload: jsonEncode(data),
+    );
+  } catch (e) {
+    unawaited(_bgLog('[fcm-bg] showRideAlarm with custom sound failed: $e, trying fallback'));
+    try {
+      await plugin.show(
+        _rideAlertNotificationId,
+        title,
+        body,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            _rideAlertChannelId,
+            _rideAlertChannelName,
+            channelDescription: _rideAlertChannelDesc,
+            importance: Importance.max,
+            priority: Priority.max,
+            playSound: true,
+            audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+            category: AndroidNotificationCategory.call,
+            fullScreenIntent: true,
+            additionalFlags: Int32List.fromList(<int>[4]),
+            enableVibration: true,
+            vibrationPattern: vibrationPattern,
+            ongoing: true,
+            autoCancel: false,
+            timeoutAfter: 30000,
+            visibility: NotificationVisibility.public,
+          ),
+        ),
+        payload: jsonEncode(data),
+      );
+    } catch (_) {}
+  }
 }
 
 class FcmService {

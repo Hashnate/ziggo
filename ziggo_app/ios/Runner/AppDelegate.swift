@@ -10,16 +10,28 @@ import FirebaseMessaging
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    FirebaseApp.configure()
+    // Safe Firebase configuration: verify plist exists and avoid duplicate configuration crashes
+    if FirebaseApp.app() == nil {
+      if let plistPath = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
+         FileManager.default.fileExists(atPath: plistPath) {
+        FirebaseApp.configure()
+      } else {
+        NSLog("[ios-startup] GoogleService-Info.plist not found in bundle — skipping Firebase configure")
+      }
+    }
+
     application.registerForRemoteNotifications() // Force APNs registration on boot
-    
+
+    // Guaranteed Google Maps initialization: always provide a key to prevent GMSInvalidAPIKeyException crash
+    let fallbackMapsKey = "AIzaSyAFtdjwK5SdMdo7c4F7jvJHWE-OE2LDSCk"
+    var mapsKey = fallbackMapsKey
     if let key = Bundle.main.object(forInfoDictionaryKey: "MAPS_API_KEY") as? String,
        !key.isEmpty,
        !key.contains("$") {
-      GMSServices.provideAPIKey(key)
-    } else {
-      NSLog("MAPS_API_KEY missing or invalid — add it to ios/Flutter/Secrets.xcconfig")
+      mapsKey = key
     }
+    GMSServices.provideAPIKey(mapsKey)
+
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
