@@ -834,16 +834,23 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                   children: [
                     ListTile(
                       onTap: () async {
-                        final status = await FlutterContacts.permissions.request(PermissionType.read);
-                        if (status == PermissionStatus.granted || status == PermissionStatus.limited) {
-                          final contact = await FlutterContacts.native.showPicker(
-                            properties: {ContactProperty.phone},
-                          );
-                          if (contact != null && contact.phones.isNotEmpty) {
-                            setState(() => _friend = (
-                              name: contact.displayName ?? '',
-                              phone: contact.phones.first.number,
-                            ));
+                        final granted = await FlutterContacts.requestPermission(readonly: true);
+                        if (granted) {
+                          final contact = await FlutterContacts.openExternalPick();
+                          if (contact != null) {
+                            final fullContact = await FlutterContacts.getContact(contact.id);
+                            final phone = (fullContact?.phones.isNotEmpty == true)
+                                ? fullContact!.phones.first.number
+                                : (contact.phones.isNotEmpty ? contact.phones.first.number : '');
+                            final name = (fullContact?.displayName.isNotEmpty == true)
+                                ? fullContact!.displayName
+                                : contact.displayName;
+                            if (phone.isNotEmpty) {
+                              setState(() => _friend = (
+                                name: name,
+                                phone: phone,
+                              ));
+                            }
                           }
                         }
                         if (context.mounted) Navigator.pop(ctx);

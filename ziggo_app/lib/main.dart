@@ -203,7 +203,7 @@ class _RootState extends State<_Root> with WidgetsBindingObserver {
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.hidden) {
       final auth = context.read<AuthProvider>();
-      if (auth.status == AuthStatus.authenticated && auth.role == 'driver') {
+      if (auth.status == AuthStatus.authenticated) {
         final driver = context.read<DriverProvider>();
         if (driver.isOnline) {
           FloatingOverlayService.showFloatingWidget();

@@ -48,7 +48,13 @@ class MainActivity : FlutterActivity() {
                             startActivity(intent)
                             result.success(true)
                         } catch (e: Exception) {
-                            result.error("PERMISSION_ERROR", e.message, null)
+                            try {
+                                val fallbackIntent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                                startActivity(fallbackIntent)
+                                result.success(true)
+                            } catch (e2: Exception) {
+                                result.error("PERMISSION_ERROR", e2.message, null)
+                            }
                         }
                     } else {
                         result.success(true)
