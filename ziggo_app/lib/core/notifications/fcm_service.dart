@@ -36,9 +36,9 @@ import '../network/api_client.dart';
 import 'notification_router.dart';
 
 // Must match the channel_id the backend sends in FCM payloads
-// (see fcm_service.py `channel_id="ziggo_ride_alarm_v12"`). Bumping this id
+// (see fcm_service.py `channel_id="ziggo_ride_alarm_v13"`). Bumping this id
 // forces Android to create a fresh channel with custom sound and ringtone usage.
-const String _rideAlertChannelId = 'ziggo_ride_alarm_v12';
+const String _rideAlertChannelId = 'ziggo_ride_alarm_v13';
 const String _rideAlertChannelName = 'Ride alarms';
 const String _rideAlertChannelDesc =
     'New ride requests. Rings like an incoming call until you respond or it expires.';
@@ -123,9 +123,13 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 Future<void> createRideAlarmChannel(
   AndroidFlutterLocalNotificationsPlugin plugin,
 ) async {
-  // Remove stale obsolete channels from earlier iterations so they don't linger on device
+  // Remove stale obsolete channels from earlier iterations so they don't linger on device.
+  // IMPORTANT: Android freezes a channel's sound after first creation. The only way to change
+  // the sound is to delete the old channel and create a new one with a bumped ID.
   for (final oldId in const [
     'ziggo_ride_alarm_v10',
+    'ziggo_ride_alarm_v11',
+    'ziggo_ride_alarm_v12',  // v12 → retired because some devices got it without custom sound
     'ziggo_ride_calls_v8',
     'ziggo_ride_alerts',
   ]) {
