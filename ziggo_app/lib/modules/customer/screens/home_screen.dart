@@ -67,9 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _bootstrap() {
     context.read<WalletProvider>().refresh();
-    context.read<BookingProvider>().loadActive().then((_) {
-      _checkPendingRating();
-    });
+    context.read<BookingProvider>().loadActive();
     context.read<NotificationsProvider>().refresh();
     
     context.read<FoodProvider>().fetchHome();
@@ -113,33 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _checkPendingRating() async {
-    if (!mounted) return;
-    // A phone number that just signed up has nothing to rate. Anything the API
-    // does return belongs to an earlier account on this device, so never greet
-    // a first-time user with the rating screen.
-    if (context.read<AuthProvider>().isNewUser) return;
-    final bp = context.read<BookingProvider>();
-    if (bp.activeBooking != null) {
-      final s = bp.activeBooking!['status'];
-      if (s == 'searching' || s == 'accepted' || s == 'arrived' || s == 'started') {
-        return;
-      }
-    }
-    final pending = await bp.checkPendingRating();
-    if (pending != null && mounted && !_ratingPromptOpen) {
-      final isCurrent = ModalRoute.of(context)?.isCurrent ?? false;
-      if (isCurrent) {
-        _ratingPromptOpen = true;
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) =>
-                RatingScreen(bookingId: pending['id'] as int, booking: pending),
-          ),
-        );
-        _ratingPromptOpen = false;
-      }
-    }
+    // Rating screen is presented directly upon ride completion via RideTrackingScreen.
   }
 
   @override
@@ -746,28 +718,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _autoRedirected = false;
     }
 
-    final pendingRating = booking.pendingRatingBooking;
-    if (!isRideActive &&
-        pendingRating != null &&
-        !auth.isNewUser &&
-        !_ratingPromptOpen &&
-        isCurrent) {
-      _ratingPromptOpen = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => RatingScreen(
-              bookingId: pendingRating['id'] as int,
-              booking: pendingRating,
-            ),
-          ),
-        ).then((_) {
-          _ratingPromptOpen = false;
-        });
-      });
-    }
 
     return Scaffold(
       key: _scaffoldKey,

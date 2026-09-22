@@ -40,12 +40,24 @@ class _RatingScreenState extends State<RatingScreen> with TickerProviderStateMix
     _checkScale = CurvedAnimation(parent: _checkController, curve: Curves.elasticOut);
 
     _driver = _driverOf(widget.booking);
-    if (_driver == null) _loadDriver();
+    if (_driver == null || _driver!['full_name'] == null) {
+      _loadDriver();
+    }
   }
 
   Map<String, dynamic>? _driverOf(Map<String, dynamic>? booking) {
-    final d = booking?['driver'];
-    return d is Map ? Map<String, dynamic>.from(d) : null;
+    if (booking == null) return null;
+    final d = booking['driver'];
+    if (d is Map) return Map<String, dynamic>.from(d);
+    if (booking.containsKey('driver_name') || booking.containsKey('driver_photo')) {
+      return {
+        'full_name': booking['driver_name'],
+        'profile_photo': booking['driver_photo'],
+        'vehicle_model': booking['vehicle_model'],
+        'vehicle_number': booking['vehicle_number'],
+      };
+    }
+    return null;
   }
 
   /// The app-open prompt and deep links hand us an id only; pull the driver in
@@ -367,105 +379,130 @@ class _RatingScreenState extends State<RatingScreen> with TickerProviderStateMix
   }
 }
 
-/// The completion badge at the top of the rating screen. With a driver it is
-/// their photo (or initial) ringed by the brand gradient, with the tick moved
-/// to a corner badge; with no driver it stays the plain tick it has always been.
+/// The driver avatar badge at the top of the rating screen. Displays the driver's
+/// profile picture (or styled avatar) with a completed check badge on the corner.
 class _CompletionAvatar extends StatelessWidget {
   final Map<String, dynamic>? driver;
   const _CompletionAvatar({this.driver});
 
-  static const double _ring = 110;
-  static const double _photo = 96;
+  static const double _ring = 104;
+  static const double _photo = 94;
 
   String? _photoUrl() {
     final raw = driver?['profile_photo']?.toString().trim() ?? '';
-    if (raw.isEmpty) return null;
-    if (raw.startsWith('http')) return raw;
+    if (raw.isEmpty || raw == 'null') return null;
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
     return raw.startsWith('/')
         ? '${ApiConfig.baseHost}$raw'
         : '${ApiConfig.baseHost}/$raw';
   }
 
-  Widget _initial() {
+  Widget _placeholder() {
     final name = driver?['full_name']?.toString().trim() ?? '';
-    return Text(
-      name.isEmpty ? 'D' : name[0].toUpperCase(),
-      style: const TextStyle(
+    if (name.isNotEmpty) {
+      return Container(
+        width: _photo,
+        height: _photo,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
+          ),
+          shape: BoxShape.circle,
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          name[0].toUpperCase(),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            fontSize: 40,
+          ),
+        ),
+      );
+    }
+    return Container(
+      width: _photo,
+      height: _photo,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
+        ),
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: const Icon(
+        Icons.person_rounded,
         color: Colors.white,
-        fontWeight: FontWeight.w900,
-        fontSize: 42,
+        size: 54,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final photoUrl = _photoUrl();
+
+    final avatarContent = ClipOval(
+      child: photoUrl != null
+          ? Image.network(
+              photoUrl,
+              width: _photo,
+              height: _photo,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _placeholder(),
+              loadingBuilder: (context, child, progress) =>
+                  progress == null ? child : _placeholder(),
+            )
+          : _placeholder(),
+    );
+
     final ring = Container(
       width: _ring,
       height: _ring,
-      alignment: Alignment.center,
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        gradient: AppColors.goldGradient,
+        color: Colors.white,
         shape: BoxShape.circle,
-        boxShadow: AppStyles.goldGlow,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.2),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+        border: Border.all(color: AppColors.primary.withOpacity(0.25), width: 2.5),
       ),
-      child: driver == null
-          ? const Icon(Icons.check_rounded, color: Colors.black, size: 60)
-          : _avatar(),
+      child: Center(child: avatarContent),
     );
 
-    if (driver == null) return ring;
-
-    // Box sized so the badge sits on the ring's edge at roughly 45 degrees.
     return SizedBox(
-      width: _ring + 16,
-      height: _ring + 16,
+      width: _ring + 14,
+      height: _ring + 14,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Center(child: ring),
           Positioned(
-            right: 5,
-            bottom: 5,
+            right: 4,
+            bottom: 4,
             child: Container(
-              width: 38,
-              height: 38,
+              width: 32,
+              height: 32,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: AppColors.success,
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 3),
+                border: Border.all(color: Colors.white, width: 2.5),
                 boxShadow: AppStyles.shadowSm,
               ),
-              child: const Icon(Icons.check_rounded, color: Colors.white, size: 20),
+              child: const Icon(Icons.check_rounded, color: Colors.white, size: 18),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _avatar() {
-    final url = _photoUrl();
-    if (url == null) return _initial();
-    return ClipOval(
-      child: Image.network(
-        url,
-        width: _photo,
-        height: _photo,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => SizedBox(
-          width: _photo,
-          height: _photo,
-          child: Center(child: _initial()),
-        ),
-        loadingBuilder: (context, child, progress) => progress == null
-            ? child
-            : SizedBox(
-                width: _photo,
-                height: _photo,
-                child: Center(child: _initial()),
-              ),
       ),
     );
   }

@@ -1190,20 +1190,19 @@ async def get_pending_rating(
         .where(
             Booking.customer_id == customer.id,
             Booking.status == BookingStatus.COMPLETED,
-            Booking.customer_rating.is_(None),
-            Booking.completed_at.is_not(None),
-            Booking.completed_at >= cutoff,
-            # is_not(True) rather than == False: these flags are nullable and
-            # legacy rows predate them, so == False would drop real rides.
             Booking.is_flash.is_not(True),
             Booking.is_courier.is_not(True),
             Booking.is_rental.is_not(True),
         )
-        .order_by(Booking.completed_at.desc(), Booking.id.desc())
+        .order_by(Booking.completed_at.desc().nullslast(), Booking.id.desc())
         .limit(1)
     )
     b = q.scalars().first()
-    return await _booking_to_response(db, b) if b else None
+    if not b or b.customer_rating is not None:
+        return None
+    if not b.completed_at or b.completed_at < cutoff:
+        return None
+    return await _booking_to_response(db, b)
 
 
 @router.get("/{booking_id}", response_model=BookingResponse)

@@ -387,15 +387,7 @@ class BookingProvider extends ChangeNotifier {
       notifyListeners();
     } catch (_) {}
 
-    final isRideUnderway = _activeBooking != null &&
-        (_activeBooking!['status'] == 'searching' ||
-         _activeBooking!['status'] == 'accepted' ||
-         _activeBooking!['status'] == 'arrived' ||
-         _activeBooking!['status'] == 'started');
-
-    if (!isRideUnderway) {
-      await checkPendingRating();
-    }
+    // Do not check pending rating automatically on loadActive to prevent unwanted popups on startup
   }
 
   Future<Map<String, dynamic>?> updateStatus(int bookingId, String status, {String? reason}) async {
