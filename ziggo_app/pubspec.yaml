@@ -70,10 +70,14 @@ dependencies:
   # notification firing / notification permission being granted — those only
   # cover the backgrounded/killed case. Asset: assets/sounds/ride_alert.mp3.
   audioplayers: ^6.1.0
-  # 2.x is required on iOS 27. 1.x force-unwrapped
+  # Vendored copy of upstream 1.1.9+2 with one fix: upstream force-unwrapped
   # UIApplication.shared.delegate!.window!!.rootViewController! at plugin
-  # registration, which is nil under the scene-based engine → SIGTRAP on launch.
-  flutter_contacts: ^1.1.9+2
+  # registration, which is nil under the UIScene lifecycle (the app delegate owns
+  # no window, and registration runs before the scene's root VC exists) → SIGTRAP
+  # on every launch. The vendored copy resolves that view controller lazily.
+  # Upstream 2.5.0 fixes this properly but is an API rewrite needing Flutter 3.44+.
+  flutter_contacts:
+    path: packages/flutter_contacts
   pdf: 3.11.1
   printing: ^5.14.3
   share_plus: ^10.0.2
