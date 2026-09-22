@@ -146,6 +146,7 @@ class _Root extends StatefulWidget {
 class _RootState extends State<_Root> with WidgetsBindingObserver {
   bool _splashed = false;
   bool _fcmRegistered = false;
+  bool _sessionCleared = false;
   StreamSubscription? _adminSub;
 
   @override
@@ -219,8 +220,18 @@ class _RootState extends State<_Root> with WidgetsBindingObserver {
     if (auth.status != AuthStatus.authenticated && !auth.isGuest) {
       _adminSub?.cancel();
       _adminSub = null;
+      // Providers outlive logout. Drop the previous customer's ride, rating
+      // prompt and socket here, or the next account to sign in on this app run
+      // inherits them — and re-register FCM for whoever signs in next.
+      if (!_sessionCleared) {
+        _sessionCleared = true;
+        _fcmRegistered = false;
+        final booking = context.read<BookingProvider>();
+        WidgetsBinding.instance.addPostFrameCallback((_) => booking.resetSession());
+      }
       return const RoleSelectionScreen();
     }
+    _sessionCleared = false;
     // Bootstrap booking realtime once authenticated
     final booking = context.read<BookingProvider>();
     if (auth.token != null && !booking.ws.isConnected) {

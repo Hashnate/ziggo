@@ -17,6 +17,9 @@ class BookingProvider extends ChangeNotifier {
   final _adminUpdateController = StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get adminUpdates => _adminUpdateController.stream;
 
+  StreamSubscription? _wsSub;
+  StreamSubscription? _fcmSub;
+
   // Backend cancels a stale search at 120 s (swept every 30 s, so up to ~150 s).
   // The client only steps in if that clearly didn't happen.
   static const int _searchFailsafeSeconds = 180;
@@ -39,8 +42,13 @@ class BookingProvider extends ChangeNotifier {
   }
 
   Future<void> connectRealtime(String token) async {
+    // connect() first: it sets isConnected synchronously, which is what callers
+    // gate on. Both streams below are broadcast and outlive the connection, so
+    // a second call would stack a duplicate handler on top of the first.
     _ws.connect(token);
-    _ws.events.listen((msg) {
+    await _wsSub?.cancel();
+    await _fcmSub?.cancel();
+    _wsSub = _ws.events.listen((msg) {
       final event = msg['event'];
       final data = msg['data'] as Map<String, dynamic>?;
       if (data == null) return;
@@ -85,7 +93,7 @@ class BookingProvider extends ChangeNotifier {
     });
 
     // Fallback: If WebSocket drops a message, FCM push notifications act as a secondary trigger
-    FcmService.instance.onForegroundEvent.listen((data) {
+    _fcmSub = FcmService.instance.onForegroundEvent.listen((data) {
       if (data['event'] == 'booking_update') {
         final s = data['status']?.toString();
         // Skip loadActive() for terminal statuses — the WS handler already
@@ -430,6 +438,21 @@ class BookingProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// One booking by id, for screens handed only an id (the rating screen needs
+  /// the driver block to show who it is rating).
+  Future<Map<String, dynamic>?> fetchBooking(int bookingId) async {
+    try {
+      final resp = await ApiClient.instance.dio.get('/bookings/$bookingId');
+      if (resp.data is Map) {
+        return Map<String, dynamic>.from(resp.data as Map);
+      }
+      return null;
+    } on DioException catch (e) {
+      _lastError = e.response?.data?['detail']?.toString() ?? e.message;
+      return null;
+    }
+  }
+
   Future<Map<String, dynamic>?> checkPendingRating() async {
     try {
       final resp = await ApiClient.instance.dio.get('/bookings/pending-rating');
@@ -460,25 +483,36 @@ class BookingProvider extends ChangeNotifier {
     }
   }
 
+  /// Records that the customer declined to rate this booking. The id is
+  /// persisted, so ✕ / "Skip" is honoured on the next launch too — the API
+  /// still reports the booking as unrated, and without this the full-screen
+  /// prompt re-opens on every app open. rate() drops the key once a rating
+  /// lands, and the backend stops offering the booking after 48 h anyway.
   Future<void> dismissRating(int bookingId) async {
+    if (_pendingRatingBooking != null && _pendingRatingBooking!['id'] == bookingId) {
+      _pendingRatingBooking = null;
+    }
+    _activeBooking = null;
+    notifyListeners();
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('dismissed_rating_booking_id', bookingId);
     } catch (_) {}
-    if (_pendingRatingBooking != null && _pendingRatingBooking!['id'] == bookingId) {
-      _pendingRatingBooking = null;
-    }
-    clearActiveBookingLocally();
-    notifyListeners();
   }
 
-  /// Clears the pending rating from memory ONLY (no SharedPreferences write).
-  /// Use this when the customer presses ✕ or "Skip" — the rating disappears
-  /// for the current session but will reappear the next time the app is opened
-  /// because the API still has the unrated booking.
-  void snoozeRating() {
-    _pendingRatingBooking = null;
+  /// Drops every trace of the signed-in customer. Providers outlive logout, so
+  /// without this the next account to sign in on the same app run inherits the
+  /// previous one's active ride and rating prompt.
+  Future<void> resetSession() async {
+    await _wsSub?.cancel();
+    await _fcmSub?.cancel();
+    _wsSub = null;
+    _fcmSub = null;
+    await _ws.disconnect();
     _activeBooking = null;
+    _pendingRatingBooking = null;
+    _lastError = null;
+    _busy = false;
     notifyListeners();
   }
 
@@ -636,6 +670,8 @@ class BookingProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _wsSub?.cancel();
+    _fcmSub?.cancel();
     _ws.dispose();
     _adminUpdateController.close();
     super.dispose();

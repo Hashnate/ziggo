@@ -3,12 +3,18 @@ import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
+import '../../../core/network/api_client.dart';
 import '../../../core/widgets/confetti.dart';
 import '../booking_provider.dart';
 
 class RatingScreen extends StatefulWidget {
   final int bookingId;
-  const RatingScreen({super.key, required this.bookingId});
+
+  /// The booking being rated, when the caller already has it. Only the
+  /// `driver` block is read; omit it and the screen fetches the booking itself.
+  final Map<String, dynamic>? booking;
+
+  const RatingScreen({super.key, required this.bookingId, this.booking});
 
   @override
   State<RatingScreen> createState() => _RatingScreenState();
@@ -18,6 +24,8 @@ class _RatingScreenState extends State<RatingScreen> with TickerProviderStateMix
   int _stars = 0;
   final _feedbackCtrl = TextEditingController();
   bool _busy = false;
+
+  Map<String, dynamic>? _driver;
 
   late final AnimationController _checkController;
   late final Animation<double> _checkScale;
@@ -30,6 +38,36 @@ class _RatingScreenState extends State<RatingScreen> with TickerProviderStateMix
       duration: const Duration(milliseconds: 600),
     )..forward();
     _checkScale = CurvedAnimation(parent: _checkController, curve: Curves.elasticOut);
+
+    _driver = _driverOf(widget.booking);
+    if (_driver == null) _loadDriver();
+  }
+
+  Map<String, dynamic>? _driverOf(Map<String, dynamic>? booking) {
+    final d = booking?['driver'];
+    return d is Map ? Map<String, dynamic>.from(d) : null;
+  }
+
+  /// The app-open prompt and deep links hand us an id only; pull the driver in
+  /// so the customer can see who they are rating.
+  Future<void> _loadDriver() async {
+    final booking =
+        await context.read<BookingProvider>().fetchBooking(widget.bookingId);
+    if (!mounted) return;
+    final d = _driverOf(booking);
+    if (d != null) setState(() => _driver = d);
+  }
+
+  String get _driverName => _driver?['full_name']?.toString().trim() ?? '';
+
+  String get _driverFirstName => _driverName.split(' ').first;
+
+  String get _vehicleLine {
+    final parts = [
+      _driver?['vehicle_model']?.toString().trim() ?? '',
+      _driver?['vehicle_number']?.toString().trim() ?? '',
+    ].where((p) => p.isNotEmpty);
+    return parts.join('  ·  ');
   }
 
   @override
@@ -105,10 +143,9 @@ class _RatingScreenState extends State<RatingScreen> with TickerProviderStateMix
   }
 
   void _dismiss() {
-    // snoozeRating() clears from memory only — no SharedPreferences write.
-    // The rating screen disappears for this session but will reappear the
-    // next time the app is opened so the customer can still rate later.
-    context.read<BookingProvider>().snoozeRating();
+    // Persisted, not session-only: the booking stays unrated on the server, so
+    // without a stored dismissal this screen re-opens on every app launch.
+    context.read<BookingProvider>().dismissRating(widget.bookingId);
     Navigator.popUntil(context, (r) => r.isFirst);
   }
 
@@ -139,21 +176,7 @@ class _RatingScreenState extends State<RatingScreen> with TickerProviderStateMix
                               Center(
                                 child: ScaleTransition(
                                   scale: _checkScale,
-                                  child: Container(
-                                    width: 110,
-                                    height: 110,
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                      gradient: AppColors.goldGradient,
-                                      shape: BoxShape.circle,
-                                      boxShadow: AppStyles.goldGlow,
-                                    ),
-                                    child: const Icon(
-                                      Icons.check_rounded,
-                                      color: Colors.black,
-                                      size: 60,
-                                    ),
-                                  ),
+                                  child: _CompletionAvatar(driver: _driver),
                                 ),
                               ),
                               const SizedBox(height: 28),
@@ -167,14 +190,39 @@ class _RatingScreenState extends State<RatingScreen> with TickerProviderStateMix
                                 ),
                               ),
                               const SizedBox(height: 6),
-                              const Text(
-                                'How was your ride? Your feedback helps everyone.',
+                              Text(
+                                _driverName.isEmpty
+                                    ? 'How was your ride? Your feedback helps everyone.'
+                                    : 'How was your ride with $_driverFirstName?',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   color: AppColors.textSecondary,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
+                              if (_vehicleLine.isNotEmpty) ...[
+                                const SizedBox(height: 12),
+                                Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 7),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(999),
+                                      boxShadow: AppStyles.shadowSm,
+                                    ),
+                                    child: Text(
+                                      _vehicleLine,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.textSecondary,
+                                        letterSpacing: 0.2,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                               const SizedBox(height: 36),
                               Container(
                                 padding: const EdgeInsets.all(20),
@@ -314,6 +362,110 @@ class _RatingScreenState extends State<RatingScreen> with TickerProviderStateMix
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The completion badge at the top of the rating screen. With a driver it is
+/// their photo (or initial) ringed by the brand gradient, with the tick moved
+/// to a corner badge; with no driver it stays the plain tick it has always been.
+class _CompletionAvatar extends StatelessWidget {
+  final Map<String, dynamic>? driver;
+  const _CompletionAvatar({this.driver});
+
+  static const double _ring = 110;
+  static const double _photo = 96;
+
+  String? _photoUrl() {
+    final raw = driver?['profile_photo']?.toString().trim() ?? '';
+    if (raw.isEmpty) return null;
+    if (raw.startsWith('http')) return raw;
+    return raw.startsWith('/')
+        ? '${ApiConfig.baseHost}$raw'
+        : '${ApiConfig.baseHost}/$raw';
+  }
+
+  Widget _initial() {
+    final name = driver?['full_name']?.toString().trim() ?? '';
+    return Text(
+      name.isEmpty ? 'D' : name[0].toUpperCase(),
+      style: const TextStyle(
+        color: Colors.white,
+        fontWeight: FontWeight.w900,
+        fontSize: 42,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ring = Container(
+      width: _ring,
+      height: _ring,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        gradient: AppColors.goldGradient,
+        shape: BoxShape.circle,
+        boxShadow: AppStyles.goldGlow,
+      ),
+      child: driver == null
+          ? const Icon(Icons.check_rounded, color: Colors.black, size: 60)
+          : _avatar(),
+    );
+
+    if (driver == null) return ring;
+
+    // Box sized so the badge sits on the ring's edge at roughly 45 degrees.
+    return SizedBox(
+      width: _ring + 16,
+      height: _ring + 16,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Center(child: ring),
+          Positioned(
+            right: 5,
+            bottom: 5,
+            child: Container(
+              width: 38,
+              height: 38,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.success,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 3),
+                boxShadow: AppStyles.shadowSm,
+              ),
+              child: const Icon(Icons.check_rounded, color: Colors.white, size: 20),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _avatar() {
+    final url = _photoUrl();
+    if (url == null) return _initial();
+    return ClipOval(
+      child: Image.network(
+        url,
+        width: _photo,
+        height: _photo,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => SizedBox(
+          width: _photo,
+          height: _photo,
+          child: Center(child: _initial()),
+        ),
+        loadingBuilder: (context, child, progress) => progress == null
+            ? child
+            : SizedBox(
+                width: _photo,
+                height: _photo,
+                child: Center(child: _initial()),
+              ),
       ),
     );
   }

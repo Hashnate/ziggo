@@ -1163,24 +1163,41 @@ async def get_active_booking(
     return await _booking_to_response(db, b) if b else None
 
 
+PENDING_RATING_WINDOW_HOURS = 48
+
+
 @router.get("/pending-rating", response_model=Optional[BookingResponse])
 async def get_pending_rating(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Return the customer's most recent completed booking that has not been rated yet."""
+    """Return the customer's most recent unrated ride, for the app-open prompt.
+
+    Scoped deliberately: rides only (a parcel or hire is rated from its own
+    tracking screen) and only the last PENDING_RATING_WINDOW_HOURS, so a trip
+    the customer never got round to rating stops re-opening the full-screen
+    prompt on every launch for ever.
+    """
     if user.role != UserRole.CUSTOMER:
         return None
     customer = await _get_customer(db, user)
     if not customer:
         return None
 
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=PENDING_RATING_WINDOW_HOURS)
     q = await db.execute(
         select(Booking)
         .where(
             Booking.customer_id == customer.id,
             Booking.status == BookingStatus.COMPLETED,
             Booking.customer_rating.is_(None),
+            Booking.completed_at.is_not(None),
+            Booking.completed_at >= cutoff,
+            # is_not(True) rather than == False: these flags are nullable and
+            # legacy rows predate them, so == False would drop real rides.
+            Booking.is_flash.is_not(True),
+            Booking.is_courier.is_not(True),
+            Booking.is_rental.is_not(True),
         )
         .order_by(Booking.completed_at.desc(), Booking.id.desc())
         .limit(1)

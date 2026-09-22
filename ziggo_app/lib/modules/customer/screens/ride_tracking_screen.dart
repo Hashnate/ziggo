@@ -471,7 +471,8 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => RatingScreen(bookingId: active['id'] as int),
+            builder: (_) =>
+                RatingScreen(bookingId: active['id'] as int, booking: active),
           ),
         );
       });

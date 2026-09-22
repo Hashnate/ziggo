@@ -114,6 +114,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _checkPendingRating() async {
     if (!mounted) return;
+    // A phone number that just signed up has nothing to rate. Anything the API
+    // does return belongs to an earlier account on this device, so never greet
+    // a first-time user with the rating screen.
+    if (context.read<AuthProvider>().isNewUser) return;
     final bp = context.read<BookingProvider>();
     if (bp.activeBooking != null) {
       final s = bp.activeBooking!['status'];
@@ -129,7 +133,8 @@ class _HomeScreenState extends State<HomeScreen> {
         await Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => RatingScreen(bookingId: pending['id'] as int),
+            builder: (_) =>
+                RatingScreen(bookingId: pending['id'] as int, booking: pending),
           ),
         );
         _ratingPromptOpen = false;
@@ -742,14 +747,21 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final pendingRating = booking.pendingRatingBooking;
-    if (!isRideActive && pendingRating != null && !_ratingPromptOpen && isCurrent) {
+    if (!isRideActive &&
+        pendingRating != null &&
+        !auth.isNewUser &&
+        !_ratingPromptOpen &&
+        isCurrent) {
       _ratingPromptOpen = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => RatingScreen(bookingId: pendingRating['id'] as int),
+            builder: (_) => RatingScreen(
+              bookingId: pendingRating['id'] as int,
+              booking: pendingRating,
+            ),
           ),
         ).then((_) {
           _ratingPromptOpen = false;

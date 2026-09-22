@@ -365,7 +365,8 @@ class _FlashTrackingScreenState extends State<FlashTrackingScreen> with SingleTi
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => RatingScreen(bookingId: active['id'] as int),
+            builder: (_) =>
+                RatingScreen(bookingId: active['id'] as int, booking: active),
           ),
         );
       });
