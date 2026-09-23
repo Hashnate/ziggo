@@ -11,11 +11,13 @@
             <h2 class="text-lg font-bold tracking-tight text-white leading-tight">Welcome back, Admin!</h2>
             <p class="text-xs text-slate-400 font-medium">Here's what's happening with Ziggo today.</p>
         </div>
+        {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
         <div class="flex items-center gap-3">
             <a href="/admin/finance" class="px-4 py-2 rounded-xl bg-white text-slate-900 font-semibold text-xs hover:bg-slate-100 transition shadow-sm">
                 Finance Detail
             </a>
         </div>
+        {% endif %}
     </div>
 </div>
 

@@ -45,11 +45,13 @@ class NotificationRouter {
         navContext.read<NotificationsProvider>().refresh();
       } catch (_) {}
 
-      final isRequestEvent = event == 'new_ride_request' ||
+      final isBroadcast = event.toString().contains('broadcast');
+      final isRequestEvent = !isBroadcast && (
+          event == 'new_ride_request' ||
           event == 'new_ride' ||
           event == 'new_market_order' ||
           event == 'new_market_request' ||
-          (data.containsKey('pickup_lat') && data.containsKey('fare'));
+          (data.containsKey('pickup_lat') && data.containsKey('fare')));
 
       if (isRequestEvent) {
         final parsed = FcmService.instance.parseFcmData(data);

@@ -277,12 +277,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
     final data = message.data;
     final event = data['event'];
     
-    final isRequestEvent = event == 'new_ride_request' || 
+    final isBroadcast = event.toString().contains('broadcast');
+    final isRequestEvent = !isBroadcast && (
+                           event == 'new_ride_request' || 
                            event == 'new_ride' || 
                            event == 'new_market_order' || 
                            event == 'new_market_request' || 
-                           (event.toString().contains('request') && !event.toString().contains('broadcast')) ||
-                           (data.containsKey('pickup_lat') && data.containsKey('fare'));
+                           (event.toString().contains('request') && !isBroadcast) ||
+                           (data.containsKey('pickup_lat') && data.containsKey('fare')));
                            
     if (isRequestEvent) {
       final parsed = FcmService.instance.parseFcmData(data);

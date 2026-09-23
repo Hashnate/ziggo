@@ -139,7 +139,7 @@ async def _send_to_token(
             ios_sound = "ride_alert.caf"
     else:
         android_sound = "default"
-        android_channel = None
+        android_channel = "ziggo_general_alerts_v2"
         ios_sound = "default"
 
     # Always mirror title/body into `data` so the client-side background

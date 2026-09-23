@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_auth/smart_auth.dart';
 
@@ -39,6 +40,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     super.initState();
     _otpCtrl = TextEditingController();
     _focusNode = FocusNode();
+    _focusNode.addListener(_onFocusChange);
 
     final dev = context.read<AuthProvider>().devOtp;
     if (dev != null && dev.length == _len) {
@@ -51,6 +53,10 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     } else {
       _listenForSms();
     }
+  }
+
+  void _onFocusChange() {
+    if (mounted) setState(() {});
   }
 
   void _listenForSms() {
@@ -91,6 +97,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       _smartAuth.removeSmsRetrieverApiListener();
       _smartAuth.removeUserConsentApiListener();
     } catch (_) {}
+    _focusNode.removeListener(_onFocusChange);
     _otpCtrl.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -233,49 +240,12 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
               EntranceSlide(
                 delay: const Duration(milliseconds: 120),
                 child: AutofillGroup(
-                  child: GestureDetector(
-                    onTap: () => _focusNode.requestFocus(),
-                    behavior: HitTestBehavior.opaque,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        // Offstage/transparent single TextField handling OS SMS autofill & keyboard input
-                        Opacity(
-                          opacity: 0.0,
-                          child: TextField(
-                            controller: _otpCtrl,
-                            focusNode: _focusNode,
-                            autofocus: true,
-                            keyboardType: TextInputType.number,
-                            textInputAction: TextInputAction.done,
-                            maxLength: _len,
-                            autofillHints: const [AutofillHints.oneTimeCode],
-                            enableSuggestions: true,
-                            onChanged: (v) {
-                              final digits = v.replaceAll(RegExp(r'\D'), '');
-                              if (digits != v) {
-                                _otpCtrl.value = TextEditingValue(
-                                  text: digits,
-                                  selection: TextSelection.collapsed(offset: digits.length),
-                                );
-                              }
-                              setState(() {});
-                              if (digits.length == _len && !_busy) {
-                                _verify();
-                              }
-                            },
-                            decoration: const InputDecoration(
-                              counterText: '',
-                              contentPadding: EdgeInsets.zero,
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              filled: false,
-                            ),
-                          ),
-                        ),
-                        // Visual 6-cell PIN display
-                        Row(
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Visual 6-cell PIN display (ignore pointer so tap directly hits the TextField)
+                      IgnorePointer(
+                        child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: List.generate(_len, (i) {
                             final code = _code;
@@ -312,8 +282,56 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                             );
                           }),
                         ),
-                      ],
-                    ),
+                      ),
+                      // Invisible full-area TextField on TOP to capture keyboard input, taps, and autofill directly
+                      Positioned.fill(
+                        child: Opacity(
+                          opacity: 0.0,
+                          child: TextField(
+                            controller: _otpCtrl,
+                            focusNode: _focusNode,
+                            autofocus: true,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(_len),
+                            ],
+                            textInputAction: TextInputAction.done,
+                            maxLength: _len,
+                            autofillHints: const [AutofillHints.oneTimeCode],
+                            enableSuggestions: true,
+                            showCursor: false,
+                            enableInteractiveSelection: false,
+                            onTap: () {
+                              _otpCtrl.selection = TextSelection.collapsed(
+                                offset: _otpCtrl.text.length,
+                              );
+                            },
+                            onChanged: (v) {
+                              final digits = v.replaceAll(RegExp(r'\D'), '');
+                              if (digits != v) {
+                                _otpCtrl.value = TextEditingValue(
+                                  text: digits,
+                                  selection: TextSelection.collapsed(offset: digits.length),
+                                );
+                              }
+                              setState(() {});
+                              if (digits.length == _len && !_busy) {
+                                _verify();
+                              }
+                            },
+                            decoration: const InputDecoration(
+                              counterText: '',
+                              contentPadding: EdgeInsets.zero,
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              filled: false,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),

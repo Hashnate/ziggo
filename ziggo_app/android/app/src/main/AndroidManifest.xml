@@ -28,7 +28,7 @@
             android:resource="@mipmap/launcher_icon" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="ziggo_ride_alarm_v14" />
+            android:value="ziggo_general_alerts_v2" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

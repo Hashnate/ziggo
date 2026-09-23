@@ -95,18 +95,22 @@ class DriverProvider extends ChangeNotifier {
       return;
     }
 
+    if (event == 'broadcast_message') {
+      return;
+    }
+
     if (data == null) return;
     
     // Aggressive catch-all: If it looks like a request, show it!
-    // But exclude cancellation events that might contain 'request'.
+    // Exclude cancellation events and broadcast notifications.
     final isCancelEvent = event.toString().contains('cancel');
-    final isRequestEvent = !isCancelEvent && (
+    final isBroadcast = event.toString().contains('broadcast');
+    final isRequestEvent = !isCancelEvent && !isBroadcast && (
                            event == 'new_ride_request' || 
                            event == 'new_ride' || 
                            event == 'new_market_order' || 
                            event == 'new_market_request' || 
-                           event.toString().contains('request') ||
-                           event.toString().contains('broadcast') ||
+                           (event.toString().contains('request') && !isBroadcast) ||
                            (data.containsKey('pickup_lat') && data.containsKey('fare'))
     );
 
