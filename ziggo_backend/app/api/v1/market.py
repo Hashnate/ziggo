@@ -35,7 +35,7 @@ from ...services.fare_service import haversine_km
 from ...services.matching_service import find_all_nearby_drivers
 from ...services import market_delivery_service as delivery
 from ...services.ws_manager import manager
-from ...services import payhere_service
+from ...services import ipay_service
 
 router = APIRouter()
 
@@ -615,7 +615,7 @@ async def create_market_order(
         )
         card = card_q.scalars().first()
         if card:
-            charge_res = await payhere_service.charge_tokenized_card(
+            charge_res = await ipay_service.charge_tokenized_card(
                 customer_token=card.customer_token,
                 amount=final,
                 order_id=order_ref,

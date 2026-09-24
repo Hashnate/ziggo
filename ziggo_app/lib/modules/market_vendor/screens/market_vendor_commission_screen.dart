@@ -54,7 +54,7 @@ class _MarketVendorCommissionScreenState
             textAlign: TextAlign.center,
             style: TextStyle(fontWeight: FontWeight.w900)),
         content: Text(
-          'You are about to pay Rs.${NumberFormat('#,##0').format(outstanding.round())} in commission to Ziggo Admin via PayHere.',
+          'You are about to pay Rs.${NumberFormat('#,##0').format(outstanding.round())} in commission to Ziggo Admin via iPay.',
           textAlign: TextAlign.center,
           style: const TextStyle(
               color: AppColors.textSecondary, fontWeight: FontWeight.w600),

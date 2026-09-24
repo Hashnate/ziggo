@@ -57,8 +57,8 @@ dependencies:
   # bundle root — Flutter assets are neither).
   path_provider: ^2.1.5
 
-  # PayHere hosted checkout — opened in an in-app WebView. Returns to the
-  # app via PayHere's `return_url` (a deep link we control).
+  # iPay hosted checkout — opened in an in-app WebView. Returns to the
+  # app via iPay's `return_url` (a deep link we control).
   webview_flutter: ^4.10.0
 
   # QR Scanning & Generation for Scan-to-Pay

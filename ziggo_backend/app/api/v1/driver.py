@@ -706,14 +706,14 @@ async def settle_commission(
         if not card:
             raise HTTPException(status_code=404, detail="Selected card not found")
             
-        from ...services.payhere_service import charge_tokenized_card
+        from ...services.ipay_service import charge_tokenized_card
         import secrets
         order_id = "SC" + secrets.token_hex(6).upper()
         res = await charge_tokenized_card(
             customer_token=card.customer_token,
             amount=settle_amount,
             order_id=order_id,
-            description=f"Admin Commission Settlement ({order_id})",
+            items=f"Admin Commission Settlement ({order_id})",
         )
         if not res.get("success"):
             raise HTTPException(status_code=400, detail=res.get("message", "Payment failed"))

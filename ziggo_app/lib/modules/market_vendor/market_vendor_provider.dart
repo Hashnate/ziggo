@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/network/ws_client.dart';
-import '../../core/payments/payhere_service.dart';
+import '../../core/payments/ipay_service.dart';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 
@@ -536,15 +536,17 @@ class MarketVendorProvider extends ChangeNotifier {
     }
   }
 
+  /// Submits a commission payment to the admin via iPay.
+  /// Returns null on success, or an error string on failure.
   Future<String?> payCommission(BuildContext context, double amount) async {
     try {
-      // Step 1: Pay via PayHere (tops up the owner's wallet)
-      final enabled = await PayHereService.instance.isEnabled();
+      // Step 1: Pay via iPay (tops up the owner's wallet)
+      final enabled = await IPayService.instance.isEnabled();
       if (!enabled) {
-        return 'PayHere is not enabled on this server.';
+        return 'iPay is not enabled on this server.';
       }
       
-      final result = await PayHereService.instance.topUpWallet(context, amount);
+      final result = await IPayService.instance.topUpWallet(context, amount);
       if (!result.success) {
         return result.message ?? 'Payment cancelled or failed';
       }

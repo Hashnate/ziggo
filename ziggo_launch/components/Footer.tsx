@@ -88,7 +88,7 @@ export default function Footer() {
             Powered by{' '}
             <span className="text-brand-glow/60 font-semibold">Ziggo Wallet</span>
             {' '}·{' '}
-            <span className="text-brand-glow/60 font-semibold">PayHere</span>
+            <span className="text-brand-glow/60 font-semibold">iPay</span>
           </span>
           <span className="hidden sm:block text-white/20 text-xs">|</span>
           <span className="text-xs text-white/25 font-['DM_Sans']">

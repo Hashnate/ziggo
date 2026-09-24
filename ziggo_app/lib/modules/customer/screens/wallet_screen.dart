@@ -29,11 +29,10 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Future<void> _topUp(BuildContext context, double amount) async {
-    // topUpViaPayHere routes through the real gateway when PayHere is
+    // topUpViaIPay routes through the real gateway when iPay is
     // configured on the backend, and silently falls back to the mock
-    // direct-credit path when it isn't — so dev keeps working unchanged
-    // while prod uses real money the moment the merchant keys land.
-    final err = await context.read<WalletProvider>().topUpViaPayHere(context, amount);
+    // direct-credit path when it isn't.
+    final err = await context.read<WalletProvider>().topUpViaIPay(context, amount);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

@@ -28,14 +28,25 @@ class Settings(BaseSettings):
     NOTIFY_LK_API_KEY: Optional[str] = None
     NOTIFY_LK_SENDER_ID: Optional[str] = None
 
-    # PayHere — Sri Lankan payment gateway. When MERCHANT_ID is empty the
-    # /payments/payhere/* endpoints return 503 and wallet top-ups fall back
+    # iPay — Sri Lankan payment gateway. When IPAY_MERCHANT_ID is empty the
+    # /payments/ipay/* endpoints return 503 and wallet top-ups fall back
     # to the existing mock direct-credit flow.
+    IPAY_MERCHANT_ID: Optional[str] = None
+    IPAY_API_KEY: Optional[str] = None
+    IPAY_SECRET_KEY: Optional[str] = None
+    IPAY_APP_ID: Optional[str] = None
+    IPAY_APP_SECRET: Optional[str] = None
+    IPAY_MODE: Optional[str] = "sandbox"  # "sandbox" or "live"
+    IPAY_NOTIFY_URL: Optional[str] = None
+    IPAY_REDIRECT_URL: Optional[str] = None
+    IPAY_CANCEL_URL: Optional[str] = None
+
+    # Legacy PayHere fallback aliases (for transitional backward compatibility)
     PAYHERE_MERCHANT_ID: Optional[str] = None
     PAYHERE_MERCHANT_SECRET: Optional[str] = None
     PAYHERE_APP_ID: Optional[str] = None
     PAYHERE_APP_SECRET: Optional[str] = None
-    PAYHERE_MODE: Optional[str] = "sandbox"  # "sandbox" or "live"
+    PAYHERE_MODE: Optional[str] = "sandbox"
     PAYHERE_NOTIFY_URL: Optional[str] = None
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")

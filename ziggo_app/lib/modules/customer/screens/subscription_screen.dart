@@ -41,8 +41,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   Future<void> _subscribe(int total) async {
     final wallet = context.read<WalletProvider>();
 
-    if (_payment == 'payhere') {
-      final err = await wallet.topUpViaPayHere(context, total.toDouble());
+    if (_payment == 'ipay' || _payment == 'payhere') {
+      final err = await wallet.topUpViaIPay(context, total.toDouble());
       if (!mounted) return;
       if (err != null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -194,7 +194,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _payment == 'wallet' ? 'Pay from wallet' : 'Pay Online (PayHere)',
+                          _payment == 'wallet' ? 'Pay from wallet' : 'Pay Online (iPay)',
                           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                         ),
                         if (_payment == 'wallet')
@@ -307,10 +307,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 ListTile(
                   leading: const Icon(Icons.credit_card_rounded, color: AppColors.accent),
                   title: const Text('Online Payment', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('Pay securely via PayHere'),
-                  trailing: _payment == 'payhere' ? const Icon(Icons.check_circle_rounded, color: AppColors.accent) : null,
+                  subtitle: const Text('Pay securely via iPay'),
+                  trailing: (_payment == 'ipay' || _payment == 'payhere') ? const Icon(Icons.check_circle_rounded, color: AppColors.accent) : null,
                   onTap: () {
-                    setState(() => _payment = 'payhere');
+                    setState(() => _payment = 'ipay');
                     Navigator.pop(ctx);
                   },
                 ),

@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
-import '../../../core/payments/payhere_service.dart';
+import '../../../core/payments/ipay_service.dart';
 import '../../../core/widgets/ambient_orbs.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/motion.dart';
@@ -32,12 +32,12 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
   }
 
   Future<void> _addCard() async {
-    final enabled = await PayHereService.instance.isEnabled();
+    final enabled = await IPayService.instance.isEnabled();
     if (!mounted) return;
 
     if (enabled) {
       final provider = context.read<PaymentMethodsProvider>();
-      final err = await provider.addCardViaPayHere(context);
+      final err = await provider.addCardViaIPay(context);
       if (!mounted) return;
 
       if (err != null) {

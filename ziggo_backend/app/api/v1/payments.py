@@ -1,18 +1,18 @@
-"""Payment endpoints — PayHere (Sri Lanka card + wallet gateway).
+"""Payment endpoints — iPay (Sri Lanka card + wallet gateway).
 
 Endpoints:
-  POST /payments/payhere/checkout    — start a wallet top-up; returns hosted
-                                       checkout URL + signed form fields
-  POST /payments/payhere/notify      — server-to-server webhook from PayHere
-                                       on payment completion
-  GET  /payments/payhere/status/{id} — client polls this to detect success
-                                       (the WS push is the primary channel,
-                                       this is the fallback)
+  POST /payments/ipay/checkout    — start a wallet top-up; returns hosted
+                                    checkout URL + signed form fields
+  POST /payments/ipay/notify      — server-to-server webhook from iPay
+                                    on payment completion
+  GET  /payments/ipay/status/{id} — client polls this to detect success
+  GET  /payments/ipay/config      — probe gateway status & mode
+  POST /payments/ipay/preapprove  — start card registration/tokenization session
 
-All endpoints 503 when PayHere isn't configured so the mobile app can
-gracefully fall back to the existing mock /customer/wallet/topup path.
+Aliases are maintained under /payments/payhere/* for transitional compatibility.
 """
 from decimal import Decimal
+import json
 import secrets
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
@@ -28,7 +28,7 @@ from ...schemas import (
     MerchantPayRequest,
     MerchantPayResponse,
 )
-from ...services import payhere_service
+from ...services import ipay_service, payhere_service
 from ...services.auth_service import require_role
 from ...services.ws_manager import manager
 
@@ -38,15 +38,16 @@ router = APIRouter()
 
 
 def _ensure_enabled():
-    if not payhere_service.is_enabled():
+    if not ipay_service.is_enabled():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="PayHere is not configured on this server",
+            detail="iPay payment gateway is not configured on this server",
         )
 
 
+@router.post("/ipay/checkout")
 @router.post("/payhere/checkout")
-async def payhere_checkout(
+async def ipay_checkout(
     body: dict,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_role("customer", "restaurant_owner", "market_owner")),
@@ -68,7 +69,7 @@ async def payhere_checkout(
 
     full_name = (user.full_name or "Customer").strip()
     first, _, last = full_name.partition(" ")
-    payload = payhere_service.build_checkout_payload(
+    payload = ipay_service.build_checkout_payload(
         order_id=order_id,
         amount=amount,
         items="Ziggo wallet top-up",
@@ -82,46 +83,55 @@ async def payhere_checkout(
     return {"order_id": order_id, **payload}
 
 
+@router.post("/ipay/notify")
 @router.post("/payhere/notify")
-async def payhere_notify(
+async def ipay_notify(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """Server-to-server webhook from PayHere. Public (no auth).
+    """Server-to-server webhook from iPay. Public (no auth).
 
-    PayHere POSTs application/x-www-form-urlencoded. We verify the md5
-    signature, then on a success status credit the wallet + push WS.
+    Accepts application/x-www-form-urlencoded or application/json.
+    Verifies cryptographic signature, credits wallet / registers card, and notifies client via WS.
     """
-    if not payhere_service.is_enabled():
-        # Don't leak that PayHere isn't configured — just say OK so PayHere
-        # doesn't retry forever if someone misroutes a webhook.
+    if not ipay_service.is_enabled():
         return {"ok": True, "note": "ignored"}
 
-    form = await request.form()
-    merchant_id = str(form.get("merchant_id", ""))
-    order_id = str(form.get("order_id", ""))
-    payhere_amount = str(form.get("payhere_amount", ""))
-    payhere_currency = str(form.get("payhere_currency", "LKR"))
-    status_code = str(form.get("status_code", ""))
-    md5sig = str(form.get("md5sig", ""))
-    custom1 = str(form.get("custom_1", ""))  # we stash user_id here in future
+    data: dict = {}
+    content_type = request.headers.get("content-type", "")
+    if "application/json" in content_type:
+        try:
+            data = await request.json()
+        except Exception:
+            data = {}
+    else:
+        form = await request.form()
+        data = dict(form)
 
-    ok = payhere_service.verify_notification(
-        merchant_id=merchant_id,
+    merchant_id = str(data.get("merchant_id", ""))
+    order_id = str(data.get("order_id", ""))
+    amount_str = str(data.get("ipay_amount") or data.get("payhere_amount") or data.get("amount", ""))
+    currency = str(data.get("ipay_currency") or data.get("payhere_currency") or data.get("currency", "LKR"))
+    status_code = str(data.get("status_code") or data.get("status", ""))
+    signature = str(data.get("signature") or data.get("md5sig") or data.get("hash", ""))
+    custom1 = str(data.get("custom_1") or data.get("user_id", ""))
+
+    ok = ipay_service.verify_notification(
+        merchant_id_val=merchant_id,
         order_id=order_id,
-        payhere_amount=payhere_amount,
-        payhere_currency=payhere_currency,
+        ipay_amount=amount_str,
+        ipay_currency=currency,
         status_code=status_code,
-        md5sig=md5sig,
+        signature=signature,
     )
     if not ok:
-        print(f"[payhere] notify rejected — bad signature for order {order_id}")
+        print(f"[ipay] notify rejected — bad signature for order {order_id}")
         raise HTTPException(status_code=400, detail="Invalid signature")
 
-    label = payhere_service.status_label(status_code)
-    print(f"[payhere] notify order={order_id} status={label} amount={payhere_amount}")
+    label = ipay_service.status_label(status_code)
+    print(f"[ipay] notify order={order_id} status={label} amount={amount_str}")
 
-    if status_code != payhere_service.STATUS_SUCCESS:
+    if label != "success":
         return {"ok": True, "status": label}
 
     if order_id.startswith("PA"):
@@ -131,30 +141,30 @@ async def payhere_notify(
         except ValueError:
             cust_user_id = None
         if not cust_user_id:
-            email = str(form.get("email", ""))
+            email = str(data.get("email", ""))
             if email:
                 uq = await db.execute(select(User).where(User.email == email))
                 u = uq.scalars().first()
                 if u:
                     cust_user_id = u.id
         if not cust_user_id:
-            print(f"[payhere] preapprove couldn't resolve user for order {order_id}")
+            print(f"[ipay] preapprove couldn't resolve user for order {order_id}")
             return {"ok": True, "status": "unmatched"}
 
         cq = await db.execute(select(Customer).where(Customer.user_id == cust_user_id))
         cust = cq.scalars().first()
         if cust is None:
-            print(f"[payhere] preapprove no customer profile for user {cust_user_id}")
+            print(f"[ipay] preapprove no customer profile for user {cust_user_id}")
             return {"ok": True, "status": "no_customer"}
 
-        customer_token = str(form.get("customer_token", ""))
-        card_no = str(form.get("card_no", ""))
-        card_expiry = str(form.get("card_expiry", ""))
-        card_type = str(form.get("method", "CARD"))
-        card_holder_name = str(form.get("card_holder_name", ""))
+        customer_token = str(data.get("customer_token") or data.get("token", ""))
+        card_no = str(data.get("card_no") or data.get("masked_card_no", ""))
+        card_expiry = str(data.get("card_expiry", ""))
+        card_type = str(data.get("method") or data.get("card_type", "CARD"))
+        card_holder_name = str(data.get("card_holder_name", ""))
 
         if not customer_token:
-            print(f"[payhere] preapprove missing customer_token for order {order_id}")
+            print(f"[ipay] preapprove missing customer_token for order {order_id}")
             return {"ok": True, "status": "missing_token"}
 
         existing_card = await db.execute(
@@ -197,49 +207,46 @@ async def payhere_notify(
         select(WalletTransaction).where(WalletTransaction.reference_id == order_id)
     )
     if existing.scalars().first() is not None:
-        print(f"[payhere] order {order_id} already credited, skipping")
+        print(f"[ipay] order {order_id} already credited, skipping")
         return {"ok": True, "status": "already_credited"}
 
-    # Look up the customer this top-up belongs to. The order_id convention
-    # 'WT<hex>' doesn't embed user_id; we derive it from `custom_1` if set,
-    # otherwise fall back to email lookup. The mobile app populates custom_1
-    # with user.id when starting checkout.
+    # Look up the customer this top-up belongs to.
     cust_user_id = None
     try:
         cust_user_id = int(custom1) if custom1 else None
     except ValueError:
         cust_user_id = None
     if not cust_user_id:
-        email = str(form.get("email", ""))
+        email = str(data.get("email", ""))
         if email:
             uq = await db.execute(select(User).where(User.email == email))
             u = uq.scalars().first()
             if u:
                 cust_user_id = u.id
     if not cust_user_id:
-        print(f"[payhere] couldn't resolve user for order {order_id}")
+        print(f"[ipay] couldn't resolve user for order {order_id}")
         return {"ok": True, "status": "unmatched"}
 
     cq = await db.execute(select(Customer).where(Customer.user_id == cust_user_id))
     cust = cq.scalars().first()
     if cust is None:
-        print(f"[payhere] no customer profile for user {cust_user_id}")
+        print(f"[ipay] no customer profile for user {cust_user_id}")
         return {"ok": True, "status": "no_customer"}
 
-    amount = Decimal(payhere_amount)
+    amount = Decimal(amount_str)
     cust.wallet_balance = (cust.wallet_balance or Decimal(0)) + amount
     txn = WalletTransaction(
         user_id=cust_user_id,
         amount=amount,
         type="credit",
-        description=f"PayHere top-up ({order_id})",
+        description=f"iPay top-up ({order_id})",
         reference_id=order_id,
         balance_after=cust.wallet_balance,
     )
     db.add(txn)
     await db.commit()
 
-    # Notify the app via WS (which also piggybacks an FCM if configured)
+    # Notify the app via WS
     await manager.send(
         cust_user_id,
         "wallet_credited",
@@ -249,8 +256,9 @@ async def payhere_notify(
     return {"ok": True, "status": "credited"}
 
 
+@router.get("/ipay/status/{order_id}", response_model=WalletTransactionResponse)
 @router.get("/payhere/status/{order_id}", response_model=WalletTransactionResponse)
-async def payhere_status(
+async def ipay_status(
     order_id: str,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_role("customer", "restaurant_owner", "market_owner")),
@@ -269,35 +277,33 @@ async def payhere_status(
     return txn
 
 
+@router.get("/ipay/config")
 @router.get("/payhere/config")
-async def payhere_config():
+async def ipay_config():
     """Lightweight probe so the Flutter app can decide which top-up flow to
     show (real gateway vs mock). No auth required — returns no secrets."""
     return {
-        "enabled": payhere_service.is_enabled(),
-        "mode": settings_mode(),
+        "enabled": ipay_service.is_enabled(),
+        "mode": ipay_service.mode(),
+        "gateway": "ipay",
     }
 
 
-def settings_mode() -> str:
-    from ...config import settings
-    return (settings.PAYHERE_MODE or "sandbox").lower()
-
-
+@router.post("/ipay/preapprove")
 @router.post("/payhere/preapprove")
-async def payhere_preapprove(
+async def ipay_preapprove(
     body: dict,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_role("customer", "driver")),
 ):
-    """Start a card pre-approval session. Body: {return_url?, cancel_url?}.
-    Returns fields to be posted to PayHere pre-approve URL.
+    """Start a card pre-approval/tokenization session. Body: {return_url?, cancel_url?}.
+    Returns fields to be posted to iPay pre-approve URL.
     """
     _ensure_enabled()
     order_id = "PA" + secrets.token_hex(6).upper()  # PA = pre-approval
     full_name = (user.full_name or "Customer").strip()
     first, _, last = full_name.partition(" ")
-    payload = payhere_service.build_preapprove_payload(
+    payload = ipay_service.build_preapprove_payload(
         order_id=order_id,
         first_name=first or "Customer",
         last_name=last or "-",

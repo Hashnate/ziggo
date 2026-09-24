@@ -483,7 +483,7 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
     
     if (_paymentMethod == 'card') {
       final wallet = context.read<WalletProvider>();
-      final err = await wallet.topUpViaPayHere(context, _total);
+      final err = await wallet.topUpViaIPay(context, _total);
       if (!mounted) return;
       if (err != null) {
         setState(() => _busy = false);

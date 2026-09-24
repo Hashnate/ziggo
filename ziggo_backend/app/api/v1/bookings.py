@@ -43,7 +43,7 @@ from ...services.auth_service import get_current_user
 from ...services.fare_service import calculate_fare, to_decimal
 from ...services.matching_service import find_all_nearby_drivers, find_nearest_driver
 from ...services.ws_manager import manager
-from ...services import payhere_service
+from ...services import ipay_service
 
 router = APIRouter()
 
@@ -1729,7 +1729,7 @@ async def update_booking_status(
                 card_q = await db.execute(select(CustomerCard).where(CustomerCard.id == card_id))
                 card = card_q.scalars().first()
                 if card:
-                    charge_res = await payhere_service.charge_tokenized_card(
+                    charge_res = await ipay_service.charge_tokenized_card(
                         customer_token=card.customer_token,
                         amount=b.final_amount,
                         order_id=b.booking_ref,
@@ -1738,7 +1738,7 @@ async def update_booking_status(
                     if not charge_res.get("success"):
                         b.status = BookingStatus.PAYMENT_PENDING
                         b.payment_status = "failed"
-                        print(f"[payhere] automated charge failed for booking {b.booking_ref}: {charge_res.get('message')}")
+                        print(f"[ipay] automated charge failed for booking {b.booking_ref}: {charge_res.get('message')}")
                         from ...models import Payment
                         pay_rec = Payment(
                             booking_id=b.id,

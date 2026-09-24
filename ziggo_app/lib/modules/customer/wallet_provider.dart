@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/network/api_client.dart';
-import '../../core/payments/payhere_service.dart';
+import '../../core/payments/ipay_service.dart';
 
 class WalletProvider extends ChangeNotifier {
   double _balance = 0;
@@ -40,17 +40,20 @@ class WalletProvider extends ChangeNotifier {
     }
   }
 
-  /// Real-money top-up via PayHere. Returns null on success, an error string
-  /// on failure (so the caller can show it). When PayHere isn't configured
-  /// on the backend, transparently falls back to the mock direct-credit
-  /// `topUp()` above — same UX, same result, no real money moves.
-  Future<String?> topUpViaPayHere(BuildContext context, double amount) async {
-    final enabled = await PayHereService.instance.isEnabled();
+  /// Alias for backward compatibility
+  Future<String?> topUpViaPayHere(BuildContext context, double amount) =>
+      topUpViaIPay(context, amount);
+
+  /// Real-money top-up via iPay. Returns null on success, an error string
+  /// on failure. When iPay isn't configured on the backend, transparently falls back
+  /// to the mock direct-credit `topUp()` above.
+  Future<String?> topUpViaIPay(BuildContext context, double amount) async {
+    final enabled = await IPayService.instance.isEnabled();
     if (!enabled) {
       final ok = await topUp(amount, description: 'Wallet top-up (requested)');
       return ok ? null : 'Failed to top up wallet';
     }
-    final result = await PayHereService.instance.topUpWallet(context, amount);
+    final result = await IPayService.instance.topUpWallet(context, amount);
     if (result.success) {
       await refresh();
       return null;

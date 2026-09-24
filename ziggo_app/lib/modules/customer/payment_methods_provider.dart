@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/network/api_client.dart';
-import '../../core/payments/payhere_service.dart';
-import 'screens/payhere_checkout_screen.dart';
+import '../../core/payments/ipay_service.dart';
+import 'screens/ipay_checkout_screen.dart';
 
 class PaymentMethodsProvider extends ChangeNotifier {
   Map<String, dynamic>? _corporateProfile;
@@ -71,8 +71,10 @@ class PaymentMethodsProvider extends ChangeNotifier {
     }
   }
 
-  Future<String?> addCardViaPayHere(BuildContext context) async {
-    final enabled = await PayHereService.instance.isEnabled();
+  Future<String?> addCardViaPayHere(BuildContext context) => addCardViaIPay(context);
+
+  Future<String?> addCardViaIPay(BuildContext context) async {
+    final enabled = await IPayService.instance.isEnabled();
     if (!enabled) {
       _isLoading = true;
       notifyListeners();
@@ -91,10 +93,10 @@ class PaymentMethodsProvider extends ChangeNotifier {
     final Map<String, dynamic> session;
     try {
       final r = await ApiClient.instance.dio.post(
-        '/payments/payhere/preapprove',
+        '/payments/ipay/preapprove',
         data: {
-          'return_url': 'https://ziggo.app/payhere/return',
-          'cancel_url': 'https://ziggo.app/payhere/cancel',
+          'return_url': 'https://ziggo.app/ipay/return',
+          'cancel_url': 'https://ziggo.app/ipay/cancel',
         },
       );
       session = Map<String, dynamic>.from(r.data as Map);
@@ -114,9 +116,10 @@ class PaymentMethodsProvider extends ChangeNotifier {
     if (!context.mounted) return 'cancelled';
     final bool? webResult = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => PayHereCheckoutScreen(
+        builder: (_) => IPayCheckoutScreen(
           checkoutUrl: url,
           formFields: fields,
+          title: 'Register Card with iPay',
         ),
       ),
     );
@@ -138,14 +141,16 @@ class PaymentMethodsProvider extends ChangeNotifier {
           _cards = currentCards;
           _isLoading = false;
           notifyListeners();
-          return null; 
+          return null;
         }
       } on DioException {
-        // ignore
+        // swallow
       }
     }
     
+    _isLoading = false;
     await fetchCards();
+    notifyListeners();
     return null;
   }
 
