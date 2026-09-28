@@ -8,6 +8,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../core/network/api_client.dart';
 import '../../core/network/ws_client.dart';
 import '../../core/notifications/fcm_service.dart';
@@ -56,18 +58,53 @@ class DriverProvider extends ChangeNotifier {
   DateTime? _lastLocationPush;
   Timer? _profileTimer;
 
+  DriverProvider() {
+    _initLocation();
+  }
+
+  Future<void> _initLocation() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lat = prefs.getDouble('driver_last_lat');
+      final lng = prefs.getDouble('driver_last_lng');
+      if (lat != null && lng != null && _currentLocation == null) {
+        _currentLocation = LatLng(lat, lng);
+        notifyListeners();
+      }
+    } catch (_) {}
+
+    try {
+      final pos = await Geolocator.getLastKnownPosition();
+      if (pos != null) {
+        _currentLocation = LatLng(pos.latitude, pos.longitude);
+        _saveCachedLocation(_currentLocation!);
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveCachedLocation(LatLng loc) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('driver_last_lat', loc.latitude);
+      await prefs.setDouble('driver_last_lng', loc.longitude);
+    } catch (_) {}
+  }
+
   Future<void> bootstrap(String token) async {
     _ws.connect(token);
     _ws.events.listen(_onWsEvent);
-    await loadProfile();
-    await loadVehicles();
-    await loadActive();
-    await loadActiveFoodOrder();
-    await loadActiveMarketOrder();
-    await loadPendingRequest();
-    await loadIncentives();
-    await loadSurgeZones();
-    await _pushLocationOnce();
+    unawaited(_pushLocationOnce());
+    await Future.wait([
+      loadProfile(),
+      loadVehicles(),
+      loadActive(),
+      loadActiveFoodOrder(),
+      loadActiveMarketOrder(),
+      loadPendingRequest(),
+      loadIncentives(),
+      loadSurgeZones(),
+    ]);
     _startProfileTimer();
 
     if (_isOnline) {
@@ -524,6 +561,7 @@ class DriverProvider extends ChangeNotifier {
     _locationSub = Geolocator.getPositionStream(locationSettings: settings).listen(
       (pos) {
         _currentLocation = LatLng(pos.latitude, pos.longitude);
+        _saveCachedLocation(_currentLocation!);
         notifyListeners();
         // Every fix keeps the process alive; only some need to reach the server.
         final now = DateTime.now();
@@ -567,10 +605,22 @@ class DriverProvider extends ChangeNotifier {
       }
       if (perm == LocationPermission.deniedForever || perm == LocationPermission.denied) return;
 
+      // First check last known position quickly
+      final lastPos = await Geolocator.getLastKnownPosition();
+      if (lastPos != null && _currentLocation == null) {
+        _currentLocation = LatLng(lastPos.latitude, lastPos.longitude);
+        _saveCachedLocation(_currentLocation!);
+        notifyListeners();
+      }
+
       final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 5),
+        ),
       );
       _currentLocation = LatLng(pos.latitude, pos.longitude);
+      _saveCachedLocation(_currentLocation!);
       notifyListeners();
       _lastLocationPush = DateTime.now();
       await _sendLocation(pos);
@@ -579,6 +629,7 @@ class DriverProvider extends ChangeNotifier {
 
   void updateCurrentLocation(LatLng location) {
     _currentLocation = location;
+    _saveCachedLocation(location);
     notifyListeners();
   }
 

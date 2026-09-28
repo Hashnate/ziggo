@@ -1,4 +1,5 @@
 """Server-rendered admin panel with real DB queries + simple session auth."""
+import asyncio
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -670,13 +671,16 @@ async def admin_drivers(
     else:
         # Build filter conditions on registered drivers
         where_clauses = []
-        if status == "online":
+        if status == "approved":
+            where_clauses.append(Driver.is_approved == True)
+            where_clauses.append(Driver.status != DriverStatus.PENDING)
+        elif status == "online":
             where_clauses.append(Driver.is_online == True)
         elif status == "offline":
             where_clauses.append(Driver.is_online == False)
             where_clauses.append(Driver.is_approved == True)
         elif status == "pending":
-            where_clauses.append(Driver.status == DriverStatus.PENDING)
+            where_clauses.append(or_(Driver.status == DriverStatus.PENDING, Driver.is_approved == False))
             
         if search:
             search_term = f"%{search.strip()}%"
@@ -1360,30 +1364,109 @@ async def delete_driver_application(
     return RedirectResponse(url="/admin/drivers?view=applications", status_code=303)
 
 
+async def _cleanup_user_references(db: AsyncSession, user_id: int):
+    """Safely unlink or remove foreign key references pointing to users.id before deletion."""
+    from sqlalchemy import text
+    cleanup_statements = [
+        # Emergency alerts (reports & acknowledged)
+        "UPDATE emergency_alerts SET acknowledged_by = NULL WHERE acknowledged_by = :uid",
+        "DELETE FROM emergency_alerts WHERE user_id = :uid",
+        # Support tickets / complaints & messages
+        "UPDATE complaints SET assigned_to = NULL WHERE assigned_to = :uid",
+        "DELETE FROM complaint_messages WHERE sender_user_id = :uid",
+        "DELETE FROM complaints WHERE user_id = :uid",
+        # Incidents / Safety reports
+        "UPDATE incidents SET reported_by_user_id = NULL WHERE reported_by_user_id = :uid",
+        # Vendor / Restaurant ownership
+        "UPDATE market_vendors SET owner_id = NULL WHERE owner_id = :uid",
+        "UPDATE restaurants SET owner_id = NULL WHERE owner_id = :uid",
+        # Referrals
+        "DELETE FROM referral_bonuses WHERE referred_user_id = :uid OR referrer_user_id = :uid",
+        "UPDATE users SET referred_by_user_id = NULL WHERE referred_by_user_id = :uid",
+        # Wallet topup requests and transactions
+        "UPDATE wallet_topup_requests SET approved_by_id = NULL WHERE approved_by_id = :uid",
+        "DELETE FROM wallet_topup_requests WHERE user_id = :uid",
+        "DELETE FROM wallet_transactions WHERE user_id = :uid",
+        # Driver document verification
+        "UPDATE driver_documents SET verified_by = NULL WHERE verified_by = :uid",
+        # Saved addresses, corporate memberships, notifications
+        "DELETE FROM saved_addresses WHERE user_id = :uid",
+        "DELETE FROM corporate_members WHERE user_id = :uid",
+        "DELETE FROM notifications WHERE user_id = :uid",
+    ]
+    for stmt in cleanup_statements:
+        try:
+            await db.execute(text(stmt), {"uid": user_id})
+        except Exception as e:
+            logger.warning(f"Cleanup query failed ({stmt}): {e}")
+
+
+async def _cleanup_driver_references(db: AsyncSession, driver_id: int):
+    """Safely unlink or remove foreign key references pointing to drivers.id before deletion."""
+    from sqlalchemy import text
+    cleanup_statements = [
+        "UPDATE market_orders SET driver_id = NULL WHERE driver_id = :did",
+        "UPDATE bookings SET driver_id = NULL WHERE driver_id = :did",
+        "UPDATE food_orders SET driver_id = NULL WHERE driver_id = :did",
+        "DELETE FROM driver_documents WHERE driver_id = :did",
+        "DELETE FROM driver_payouts WHERE driver_id = :did",
+        "DELETE FROM driver_vehicles WHERE driver_id = :did",
+    ]
+    for stmt in cleanup_statements:
+        try:
+            await db.execute(text(stmt), {"did": driver_id})
+        except Exception as e:
+            logger.warning(f"Cleanup query failed ({stmt}): {e}")
+
+
+async def _cleanup_customer_references(db: AsyncSession, customer_id: int):
+    """Safely unlink or remove foreign key references pointing to customers.id before deletion."""
+    from sqlalchemy import text
+    cleanup_statements = [
+        "UPDATE bookings SET customer_id = NULL WHERE customer_id = :cid",
+        "UPDATE food_orders SET customer_id = NULL WHERE customer_id = :cid",
+        "UPDATE market_orders SET customer_id = NULL WHERE customer_id = :cid",
+        "UPDATE event_orders SET customer_id = NULL WHERE customer_id = :cid",
+        "UPDATE payments SET customer_id = NULL WHERE customer_id = :cid",
+        "DELETE FROM customer_cards WHERE customer_id = :cid",
+        "DELETE FROM customer_promo_claims WHERE customer_id = :cid",
+        "DELETE FROM favorite_restaurants WHERE customer_id = :cid",
+        "DELETE FROM loyalty_transactions WHERE customer_id = :cid",
+    ]
+    for stmt in cleanup_statements:
+        try:
+            await db.execute(text(stmt), {"cid": customer_id})
+        except Exception as e:
+            logger.warning(f"Cleanup query failed ({stmt}): {e}")
+
+
 @router.post("/drivers/{driver_id}/delete")
+@router.get("/drivers/{driver_id}/delete")
 async def delete_driver_form(
     driver_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_superadmin_or_admin),
 ):
-    from app.models import MarketOrder
-    from sqlalchemy import update
-    q = await db.execute(
-        select(Driver).options(selectinload(Driver.user)).where(Driver.id == driver_id)
-    )
-    d = q.scalars().first()
-    if d:
-        # Avoid foreign key constraint violation in market_orders
-        await db.execute(
-            update(MarketOrder)
-            .where(MarketOrder.driver_id == driver_id)
-            .values(driver_id=None)
+    try:
+        q = await db.execute(
+            select(Driver).options(selectinload(Driver.user)).where(Driver.id == driver_id)
         )
-        user = d.user
-        await db.delete(d)
-        if user:
-            await db.delete(user)
-        await db.commit()
+        d = q.scalars().first()
+        if d:
+            user = d.user
+            user_id = user.id if user else None
+
+            await _cleanup_driver_references(db, driver_id)
+            if user_id:
+                await _cleanup_user_references(db, user_id)
+
+            await db.delete(d)
+            if user:
+                await db.delete(user)
+            await db.commit()
+    except Exception as e:
+        logger.error(f"Error deleting driver {driver_id}: {e}", exc_info=True)
+        await db.rollback()
     return RedirectResponse(url="/admin/drivers", status_code=303)
 
 
@@ -1681,21 +1764,32 @@ async def admin_rider_activate(
 
 
 @router.post("/riders/{customer_id}/delete")
+@router.get("/riders/{customer_id}/delete")
 async def admin_rider_delete(
     customer_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_superadmin_or_admin),
 ):
-    q = await db.execute(
-        select(Customer).options(selectinload(Customer.user)).where(Customer.id == customer_id)
-    )
-    c = q.scalars().first()
-    if c:
-        user = c.user
-        await db.delete(c)
-        if user:
-            await db.delete(user)
-        await db.commit()
+    try:
+        q = await db.execute(
+            select(Customer).options(selectinload(Customer.user)).where(Customer.id == customer_id)
+        )
+        c = q.scalars().first()
+        if c:
+            user = c.user
+            user_id = user.id if user else None
+
+            await _cleanup_customer_references(db, customer_id)
+            if user_id:
+                await _cleanup_user_references(db, user_id)
+
+            await db.delete(c)
+            if user:
+                await db.delete(user)
+            await db.commit()
+    except Exception as e:
+        logger.error(f"Error deleting rider {customer_id}: {e}", exc_info=True)
+        await db.rollback()
     return RedirectResponse(url="/admin/riders", status_code=303)
 
 
@@ -8060,6 +8154,56 @@ async def admin_messages(
     )
 
 
+async def _async_broadcast_worker(audience: str, title: str, body: str, user_ids: list[int]) -> None:
+    from app.database import AsyncSessionLocal
+    from app.models import Notification
+    from app.services.ws_manager import manager
+    from app.services import fcm_service
+    import json
+    from datetime import datetime, timezone
+
+    if not user_ids:
+        return
+
+    created_at_now = datetime.now(timezone.utc)
+    data_str = json.dumps({"audience": audience})
+
+    # 1. Bulk insert Notification records in chunks
+    try:
+        async with AsyncSessionLocal() as bg_db:
+            chunk_size = 500
+            for i in range(0, len(user_ids), chunk_size):
+                chunk = user_ids[i : i + chunk_size]
+                notifications = [
+                    Notification(
+                        user_id=uid,
+                        title=title,
+                        body=body,
+                        type="broadcast",
+                        data=data_str,
+                        created_at=created_at_now,
+                    )
+                    for uid in chunk
+                ]
+                bg_db.add_all(notifications)
+                await bg_db.commit()
+    except Exception as e:
+        print(f"[broadcast] DB bulk insert failed: {e}")
+
+    # 2. WebSocket live dispatch for connected sockets
+    for uid in user_ids:
+        try:
+            await manager.send(uid, "broadcast_message", {"title": title, "body": body})
+        except Exception:
+            pass
+
+    # 3. Batch FCM push to mobile devices
+    try:
+        async with AsyncSessionLocal() as fcm_db:
+            await fcm_service.send_to_users(fcm_db, user_ids, title, body, {"event": "broadcast_message"})
+    except Exception as e:
+        print(f"[broadcast] FCM send failed: {e}")
+
 
 @router.post("/messages/send")
 async def admin_messages_send(
@@ -8070,49 +8214,21 @@ async def admin_messages_send(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from app.models import User, UserRole, Notification
-    from app.services.ws_manager import manager
-    from app.services import fcm_service
+    from app.models import User, UserRole
 
     if audience == "customer":
-        q = await db.execute(select(User).where(User.role == UserRole.CUSTOMER, User.is_active == True))
+        q = await db.execute(select(User.id).where(User.role == UserRole.CUSTOMER, User.is_active == True))
     elif audience == "driver":
-        q = await db.execute(select(User).where(User.role == UserRole.DRIVER, User.is_active == True))
+        q = await db.execute(select(User.id).where(User.role == UserRole.DRIVER, User.is_active == True))
     else:
-        q = await db.execute(select(User).where(User.role.in_([UserRole.CUSTOMER, UserRole.DRIVER]), User.is_active == True))
-    
-    users = q.scalars().all()
-    user_ids = [u.id for u in users]
-    
-    if user_ids:
-        created_at_now = datetime.now(timezone.utc)
-        import json
-        data_str = json.dumps({"audience": audience})
-        
-        for uid in user_ids:
-            db.add(
-                Notification(
-                    user_id=uid,
-                    title=title,
-                    body=body,
-                    type="broadcast",
-                    data=data_str,
-                    created_at=created_at_now,
-                )
-            )
-            try:
-                await manager.send(uid, "broadcast_message", {"title": title, "body": body})
-            except Exception:
-                pass
-        
-        await db.commit()
-        
-        try:
-            await fcm_service.send_to_users(db, user_ids, title, body, {"event": "broadcast_message"})
-        except Exception as e:
-            print(f"[broadcast] FCM send failed: {e}")
+        q = await db.execute(select(User.id).where(User.role.in_([UserRole.CUSTOMER, UserRole.DRIVER]), User.is_active == True))
 
-    return RedirectResponse(url="/admin/messages", status_code=303)
+    user_ids = [uid for uid in q.scalars().all()]
+
+    if user_ids:
+        asyncio.create_task(_async_broadcast_worker(audience, title, body, user_ids))
+
+    return RedirectResponse(url="/admin/messages?queued=1", status_code=303)
 
 
 # ---------- Corporate Billing (BRD: PY-05 / AD-12) ----------

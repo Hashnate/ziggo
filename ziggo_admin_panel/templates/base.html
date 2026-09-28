@@ -420,9 +420,11 @@
             </a>
 
             <p class="zi-nav-group">Catalog</p>
+            {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
             <a href="/admin/categories" class="sidebar-item {% if active_page == 'categories' %}active{% endif %}">
                 <i class="fas fa-layer-group"></i><span>Categories</span>
             </a>
+            {% endif %}
             <a href="/admin/events" class="sidebar-item {% if active_page == 'events' %}active{% endif %}">
                 <i class="fas fa-calendar-alt"></i><span>Events</span>
             </a>

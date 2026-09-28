@@ -4,12 +4,26 @@
 {% block page_title %}Broadcast Messages{% endblock %}
 
 {% block content %}
+{% if request.query_params.get('queued') %}
+<div class="mb-6 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between shadow-sm animate-fade-in">
+    <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+            <i class="fas fa-paper-plane text-emerald-600 text-xs"></i>
+        </div>
+        <div>
+            <p class="font-bold text-emerald-900">Broadcast dispatched successfully!</p>
+            <p class="text-xs text-emerald-700">Messages and push notifications are being delivered in the background to all selected recipients.</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <!-- Compose -->
     <div class="zi-card p-6 lg:col-span-1 h-fit">
         <h3 class="font-black text-ziggo-ink mb-1">Send broadcast</h3>
         <p class="text-xs text-ziggo-muted mb-4">Message lands as an in-app notification for the chosen audience.</p>
-        <form method="post" action="/admin/messages/send" class="space-y-3">
+        <form method="post" action="/admin/messages/send" class="space-y-3" onsubmit="var b = this.querySelector('button'); b.disabled = true; b.innerHTML = '<i class=\'fas fa-spinner fa-spin mr-1\'></i> Sending…';">
             <div>
                 <label class="text-[10px] uppercase font-bold text-ziggo-faint">Audience</label>
                 <select name="audience" class="w-full mt-1 px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-ziggo">

@@ -274,13 +274,106 @@ async def send_to_users(
     body: str,
     data: Optional[dict] = None,
 ) -> int:
+    """Send push notification to multiple users using FCM batch multicast."""
     if not _initialized:
         return 0
-    delivered = 0
-    for uid in user_ids:
-        if await send_to_user(db, uid, title, body, data):
-            delivered += 1
-    return delivered
+
+    from ..models import SystemSettings, User
+
+    # 1. Check system-wide push notification setting once
+    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    ss = ss_q.scalars().first()
+    if ss and not ss.push_notifications_enabled:
+        print("[fcm] skip bulk send: push notifications disabled in system settings")
+        return 0
+
+    user_id_list = list(user_ids)
+    if not user_id_list:
+        return 0
+
+    # 2. Fetch all valid tokens for the target users in one query
+    stmt = select(User.notification_token).where(
+        User.id.in_(user_id_list),
+        User.notification_token.isnot(None),
+        User.notification_token != "",
+    )
+    res = await db.execute(stmt)
+    valid_tokens = [tok.strip() for tok in res.scalars().all() if (tok or "").strip()]
+
+    if not valid_tokens:
+        print(f"[fcm] bulk send: 0 registered tokens found for {len(user_id_list)} users")
+        return 0
+
+    # Deduplicate tokens while preserving order
+    valid_tokens = list(dict.fromkeys(valid_tokens))
+
+    payload_data = {k: str(v) for k, v in (data or {}).items()}
+    event = (data or {}).get("event")
+    urgent = event in _URGENT_EVENTS
+
+    android_channel = "ziggo_urgent" if urgent else "ziggo_general"
+    android_sound = "ride_alert" if urgent else "default"
+    ios_sound = "ride_alert.caf" if urgent else "default"
+
+    total_delivered = 0
+    dead_tokens: list[str] = []
+    chunk_size = 500  # Firebase max multicast limit per batch
+
+    for i in range(0, len(valid_tokens), chunk_size):
+        chunk = valid_tokens[i : i + chunk_size]
+        msg = messaging.MulticastMessage(
+            tokens=chunk,
+            notification=messaging.Notification(title=title, body=body),
+            data=payload_data,
+            android=messaging.AndroidConfig(
+                priority="high" if urgent else "normal",
+                notification=messaging.AndroidNotification(
+                    sound=android_sound,
+                    channel_id=android_channel,
+                    priority="max" if urgent else "default",
+                    visibility="public" if urgent else "private",
+                ),
+            ),
+            apns=messaging.APNSConfig(
+                headers={"apns-priority": "10" if urgent else "5"},
+                payload=messaging.APNSPayload(
+                    aps=messaging.Aps(
+                        sound=ios_sound,
+                        content_available=True,
+                        alert=messaging.ApsAlert(title=title, body=body),
+                    ),
+                ),
+            ),
+        )
+
+        try:
+            batch_resp = await asyncio.to_thread(messaging.send_each_for_multicast, msg)
+            total_delivered += batch_resp.success_count
+            print(
+                f"[fcm] bulk multicast batch {i // chunk_size + 1}: {batch_resp.success_count}/{len(chunk)} delivered"
+            )
+
+            for idx, resp in enumerate(batch_resp.responses):
+                if not resp.success and resp.exception:
+                    err = f"{type(resp.exception).__name__}: {resp.exception}"
+                    if any(c in err.lower() for c in _DEAD_TOKEN_CODES):
+                        dead_tokens.append(chunk[idx])
+        except Exception as e:
+            print(f"[fcm] bulk multicast batch exception: {type(e).__name__}: {e}")
+
+    if dead_tokens:
+        try:
+            await db.execute(
+                update(User)
+                .where(User.notification_token.in_(dead_tokens))
+                .values(notification_token=None)
+            )
+            await db.commit()
+            print(f"[fcm] bulk cleared {len(dead_tokens)} dead token(s)")
+        except Exception as e:
+            print(f"[fcm] error clearing dead tokens: {e}")
+
+    return total_delivered
 
 
 def fire_and_forget(user_id: int, event: str, payload: dict) -> None:

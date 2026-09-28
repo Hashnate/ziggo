@@ -299,8 +299,35 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
   Future<void> _bootstrap() async {
     if (_bootstrapped) return;
     _bootstrapped = true;
+
+    // Fast-path: immediately use last known GPS position to center map
+    try {
+      final lastPos = await Geolocator.getLastKnownPosition();
+      if (lastPos != null && mounted) {
+        final loc = LatLng(lastPos.latitude, lastPos.longitude);
+        context.read<DriverProvider>().updateCurrentLocation(loc);
+        _mapController.moveTo(loc, zoom: 16);
+      }
+    } catch (_) {}
+
     await _ensureLocationReady();
     if (!mounted) return;
+
+    // Fast-path: get quick position right away
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 4),
+        ),
+      );
+      if (mounted) {
+        final loc = LatLng(pos.latitude, pos.longitude);
+        context.read<DriverProvider>().updateCurrentLocation(loc);
+        _mapController.moveTo(loc, zoom: 16);
+      }
+    } catch (_) {}
+
     final auth = context.read<AuthProvider>();
     final driver = context.read<DriverProvider>();
     if (auth.token != null) {
@@ -571,6 +598,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
           locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
         );
         final newLoc = LatLng(pos.latitude, pos.longitude);
+        driver.updateCurrentLocation(newLoc);
         _mapController.moveTo(newLoc, zoom: 16);
       } catch (_) {
         // ignore
@@ -1225,14 +1253,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
                     ),
                 ],
                 markers: [
-                  pinMarker(
-                    point: loc,
-                    icon: Icons.navigation_rounded,
-                    color: Colors.black,
-                    assetPath: 'assets/icons/heading_indicator.png',
-                    rotation: _heading,
-                    size: 32,
-                  ),
+                  if (driver.currentLocation != null)
+                    pinMarker(
+                      point: driver.currentLocation!,
+                      icon: Icons.navigation_rounded,
+                      color: Colors.black,
+                      assetPath: 'assets/icons/heading_indicator.png',
+                      rotation: _heading,
+                      size: 32,
+                    ),
                   if (_pendingPickupLatLng != null)
                     pinMarker(
                       point: _pendingPickupLatLng!,
