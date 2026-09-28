@@ -1044,14 +1044,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
   }
 
   Future<void> _openNavigation(double lat, double lng) async {
-    final googleMapsUrl = Uri.parse("google.navigation:q=$lat,$lng");
+    // Launch Google Maps driving directions via standard universal URL to prevent
+    // Google Maps from attaching its own duplicate grey return chathead.
+    // This ensures only Ziggo's custom branded floating widget remains visible.
     final mapUrl = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving");
+    final geoUrl = Uri.parse("geo:$lat,$lng?q=$lat,$lng");
 
     try {
-      if (await canLaunchUrl(googleMapsUrl)) {
-        await launchUrl(googleMapsUrl, mode: LaunchMode.externalApplication);
-      } else if (await canLaunchUrl(mapUrl)) {
+      if (await canLaunchUrl(mapUrl)) {
         await launchUrl(mapUrl, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(geoUrl)) {
+        await launchUrl(geoUrl, mode: LaunchMode.externalApplication);
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1061,7 +1064,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
       }
     } catch (_) {
       try {
-        await launchUrl(mapUrl, mode: LaunchMode.externalApplication);
+        if (await canLaunchUrl(geoUrl)) {
+          await launchUrl(geoUrl, mode: LaunchMode.externalApplication);
+        }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

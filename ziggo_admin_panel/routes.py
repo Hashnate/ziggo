@@ -1256,7 +1256,7 @@ async def admin_drivers_edit_submit(
                     db.add(doc)
 
     await db.commit()
-    return RedirectResponse(url="/admin/drivers", status_code=303)
+    return RedirectResponse(url=f"/admin/drivers/{driver_id}/edit?success=Driver+updated+successfully", status_code=303)
 
 
 @router.post("/drivers/{driver_id}/approve")
@@ -8042,7 +8042,7 @@ async def admin_events_edit_submit(
             await db.delete(t)
 
     await db.commit()
-    return RedirectResponse(url="/admin/events", status_code=303)
+    return RedirectResponse(url=f"/admin/events/{event_id}/edit?success=Event+updated+successfully", status_code=303)
 
 
 @router.post("/events/{event_id}/publish")
@@ -9557,7 +9557,7 @@ async def admin_jobs_edit_submit(
     job.is_active = bool(is_active)
 
     await db.commit()
-    return RedirectResponse(url="/admin/jobs?saved=1", status_code=303)
+    return RedirectResponse(url=f"/admin/jobs/{job_id}/edit?success=Job+updated+successfully", status_code=303)
 
 
 @router.post("/jobs/{job_id}/toggle-status")

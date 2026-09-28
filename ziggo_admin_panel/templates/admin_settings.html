@@ -156,64 +156,66 @@
                     </div>
                     <div class="space-y-4">
                         <div class="bg-white rounded-2xl border border-ziggo-line overflow-hidden shadow-soft-sm mb-4">
-                            <table class="w-full text-left border-collapse">
-                                <thead class="bg-gray-50 text-[11px] uppercase text-ziggo-muted font-black tracking-wider border-b border-ziggo-line">
-                                    <tr>
-                                        <th class="px-6 py-3.5">Start Time</th>
-                                        <th class="px-6 py-3.5">End Time</th>
-                                        <th class="px-6 py-3.5">Vehicle Category</th>
-                                        <th class="px-6 py-3.5">Boost Amount (Rs.)</th>
-                                        <th class="px-6 py-3.5">Status</th>
-                                        <th class="px-6 py-3.5 text-right">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-ziggo-line">
-                                    {% for pk in peaks %}
-                                    <tr class="hover:bg-gray-50/50">
-                                        <td class="px-6 py-3">
-                                            <input type="time" name="peak_start_hour_{{ pk.id }}" value="{{ pk.start_time if pk.start_time is not none else ('%02d:00'|format(pk.start_hour) if pk.start_hour is not none else '') }}" class="p-2 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-semibold w-36">
-                                        </td>
-                                        <td class="px-6 py-3">
-                                            <input type="time" name="peak_end_hour_{{ pk.id }}" value="{{ pk.end_time if pk.end_time is not none else ('%02d:00'|format(pk.end_hour) if pk.end_hour is not none else '') }}" class="p-2 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-semibold w-36">
-                                        </td>
-                                        <td class="px-6 py-3">
-                                            <select name="peak_vehicle_category_{{ pk.id }}" class="p-2 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-semibold w-40">
-                                                <option value="">All Categories</option>
-                                                {% for cat in categories %}
-                                                <option value="{{ cat.service_type }}" {% if pk.vehicle_category == cat.service_type %}selected{% endif %}>{{ cat.display_name }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </td>
-                                        <td class="px-6 py-3">
-                                            <input type="number" step="0.01" min="0" name="peak_extra_amount_{{ pk.id }}" value="{{ pk.extra_amount if pk.extra_amount is not none and pk.extra_amount != 0 else '' }}" placeholder="0.00" class="p-2 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-semibold w-32">
-                                        </td>
-                                        <td class="px-6 py-3">
-                                            {% if pk.is_active %}
-                                            <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600">Active</span>
-                                            {% else %}
-                                            <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-gray-100 text-gray-500">Inactive</span>
-                                            {% endif %}
-                                        </td>
-                                        <td class="px-6 py-3 text-right">
-                                            <div class="flex items-center justify-end gap-2">
-                                                <button type="button" onclick="togglePeak({{ pk.id }})" class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 {% if pk.is_active %}bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-100{% else %}bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100{% endif %}">
-                                                    {% if pk.is_active %}
-                                                    <i class="fas fa-power-off"></i> Deactivate
-                                                    {% else %}
-                                                    <i class="fas fa-play"></i> Activate
-                                                    {% endif %}
-                                                </button>
-                                                {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
-                                                <button type="button" onclick="deletePeak({{ pk.id }})" class="px-3 py-1.5 rounded-xl text-xs font-bold transition bg-gray-50 text-gray-500 border border-gray-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 flex items-center gap-1.5">
-                                                    <i class="fas fa-trash-alt"></i> Delete
-                                                </button>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse">
+                                    <thead class="bg-gray-50 text-[11px] uppercase text-ziggo-muted font-black tracking-wider border-b border-ziggo-line">
+                                        <tr>
+                                            <th class="px-6 py-3.5">Start Time</th>
+                                            <th class="px-6 py-3.5">End Time</th>
+                                            <th class="px-6 py-3.5">Vehicle Category</th>
+                                            <th class="px-6 py-3.5">Boost Amount (Rs.)</th>
+                                            <th class="px-6 py-3.5">Status</th>
+                                            <th class="px-6 py-3.5 text-right">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-ziggo-line">
+                                        {% for pk in peaks %}
+                                        <tr class="hover:bg-gray-50/50">
+                                            <td class="px-6 py-3">
+                                                <input type="time" name="peak_start_hour_{{ pk.id }}" value="{{ pk.start_time if pk.start_time is not none else ('%02d:00'|format(pk.start_hour) if pk.start_hour is not none else '') }}" class="p-2 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-semibold w-36">
+                                            </td>
+                                            <td class="px-6 py-3">
+                                                <input type="time" name="peak_end_hour_{{ pk.id }}" value="{{ pk.end_time if pk.end_time is not none else ('%02d:00'|format(pk.end_hour) if pk.end_hour is not none else '') }}" class="p-2 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-semibold w-36">
+                                            </td>
+                                            <td class="px-6 py-3">
+                                                <select name="peak_vehicle_category_{{ pk.id }}" class="p-2 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-semibold w-40">
+                                                    <option value="">All Categories</option>
+                                                    {% for cat in categories %}
+                                                    <option value="{{ cat.service_type }}" {% if pk.vehicle_category == cat.service_type %}selected{% endif %}>{{ cat.display_name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </td>
+                                            <td class="px-6 py-3">
+                                                <input type="number" step="0.01" min="0" name="peak_extra_amount_{{ pk.id }}" value="{{ pk.extra_amount if pk.extra_amount is not none and pk.extra_amount != 0 else '' }}" placeholder="0.00" class="p-2 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-semibold w-32">
+                                            </td>
+                                            <td class="px-6 py-3">
+                                                {% if pk.is_active %}
+                                                <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600">Active</span>
+                                                {% else %}
+                                                <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-gray-100 text-gray-500">Inactive</span>
                                                 {% endif %}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                                            </td>
+                                            <td class="px-6 py-3 text-right">
+                                                <div class="flex items-center justify-end gap-2">
+                                                    <button type="button" onclick="togglePeak({{ pk.id }})" class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 {% if pk.is_active %}bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-100{% else %}bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100{% endif %}">
+                                                        {% if pk.is_active %}
+                                                        <i class="fas fa-power-off"></i> Deactivate
+                                                        {% else %}
+                                                        <i class="fas fa-play"></i> Activate
+                                                        {% endif %}
+                                                    </button>
+                                                    {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
+                                                    <button type="button" onclick="deletePeak({{ pk.id }})" class="px-3 py-1.5 rounded-xl text-xs font-bold transition bg-gray-50 text-gray-500 border border-gray-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 flex items-center gap-1.5">
+                                                        <i class="fas fa-trash-alt"></i> Delete
+                                                    </button>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </section>

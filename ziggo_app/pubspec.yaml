@@ -52,6 +52,8 @@ dependencies:
   # plugin fills that gap. It also lets us pre-create the high-importance
   # ride-alert channel that pins our custom sound.
   flutter_local_notifications: ^17.2.3
+  # Apple CallKit / Android incoming call UI for ride requests (continuous ringtone)
+  flutter_callkit_incoming: ^2.0.4+1
   # Used to install the .caf ride/food alert sounds into Library/Sounds on iOS
   # so APNs can play them (custom notification sounds must live there or in the
   # bundle root — Flutter assets are neither).

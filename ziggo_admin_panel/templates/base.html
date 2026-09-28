@@ -328,12 +328,25 @@
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12) !important;
         }
 
-        /* ===== Tables ===== */
+        /* ===== Tables & Scrollable Containers ===== */
         table {
             width: 100% !important;
             border-collapse: collapse !important;
         }
+        .overflow-x-auto {
+            max-height: calc(100vh - 300px);
+            overflow-y: auto !important;
+            overflow-x: auto !important;
+        }
+        thead, table thead {
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 20 !important;
+        }
         thead th, table thead th {
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 20 !important;
             font-size: 11px !important;
             letter-spacing: 0.05em !important;
             text-transform: uppercase !important;
@@ -342,6 +355,7 @@
             background: #F8FAFC !important;
             padding: 10px 10px !important;
             border-bottom: 1px solid #EEF1F6 !important;
+            box-shadow: 0 1px 0 #EEF1F6 !important;
         }
         tbody td, table tbody td {
             padding: 10px 10px !important;
@@ -574,7 +588,7 @@
         </header>
 
         <!-- Page Content -->
-        <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        <div id="mainContent" class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
             {% if request.query_params.get("error") %}
             <div class="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 flex items-start gap-3 text-sm max-w-6xl font-bold">
                 <i class="fas fa-circle-exclamation mt-0.5 shrink-0 text-red-500"></i>
@@ -786,6 +800,65 @@
           }
           overlay.addEventListener('click', closeSidebar);
         }
+      })();
+
+      // Preserve scroll position when saving changes across all admin panel edit parts
+      (function () {
+        function getScrollContainer() {
+          return document.getElementById('mainContent') || document.querySelector('main > .overflow-y-auto') || window;
+        }
+
+        function saveScrollPosition() {
+          try {
+            var sc = getScrollContainer();
+            var pos = (sc === window) ? window.scrollY : sc.scrollTop;
+            if (pos > 0) {
+              sessionStorage.setItem('ziggo_admin_scroll_' + window.location.pathname, String(pos));
+            }
+          } catch (e) {}
+        }
+
+        // Intercept form submissions across all edit pages/forms
+        document.addEventListener('submit', function (e) {
+          saveScrollPosition();
+        }, true);
+
+        // Also save when unloading page
+        window.addEventListener('beforeunload', function () {
+          saveScrollPosition();
+        });
+
+        // Restore scroll position upon load/render
+        function restoreScrollPosition() {
+          try {
+            var saved = sessionStorage.getItem('ziggo_admin_scroll_' + window.location.pathname);
+            if (saved !== null) {
+              var pos = parseInt(saved, 10);
+              if (!isNaN(pos) && pos > 0) {
+                var sc = getScrollContainer();
+                if (sc === window) {
+                  window.scrollTo(0, pos);
+                } else {
+                  sc.scrollTop = pos;
+                }
+              }
+            }
+          } catch (e) {}
+        }
+
+        restoreScrollPosition();
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', restoreScrollPosition);
+        }
+        window.addEventListener('load', function () {
+          restoreScrollPosition();
+          setTimeout(function () {
+            sessionStorage.removeItem('ziggo_admin_scroll_' + window.location.pathname);
+          }, 1200);
+        });
+        setTimeout(restoreScrollPosition, 50);
+        setTimeout(restoreScrollPosition, 150);
+        setTimeout(restoreScrollPosition, 350);
       })();
     </script>
     {% block scripts %}{% endblock %}

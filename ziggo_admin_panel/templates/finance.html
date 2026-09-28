@@ -36,33 +36,35 @@
             <h3 class="font-black text-ziggo">Revenue by service line</h3>
             <p class="text-xs text-gray-400 mt-1">GMV = what customers paid. Commission = Ziggo's slice (ride platform fee + 20% of food/market delivery fee).</p>
         </div>
-        <table class="w-full">
-            <thead class="bg-gray-50 text-xs font-black uppercase text-gray-500 tracking-wider">
-                <tr>
-                    <th class="px-6 py-3 text-left">Service</th>
-                    <th class="px-6 py-3 text-right">GMV</th>
-                    <th class="px-6 py-3 text-right">Commission</th>
-                    <th class="px-6 py-3 text-right">Completed</th>
-                    <th class="px-6 py-3 text-right">Cancelled</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100 text-sm">
-                {% for svc, gmv_key, com_key, comp_key, canc_key in [
-                    ('Rides', 'rides', 'rides', 'rides', 'rides'),
-                    ('Flash parcels', 'flash', 'flash', 'flash', 'flash'),
-                    ('Food orders', 'food', 'food', 'food', 'food'),
-                    ('Market orders', 'market', 'market', 'market', 'market'),
-                ] %}
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-3 font-bold">{{ svc }}</td>
-                    <td class="px-6 py-3 text-right font-black">Rs.{{ "{:,.0f}".format(rs.gmv[gmv_key]) }}</td>
-                    <td class="px-6 py-3 text-right font-black text-green-600">Rs.{{ "{:,.0f}".format(rs.commission[com_key]) }}</td>
-                    <td class="px-6 py-3 text-right">{{ rs.completed[comp_key] }}</td>
-                    <td class="px-6 py-3 text-right text-red-500">{{ rs.cancelled[canc_key] }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 text-xs font-black uppercase text-gray-500 tracking-wider">
+                    <tr>
+                        <th class="px-6 py-3 text-left">Service</th>
+                        <th class="px-6 py-3 text-right">GMV</th>
+                        <th class="px-6 py-3 text-right">Commission</th>
+                        <th class="px-6 py-3 text-right">Completed</th>
+                        <th class="px-6 py-3 text-right">Cancelled</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 text-sm">
+                    {% for svc, gmv_key, com_key, comp_key, canc_key in [
+                        ('Rides', 'rides', 'rides', 'rides', 'rides'),
+                        ('Flash parcels', 'flash', 'flash', 'flash', 'flash'),
+                        ('Food orders', 'food', 'food', 'food', 'food'),
+                        ('Market orders', 'market', 'market', 'market', 'market'),
+                    ] %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-3 font-bold">{{ svc }}</td>
+                        <td class="px-6 py-3 text-right font-black">Rs.{{ "{:,.0f}".format(rs.gmv[gmv_key]) }}</td>
+                        <td class="px-6 py-3 text-right font-black text-green-600">Rs.{{ "{:,.0f}".format(rs.commission[com_key]) }}</td>
+                        <td class="px-6 py-3 text-right">{{ rs.completed[comp_key] }}</td>
+                        <td class="px-6 py-3 text-right text-red-500">{{ rs.cancelled[canc_key] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <!-- Drill-down cards -->

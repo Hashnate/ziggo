@@ -3,6 +3,28 @@
 {% block title %}Driver Management | Ziggo Admin{% endblock %}
 {% block page_title %}Driver Management{% endblock %}
 
+{% block head %}
+<style>
+    .drivers-table-wrapper {
+        max-height: calc(100vh - 300px);
+        overflow-y: auto;
+        overflow-x: auto;
+    }
+    .drivers-table-wrapper thead {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+    }
+    .drivers-table-wrapper thead th {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        background-color: #F8FAFC !important;
+        box-shadow: 0 1px 0 #EEF1F6;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <!-- View Tabs -->
 <div class="flex border-b border-gray-200 mb-6 gap-6">
@@ -129,20 +151,20 @@
 
 
     <!-- Drivers Table -->
-    <div class="overflow-x-auto">
+    <div class="overflow-x-auto overflow-y-auto max-h-[calc(100vh-300px)] drivers-table-wrapper">
         <table class="w-full text-left min-w-[1200px]">
             {% if view == 'applications' %}
-            <thead class="bg-ziggo-canvas/70 text-[11px] uppercase tracking-wider text-ziggo-faint font-black">
+            <thead class="sticky top-0 z-20 bg-[#F8FAFC] text-[11px] uppercase tracking-wider text-ziggo-faint font-black shadow-[0_1px_0_0_#EEF1F6]">
                 <tr>
-                    <th class="px-6 py-4">ID</th>
-                    <th class="px-6 py-4">Applicant Name</th>
-                    <th class="px-6 py-4">Mobile</th>
-                    <th class="px-6 py-4">City</th>
-                    <th class="px-6 py-4">Vehicle Type</th>
-                    <th class="px-6 py-4">NIC</th>
-                    <th class="px-6 py-4">Status</th>
-                    <th class="px-6 py-4">Applied At</th>
-                    <th class="px-6 py-4">Action</th>
+                    <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20">ID</th>
+                    <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20">Applicant Name</th>
+                    <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20">Mobile</th>
+                    <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20">City</th>
+                    <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20">Vehicle Type</th>
+                    <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20">NIC</th>
+                    <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20">Status</th>
+                    <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20">Applied At</th>
+                    <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20">Action</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
@@ -191,17 +213,17 @@
                 {% endfor %}
             </tbody>
             {% else %}
-            <thead class="bg-ziggo-canvas/70 text-[11px] uppercase tracking-wider text-ziggo-faint font-black">
+            <thead class="sticky top-0 z-20 bg-[#F8FAFC] text-[11px] uppercase tracking-wider text-ziggo-faint font-black shadow-[0_1px_0_0_#EEF1F6]">
                 <tr>
-                    <th class="px-6 py-4">ID</th>
-                    <th class="px-6 py-4">Driver Name</th>
-                    <th class="px-6 py-4">Vehicle</th>
-                    <th class="px-6 py-4">Status</th>
-                    <th class="px-6 py-4">Joined</th>
-                    <th class="px-6 py-4">Rating</th>
-                    <th class="px-6 py-4">Total Earnings</th>
-                    <th class="px-6 py-4">Settlement Owed</th>
-                    <th class="px-6 py-4">Action</th>
+                    <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20">ID</th>
+                    <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20">Driver Name</th>
+                    <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20">Vehicle</th>
+                    <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20">Status</th>
+                    <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20">Joined</th>
+                    <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20">Rating</th>
+                    <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20">Total Earnings</th>
+                    <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20">Settlement Owed</th>
+                    <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20">Action</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">

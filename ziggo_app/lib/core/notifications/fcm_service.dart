@@ -31,6 +31,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_callkit_incoming/entities/entities.dart';
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 
 import '../network/api_client.dart';
 import 'notification_router.dart';
@@ -89,10 +91,10 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   unawaited(_bgLog('[fcm-bg] handler invoked event=$event booking_id=${data['booking_id']} platform=${Platform.operatingSystem}'));
 
   if (event == 'new_ride_request') {
-    // Android only: iOS renders the banner itself from the APNs alert payload.
-    // This path initialises the plugin with Android-only settings, and iOS
-    // reaches it because the backend sets content-available on ride requests.
-    if (!Platform.isAndroid) return;
+    if (Platform.isIOS) {
+      await showCallkitIncomingForRide(data);
+      return;
+    }
 
     final title = data['title'] ?? 'Incoming Ride Request';
     final body = data['body'] ?? 'Tap to view and accept the ride';
@@ -114,6 +116,77 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     } catch (e) {
       unawaited(_bgLog('[fcm-bg] alarm FAILED booking_id=${data['booking_id']}: $e'));
     }
+  }
+}
+
+/// Top-level helper to trigger native CallKit incoming call screen on iOS.
+Future<void> showCallkitIncomingForRide(Map<String, dynamic> data) async {
+  try {
+    final bookingId = (data['booking_id'] ??
+            data['food_order_id'] ??
+            data['market_order_id'] ??
+            DateTime.now().millisecondsSinceEpoch)
+        .toString();
+    final isFood = data['is_food'] == 'true' || data['is_food'] == true;
+    final isMarket = data['is_market'] == 'true' || data['is_market'] == true;
+
+    String callerName = 'New Ride Request';
+    if (isFood) {
+      callerName = 'New Delivery Request';
+    } else if (isMarket) {
+      callerName = 'New Market Order';
+    }
+
+    final fare = data['fare'] != null ? 'Rs. ${data['fare']}' : '';
+    final pickup = (data['pickup_address'] ??
+            data['restaurant_name'] ??
+            data['vendor_name'] ??
+            '')
+        .toString();
+    final handle = [fare, pickup].where((s) => s.isNotEmpty).join(' • ');
+
+    final callParams = CallKitParams(
+      id: bookingId,
+      nameCaller: callerName,
+      appName: 'Ziggo Driver',
+      avatar: 'https://ziggo.lk/assets/logo.png',
+      handle: handle.isNotEmpty ? handle : 'Tap to accept ride',
+      type: 0,
+      duration: 30000,
+      textAccept: 'Accept',
+      textDecline: 'Decline',
+      extra: Map<String, dynamic>.from(data),
+      headers: <String, dynamic>{'apiKey': 'ziggo'},
+      android: const AndroidParams(
+        isCustomNotification: true,
+        isShowLogo: false,
+        ringtonePath: 'ride_alert',
+        backgroundColor: '#051347',
+        actionColor: '#22c55e',
+        textColor: '#ffffff',
+      ),
+      ios: const IOSParams(
+        iconName: 'AppIcon',
+        handleType: 'generic',
+        supportsVideo: false,
+        maximumCallGroups: 1,
+        maximumCallsPerCallGroup: 1,
+        audioSessionMode: 'default',
+        audioSessionActive: true,
+        audioSessionPreferredSampleRate: 44100.0,
+        audioSessionPreferredIOBufferDuration: 0.005,
+        supportsDTMF: false,
+        supportsHolding: false,
+        supportsGrouping: false,
+        supportsUngrouping: false,
+        ringtonePath: 'ride_alert.caf',
+      ),
+    );
+
+    await FlutterCallkitIncoming.showCallkitIncoming(callParams);
+    unawaited(_bgLog('[callkit] showCallkitIncoming triggered booking_id=$bookingId'));
+  } catch (e) {
+    unawaited(_bgLog('[callkit] showCallkitIncoming failed: $e'));
   }
 }
 
@@ -382,6 +455,27 @@ class FcmService {
       // 5. Wire handlers
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
       _foregroundSub = FirebaseMessaging.onMessage.listen(_onForegroundMessage);
+
+      // Wire CallKit action listener (Accept / Decline on lock screen)
+      FlutterCallkitIncoming.onEvent.listen((CallEvent? callEvent) {
+        if (callEvent == null) return;
+        switch (callEvent.event) {
+          case Event.actionCallAccept:
+            final extra = callEvent.body?['extra'];
+            if (extra is Map<String, dynamic>) {
+              _handleNotificationDataClick(extra);
+            } else if (extra is Map) {
+              _handleNotificationDataClick(Map<String, dynamic>.from(extra));
+            }
+            break;
+          case Event.actionCallDecline:
+          case Event.actionCallEnded:
+          case Event.actionCallTimeout:
+            break;
+          default:
+            break;
+        }
+      });
 
       // Handle when the app is in the background and opened by a notification tap
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
@@ -731,10 +825,12 @@ class FcmService {
 
   /// Raise the ride alarm from the live app. Used when a request arrives over
   /// the WebSocket while the app is alive but not on screen (backgrounded or
-  /// phone locked during an online session). Android only: iOS shows the
-  /// APNs banner itself and a local one on top would duplicate it.
+  /// phone locked during an online session).
   Future<void> showRideAlarmFromApp(Map<String, dynamic> data) async {
-    if (!Platform.isAndroid) return;
+    if (Platform.isIOS) {
+      await showCallkitIncomingForRide(data);
+      return;
+    }
     try {
       final title = (data['title'] ?? 'Incoming Ride Request').toString();
       final body = (data['body'] ?? 'Tap to view and accept the ride').toString();
@@ -748,6 +844,9 @@ class FcmService {
   Future<void> cancelRideAlert() async {
     try {
       await _local.cancel(_rideAlertNotificationId);
+    } catch (_) {}
+    try {
+      await FlutterCallkitIncoming.endAllCalls();
     } catch (_) {}
   }
 
