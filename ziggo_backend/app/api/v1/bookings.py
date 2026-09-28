@@ -40,7 +40,7 @@ from ...schemas import (
     BookingUpdateDestinationRequest,
 )
 from ...services.auth_service import get_current_user
-from ...services.fare_service import calculate_fare, to_decimal
+from ...services.fare_service import calculate_fare, calculate_fares_bulk, to_decimal
 from ...services.matching_service import find_all_nearby_drivers, find_nearest_driver
 from ...services.ws_manager import manager
 from ...services import ipay_service
@@ -476,41 +476,29 @@ async def estimate_fare_bulk(
     if (req.redeem_points or 0) > 0:
         customer = await _get_customer(db, user)
         
-    results = {}
-    if "truck" not in req.service_types:
-        req.service_types.append("truck")
+    service_types = list(req.service_types or [])
+    if "truck" not in service_types and not req.is_flash and not req.is_courier and not req.is_rental:
+        service_types.append("truck")
         
-    for st in req.service_types:
-        try:
-            fare = await calculate_fare(
-                db,
-                st,
-                req.pickup_lat,
-                req.pickup_lng,
-                req.drop_lat,
-                req.drop_lng,
-                req.promo_code,
-                trip_type=req.trip_type,
-                is_flash=req.is_flash,
-                parcel_weight_kg=req.parcel_weight_kg,
-                is_rental=req.is_rental,
-                rental_hours=req.rental_hours,
-                is_courier=req.is_courier,
-                packages=[p.model_dump() for p in (req.packages or [])],
-                customer=customer,
-                redeem_points=req.redeem_points or 0,
-                stops=[s.model_dump() for s in (req.stops or [])],
-            )
-            fare.pop("hourly_rate", None)
-            fare.pop("rental_hours", None)
-            fare["service_type"] = st
-            results[st] = fare
-        except Exception as e:
-            import logging
-            logging.error(f"Error calculating fare for {st}: {e}", exc_info=True)
-            # Skip or log error for this specific service type
-            continue
-            
+    results = await calculate_fares_bulk(
+        db=db,
+        service_types=service_types,
+        pickup_lat=req.pickup_lat,
+        pickup_lng=req.pickup_lng,
+        drop_lat=req.drop_lat,
+        drop_lng=req.drop_lng,
+        promo=req.promo_code,
+        trip_type=req.trip_type,
+        is_flash=req.is_flash,
+        parcel_weight_kg=req.parcel_weight_kg,
+        is_rental=req.is_rental,
+        rental_hours=req.rental_hours,
+        is_courier=req.is_courier,
+        packages=[p.model_dump() for p in (req.packages or [])],
+        customer=customer,
+        redeem_points=req.redeem_points or 0,
+        stops=[s.model_dump() for s in (req.stops or [])],
+    )
     return results
 
 

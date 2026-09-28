@@ -51,6 +51,9 @@ class VehicleSelectionScreen extends StatefulWidget {
 class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
   final ZiggoMapController _mapController = ZiggoMapController();
   
+  static List<Map<String, dynamic>>? _cachedCategories;
+  static Map<String, Map<String, dynamic>> _cachedCategoryMap = {};
+
   String? _serviceType;
   String _payment = 'cash';
   String _promo = '';
@@ -77,22 +80,26 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       final resp = await ApiClient.instance.dio.get('/public/categories');
       if (resp.data is List) {
         final list = List<Map<String, dynamic>>.from(resp.data as List);
-        setState(() {
-          _serviceTypes = list
-              .where((item) => widget.isTruckMode ? (item['is_truck'] == true) : (item['is_truck'] != true))
-              .map((item) => item['service_type'] as String)
-              .toList();
-          _categoryData = {
-            for (var item in list) item['service_type'] as String: item
-          };
-        });
+        _cachedCategories = list;
+        _cachedCategoryMap = {
+          for (var item in list) item['service_type'] as String: item
+        };
+        final newServiceTypes = list
+            .where((item) => widget.isTruckMode ? (item['is_truck'] == true) : (item['is_truck'] != true))
+            .map((item) => item['service_type'] as String)
+            .toList();
+        if (mounted) {
+          setState(() {
+            if (newServiceTypes.isNotEmpty) _serviceTypes = newServiceTypes;
+            _categoryData = _cachedCategoryMap;
+            if (_serviceType == null || !_serviceTypes.contains(_serviceType)) {
+              if (_serviceTypes.isNotEmpty) _serviceType = _serviceTypes.first;
+            }
+          });
+        }
       }
     } catch (e) {
       debugPrint("Error fetching active services: $e");
-      setState(() {
-        _serviceTypes = widget.isTruckMode ? [] : ['tuk', 'bike', 'car', 'mini', 'van', 'truck'];
-        _categoryData = {};
-      });
     }
   }
 
@@ -102,7 +109,25 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     _termsRecognizer = TapGestureRecognizer()..onTap = _launchTermsUrl;
     _secondaryPhone = widget.friend?.phone;
     _scheduledTime = widget.scheduledTime;
+
+    // Instant initialization from cache or standard fallback so UI renders with 0 delay
+    if (_cachedCategories != null && _cachedCategories!.isNotEmpty) {
+      _serviceTypes = _cachedCategories!
+          .where((item) => widget.isTruckMode ? (item['is_truck'] == true) : (item['is_truck'] != true))
+          .map((item) => item['service_type'] as String)
+          .toList();
+      _categoryData = _cachedCategoryMap;
+    }
+    if (_serviceTypes.isEmpty) {
+      _serviceTypes = widget.isTruckMode
+          ? ['truck', 'light', 'light_open', 'mover', 'mover_open']
+          : ['tuk', 'bike', 'car', 'mini', 'van', 'truck'];
+    }
+    _serviceType = _serviceTypes.isNotEmpty ? _serviceTypes.first : null;
+
     _fetchRoutePoints();
+    _fetchActiveServices();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<PromosProvider>().refresh();
       context.read<PaymentMethodsProvider>().fetchCards();
@@ -259,38 +284,16 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
   void _startFareUpdatePolling() {
     _fareUpdateTimer?.cancel();
     _fareUpdateTimer = Timer.periodic(
-      const Duration(seconds: 3),
+      const Duration(seconds: 12),
       (_) => _recalculateSilently(),
     );
   }
 
   Future<void> _recalculateSilently() async {
     if (_loadingEstimates) return;
+    if (_serviceTypes.isEmpty) return;
     
-    List<String> currentServiceTypes = List<String>.from(_serviceTypes);
-    try {
-      final resp = await ApiClient.instance.dio.get('/public/categories');
-      if (resp.data is List && mounted) {
-        final list = List<Map<String, dynamic>>.from(resp.data as List);
-        final newServiceTypes = list
-            .where((item) => widget.isTruckMode ? (item['is_truck'] == true) : (item['is_truck'] != true))
-            .map((item) => item['service_type'] as String)
-            .toList();
-        final newCategoryData = {
-          for (var item in list) item['service_type'] as String: item
-        };
-        setState(() {
-          _serviceTypes = newServiceTypes;
-          _categoryData = newCategoryData;
-        });
-        currentServiceTypes = newServiceTypes;
-      }
-    } catch (e) {
-      debugPrint("Error fetching active services silently: $e");
-    }
-
-    if (currentServiceTypes.isEmpty) return;
-    
+    final currentServiceTypes = List<String>.from(_serviceTypes);
     final booking = context.read<BookingProvider>();
     final bulkRes = await booking.estimateFaresBulk(
       serviceTypes: currentServiceTypes,
@@ -368,13 +371,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     });
     
     final booking = context.read<BookingProvider>();
-    _estimates.clear();
-    
-    if (_serviceTypes.isEmpty) {
-      await _fetchActiveServices();
-    }
-    
-    final servicesToFetch = _serviceTypes;
+    final servicesToFetch = List<String>.from(_serviceTypes);
 
     final bulkRes = await booking.estimateFaresBulk(
       serviceTypes: servicesToFetch,
@@ -389,11 +386,14 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       }).toList(),
     );
 
-    if (bulkRes != null) {
-      bulkRes.forEach((st, res) {
-        if (res is Map) {
-          _estimates[st] = Map<String, dynamic>.from(res);
-        }
+    if (bulkRes != null && mounted) {
+      setState(() {
+        _estimates.clear();
+        bulkRes.forEach((st, res) {
+          if (res is Map) {
+            _estimates[st] = Map<String, dynamic>.from(res);
+          }
+        });
       });
     }
     
@@ -909,17 +909,14 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                   ],
                   
                   // Vehicles horizontal list
-                  if (_loadingEstimates)
-                    const SizedBox(height: 165, child: Center(child: CircularProgressIndicator()))
-                  else
-                    SizedBox(
-                      height: 165,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.only(left: 16, right: 16, top: 4),
-                        children: _serviceTypes.map((st) => _vehicleCard(st)).toList(),
-                      ),
+                  SizedBox(
+                    height: 165,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.only(left: 16, right: 16, top: 4),
+                      children: _serviceTypes.map((st) => _vehicleCard(st)).toList(),
                     ),
+                  ),
 
                   if (!_loadingEstimates && _serviceType != null) ...[
                     Builder(
@@ -1159,7 +1156,6 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
   Widget _vehicleCard(String st) {
     final selected = _serviceType == st;
     final est = _estimates[st];
-    if (est == null) return const SizedBox.shrink();
 
     final meta = {
       'bike': ('Bike', 'assets/icons/bike.png', 1),
@@ -1204,8 +1200,6 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     } else {
       etaMin = null;
     }
-
-    final descriptionText = category?['description']?.toString() ?? '';
 
     return GestureDetector(
       onTap: () {
@@ -1260,7 +1254,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                 ),
                 const SizedBox(width: 4),
                 const Icon(Icons.person_rounded, size: 10, color: AppColors.textSecondary),
-                Text(' ${est['capacity'] ?? capacity}', style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                Text(' ${est?['capacity'] ?? capacity}', style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
               ],
             ),
             const SizedBox(height: 2),
@@ -1269,21 +1263,28 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    'LKR ${(est['final_amount'] as num).toStringAsFixed(2)}',
-                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
-                  ),
-                  if (est['original_amount'] != null &&
-                      (est['original_amount'] as num) > (est['final_amount'] as num))
+                  if (est != null && est['final_amount'] != null) ...[
                     Text(
-                      'LKR ${(est['original_amount'] as num).toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.normal,
-                        fontSize: 10,
-                        color: Colors.grey,
-                        decoration: TextDecoration.lineThrough,
-                      ),
+                      'LKR ${(est['final_amount'] as num).toStringAsFixed(2)}',
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
                     ),
+                    if (est['original_amount'] != null &&
+                        (est['original_amount'] as num) > (est['final_amount'] as num))
+                      Text(
+                        'LKR ${(est['original_amount'] as num).toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.normal,
+                          fontSize: 10,
+                          color: Colors.grey,
+                          decoration: TextDecoration.lineThrough,
+                        ),
+                      ),
+                  ] else ...[
+                    const Text(
+                      'LKR ...',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textTertiary),
+                    ),
+                  ],
                 ],
               ),
             ),
