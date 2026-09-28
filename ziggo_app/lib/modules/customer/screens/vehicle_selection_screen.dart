@@ -225,17 +225,21 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
 
   Future<void> _fetchNearbyDrivers() async {
     final pickup = widget.pickup.location;
-    final catInfo = _serviceType != null ? _categoryData[_serviceType] : null;
-    final catRadius = catInfo != null ? catInfo['search_radius_km'] : null;
+    num? maxRadius;
+    for (final cat in _categoryData.values) {
+      final r = cat['search_radius_km'];
+      if (r is num && r > 0) {
+        if (maxRadius == null || r > maxRadius) {
+          maxRadius = r;
+        }
+      }
+    }
     final queryParams = <String, dynamic>{
       'lat': pickup.latitude,
       'lng': pickup.longitude,
     };
-    if (catRadius != null && (catRadius as num) > 0) {
-      queryParams['radius_km'] = catRadius;
-    }
-    if (_serviceType != null) {
-      queryParams['vehicle_type'] = _serviceType;
+    if (maxRadius != null) {
+      queryParams['radius_km'] = maxRadius;
     }
 
     try {
@@ -1190,7 +1194,9 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
 
     // Find nearby drivers of this type to calculate pickup ETA
     int? etaMin;
-    final typeDrivers = _nearbyDrivers.where((d) => d['vehicle_type'] == st).toList();
+    final typeDrivers = _nearbyDrivers.where((d) => 
+      (d['vehicle_type']?.toString().toLowerCase().trim() ?? '') == st.toLowerCase().trim()
+    ).toList();
     if (typeDrivers.isNotEmpty) {
       final minDist = typeDrivers.map((d) => d['distance_km'] as num).reduce((a, b) => a < b ? a : b).toDouble();
       etaMin = (minDist / 25.0 * 60).round();
