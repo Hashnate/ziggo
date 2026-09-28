@@ -11,18 +11,11 @@ class ZiggoWordmark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final image = Image.asset(
-      'assets/images/ziggo.png',
+    return Image.asset(
+      onDark ? 'assets/images/dark.png' : 'assets/images/light.png',
       height: size,
       fit: BoxFit.contain,
       filterQuality: FilterQuality.high,
-    );
-
-    if (!onDark) return image;
-
-    return ColorFiltered(
-      colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-      child: image,
     );
   }
 }
