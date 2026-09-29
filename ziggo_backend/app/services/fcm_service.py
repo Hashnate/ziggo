@@ -171,16 +171,6 @@ async def _send_to_token(
                         sound=ios_sound,
                         content_available=True,
                         alert=messaging.ApsAlert(title=title, body=body),
-                        # NOTE: interruption-level: time-sensitive removed until
-                        # the Apple Developer portal provisioning profile is
-                        # updated to include the Time Sensitive Notifications
-                        # capability. To re-enable:
-                        # 1. developer.apple.com → App IDs → ziggo → Edit →
-                        #    Time Sensitive Notifications → Enable → Save
-                        # 2. Regenerate "Ziggo Profile" provisioning profile
-                        # 3. Add com.apple.developer.usernotifications.time-sensitive
-                        #    back to ios/Runner/Runner.entitlements
-                        # custom_data={"interruption-level": "time-sensitive"},
                     ),
                 ),
             ),
@@ -191,19 +181,18 @@ async def _send_to_token(
             notification=messaging.Notification(title=title, body=body),
             data=payload_data,
             android=messaging.AndroidConfig(
-                priority="high" if urgent else "normal",
+                priority="high",
                 notification=messaging.AndroidNotification(
-                    # Urgent events play custom sounds.
                     # Android references res/raw assets WITHOUT extension.
                     sound=android_sound,
                     # Channel id — once created, the channel's sound is fixed.
                     channel_id=android_channel,
-                    priority="max" if urgent else "default",
-                    visibility="public" if urgent else "private",
+                    priority="high" if not urgent else "max",
+                    visibility="public",
                 ),
             ),
             apns=messaging.APNSConfig(
-                headers={"apns-priority": "10" if urgent else "5"},
+                headers={"apns-priority": "10"},
                 payload=messaging.APNSPayload(
                     aps=messaging.Aps(
                         sound=ios_sound,
@@ -311,7 +300,7 @@ async def send_to_users(
     event = (data or {}).get("event")
     urgent = event in _URGENT_EVENTS
 
-    android_channel = "ziggo_urgent" if urgent else "ziggo_general"
+    android_channel = "ziggo_ride_alarm_v14" if urgent else "ziggo_general_alerts_v2"
     android_sound = "ride_alert" if urgent else "default"
     ios_sound = "ride_alert.caf" if urgent else "default"
 
@@ -326,16 +315,16 @@ async def send_to_users(
             notification=messaging.Notification(title=title, body=body),
             data=payload_data,
             android=messaging.AndroidConfig(
-                priority="high" if urgent else "normal",
+                priority="high",
                 notification=messaging.AndroidNotification(
                     sound=android_sound,
                     channel_id=android_channel,
-                    priority="max" if urgent else "default",
-                    visibility="public" if urgent else "private",
+                    priority="max" if urgent else "high",
+                    visibility="public",
                 ),
             ),
             apns=messaging.APNSConfig(
-                headers={"apns-priority": "10" if urgent else "5"},
+                headers={"apns-priority": "10"},
                 payload=messaging.APNSPayload(
                     aps=messaging.Aps(
                         sound=ios_sound,
@@ -451,6 +440,14 @@ def _format(event: str, payload: dict) -> tuple[str, str]:
                 bits.append(route)
             body = " • ".join(bits) or "Tap to accept"
         return (title, body)
+    if event == "booking_cancelled":
+        reason = payload.get("reason")
+        ref = payload.get("booking_ref")
+        if reason:
+            return ("Ride Cancelled", f"Customer cancelled the ride: {reason}")
+        if ref:
+            return ("Ride Cancelled", f"Booking {ref} was cancelled by the customer.")
+        return ("Ride Cancelled", "The customer has cancelled the ride request.")
     if event == "destination_updated":
         return ("Trip Updated", "The customer has added a stop or changed the destination.")
     if event == "booking_update":
@@ -466,7 +463,20 @@ def _format(event: str, payload: dict) -> tuple[str, str]:
         if status == "completed":
             return ("Ride completed", "Thanks for riding with Ziggo.")
         if status == "cancelled":
-            return ("Ride cancelled", "Your ride has been cancelled.")
+            reason = payload.get("reason")
+            cancelled_by = payload.get("cancelled_by")
+            if cancelled_by == "customer":
+                if reason:
+                    return ("Ride Cancelled by Customer", f"Reason: {reason}")
+                return ("Ride Cancelled by Customer", "The customer has cancelled the ride.")
+            elif cancelled_by == "driver":
+                if reason:
+                    return ("Ride Cancelled by Driver", f"Reason: {reason}")
+                return ("Ride Cancelled", "The driver has cancelled the ride.")
+            else:
+                if reason:
+                    return ("Ride Cancelled", f"Reason: {reason}")
+                return ("Ride Cancelled", "Your ride has been cancelled.")
     if event == "no_drivers_available":
         return ("No drivers found", "We couldn't find a driver nearby. Please try again.")
     if event == "chat_message":

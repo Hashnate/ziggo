@@ -1881,7 +1881,12 @@ async def update_booking_status(
             await manager.send(
                 nd.user_id,
                 "booking_cancelled",
-                {"booking_id": b.id, "booking_ref": b.booking_ref},
+                {
+                    "booking_id": b.id,
+                    "booking_ref": b.booking_ref,
+                    "reason": b.cancellation_reason,
+                    "cancelled_by": b.cancelled_by,
+                },
             )
 
     if b.driver_id:
@@ -1891,8 +1896,25 @@ async def update_booking_status(
             await manager.send(
                 drv.user_id,
                 "booking_update",
-                {"booking_id": b.id, "status": b.status.value},
+                {
+                    "booking_id": b.id,
+                    "status": b.status.value,
+                    "reason": b.cancellation_reason,
+                    "cancelled_by": b.cancelled_by,
+                    "booking_ref": b.booking_ref,
+                },
             )
+            if b.status == BookingStatus.CANCELLED and b.cancelled_by == "customer":
+                reason_msg = f" Reason: {b.cancellation_reason}" if b.cancellation_reason else ""
+                db.add(
+                    Notification(
+                        user_id=drv.user_id,
+                        title="Ride Cancelled by Customer",
+                        body=f"Booking {b.booking_ref} was cancelled by customer.{reason_msg}",
+                        type="ride_update",
+                        data=f'{{"booking_id":{b.id}}}',
+                    )
+                )
         dispatch_vehicle = None if (b.is_flash or b.is_courier) else b.service_type
         max_radius = await get_search_radius_for_service(db, dispatch_vehicle)
 

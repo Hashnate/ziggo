@@ -90,6 +90,19 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final event = data['event'];
   unawaited(_bgLog('[fcm-bg] handler invoked event=$event booking_id=${data['booking_id']} platform=${Platform.operatingSystem}'));
 
+  if (event == 'booking_cancelled' || (event == 'booking_update' && data['status'] == 'cancelled')) {
+    try {
+      await FlutterCallkitIncoming.endAllCalls();
+    } catch (_) {}
+    try {
+      final local = FlutterLocalNotificationsPlugin();
+      const androidInit = AndroidInitializationSettings('@mipmap/launcher_icon');
+      await local.initialize(const InitializationSettings(android: androidInit));
+      await local.cancel(_rideAlertNotificationId);
+    } catch (_) {}
+    return;
+  }
+
   if (event == 'new_ride_request') {
     if (Platform.isIOS) {
       await showCallkitIncomingForRide(data);
@@ -725,10 +738,14 @@ class FcmService {
     // is handled by the system, not this foreground handler).
     if (isRideRequest) return;
 
+    if (event == 'booking_cancelled' || (event == 'booking_update' && message.data['status'] == 'cancelled')) {
+      await cancelRideAlert();
+    }
+
     final notif = message.notification;
-    if (notif == null) return; // pure data-only payload — let the WS update the UI
-    final String? title = notif.title;
-    final String? body = notif.body;
+    final String? title = notif?.title ?? message.data['title'];
+    final String? body = notif?.body ?? message.data['body'];
+    if (title == null || title.isEmpty) return;
 
     if (kDebugMode) {
       debugPrint('[fcm] foreground: $title — $body');
