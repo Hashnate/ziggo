@@ -677,10 +677,6 @@ class FcmService {
     unawaited(_logToServer('[fcm] token retrieval loop finished. cachedToken: ${(token != null && token.length > 15) ? token.substring(0, 15) : token}'));
     
     if (token == null || token.isEmpty) return false;
-    if (token == _lastUploadedToken) {
-      unawaited(_logToServer('[fcm] token already uploaded, skipping backend call'));
-      return true;
-    }
     return _sendToBackend(token);
   }
 

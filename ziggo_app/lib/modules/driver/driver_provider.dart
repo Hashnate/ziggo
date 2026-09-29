@@ -153,15 +153,23 @@ class DriverProvider extends ChangeNotifier {
 
     if (isCancelEvent) {
       loadActive();
+      FcmService.instance.cancelRideAlert();
       final pending = _pendingRequest;
       if (pending != null) {
-        final pendingBid = pending['booking_id'] ?? pending['food_order_id'] ?? pending['market_order_id'];
-        final dataBid   = data['booking_id'] ?? data['food_order_id'] ?? data['market_order_id'];
-        if (dataBid != null && pendingBid != null && pendingBid == dataBid) {
+        final pendingBid = (pending['booking_id'] ?? pending['food_order_id'] ?? pending['market_order_id'])?.toString();
+        final dataBid   = (data['booking_id'] ?? data['food_order_id'] ?? data['market_order_id'])?.toString();
+        if (dataBid == null || pendingBid == null || pendingBid == dataBid) {
           _pendingRequest = null;
-          FcmService.instance.cancelRideAlert();
           notifyListeners();
         }
+      }
+      final reason = data['reason']?.toString();
+      if (SchedulerBinding.instance.lifecycleState != AppLifecycleState.resumed && reason != null && reason.isNotEmpty) {
+        unawaited(FcmService.instance.showChatNotification(
+          'Ride Cancelled by Customer',
+          'Reason: $reason',
+          data: data,
+        ));
       }
     } else if (isRequestEvent) {
       // Rich payload — rides, parcels (is_flash), food orders (is_food),
@@ -182,29 +190,45 @@ class DriverProvider extends ChangeNotifier {
       // the driver is NOT shown a stale alert for a ride that no longer exists.
       final cancelledStatus = data['status']?.toString();
       if (cancelledStatus == 'cancelled') {
+        FcmService.instance.cancelRideAlert();
         final pending = _pendingRequest;
         if (pending != null) {
-          final pendingBid = pending['booking_id'];
-          final dataBid   = data['booking_id'];
-          if (dataBid != null && pendingBid != null && pendingBid == dataBid) {
+          final pendingBid = pending['booking_id']?.toString();
+          final dataBid   = data['booking_id']?.toString();
+          if (dataBid == null || pendingBid == null || pendingBid == dataBid) {
             _pendingRequest = null;
-            FcmService.instance.cancelRideAlert();
             notifyListeners();
           }
+        }
+        final reason = data['reason']?.toString();
+        if (SchedulerBinding.instance.lifecycleState != AppLifecycleState.resumed && reason != null && reason.isNotEmpty) {
+          unawaited(FcmService.instance.showChatNotification(
+            'Ride Cancelled by Customer',
+            'Reason: $reason',
+            data: data,
+          ));
         }
       }
     } else if (event == 'booking_cancelled') {
       // Dedicated cancellation event — dismiss matching pending request.
       loadActive();
+      FcmService.instance.cancelRideAlert();
       final pending = _pendingRequest;
       if (pending != null) {
-        final pendingBid = pending['booking_id'];
-        final dataBid   = data['booking_id'];
-        if (dataBid != null && pendingBid != null && pendingBid == dataBid) {
+        final pendingBid = pending['booking_id']?.toString();
+        final dataBid   = data['booking_id']?.toString();
+        if (dataBid == null || pendingBid == null || pendingBid == dataBid) {
           _pendingRequest = null;
-          FcmService.instance.cancelRideAlert();
           notifyListeners();
         }
+      }
+      final reason = data['reason']?.toString();
+      if (SchedulerBinding.instance.lifecycleState != AppLifecycleState.resumed && reason != null && reason.isNotEmpty) {
+        unawaited(FcmService.instance.showChatNotification(
+          'Ride Cancelled by Customer',
+          'Reason: $reason',
+          data: data,
+        ));
       }
     } else if (event == 'order_update') {
       loadActiveFoodOrder();
