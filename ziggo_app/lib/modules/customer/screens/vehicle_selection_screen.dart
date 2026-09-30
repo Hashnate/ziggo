@@ -248,24 +248,28 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     );
   }
 
+  double _getCategorySearchRadius(String? st) {
+    if (st == null) return 15.0;
+    final cat = _categoryData[st.toLowerCase().trim()];
+    if (cat != null && cat['search_radius_km'] is num && (cat['search_radius_km'] as num) > 0) {
+      return (cat['search_radius_km'] as num).toDouble();
+    }
+    return 15.0;
+  }
+
+  bool _isDriverInCategoryRadius(Map<String, dynamic> driver) {
+    final vType = driver['vehicle_type']?.toString().toLowerCase().trim();
+    final radius = _getCategorySearchRadius(vType);
+    final dist = (driver['distance_km'] as num?)?.toDouble() ?? 0.0;
+    return dist <= radius;
+  }
+
   Future<void> _fetchNearbyDrivers() async {
     final pickup = widget.pickup.location;
-    num? maxRadius;
-    for (final cat in _categoryData.values) {
-      final r = cat['search_radius_km'];
-      if (r is num && r > 0) {
-        if (maxRadius == null || r > maxRadius) {
-          maxRadius = r;
-        }
-      }
-    }
     final queryParams = <String, dynamic>{
       'lat': pickup.latitude,
       'lng': pickup.longitude,
     };
-    if (maxRadius != null) {
-      queryParams['radius_km'] = maxRadius;
-    }
 
     try {
       final resp = await ApiClient.instance.dio.get(
@@ -771,8 +775,9 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
               markers: [
                 if (!_loadingEstimates && _serviceType != null)
                   for (final d in _nearbyDrivers)
-                    if ((widget.isTruckMode && d['vehicle_type'] == 'truck') ||
-                        (!widget.isTruckMode && d['vehicle_type'] == _serviceType))
+                    if (((widget.isTruckMode && d['vehicle_type'] == 'truck') ||
+                        (!widget.isTruckMode && d['vehicle_type'] == _serviceType)) &&
+                        _isDriverInCategoryRadius(d))
                       pinMarker(
                         point: LatLng((d['lat'] as num).toDouble(), (d['lng'] as num).toDouble()),
                         icon: _vehicleIcon(d['vehicle_type'] as String?),
@@ -889,7 +894,9 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                         final descriptionText = category?['description']?.toString() ?? '';
                         if (descriptionText.isEmpty) return const SizedBox.shrink();
                         
-                        final typeDrivers = _nearbyDrivers.where((d) => d['vehicle_type'] == _serviceType).toList();
+                        final typeDrivers = _nearbyDrivers.where((d) => 
+                          d['vehicle_type'] == _serviceType && _isDriverInCategoryRadius(d)
+                        ).toList();
                         final isOnline = typeDrivers.isNotEmpty;
                         
                         return Padding(
@@ -921,7 +928,9 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                   if (!_loadingEstimates && _serviceType != null) ...[
                     Builder(
                       builder: (context) {
-                        final typeDrivers = _nearbyDrivers.where((d) => d['vehicle_type'] == _serviceType).toList();
+                        final typeDrivers = _nearbyDrivers.where((d) => 
+                          d['vehicle_type'] == _serviceType && _isDriverInCategoryRadius(d)
+                        ).toList();
                         if (typeDrivers.isEmpty) {
                           final displayName = _categoryData[_serviceType]?['name'] as String? ?? 
                               {
@@ -1188,10 +1197,11 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                 : '${ApiConfig.baseHost}/$customImage'))
         : null;
 
-    // Find nearby drivers of this type to calculate pickup ETA
+    // Find nearby drivers of this type to calculate pickup ETA (respecting category search radius)
     int? etaMin;
     final typeDrivers = _nearbyDrivers.where((d) => 
-      (d['vehicle_type']?.toString().toLowerCase().trim() ?? '') == st.toLowerCase().trim()
+      (d['vehicle_type']?.toString().toLowerCase().trim() ?? '') == st.toLowerCase().trim() &&
+      _isDriverInCategoryRadius(d)
     ).toList();
     if (typeDrivers.isNotEmpty) {
       final minDist = typeDrivers.map((d) => d['distance_km'] as num).reduce((a, b) => a < b ? a : b).toDouble();

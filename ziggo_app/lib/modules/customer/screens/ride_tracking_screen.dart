@@ -263,7 +263,6 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
         queryParameters: {
           'lat': pickup.latitude,
           'lng': pickup.longitude,
-          'radius_km': 5,
           if (serviceType != null) 'vehicle_type': serviceType,
         },
       );

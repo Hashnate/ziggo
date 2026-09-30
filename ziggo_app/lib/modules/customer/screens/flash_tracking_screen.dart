@@ -175,7 +175,6 @@ class _FlashTrackingScreenState extends State<FlashTrackingScreen> with SingleTi
         queryParameters: {
           'lat': pickup.latitude,
           'lng': pickup.longitude,
-          'radius_km': 5,
           if (serviceType != null) 'vehicle_type': serviceType,
         },
       );

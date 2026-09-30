@@ -139,16 +139,22 @@ async def list_nearby_drivers(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    """Return online + approved drivers within `radius_km` (or category search radius) of the given point.
+    """Return online + approved drivers within their category search radius (or radius_km) of the given point.
 
     Used by the customer map to render moving vehicle pins around the pickup.
     Returns minimal data — id, vehicle_type, coords, distance — no PII.
     """
-    if radius_km is not None:
-        effective_radius = radius_km
-    else:
-        from .bookings import get_search_radius_for_service
-        effective_radius = float(await get_search_radius_for_service(db, vehicle_type))
+    from ...models import FareSetting, SystemSettings
+    fs_q = await db.execute(select(FareSetting))
+    fare_settings = {
+        (fs.service_type or "").lower().strip(): fs.search_radius_km
+        for fs in fs_q.scalars().all()
+        if fs.service_type
+    }
+
+    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    ss = ss_q.scalars().first()
+    default_radius = float(ss.driver_search_radius_km) if (ss and ss.driver_search_radius_km is not None) else 15.0
 
     stmt = select(Driver).where(
         Driver.is_online == True,  # noqa: E712
@@ -164,6 +170,12 @@ async def list_nearby_drivers(
         if d.current_lat is None or d.current_lng is None:
             continue
         dist = haversine_km(lat, lng, float(d.current_lat), float(d.current_lng))
+
+        v_type = (d.vehicle_type or "").lower().strip()
+        cat_radius_val = fare_settings.get(v_type)
+        cat_radius = float(cat_radius_val) if (cat_radius_val is not None and cat_radius_val > 0) else default_radius
+
+        effective_radius = cat_radius if radius_km is None else min(radius_km, cat_radius)
         if dist > effective_radius:
             continue
         out.append({
