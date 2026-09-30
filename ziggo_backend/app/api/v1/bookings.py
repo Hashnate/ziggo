@@ -55,7 +55,16 @@ def _gen_ref() -> str:
 async def get_search_radius_for_service(db: AsyncSession, service_type: Optional[str]) -> int:
     if service_type:
         from ...models import FareSetting
-        q = await db.execute(select(FareSetting).where(FareSetting.service_type == service_type))
+        from sqlalchemy import or_, func
+        st_clean = service_type.strip().lower()
+        q = await db.execute(
+            select(FareSetting).where(
+                or_(
+                    func.lower(FareSetting.service_type) == st_clean,
+                    func.lower(FareSetting.display_name) == st_clean,
+                )
+            )
+        )
         fs = q.scalars().first()
         if fs and fs.search_radius_km is not None and fs.search_radius_km > 0:
             return fs.search_radius_km

@@ -4,18 +4,59 @@
 {% block page_title %}Vehicle Categories{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
+<div class="space-y-6 flex flex-col min-h-[calc(100vh-140px)]">
+
+    <!-- Stat cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-blue-100 text-ziggo flex items-center justify-center text-2xl">
+                <i class="fas fa-layer-group"></i>
+            </div>
+            <div>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Total Categories</p>
+                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1">{{ categories|length }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-2xl">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Active Services</p>
+                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1">{{ categories|selectattr('is_active')|list|length }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-gray-100 text-gray-500 flex items-center justify-center text-2xl">
+                <i class="fas fa-pause-circle"></i>
+            </div>
+            <div>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Inactive</p>
+                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1">{{ categories|rejectattr('is_active')|list|length }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center text-2xl">
+                <i class="fas fa-id-card"></i>
+            </div>
+            <div>
+                <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Assigned Drivers</p>
+                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1">{{ driver_counts.values()|sum if driver_counts else 0 }}</p>
+            </div>
+        </div>
+    </div>
 
     <!-- Header Controls -->
-    <div class="flex justify-end">
+    <div class="flex items-center justify-between">
+        <p class="text-xs text-ziggo-muted font-bold"><i class="fas fa-grip-vertical mr-1 text-gray-400"></i> Drag &amp; drop rows to change display order in rider app</p>
         <button onclick="openCreateModal()" class="px-3.5 py-2 text-sm bg-ziggo text-white rounded-xl font-semibold shadow-brand hover:bg-ziggo-light transition flex items-center gap-1.5">
             <i class="fas fa-plus text-xs"></i> Add Category
         </button>
     </div>
 
     <!-- Table -->
-    <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
-        <div class="overflow-x-auto">
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm flex-1 flex flex-col justify-between overflow-hidden min-h-[420px]">
+        <div class="overflow-x-auto flex-1">
             <table class="w-full text-left">
                 <thead class="bg-gray-50 text-[11px] uppercase text-ziggo-muted font-black tracking-wider">
                     <tr>
@@ -130,6 +171,10 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+        <div class="px-6 py-3.5 border-t border-ziggo-line bg-gray-50/50 flex items-center justify-between text-xs text-ziggo-muted">
+            <span class="font-medium">Total <strong class="text-ziggo-ink">{{ categories|length }}</strong> categories</span>
+            <span class="text-[11px] font-semibold text-gray-400">Drag rows to reorder</span>
         </div>
     </div>
 </div>

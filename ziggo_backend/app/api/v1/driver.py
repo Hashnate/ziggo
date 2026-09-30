@@ -7,7 +7,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from ...database import get_db
 from ...models import Driver, DriverDocument, DriverStatus, FareSetting, Notification, User, DriverVehicle, Booking, BookingStatus
@@ -146,11 +146,13 @@ async def list_nearby_drivers(
     """
     from ...models import FareSetting, SystemSettings
     fs_q = await db.execute(select(FareSetting))
-    fare_settings = {
-        (fs.service_type or "").lower().strip(): fs.search_radius_km
-        for fs in fs_q.scalars().all()
-        if fs.service_type
-    }
+    fare_settings = {}
+    for fs in fs_q.scalars().all():
+        if fs.service_type:
+            r_val = fs.search_radius_km
+            fare_settings[fs.service_type.lower().strip()] = r_val
+            if fs.display_name:
+                fare_settings[fs.display_name.lower().strip()] = r_val
 
     ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
     ss = ss_q.scalars().first()
@@ -161,7 +163,8 @@ async def list_nearby_drivers(
         Driver.status == DriverStatus.APPROVED,
     )
     if vehicle_type:
-        stmt = stmt.where(Driver.vehicle_type == vehicle_type)
+        vt_clean = vehicle_type.lower().strip()
+        stmt = stmt.where(func.lower(Driver.vehicle_type) == vt_clean)
     q = await db.execute(stmt)
     drivers = q.scalars().all()
 
@@ -185,6 +188,7 @@ async def list_nearby_drivers(
             "lng": float(d.current_lng),
             "heading": float(d.current_heading) if d.current_heading is not None else 0.0,
             "distance_km": round(dist, 2),
+            "search_radius_km": round(effective_radius, 1),
         })
     out.sort(key=lambda r: r["distance_km"])
     return out

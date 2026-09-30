@@ -81,18 +81,24 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       if (resp.data is List) {
         final list = List<Map<String, dynamic>>.from(resp.data as List);
         _cachedCategories = list;
-        _cachedCategoryMap = {
-          for (var item in list) item['service_type'] as String: item
-        };
+        final map = <String, Map<String, dynamic>>{};
+        for (var item in list) {
+          final st = (item['service_type'] as String? ?? '').toLowerCase().trim();
+          if (st.isNotEmpty) map[st] = item;
+          final name = (item['name'] as String? ?? '').toLowerCase().trim();
+          if (name.isNotEmpty) map[name] = item;
+        }
+        _cachedCategoryMap = map;
         final newServiceTypes = list
             .where((item) => widget.isTruckMode ? (item['is_truck'] == true) : (item['is_truck'] != true))
-            .map((item) => item['service_type'] as String)
+            .map((item) => (item['service_type'] as String? ?? '').toLowerCase().trim())
+            .where((s) => s.isNotEmpty)
             .toList();
         if (mounted) {
           setState(() {
             if (newServiceTypes.isNotEmpty) _serviceTypes = newServiceTypes;
             _categoryData = _cachedCategoryMap;
-            if (_serviceType == null || !_serviceTypes.contains(_serviceType)) {
+            if (_serviceType == null || !_serviceTypes.contains(_serviceType?.toLowerCase().trim())) {
               if (_serviceTypes.isNotEmpty) _serviceType = _serviceTypes.first;
             }
           });
@@ -114,7 +120,8 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     if (_cachedCategories != null && _cachedCategories!.isNotEmpty) {
       _serviceTypes = _cachedCategories!
           .where((item) => widget.isTruckMode ? (item['is_truck'] == true) : (item['is_truck'] != true))
-          .map((item) => item['service_type'] as String)
+          .map((item) => (item['service_type'] as String? ?? '').toLowerCase().trim())
+          .where((s) => s.isNotEmpty)
           .toList();
       _categoryData = _cachedCategoryMap;
     }
@@ -249,18 +256,23 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
   }
 
   double _getCategorySearchRadius(String? st) {
-    if (st == null) return 15.0;
-    final cat = _categoryData[st.toLowerCase().trim()];
+    if (st == null) return 3.0;
+    final key = st.toLowerCase().trim();
+    final cat = _categoryData[key] ?? _cachedCategoryMap[key];
     if (cat != null && cat['search_radius_km'] is num && (cat['search_radius_km'] as num) > 0) {
       return (cat['search_radius_km'] as num).toDouble();
     }
-    return 15.0;
+    return 3.0;
   }
 
   bool _isDriverInCategoryRadius(Map<String, dynamic> driver) {
+    final dist = (driver['distance_km'] as num?)?.toDouble() ?? 0.0;
+    if (driver['search_radius_km'] is num && (driver['search_radius_km'] as num) > 0) {
+      final radius = (driver['search_radius_km'] as num).toDouble();
+      return dist <= radius;
+    }
     final vType = driver['vehicle_type']?.toString().toLowerCase().trim();
     final radius = _getCategorySearchRadius(vType);
-    final dist = (driver['distance_km'] as num?)?.toDouble() ?? 0.0;
     return dist <= radius;
   }
 
@@ -775,8 +787,8 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
               markers: [
                 if (!_loadingEstimates && _serviceType != null)
                   for (final d in _nearbyDrivers)
-                    if (((widget.isTruckMode && d['vehicle_type'] == 'truck') ||
-                        (!widget.isTruckMode && d['vehicle_type'] == _serviceType)) &&
+                    if (((widget.isTruckMode && (d['vehicle_type']?.toString().toLowerCase().trim() == 'truck')) ||
+                        (!widget.isTruckMode && (d['vehicle_type']?.toString().toLowerCase().trim() ?? '') == _serviceType?.toLowerCase().trim())) &&
                         _isDriverInCategoryRadius(d))
                       pinMarker(
                         point: LatLng((d['lat'] as num).toDouble(), (d['lng'] as num).toDouble()),
@@ -890,12 +902,13 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                   if (!_loadingEstimates && _serviceType != null) ...[
                     Builder(
                       builder: (context) {
-                        final category = _categoryData[_serviceType];
+                        final cleanSt = _serviceType?.toLowerCase().trim() ?? '';
+                        final category = _categoryData[cleanSt] ?? _cachedCategoryMap[cleanSt];
                         final descriptionText = category?['description']?.toString() ?? '';
                         if (descriptionText.isEmpty) return const SizedBox.shrink();
                         
                         final typeDrivers = _nearbyDrivers.where((d) => 
-                          d['vehicle_type'] == _serviceType && _isDriverInCategoryRadius(d)
+                          (d['vehicle_type']?.toString().toLowerCase().trim() ?? '') == cleanSt && _isDriverInCategoryRadius(d)
                         ).toList();
                         final isOnline = typeDrivers.isNotEmpty;
                         
@@ -928,11 +941,12 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                   if (!_loadingEstimates && _serviceType != null) ...[
                     Builder(
                       builder: (context) {
+                        final cleanSt = _serviceType?.toLowerCase().trim() ?? '';
                         final typeDrivers = _nearbyDrivers.where((d) => 
-                          d['vehicle_type'] == _serviceType && _isDriverInCategoryRadius(d)
+                          (d['vehicle_type']?.toString().toLowerCase().trim() ?? '') == cleanSt && _isDriverInCategoryRadius(d)
                         ).toList();
                         if (typeDrivers.isEmpty) {
-                          final displayName = _categoryData[_serviceType]?['name'] as String? ?? 
+                          final displayName = (_categoryData[cleanSt] ?? _cachedCategoryMap[cleanSt])?['name'] as String? ?? 
                               {
                                 'bike': 'Bike',
                                 'tuk': 'Tuk',
@@ -940,7 +954,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                                 'mini': 'Mini',
                                 'van': 'Mini van',
                                 'truck': 'Truck',
-                              }[_serviceType] ?? (_serviceType!.isNotEmpty ? '${_serviceType![0].toUpperCase()}${_serviceType!.substring(1)}' : _serviceType!);
+                              }[cleanSt] ?? (cleanSt.isNotEmpty ? '${cleanSt[0].toUpperCase()}${cleanSt.substring(1)}' : cleanSt);
                           return Padding(
                             padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
                             child: Container(
@@ -956,9 +970,9 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
-                                      _nearbyDrivers.isEmpty 
-                                          ? 'No drivers online in your area currently.' 
-                                          : 'No $displayName drivers online currently.',
+                                      _nearbyDrivers.where((d) => _isDriverInCategoryRadius(d)).isEmpty 
+                                          ? 'No drivers in your area currently.' 
+                                          : 'No $displayName drivers in your area currently.',
                                       style: const TextStyle(
                                         color: AppColors.error,
                                         fontSize: 13,
@@ -1179,7 +1193,8 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
       'mover_open': ('Mover Open', 'assets/icons/truck.png', 1),
     }[st];
 
-    final category = _categoryData[st];
+    final cleanKey = st.toLowerCase().trim();
+    final category = _categoryData[cleanKey] ?? _cachedCategoryMap[cleanKey];
     final customName = category?['name'] as String?;
     final customImage = category?['image_url'] as String?;
 
