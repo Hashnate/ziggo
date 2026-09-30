@@ -3721,8 +3721,8 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
     try {
       _alertSoundPlaying = true;
       await _alertPlayer.setAudioContext(
-        const AudioContext(
-          android: AudioContextAndroid(
+        AudioContext(
+          android: const AudioContextAndroid(
             isSpeakerphoneOn: true,
             stayAwake: true,
             contentType: AndroidContentType.music,
@@ -3731,7 +3731,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
           ),
           iOS: AudioContextIOS(
             category: AVAudioSessionCategory.playback,
-            options: [
+            options: const [
               AVAudioSessionOptions.defaultToSpeaker,
             ],
           ),
