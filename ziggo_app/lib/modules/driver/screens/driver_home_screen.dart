@@ -3731,9 +3731,9 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
           ),
           iOS: AudioContextIOS(
             category: AVAudioSessionCategory.playback,
-            options: const [
+            options: const {
               AVAudioSessionOptions.defaultToSpeaker,
-            ],
+            },
           ),
         ),
       );
