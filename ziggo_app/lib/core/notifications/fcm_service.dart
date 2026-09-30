@@ -234,25 +234,23 @@ Future<void> createRideAlarmChannel(
     importance: Importance.max,
     playSound: true,
     sound: const RawResourceAndroidNotificationSound('ride_alert'),
-    // Use the ringtone audio stream so it rings through silent/vibrate modes
-    // exactly like an incoming phone call.
-    audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+    // Use the alarm audio stream so it rings through silent/vibrate modes
+    // and plays full-volume ringtone on the loudspeaker.
+    audioAttributesUsage: AudioAttributesUsage.alarm,
     enableVibration: true,
     vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
   );
 
   // Fallback: if our custom .mp3 can't be resolved, use the system default
   // ringtone — the driver will ALWAYS hear a sound, never silence.
-  // Sound: null means Android picks the channel's default, which for
-  // Importance.max + notificationRingtone is the device's ringtone.
   final channelWithDefaultSound = AndroidNotificationChannel(
     _rideAlertChannelId,
     _rideAlertChannelName,
     description: _rideAlertChannelDesc,
     importance: Importance.max,
     playSound: true,
-    sound: null, // null = Android system default ringtone for this importance level
-    audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+    sound: null,
+    audioAttributesUsage: AudioAttributesUsage.alarm,
     enableVibration: true,
     vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
   );
@@ -297,7 +295,7 @@ Future<void> showRideAlarm(
           priority: Priority.max,
           playSound: true,
           sound: const RawResourceAndroidNotificationSound('ride_alert'),
-          audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+          audioAttributesUsage: AudioAttributesUsage.alarm,
           category: AndroidNotificationCategory.call,
           // fullScreenIntent wakes the screen when locked and displays heads-up
           fullScreenIntent: true,
@@ -328,7 +326,7 @@ Future<void> showRideAlarm(
             importance: Importance.max,
             priority: Priority.max,
             playSound: true,
-            audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+            audioAttributesUsage: AudioAttributesUsage.alarm,
             category: AndroidNotificationCategory.call,
             fullScreenIntent: true,
             additionalFlags: Int32List.fromList(<int>[4]),
