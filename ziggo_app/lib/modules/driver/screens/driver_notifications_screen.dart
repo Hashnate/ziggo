@@ -54,7 +54,18 @@ class _DriverNotificationsScreenState extends State<DriverNotificationsScreen> {
       );
     }
 
-    // 2. Rides, deliveries, and bookings
+    // 2. Cancellation
+    if (t == 'ride_cancelled' ||
+        titleLower.contains('cancelled') ||
+        titleLower.contains('canceled')) {
+      return (
+        icon: Icons.cancel_outlined,
+        color: AppColors.error,
+        category: 'rides',
+      );
+    }
+
+    // 3. Rides, deliveries, and bookings
     if (t == 'ride_update' ||
         t == 'order_update' ||
         t == 'market_order_update' ||
@@ -548,6 +559,13 @@ class _DriverNotificationsScreenState extends State<DriverNotificationsScreen> {
     final match =
         RegExp(r'\b(ZG|CR|FL|RT|FO|MK|EV)[0-9A-Z]{8}\b').firstMatch(body);
     final String? ref = match?.group(0);
+
+    // If it's a cancellation, keep the driver on the notifications list so they can view details
+    if (type == 'ride_cancelled' ||
+        title.contains('cancelled') ||
+        title.contains('canceled')) {
+      return;
+    }
 
     // Deep-linking based on explicit categorization
     if (ref != null ||

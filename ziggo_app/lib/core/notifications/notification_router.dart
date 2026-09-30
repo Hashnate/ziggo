@@ -103,6 +103,17 @@ class NotificationRouter {
         return;
       }
 
+      // Cancellation notifications → Open Driver Notifications Screen directly
+      if (event == 'booking_cancelled' ||
+          event == 'ride_cancelled' ||
+          combinedLower.contains('cancelled') ||
+          combinedLower.contains('canceled')) {
+        rootNavigatorKey.currentState?.push(
+          MaterialPageRoute(builder: (_) => const DriverNotificationsScreen()),
+        );
+        return;
+      }
+
       // Ride / Trip updates
       if (event == 'ride_update' ||
           event == 'booking_update' ||

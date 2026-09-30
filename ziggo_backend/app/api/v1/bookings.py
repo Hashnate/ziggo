@@ -1878,6 +1878,16 @@ async def update_booking_status(
             exclude_driver_id=None,
         )
         for nd in nearby:
+            reason_msg = f" Reason: {b.cancellation_reason}" if b.cancellation_reason else ""
+            db.add(
+                Notification(
+                    user_id=nd.user_id,
+                    title="Ride Cancelled by Customer",
+                    body=f"Ride request {b.booking_ref} was cancelled by customer.{reason_msg}",
+                    type="ride_cancelled",
+                    data=f'{{"booking_id":{b.id},"booking_ref":"{b.booking_ref}"}}',
+                )
+            )
             await manager.send(
                 nd.user_id,
                 "booking_cancelled",
@@ -1911,8 +1921,8 @@ async def update_booking_status(
                         user_id=drv.user_id,
                         title="Ride Cancelled by Customer",
                         body=f"Booking {b.booking_ref} was cancelled by customer.{reason_msg}",
-                        type="ride_update",
-                        data=f'{{"booking_id":{b.id}}}',
+                        type="ride_cancelled",
+                        data=f'{{"booking_id":{b.id},"booking_ref":"{b.booking_ref}"}}',
                     )
                 )
         dispatch_vehicle = None if (b.is_flash or b.is_courier) else b.service_type

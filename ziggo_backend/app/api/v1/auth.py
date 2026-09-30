@@ -114,13 +114,17 @@ async def verify_otp(request: OTPVerify, db: AsyncSession = Depends(get_db)):
             if user.role in switchable_roles and request.role in switchable_roles:
                 # Auto-create the missing profile for the requested role
                 if request.role == UserRole.DRIVER and not user.driver_profile:
-                    db.add(Driver(user_id=user.id))
+                    db.add(Driver(user_id=user.id, is_online=True))
                 elif request.role == UserRole.CUSTOMER and not user.customer_profile:
                     db.add(Customer(user_id=user.id))
 
-                # If switching to customer (passenger), ensure the driver profile goes offline
+                # Manage driver online status on role switch:
+                # If switching to customer (passenger), ensure driver profile goes offline.
+                # If switching to driver, automatically set driver online.
                 if request.role == UserRole.CUSTOMER and user.driver_profile:
                     user.driver_profile.is_online = False
+                elif request.role == UserRole.DRIVER and user.driver_profile:
+                    user.driver_profile.is_online = True
 
                 # Switch the user's active role
                 user.role = request.role
@@ -164,8 +168,8 @@ async def switch_role(
     """Switch the active role between switchable roles (customer, driver, etc.).
     
     Auto-provisions the required profile (Customer or Driver) if it doesn't exist,
-    takes the driver offline when switching to customer mode, and returns a new
-    JWT token scoped to the target role.
+    takes the driver offline when switching to customer mode, sets the driver online
+    when switching to driver mode, and returns a new JWT token scoped to the target role.
     """
     switchable_roles = {
         UserRole.CUSTOMER,
@@ -197,8 +201,11 @@ async def switch_role(
         dq = await db.execute(select(Driver).where(Driver.user_id == user.id))
         driver_prof = dq.scalars().first()
         if not driver_prof:
-            driver_prof = Driver(user_id=user.id)
+            driver_prof = Driver(user_id=user.id, is_online=True)
             db.add(driver_prof)
+        else:
+            # When switching back to driver mode, go online automatically
+            driver_prof.is_online = True
 
     # 2. Update user's active role
     user.role = request.role
