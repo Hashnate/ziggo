@@ -33,14 +33,15 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 import '../network/api_client.dart';
 import 'notification_router.dart';
 
 // Must match the channel_id the backend sends in FCM payloads
-// (see fcm_service.py `channel_id="ziggo_ride_alarm_v15"`). Bumping this id
+// (see fcm_service.py `channel_id="ziggo_ride_alarm_v16"`). Bumping this id
 // forces Android to create a fresh channel with custom sound and ringtone usage.
-const String _rideAlertChannelId = 'ziggo_ride_alarm_v15';
+const String _rideAlertChannelId = 'ziggo_ride_alarm_v16';
 const String _rideAlertChannelName = 'Ride alarms';
 const String _rideAlertChannelDesc =
     'New ride requests. Rings like an incoming call until you respond or it expires.';
@@ -90,6 +91,9 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   unawaited(_bgLog('[fcm-bg] handler invoked event=$event booking_id=${data['booking_id']} platform=${Platform.operatingSystem}'));
 
   if (event == 'booking_cancelled' || (event == 'booking_update' && data['status'] == 'cancelled')) {
+    try {
+      await _stopAlarmAudio();
+    } catch (_) {}
     try {
       await FlutterCallkitIncoming.endAllCalls();
     } catch (_) {}
@@ -218,6 +222,7 @@ Future<void> createRideAlarmChannel(
     'ziggo_ride_alarm_v12',
     'ziggo_ride_alarm_v13',
     'ziggo_ride_alarm_v14',
+    'ziggo_ride_alarm_v15',
     'ziggo_ride_calls_v8',
     'ziggo_ride_alerts',
   ]) {
@@ -269,6 +274,39 @@ Future<void> createRideAlarmChannel(
   }
 }
 
+final AudioPlayer _bgAlarmAudioPlayer = AudioPlayer();
+
+Future<void> _playAlarmAudio() async {
+  try {
+    await _bgAlarmAudioPlayer.setAudioContext(
+      AudioContext(
+        android: const AudioContextAndroid(
+          isSpeakerphoneOn: true,
+          stayAwake: true,
+          contentType: AndroidContentType.music,
+          usageType: AndroidUsageType.alarm,
+          audioMode: AndroidAudioMode.normal,
+        ),
+        iOS: AudioContextIOS(
+          category: AVAudioSessionCategory.playback,
+          options: const {
+            AVAudioSessionOptions.defaultToSpeaker,
+          },
+        ),
+      ),
+    );
+    await _bgAlarmAudioPlayer.setVolume(1.0);
+    await _bgAlarmAudioPlayer.setReleaseMode(ReleaseMode.loop);
+    await _bgAlarmAudioPlayer.play(AssetSource('sounds/ride_alert.mp3'));
+  } catch (_) {}
+}
+
+Future<void> _stopAlarmAudio() async {
+  try {
+    await _bgAlarmAudioPlayer.stop();
+  } catch (_) {}
+}
+
 /// The Android ride alarm. Shared by the FCM background isolate (app killed or
 /// suspended) and the main isolate (app alive on its WebSocket in the
 /// background) — both use the same notification id, so whichever fires second
@@ -279,6 +317,7 @@ Future<void> showRideAlarm(
   String body,
   Map<String, dynamic> data,
 ) async {
+  unawaited(_playAlarmAudio());
   final vibrationPattern = Int64List.fromList([0, 1000, 500, 1000, 500, 1000]);
 
   try {
@@ -853,6 +892,9 @@ class FcmService {
   }
 
   Future<void> cancelRideAlert() async {
+    try {
+      await _stopAlarmAudio();
+    } catch (_) {}
     try {
       await _local.cancel(_rideAlertNotificationId);
     } catch (_) {}
