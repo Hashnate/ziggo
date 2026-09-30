@@ -3662,16 +3662,9 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // If the app is in the foreground, take over alerting with in-app audio
-    // and cancel the system notification. If the app is in the background or
-    // screen is off, do NOT cancel the notification: the OS notification
-    // must ring loudly and vibrate until the driver opens the app or acts.
-    final isResumed =
-        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
-    if (isResumed) {
-      FcmService.instance.cancelRideAlert();
-      _startAlertSound();
-    }
+    // Always start the alert sound through the audio player so it plays loudly
+    // on the loudspeaker even when the driver is on the home screen or using other apps.
+    _startAlertSound();
 
     _secondsLeft = (widget.request['expires_in_seconds'] as num?)?.toInt() ?? 30;
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
@@ -3679,9 +3672,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
       setState(() => _secondsLeft--);
       if (_secondsLeft <= 0) {
         t.cancel();
-        // Cancel the persistent full-screen notification — the 30 s window
-        // has elapsed so the sound/overlay must stop even if the driver never
-        // opened the app. The decline() call below handles the server-side dismiss.
+        // Cancel the persistent full-screen notification and stop sound
         _stopAlertSound();
         FcmService.instance.cancelRideAlert();
         _decline();
@@ -3695,15 +3686,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // Driver brought app to foreground: silence system notification and
-      // play in-app looping sound until accepted/declined.
-      FcmService.instance.cancelRideAlert();
       _startAlertSound();
-    } else if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.hidden) {
-      // App off-screen: stop in-app audio player so system notification can ring cleanly
-      _stopAlertSound();
     }
   }
 
@@ -3732,11 +3715,28 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
     }
   }
 
-  // Loop the ride-alert sound IN-APP for as long as the request sheet is open in the foreground.
+  // Loop the ride-alert sound for as long as the request sheet is open (foreground or background).
   Future<void> _startAlertSound() async {
     if (_alertSoundPlaying) return;
     try {
       _alertSoundPlaying = true;
+      await _alertPlayer.setAudioContext(
+        const AudioContext(
+          android: AudioContextAndroid(
+            isSpeakerphoneOn: true,
+            stayAwake: true,
+            contentType: AndroidContentType.music,
+            usageType: AndroidUsageType.alarm,
+            audioMode: AndroidAudioMode.normal,
+          ),
+          iOS: AudioContextIOS(
+            category: AVAudioSessionCategory.playback,
+            options: [
+              AVAudioSessionOptions.defaultToSpeaker,
+            ],
+          ),
+        ),
+      );
       await _alertPlayer.setReleaseMode(ReleaseMode.loop);
       await _alertPlayer.play(AssetSource('sounds/ride_alert.mp3'));
     } catch (_) {}

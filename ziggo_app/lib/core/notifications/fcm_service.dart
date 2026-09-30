@@ -38,10 +38,9 @@ import '../network/api_client.dart';
 import 'notification_router.dart';
 
 // Must match the channel_id the backend sends in FCM payloads
-// (see fcm_service.py `channel_id="ziggo_ride_alarm_v14"`). Bumping this id
+// (see fcm_service.py `channel_id="ziggo_ride_alarm_v15"`). Bumping this id
 // forces Android to create a fresh channel with custom sound and ringtone usage.
-// v13 → v14: fixed silent fallback (null sound → system default ringtone).
-const String _rideAlertChannelId = 'ziggo_ride_alarm_v14';
+const String _rideAlertChannelId = 'ziggo_ride_alarm_v15';
 const String _rideAlertChannelName = 'Ride alarms';
 const String _rideAlertChannelDesc =
     'New ride requests. Rings like an incoming call until you respond or it expires.';
@@ -217,7 +216,8 @@ Future<void> createRideAlarmChannel(
     'ziggo_ride_alarm_v10',
     'ziggo_ride_alarm_v11',
     'ziggo_ride_alarm_v12',
-    'ziggo_ride_alarm_v13',  // v13 → retired: fallback used null sound (silent)
+    'ziggo_ride_alarm_v13',
+    'ziggo_ride_alarm_v14',
     'ziggo_ride_calls_v8',
     'ziggo_ride_alerts',
   ]) {
