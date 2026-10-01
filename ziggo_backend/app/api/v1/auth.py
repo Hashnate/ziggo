@@ -114,17 +114,20 @@ async def verify_otp(request: OTPVerify, db: AsyncSession = Depends(get_db)):
             if user.role in switchable_roles and request.role in switchable_roles:
                 # Auto-create the missing profile for the requested role
                 if request.role == UserRole.DRIVER and not user.driver_profile:
-                    db.add(Driver(user_id=user.id, is_online=True))
+                    db.add(Driver(user_id=user.id, is_online=False))
                 elif request.role == UserRole.CUSTOMER and not user.customer_profile:
                     db.add(Customer(user_id=user.id))
 
                 # Manage driver online status on role switch:
                 # If switching to customer (passenger), ensure driver profile goes offline.
-                # If switching to driver, automatically set driver online.
+                # If switching to driver, only set online if already approved.
                 if request.role == UserRole.CUSTOMER and user.driver_profile:
                     user.driver_profile.is_online = False
                 elif request.role == UserRole.DRIVER and user.driver_profile:
-                    user.driver_profile.is_online = True
+                    if user.driver_profile.is_approved:
+                        user.driver_profile.is_online = True
+                    else:
+                        user.driver_profile.is_online = False
 
                 # Switch the user's active role
                 user.role = request.role
@@ -201,11 +204,14 @@ async def switch_role(
         dq = await db.execute(select(Driver).where(Driver.user_id == user.id))
         driver_prof = dq.scalars().first()
         if not driver_prof:
-            driver_prof = Driver(user_id=user.id, is_online=True)
+            driver_prof = Driver(user_id=user.id, is_online=False)
             db.add(driver_prof)
         else:
-            # When switching back to driver mode, go online automatically
-            driver_prof.is_online = True
+            # When switching back to driver mode, only go online if approved
+            if driver_prof.is_approved:
+                driver_prof.is_online = True
+            else:
+                driver_prof.is_online = False
 
     # 2. Update user's active role
     user.role = request.role

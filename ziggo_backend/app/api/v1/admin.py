@@ -31,7 +31,11 @@ async def admin_stats(
     drivers = (await db.execute(select(func.count(Driver.id)))).scalar()
     bookings = (await db.execute(select(func.count(Booking.id)))).scalar()
     online_drivers = (
-        await db.execute(select(func.count(Driver.id)).where(Driver.is_online == True))  # noqa: E712
+        await db.execute(
+            select(func.count(Driver.id)).where(
+                Driver.is_online == True, Driver.is_approved == True  # noqa: E712
+            )
+        )
     ).scalar()
     revenue = (
         await db.execute(
@@ -42,7 +46,9 @@ async def admin_stats(
     ).scalar()
     pending_drivers = (
         await db.execute(
-            select(func.count(Driver.id)).where(Driver.status == DriverStatus.PENDING)
+            select(func.count(Driver.id)).where(
+                or_(Driver.status == DriverStatus.PENDING, Driver.is_approved == False)
+            )
         )
     ).scalar()
 

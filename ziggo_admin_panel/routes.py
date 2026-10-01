@@ -465,7 +465,11 @@ async def admin_dashboard(
     drivers = (await db.execute(select(func.count(Driver.id)))).scalar()
     bookings = (await db.execute(select(func.count(Booking.id)))).scalar()
     online_drivers = (
-        await db.execute(select(func.count(Driver.id)).where(Driver.is_online == True))  # noqa: E712
+        await db.execute(
+            select(func.count(Driver.id)).where(
+                Driver.is_online == True, Driver.is_approved == True  # noqa: E712
+            )
+        )
     ).scalar()
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     completed_today = (
@@ -600,11 +604,17 @@ async def admin_drivers(
     # Base counts for stats bar
     total_all = (await db.execute(select(func.count(Driver.id)))).scalar() or 0
     online = (
-        await db.execute(select(func.count(Driver.id)).where(Driver.is_online == True))  # noqa: E712
+        await db.execute(
+            select(func.count(Driver.id)).where(
+                Driver.is_online == True, Driver.is_approved == True  # noqa: E712
+            )
+        )
     ).scalar() or 0
     pending = (
         await db.execute(
-            select(func.count(Driver.id)).where(Driver.status == DriverStatus.PENDING)
+            select(func.count(Driver.id)).where(
+                or_(Driver.status == DriverStatus.PENDING, Driver.is_approved == False)
+            )
         )
     ).scalar() or 0
     
@@ -676,6 +686,7 @@ async def admin_drivers(
             where_clauses.append(Driver.status != DriverStatus.PENDING)
         elif status == "online":
             where_clauses.append(Driver.is_online == True)
+            where_clauses.append(Driver.is_approved == True)
         elif status == "offline":
             where_clauses.append(Driver.is_online == False)
             where_clauses.append(Driver.is_approved == True)
