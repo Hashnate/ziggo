@@ -444,7 +444,7 @@
                     </button>
                     <a href="/admin/settings" class="px-6 py-4 border border-ziggo-line rounded-2xl font-black text-ziggo-muted hover:bg-gray-50">Reset</a>
                     {% if s.updated_at %}
-                    <span class="text-xs text-ziggo-faint font-bold ml-auto">Last updated {{ s.updated_at.strftime("%Y-%m-%d %H:%M UTC") }}</span>
+                    <span class="text-xs text-ziggo-faint font-bold ml-auto">Last updated {{ s.updated_at|colombo_dt("%Y-%m-%d %H:%M") }}</span>
                     {% endif %}
                 </div>
 

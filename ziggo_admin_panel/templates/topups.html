@@ -78,7 +78,7 @@
             <tbody class="divide-y divide-gray-100">
                 {% for item in items %}
                 <tr class="hover:bg-gray-50" data-type="{{ item.type }}">
-                    <td class="px-6 py-3 text-xs text-gray-500">{{ item.date.strftime("%Y-%m-%d %H:%M") if item.date else '' }}</td>
+                    <td class="px-6 py-3 text-xs text-gray-500">{{ item.date|colombo_dt("%Y-%m-%d %H:%M") }}</td>
                     <td class="px-6 py-3 text-xs font-bold {% if item.type == 'request' %}text-orange-500{% else %}text-emerald-600{% endif %}">
                         {{ 'Request' if item.type == 'request' else 'Completed' }}
                     </td>

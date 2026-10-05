@@ -104,7 +104,7 @@ export default function Dashboard() {
   const series = d.revenue_7d.data
   const week = series.reduce((a, b) => a + b, 0)
   const rt = trendOf(series), up = rt >= 0
-  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+  const today = new Date().toLocaleDateString('en-US', { timeZone: 'Asia/Colombo', weekday: 'long', month: 'long', day: 'numeric' })
 
   return (
     <div className="space-y-4">

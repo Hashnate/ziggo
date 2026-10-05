@@ -58,7 +58,7 @@ export default function Referrals() {
                   </span>
                 </td>
                 <td className="px-6 py-4 text-ziggo-muted font-medium text-xs">
-                  {new Date(ref.created_at).toLocaleString()}
+                  {new Date(ref.created_at).toLocaleString('en-US', { timeZone: 'Asia/Colombo' })}
                 </td>
               </tr>
             ))}

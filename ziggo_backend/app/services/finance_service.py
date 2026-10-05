@@ -1037,7 +1037,8 @@ async def get_driver_outstanding_commission(db: AsyncSession, driver_id: int) ->
     """Calculate unpaid outstanding commission driver owes platform from cash bookings/orders."""
     from app.models import Booking, BookingStatus, FoodOrder, FoodOrderStatus, MarketOrder, MarketOrderStatus, DriverPayout
     
-    # 1. Platform fee from completed cash bookings
+    # 1. Net platform balance from completed cash bookings (cash collected - driver entitlement)
+    # When promo discount is applied, cash collected is lower and the promo difference is subsidized by the platform.
     bq = await db.execute(
         select(Booking).where(
             Booking.driver_id == driver_id,
@@ -1046,7 +1047,7 @@ async def get_driver_outstanding_commission(db: AsyncSession, driver_id: int) ->
         )
     )
     cash_bookings = bq.scalars().all()
-    cash_booking_commission = sum((_dec(b.platform_fee) for b in cash_bookings), Decimal("0"))
+    cash_booking_commission = sum(((_dec(b.final_amount or b.fare_amount) - _dec(b.driver_earnings)) for b in cash_bookings), Decimal("0"))
     
     # 2. Platform fee from completed cash food orders
     fq = await db.execute(
@@ -1190,14 +1191,36 @@ async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
         delivery_earnings += earn
     delivery_count = len(delivery_bookings) + len(foods) + len(markets)
 
+    cash_collected = Decimal("0")
+    for b in bookings:
+        if b.payment_method == "cash":
+            cash_collected += _dec(b.final_amount or b.fare_amount)
+
+    for o in foods:
+        if o.payment_method == "cash":
+            cash_collected += _dec(o.delivery_fee)
+
+    for o in markets:
+        if o.payment_method == "cash":
+            cash_collected += _dec(o.delivery_fee)
+
     collected = ride_collected + delivery_collected
     earnings = ride_earnings + delivery_earnings
 
     pq = await db.execute(select(DriverPayout).where(DriverPayout.driver_id == driver_id))
-    paid = sum((_dec(p.amount) for p in pq.scalars().all()), Decimal("0"))
-    pending = earnings - paid
-    if pending < 0:
-        pending = Decimal("0")
+    payouts = pq.scalars().all()
+    total_paid_out = Decimal("0")
+    total_settled_in = Decimal("0")
+    for p in payouts:
+        desc = (p.description or "").lower()
+        if "commission settled" in desc or "commission settlement" in desc:
+            total_settled_in += _dec(p.amount)
+        else:
+            total_paid_out += _dec(p.amount)
+
+    # Net amount platform owes driver (from online trips and promo discounts where cash collected < driver earnings)
+    net_admin_debt = (earnings - cash_collected) - total_paid_out + total_settled_in
+    pending = max(Decimal("0"), net_admin_debt)
 
     outstanding = await get_driver_outstanding_commission(db, driver_id)
 
@@ -1213,7 +1236,7 @@ async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
         "commission": float(collected - earnings),
         "outstanding_commission": float(outstanding),
         "earnings": float(earnings),
-        "paid": float(paid),
+        "paid": float(total_paid_out),
         "pending": float(pending),
         "trips": ride_count + delivery_count,
         "rides": ride_count,
@@ -1228,32 +1251,44 @@ async def get_driver_payout_stats(db: AsyncSession, driver_id: int) -> dict:
         select(Booking)
         .where(Booking.driver_id == driver_id, Booking.status == BookingStatus.COMPLETED)
     )
-    ride_earn = sum((_dec(b.driver_earnings) for b in bq.scalars().all()), Decimal("0"))
+    bookings = bq.scalars().all()
+    ride_earn = sum((_dec(b.driver_earnings) for b in bookings), Decimal("0"))
+    cash_collected = sum((_dec(b.final_amount or b.fare_amount) for b in bookings if b.payment_method == "cash"), Decimal("0"))
 
     fq = await db.execute(
         select(FoodOrder).options(joinedload(FoodOrder.restaurant))
         .where(FoodOrder.driver_id == driver_id, FoodOrder.status == FoodOrderStatus.DELIVERED)
     )
-    food_earn = sum((_food_split(o)[0] for o in fq.scalars().all()), Decimal("0"))
+    foods = fq.scalars().all()
+    food_earn = sum((_food_split(o)[0] for o in foods), Decimal("0"))
+    cash_collected += sum((_dec(o.delivery_fee) for o in foods if o.payment_method == "cash"), Decimal("0"))
 
     mq = await db.execute(
         select(MarketOrder).options(joinedload(MarketOrder.vendor))
         .where(MarketOrder.driver_id == driver_id, MarketOrder.status == MarketOrderStatus.DELIVERED)
     )
-    market_earn = sum((_market_split(o)[0] for o in mq.scalars().all()), Decimal("0"))
+    markets = mq.scalars().all()
+    market_earn = sum((_market_split(o)[0] for o in markets), Decimal("0"))
+    cash_collected += sum((_dec(o.delivery_fee) for o in markets if o.payment_method == "cash"), Decimal("0"))
 
     total_earned = ride_earn + food_earn + market_earn
 
     pq = await db.execute(select(DriverPayout).where(DriverPayout.driver_id == driver_id))
-    total_paid = sum((_dec(p.amount) for p in pq.scalars().all()), Decimal("0"))
+    payouts = pq.scalars().all()
+    total_paid_out = Decimal("0")
+    total_settled_in = Decimal("0")
+    for p in payouts:
+        desc = (p.description or "").lower()
+        if "commission settled" in desc or "commission settlement" in desc:
+            total_settled_in += _dec(p.amount)
+        else:
+            total_paid_out += _dec(p.amount)
 
-    pending = total_earned - total_paid
-    if pending < 0:
-        pending = Decimal("0")
+    pending = max(Decimal("0"), (total_earned - cash_collected) - total_paid_out + total_settled_in)
 
     return {
         "earned": float(total_earned),
-        "paid": float(total_paid),
+        "paid": float(total_paid_out),
         "pending": float(pending),
     }
 

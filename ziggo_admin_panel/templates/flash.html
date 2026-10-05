@@ -102,7 +102,7 @@
                         </span>
                     </td>
                     <td class="px-6 py-3 text-sm font-bold">Rs.{{ "{:,.0f}".format(o.final_amount or 0) }}</td>
-                    <td class="px-6 py-3 text-xs text-gray-500">{{ o.booked_at.strftime("%Y-%m-%d %H:%M") if o.booked_at else '' }}</td>
+                    <td class="px-6 py-3 text-xs text-gray-500">{{ o.booked_at|colombo_dt("%Y-%m-%d %H:%M") }}</td>
                 </tr>
                 {% else %}
                 <tr><td colspan="8" class="px-6 py-10 text-center text-gray-400">No parcel deliveries yet</td></tr>

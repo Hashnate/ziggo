@@ -59,7 +59,7 @@
                             {% endif %}
                             <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-ziggo-soft text-ziggo">Size: {{ r.team_size }}</span>
                             <span class="ml-auto text-[11px] text-ziggo-faint font-bold whitespace-nowrap">
-                                <i class="far fa-clock mr-1"></i>{{ r.created_at.strftime("%b %d, %Y · %H:%M") if r.created_at else '—' }}
+                                <i class="far fa-clock mr-1"></i>{{ r.created_at|colombo_dt("%b %d, %Y · %H:%M") if r.created_at else '—' }}
                             </span>
                         </div>
 

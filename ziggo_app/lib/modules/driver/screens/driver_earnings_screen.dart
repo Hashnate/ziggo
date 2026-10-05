@@ -417,8 +417,8 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
     final total = _summary != null ? _d(_summary!, 'earnings') : ((profile['total_earnings'] as num?)?.toDouble() ?? 0);
     final today = (profile['today_earnings'] as num?)?.toDouble() ?? 0;
     final trips = (profile['today_rides'] as num?)?.toInt() ?? 0;
-    final paid = (profile['paid_payouts'] as num?)?.toDouble() ?? 0;
-    final pending = (profile['pending_payout'] as num?)?.toDouble() ?? 0;
+    final paid = _summary != null ? _d(_summary!, 'paid') : ((profile['paid_payouts'] as num?)?.toDouble() ?? 0);
+    final pending = _summary != null ? _d(_summary!, 'pending') : ((profile['pending_payout'] as num?)?.toDouble() ?? 0);
     final outstanding = _summary != null ? _d(_summary!, 'outstanding_commission') : 0.0;
 
     return Scaffold(

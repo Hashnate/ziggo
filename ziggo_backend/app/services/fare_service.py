@@ -151,9 +151,9 @@ async def calculate_fare(
                 promo_applied = p.code
 
         final = max(0, fare - discount)
-        platform_fee = final * (platform_pct / 100.0)
+        platform_fee = fare * (platform_pct / 100.0)
         passenger_pays = final + platform_fee
-        driver_earnings = passenger_pays - platform_fee
+        driver_earnings = fare - platform_fee
 
         rental_dict = {
             "distance_km": 0.0,
@@ -213,9 +213,9 @@ async def calculate_fare(
                 promo_applied = p.code
 
         final = max(0, fare - discount)
-        platform_fee = final * (platform_pct / 100.0)
+        platform_fee = fare * (platform_pct / 100.0)
         passenger_pays = final + platform_fee
-        driver_earnings = passenger_pays - platform_fee
+        driver_earnings = fare - platform_fee
 
         courier_dict = {
             "distance_km": round(distance_km, 2),
@@ -414,19 +414,19 @@ async def calculate_fare(
                 discount_original = float(p.discount_value)
             promo_applied = p.code
 
+    feeable_amount = max(0.0, fare_val - boost_val)
+    app_usage_charges = feeable_amount * (platform_pct / 100.0)
+    driver_earnings = max(0.0, fare_val - app_usage_charges)
+
     final_pre_deductible = max(0.0, fare_val - discount)
     passenger_deductible_val = final_pre_deductible * (passenger_deductible_pct / 100.0)
-    feeable_amount = max(0.0, final_pre_deductible - boost_val)
-    app_usage_charges = feeable_amount * (platform_pct / 100.0)
-    
     gross_total = final_pre_deductible + passenger_deductible_val + app_usage_charges
     deductions = app_usage_charges + passenger_deductible_val
-    driver_earnings = gross_total - deductions
 
+    feeable_amount_original = max(0.0, fare_val_original - boost_val)
+    app_usage_charges_original = feeable_amount_original * (platform_pct / 100.0)
     final_pre_deductible_original = max(0.0, fare_val_original - discount_original)
     passenger_deductible_val_original = final_pre_deductible_original * (passenger_deductible_pct / 100.0)
-    feeable_amount_original = max(0.0, final_pre_deductible_original - boost_val)
-    app_usage_charges_original = feeable_amount_original * (platform_pct / 100.0)
     gross_total_original = final_pre_deductible_original + passenger_deductible_val_original + app_usage_charges_original
 
     fare_dict = {
@@ -507,20 +507,8 @@ async def _enrich_with_loyalty(
 
         if actual_points > 0:
             new_final = max(0.0, pre_redemption_final - redeem_discount)
-            # Platform fee + driver earnings recompute against the new final.
-            # We preserve the ratio implied by the original numbers so a
-            # missing FareSetting doesn't change the split here.
-            if pre_redemption_final > 0:
-                platform_ratio = float(fare.get("platform_fee", 0)) / pre_redemption_final
-            else:
-                platform_ratio = 0.0
-            new_platform = round(new_final * platform_ratio, 2)
             fare["final_amount"] = round(new_final, 2)
             fare["original_amount"] = round(max(0.0, pre_redemption_original - redeem_discount), 2)
-            fare["platform_fee"] = new_platform
-            fare["app_usage_charges"] = new_platform
-            fare["deductions"] = round(new_platform + float(fare.get("passenger_deductible", 0)), 2)
-            fare["driver_earnings"] = round(new_final - fare["deductions"], 2)
 
     fare["points_earnable"] = earnable
     fare["redeem_points_used"] = actual_points
@@ -719,9 +707,9 @@ async def calculate_fares_bulk(
                     promo_applied = promo_code_obj.code
 
                 final = max(0, fare - discount)
-                platform_fee = final * (platform_pct / 100.0)
+                platform_fee = fare * (platform_pct / 100.0)
                 passenger_pays = final + platform_fee
-                driver_earnings = passenger_pays - platform_fee
+                driver_earnings = fare - platform_fee
 
                 rental_dict = {
                     "service_type": service_type,
@@ -786,9 +774,9 @@ async def calculate_fares_bulk(
                     promo_applied = promo_code_obj.code
 
                 final = max(0, fare - discount)
-                platform_fee = final * (platform_pct / 100.0)
+                platform_fee = fare * (platform_pct / 100.0)
                 passenger_pays = final + platform_fee
-                driver_earnings = passenger_pays - platform_fee
+                driver_earnings = fare - platform_fee
 
                 courier_dict = {
                     "service_type": service_type,
@@ -929,18 +917,19 @@ async def calculate_fares_bulk(
                     discount_original = float(promo_code_obj.discount_value)
                 promo_applied = promo_code_obj.code
 
+            feeable_amount = max(0.0, fare_val - boost_val)
+            app_usage_charges = feeable_amount * (platform_pct / 100.0)
+            driver_earnings = max(0.0, fare_val - app_usage_charges)
+
             final_pre_deductible = max(0.0, fare_val - discount)
             passenger_deductible_val = final_pre_deductible * (passenger_deductible_pct / 100.0)
-            feeable_amount = max(0.0, final_pre_deductible - boost_val)
-            app_usage_charges = feeable_amount * (platform_pct / 100.0)
             gross_total = final_pre_deductible + passenger_deductible_val + app_usage_charges
             deductions = app_usage_charges + passenger_deductible_val
-            driver_earnings = gross_total - deductions
 
+            feeable_amount_original = max(0.0, fare_val_original - boost_val)
+            app_usage_charges_original = feeable_amount_original * (platform_pct / 100.0)
             final_pre_deductible_original = max(0.0, fare_val_original - discount_original)
             passenger_deductible_val_original = final_pre_deductible_original * (passenger_deductible_pct / 100.0)
-            feeable_amount_original = max(0.0, final_pre_deductible_original - boost_val)
-            app_usage_charges_original = feeable_amount_original * (platform_pct / 100.0)
             gross_total_original = final_pre_deductible_original + passenger_deductible_val_original + app_usage_charges_original
 
             fare_dict = {

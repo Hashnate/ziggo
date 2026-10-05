@@ -59,7 +59,7 @@
                             {% endif %}
                         </td>
                         <td class="px-6 py-3 text-sm">
-                            {{ e.starts_at.strftime("%d %b %Y · %H:%M") if e.starts_at else '—' }}
+                            {{ e.starts_at|colombo_dt("%d %b %Y · %H:%M") if e.starts_at else '—' }}
                         </td>
                         <td class="px-6 py-3 text-xs">
                             {% for t in e.tiers %}

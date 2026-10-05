@@ -3125,6 +3125,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
               const Divider(height: 1),
               const SizedBox(height: 8),
               buildItemizedRow('Your Earnings', driverEarnings.toStringAsFixed(2), isBold: true, customColor: AppColors.primary),
+              if (driverEarnings > grossTotal) ...[
+                const SizedBox(height: 6),
+                buildItemizedRow('Ziggo Subsidy (Added to Payout)', (driverEarnings - grossTotal).toStringAsFixed(2), customColor: AppColors.success, isBold: true),
+              ],
             ],
           ),
           actionsAlignment: MainAxisAlignment.center,

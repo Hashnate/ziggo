@@ -173,7 +173,7 @@
                     <div class="flex-1 min-w-0">
                         <p class="font-black text-sm text-ziggo-ink">{{ doc.label }}</p>
                         {% if doc.document_url %}
-                        <p class="text-[11px] text-ziggo-muted truncate" id="{{ doc.kind }}Status">Uploaded {{ doc.uploaded_at.strftime("%Y-%m-%d") if doc.uploaded_at else '' }}</p>
+                        <p class="text-[11px] text-ziggo-muted truncate" id="{{ doc.kind }}Status">Uploaded {{ doc.uploaded_at|colombo_dt("%Y-%m-%d") }}</p>
                         {% if doc.is_verified %}
                         <span class="px-2 py-0.5 mt-1 inline-block text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700 rounded-full" id="{{ doc.kind }}VerifyBadge">Verified</span>
                         {% else %}

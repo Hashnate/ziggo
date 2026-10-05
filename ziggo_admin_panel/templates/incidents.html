@@ -55,7 +55,7 @@
                     {% for i in incidents %}
                     <tr class="hover:bg-gray-50/50">
                         <td class="px-6 py-4 font-bold text-ziggo-ink">#{{ i.id }}</td>
-                        <td class="px-6 py-4 text-sm text-ziggo-muted">{{ i.created_at.strftime("%Y-%m-%d %H:%M") if i.created_at else '—' }}</td>
+                        <td class="px-6 py-4 text-sm text-ziggo-muted">{{ i.created_at|colombo_dt("%Y-%m-%d %H:%M") if i.created_at else '—' }}</td>
                         <td class="px-6 py-4 text-sm font-black uppercase tracking-wider text-amber-600">{{ i.kind }}</td>
                         <td class="px-6 py-4 text-sm">
                             {% if i.reporter %}

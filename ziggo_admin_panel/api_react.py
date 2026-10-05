@@ -8,7 +8,7 @@ from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -16,6 +16,8 @@ from app.models import (
     User, UserRole, Customer, Driver, DriverStatus, Booking, BookingStatus,
     FareSetting,
 )
+
+COLOMBO_TZ = timezone(timedelta(hours=5, minutes=30))
 
 # Reuse the existing admin session helpers so both panels share one login.
 from . import routes as adminp
@@ -103,7 +105,9 @@ async def rx_dashboard(
         )
     ) or 0
 
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    now_colombo = datetime.now(COLOMBO_TZ)
+    today_start_colombo = datetime(now_colombo.year, now_colombo.month, now_colombo.day, 0, 0, 0, tzinfo=COLOMBO_TZ)
+    today_start = today_start_colombo.astimezone(timezone.utc)
     completed_today = await scalar(
         select(func.count(Booking.id)).where(
             Booking.status == BookingStatus.COMPLETED, Booking.completed_at >= today_start
@@ -118,9 +122,10 @@ async def rx_dashboard(
     # 7-day daily series (oldest -> newest): revenue + new customers/drivers/bookings
     labels, rev_s, cust_s, drv_s, book_s = [], [], [], [], []
     for i in range(6, -1, -1):
-        day_start = today_start - timedelta(days=i)
+        day_start_colombo = today_start_colombo - timedelta(days=i)
+        day_start = day_start_colombo.astimezone(timezone.utc)
         day_end = day_start + timedelta(days=1)
-        labels.append(day_start.strftime("%a"))
+        labels.append(day_start_colombo.strftime("%a"))
         rev_s.append(round(float(await scalar(
             select(func.coalesce(func.sum(Booking.final_amount), 0)).where(
                 Booking.status == BookingStatus.COMPLETED,

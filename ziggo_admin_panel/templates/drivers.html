@@ -186,7 +186,7 @@
                             {{ 'Processed' if app.is_read else 'New Application' }}
                         </span>
                     </td>
-                    <td class="px-6 py-4 text-xs text-gray-400 font-semibold">{{ app.created_at.strftime("%b %d, %Y · %H:%M") if app.created_at else '—' }}</td>
+                    <td class="px-6 py-4 text-xs text-gray-400 font-semibold">{{ app.created_at|colombo_dt("%b %d, %Y · %H:%M") if app.created_at else '—' }}</td>
                     <td class="px-6 py-4">
                         <div class="flex items-center gap-2">
                             <form method="post" action="/admin/drivers/applications/{{ app.id }}/read" style="display:inline">
@@ -267,7 +267,7 @@
                         {% endif %}
                     </td>
                     <td class="px-6 py-4">
-                        <p class="text-xs text-gray-400 font-semibold">{{ driver.user.created_at.strftime("%b %d, %Y") if driver.user.created_at else '—' }}</p>
+                        <p class="text-xs text-gray-400 font-semibold">{{ driver.user.created_at|colombo_dt("%b %d, %Y") if driver.user.created_at else '—' }}</p>
                     </td>
                     <td class="px-6 py-4">
                         <div class="flex items-center gap-1 text-sm font-bold">

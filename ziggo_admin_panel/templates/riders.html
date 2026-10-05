@@ -290,7 +290,7 @@
                         </span>
                     </td>
                     <td class="px-5 py-3 text-xs text-gray-400 whitespace-nowrap">
-                        {{ p.created_at.strftime("%b %d, %Y · %H:%M") if p.created_at else '—' }}
+                        {{ p.created_at|colombo_dt("%b %d, %Y · %H:%M") if p.created_at else '—' }}
                     </td>
                     <td class="px-5 py-3">
                         <div class="flex items-center gap-1.5">
@@ -356,7 +356,7 @@
                     <td class="px-5 py-3 text-sm text-gray-500">{{ c.user.email or '—' }}</td>
                     <td class="px-5 py-3 text-sm font-semibold text-gray-700">{{ c.user.phone_number or '—' }}</td>
                     <td class="px-5 py-3 text-xs text-gray-400 whitespace-nowrap">
-                        {{ c.user.created_at.strftime("%b %d, %Y") if c.user.created_at else '—' }}
+                        {{ c.user.created_at|colombo_dt("%b %d, %Y") if c.user.created_at else '—' }}
                     </td>
                     <td class="px-5 py-3 text-sm font-bold text-gray-700 text-center">
                         {{ c.user.total_rides or 0 }}

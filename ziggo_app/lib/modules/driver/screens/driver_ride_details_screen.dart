@@ -600,6 +600,36 @@ class DriverRideDetailsScreen extends StatelessWidget {
                     const SizedBox(height: 16),
 
                     _breakdownRow('Your earnings', fmt.format(driverEarnings), isBold: true),
+                    if (paymentMethod == 'cash' && driverEarnings > ((rideData['final_amount'] as num?)?.toDouble() ?? 0.0)) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFBBF7D0)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.account_balance_wallet_outlined, size: 16, color: Color(0xFF16A34A)),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Ziggo Subsidy (Added to Payout):',
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF15803D)),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              '+Rs.${fmt.format(driverEarnings - ((rideData['final_amount'] as num?)?.toDouble() ?? 0.0))}',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const Divider(height: 24),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,

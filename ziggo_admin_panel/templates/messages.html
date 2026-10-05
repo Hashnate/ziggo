@@ -62,7 +62,7 @@
                     <div>
                         <p class="text-sm font-black text-ziggo-ink">{{ b.title }}</p>
                         <p class="text-[10px] text-ziggo-faint mt-1">
-                            {{ b.sent_at.strftime("%Y-%m-%d %H:%M") if b.sent_at else '' }}
+                            {{ b.sent_at|colombo_dt("%Y-%m-%d %H:%M") }}
                         </p>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">

@@ -65,7 +65,7 @@
                     {% for a in alerts %}
                     <tr class="hover:bg-gray-50/50 {% if a.status == 'open' %}bg-rose-50/40{% endif %}">
                         <td class="px-6 py-4 font-bold text-ziggo-ink">#{{ a.id }}</td>
-                        <td class="px-6 py-4 text-sm text-ziggo-muted">{{ a.created_at.strftime("%Y-%m-%d %H:%M") if a.created_at else '—' }}</td>
+                        <td class="px-6 py-4 text-sm text-ziggo-muted">{{ a.created_at|colombo_dt("%Y-%m-%d %H:%M") if a.created_at else '—' }}</td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             {% if a.user %}
                             <p class="text-sm font-black text-ziggo-ink">{{ a.user.full_name or '—' }}</p>

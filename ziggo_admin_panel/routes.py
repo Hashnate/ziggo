@@ -65,6 +65,33 @@ router = APIRouter()
 current_dir = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(current_dir, "templates"))
 
+COLOMBO_TZ = timezone(timedelta(hours=5, minutes=30))
+
+
+def to_colombo_dt(dt: datetime | None) -> datetime | None:
+    if dt is None:
+        return None
+    if not isinstance(dt, datetime):
+        return dt
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(COLOMBO_TZ)
+
+
+def format_colombo_dt(dt: datetime | None, fmt: str = "%Y-%m-%d %H:%M") -> str:
+    if not dt:
+        return ""
+    c_dt = to_colombo_dt(dt)
+    if isinstance(c_dt, datetime):
+        return c_dt.strftime(fmt)
+    if hasattr(dt, "strftime"):
+        return dt.strftime(fmt)
+    return str(dt)
+
+
+templates.env.filters["colombo_dt"] = format_colombo_dt
+templates.env.filters["to_colombo"] = to_colombo_dt
+
 UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "drivers")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 CATEGORY_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "categories")
@@ -471,7 +498,9 @@ async def admin_dashboard(
             )
         )
     ).scalar()
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    now_colombo = datetime.now(COLOMBO_TZ)
+    today_start_colombo = datetime(now_colombo.year, now_colombo.month, now_colombo.day, 0, 0, 0, tzinfo=COLOMBO_TZ)
+    today_start = today_start_colombo.astimezone(timezone.utc)
     completed_today = (
         await db.execute(
             select(func.count(Booking.id)).where(
@@ -508,44 +537,44 @@ async def admin_dashboard(
         )
     ).scalar()
 
-    # Daily revenue for the last N days — across ALL streams
+    # Daily revenue for the last N days — across ALL streams (in Colombo calendar days)
     window_start = today_start - timedelta(days=days - 1)
     window_end = today_start + timedelta(days=1)
     rev_by_day = {}
 
-    def _acc_rev(day, amt):
-        rev_by_day[day.isoformat()] = rev_by_day.get(day.isoformat(), 0.0) + float(amt or 0)
+    def _acc_dt_rev(dt, amt):
+        if not dt:
+            return
+        c_dt = to_colombo_dt(dt)
+        if c_dt:
+            k = c_dt.date().isoformat()
+            rev_by_day[k] = rev_by_day.get(k, 0.0) + float(amt or 0)
 
-    for day, amt in (await db.execute(
-        select(_cast(Booking.booked_at, _Date), func.coalesce(func.sum(Booking.final_amount), 0))
+    for dt, amt in (await db.execute(
+        select(Booking.booked_at, Booking.final_amount)
         .where(Booking.status == BookingStatus.COMPLETED, Booking.booked_at >= window_start, Booking.booked_at < window_end)
-        .group_by(_cast(Booking.booked_at, _Date))
     )).all():
-        _acc_rev(day, amt)
-    for day, amt in (await db.execute(
-        select(_cast(FoodOrder.created_at, _Date), func.coalesce(func.sum(FoodOrder.final_amount), 0))
+        _acc_dt_rev(dt, amt)
+    for dt, amt in (await db.execute(
+        select(FoodOrder.created_at, FoodOrder.final_amount)
         .where(FoodOrder.status == FoodOrderStatus.DELIVERED, FoodOrder.created_at >= window_start, FoodOrder.created_at < window_end)
-        .group_by(_cast(FoodOrder.created_at, _Date))
     )).all():
-        _acc_rev(day, amt)
-    for day, amt in (await db.execute(
-        select(_cast(MarketOrder.created_at, _Date), func.coalesce(func.sum(MarketOrder.final_amount), 0))
+        _acc_dt_rev(dt, amt)
+    for dt, amt in (await db.execute(
+        select(MarketOrder.created_at, MarketOrder.final_amount)
         .where(MarketOrder.status == MarketOrderStatus.DELIVERED, MarketOrder.created_at >= window_start, MarketOrder.created_at < window_end)
-        .group_by(_cast(MarketOrder.created_at, _Date))
     )).all():
-        _acc_rev(day, amt)
-    for day, amt in (await db.execute(
-        select(_cast(WalletTransaction.created_at, _Date), func.coalesce(func.sum(WalletTransaction.amount), 0))
+        _acc_dt_rev(dt, amt)
+    for dt, amt in (await db.execute(
+        select(WalletTransaction.created_at, WalletTransaction.amount)
         .where(WalletTransaction.reference_id == "GOLD", WalletTransaction.created_at >= window_start, WalletTransaction.created_at < window_end)
-        .group_by(_cast(WalletTransaction.created_at, _Date))
     )).all():
-        _acc_rev(day, amt)
-
+        _acc_dt_rev(dt, amt)
 
     labels = []
     data = []
     for i in range(days - 1, -1, -1):
-        day_start = today_start - timedelta(days=i)
+        day_start = today_start_colombo - timedelta(days=i)
         if days == 30:
             labels.append(day_start.strftime("%b %d"))
         else:
@@ -1823,18 +1852,20 @@ async def admin_bookings(
     # each of which has its own admin page.
     base_where = [Booking.is_flash == False, Booking.is_courier == False]
 
-    # Parse dates
+    # Parse dates with Colombo timezone
     start_dt = None
     end_dt = None
     if start:
         try:
-            start_dt = datetime.strptime(start.strip(), "%Y-%m-%d").replace(tzinfo=timezone.utc, hour=0, minute=0, second=0, microsecond=0)
+            start_d = datetime.strptime(start.strip(), "%Y-%m-%d")
+            start_dt = datetime(start_d.year, start_d.month, start_d.day, 0, 0, 0, tzinfo=COLOMBO_TZ).astimezone(timezone.utc)
             base_where.append(Booking.booked_at >= start_dt)
         except ValueError:
             pass
     if end:
         try:
-            end_dt = datetime.strptime(end.strip(), "%Y-%m-%d").replace(tzinfo=timezone.utc, hour=23, minute=59, second=59, microsecond=0)
+            end_d = datetime.strptime(end.strip(), "%Y-%m-%d")
+            end_dt = datetime(end_d.year, end_d.month, end_d.day, 23, 59, 59, 999999, tzinfo=COLOMBO_TZ).astimezone(timezone.utc)
             base_where.append(Booking.booked_at <= end_dt)
         except ValueError:
             pass
@@ -7235,14 +7266,14 @@ async def admin_support(
             "status": _normalize_status(t.status),
             "user_name": (t.user.full_name if t.user else "") or "",
             "user_phone": (t.user.phone_number if t.user else "") or "",
-            "created_at": t.created_at.strftime("%Y-%m-%d %H:%M") if t.created_at else "",
+            "created_at": format_colombo_dt(t.created_at) if t.created_at else "",
             "messages": [
                 {
                     "id": m.id,
                     "sender_role": m.sender_role,
                     "sender_name": (m.sender.full_name if m.sender else "") or "",
                     "body": m.body,
-                    "created_at": m.created_at.strftime("%Y-%m-%d %H:%M") if m.created_at else "",
+                    "created_at": format_colombo_dt(m.created_at) if m.created_at else "",
                 }
                 for m in (t.messages or [])
             ],
@@ -7303,7 +7334,7 @@ async def admin_support_messages(
                 "sender_role": m.sender_role,
                 "sender_name": (m.sender.full_name if m.sender else "") or "",
                 "body": m.body,
-                "created_at": m.created_at.strftime("%Y-%m-%d %H:%M") if m.created_at else "",
+                "created_at": format_colombo_dt(m.created_at) if m.created_at else "",
             }
             for m in (t.messages or [])
         ],
@@ -9213,8 +9244,10 @@ async def admin_referrals(
             or_(
                 ReferrerUser.full_name.ilike(s_term),
                 ReferrerUser.phone_number.ilike(s_term),
+                ReferrerUser.referral_code.ilike(s_term),
                 ReferredUser.full_name.ilike(s_term),
                 ReferredUser.phone_number.ilike(s_term),
+                ReferredUser.referral_code.ilike(s_term),
             )
         )
 

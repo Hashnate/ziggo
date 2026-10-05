@@ -257,10 +257,7 @@
     function formatTime(iso) {
         try {
             const d = iso ? new Date(iso) : new Date();
-            const hh = String(d.getHours()).padStart(2, '0');
-            const mm = String(d.getMinutes()).padStart(2, '0');
-            const ss = String(d.getSeconds()).padStart(2, '0');
-            return `${hh}:${mm}:${ss}`;
+            return d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Colombo', hour12: false });
         } catch (_) {
             return '--:--:--';
         }
