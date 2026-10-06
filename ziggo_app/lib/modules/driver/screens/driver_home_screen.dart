@@ -356,6 +356,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
           if (speedChanged) _speedKmh = kmh;
           if (headingChanged) _heading = p.heading;
         });
+      }
+      
       final food = driver.activeFoodOrder;
       final market = driver.activeMarketOrder;
       final currentLoc = LatLng(p.latitude, p.longitude);
