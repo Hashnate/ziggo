@@ -47,7 +47,9 @@ async def admin_stats(
     pending_drivers = (
         await db.execute(
             select(func.count(Driver.id)).where(
-                or_(Driver.status == DriverStatus.PENDING, Driver.is_approved == False)
+                or_(Driver.status == DriverStatus.PENDING, Driver.is_approved == False),
+                Driver.vehicle_number.isnot(None),
+                Driver.vehicle_number != "",
             )
         )
     ).scalar()
@@ -132,6 +134,8 @@ async def approve_driver(
     d = q.scalars().first()
     if not d:
         raise HTTPException(status_code=404, detail="Driver not found")
+    if not d.vehicle_number or not d.nic_number or not d.license_number:
+        raise HTTPException(status_code=400, detail="Cannot approve driver: registration details are incomplete.")
     d.is_approved = True
     d.status = DriverStatus.APPROVED
     d.approved_at = datetime.now(timezone.utc)

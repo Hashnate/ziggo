@@ -87,7 +87,7 @@ async def rx_dashboard(
         return (await db.execute(stmt)).scalar()
 
     customers = await scalar(select(func.count(Customer.id))) or 0
-    drivers = await scalar(select(func.count(Driver.id))) or 0
+    drivers = await scalar(select(func.count(Driver.id)).where(Driver.vehicle_number.isnot(None), Driver.vehicle_number != "")) or 0
     bookings = await scalar(select(func.count(Booking.id))) or 0
     online_drivers = await scalar(
         select(func.count(Driver.id)).where(
@@ -96,7 +96,9 @@ async def rx_dashboard(
     ) or 0
     pending_drivers = await scalar(
         select(func.count(Driver.id)).where(
-            or_(Driver.status == DriverStatus.PENDING, Driver.is_approved == False)
+            or_(Driver.status == DriverStatus.PENDING, Driver.is_approved == False),
+            Driver.vehicle_number.isnot(None),
+            Driver.vehicle_number != "",
         )
     ) or 0
     revenue = await scalar(

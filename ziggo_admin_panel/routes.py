@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from itsdangerous import URLSafeSerializer, BadSignature
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, or_, and_
 from sqlalchemy.orm import selectinload
 
 logger = logging.getLogger(__name__)
@@ -489,7 +489,7 @@ async def admin_dashboard(
         days = 7
 
     customers = (await db.execute(select(func.count(Customer.id)))).scalar()
-    drivers = (await db.execute(select(func.count(Driver.id)))).scalar()
+    drivers = (await db.execute(select(func.count(Driver.id)).where(Driver.vehicle_number.isnot(None), Driver.vehicle_number != ""))).scalar()
     bookings = (await db.execute(select(func.count(Booking.id)))).scalar()
     online_drivers = (
         await db.execute(
@@ -516,7 +516,13 @@ async def admin_dashboard(
         )
     ).scalar()
     pending_drivers = (
-        await db.execute(select(func.count(Driver.id)).where(Driver.status == DriverStatus.PENDING))
+        await db.execute(
+            select(func.count(Driver.id)).where(
+                or_(Driver.status == DriverStatus.PENDING, Driver.is_approved == False),
+                Driver.vehicle_number.isnot(None),
+                Driver.vehicle_number != "",
+            )
+        )
     ).scalar()
     # Total revenue across ALL streams (rides + flash, food, market, gold)
     from app.models import FoodOrder, FoodOrderStatus, MarketOrder, MarketOrderStatus, WalletTransaction
@@ -624,14 +630,16 @@ async def admin_drivers(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    from sqlalchemy import or_
+    from sqlalchemy import or_, and_
     from app.api.v1.public import DriverApplication
 
     limit = 50
     offset = (page - 1) * limit
 
+    is_submitted_driver = and_(Driver.vehicle_number.isnot(None), Driver.vehicle_number != "")
+
     # Base counts for stats bar
-    total_all = (await db.execute(select(func.count(Driver.id)))).scalar() or 0
+    total_all = (await db.execute(select(func.count(Driver.id)).where(is_submitted_driver))).scalar() or 0
     online = (
         await db.execute(
             select(func.count(Driver.id)).where(
@@ -642,7 +650,15 @@ async def admin_drivers(
     pending = (
         await db.execute(
             select(func.count(Driver.id)).where(
-                or_(Driver.status == DriverStatus.PENDING, Driver.is_approved == False)
+                or_(Driver.status == DriverStatus.PENDING, Driver.is_approved == False),
+                is_submitted_driver,
+            )
+        )
+    ).scalar() or 0
+    incomplete = (
+        await db.execute(
+            select(func.count(Driver.id)).where(
+                or_(Driver.vehicle_number.is_(None), Driver.vehicle_number == "")
             )
         )
     ).scalar() or 0
@@ -665,6 +681,7 @@ async def admin_drivers(
         "online": online,
         "online_pct": int(round((online / total_all * 100) if total_all else 0)),
         "pending": pending,
+        "incomplete": incomplete,
         "avg_rating": avg_rating,
         "total_apps": total_apps,
         "unread_apps": unread_apps,
@@ -713,14 +730,22 @@ async def admin_drivers(
         if status == "approved":
             where_clauses.append(Driver.is_approved == True)
             where_clauses.append(Driver.status != DriverStatus.PENDING)
+            where_clauses.append(is_submitted_driver)
         elif status == "online":
             where_clauses.append(Driver.is_online == True)
             where_clauses.append(Driver.is_approved == True)
         elif status == "offline":
             where_clauses.append(Driver.is_online == False)
             where_clauses.append(Driver.is_approved == True)
+            where_clauses.append(is_submitted_driver)
         elif status == "pending":
             where_clauses.append(or_(Driver.status == DriverStatus.PENDING, Driver.is_approved == False))
+            where_clauses.append(is_submitted_driver)
+        elif status == "incomplete":
+            where_clauses.append(or_(Driver.vehicle_number.is_(None), Driver.vehicle_number == ""))
+        elif status == "all":
+            # Show completed / submitted registrations by default
+            where_clauses.append(is_submitted_driver)
             
         if search:
             search_term = f"%{search.strip()}%"
@@ -791,9 +816,14 @@ async def admin_drivers_export(
     import csv
     import io
     from fastapi.responses import Response
+    from sqlalchemy import and_
 
+    is_submitted_driver = and_(Driver.vehicle_number.isnot(None), Driver.vehicle_number != "")
     q = await db.execute(
-        select(Driver).options(selectinload(Driver.user)).order_by(Driver.id.desc())
+        select(Driver)
+        .options(selectinload(Driver.user))
+        .where(is_submitted_driver)
+        .order_by(Driver.id.desc())
     )
     drivers = q.scalars().all()
 
@@ -1258,10 +1288,13 @@ async def admin_drivers_edit_submit(
     d.driver_type = driver_type
 
     approved_now = bool(is_approved)
-    if approved_now and not d.is_approved:
-        d.is_approved = True
-        d.status = DriverStatus.APPROVED
-        d.approved_at = datetime.now(timezone.utc)
+    if approved_now:
+        if not vehicle_number or not nic_number or not license_number or not full_name:
+            return _err("Cannot approve driver: Full Name, NIC, License, and Vehicle Number are required before approval.")
+        if not d.is_approved:
+            d.is_approved = True
+            d.status = DriverStatus.APPROVED
+            d.approved_at = datetime.now(timezone.utc)
     elif not approved_now and d.is_approved:
         d.is_approved = False
         d.is_online = False
@@ -1308,11 +1341,13 @@ async def approve_driver_form(
     q = await db.execute(select(Driver).where(Driver.id == driver_id))
     d = q.scalars().first()
     if d:
+        if not d.vehicle_number or not d.nic_number or not d.license_number:
+            return RedirectResponse(url="/admin/drivers?error=Cannot+approve+driver:+registration+details+are+incomplete", status_code=303)
         d.is_approved = True
         d.status = DriverStatus.APPROVED
         d.approved_at = datetime.now(timezone.utc)
         await db.commit()
-    return RedirectResponse(url="/admin/drivers", status_code=303)
+    return RedirectResponse(url="/admin/drivers?success=Driver+approved+successfully", status_code=303)
 
 
 @router.post("/drivers/{driver_id}/suspend")

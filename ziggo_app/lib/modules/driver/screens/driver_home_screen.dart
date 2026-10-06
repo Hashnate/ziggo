@@ -342,6 +342,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
         accuracy: LocationAccuracy.high, distanceFilter: 5,
       ),
     ).listen((p) {
+      final driver = context.read<DriverProvider>();
+      if (!driver.profileComplete) return;
+
       final kmh = (p.speed.isNaN || p.speed < 0) ? 0.0 : p.speed * 3.6;
       if (!mounted) return;
       

@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
@@ -34,52 +35,196 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
   final _relativeRelationship = TextEditingController();
   final _referralCode = TextEditingController();
 
-  @override
-  void initState() {
-    super.initState();
-    _loadPendingReferral();
-  }
-
-  Future<void> _loadPendingReferral() async {
-    final pending = await ReferralTracker.getPendingReferralCode();
-    if (pending != null && pending.isNotEmpty && mounted) {
-      setState(() {
-        _referralCode.text = pending;
-      });
-    }
-  }
-
   String _vehicleType = 'car';
   String _driverType = 'ride';
   bool _busy = false;
   String? _error;
+  String? _uploadStatus;
 
   File? _profilePhoto;
-  File? _nicFrontDoc;
-  File? _nicBackDoc;
-  File? _licenseFrontDoc;
-  File? _licenseBackDoc;
-  File? _vehicleRegDoc;
-  File? _insuranceDoc;
-  File? _yearLicenseDoc;
-  File? _ecoTestDoc;
-  File? _vehicleFrontDoc;
-  File? _vehicleBackDoc;
-  File? _vehicleSideDoc;
+  String? _profilePhotoUrl;
+  bool _profilePhotoUploading = false;
+
+  final Map<String, File?> _localDocs = {};
+  final Map<String, String?> _remoteDocs = {};
+  final Map<String, bool> _uploadingDocs = {};
+  final Map<String, String?> _docErrors = {};
+
+  static const _requiredDocKeys = [
+    'nic_front',
+    'nic_back',
+    'license_front',
+    'license_back',
+    'vehicle_reg',
+    'insurance',
+    'year_license',
+    'eco_test',
+    'vehicle_front',
+    'vehicle_back',
+    'vehicle_side',
+  ];
 
   static const _typeLabels = {
     'nic_front': 'NIC (front)',
     'nic_back': 'NIC (back)',
     'license_front': 'Driving License (front)',
     'license_back': 'Driving License (back)',
-    'vehicle_reg': 'Vehicle Registration',
-    'insurance': 'Insurance',
+    'vehicle_reg': 'Vehicle Registration Book',
+    'insurance': 'Insurance Document',
     'year_license': 'Year License',
     'eco_test': 'Eco Test Report',
     'vehicle_front': 'Vehicle Photo (front)',
     'vehicle_back': 'Vehicle Photo (back)',
     'vehicle_side': 'Vehicle Photo (side)',
   };
+
+  @override
+  void initState() {
+    super.initState();
+    _initData();
+    _setupAutoSave();
+  }
+
+  void _setupAutoSave() {
+    for (final ctrl in [
+      _fullName,
+      _email,
+      _nic,
+      _license,
+      _vehicleNumber,
+      _vehicleModel,
+      _vehicleColor,
+      _relativeName,
+      _relativeContact,
+      _relativeRelationship,
+      _referralCode,
+    ]) {
+      ctrl.addListener(_saveDraft);
+    }
+  }
+
+  Future<void> _saveDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('driver_reg_name', _fullName.text);
+      await prefs.setString('driver_reg_email', _email.text);
+      await prefs.setString('driver_reg_nic', _nic.text);
+      await prefs.setString('driver_reg_license', _license.text);
+      await prefs.setString('driver_reg_vnum', _vehicleNumber.text);
+      await prefs.setString('driver_reg_vmodel', _vehicleModel.text);
+      await prefs.setString('driver_reg_vcolor', _vehicleColor.text);
+      await prefs.setString('driver_reg_relname', _relativeName.text);
+      await prefs.setString('driver_reg_relcontact', _relativeContact.text);
+      await prefs.setString('driver_reg_relrel', _relativeRelationship.text);
+      await prefs.setString('driver_reg_ref', _referralCode.text);
+      await prefs.setString('driver_reg_vtype', _vehicleType);
+      await prefs.setString('driver_reg_dtype', _driverType);
+    } catch (_) {}
+  }
+
+  Future<void> _clearDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('driver_reg_name');
+      await prefs.remove('driver_reg_email');
+      await prefs.remove('driver_reg_nic');
+      await prefs.remove('driver_reg_license');
+      await prefs.remove('driver_reg_vnum');
+      await prefs.remove('driver_reg_vmodel');
+      await prefs.remove('driver_reg_vcolor');
+      await prefs.remove('driver_reg_relname');
+      await prefs.remove('driver_reg_relcontact');
+      await prefs.remove('driver_reg_relrel');
+      await prefs.remove('driver_reg_ref');
+      await prefs.remove('driver_reg_vtype');
+      await prefs.remove('driver_reg_dtype');
+    } catch (_) {}
+  }
+
+  Future<void> _initData() async {
+    // 1. Referral code
+    final pending = await ReferralTracker.getPendingReferralCode();
+    if (pending != null && pending.isNotEmpty && mounted) {
+      setState(() {
+        _referralCode.text = pending;
+      });
+    }
+
+    // 2. Draft / prefill restore
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final auth = context.read<AuthProvider>();
+      final driver = context.read<DriverProvider>();
+      final prof = driver.profile ?? {};
+
+      final draftName = prefs.getString('driver_reg_name') ?? (auth.user?.fullName ?? (prof['full_name']?.toString() ?? ''));
+      if (draftName.isNotEmpty && _fullName.text.isEmpty) _fullName.text = draftName;
+
+      final draftEmail = prefs.getString('driver_reg_email') ?? (auth.user?.email ?? (prof['email']?.toString() ?? ''));
+      if (draftEmail.isNotEmpty && _email.text.isEmpty) _email.text = draftEmail;
+
+      final draftNic = prefs.getString('driver_reg_nic') ?? (prof['nic_number']?.toString() ?? '');
+      if (draftNic.isNotEmpty && _nic.text.isEmpty) _nic.text = draftNic;
+
+      final draftLicense = prefs.getString('driver_reg_license') ?? (prof['license_number']?.toString() ?? '');
+      if (draftLicense.isNotEmpty && _license.text.isEmpty) _license.text = draftLicense;
+
+      final draftVnum = prefs.getString('driver_reg_vnum') ?? (prof['vehicle_number']?.toString() ?? '');
+      if (draftVnum.isNotEmpty && _vehicleNumber.text.isEmpty) _vehicleNumber.text = draftVnum;
+
+      final draftVmodel = prefs.getString('driver_reg_vmodel') ?? (prof['vehicle_model']?.toString() ?? '');
+      if (draftVmodel.isNotEmpty && _vehicleModel.text.isEmpty) _vehicleModel.text = draftVmodel;
+
+      final draftVcolor = prefs.getString('driver_reg_vcolor') ?? (prof['vehicle_color']?.toString() ?? '');
+      if (draftVcolor.isNotEmpty && _vehicleColor.text.isEmpty) _vehicleColor.text = draftVcolor;
+
+      final draftRelname = prefs.getString('driver_reg_relname') ?? (prof['relative_name']?.toString() ?? '');
+      if (draftRelname.isNotEmpty && _relativeName.text.isEmpty) _relativeName.text = draftRelname;
+
+      final draftRelcontact = prefs.getString('driver_reg_relcontact') ?? (prof['relative_contact']?.toString() ?? '');
+      if (draftRelcontact.isNotEmpty && _relativeContact.text.isEmpty) _relativeContact.text = draftRelcontact;
+
+      final draftRelrel = prefs.getString('driver_reg_relrel') ?? (prof['relative_relationship']?.toString() ?? '');
+      if (draftRelrel.isNotEmpty && _relativeRelationship.text.isEmpty) _relativeRelationship.text = draftRelrel;
+
+      final draftVtype = prefs.getString('driver_reg_vtype') ?? (prof['vehicle_type']?.toString() ?? 'car');
+      _vehicleType = draftVtype;
+
+      final draftDtype = prefs.getString('driver_reg_dtype') ?? (prof['driver_type']?.toString() ?? 'ride');
+      _driverType = draftDtype;
+
+      final existingPhoto = auth.user?.profilePhoto ?? prof['profile_photo']?.toString();
+      if (existingPhoto != null && existingPhoto.isNotEmpty) {
+        _profilePhotoUrl = existingPhoto;
+      }
+    } catch (_) {}
+
+    // 3. Restore uploaded KYC documents from server
+    try {
+      final r = await ApiClient.instance.dio.get('/driver/documents');
+      if (r.data is List && mounted) {
+        setState(() {
+          for (final item in r.data as List) {
+            if (item is Map && item['document_type'] != null && item['document_url'] != null) {
+              final type = item['document_type'].toString();
+              final url = item['document_url'].toString();
+              if (url.isNotEmpty) {
+                _remoteDocs[type] = url;
+              }
+            }
+          }
+        });
+      }
+    } catch (_) {}
+    if (mounted) setState(() {});
+  }
+
+  String _absoluteUrl(String path) {
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
+    }
+    return '${ApiConfig.baseHost}$path';
+  }
 
   Future<File?> _pickImage() async {
     final picker = ImagePicker();
@@ -114,6 +259,75 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
     return File(picked.path);
   }
 
+  Future<void> _pickAndUploadProfilePhoto() async {
+    final file = await _pickImage();
+    if (file == null) return;
+
+    setState(() {
+      _profilePhoto = file;
+      _profilePhotoUploading = true;
+      _error = null;
+    });
+
+    try {
+      final photoForm = FormData.fromMap({
+        'photo': await MultipartFile.fromFile(file.path),
+      });
+      final res = await ApiClient.instance.dio.post('/driver/profile-photo', data: photoForm);
+      final url = res.data?['profile_photo']?.toString();
+      if (mounted) {
+        setState(() {
+          _profilePhotoUrl = url;
+          _profilePhotoUploading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _profilePhotoUploading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _pickAndUploadDoc(String kind) async {
+    final file = await _pickImage();
+    if (file == null) return;
+
+    setState(() {
+      _localDocs[kind] = file;
+      _uploadingDocs[kind] = true;
+      _docErrors[kind] = null;
+      _error = null;
+    });
+
+    try {
+      final docForm = FormData.fromMap({
+        'document_type': kind,
+        'document': await MultipartFile.fromFile(file.path),
+      });
+      final res = await ApiClient.instance.dio.post('/driver/documents', data: docForm);
+      final url = res.data?['document_url']?.toString();
+      if (mounted) {
+        setState(() {
+          _remoteDocs[kind] = url ?? 'uploaded';
+          _uploadingDocs[kind] = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        String msg = 'Upload failed';
+        if (e is DioException) {
+          msg = e.response?.data?['detail']?.toString() ?? e.message ?? msg;
+        }
+        setState(() {
+          _uploadingDocs[kind] = false;
+          _docErrors[kind] = msg;
+        });
+      }
+    }
+  }
+
   @override
   void dispose() {
     _fullName.dispose();
@@ -130,65 +344,63 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
     super.dispose();
   }
 
-  String? _uploadStatus;
-
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_profilePhoto == null) {
-      setState(() => _error = 'Please select a Profile Photo');
+
+    final hasPhoto = _profilePhoto != null || (_profilePhotoUrl != null && _profilePhotoUrl!.isNotEmpty);
+    if (!hasPhoto) {
+      setState(() => _error = 'Please select and upload a Profile Photo');
       return;
     }
 
-    if (_nicFrontDoc == null || _nicBackDoc == null || _licenseFrontDoc == null || _licenseBackDoc == null || _vehicleRegDoc == null || _insuranceDoc == null || _yearLicenseDoc == null || _ecoTestDoc == null || _vehicleFrontDoc == null || _vehicleBackDoc == null || _vehicleSideDoc == null) {
-      setState(() => _error = 'Please upload all required KYC documents');
-      return;
+    for (final kind in _requiredDocKeys) {
+      final hasDoc = (_remoteDocs[kind] != null && _remoteDocs[kind]!.isNotEmpty) || _localDocs[kind] != null;
+      if (!hasDoc) {
+        final label = _typeLabels[kind] ?? kind;
+        setState(() => _error = 'Please upload $label');
+        return;
+      }
     }
 
     setState(() {
       _busy = true;
       _error = null;
-      _uploadStatus = 'Uploading profile photo...';
+      _uploadStatus = 'Saving details...';
     });
 
     try {
-      // 1. Upload Profile Photo
-      if (mounted) setState(() => _uploadStatus = 'Uploading profile photo...');
-      final photoForm = FormData.fromMap({
-        'photo': await MultipartFile.fromFile(_profilePhoto!.path),
-      });
-      await ApiClient.instance.dio.post('/driver/profile-photo', data: photoForm);
-
-      // 2. Upload KYC Documents
-      final docs = {
-        'nic_front': _nicFrontDoc,
-        'nic_back': _nicBackDoc,
-        'license_front': _licenseFrontDoc,
-        'license_back': _licenseBackDoc,
-        'vehicle_reg': _vehicleRegDoc,
-        'insurance': _insuranceDoc,
-        'year_license': _yearLicenseDoc,
-        'eco_test': _ecoTestDoc,
-        'vehicle_front': _vehicleFrontDoc,
-        'vehicle_back': _vehicleBackDoc,
-        'vehicle_side': _vehicleSideDoc,
-      };
-
-      int idx = 0;
-      for (final entry in docs.entries) {
-        idx++;
-        final label = _typeLabels[entry.key] ?? entry.key;
-        if (mounted) {
-          setState(() => _uploadStatus = 'Uploading $label ($idx/${docs.length})...');
-        }
-        final docForm = FormData.fromMap({
-          'document_type': entry.key,
-          'document': await MultipartFile.fromFile(entry.value!.path),
+      // 1. Ensure profile photo is uploaded
+      if (_profilePhoto != null && (_profilePhotoUrl == null || _profilePhotoUrl!.isEmpty)) {
+        if (mounted) setState(() => _uploadStatus = 'Uploading profile photo...');
+        final photoForm = FormData.fromMap({
+          'photo': await MultipartFile.fromFile(_profilePhoto!.path),
         });
-        await ApiClient.instance.dio.post('/driver/documents', data: docForm);
+        final res = await ApiClient.instance.dio.post('/driver/profile-photo', data: photoForm);
+        _profilePhotoUrl = res.data?['profile_photo']?.toString();
       }
 
-      // 3. Submit registration details (triggers state transition to awaiting approval)
-      if (mounted) setState(() => _uploadStatus = 'Saving details...');
+      // 2. Ensure all locally selected docs are uploaded
+      int idx = 0;
+      for (final kind in _requiredDocKeys) {
+        idx++;
+        final isRemote = _remoteDocs[kind] != null && _remoteDocs[kind]!.isNotEmpty;
+        final localFile = _localDocs[kind];
+        if (!isRemote && localFile != null) {
+          final label = _typeLabels[kind] ?? kind;
+          if (mounted) {
+            setState(() => _uploadStatus = 'Uploading $label ($idx/${_requiredDocKeys.length})...');
+          }
+          final docForm = FormData.fromMap({
+            'document_type': kind,
+            'document': await MultipartFile.fromFile(localFile.path),
+          });
+          final res = await ApiClient.instance.dio.post('/driver/documents', data: docForm);
+          _remoteDocs[kind] = res.data?['document_url']?.toString() ?? 'uploaded';
+        }
+      }
+
+      // 3. Submit registration details
+      if (mounted) setState(() => _uploadStatus = 'Submitting registration...');
       final err = await context.read<DriverProvider>().register(
             fullName: _fullName.text.trim(),
             email: _email.text.trim().isEmpty ? null : _email.text.trim(),
@@ -217,6 +429,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
       }
 
       await ReferralTracker.markAttributed();
+      await _clearDraft();
 
       if (mounted) {
         setState(() {
@@ -245,7 +458,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
         }
         setState(() {
           _busy = false;
-          _error = 'Upload failed: $msg';
+          _error = 'Submission failed: $msg';
           _uploadStatus = null;
         });
       }
@@ -261,7 +474,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
         icon: const Icon(Icons.logout_rounded, color: AppColors.error, size: 36),
         title: const Text('Exit Registration?', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textPrimary)),
         content: const Text(
-          'You will be logged out. Are you sure you want to exit?',
+          'Your uploaded documents and entered details are saved. Are you sure you want to exit?',
           textAlign: TextAlign.center,
           style: TextStyle(color: AppColors.textSecondary),
         ),
@@ -430,6 +643,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                   ],
                 ),
               ),
+
               // Profile Photo Card
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -437,19 +651,39 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                   Row(
                     children: [
                       GestureDetector(
-                        onTap: () async {
-                          final file = await _pickImage();
-                          if (file != null) {
-                            setState(() => _profilePhoto = file);
-                          }
-                        },
-                        child: CircleAvatar(
-                          radius: 36,
-                          backgroundColor: kDriverCardLight,
-                          backgroundImage: _profilePhoto != null ? FileImage(_profilePhoto!) : null,
-                          child: _profilePhoto == null
-                              ? const Icon(Icons.add_a_photo_rounded, color: AppColors.textTertiary, size: 24)
-                              : null,
+                        onTap: _pickAndUploadProfilePhoto,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            CircleAvatar(
+                              radius: 36,
+                              backgroundColor: kDriverCardLight,
+                              backgroundImage: _profilePhoto != null
+                                  ? FileImage(_profilePhoto!)
+                                  : (_profilePhotoUrl != null && _profilePhotoUrl!.isNotEmpty
+                                      ? NetworkImage(_absoluteUrl(_profilePhotoUrl!))
+                                      : null),
+                              child: (_profilePhoto == null && (_profilePhotoUrl == null || _profilePhotoUrl!.isEmpty))
+                                  ? const Icon(Icons.add_a_photo_rounded, color: AppColors.textTertiary, size: 24)
+                                  : null,
+                            ),
+                            if (_profilePhotoUploading)
+                              Container(
+                                width: 72,
+                                height: 72,
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.4),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Center(
+                                  child: SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -463,11 +697,15 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              _profilePhoto == null
-                                  ? 'Upload a clear profile photo'
-                                  : 'Photo selected successfully',
+                              _profilePhotoUploading
+                                  ? 'Uploading...'
+                                  : (_profilePhoto != null || (_profilePhotoUrl != null && _profilePhotoUrl!.isNotEmpty)
+                                      ? '✓ Photo uploaded successfully'
+                                      : 'Upload a clear profile photo'),
                               style: TextStyle(
-                                color: _profilePhoto == null ? AppColors.textSecondary : AppColors.success,
+                                color: (_profilePhoto != null || (_profilePhotoUrl != null && _profilePhotoUrl!.isNotEmpty))
+                                    ? AppColors.success
+                                    : AppColors.textSecondary,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -479,6 +717,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                   ),
                 ),
               ),
+
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Column(
@@ -526,10 +765,10 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                     _card(
                       Column(
                         children: [
-                           _driverTypeRow(),
-                           const SizedBox(height: 16),
-                           _vehicleTypeRow(),
-                           const SizedBox(height: 12),
+                          _driverTypeRow(),
+                          const SizedBox(height: 16),
+                          _vehicleTypeRow(),
+                          const SizedBox(height: 12),
                           _field(_vehicleNumber, 'Vehicle Number',
                               Icons.confirmation_number_rounded, hint: 'WP-1234'),
                           const SizedBox(height: 10),
@@ -547,28 +786,27 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                     _card(
                       Column(
                         children: [
-                          _docUploadRow('nic_front', 'NIC (front)', _nicFrontDoc, (file) => setState(() => _nicFrontDoc = file)),
+                          _docUploadRow('nic_front', 'NIC (front)'),
                           const Divider(height: 20),
-                          _docUploadRow('nic_back', 'NIC (back)', _nicBackDoc, (file) => setState(() => _nicBackDoc = file)),
+                          _docUploadRow('nic_back', 'NIC (back)'),
                           const Divider(height: 20),
-                          _docUploadRow('license_front', 'Driving License (front)', _licenseFrontDoc, (file) => setState(() => _licenseFrontDoc = file)),
+                          _docUploadRow('license_front', 'Driving License (front)'),
                           const Divider(height: 20),
-                          _docUploadRow('license_back', 'Driving License (back)', _licenseBackDoc, (file) => setState(() => _licenseBackDoc = file)),
+                          _docUploadRow('license_back', 'Driving License (back)'),
                           const Divider(height: 20),
-                          _docUploadRow('vehicle_reg', 'Vehicle Registration Book', _vehicleRegDoc, (file) => setState(() => _vehicleRegDoc = file)),
+                          _docUploadRow('vehicle_reg', 'Vehicle Registration Book'),
                           const Divider(height: 20),
-                          _docUploadRow('insurance', 'Insurance Document', _insuranceDoc, (file) => setState(() => _insuranceDoc = file)),
+                          _docUploadRow('insurance', 'Insurance Document'),
                           const Divider(height: 20),
-                          _docUploadRow('year_license', 'Year License', _yearLicenseDoc, (file) => setState(() => _yearLicenseDoc = file)),
+                          _docUploadRow('year_license', 'Year License'),
                           const Divider(height: 20),
-                          _docUploadRow('eco_test', 'Eco Test Report', _ecoTestDoc, (file) => setState(() => _ecoTestDoc = file)),
+                          _docUploadRow('eco_test', 'Eco Test Report'),
                           const Divider(height: 20),
-                          _docUploadRow('vehicle_front', 'Vehicle Photo (front)', _vehicleFrontDoc, (file) => setState(() => _vehicleFrontDoc = file)),
+                          _docUploadRow('vehicle_front', 'Vehicle Photo (front)'),
                           const Divider(height: 20),
-                          _docUploadRow('vehicle_back', 'Vehicle Photo (back)', _vehicleBackDoc, (file) => setState(() => _vehicleBackDoc = file)),
+                          _docUploadRow('vehicle_back', 'Vehicle Photo (back)'),
                           const Divider(height: 20),
-                          _docUploadRow('vehicle_side', 'Vehicle Photo (side)', _vehicleSideDoc, (file) => setState(() => _vehicleSideDoc = file)),
-
+                          _docUploadRow('vehicle_side', 'Vehicle Photo (side)'),
                         ],
                       ),
                     ),
@@ -736,7 +974,10 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
           children: types.map((t) {
             final sel = _vehicleType == t.$1;
             return GestureDetector(
-              onTap: () => setState(() => _vehicleType = t.$1),
+              onTap: () {
+                setState(() => _vehicleType = t.$1);
+                _saveDraft();
+              },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -771,7 +1012,20 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
     );
   }
 
-  Widget _docUploadRow(String type, String label, File? file, ValueChanged<File> onFileSelected) {
+  Widget _docUploadRow(String kind, String label) {
+    final localFile = _localDocs[kind];
+    final remoteUrl = _remoteDocs[kind];
+    final isUploading = _uploadingDocs[kind] == true;
+    final docError = _docErrors[kind];
+    final isUploaded = (remoteUrl != null && remoteUrl.isNotEmpty) || localFile != null;
+
+    ImageProvider? imageProvider;
+    if (localFile != null) {
+      imageProvider = FileImage(localFile);
+    } else if (remoteUrl != null && remoteUrl.isNotEmpty) {
+      imageProvider = NetworkImage(_absoluteUrl(remoteUrl));
+    }
+
     return Row(
       children: [
         Container(
@@ -780,11 +1034,11 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
           decoration: BoxDecoration(
             color: kDriverCardLight,
             borderRadius: BorderRadius.circular(12),
-            image: file != null
-                ? DecorationImage(image: FileImage(file), fit: BoxFit.cover)
+            image: imageProvider != null
+                ? DecorationImage(image: imageProvider, fit: BoxFit.cover)
                 : null,
           ),
-          child: file == null
+          child: imageProvider == null
               ? const Icon(Icons.description_rounded, color: AppColors.textTertiary, size: 20)
               : null,
         ),
@@ -798,36 +1052,61 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                 style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
               ),
               const SizedBox(height: 2),
-              Text(
-                file == null ? 'Not uploaded yet' : 'Selected',
-                style: TextStyle(
-                  color: file == null ? AppColors.textSecondary : AppColors.success,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
+              if (isUploading)
+                const Text(
+                  'Uploading to server...',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                )
+              else if (docError != null)
+                Text(
+                  docError,
+                  style: const TextStyle(
+                    color: AppColors.error,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                )
+              else
+                Text(
+                  isUploaded ? '✓ Uploaded & Ready' : 'Not uploaded yet',
+                  style: TextStyle(
+                    color: isUploaded ? AppColors.success : AppColors.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
             ],
           ),
         ),
-        OutlinedButton(
-          onPressed: () async {
-            final picked = await _pickImage();
-            if (picked != null) {
-              onFileSelected(picked);
-            }
-          },
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            side: const BorderSide(color: AppColors.divider),
+        if (isUploading)
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+            ),
+          )
+        else
+          OutlinedButton(
+            onPressed: () => _pickAndUploadDoc(kind),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              side: BorderSide(color: isUploaded ? AppColors.success.withOpacity(0.5) : AppColors.divider),
+              backgroundColor: isUploaded ? AppColors.success.withOpacity(0.05) : null,
+            ),
+            child: Text(isUploaded ? 'Replace' : 'Upload',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 11,
+                  color: isUploaded ? AppColors.success : AppColors.primary,
+                )),
           ),
-          child: Text(file == null ? 'Upload' : 'Replace',
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 11,
-                color: AppColors.primary,
-              )),
-        ),
       ],
     );
   }
@@ -856,7 +1135,10 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
           children: dtypes.map((t) {
             final sel = _driverType == t.$1;
             return GestureDetector(
-              onTap: () => setState(() => _driverType = t.$1),
+              onTap: () {
+                setState(() => _driverType = t.$1);
+                _saveDraft();
+              },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

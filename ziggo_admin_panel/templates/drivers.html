@@ -26,11 +26,31 @@
 {% endblock %}
 
 {% block content %}
+<!-- Error / Success Alerts -->
+{% if request.query_params.get('error') %}
+<div class="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-bold flex items-center gap-2">
+    <i class="fas fa-exclamation-circle text-red-500"></i>
+    <span>{{ request.query_params.get('error') }}</span>
+</div>
+{% endif %}
+{% if request.query_params.get('success') %}
+<div class="mb-6 p-4 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm font-bold flex items-center gap-2">
+    <i class="fas fa-check-circle text-green-500"></i>
+    <span>{{ request.query_params.get('success') }}</span>
+</div>
+{% endif %}
+
 <!-- View Tabs -->
 <div class="flex border-b border-gray-200 mb-6 gap-6">
     <span class="pb-3 text-sm font-black border-b-2 border-ziggo text-ziggo">
         Registered Drivers ({{ stats.total }})
     </span>
+    {% if stats.incomplete and stats.incomplete > 0 %}
+    <a href="/admin/drivers?status=incomplete" class="pb-3 text-sm font-bold text-gray-400 hover:text-ziggo transition flex items-center gap-1.5">
+        <span>Incomplete Signups</span>
+        <span class="px-2 py-0.5 rounded-full text-xs font-black bg-gray-100 text-gray-600">{{ stats.incomplete }}</span>
+    </a>
+    {% endif %}
 </div>
 
 <!-- Driver Stats Bar -->
@@ -42,7 +62,7 @@
                 <i class="fas fa-users"></i>
             </div>
         </div>
-        <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Total Drivers</p>
+        <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Registered Drivers</p>
         <p class="text-2xl font-black text-ziggo">{{ stats.total }}</p>
     </div>
     <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
@@ -62,7 +82,7 @@
             </div>
             <span class="text-xs font-black text-orange-500">{{ stats.pending }} Pending</span>
         </div>
-        <p class="text-xs font-black text-gray-400 uppercase tracking-widest">New Apps</p>
+        <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Pending Review</p>
         <p class="text-2xl font-black text-ziggo">{{ stats.pending }}</p>
     </div>
     <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
@@ -115,12 +135,13 @@
             {% if view != 'applications' %}
             <div>
                 <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Status</label>
-                <select name="status" onchange="this.form.submit()" class="bg-white border border-gray-200 rounded-lg px-4 py-2 text-sm font-semibold outline-none shadow-soft-sm cursor-pointer hover:border-ziggo transition-all min-w-[140px]">
-                    <option value="all" {% if status == 'all' %}selected{% endif %}>All Drivers</option>
+                <select name="status" onchange="this.form.submit()" class="bg-white border border-gray-200 rounded-lg px-4 py-2 text-sm font-semibold outline-none shadow-soft-sm cursor-pointer hover:border-ziggo transition-all min-w-[160px]">
+                    <option value="all" {% if status == 'all' %}selected{% endif %}>All Registered</option>
+                    <option value="pending" {% if status == 'pending' %}selected{% endif %}>🟡 Pending Review</option>
                     <option value="approved" {% if status == 'approved' %}selected{% endif %}>🔵 Approved</option>
                     <option value="online" {% if status == 'online' %}selected{% endif %}>🟢 Online</option>
                     <option value="offline" {% if status == 'offline' %}selected{% endif %}>⚫ Offline</option>
-                    <option value="pending" {% if status == 'pending' %}selected{% endif %}>🟡 Pending</option>
+                    <option value="incomplete" {% if status == 'incomplete' %}selected{% endif %}>⚪ Incomplete / Draft</option>
                 </select>
             </div>
             {% endif %}
@@ -244,7 +265,12 @@
                         <p class="text-xs text-gray-400">{{ driver.vehicle_number or 'N/A' }}</p>
                     </td>
                     <td class="px-6 py-4">
-                        {% if not driver.is_approved or driver.status == 'pending' %}
+                        {% if not driver.vehicle_number or not driver.nic_number %}
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-bold">
+                            <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                            Incomplete Signup
+                        </span>
+                        {% elif not driver.is_approved or driver.status == 'pending' %}
                         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-bold">
                             <span class="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
                             Pending
@@ -281,7 +307,9 @@
                             <a href="/admin/drivers/{{ driver.id }}/edit" class="w-8 h-8 rounded-lg bg-ziggo-soft border border-ziggo-line text-ziggo inline-flex items-center justify-center hover:bg-ziggo hover:text-white hover:border-ziggo transition" title="Edit">
                                 <i class="fas fa-edit"></i>
                             </a>
-                            {% if not driver.is_approved %}
+                            {% if not driver.vehicle_number or not driver.nic_number %}
+                              <span class="text-[11px] text-gray-400 font-bold px-2 py-1 bg-gray-100 rounded-lg">Draft</span>
+                            {% elif not driver.is_approved %}
                               <form method="post" action="/admin/drivers/{{ driver.id }}/approve" style="display:inline">
                                 <button class="px-3 py-1.5 rounded-lg bg-green-50 border border-green-200 text-green-700 text-xs font-bold hover:bg-green-600 hover:text-white hover:border-green-600 transition" type="submit">Approve</button>
                               </form>
