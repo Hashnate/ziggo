@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Complaints | Ziggo Admin{% endblock %}
+{% block page_title %}Complaints & Support{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="p-6 border-b border-gray-100">
+        <h3 class="font-bold text-ziggo">Complaints ({{ total_complaints }})</h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead class="bg-ziggo-canvas/70 text-[11px] uppercase tracking-wider text-ziggo-faint font-black">
+                <tr>
+                    <th class="px-6 py-3">ID</th>
+                    <th class="px-6 py-3">Category</th>
+                    <th class="px-6 py-3">Subject</th>
+                    <th class="px-6 py-3">Status</th>
+                    <th class="px-6 py-3">Created</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for c in complaints %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-3 text-sm font-medium">#{{ c.id }}</td>
+                    <td class="px-6 py-3 text-sm">{{ c.category or '' }}</td>
+                    <td class="px-6 py-3 text-sm">{{ c.subject or '' }}</td>
+                    <td class="px-6 py-3">
+                        <span class="px-2 py-1 rounded-full text-xs font-bold
+                          {% if c.status == 'resolved' %}bg-green-100 text-green-700
+                          {% elif c.status == 'in_progress' %}bg-blue-100 text-blue-700
+                          {% else %}bg-orange-100 text-orange-700{% endif %}">{{ c.status or 'pending' }}</span>
+                    </td>
+                    <td class="px-6 py-3 text-xs text-gray-500">{{ c.created_at|colombo_dt("%Y-%m-%d %H:%M") }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="px-6 py-10 text-center text-gray-400">No complaints</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination controls -->
+    {% if total_pages > 1 %}
+    <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
+        <p class="text-sm text-gray-500">
+            Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
+            <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
+            <span class="font-bold text-ziggo">{{ total_complaints }}</span> complaints
+        </p>
+        <div class="flex items-center gap-1.5">
+            {% if page > 1 %}
+                <a href="/admin/complaints?page={{ page - 1 }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
+            {% else %}
+                <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Previous</span>
+            {% endif %}
+
+            {% for p in page_range %}
+                {% if p == page %}
+                    <span class="px-3 py-1.5 rounded-lg bg-ziggo text-white text-xs font-black">{{ p }}</span>
+                {% else %}
+                    <a href="/admin/complaints?page={{ p }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
+                {% endif %}
+            {% endfor %}
+
+            {% if page < total_pages %}
+                <a href="/admin/complaints?page={{ page + 1 }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
+            {% else %}
+                <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Next</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,687 @@
+{% extends "base.html" %}
+
+{% block title %}Reports | Ziggo Admin{% endblock %}
+{% block page_title %}Insight & Analytics{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+<div class="space-y-6">
+
+    <!-- KPI Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="zi-kpi">
+            <div class="zi-kpi-ic"><i class="fas fa-coins" id="kpiIcon1"></i></div>
+            <p class="zi-kpi-lbl" id="kpiLabel1">Admin Net (Commission)</p>
+            <p class="zi-kpi-val"><span id="kpiVal1">0</span></p>
+        </div>
+        <div class="zi-kpi">
+            <div class="zi-kpi-ic"><i class="fas fa-route" id="kpiIcon2"></i></div>
+            <p class="zi-kpi-lbl" id="kpiLabel2">Total Rides</p>
+            <p class="zi-kpi-val"><span id="kpiVal2">0</span></p>
+        </div>
+        <div class="zi-kpi">
+            <div class="zi-kpi-ic"><i class="far fa-id-card" id="kpiIcon3"></i></div>
+            <p class="zi-kpi-lbl" id="kpiLabel3">Active Drivers</p>
+            <p class="zi-kpi-val"><span id="kpiVal3">0</span></p>
+        </div>
+        <div class="zi-kpi">
+            <div class="zi-kpi-ic"><i class="far fa-credit-card" id="kpiIcon4"></i></div>
+            <p class="zi-kpi-lbl" id="kpiLabel4">Gross Bookings</p>
+            <p class="zi-kpi-val"><span id="kpiVal4">0</span></p>
+        </div>
+    </div>
+
+    <style>
+        .zi-kpi { background:#fff; border:1px solid #E7EBF1; border-radius:16px; padding:18px 18px 16px; box-shadow:0 1px 2px rgba(15,23,42,.03); transition:box-shadow .16s ease, border-color .16s ease; }
+        .zi-kpi:hover { box-shadow:0 8px 24px -10px rgba(15,23,42,.12); border-color:#D5DCE6; }
+        .zi-kpi-ic { width:42px; height:42px; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:18px; background:linear-gradient(135deg,#1E40AF,#3B82F6); box-shadow:0 8px 18px -8px rgba(30,64,175,.5); margin-bottom:12px; }
+        .zi-kpi-lbl { font-size:10px; letter-spacing:.12em; text-transform:uppercase; font-weight:700; color:#94A3B8; }
+        .zi-kpi-val { font-size:26px; line-height:1.1; font-weight:800; color:#0F172A; margin-top:4px; }
+        .zi-quick { padding:8px 14px; border-radius:10px; font-size:12px; font-weight:600; border:1px solid #E7EBF1; background:#F4F7FB; color:#334155; transition:all .15s ease; }
+        .zi-quick:hover { background:#DBEAFE; color:#1E3A8A; border-color:#BFD3F5; }
+    </style>
+
+    <!-- Service revenue breakdown (revenue report only) -->
+    <div id="serviceBreakdown" class="hidden">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="serviceCards"></div>
+    </div>
+
+    <style>
+        .zi-svc { background:#fff; border:1px solid #E7EBF1; border-radius:16px; padding:16px 18px; box-shadow:0 1px 2px rgba(15,23,42,.03); }
+        .zi-svc-top { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+        .zi-svc-ic { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:15px; }
+        .zi-svc-name { font-size:13px; font-weight:800; color:#0F172A; }
+        .zi-svc-gmv { font-size:22px; font-weight:800; color:#0F172A; line-height:1.1; }
+        .zi-svc-sub { font-size:11px; font-weight:700; color:#94A3B8; margin-top:6px; display:flex; justify-content:space-between; }
+    </style>
+
+    <!-- Filter row -->
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm px-5 py-4 flex flex-wrap items-end gap-3">
+        <div class="min-w-[150px]">
+            <label class="block text-[10px] font-black text-ziggo-muted mb-1.5 uppercase tracking-wider">Report type</label>
+            <select id="rptType" class="w-full px-3 py-2 border border-ziggo-line rounded-lg text-sm outline-none focus:border-ziggo bg-white">
+                <option value="summary" {% if report_type == 'summary' %}selected{% endif %}>Summary</option>
+                <optgroup label="── Revenue Breakdown ──">
+                    <option value="revenue" {% if report_type == 'revenue' %}selected{% endif %}>Revenue · All Services</option>
+                    <option value="revenue_rides" {% if report_type == 'revenue_rides' %}selected{% endif %}>Revenue · Rides</option>
+                    <option value="revenue_delivery" {% if report_type == 'revenue_delivery' %}selected{% endif %}>Revenue · Flash Delivery</option>
+                    <option value="revenue_food" {% if report_type == 'revenue_food' %}selected{% endif %}>Revenue · Food</option>
+                    <option value="revenue_market" {% if report_type == 'revenue_market' %}selected{% endif %}>Revenue · Marketplace</option>
+                </optgroup>
+                <option value="earnings" {% if report_type == 'earnings' %}selected{% endif %}>Earnings</option>
+                <option value="drivers" {% if report_type == 'drivers' %}selected{% endif %}>Driver Performance</option>
+                <option value="riders" {% if report_type == 'riders' %}selected{% endif %}>Rider Analytics</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-[10px] font-black text-ziggo-muted mb-1.5 uppercase tracking-wider">Start date</label>
+            <input type="date" id="rptStart" value="{{ start_date }}" class="px-3 py-2 border border-ziggo-line rounded-lg text-sm outline-none focus:border-ziggo">
+        </div>
+        <div>
+            <label class="block text-[10px] font-black text-ziggo-muted mb-1.5 uppercase tracking-wider">End date</label>
+            <input type="date" id="rptEnd" value="{{ end_date }}" class="px-3 py-2 border border-ziggo-line rounded-lg text-sm outline-none focus:border-ziggo">
+        </div>
+        <button id="rptApply" type="button" class="px-4 py-2 bg-ziggo text-white rounded-lg font-semibold text-xs shadow-brand hover:bg-ziggo-light transition flex items-center gap-1.5">
+            <i class="fas fa-filter text-[10px]"></i> Apply
+        </button>
+        <button data-quick="7" type="button" class="zi-quick">Last 7 Days</button>
+        <button data-quick="30" type="button" class="zi-quick">Last 30 Days</button>
+        <span id="rptStatus" class="text-xs font-bold text-ziggo-muted ml-auto"></span>
+    </div>
+
+    <!-- Trend chart -->
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6">
+        <div class="flex items-center gap-2 mb-3">
+            <i class="fas fa-chart-line text-ziggo"></i>
+            <h3 class="font-black text-ziggo-ink">Trend</h3>
+        </div>
+        <div style="height: 320px;"><canvas id="trendChart"></canvas></div>
+    </div>
+
+    <!-- Summary table -->
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-ziggo-line flex items-center gap-2">
+            <i class="fas fa-table text-ziggo"></i>
+            <h3 class="font-black text-ziggo-ink">Summary Details</h3>
+            <span id="rowsCount" class="ml-auto text-xs font-bold text-ziggo-muted"></span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-gray-50 text-[11px] uppercase text-ziggo-muted font-black tracking-wider">
+                    <tr id="tableHeader">
+                        <th class="px-6 py-4">Date</th>
+                        <th class="px-6 py-4">Rides</th>
+                        <th class="px-6 py-4">Completed</th>
+                        <th class="px-6 py-4">Cancelled</th>
+                        <th class="px-6 py-4">Revenue</th>
+                        <th class="px-6 py-4">Drivers</th>
+                        <th class="px-6 py-4">Riders</th>
+                    </tr>
+                </thead>
+                <tbody id="rowsBody" class="divide-y divide-ziggo-line"></tbody>
+            </table>
+        </div>
+        <div id="rowsEmpty" class="hidden p-12 text-center">
+            <i class="fas fa-inbox text-3xl text-ziggo-faint mb-3"></i>
+            <p class="text-ziggo-muted font-bold">No bookings in this range.</p>
+        </div>
+        <!-- Pagination controls -->
+        <div id="paginationControls" class="px-6 py-4 border-t border-ziggo-line flex items-center justify-between bg-gray-50/50 hidden">
+        </div>
+    </div>
+</div>
+
+<script>
+    const initialData = {{ data|tojson }};
+    let chart;
+    let currentPage = 1;
+    const rowsPerPage = 50;
+    let currentRows = [];
+
+    function fmtMoney(n) { return Math.round(n).toLocaleString(); }
+
+    function getActiveType() {
+        return document.getElementById('rptType').value;
+    }
+
+    function renderTable() {
+        const body = document.getElementById('rowsBody');
+        const empty = document.getElementById('rowsEmpty');
+        const pagControls = document.getElementById('paginationControls');
+        
+        if (!currentRows.length) {
+            body.innerHTML = '';
+            empty.classList.remove('hidden');
+            pagControls.classList.add('hidden');
+            document.getElementById('rowsCount').textContent = '0 days';
+            return;
+        }
+        
+        empty.classList.add('hidden');
+        
+        const totalRows = currentRows.length;
+        const totalPages = Math.ceil(totalRows / rowsPerPage);
+        
+        // Adjust current page if out of bounds
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+        
+        const startIdx = (currentPage - 1) * rowsPerPage;
+        const endIdx = Math.min(startIdx + rowsPerPage, totalRows);
+        const slicedRows = currentRows.slice(startIdx, endIdx);
+        
+        const type = getActiveType();
+        const svcColors = {
+            revenue_rides:    'text-blue-600',
+            revenue_delivery: 'text-violet-600',
+            revenue_food:     'text-orange-600',
+            revenue_market:   'text-emerald-600',
+        };
+        if (type === 'revenue') {
+            body.innerHTML = slicedRows.map(r => `
+                <tr class="hover:bg-gray-50/50">
+                    <td class="px-6 py-4 font-black text-ziggo-ink">${r.date}</td>
+                    <td class="px-6 py-4 font-bold text-ziggo-ink">Rs. ${fmtMoney(r.rides)}</td>
+                    <td class="px-6 py-4 font-bold text-violet-600">Rs. ${fmtMoney(r.delivery)}</td>
+                    <td class="px-6 py-4 font-bold text-orange-600">Rs. ${fmtMoney(r.food)}</td>
+                    <td class="px-6 py-4 font-bold text-emerald-600">Rs. ${fmtMoney(r.market)}</td>
+                    <td class="px-6 py-4 font-black text-ziggo-ink">Rs. ${fmtMoney(r.total)}</td>
+                    <td class="px-6 py-4 font-black text-ziggo">Rs. ${fmtMoney(r.commission)}</td>
+                </tr>
+            `).join('');
+        } else if (svcColors[type]) {
+            const col = svcColors[type];
+            body.innerHTML = slicedRows.map(r => `
+                <tr class="hover:bg-gray-50/50">
+                    <td class="px-6 py-4 font-black text-ziggo-ink">${r.date}</td>
+                    <td class="px-6 py-4 font-bold ${col}">Rs. ${fmtMoney(r.gmv)}</td>
+                    <td class="px-6 py-4 font-bold text-ziggo">Rs. ${fmtMoney(r.commission)}</td>
+                    <td class="px-6 py-4 font-bold text-ziggo-ink">${(r.orders || 0).toLocaleString()}</td>
+                </tr>
+            `).join('');
+        } else if (type === 'earnings') {
+            body.innerHTML = slicedRows.map(r => `
+                <tr class="hover:bg-gray-50/50">
+                    <td class="px-6 py-4 font-black text-ziggo-ink">${r.date}</td>
+                    <td class="px-6 py-4 font-bold text-ziggo-ink">Rs. ${fmtMoney(r.gross)}</td>
+                    <td class="px-6 py-4 text-emerald-600 font-bold">Rs. ${fmtMoney(r.driver_earnings)}</td>
+                    <td class="px-6 py-4 text-ziggo font-black">Rs. ${fmtMoney(r.commission)}</td>
+                    <td class="px-6 py-4 font-bold text-slate-600">Rs. ${fmtMoney(r.waiting_charge)}</td>
+                    <td class="px-6 py-4 text-rose-600 font-bold">Rs. ${fmtMoney(r.discount)}</td>
+                </tr>
+            `).join('');
+        } else if (type === 'drivers') {
+            body.innerHTML = slicedRows.map(r => `
+                <tr class="hover:bg-gray-50/50">
+                    <td class="px-6 py-4 font-black text-ziggo-ink">${r.date}</td>
+                    <td class="px-6 py-4 font-bold text-ziggo-ink">${r.active_drivers}</td>
+                    <td class="px-6 py-4 font-bold">${r.rides}</td>
+                    <td class="px-6 py-4 text-emerald-600 font-bold">${r.completed}</td>
+                    <td class="px-6 py-4 text-rose-600 font-bold">${r.cancelled}</td>
+                    <td class="px-6 py-4 font-black text-ziggo">${r.completion_rate}%</td>
+                    <td class="px-6 py-4 font-bold text-amber-500">${r.avg_rating} <i class="fas fa-star text-[10px]"></i></td>
+                </tr>
+            `).join('');
+        } else if (type === 'riders') {
+            body.innerHTML = slicedRows.map(r => `
+                <tr class="hover:bg-gray-50/50">
+                    <td class="px-6 py-4 font-black text-ziggo-ink">${r.date}</td>
+                    <td class="px-6 py-4 font-bold text-ziggo-ink">${r.active_riders}</td>
+                    <td class="px-6 py-4 font-bold">${r.rides}</td>
+                    <td class="px-6 py-4 text-emerald-600 font-bold">${r.completed}</td>
+                    <td class="px-6 py-4 text-ziggo font-black">Rs. ${fmtMoney(r.avg_fare)}</td>
+                    <td class="px-6 py-4 text-blue-600 font-bold">+${r.new_riders}</td>
+                </tr>
+            `).join('');
+        } else {
+            body.innerHTML = slicedRows.map(r => `
+                <tr class="hover:bg-gray-50/50">
+                    <td class="px-6 py-4 font-black text-ziggo-ink">${r.date}</td>
+                    <td class="px-6 py-4 font-bold text-ziggo-ink">${r.rides}</td>
+                    <td class="px-6 py-4 text-emerald-600 font-bold">${r.completed}</td>
+                    <td class="px-6 py-4 text-rose-600 font-bold">${r.cancelled}</td>
+                    <td class="px-6 py-4 text-ziggo font-black">Rs. ${fmtMoney(r.revenue)}</td>
+                    <td class="px-6 py-4 font-bold">${r.drivers}</td>
+                    <td class="px-6 py-4 font-bold">${r.riders}</td>
+                </tr>
+            `).join('');
+        }
+        
+        document.getElementById('rowsCount').textContent = `${totalRows} day${totalRows === 1 ? '' : 's'}`;
+        
+        if (totalPages > 1) {
+            pagControls.classList.remove('hidden');
+            
+            // Build pagination buttons
+            let buttonsHTML = '';
+            
+            // Previous button
+            if (currentPage > 1) {
+                buttonsHTML += `<button onclick="setPage(${currentPage - 1})" class="px-3 py-1.5 rounded-lg border border-ziggo-line bg-white text-ziggo-ink hover:bg-gray-50 text-xs font-bold transition">Previous</button>`;
+            } else {
+                buttonsHTML += `<span class="px-3 py-1.5 rounded-lg border border-ziggo-line bg-gray-50 text-ziggo-muted text-xs font-bold cursor-not-allowed">Previous</span>`;
+            }
+            
+            // Page numbers
+            for (let p = 1; p <= totalPages; p++) {
+                if (p === currentPage) {
+                    buttonsHTML += `<span class="px-3 py-1.5 rounded-lg bg-ziggo text-white text-xs font-black">${p}</span>`;
+                } else {
+                    buttonsHTML += `<button onclick="setPage(${p})" class="px-3 py-1.5 rounded-lg border border-ziggo-line bg-white text-ziggo-ink hover:bg-gray-50 text-xs font-bold transition">${p}</button>`;
+                }
+            }
+            
+            // Next button
+            if (currentPage < totalPages) {
+                buttonsHTML += `<button onclick="setPage(${currentPage + 1})" class="px-3 py-1.5 rounded-lg border border-ziggo-line bg-white text-ziggo-ink hover:bg-gray-50 text-xs font-bold transition">Next</button>`;
+            } else {
+                buttonsHTML += `<span class="px-3 py-1.5 rounded-lg border border-ziggo-line bg-gray-50 text-ziggo-muted text-xs font-bold cursor-not-allowed">Next</span>`;
+            }
+            
+            pagControls.innerHTML = `
+                <p class="text-sm text-ziggo-muted">
+                    Showing <span class="font-bold text-ziggo">${startIdx + 1}</span> to 
+                    <span class="font-bold text-ziggo">${endIdx}</span> of 
+                    <span class="font-bold text-ziggo">${totalRows}</span> entries
+                </p>
+                <div class="flex items-center gap-1.5">
+                    ${buttonsHTML}
+                </div>
+            `;
+        } else {
+            pagControls.classList.add('hidden');
+        }
+    }
+
+    window.setPage = function(page) {
+        currentPage = page;
+        renderTable();
+    };
+
+    function applyData(d) {
+        const type = getActiveType();
+
+        // 1. Update KPIs
+        const icon1 = document.getElementById('kpiIcon1');
+        const icon2 = document.getElementById('kpiIcon2');
+        const icon3 = document.getElementById('kpiIcon3');
+        const icon4 = document.getElementById('kpiIcon4');
+
+        const label1 = document.getElementById('kpiLabel1');
+        const label2 = document.getElementById('kpiLabel2');
+        const label3 = document.getElementById('kpiLabel3');
+        const label4 = document.getElementById('kpiLabel4');
+
+        const val1 = document.getElementById('kpiVal1');
+        const val2 = document.getElementById('kpiVal2');
+        const val3 = document.getElementById('kpiVal3');
+        const val4 = document.getElementById('kpiVal4');
+
+        // Service breakdown cards only render for the full revenue report.
+        const breakdown = document.getElementById('serviceBreakdown');
+        if (type === 'revenue') {
+            breakdown.classList.remove('hidden');
+            const meta = {
+                rides:    { ic: 'fas fa-route',         grad: 'linear-gradient(135deg,#1E40AF,#3B82F6)' },
+                delivery: { ic: 'fas fa-box',           grad: 'linear-gradient(135deg,#7C3AED,#A78BFA)' },
+                food:     { ic: 'fas fa-utensils',      grad: 'linear-gradient(135deg,#EA580C,#FB923C)' },
+                market:   { ic: 'fas fa-shopping-basket',grad: 'linear-gradient(135deg,#059669,#34D399)' },
+            };
+            document.getElementById('serviceCards').innerHTML = (d.services || []).map(s => {
+                const m = meta[s.key] || { ic: 'fas fa-circle', grad: 'linear-gradient(135deg,#64748B,#94A3B8)' };
+                return `
+                <div class="zi-svc">
+                    <div class="zi-svc-top">
+                        <div class="zi-svc-ic" style="background:${m.grad}"><i class="${m.ic}"></i></div>
+                        <span class="zi-svc-name">${s.name}</span>
+                    </div>
+                    <div class="zi-svc-gmv">Rs. ${fmtMoney(s.gmv)}</div>
+                    <div class="zi-svc-sub"><span>${s.orders.toLocaleString()} orders</span><span class="text-ziggo">Comm. Rs. ${fmtMoney(s.commission)}</span></div>
+                </div>`;
+            }).join('');
+        } else {
+            breakdown.classList.add('hidden');
+        }
+
+        // ── Individual service revenue types ─────────────────────────────
+        const svcMeta = {
+            revenue_rides:    { label: 'Rides Revenue',         icon: 'fas fa-route',            color: '#3B82F6', grad: 'linear-gradient(135deg,#1E40AF,#3B82F6)' },
+            revenue_delivery: { label: 'Flash Delivery Revenue', icon: 'fas fa-box',             color: '#7C3AED', grad: 'linear-gradient(135deg,#7C3AED,#A78BFA)' },
+            revenue_food:     { label: 'Food Revenue',           icon: 'fas fa-utensils',        color: '#EA580C', grad: 'linear-gradient(135deg,#EA580C,#FB923C)' },
+            revenue_market:   { label: 'Marketplace Revenue',    icon: 'fas fa-shopping-basket', color: '#059669', grad: 'linear-gradient(135deg,#059669,#34D399)' },
+        };
+
+        if (type === 'revenue') {
+            icon1.className = 'far fa-credit-card';
+            label1.textContent = 'Total Revenue';
+            val1.textContent = `Rs. ${fmtMoney(d.totals.gross_total)}`;
+
+            icon2.className = 'fas fa-coins';
+            label2.textContent = 'Admin Commission';
+            val2.textContent = `Rs. ${fmtMoney(d.totals.commission_total)}`;
+
+            icon3.className = 'fas fa-utensils';
+            label3.textContent = 'Food Revenue';
+            val3.textContent = `Rs. ${fmtMoney(d.totals.food_revenue)}`;
+
+            icon4.className = 'fas fa-shopping-basket';
+            label4.textContent = 'Marketplace Revenue';
+            val4.textContent = `Rs. ${fmtMoney(d.totals.market_revenue)}`;
+        } else if (svcMeta[type]) {
+            // Individual service revenue sub-reports
+            const sm = svcMeta[type];
+            icon1.className = sm.icon;
+            label1.textContent = sm.label;
+            val1.textContent = `Rs. ${fmtMoney(d.totals.gross_total)}`;
+
+            icon2.className = 'fas fa-coins';
+            label2.textContent = 'Admin Commission';
+            val2.textContent = `Rs. ${fmtMoney(d.totals.commission_total)}`;
+
+            icon3.className = 'fas fa-list-ol';
+            label3.textContent = 'Total Orders';
+            val3.textContent = (d.totals.total_orders || 0).toLocaleString();
+
+            icon4.className = 'fas fa-percentage';
+            label4.textContent = 'Commission Rate';
+            const commRate = d.totals.gross_total > 0
+                ? ((d.totals.commission_total / d.totals.gross_total) * 100).toFixed(1)
+                : '0.0';
+            val4.textContent = `${commRate}%`;
+        } else if (type === 'earnings') {
+            icon1.className = 'fas fa-coins';
+            label1.textContent = 'Admin Commission';
+            val1.textContent = `Rs. ${fmtMoney(d.totals.admin_net)}`;
+
+            icon2.className = 'fas fa-wallet';
+            label2.textContent = 'Driver Earnings';
+            val2.textContent = `Rs. ${fmtMoney(d.totals.driver_earnings)}`;
+
+            icon3.className = 'fas fa-tags';
+            label3.textContent = 'Total Discounts';
+            val3.textContent = `Rs. ${fmtMoney(d.totals.total_discount)}`;
+
+            icon4.className = 'far fa-credit-card';
+            label4.textContent = 'Gross Bookings';
+            val4.textContent = `Rs. ${fmtMoney(d.totals.gross_bookings)}`;
+        } else if (type === 'drivers') {
+            icon1.className = 'far fa-id-card';
+            label1.textContent = 'Active Drivers';
+            val1.textContent = d.totals.active_drivers.toLocaleString();
+
+            icon2.className = 'fas fa-route';
+            label2.textContent = 'Total Rides';
+            val2.textContent = d.totals.total_rides.toLocaleString();
+
+            icon3.className = 'fas fa-check-circle';
+            label3.textContent = 'Completion Rate';
+            val3.textContent = `${d.totals.completion_rate}%`;
+
+            icon4.className = 'fas fa-star';
+            label4.textContent = 'Avg Rating';
+            val4.textContent = `${d.totals.avg_rating} / 5`;
+        } else if (type === 'riders') {
+            icon1.className = 'fas fa-users';
+            label1.textContent = 'Active Riders';
+            val1.textContent = d.totals.active_riders.toLocaleString();
+
+            icon2.className = 'fas fa-route';
+            label2.textContent = 'Total Rides';
+            val2.textContent = d.totals.total_rides.toLocaleString();
+
+            icon3.className = 'fas fa-user-plus';
+            label3.textContent = 'New Registrations';
+            val3.textContent = d.totals.new_riders.toLocaleString();
+
+            icon4.className = 'fas fa-money-bill-wave';
+            label4.textContent = 'Avg Fare';
+            val4.textContent = `Rs. ${fmtMoney(d.totals.avg_fare)}`;
+        } else {
+            icon1.className = 'fas fa-coins';
+            label1.textContent = 'Admin Net (Commission)';
+            val1.textContent = `Rs. ${fmtMoney(d.totals.admin_net)}`;
+
+            icon2.className = 'fas fa-route';
+            label2.textContent = 'Total Rides';
+            val2.textContent = d.totals.total_rides.toLocaleString();
+
+            icon3.className = 'far fa-id-card';
+            label3.textContent = 'Active Drivers';
+            val3.textContent = d.totals.active_drivers.toLocaleString();
+
+            icon4.className = 'far fa-credit-card';
+            label4.textContent = 'Gross Bookings';
+            val4.textContent = `Rs. ${fmtMoney(d.totals.gross_bookings)}`;
+        }
+
+        // 2. Update Table Headers
+        const header = document.getElementById('tableHeader');
+        const tableTitle = document.querySelector('#rowsBody').closest('.bg-white').querySelector('h3');
+        if (type === 'revenue') {
+            header.innerHTML = `
+                <th class="px-6 py-4">Date</th>
+                <th class="px-6 py-4">Rides</th>
+                <th class="px-6 py-4">Delivery</th>
+                <th class="px-6 py-4">Food</th>
+                <th class="px-6 py-4">Marketplace</th>
+                <th class="px-6 py-4">Total Revenue</th>
+                <th class="px-6 py-4">Commission</th>
+            `;
+            if (tableTitle) tableTitle.textContent = 'Revenue Details';
+        } else if (svcMeta[type]) {
+            const sm = svcMeta[type];
+            header.innerHTML = `
+                <th class="px-6 py-4">Date</th>
+                <th class="px-6 py-4">${sm.label}</th>
+                <th class="px-6 py-4">Commission</th>
+                <th class="px-6 py-4">Orders</th>
+            `;
+            if (tableTitle) tableTitle.textContent = sm.label + ' Details';
+        } else if (type === 'earnings') {
+            header.innerHTML = `
+                <th class="px-6 py-4">Date</th>
+                <th class="px-6 py-4">Gross Bookings</th>
+                <th class="px-6 py-4">Driver Earnings</th>
+                <th class="px-6 py-4">Admin Commission</th>
+                <th class="px-6 py-4">Waiting Surcharge</th>
+                <th class="px-6 py-4">Discounts</th>
+            `;
+        } else if (type === 'drivers') {
+            header.innerHTML = `
+                <th class="px-6 py-4">Date</th>
+                <th class="px-6 py-4">Active Drivers</th>
+                <th class="px-6 py-4">Total Rides</th>
+                <th class="px-6 py-4">Completed</th>
+                <th class="px-6 py-4">Cancelled</th>
+                <th class="px-6 py-4">Completion Rate</th>
+                <th class="px-6 py-4">Avg Rating</th>
+            `;
+        } else if (type === 'riders') {
+            header.innerHTML = `
+                <th class="px-6 py-4">Date</th>
+                <th class="px-6 py-4">Active Riders</th>
+                <th class="px-6 py-4">Total Rides</th>
+                <th class="px-6 py-4">Completed</th>
+                <th class="px-6 py-4">Avg Fare</th>
+                <th class="px-6 py-4">New Registrations</th>
+            `;
+        } else {
+            header.innerHTML = `
+                <th class="px-6 py-4">Date</th>
+                <th class="px-6 py-4">Rides</th>
+                <th class="px-6 py-4">Completed</th>
+                <th class="px-6 py-4">Cancelled</th>
+                <th class="px-6 py-4">Revenue</th>
+                <th class="px-6 py-4">Drivers</th>
+                <th class="px-6 py-4">Riders</th>
+            `;
+        }
+
+        // 3. Trend Chart
+        const labels = d.trend.map(r => r.date);
+        
+        let datasets = [];
+        let scales = {};
+        
+        if (type === 'revenue') {
+            datasets = [
+                { label: 'Rides (Rs.)', data: d.trend.map(r => r.rides), borderColor: '#3B82F6', backgroundColor: 'rgba(59,130,246,0.10)',
+                  yAxisID: 'y', tension: 0.35, fill: false, pointRadius: 3 },
+                { label: 'Delivery (Rs.)', data: d.trend.map(r => r.delivery), borderColor: '#7C3AED', backgroundColor: 'rgba(124,58,237,0.10)',
+                  yAxisID: 'y', tension: 0.35, fill: false, pointRadius: 3 },
+                { label: 'Food (Rs.)', data: d.trend.map(r => r.food), borderColor: '#EA580C', backgroundColor: 'rgba(234,88,12,0.10)',
+                  yAxisID: 'y', tension: 0.35, fill: false, pointRadius: 3 },
+                { label: 'Marketplace (Rs.)', data: d.trend.map(r => r.market), borderColor: '#059669', backgroundColor: 'rgba(5,150,105,0.10)',
+                  yAxisID: 'y', tension: 0.35, fill: false, pointRadius: 3 },
+                { label: 'Total (Rs.)', data: d.trend.map(r => r.total), borderColor: '#0F172A', backgroundColor: 'rgba(15,23,42,0.06)',
+                  yAxisID: 'y', tension: 0.35, fill: false, pointRadius: 3, borderDash: [5, 4] },
+            ];
+            scales = {
+                y: { position: 'left', beginAtZero: true, title: { display: true, text: 'Revenue (Rs.)' } },
+            };
+        } else if (svcMeta[type]) {
+            const sm = svcMeta[type];
+            const hex = sm.color;
+            const rgba = hex + '1A'; // ~10% opacity
+            datasets = [
+                { label: sm.label + ' (Rs.)', data: d.trend.map(r => r.gmv), borderColor: hex, backgroundColor: rgba,
+                  yAxisID: 'y', tension: 0.35, fill: true, pointRadius: 3 },
+                { label: 'Commission (Rs.)', data: d.trend.map(r => r.commission), borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,0.10)',
+                  yAxisID: 'y1', tension: 0.35, fill: false, pointRadius: 3 },
+            ];
+            scales = {
+                y:  { position: 'left',  beginAtZero: true, title: { display: true, text: sm.label + ' (Rs.)' } },
+                y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false },
+                      title: { display: true, text: 'Commission (Rs.)' } },
+            };
+        } else if (type === 'earnings') {
+            datasets = [
+                { label: 'Gross Bookings (Rs.)', data: d.trend.map(r => r.gross), borderColor: '#3B82F6', backgroundColor: 'rgba(59,130,246,0.10)',
+                  yAxisID: 'y', tension: 0.35, fill: false, pointRadius: 3 },
+                { label: 'Admin Commission (Rs.)', data: d.trend.map(r => r.commission), borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,0.10)',
+                  yAxisID: 'y1', tension: 0.35, fill: false, pointRadius: 3 },
+            ];
+            scales = {
+                y:  { position: 'left',  beginAtZero: true, title: { display: true, text: 'Gross Bookings (Rs.)' } },
+                y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false },
+                      title: { display: true, text: 'Commission (Rs.)' } },
+            };
+        } else if (type === 'drivers') {
+            datasets = [
+                { label: 'Active Drivers', data: d.trend.map(r => r.active_drivers), borderColor: '#F59E0B', backgroundColor: 'rgba(245,158,11,0.10)',
+                  yAxisID: 'y', tension: 0.35, fill: false, pointRadius: 3 },
+                { label: 'Completion Rate (%)', data: d.trend.map(r => r.completion_rate), borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,0.10)',
+                  yAxisID: 'y1', tension: 0.35, fill: false, pointRadius: 3 },
+            ];
+            scales = {
+                y:  { position: 'left',  beginAtZero: true, title: { display: true, text: 'Active Drivers' } },
+                y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false },
+                      title: { display: true, text: 'Completion Rate (%)' } },
+            };
+        } else if (type === 'riders') {
+            datasets = [
+                { label: 'Active Riders', data: d.trend.map(r => r.active_riders), borderColor: '#3B82F6', backgroundColor: 'rgba(59,130,246,0.10)',
+                  yAxisID: 'y', tension: 0.35, fill: false, pointRadius: 3 },
+                { label: 'New Registrations', data: d.trend.map(r => r.new_riders), borderColor: '#8B5CF6', backgroundColor: 'rgba(139,92,246,0.10)',
+                  yAxisID: 'y1', tension: 0.35, fill: false, pointRadius: 3 },
+            ];
+            scales = {
+                y:  { position: 'left',  beginAtZero: true, title: { display: true, text: 'Active Riders' } },
+                y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false },
+                      title: { display: true, text: 'New Registrations' } },
+            };
+        } else {
+            datasets = [
+                { label: 'Rides', data: d.trend.map(r => r.rides), borderColor: '#3B82F6', backgroundColor: 'rgba(59,130,246,0.10)',
+                  yAxisID: 'y', tension: 0.35, fill: false, pointRadius: 3 },
+                { label: 'Revenue (Rs.)', data: d.trend.map(r => r.revenue), borderColor: '#06B6D4', backgroundColor: 'rgba(6,182,212,0.10)',
+                  yAxisID: 'y1', tension: 0.35, fill: false, pointRadius: 3 },
+            ];
+            scales = {
+                y:  { position: 'left',  beginAtZero: true, title: { display: true, text: 'Rides' } },
+                y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false },
+                      title: { display: true, text: 'Revenue (Rs.)' } },
+            };
+        }
+
+        // Thin out the x-axis date labels and lighten the axes (UI only)
+        scales.x = {
+            grid: { display: false },
+            ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8, color: '#94A3B8', font: { size: 11 } }
+        };
+        Object.keys(scales).forEach(function (k) {
+            if (k === 'x') return;
+            scales[k].grid = Object.assign({ color: 'rgba(15,23,42,0.05)', drawBorder: false }, scales[k].grid || {});
+            scales[k].ticks = Object.assign({ color: '#94A3B8', font: { size: 11 } }, scales[k].ticks || {});
+        });
+        // Slimmer lines and smaller points for a cleaner look
+        datasets.forEach(function (ds) { ds.borderWidth = 2; ds.pointRadius = 0; ds.pointHoverRadius = 5; });
+
+        if (chart) {
+            chart.destroy();
+        }
+
+        chart = new Chart(document.getElementById('trendChart'), {
+            type: 'line',
+            data: {
+                labels,
+                datasets
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                scales,
+                plugins: { legend: { position: 'top', align: 'center', labels: { usePointStyle: true, boxWidth: 8, font: { size: 12 } } } }
+            }
+        });
+
+        // 4. Table
+        currentRows = d.rows || [];
+        currentPage = 1;
+        renderTable();
+    }
+
+    async function reload() {
+        const status = document.getElementById('rptStatus');
+        const start = document.getElementById('rptStart').value;
+        const end = document.getElementById('rptEnd').value;
+        const type = getActiveType();
+        status.textContent = 'Loading…';
+        try {
+            const r = await fetch(`/admin/reports/data?start=${start}&end=${end}&type=${type}`);
+            if (!r.ok) {
+                status.textContent = 'Error ' + r.status;
+                return;
+            }
+            const j = await r.json();
+            applyData(j);
+            status.textContent = `${start} → ${end}`;
+        } catch (e) {
+            status.textContent = 'Failed to load';
+        }
+    }
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+    function toISO(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+
+    document.getElementById('rptApply').addEventListener('click', reload);
+    document.getElementById('rptType').addEventListener('change', reload);
+    document.querySelectorAll('[data-quick]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const days = parseInt(btn.dataset.quick, 10);
+            const end = new Date();
+            const start = new Date();
+            start.setDate(end.getDate() - (days - 1));
+            document.getElementById('rptStart').value = toISO(start);
+            document.getElementById('rptEnd').value = toISO(end);
+            reload();
+        });
+    });
+
+    // First paint: use the data the server already produced (no extra request).
+    applyData(initialData);
+    document.getElementById('rptStatus').textContent =
+        `{{ start_date }} → {{ end_date }}`;
+</script>
+{% endblock %}

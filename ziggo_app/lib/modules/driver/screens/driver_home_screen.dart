@@ -1083,10 +1083,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
   Widget build(BuildContext context) {
     final driver = context.watch<DriverProvider>();
 
-    if (driver.profile != null && !driver.profileComplete) {
+    if (driver.profile != null && !driver.isApproved && !driver.profileComplete) {
       return const DriverRegistrationScreen();
     }
-    if (driver.profile != null && driver.profileComplete && !driver.isApproved) {
+    if (driver.profile != null && !driver.isApproved) {
       return _PendingApprovalScreen(
         profile: driver.profile!,
         onRefresh: () => driver.loadProfile(),

@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>{% block title %}Ziggo Admin{% endblock %}</title>
+    <link rel="icon" type="image/jpeg" href="/static/img/logo.jpeg">
+    <link rel="apple-touch-icon" href="/static/img/logo.jpeg">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        ziggo: {
+                            DEFAULT: '#1E3A8A',
+                            dark: '#131C3D',
+                            darker: '#0B1226',
+                            light: '#3B82F6',
+                            soft: '#DBEAFE',
+                            accent: '#FBBF24',
+                            ink: '#0F172A',
+                            muted: '#64748B',
+                            faint: '#94A3B8',
+                            canvas: '#F8FAFC',
+                            line: '#EEF1F6'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+                        display: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+                    },
+                    borderRadius: {
+                        'xl2': '18px',
+                        '2xl': '22px',
+                        '3xl': '28px',
+                        '4xl': '36px'
+                    },
+                    boxShadow: {
+                        'soft-sm': '0 2px 8px rgba(15, 23, 42, 0.04)',
+                        'soft':    '0 10px 30px -10px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.02)',
+                        'soft-lg': '0 20px 50px -12px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.04)',
+                        'brand':   '0 16px 40px -12px rgba(30, 64, 175, 0.35)',
+                        'gold':    '0 12px 28px -10px rgba(251, 191, 36, 0.35)'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Force Plus Jakarta Sans globally across all text elements (excluding FontAwesome icons) */
+        html, body, input, select, textarea, button, a, p, span, h1, h2, h3, h4, h5, h6, label, div:not(.fa):not(.fas):not(.far):not(.fab):not(.fal):not(.fad) {
+            font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+            letter-spacing: -0.011em;
+        }
+        h1, h2, h3, h4, h5, h6 { letter-spacing: -0.02em; }
+
+        /* Professional weight scale: only the necessary things stay bold
+           (numbers + headings). Labels/secondary text drop to medium. */
+        .font-black { font-weight: 700 !important; }
+        .font-extrabold { font-weight: 700 !important; }
+        .font-bold { font-weight: 700 !important; }
+        .font-semibold { font-weight: 500 !important; }
+        .font-medium { font-weight: 500 !important; }
+
+        .fa, .fas, .far, .fab, .fal, .fad, [class^="fa-"], [class*=" fa-"] {
+            font-family: 'Font Awesome 6 Free', 'Font Awesome 6 Brands', 'Font Awesome 5 Free', 'Font Awesome 5 Brands', sans-serif !important;
+        }
+
+        body {
+            color: #0F172A;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            background-color: #F8FAFC;
+        }
+
+        /* Force metrics numbers to a clean, consistent dark slate color instead of random rainbow colors */
+        .text-3xl.font-black,
+        .text-2xl.font-black,
+        .text-3xl.font-bold,
+        .text-2xl.font-bold,
+        p.text-3xl, p.text-2xl {
+            color: #0F172A !important;
+        }
+
+        /* ===== Page canvas ===== */
+        .zi-canvas {
+            background-color: #F8FAFC;
+        }
+
+        /* ===== Reusable card utility & override for standard tailwind cards ===== */
+        .zi-card, .bg-white.shadow-sm, .bg-white.rounded-2xl {
+            background: #ffffff !important;
+            border-radius: 14px !important;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03) !important;
+            border: 1px solid #E7EBF1 !important;
+            transition: border-color 160ms ease, box-shadow 160ms ease;
+        }
+        .zi-card-hover:hover {
+            box-shadow: 0 4px 16px -6px rgba(15, 23, 42, 0.10) !important;
+            border-color: #D5DCE6 !important;
+        }
+
+        /* Compress actions/filter wrapper bars across all pages automatically */
+        div[class*="p-8"].border-b.flex,
+        div[class*="p-8"].border-b.bg-gray-50,
+        .p-8.border-b.bg-gray-50\/30,
+        .p-8.border-b.bg-gray-50\/50,
+        .p-8.border-b.flex,
+        form[class*="p-8"].space-y-6,
+        form[class*="p-8"].space-y-5 {
+            padding: 16px 24px !important;
+        }
+
+        /* ===== Stat card ===== */
+        .zi-stat {
+            background: #fff;
+            border-radius: 14px;
+            padding: 16px 18px;
+            border: 1px solid #E7EBF1;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: border-color 160ms ease, box-shadow 160ms ease;
+        }
+        .zi-stat:hover {
+            box-shadow: 0 4px 16px -6px rgba(15, 23, 42, 0.10);
+            border-color: #D5DCE6;
+        }
+        .zi-stat .stat-icon {
+            width: 38px; height: 38px;
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 15px;
+            background: #F4F7FB;
+            border: 1px solid #E7EBF1;
+            margin-bottom: 10px;
+        }
+
+        /* ===== Sidebar ===== */
+        .zi-sidebar {
+            background: #ffffff;
+            border-right: 1px solid #EEF1F6;
+        }
+        .sidebar-item {
+            position: relative;
+            color: #64748B;
+            font-weight: 500;
+            font-size: 13.5px;
+            border-radius: 10px;
+            padding: 7px 12px !important;
+            margin: 1px 0;
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            transition: all 165ms ease;
+        }
+        .sidebar-item i { display: inline-flex; justify-content: center; width: 18px; font-size: 14px; color: #94A3B8; transition: all 165ms ease; flex: 0 0 auto; }
+        .sidebar-item:hover {
+            background: #F5F7FB;
+            color: #1E3A8A;
+        }
+        .sidebar-item:hover i { color: #1E3A8A; }
+        .sidebar-item.active {
+            background: #D6E4FB;
+            color: #1E3A8A;
+            font-weight: 600;
+        }
+        .sidebar-item.active i { color: #1E3A8A; }
+        .sidebar-item.active::before {
+            content: '';
+            position: absolute;
+            left: -10px; top: 50%; transform: translateY(-50%);
+            width: 3px; height: 18px;
+            background: #1E3A8A;
+            border-radius: 0 3px 3px 0;
+        }
+        .zi-nav-group {
+            font-size: 10px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.13em; color: #B6BECC;
+            padding: 0 12px; margin: 14px 0 5px;
+        }
+        .zi-nav-group:first-child { margin-top: 2px; }
+        .sidebar-item i { transition: transform 200ms ease; }
+        .sidebar-item:hover i,
+        .sidebar-item.active i { transform: scale(1.05); }
+
+        /* ===== Top bar ===== */
+        .zi-topbar {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            position: relative;
+            z-index: 200;
+        }
+        .zi-bell {
+            position: relative;
+            width: 40px; height: 40px;
+            border-radius: 12px;
+            background: #F8FAFC;
+            border: 1px solid #EEF1F6;
+            color: #64748B;
+            transition: all 180ms ease;
+        }
+        .zi-bell:hover { background: #EFF6FF; color: #1E3A8A; border-color: #DBEAFE; }
+        .zi-bell .dot {
+            position: absolute;
+            top: 10px; right: 12px;
+            width: 8px; height: 8px;
+            background: #EF4444;
+            border-radius: 50%;
+            box-shadow: 0 0 0 2px #fff;
+        }
+
+        /* ===== Notification popup ===== */
+        .zi-notif { position: relative; }
+        .zi-notif-panel {
+            position: absolute; right: 0; top: calc(100% + 10px); width: 320px;
+            background: #fff; border: 1px solid #EEF1F6; border-radius: 16px;
+            box-shadow: 0 20px 40px -12px rgba(16,24,40,0.12); padding: 8px; z-index: 1000;
+            opacity: 0; visibility: hidden; transform: translateY(-6px);
+            transition: all 180ms ease;
+        }
+        .zi-notif.open .zi-notif-panel { opacity: 1; visibility: visible; transform: none; }
+        .zi-notif-head { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #94A3B8; padding: 8px 10px 6px; display: flex; align-items: center; justify-content: space-between; }
+        .zi-notif-item { display: flex; align-items: center; gap: 11px; padding: 10px; border-radius: 12px; color: #0F172A; text-decoration: none; transition: background .15s; }
+        .zi-notif-item:hover { background: #F8FAFC; }
+        .zi-notif-item .ic { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: #EFF6FF; color: #1E3A8A; flex: 0 0 auto; font-size: 14px; }
+        .zi-notif-item .tx { flex: 1; min-width: 0; }
+        .zi-notif-item .tx strong { display: block; font-size: 13px; font-weight: 600; line-height: 1.2; }
+        .zi-notif-item .tx small { font-size: 11px; color: #64748B; }
+        .zi-notif-item .zi-cnt { flex: 0 0 auto; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 99px; background: #EF4444; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+        .zi-notif-item .zi-cnt.zi-cnt-seen { background: #E2E8F0; color: #64748B; }
+        .zi-notif-empty { padding: 22px 12px; text-align: center; font-size: 12px; color: #94A3B8; font-weight: 500; }
+        /* Numeric badge on bell icon */
+        .zi-badge { position: absolute; top: -4px; right: -6px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 99px; background: #EF4444; color: #fff; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; pointer-events: none; }
+        /* Bell shake when new notification arrives */
+        @keyframes zi-shake { 0%,100%{transform:rotate(0)} 20%{transform:rotate(-12deg)} 40%{transform:rotate(12deg)} 60%{transform:rotate(-8deg)} 80%{transform:rotate(6deg)} }
+        .zi-bell-shake { animation: zi-shake 0.7s ease; }
+
+        /* ===== Buttons ===== */
+        .zi-btn-primary,
+        .bg-ziggo:not(.sidebar-item):not(.zi-logo),
+        button[class*="px-6"][class*="py-3"]:not(.sidebar-item),
+        a[class*="px-6"][class*="py-3"]:not(.sidebar-item) {
+            background: #1E3A8A !important;
+            color: #ffffff !important;
+            font-weight: 600 !important;
+            padding: 8px 16px !important;
+            border-radius: 10px !important;
+            box-shadow: none !important;
+            transition: background 150ms ease !important;
+            border: none !important;
+        }
+        .zi-btn-primary:hover,
+        .bg-ziggo:not(.sidebar-item):not(.zi-logo):hover,
+        button[class*="px-6"][class*="py-3"]:not(.sidebar-item):hover,
+        a[class*="px-6"][class*="py-3"]:not(.sidebar-item):hover {
+            background: #18306e !important;
+        }
+        
+        .bg-white.border-gray-200,
+        .bg-white.border-gray-100,
+        a[class*="bg-white"][class*="border-gray-200"] {
+            border-radius: 10px !important;
+            border-color: #E2E8F0 !important;
+            padding: 8px 16px !important;
+            font-weight: 600 !important;
+            transition: all 150ms ease !important;
+        }
+
+        /* ===== Chips / Badges ===== */
+        .zi-chip {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 2px 8px; border-radius: 100px;
+            font-size: 10px; font-weight: 600;
+        }
+
+        /* ===== Scrollbar ===== */
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: #64748B #EEF2F6;
+        }
+        ::-webkit-scrollbar {
+            width: 10px !important;
+            height: 10px !important;
+        }
+        ::-webkit-scrollbar-track {
+            background: #EEF2F6 !important;
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #94A3B8 !important;
+            border-radius: 8px;
+            border: 2px solid #EEF2F6 !important;
+            transition: background 0.15s ease;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748B !important;
+        }
+        ::-webkit-scrollbar-thumb:active {
+            background: #334155 !important;
+        }
+        ::-webkit-scrollbar-corner {
+            background: #EEF2F6 !important;
+        }
+
+        /* ===== Premium Form Elements ===== */
+        input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),
+        select, textarea {
+            border: 1px solid #E2E8F0 !important;
+            border-radius: 12px !important;
+            padding: 8px 12px !important;
+            background: #fff !important;
+            transition: all 160ms ease !important;
+        }
+        input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):focus,
+        select:focus, textarea:focus {
+            outline: none !important;
+            border-color: #3B82F6 !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12) !important;
+        }
+
+        /* ===== Tables & Scrollable Containers ===== */
+        table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+        }
+        .overflow-x-auto {
+            max-height: calc(100vh - 300px);
+            overflow-y: auto !important;
+            overflow-x: auto !important;
+        }
+        thead, table thead {
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 20 !important;
+        }
+        thead th, table thead th {
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 20 !important;
+            font-size: 11px !important;
+            letter-spacing: 0.05em !important;
+            text-transform: uppercase !important;
+            color: #64748B !important;
+            font-weight: 600 !important;
+            background: #F8FAFC !important;
+            padding: 10px 10px !important;
+            border-bottom: 1px solid #EEF1F6 !important;
+            box-shadow: 0 1px 0 #EEF1F6 !important;
+        }
+        tbody td, table tbody td {
+            padding: 10px 10px !important;
+            border-bottom: 1px solid #F1F5F9 !important;
+            color: #334155 !important;
+            font-size: 13px !important;
+            white-space: nowrap !important;
+        }
+        tbody tr, table tbody tr {
+            transition: all 140ms ease !important;
+        }
+        tbody tr:hover, table tbody tr:hover {
+            background: #F8FAFC !important;
+        }
+        
+        @keyframes ziFadeUp { from { opacity: 0; } to { opacity: 1; } }
+        .zi-card, .zi-stat, .bg-white.shadow-sm, .bg-white.rounded-2xl { animation: ziFadeUp 220ms ease both; }
+        @media (prefers-reduced-motion: reduce) {
+            .zi-card, .zi-stat, .bg-white.shadow-sm, .bg-white.rounded-2xl { animation: none; }
+        }
+
+        /* Ensure modal backdrops/overlays sit on top of the z-200 top-bar */
+        .fixed.inset-0.z-50 {
+            z-index: 1000 !important;
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body class="zi-canvas flex h-screen overflow-hidden text-ziggo-ink">
+
+    <!-- Sidebar -->
+    <aside id="adminSidebar" class="w-56 zi-sidebar text-ziggo-ink flex flex-col fixed md:static inset-y-0 left-0 z-[1001] bg-white transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out">
+        <div class="px-5 py-4 flex items-center justify-between border-b border-ziggo-line">
+            <a href="/admin/dashboard" class="flex items-center gap-3 hover:bg-ziggo-canvas transition" title="Go to Dashboard">
+                <img id="sidebarLogo" src="/static/img/logo.jpeg" alt="Ziggo"
+                     class="w-10 h-10 rounded-xl object-cover flex-shrink-0"
+                     style="box-shadow: 0 8px 20px -8px rgba(30,58,138,0.45);">
+                <div class="flex flex-col leading-tight">
+                    <span id="sidebarSiteName" class="font-display text-[18px] font-extrabold tracking-tight text-ziggo-ink leading-none">Ziggo</span>
+                    <span class="text-[9px] uppercase tracking-[0.22em] text-ziggo-faint font-semibold mt-1">Admin Suite</span>
+                </div>
+            </a>
+            <button id="sidebarClose" class="md:hidden text-ziggo-muted hover:text-ziggo p-1" aria-label="Close sidebar"><i class="fas fa-times text-lg"></i></button>
+        </div>
+
+        <nav class="flex-1 mt-1 px-3 overflow-y-auto">
+            <p class="zi-nav-group">Overview</p>
+            <a href="/admin/dashboard" class="sidebar-item {% if active_page == 'dashboard' %}active{% endif %}">
+                <i class="fas fa-th-large"></i><span>Dashboard</span>
+            </a>
+
+            <p class="zi-nav-group">Operations</p>
+            <a href="/admin/bookings" class="sidebar-item {% if active_page == 'bookings' %}active{% endif %}">
+                <i class="fas fa-car"></i><span>Bookings</span>
+            </a>
+            <a href="/admin/drivers" class="sidebar-item {% if active_page == 'drivers' %}active{% endif %}">
+                <i class="fas fa-id-card"></i><span>Drivers</span>
+            </a>
+            <a href="/admin/riders" class="sidebar-item {% if active_page == 'riders' %}active{% endif %}">
+                <i class="fas fa-user-friends"></i><span>Riders</span>
+            </a>
+            <a href="/admin/vehicles" class="sidebar-item {% if active_page == 'vehicles' %}active{% endif %}">
+                <i class="fas fa-car-side"></i><span>Vehicles</span>
+            </a>
+            <a href="/admin/live-tracking" class="sidebar-item {% if active_page == 'live-tracking' %}active{% endif %}">
+                <i class="fas fa-location-arrow"></i><span>Live Tracking</span>
+            </a>
+            <a href="/admin/courier" class="sidebar-item {% if active_page == 'courier' %}active{% endif %}">
+                <i class="fas fa-box"></i><span>Courier</span>
+            </a>
+            <a href="/admin/flash" class="sidebar-item {% if active_page == 'flash' %}active{% endif %}">
+                <i class="fas fa-bolt"></i><span>Flash</span>
+            </a>
+            <a href="/admin/referrals" class="sidebar-item {% if active_page == 'referrals' %}active{% endif %}">
+                <i class="fas fa-handshake"></i><span>Referrals</span>
+            </a>
+
+            <p class="zi-nav-group">Catalog</p>
+            {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
+            <a href="/admin/categories" class="sidebar-item {% if active_page == 'categories' %}active{% endif %}">
+                <i class="fas fa-layer-group"></i><span>Categories</span>
+            </a>
+            {% endif %}
+            <a href="/admin/events" class="sidebar-item {% if active_page == 'events' %}active{% endif %}">
+                <i class="fas fa-calendar-alt"></i><span>Events</span>
+            </a>
+            <a href="/admin/restaurants" class="sidebar-item {% if active_page == 'restaurants' %}active{% endif %}">
+                <i class="fas fa-utensils"></i><span>Restaurants</span>
+            </a>
+            <a href="/admin/food-home" class="sidebar-item {% if active_page == 'food-home' %}active{% endif %}">
+                <i class="fas fa-home"></i><span>Food Home</span>
+            </a>
+            <a href="/admin/market" class="sidebar-item {% if active_page == 'market' %}active{% endif %}">
+                <i class="fas fa-store"></i><span>Market</span>
+            </a>
+            <a href="/admin/market-home" class="sidebar-item {% if active_page == 'market-home' %}active{% endif %}">
+                <i class="fas fa-home"></i><span>Market Home</span>
+            </a>
+            <a href="/admin/services" class="sidebar-item {% if active_page == 'services' %}active{% endif %}">
+                <i class="fas fa-concierge-bell"></i><span>Services</span>
+            </a>
+            <a href="/admin/promotions" class="sidebar-item {% if active_page == 'promotions' %}active{% endif %}">
+                <i class="fas fa-percent"></i><span>Promotions</span>
+            </a>
+            <a href="/admin/surge-zones" class="sidebar-item {% if active_page == 'surge_zones' %}active{% endif %}">
+                <i class="fas fa-map-marked-alt"></i><span>Surge Zones</span>
+            </a>
+
+            {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
+            <p class="zi-nav-group">Finance</p>
+            <a href="/admin/reports" class="sidebar-item {% if active_page == 'reports' %}active{% endif %}">
+                <i class="fas fa-chart-bar"></i><span>Reports</span>
+            </a>
+            <a href="/admin/withdrawals" class="sidebar-item {% if active_page == 'withdrawals' %}active{% endif %}">
+                <i class="fas fa-money-bill-wave"></i><span>Withdrawals</span>
+            </a>
+            <a href="/admin/payments" class="sidebar-item {% if active_page == 'payments' %}active{% endif %}">
+                <i class="fas fa-credit-card"></i><span>Payments</span>
+            </a>
+            <a href="/admin/topups" class="sidebar-item {% if active_page == 'topups' %}active{% endif %}">
+                <i class="fas fa-wallet"></i><span>Top-ups</span>
+            </a>
+            <a href="/admin/corporate" class="sidebar-item {% if active_page == 'corporate' %}active{% endif %}">
+                <i class="fas fa-building"></i><span>Corporate</span>
+            </a>
+            {% endif %}
+
+            <p class="zi-nav-group">Support &amp; Safety</p>
+            <a href="/admin/emergencies" class="sidebar-item {% if active_page == 'emergencies' %}active{% endif %}">
+                <i class="fas fa-exclamation-triangle"></i><span>Emergencies</span>
+            </a>
+            <a href="/admin/incidents" class="sidebar-item {% if active_page == 'incidents' %}active{% endif %}">
+                <i class="fas fa-triangle-exclamation"></i><span>Incidents</span>
+            </a>
+            <a href="/admin/support" class="sidebar-item {% if active_page == 'support' %}active{% endif %}">
+                <i class="fas fa-life-ring"></i><span>Support</span>
+            </a>
+            <a href="/admin/messages" class="sidebar-item {% if active_page == 'messages' %}active{% endif %}">
+                <i class="fas fa-envelope"></i><span>Messages</span>
+            </a>
+            <a href="/admin/inbox" class="sidebar-item {% if active_page == 'inbox' %}active{% endif %}">
+                <i class="fas fa-inbox"></i><span>Inbox</span>
+            </a>
+            <a href="/admin/demo-requests" class="sidebar-item {% if active_page == 'demo_requests' %}active{% endif %}">
+                <i class="fas fa-laptop-code"></i><span>Demo Requests</span>
+            </a>
+            <a href="/admin/partner-applications" class="sidebar-item {% if active_page == 'partner_applications' %}active{% endif %}">
+                <i class="fas fa-handshake"></i><span>Partner Leads</span>
+            </a>
+            <a href="/admin/jobs" class="sidebar-item {% if active_page == 'jobs' %}active{% endif %}">
+                <i class="fas fa-briefcase"></i><span>Careers &amp; Jobs</span>
+            </a>
+
+            <p class="zi-nav-group">System</p>
+            <a href="/admin/notifications" class="sidebar-item {% if active_page == 'notifications' %}active{% endif %}">
+                <i class="fas fa-bell"></i><span>Notifications</span>
+            </a>
+            {% if not request.state.admin or request.state.admin.admin_role == 'superadmin' %}
+            <a href="/admin/settings" class="sidebar-item {% if active_page == 'settings' and not request.url.path.endswith('/admins') %}active{% endif %}">
+                <i class="fas fa-cog"></i><span>Settings</span>
+            </a>
+            {% endif %}
+            {% if not request.state.admin or request.state.admin.admin_role in ('superadmin', 'admin') %}
+            <a href="/admin/admins" class="sidebar-item {% if request.url.path.endswith('/admins') %}active{% endif %}">
+                <i class="fas fa-users-cog"></i><span>Manage Admins</span>
+            </a>
+            {% endif %}
+        </nav>
+
+        <div class="p-3">
+            <div class="flex items-center gap-2.5 p-2.5 rounded-xl bg-ziggo-canvas border border-ziggo-line">
+                <div class="w-9 h-9 rounded-lg flex items-center justify-center bg-ziggo text-white text-sm font-bold zi-logo">
+                    {% if request.state.admin %}{{ request.state.admin.full_name[0]|upper if request.state.admin.full_name else 'A' }}{% else %}A{% endif %}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p id="footerSiteName" class="text-sm font-bold truncate text-ziggo-ink">{% if request.state.admin %}{{ request.state.admin.full_name or 'Ziggo Admin' }}{% else %}Ziggo Admin{% endif %}</p>
+                    <p id="footerAdminEmail" class="text-[11px] text-ziggo-muted truncate">{% if request.state.admin %}{{ request.state.admin.email or 'admin@ziggo.com' }}{% else %}admin@ziggo.com{% endif %}</p>
+                </div>
+                <a href="/admin/logout" class="text-ziggo-muted hover:text-ziggo p-2 rounded-lg hover:bg-ziggo-soft/40 transition" title="Logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                </a>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Sidebar Overlay for mobile -->
+    <div id="sidebarOverlay" class="fixed inset-0 bg-black/40 z-[1000] hidden md:hidden transition-opacity"></div>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col overflow-hidden">
+        <!-- Header -->
+        <header class="zi-topbar px-7 py-3.5 flex items-center justify-between border-b border-ziggo-line/60">
+            <div class="flex items-center gap-4">
+                <button id="sidebarToggle" class="text-ziggo-muted md:hidden" aria-label="Open sidebar"><i class="fas fa-bars text-xl"></i></button>
+                {% block top_title %}
+                <h1 class="text-[20px] font-bold tracking-tight text-ziggo-ink leading-none">{% block page_title %}Dashboard{% endblock %}</h1>
+                {% endblock %}
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="zi-notif" id="ziNotif">
+                    <button type="button" class="zi-bell flex items-center justify-center" id="ziBellBtn" aria-label="Notifications">
+                        <i class="far fa-bell"></i>
+                        <span class="dot" id="ziDot"></span>
+                        <span class="zi-badge" id="ziBadge" style="display:none"></span>
+                    </button>
+                    <div class="zi-notif-panel" id="ziNotifPanel">
+                        <div class="zi-notif-head">
+                            <span>Notifications</span>
+                            <a href="/admin/notifications" style="font-size:11px;font-weight:700;color:#6366f1;text-decoration:none">View all</a>
+                        </div>
+                        <div id="ziNotifList">
+                            <div class="zi-notif-empty">Loading…</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="hidden sm:flex items-center gap-2.5 pl-3 pr-1 py-1 rounded-xl border border-ziggo-line">
+                    <div class="leading-tight text-right">
+                        <p id="headerSiteName" class="text-[12px] font-bold text-ziggo-ink">{% if request.state.admin %}{{ request.state.admin.full_name or 'Ziggo Admin' }}{% else %}Ziggo Admin{% endif %}</p>
+                        {% if request.state.admin and request.state.admin.admin_role == 'superadmin' %}
+                        <p class="text-[10px] text-ziggo-faint">Superadmin</p>
+                        {% elif request.state.admin and request.state.admin.admin_role == 'data_entry' %}
+                        <p class="text-[10px] text-ziggo-faint">Data Entry</p>
+                        {% else %}
+                        <p class="text-[10px] text-ziggo-faint">Admin</p>
+                        {% endif %}
+                    </div>
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-ziggo text-white text-xs font-bold zi-logo">{% if request.state.admin %}{{ request.state.admin.full_name[0]|upper if request.state.admin.full_name else 'A' }}{% else %}A{% endif %}</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Page Content -->
+        <div id="mainContent" class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+            {% if request.query_params.get("error") %}
+            <div class="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 flex items-start gap-3 text-sm max-w-6xl font-bold">
+                <i class="fas fa-circle-exclamation mt-0.5 shrink-0 text-red-500"></i>
+                <div>
+                    <p class="font-extrabold uppercase tracking-wider text-[10px] text-red-500 mb-0.5">Error</p>
+                    <p>{{ request.query_params.get("error") }}</p>
+                </div>
+            </div>
+            {% endif %}
+            {% if request.query_params.get("success") %}
+            <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-start gap-3 text-sm max-w-6xl font-bold">
+                <i class="fas fa-circle-check mt-0.5 shrink-0 text-emerald-500"></i>
+                <div>
+                    <p class="font-extrabold uppercase tracking-wider text-[10px] text-emerald-500 mb-0.5">Success</p>
+                    <p>{{ request.query_params.get("success") }}</p>
+                </div>
+            </div>
+            {% endif %}
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <script>
+      (function () {
+        var wrap = document.getElementById('ziNotif');
+        var btn = document.getElementById('ziBellBtn');
+        var list = document.getElementById('ziNotifList');
+        var dot = document.querySelector('#ziBellBtn .dot');
+        var _badge = document.getElementById('ziBadge');
+        var _dot   = document.getElementById('ziDot');
+
+        if (wrap && btn) {
+          btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            wrap.classList.toggle('open');
+            // Opening = reading notifications → clear red dot AND numeric badge
+            if (wrap.classList.contains('open')) {
+              localStorage.setItem('ziNotifSeen', String(window._ziNotifTotal || 0));
+              if (_dot)   _dot.style.display   = 'none';
+              if (_badge) _badge.style.display = 'none';
+              // Mark each item as seen → its red count badge clears
+              markItemsSeen();
+              if (window._ziNotifData) renderList(window._ziNotifData);
+            }
+          });
+          document.addEventListener('click', function (e) { if (!wrap.contains(e.target)) wrap.classList.remove('open'); });
+          document.addEventListener('keydown', function (e) { if (e.key === 'Escape') wrap.classList.remove('open'); });
+        }
+        
+        // Live notification feed from the backend
+        function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]); }); }
+        var _prevTotal = -1;
+
+        function getSeenItems(){ try { return JSON.parse(localStorage.getItem('ziNotifSeenItems') || '{}'); } catch(e){ return {}; } }
+        function markItemsSeen(){
+            var items = window._ziNotifItems || [];
+            var seen = {};
+            items.forEach(function(i){ seen[i.url] = i.count || 0; });
+            localStorage.setItem('ziNotifSeenItems', JSON.stringify(seen));
+        }
+
+
+        function loadNotif() {
+          fetch('/admin/notif-feed', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (d) {
+              if (!d || typeof d.total === 'undefined') return;
+              var total = d.total;
+              window._ziNotifTotal = total;
+
+              var panelOpen = wrap && wrap.classList.contains('open');
+              var onNotifPage = window.location.pathname === '/admin/notifications';
+
+              // Auto-dismiss if panel is open or user is on the notifications page
+              if (panelOpen || onNotifPage) {
+                localStorage.setItem('ziNotifSeen', String(total));
+                if (_dot)   _dot.style.display   = 'none';
+                if (_badge) _badge.style.display = 'none';
+                _prevTotal = total;
+                // Still render list items
+                if (list) { renderList(d); }
+                return;
+              }
+
+              var seen = parseInt(localStorage.getItem('ziNotifSeen') || '-1', 10);
+              if (isNaN(seen) || seen < 0) {
+                // First visit ever — silently set baseline, show nothing
+                localStorage.setItem('ziNotifSeen', String(total));
+                if (_dot)   _dot.style.display   = 'none';
+                if (_badge) _badge.style.display = 'none';
+                _prevTotal = total;
+                if (list) { renderList(d); }
+                return;
+              }
+
+              // Only alert when count has GROWN beyond what was last dismissed
+              var hasNew = total > seen;
+
+              if (_badge) {
+                if (hasNew) {
+                  _badge.textContent = total > 99 ? '99+' : String(total - seen);
+                  _badge.style.display = '';
+                } else {
+                  _badge.style.display = 'none';
+                }
+              }
+              if (_dot) _dot.style.display = hasNew ? '' : 'none';
+
+              // Bell shake only when new items just arrived this poll cycle
+              if (_prevTotal >= 0 && total > _prevTotal) {
+                var bellBtn = document.getElementById('ziBellBtn');
+                if (bellBtn) {
+                  bellBtn.classList.add('zi-bell-shake');
+                  setTimeout(function(){ bellBtn.classList.remove('zi-bell-shake'); }, 700);
+                }
+              }
+              _prevTotal = total;
+              window._ziNotifItems = d.items || [];
+              window._ziNotifData = d;
+              if (list) { renderList(d); }
+            })
+            .catch(function () {});
+        }
+
+        function renderList(d) {
+              if (!d.items || !d.items.length) {
+                list.innerHTML = '<div class="zi-notif-empty">You\'re all caught up ✅</div>';
+                return;
+              }
+              var seen = getSeenItems();
+              var sorted = d.items.slice().sort(function(a, b){ return (b.count || 0) - (a.count || 0); });
+              list.innerHTML = sorted.map(function (i) {
+                var newCount = (i.count || 0) - (seen[i.url] || 0);   // only items added since last view
+                var badge = newCount > 0 ? '<span class="zi-cnt">' + esc(newCount) + '</span>' : '';
+                return '<a href="' + esc(i.url) + '" class="zi-notif-item">'
+                  + '<span class="ic"><i class="fas ' + esc(i.icon) + '"></i></span>'
+                  + '<span class="tx"><strong>' + esc(i.title) + '</strong><small>' + esc(i.subtitle) + '</small></span>'
+                  + badge + '</a>';
+              }).join('');
+        }
+
+
+        loadNotif();
+        setInterval(loadNotif, 10000);
+
+        // Load custom branding assets
+        function loadBranding() {
+          fetch('/admin/branding-assets?t=' + new Date().getTime(), { cache: 'no-store' })
+            .then(function(r) { return r.ok ? r.json() : null; })
+            .then(function(d) {
+              if (!d) return;
+              if (d.logo_url) {
+                var sidebarLogo = document.getElementById('sidebarLogo');
+                if (sidebarLogo) sidebarLogo.src = d.logo_url;
+              }
+              if (d.favicon_url) {
+                var fav = document.querySelector('link[rel="icon"]');
+                if (fav) fav.href = d.favicon_url;
+                var appleFav = document.querySelector('link[rel="apple-touch-icon"]');
+                if (appleFav) appleFav.href = d.favicon_url;
+              }
+              if (d.site_name) {
+                document.title = document.title.replace("Ziggo", d.site_name);
+                var sidebarEl = document.getElementById('sidebarSiteName');
+                if (sidebarEl) sidebarEl.textContent = d.site_name;
+              }
+              /* {% if request.state.admin and request.state.admin.admin_role == 'superadmin' %} */
+              if (d.admin_email) {
+                var footerEmailEl = document.getElementById('footerAdminEmail');
+                if (footerEmailEl) footerEmailEl.textContent = d.admin_email;
+              }
+              /* {% endif %} */
+            })
+            .catch(function() {});
+        }
+        loadBranding();
+      })();
+
+      // Keep the active sidebar item in view after navigation (don't reset to top)
+      (function () {
+        var nav = document.querySelector('aside .sidebar-item.active');
+        if (nav) {
+          try { nav.scrollIntoView({ block: 'center' }); } catch (e) { nav.scrollIntoView(); }
+        }
+      })();
+
+      // Mobile sidebar toggle logic
+      (function () {
+        var sidebar = document.getElementById('adminSidebar');
+        var toggle = document.getElementById('sidebarToggle');
+        var close = document.getElementById('sidebarClose');
+        var overlay = document.getElementById('sidebarOverlay');
+
+        if (sidebar && toggle && overlay) {
+          toggle.addEventListener('click', function () {
+            sidebar.classList.remove('-translate-x-full');
+            sidebar.classList.add('translate-x-0');
+            overlay.classList.remove('hidden');
+          });
+
+          var closeSidebar = function () {
+            sidebar.classList.add('-translate-x-full');
+            sidebar.classList.remove('translate-x-0');
+            overlay.classList.add('hidden');
+          };
+
+          if (close) {
+            close.addEventListener('click', closeSidebar);
+          }
+          overlay.addEventListener('click', closeSidebar);
+        }
+      })();
+
+      // Preserve scroll position when saving changes across all admin panel edit parts
+      (function () {
+        function getScrollContainer() {
+          return document.getElementById('mainContent') || document.querySelector('main > .overflow-y-auto') || window;
+        }
+
+        function saveScrollPosition() {
+          try {
+            var sc = getScrollContainer();
+            var pos = (sc === window) ? window.scrollY : sc.scrollTop;
+            if (pos > 0) {
+              sessionStorage.setItem('ziggo_admin_scroll_' + window.location.pathname, String(pos));
+            }
+          } catch (e) {}
+        }
+
+        // Intercept form submissions across all edit pages/forms
+        document.addEventListener('submit', function (e) {
+          saveScrollPosition();
+        }, true);
+
+        // Also save when unloading page
+        window.addEventListener('beforeunload', function () {
+          saveScrollPosition();
+        });
+
+        // Restore scroll position upon load/render
+        function restoreScrollPosition() {
+          try {
+            var saved = sessionStorage.getItem('ziggo_admin_scroll_' + window.location.pathname);
+            if (saved !== null) {
+              var pos = parseInt(saved, 10);
+              if (!isNaN(pos) && pos > 0) {
+                var sc = getScrollContainer();
+                if (sc === window) {
+                  window.scrollTo(0, pos);
+                } else {
+                  sc.scrollTop = pos;
+                }
+              }
+            }
+          } catch (e) {}
+        }
+
+        restoreScrollPosition();
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', restoreScrollPosition);
+        }
+        window.addEventListener('load', function () {
+          restoreScrollPosition();
+          setTimeout(function () {
+            sessionStorage.removeItem('ziggo_admin_scroll_' + window.location.pathname);
+          }, 1200);
+        });
+        setTimeout(restoreScrollPosition, 50);
+        setTimeout(restoreScrollPosition, 150);
+        setTimeout(restoreScrollPosition, 350);
+      })();
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

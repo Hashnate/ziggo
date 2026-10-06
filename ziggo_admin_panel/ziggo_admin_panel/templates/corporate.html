@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+
+{% block title %}Corporate Billing | Ziggo Admin{% endblock %}
+{% block page_title %}Corporate Accounts{% endblock %}
+
+{% block content %}
+<!-- Stat cards -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+    <div class="zi-stat">
+        <div class="flex items-center gap-3">
+            <div class="stat-icon bg-purple-100 text-purple-600"><i class="fas fa-building"></i></div>
+            <div>
+                <p class="text-[10px] text-ziggo-faint uppercase font-bold">Total accounts</p>
+                <p class="text-2xl font-black text-purple-600">{{ accounts|length }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="zi-stat">
+        <div class="flex items-center gap-3">
+            <div class="stat-icon bg-emerald-100 text-emerald-600"><i class="fas fa-coins"></i></div>
+            <div>
+                <p class="text-[10px] text-ziggo-faint uppercase font-bold">Total balance</p>
+                <p class="text-2xl font-bold text-emerald-600">Rs.{{ "{:,.0f}".format(accounts|sum(attribute='account.balance')) }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create account bar -->
+<div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm px-5 py-4 mb-6 flex flex-wrap items-center gap-3">
+    <p class="text-sm font-bold text-ziggo-ink whitespace-nowrap flex items-center gap-2">
+        <i class="fas fa-circle-plus text-ziggo"></i> Create account
+    </p>
+    <form method="post" action="/admin/corporate/create" class="flex flex-wrap items-center gap-2 flex-1">
+        <input name="company_name" placeholder="Company name" required
+               class="flex-1 min-w-[180px] px-3 py-2 rounded-xl border border-ziggo-line text-sm focus:outline-none focus:border-ziggo">
+        <input name="billing_email" type="email" placeholder="Billing email (optional)"
+               class="flex-1 min-w-[180px] px-3 py-2 rounded-xl border border-ziggo-line text-sm focus:outline-none focus:border-ziggo">
+        <button class="zi-btn-primary text-xs px-5 py-2 whitespace-nowrap">
+            <i class="fas fa-plus mr-1"></i> Create
+        </button>
+    </form>
+</div>
+
+{% if error %}
+<div class="mb-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
+    <i class="fas fa-exclamation-circle mr-1"></i> {{ error }}
+</div>
+{% endif %}
+{% if success %}
+<div class="mb-4 px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-700">
+    <i class="fas fa-check-circle mr-1"></i> {{ success }}
+</div>
+{% endif %}
+
+<div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="p-5 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="font-black text-ziggo-ink">Corporate Accounts ({{ accounts|length }})</h3>
+        <input type="text" id="corpSearch" placeholder="Search company…"
+               class="px-3 py-2 rounded-xl border border-gray-200 text-sm w-72 focus:outline-none focus:border-ziggo">
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left" id="corpTable">
+            <thead class="bg-ziggo-canvas/70 text-[11px] uppercase tracking-wider text-ziggo-faint font-black">
+                <tr>
+                    <th class="px-6 py-3">ID</th>
+                    <th class="px-6 py-3">Company</th>
+                    <th class="px-6 py-3">Email</th>
+                    <th class="px-6 py-3 text-right">Balance</th>
+                    <th class="px-6 py-3 text-center">Members</th>
+                    <th class="px-6 py-3">Created</th>
+                    <th class="px-6 py-3 text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for item in accounts %}
+                {% set a = item.account %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-3 text-xs text-gray-500">{{ a.id }}</td>
+                    <td class="px-6 py-3 text-sm font-semibold">{{ a.company_name }}</td>
+                    <td class="px-6 py-3 text-xs text-gray-500">{{ a.billing_email or '—' }}</td>
+                    <td class="px-6 py-3 text-right text-sm font-normal text-emerald-600">Rs.{{ "{:,.2f}".format(a.balance|float) }}</td>
+                    <td class="px-6 py-3 text-center">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-700">{{ item.member_count }}</span>
+                    </td>
+                    <td class="px-6 py-3 text-xs text-gray-500">{{ a.created_at|colombo_dt("%Y-%m-%d") }}</td>
+                    <td class="px-6 py-3 text-center">
+                        <div class="flex items-center justify-center gap-1.5">
+                            <button onclick="openTopup({{ a.id }}, '{{ a.company_name }}')"
+                                    class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition">
+                                <i class="fas fa-plus mr-0.5"></i> Top-up
+                            </button>
+                            <button onclick="openMembers({{ a.id }}, '{{ a.company_name }}')"
+                                    class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-600 hover:bg-blue-100 transition">
+                                <i class="fas fa-users mr-0.5"></i> Members
+                            </button>
+                            <button data-id="{{ a.id }}" data-name="{{ a.company_name }}" data-email="{{ a.billing_email or '' }}"
+                                    onclick="openEdit(this)"
+                                    class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-50 text-amber-600 hover:bg-amber-100 transition">
+                                <i class="fas fa-edit mr-0.5"></i> Edit
+                            </button>
+                            {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
+                            <button data-id="{{ a.id }}" data-name="{{ a.company_name }}"
+                                    onclick="openDelete(this)"
+                                    class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-red-50 text-red-600 hover:bg-red-100 transition">
+                                <i class="fas fa-trash-alt mr-0.5"></i> Delete
+                            </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="px-6 py-10 text-center text-gray-400">No corporate accounts yet</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Top-up modal -->
+<div id="topupModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden items-center justify-center" style="display:none">
+    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+        <h3 class="font-black text-ziggo-ink mb-4">Top-up: <span id="topupCompany"></span></h3>
+        <form id="topupForm" method="post">
+            <input name="amount" type="number" step="0.01" min="0.01" placeholder="Amount Rs." required
+                   class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-ziggo mb-3">
+            <div class="flex gap-2">
+                <button type="submit" class="flex-1 zi-btn-primary text-xs py-2">
+                    <i class="fas fa-plus mr-1"></i> Add credit
+                </button>
+                <button type="button" onclick="closeTopup()" class="flex-1 px-4 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Members modal -->
+<div id="membersModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden items-center justify-center" style="display:none">
+    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
+        <h3 class="font-black text-ziggo-ink mb-4">Members: <span id="membersCompany"></span></h3>
+        <div id="membersList" class="max-h-60 overflow-y-auto mb-4 space-y-2"></div>
+        <div id="memberMsg" class="text-xs font-bold text-center py-2 rounded-lg mb-2" style="display:none"></div>
+        <form id="addMemberForm" method="post" class="flex gap-2 mb-3">
+            <input name="phone_number" placeholder="Phone number (07XXXXXXXX)" required
+                   class="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-ziggo">
+            <button type="submit" class="zi-btn-primary text-xs px-4">
+                <i class="fas fa-user-plus mr-1"></i> Add
+            </button>
+        </form>
+        <button type="button" onclick="closeMembers()" class="w-full px-4 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50">Close</button>
+    </div>
+</div>
+
+<!-- Edit modal -->
+<div id="editModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden items-center justify-center" style="display:none">
+    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+        <h3 class="font-black text-ziggo-ink mb-4">Edit Company: <span id="editCompanyHeader"></span></h3>
+        <form id="editForm" method="post">
+            <div class="mb-3">
+                <label class="block text-[10px] uppercase font-bold text-gray-400 mb-1">Company Name</label>
+                <input name="company_name" id="editCompanyName" type="text" placeholder="Company name" required
+                       class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-ziggo">
+            </div>
+            <div class="mb-4">
+                <label class="block text-[10px] uppercase font-bold text-gray-400 mb-1">Billing Email</label>
+                <input name="billing_email" id="editBillingEmail" type="email" placeholder="Billing email (optional)"
+                       class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-ziggo">
+            </div>
+            <div class="flex gap-2">
+                <button type="submit" class="flex-1 zi-btn-primary text-xs py-2">
+                    <i class="fas fa-save mr-1"></i> Save Changes
+                </button>
+                <button type="button" onclick="closeEdit()" class="flex-1 px-4 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete modal -->
+<div id="deleteModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden items-center justify-center" style="display:none">
+    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+        <h3 class="font-black text-ziggo-ink mb-2">Delete Corporate Account</h3>
+        <p class="text-sm text-gray-600 mb-4">Are you sure you want to delete <span id="deleteCompany" class="font-bold text-ziggo-ink"></span>? This will also remove all linked members and cannot be undone.</p>
+        <form id="deleteForm" method="post">
+            <div class="flex gap-2">
+                <button type="submit" class="flex-1 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold py-2 transition">
+                    <i class="fas fa-trash-alt mr-1"></i> Delete
+                </button>
+                <button type="button" onclick="closeDelete()" class="flex-1 px-4 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Search
+    document.getElementById('corpSearch').addEventListener('input', (e) => {
+        const q = e.target.value.toLowerCase();
+        document.querySelectorAll('#corpTable tbody tr').forEach(tr => {
+            tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+    });
+
+    // Top-up modal
+    function openTopup(id, name) {
+        document.getElementById('topupCompany').textContent = name;
+        document.getElementById('topupForm').action = '/admin/corporate/' + id + '/topup';
+        const m = document.getElementById('topupModal');
+        m.style.display = 'flex';
+        m.classList.remove('hidden');
+    }
+    function closeTopup() {
+        const m = document.getElementById('topupModal');
+        m.style.display = 'none';
+        m.classList.add('hidden');
+    }
+
+    // Members modal
+    let currentCorpId = null;
+
+    function showMemberMsg(text, isError) {
+        const el = document.getElementById('memberMsg');
+        el.textContent = text;
+        el.className = 'text-xs font-bold text-center py-2 rounded-lg mb-2 ' +
+            (isError ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700');
+        el.style.display = 'block';
+    }
+    function hideMemberMsg() {
+        const el = document.getElementById('memberMsg');
+        el.style.display = 'none';
+        el.textContent = '';
+    }
+
+    function loadMembers(id) {
+        const list = document.getElementById('membersList');
+        list.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">Loading…</p>';
+        fetch('/admin/corporate/' + id + '/members')
+            .then(r => r.json())
+            .then(members => {
+                if (members.length === 0) {
+                    list.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">No members yet</p>';
+                    return;
+                }
+                list.innerHTML = members.map(m =>
+                    '<div class="flex items-center justify-between px-3 py-2 rounded-xl bg-gray-50">' +
+                    '  <div><span class="text-sm font-semibold">' + (m.full_name || '—') + '</span>' +
+                    '  <span class="text-xs text-gray-500 ml-2">' + m.phone_number + '</span></div>' +
+                    '  <span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ' +
+                    (m.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700') + '">' +
+                    m.status + '</span>' +
+                    '</div>'
+                ).join('');
+            })
+            .catch(() => {
+                list.innerHTML = '<p class="text-xs text-red-400 text-center py-4">Failed to load members</p>';
+            });
+    }
+
+    function openMembers(id, name) {
+        currentCorpId = id;
+        document.getElementById('membersCompany').textContent = name;
+        document.getElementById('addMemberForm').action = '/admin/corporate/' + id + '/members/add';
+        document.querySelector('#addMemberForm input[name="phone_number"]').value = '';
+        hideMemberMsg();
+        const m = document.getElementById('membersModal');
+        m.style.display = 'flex';
+        m.classList.remove('hidden');
+        loadMembers(id);
+    }
+    function closeMembers() {
+        const m = document.getElementById('membersModal');
+        m.style.display = 'none';
+        m.classList.add('hidden');
+    }
+
+    document.getElementById('addMemberForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const input = form.querySelector('input[name="phone_number"]');
+        const phone = input.value.trim();
+        hideMemberMsg();
+        if (!phone) { showMemberMsg('Please enter a phone number.', true); return; }
+        const btn = form.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        try {
+            const res = await fetch(form.action, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ phone_number: phone })
+            });
+            if (res.ok || res.redirected) {
+                input.value = '';
+                showMemberMsg('Member added successfully.', false);
+                if (currentCorpId !== null) loadMembers(currentCorpId);
+            } else {
+                let detail = 'Invalid number — no user found with this phone number.';
+                try { const j = await res.json(); if (j && j.detail) detail = j.detail; } catch (_) {}
+                showMemberMsg(detail, true);
+            }
+        } catch (_) {
+            showMemberMsg('Network error. Please try again.', true);
+        } finally {
+            btn.disabled = false;
+        }
+    });
+
+    // Edit modal
+    function openEdit(el) {
+        const id = el.dataset.id;
+        const name = el.dataset.name;
+        const email = el.dataset.email;
+        document.getElementById('editCompanyHeader').textContent = name;
+        document.getElementById('editCompanyName').value = name;
+        document.getElementById('editBillingEmail').value = email;
+        document.getElementById('editForm').action = '/admin/corporate/' + id + '/edit';
+        const m = document.getElementById('editModal');
+        m.style.display = 'flex';
+        m.classList.remove('hidden');
+    }
+    function closeEdit() {
+        const m = document.getElementById('editModal');
+        m.style.display = 'none';
+        m.classList.add('hidden');
+    }
+
+    // Delete modal
+    function openDelete(el) {
+        const id = el.dataset.id;
+        const name = el.dataset.name;
+        document.getElementById('deleteCompany').textContent = name;
+        document.getElementById('deleteForm').action = '/admin/corporate/' + id + '/delete';
+        const m = document.getElementById('deleteModal');
+        m.style.display = 'flex';
+        m.classList.remove('hidden');
+    }
+    function closeDelete() {
+        const m = document.getElementById('deleteModal');
+        m.style.display = 'none';
+        m.classList.add('hidden');
+    }
+</script>
+{% endblock %}

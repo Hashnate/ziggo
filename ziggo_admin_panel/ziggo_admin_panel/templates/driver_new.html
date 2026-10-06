@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+
+{% block title %}Add Driver | Ziggo Admin{% endblock %}
+{% block page_title %}Add New Driver{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <form method="post" action="/admin/drivers/new" enctype="multipart/form-data" class="p-8 space-y-6">
+        {% if error %}
+        <div class="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl font-bold text-sm">
+            <i class="fas fa-exclamation-circle mr-1"></i> {{ error }}
+        </div>
+        {% endif %}
+
+        {# Metadata strip #}
+        <div class="flex items-center justify-between p-4 bg-ziggo-soft/40 rounded-2xl">
+            <div class="flex items-center gap-3 text-sm">
+                <span class="font-bold text-ziggo-muted">Create New Driver Account</span>
+            </div>
+            <a href="/admin/drivers" class="text-sm font-bold text-ziggo-muted hover:text-ziggo">
+                <i class="fas fa-arrow-left mr-1"></i> Back to drivers
+            </a>
+        </div>
+
+        <div>
+            <h3 class="text-lg font-black text-ziggo mb-4">Profile Photo</h3>
+            <div class="flex items-center gap-5">
+                <div id="photoPreview" class="w-24 h-24 rounded-2xl bg-ziggo-soft/50 border-2 border-dashed border-ziggo-line flex items-center justify-center overflow-hidden">
+                    <i class="fas fa-user text-ziggo-faint text-3xl"></i>
+                </div>
+                <div class="flex-1">
+                    <label for="profile_photo" class="inline-flex items-center gap-2 cursor-pointer px-4 py-2.5 bg-ziggo-soft text-ziggo rounded-xl font-bold text-sm hover:bg-ziggo-soft/70 transition">
+                        <i class="fas fa-upload"></i>
+                        <span id="photoLabel">Choose photo</span>
+                    </label>
+                    <input id="profile_photo" name="profile_photo" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="previewPhoto(this)">
+                    <p class="text-xs text-ziggo-faint font-bold mt-2">JPG, PNG or WEBP. Max 5 MB. Leave empty to keep the current photo.</p>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h3 class="text-lg font-black text-ziggo mb-4">Personal Details</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Phone Number</label>
+                    <input name="phone_number" required value="{{ form.phone_number or '' }}"
+                           type="tel" maxlength="13" minlength="10"
+                           placeholder="0712345678"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    <p class="text-[10px] text-amber-600 font-bold mt-1">⚠️ Changing this changes the driver's login</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Full Name</label>
+                    <input name="full_name" required value="{{ form.full_name or '' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Email (optional)</label>
+                    <input name="email" type="email" value="{{ form.email or '' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">NIC Number</label>
+                    <input name="nic_number" required value="{{ form.nic_number or '' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h3 class="text-lg font-black text-ziggo mb-4">Vehicle Details</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">License Number</label>
+                    <input name="license_number" required value="{{ form.license_number or '' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Vehicle Type</label>
+                    <select name="vehicle_type" required
+                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
+                        {% set selected = form.vehicle_type or 'car' %}
+                        <option value="bike" {% if selected == 'bike' %}selected{% endif %}>Bike</option>
+                        <option value="tuk" {% if selected == 'tuk' %}selected{% endif %}>Tuk-tuk</option>
+                        <option value="car" {% if selected == 'car' %}selected{% endif %}>Car</option>
+                        <option value="van" {% if selected == 'van' %}selected{% endif %}>Van</option>
+                        <option value="truck" {% if selected == 'truck' %}selected{% endif %}>Truck</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Driver Type</label>
+                    <select name="driver_type" required
+                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
+                        {% set d_type = form.driver_type or 'ride' %}
+                        <option value="ride" {% if d_type == 'ride' %}selected{% endif %}>Ride Driver</option>
+                        <option value="delivery" {% if d_type == 'delivery' %}selected{% endif %}>Delivery Driver</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Vehicle Number</label>
+                    <input name="vehicle_number" required value="{{ form.vehicle_number or '' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo"
+                           placeholder="WP-1234">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Vehicle Model</label>
+                    <input name="vehicle_model" required value="{{ form.vehicle_model or '' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo"
+                           placeholder="Toyota Aqua">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Vehicle Color</label>
+                    <input name="vehicle_color" required value="{{ form.vehicle_color or '' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo"
+                           placeholder="White">
+                </div>
+                <div class="flex items-center mt-6">
+                    <label class="inline-flex items-center cursor-pointer">
+                        <input name="is_approved" type="checkbox" value="on" {% if form.is_approved == 'on' or form.is_approved == '1' %}checked{% endif %}
+                               class="w-5 h-5 text-ziggo border-gray-300 rounded">
+                        <span class="ml-2 text-sm font-bold text-gray-700">Approved (can go online & accept rides)</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h3 class="text-lg font-black text-ziggo mb-4">Emergency Contact (Close Relative)</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Close Relative Name</label>
+                    <input name="relative_name" value="{{ form.relative_name or '' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo"
+                           placeholder="John Doe">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Contact Number</label>
+                    <input name="relative_contact" value="{{ form.relative_contact or '' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo"
+                           placeholder="0771234567">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Relationship</label>
+                    <input name="relative_relationship" value="{{ form.relative_relationship or '' }}"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo"
+                           placeholder="Father, Spouse, etc.">
+                </div>
+            </div>
+        </div>
+
+        <!-- KYC Documents -->
+        <div class="pt-6 border-t border-gray-100">
+            <h4 class="font-black text-ziggo-ink mb-4 flex items-center gap-2">
+                <i class="fas fa-id-card text-ziggo"></i> KYC Documents
+            </h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {% for doc in documents %}
+                <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
+                    <div id="{{ doc.kind }}IconWrapper" class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
+                        {% if doc.document_url %}
+                        <a href="{{ doc.document_url }}" target="_blank" class="w-full h-full flex items-center justify-center">
+                            {% if doc.document_url.endswith('.pdf') %}
+                            <i class="fas fa-file-pdf text-2xl text-rose-500 hover:opacity-80 transition"></i>
+                            {% else %}
+                            <img src="{{ doc.document_url }}" alt="{{ doc.label }}" class="w-full h-full object-cover hover:opacity-80 transition">
+                            {% endif %}
+                        </a>
+                        {% else %}
+                            <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
+                        {% endif %}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-black text-sm text-ziggo-ink">{{ doc.label }}</p>
+                        {% if doc.document_url %}
+                        <p class="text-[11px] text-ziggo-muted truncate" id="{{ doc.kind }}Status">Uploaded {{ doc.uploaded_at|colombo_dt("%Y-%m-%d") }}</p>
+                        {% if doc.is_verified %}
+                        <span class="px-2 py-0.5 mt-1 inline-block text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700 rounded-full" id="{{ doc.kind }}VerifyBadge">Verified</span>
+                        {% else %}
+                        <span class="px-2 py-0.5 mt-1 inline-block text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-700 rounded-full" id="{{ doc.kind }}VerifyBadge">Pending review</span>
+                        {% endif %}
+                        {% else %}
+                        <p class="text-[11px] text-rose-500 font-bold" id="{{ doc.kind }}Status">Not uploaded yet</p>
+                        {% endif %}
+                    </div>
+                    <div class="flex flex-col gap-1.5 items-end">
+                        <label for="doc_{{ doc.kind }}" class="cursor-pointer px-3 py-1.5 bg-ziggo-soft text-ziggo rounded-lg text-xs font-black hover:bg-ziggo-soft/70 transition whitespace-nowrap">
+                            <i class="fas fa-upload mr-1"></i> {% if doc.document_url %}Replace{% else %}Upload{% endif %}
+                        </label>
+                        <input id="doc_{{ doc.kind }}" name="doc_{{ doc.kind }}" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden" onchange="previewDoc(this, '{{ doc.kind }}')">
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="pt-6 border-t border-gray-100 flex justify-end gap-3">
+            <a href="/admin/drivers" class="px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50">Cancel</a>
+            <button type="submit" class="px-8 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light shadow-brand">
+                <i class="fas fa-save mr-2"></i> Save changes
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+function previewPhoto(input) {
+    const preview = document.getElementById('photoPreview');
+    const label = document.getElementById('photoLabel');
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    if (file.size > 5 * 1024 * 1024) {
+        alert('Photo must be under 5 MB');
+        input.value = '';
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        preview.innerHTML = '<a href="' + e.target.result + '" target="_blank" class="w-full h-full block"><img src="' + e.target.result + '" class="w-full h-full object-cover hover:opacity-80 transition"></a>';
+    };
+    reader.readAsDataURL(file);
+    label.textContent = 'Change photo';
+}
+
+
+function previewDoc(input, kind) {
+    const wrapper = document.getElementById(kind + 'IconWrapper');
+    const status = document.getElementById(kind + 'Status');
+    const badge = document.getElementById(kind + 'VerifyBadge');
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    if (file.size > 25 * 1024 * 1024) {
+        alert('Document must be under 25 MB');
+        input.value = '';
+        return;
+    }
+    status.textContent = 'Ready to upload';
+    status.className = 'text-[11px] text-amber-500 font-bold';
+    if (badge) {
+        badge.style.display = 'none';
+    }
+    
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'pdf') {
+        wrapper.innerHTML = '<i class="fas fa-file-pdf text-2xl text-rose-500"></i>';
+    } else {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            wrapper.innerHTML = '<a href="' + e.target.result + '" target="_blank" class="w-full h-full flex items-center justify-center"><img src="' + e.target.result + '" class="w-full h-full object-cover hover:opacity-80 transition"></a>';
+        };
+        reader.readAsDataURL(file);
+    }
+}
+</script>
+{% endblock %}

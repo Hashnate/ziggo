@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Access Denied | Ziggo Admin{% endblock %}
+{% block page_title %}Access Denied{% endblock %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in fade-in zoom-in-95 duration-200">
+    <div class="bg-white rounded-3xl border border-rose-100 shadow-soft-lg max-w-md w-full p-8 text-center relative overflow-hidden">
+        <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-rose-500 to-red-600"></div>
+        
+        <div class="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-100 text-rose-500 flex items-center justify-center mx-auto mb-6 text-2xl">
+            <i class="fas fa-shield-halved"></i>
+        </div>
+        
+        <h2 class="text-2xl font-black text-slate-800 tracking-tight mb-2">Insufficient Permissions</h2>
+        <p class="text-sm text-slate-500 leading-relaxed mb-6 font-medium">
+            Your administrative account does not have authorization to view this page. If you believe this is in error, please contact a system superadministrator to adjust your role.
+        </p>
+        
+        <div class="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-left mb-6">
+            <div class="flex items-center justify-between text-xs text-slate-400 font-bold uppercase tracking-wider mb-2">
+                <span>Account Profile</span>
+                <span class="px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-100 text-[10px]">Restricted</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-slate-200 flex items-center justify-center font-black text-slate-600">
+                    {{ request.state.admin.full_name[0] if request.state.admin else 'A' }}
+                </div>
+                <div class="min-w-0">
+                    <p class="text-sm font-black text-slate-700 truncate">{{ request.state.admin.full_name if request.state.admin else 'Administrator' }}</p>
+                    <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">{{ request.state.admin.admin_role or 'admin' }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="flex gap-3">
+            <a href="/admin/dashboard" class="flex-1 px-6 py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-900 transition flex items-center justify-center gap-2">
+                <i class="fas fa-home"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

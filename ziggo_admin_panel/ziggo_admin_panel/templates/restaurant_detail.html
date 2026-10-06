@@ -1,0 +1,385 @@
+{% extends "base.html" %}
+
+{% block title %}{{ restaurant.name }} | Ziggo Admin{% endblock %}
+{% block page_title %}{{ restaurant.name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-6xl mx-auto">
+    <a href="/admin/restaurants" class="inline-flex items-center text-sm font-bold text-gray-500 hover:text-ziggo">
+        <i class="fas fa-arrow-left mr-2"></i> Back to restaurants
+    </a>
+
+    <!-- Restaurant summary card -->
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-wrap items-center gap-6">
+        <div class="w-20 h-20 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center text-3xl">
+            <i class="fas fa-utensils"></i>
+        </div>
+        <div class="flex-1 min-w-[200px]">
+            <h2 class="text-2xl font-black text-ziggo">{{ restaurant.name }}</h2>
+            <p class="text-sm text-gray-500">{{ restaurant.cuisine or '' }} • {{ restaurant.address or '' }}</p>
+            <div class="mt-2 flex flex-wrap gap-4 text-xs text-gray-600 font-bold">
+                <span><i class="fas fa-star text-yellow-400"></i> {{ "{:.1f}".format((restaurant.rating or 0)|float) }}</span>
+                <span><i class="fas fa-clock"></i> {{ restaurant.eta_minutes or 30 }} min</span>
+                <span><i class="fas fa-truck"></i> Rs.{{ "{:,.0f}".format(restaurant.delivery_fee or 0) }}</span>
+                <span><i class="fas fa-business-time"></i> {{ restaurant.opening_time or '' }} – {{ restaurant.closing_time or '' }}</span>
+                <span class="px-2 py-0.5 rounded-full {% if restaurant.is_active %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-500{% endif %}">{{ 'Active' if restaurant.is_active else 'Inactive' }}</span>
+            </div>
+            
+            <!-- Outstanding Display -->
+            <div class="mt-4 p-4 rounded-xl border {% if admin_owes_vendor > 0 %}bg-blue-50 border-blue-100{% elif vendor_owes_admin > 0 %}bg-red-50 border-red-100{% else %}bg-gray-50 border-gray-100{% endif %} flex items-center justify-between">
+                <div>
+                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Settlement Status</h4>
+                    {% if admin_owes_vendor > 0 %}
+                        <p class="text-lg font-black text-blue-600 mt-1">Ziggo owes Restaurant: Rs.{{ "{:,.2f}".format(admin_owes_vendor) }}</p>
+                    {% elif vendor_owes_admin > 0 %}
+                        <p class="text-lg font-black text-red-600 mt-1">Restaurant owes Ziggo: Rs.{{ "{:,.2f}".format(vendor_owes_admin) }}</p>
+                    {% else %}
+                        <p class="text-lg font-black text-gray-600 mt-1">Settled (Rs.0.00)</p>
+                    {% endif %}
+                </div>
+                {% if admin_owes_vendor > 0 %}
+                <form method="post" action="/admin/restaurants/{{ restaurant.id }}/pay-settlement">
+                    <button type="submit" class="px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-sm">
+                        <i class="fas fa-money-bill-wave mr-1.5"></i> Pay Settlement
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left: existing categories & items -->
+        <div class="lg:col-span-2 space-y-4">
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div class="p-6 border-b border-gray-100">
+                    <h3 class="font-black text-ziggo">Menu</h3>
+                    <p class="text-xs text-gray-400">{{ items | length }} item{{ '' if items|length == 1 else 's' }} across {{ categories | length }} categor{{ 'y' if categories|length == 1 else 'ies' }}</p>
+                </div>
+                <div class="divide-y divide-gray-100">
+                    {% for cat in categories %}
+                    <div class="p-6">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="font-black text-ziggo-accent uppercase tracking-widest text-xs">{{ cat.name }}</h4>
+                            <button onclick='openEditCategoryModal({{ cat.id }}, {{ cat.name | tojson | safe }}, {{ cat.display_order }})' class="text-gray-400 hover:text-ziggo text-xs"><i class="fas fa-edit"></i> Edit</button>
+                        </div>
+
+                        {% set cat_items = items | selectattr('category_id', 'equalto', cat.id) | list %}
+                        {% if cat_items %}
+                            <div class="space-y-2">
+                            {% for it in cat_items %}
+                                <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl group relative">
+                                    <div class="w-2 h-2 rounded-full {% if it.is_veg %}bg-green-500{% else %}bg-red-500{% endif %}"></div>
+                                    <div class="flex-1">
+                                        <p class="font-bold text-sm text-ziggo">{{ it.name }}</p>
+                                        {% if it.description %}<p class="text-xs text-gray-500">{{ it.description }}</p>{% endif %}
+                                    </div>
+                                    <div class="flex items-center gap-4">
+                                        <span class="font-black text-sm">
+                                            {% if it.has_portions %}
+                                                Half: Rs.{{ "{:,.0f}".format(it.price_half or (it.price / 2)) }} / Full: Rs.{{ "{:,.0f}".format(it.price) }}
+                                            {% else %}
+                                                Rs.{{ "{:,.0f}".format(it.price) }}
+                                            {% endif %}
+                                        </span>
+                                        <button onclick='openEditItemModal({{ it.id }}, {{ it.name | tojson | safe }}, {{ (it.description or "") | tojson | safe }}, {{ it.price }}, {{ it.category_id }}, {{ (it.image_url or "") | tojson | safe }}, {{ "true" if it.is_veg else "false" }}, {{ it.prep_time_min }}, {{ "true" if it.has_portions else "false" }}, {{ it.price_half or 0 }}, {{ it.packing_charge or 0 }})' class="opacity-0 group-hover:opacity-100 bg-white shadow-sm border border-gray-200 text-ziggo px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:bg-gray-50">
+                                            <i class="fas fa-edit"></i> Edit
+                                        </button>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-xs text-gray-400 italic">No items in this category yet.</p>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <div class="p-10 text-center text-gray-400">
+                        <i class="fas fa-utensils text-3xl mb-3"></i>
+                        <p class="text-sm font-bold">No menu yet. Add a category to get started →</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: forms to add category and item -->
+        <div class="space-y-4">
+            <!-- Add category -->
+            <form method="post" action="/admin/restaurants/{{ restaurant.id }}/categories/new"
+                  class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+                <h3 class="font-black text-ziggo">Add category</h3>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Name</label>
+                    <input name="name" required placeholder="e.g. Mains, Drinks"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Display order</label>
+                    <input name="display_order" type="number" value="0"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <button class="w-full px-4 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light">
+                    <i class="fas fa-plus mr-2"></i> Add Category
+                </button>
+            </form>
+
+            <!-- Add menu item -->
+            {% if categories %}
+            <form method="post" action="/admin/restaurants/{{ restaurant.id }}/items/new"
+                  class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+                <h3 class="font-black text-ziggo">Add menu item</h3>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Category</label>
+                    <select name="category_id" required
+                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                        {% for cat in categories %}
+                        <option value="{{ cat.id }}">{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Name</label>
+                    <input name="name" required placeholder="e.g. Chicken Kottu"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Description</label>
+                    <input name="description" placeholder="optional"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Price (Rs.)</label>
+                        <input name="price" type="number" step="0.01" min="0" required
+                               class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Prep time (min)</label>
+                        <input name="prep_time_min" type="number" value="15" min="1"
+                               class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Packing Charge (Rs.)</label>
+                    <input name="packing_charge" type="number" step="0.01" min="0" value="0.00" required
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div class="p-4 bg-gray-50 rounded-2xl space-y-3">
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input name="has_portions" type="checkbox" onchange="toggleAddPortionFields(this)" class="w-4 h-4 rounded border-gray-300 text-ziggo focus:ring-ziggo">
+                        <span class="text-sm font-bold text-gray-700">Enable Half/Full Portions</span>
+                    </label>
+                    <div id="addPortionPriceDiv" class="hidden">
+                        <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Half Portion Price (Rs.)</label>
+                        <input name="price_half" type="number" step="0.01" min="0" placeholder="e.g. 150"
+                               class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Image URL</label>
+                    <input name="image_url" placeholder="optional"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+                    <input name="is_veg" type="checkbox" class="w-4 h-4">
+                    <span class="text-sm font-bold text-gray-700">Vegetarian</span>
+                </label>
+                <button class="w-full px-4 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light">
+                    <i class="fas fa-plus mr-2"></i> Add Item
+                </button>
+            </form>
+            {% else %}
+            <div class="bg-yellow-50 border border-yellow-200 rounded-2xl p-6 text-sm text-yellow-800 font-bold">
+                Add a category first before adding menu items.
+            </div>
+            {% endif %}
+
+            <!-- Home-screen cuisine categories (drives the Food home filter) -->
+            <form method="post" action="/admin/restaurants/{{ restaurant.id }}/cuisine-categories"
+                  class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+                <div>
+                    <h3 class="font-black text-ziggo">Home cuisine categories</h3>
+                    <p class="text-xs text-gray-400">Tapping these on the Food home screen filters to this outlet. Manage the list at <a href="/admin/food-home" class="text-ziggo font-bold">Food Home</a>.</p>
+                </div>
+                {% if all_food_categories %}
+                <div class="grid grid-cols-2 gap-2">
+                    {% for fc in all_food_categories %}
+                    <label class="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-50">
+                        <input type="checkbox" name="category_ids" value="{{ fc.id }}"
+                               {% if fc.id in selected_food_category_ids %}checked{% endif %}
+                               class="w-4 h-4 rounded border-gray-300 text-ziggo focus:ring-ziggo">
+                        <span class="text-sm font-bold text-gray-700">{{ fc.name }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                <button class="w-full px-4 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light">
+                    <i class="fas fa-save mr-2"></i> Save categories
+                </button>
+                {% else %}
+                <p class="text-xs text-gray-400 italic">No cuisine categories defined yet. Create some at Food Home first.</p>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Category Modal -->
+<div id="editCatModal" class="fixed inset-0 z-50 bg-gray-900/50 hidden flex items-center justify-center backdrop-blur-sm" onclick="closeEditCatModal()">
+    <div class="bg-white rounded-3xl shadow-xl w-full max-w-md p-6 m-4" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-black text-ziggo text-xl">Edit Category</h3>
+            <button onclick="closeEditCatModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
+        </div>
+        <form id="editCatForm" method="post" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Name</label>
+                <input id="editCatName" name="name" required class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Display order</label>
+                <input id="editCatOrder" name="display_order" type="number" class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="submit" class="flex-1 px-4 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light">Save Changes</button>
+                {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
+                <button type="button" onclick="deleteCategory()" class="px-4 py-3 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100"><i class="fas fa-trash"></i></button>
+                {% endif %}
+            </div>
+        </form>
+        <form id="deleteCatForm" method="post" class="hidden"></form>
+    </div>
+</div>
+
+<!-- Edit Item Modal -->
+<div id="editItemModal" class="fixed inset-0 z-50 bg-gray-900/50 hidden flex items-center justify-center backdrop-blur-sm" onclick="closeEditItemModal()">
+    <div class="bg-white rounded-3xl shadow-xl w-full max-w-md p-6 m-4" onclick="event.stopPropagation()" style="max-height: 90vh; overflow-y: auto;">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-black text-ziggo text-xl">Edit Menu Item</h3>
+            <button onclick="closeEditItemModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
+        </div>
+        <form id="editItemForm" method="post" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Category</label>
+                <select id="editItemCat" name="category_id" required class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}">{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Name</label>
+                <input id="editItemName" name="name" required class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Description</label>
+                <input id="editItemDesc" name="description" class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Price (Rs.)</label>
+                    <input id="editItemPrice" name="price" type="number" step="0.01" min="0" required class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Prep time (min)</label>
+                    <input id="editItemPrep" name="prep_time_min" type="number" min="1" class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Packing Charge (Rs.)</label>
+                <input id="editItemPacking" name="packing_charge" type="number" step="0.01" min="0" required class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+            </div>
+            <div class="p-4 bg-gray-50 rounded-2xl space-y-3">
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+                    <input id="editItemHasPortions" name="has_portions" type="checkbox" onchange="toggleEditPortionFields(this)" class="w-4 h-4 rounded border-gray-300 text-ziggo focus:ring-ziggo">
+                    <span class="text-sm font-bold text-gray-700">Enable Half/Full Portions</span>
+                </label>
+                <div id="editPortionPriceDiv" class="hidden">
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Half Portion Price (Rs.)</label>
+                    <input id="editItemPriceHalf" name="price_half" type="number" step="0.01" min="0" placeholder="e.g. 150"
+                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Image URL</label>
+                <input id="editItemImage" name="image_url" class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+            </div>
+            <label class="inline-flex items-center gap-2 cursor-pointer">
+                <input id="editItemVeg" name="is_veg" type="checkbox" class="w-4 h-4">
+                <span class="text-sm font-bold text-gray-700">Vegetarian</span>
+            </label>
+            <div class="flex gap-3 pt-2">
+                <button type="submit" class="flex-1 px-4 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light">Save Changes</button>
+                {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
+                <button type="button" onclick="deleteItem()" class="px-4 py-3 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100"><i class="fas fa-trash"></i></button>
+                {% endif %}
+            </div>
+        </form>
+        <form id="deleteItemForm" method="post" class="hidden"></form>
+    </div>
+</div>
+
+<script>
+function openEditCategoryModal(id, name, order) {
+    document.getElementById('editCatForm').action = `/admin/restaurants/{{ restaurant.id }}/categories/${id}/edit`;
+    document.getElementById('deleteCatForm').action = `/admin/restaurants/{{ restaurant.id }}/categories/${id}/delete`;
+    document.getElementById('editCatName').value = name;
+    document.getElementById('editCatOrder').value = order;
+    document.getElementById('editCatModal').classList.remove('hidden');
+}
+function closeEditCatModal() {
+    document.getElementById('editCatModal').classList.add('hidden');
+}
+function deleteCategory() {
+    if(confirm('Are you sure you want to delete this category and all its items?')) {
+        document.getElementById('deleteCatForm').submit();
+    }
+}
+
+function openEditItemModal(id, name, desc, price, cat_id, image, is_veg, prep_time, has_portions, price_half, packing_charge) {
+    document.getElementById('editItemForm').action = `/admin/restaurants/{{ restaurant.id }}/items/${id}/edit`;
+    document.getElementById('deleteItemForm').action = `/admin/restaurants/{{ restaurant.id }}/items/${id}/delete`;
+    document.getElementById('editItemName').value = name;
+    document.getElementById('editItemDesc').value = desc || '';
+    document.getElementById('editItemPrice').value = price;
+    document.getElementById('editItemCat').value = cat_id;
+    document.getElementById('editItemImage').value = image || '';
+    document.getElementById('editItemVeg').checked = is_veg;
+    document.getElementById('editItemPrep').value = prep_time;
+    
+    const hasPortionsCheckbox = document.getElementById('editItemHasPortions');
+    hasPortionsCheckbox.checked = has_portions;
+    toggleEditPortionFields(hasPortionsCheckbox);
+    document.getElementById('editItemPriceHalf').value = price_half || '';
+    document.getElementById('editItemPacking').value = packing_charge || 0;
+
+    document.getElementById('editItemModal').classList.remove('hidden');
+}
+
+function toggleAddPortionFields(chk) {
+    const div = document.getElementById('addPortionPriceDiv');
+    if (chk.checked) {
+        div.classList.remove('hidden');
+    } else {
+        div.classList.add('hidden');
+    }
+}
+
+function toggleEditPortionFields(chk) {
+    const div = document.getElementById('editPortionPriceDiv');
+    if (chk.checked) {
+        div.classList.remove('hidden');
+    } else {
+        div.classList.add('hidden');
+    }
+}
+function closeEditItemModal() {
+    document.getElementById('editItemModal').classList.add('hidden');
+}
+function deleteItem() {
+    if(confirm('Are you sure you want to delete this item?')) {
+        document.getElementById('deleteItemForm').submit();
+    }
+}
+</script>
+{% endblock %}

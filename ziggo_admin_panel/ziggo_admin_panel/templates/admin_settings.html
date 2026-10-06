@@ -1,0 +1,645 @@
+{% extends "base.html" %}
+
+{% block title %}System Configuration | Ziggo Admin{% endblock %}
+{% block page_title %}System Configuration{% endblock %}
+{% block content %}
+<style>
+    .settings-layout { display: grid; grid-template-columns: 248px 1fr; gap: 24px; align-items: start; }
+    .settings-tabs { display: flex; flex-direction: column; gap: 4px; position: sticky; top: 8px;
+        background: #fff; border: 1px solid #ECEFF3; border-radius: 16px; padding: 8px;
+        box-shadow: 0 1px 2px rgba(16,24,40,0.04), 0 6px 20px -10px rgba(16,24,40,0.10); }
+    .settings-tab { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
+        padding: 11px 14px; border: 0; background: transparent; border-radius: 12px; cursor: pointer;
+        font-size: 13px; font-weight: 700; color: #475569; transition: background .15s, color .15s; }
+    .settings-tab i { width: 18px; text-align: center; color: #94A3B8; transition: color .15s; }
+    .settings-tab:hover { background: rgba(30,58,138,0.05); color: #0F172A; }
+    .settings-tab.active { background: linear-gradient(135deg,#1E3A8A 0%,#2563EB 100%); color: #fff; box-shadow: 0 8px 18px -8px rgba(30,58,138,0.5); }
+    .settings-tab.active i { color: #fff; }
+    .settings-panel { display: none; }
+    /* opacity-only fade (no transform) so panels don't create a stacking
+       context that would paint over the pinned header */
+    .settings-panel.active { display: block; animation: ziSettingsFade 220ms ease both; }
+    @keyframes ziSettingsFade { from { opacity: 0; } to { opacity: 1; } }
+    @media (max-width: 900px) {
+        .settings-layout { grid-template-columns: 1fr; }
+        .settings-tabs { position: static; flex-direction: row; flex-wrap: nowrap; overflow-x: auto; }
+        .settings-tab { white-space: nowrap; }
+    }
+</style>
+<div class="space-y-6">
+
+    {% if saved %}
+    <div class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-2xl p-4 flex items-center gap-3 font-bold">
+        <i class="fas fa-check-circle"></i>
+        Settings saved successfully.
+    </div>
+    {% endif %}
+
+    {% if error %}
+    <div class="bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl p-4 flex items-center gap-3 font-bold">
+        <i class="fas fa-exclamation-circle"></i>
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="/admin/settings" enctype="multipart/form-data">
+        <input type="hidden" name="active_tab" id="activeTabInput" value="general">
+        <div class="settings-layout">
+
+            <!-- Left tabs -->
+            <aside class="settings-tabs" id="settingsTabs">
+                <button type="button" class="settings-tab active" data-tab="general"><i class="fas fa-globe"></i> General</button>
+                <button type="button" class="settings-tab" data-tab="pricing"><i class="fas fa-coins"></i> Pricing</button>
+                <button type="button" class="settings-tab" data-tab="peakhours"><i class="fas fa-clock"></i> Peak Hours</button>
+                <button type="button" class="settings-tab" data-tab="security"><i class="fas fa-shield-alt"></i> Security</button>
+                <button type="button" class="settings-tab" data-tab="notifications"><i class="fas fa-bell"></i> Notifications</button>
+                <button type="button" class="settings-tab" data-tab="loyalty"><i class="fas fa-medal"></i> Loyalty &amp; Membership</button>
+                <button type="button" class="settings-tab" data-tab="trips"><i class="fas fa-map-pin"></i> Trip Stops &amp; Waiting</button>
+                <button type="button" class="settings-tab" data-tab="incentives"><i class="fas fa-gift"></i> Incentives</button>
+                <button type="button" class="settings-tab" data-tab="branding"><i class="fas fa-image"></i> Logo &amp; Favicon</button>
+            </aside>
+
+            <!-- Right content -->
+            <div class="space-y-6 min-w-0">
+
+                <!-- General -->
+                <section class="settings-panel active bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="general">
+                    <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                        <i class="fas fa-globe text-ziggo"></i> General
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Site Name</label>
+                            <input type="text" name="site_name" value="{{ s.site_name or '' }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Admin Email</label>
+                            <input type="email" name="admin_email" value="{{ s.admin_email or '' }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Contact Phone</label>
+                            <input type="text" name="contact_phone" value="{{ s.contact_phone or '' }}" pattern="^\d{10}$" title="Contact phone must be a 10-digit login phone number (e.g. 0773095788)" placeholder="e.g. 0773095788" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Contact Email</label>
+                            <input type="email" name="contact_email" value="{{ s.contact_email or '' }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Address</label>
+                            <textarea name="address" rows="3" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">{{ s.address or '' }}</textarea>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Pricing -->
+                <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="pricing">
+                    <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                        <i class="fas fa-coins text-ziggo"></i> Pricing
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Commission Rate (%)</label>
+                            <input type="number" step="0.01" min="0" max="100" name="commission_rate" value="{{ s.commission_rate if s.commission_rate is not none else 15 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Maximum Outstanding Commission Limit (Rs.)</label>
+                            <input type="number" step="0.01" min="0" name="max_settle_amount" value="{{ s.max_settle_amount if s.max_settle_amount is not none else 1000 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                            <p class="text-[10px] text-ziggo-faint font-bold mt-1">If the driver's outstanding unpaid commission exceeds this limit, their account is automatically deactivated.</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Busy Hours Start (0–23)</label>
+                            <input type="number" min="0" max="23" name="surge_start_hour" value="{{ s.surge_start_hour if s.surge_start_hour is not none else 17 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Busy Hours End (0–23)</label>
+                            <input type="number" min="0" max="23" name="surge_end_hour" value="{{ s.surge_end_hour if s.surge_end_hour is not none else 20 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Busy Hours Multiplier</label>
+                            <input type="number" step="0.01" min="0.1" name="surge_multiplier" value="{{ s.surge_multiplier if s.surge_multiplier is not none else 1.5 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Standard Cancellation Fee (Rs.)</label>
+                            <input type="number" step="0.01" min="0" name="cancellation_fee" value="{{ s.cancellation_fee if s.cancellation_fee is not none else 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Cancellation Grace Period (Minutes)</label>
+                            <input type="number" min="0" name="cancellation_grace_period_minutes" value="{{ s.cancellation_grace_period_minutes if s.cancellation_grace_period_minutes is not none else 3 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Unreasonable Penalty – Rider (Rs.)</label>
+                            <input type="number" step="0.01" min="0" name="rider_penalty" value="{{ s.rider_penalty if s.rider_penalty is not none else 0 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Self Pickup App Usage Charge (%)</label>
+                            <input type="number" step="0.01" min="0" max="100" name="self_pickup_app_usage_charge" value="{{ s.self_pickup_app_usage_charge if s.self_pickup_app_usage_charge is not none else 5.00 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <hr class="border-ziggo-line my-4">
+                        <h4 class="text-sm font-black text-ziggo-ink mb-3">Driver Search Settings</h4>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Driver Search Radius (km)</label>
+                            <input type="number" min="1" name="driver_search_radius_km" value="{{ s.driver_search_radius_km if s.driver_search_radius_km is not none else 15 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                            <p class="text-[10px] text-ziggo-faint font-bold mt-1">Maximum distance to search for available drivers when a booking is created.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Peak Hours -->
+                <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="peakhours">
+                    <div class="flex justify-between items-center mb-5">
+                        <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink">
+                            <i class="fas fa-clock text-ziggo"></i> Peak Hours Settings
+                        </h3>
+                        <button type="button" onclick="addPeakHour()" class="px-4 py-2 bg-ziggo text-white rounded-xl text-xs font-black shadow-brand hover:bg-ziggo-light transition flex items-center gap-1.5">
+                            <i class="fas fa-plus"></i> Add Peak Hour
+                        </button>
+                    </div>
+                    <div class="space-y-4">
+                        <div class="bg-white rounded-2xl border border-ziggo-line overflow-hidden shadow-soft-sm mb-4">
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse">
+                                    <thead class="bg-gray-50 text-[11px] uppercase text-ziggo-muted font-black tracking-wider border-b border-ziggo-line">
+                                        <tr>
+                                            <th class="px-6 py-3.5">Start Time</th>
+                                            <th class="px-6 py-3.5">End Time</th>
+                                            <th class="px-6 py-3.5">Vehicle Category</th>
+                                            <th class="px-6 py-3.5">Boost Amount (Rs.)</th>
+                                            <th class="px-6 py-3.5">Status</th>
+                                            <th class="px-6 py-3.5 text-right">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-ziggo-line">
+                                        {% for pk in peaks %}
+                                        <tr class="hover:bg-gray-50/50">
+                                            <td class="px-6 py-3">
+                                                <input type="time" name="peak_start_hour_{{ pk.id }}" value="{{ pk.start_time if pk.start_time is not none else ('%02d:00'|format(pk.start_hour) if pk.start_hour is not none else '') }}" class="p-2 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-semibold w-36">
+                                            </td>
+                                            <td class="px-6 py-3">
+                                                <input type="time" name="peak_end_hour_{{ pk.id }}" value="{{ pk.end_time if pk.end_time is not none else ('%02d:00'|format(pk.end_hour) if pk.end_hour is not none else '') }}" class="p-2 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-semibold w-36">
+                                            </td>
+                                            <td class="px-6 py-3">
+                                                <select name="peak_vehicle_category_{{ pk.id }}" class="p-2 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-semibold w-40">
+                                                    <option value="">All Categories</option>
+                                                    {% for cat in categories %}
+                                                    <option value="{{ cat.service_type }}" {% if pk.vehicle_category == cat.service_type %}selected{% endif %}>{{ cat.display_name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </td>
+                                            <td class="px-6 py-3">
+                                                <input type="number" step="0.01" min="0" name="peak_extra_amount_{{ pk.id }}" value="{{ pk.extra_amount if pk.extra_amount is not none and pk.extra_amount != 0 else '' }}" placeholder="0.00" class="p-2 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-semibold w-32">
+                                            </td>
+                                            <td class="px-6 py-3">
+                                                {% if pk.is_active %}
+                                                <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600">Active</span>
+                                                {% else %}
+                                                <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-gray-100 text-gray-500">Inactive</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="px-6 py-3 text-right">
+                                                <div class="flex items-center justify-end gap-2">
+                                                    <button type="button" onclick="togglePeak({{ pk.id }})" class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 {% if pk.is_active %}bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-100{% else %}bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100{% endif %}">
+                                                        {% if pk.is_active %}
+                                                        <i class="fas fa-power-off"></i> Deactivate
+                                                        {% else %}
+                                                        <i class="fas fa-play"></i> Activate
+                                                        {% endif %}
+                                                    </button>
+                                                    {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
+                                                    <button type="button" onclick="deletePeak({{ pk.id }})" class="px-3 py-1.5 rounded-xl text-xs font-bold transition bg-gray-50 text-gray-500 border border-gray-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 flex items-center gap-1.5">
+                                                        <i class="fas fa-trash-alt"></i> Delete
+                                                    </button>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Security -->
+                <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="security">
+                    <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                        <i class="fas fa-shield-alt text-ziggo"></i> Security
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Min Password Length</label>
+                            <input type="number" min="1" name="min_password_length" value="{{ s.min_password_length or 6 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Session Timeout (minutes)</label>
+                            <input type="number" min="1" name="session_timeout_minutes" value="{{ s.session_timeout_minutes or 30 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Max Login Attempts</label>
+                            <input type="number" min="1" name="max_login_attempts" value="{{ s.max_login_attempts or 5 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Password Reset Option</label>
+                            <select name="password_reset_option" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                                <option value="email" {% if s.password_reset_option == 'email' %}selected{% endif %}>Email Only</option>
+                                <option value="sms" {% if s.password_reset_option == 'sms' %}selected{% endif %}>SMS Only</option>
+                                <option value="both" {% if s.password_reset_option == 'both' %}selected{% endif %}>Email & SMS</option>
+                                <option value="none" {% if s.password_reset_option == 'none' %}selected{% endif %}>Disabled</option>
+                            </select>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Notifications -->
+                <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="notifications">
+                    <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                        <i class="fas fa-bell text-ziggo"></i> Notifications
+                    </h3>
+                    <div class="space-y-3">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" name="email_notifications_enabled" {% if s.email_notifications_enabled %}checked{% endif %} class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
+                            <span class="text-sm font-bold text-ziggo-ink">Enable Email Notifications</span>
+                        </label>
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" name="sms_notifications_enabled" {% if s.sms_notifications_enabled %}checked{% endif %} class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
+                            <span class="text-sm font-bold text-ziggo-ink">Enable SMS Notifications</span>
+                        </label>
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" name="push_notifications_enabled" {% if s.push_notifications_enabled %}checked{% endif %} class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
+                            <span class="text-sm font-bold text-ziggo-ink">Enable Push Notifications</span>
+                        </label>
+                    </div>
+                </section>
+
+
+                <!-- Loyalty & Membership -->
+                <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="loyalty">
+                    <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                        <i class="fas fa-medal text-ziggo"></i> Loyalty &amp; Membership
+                    </h3>
+                    <div class="space-y-4">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" name="loyalty_is_active" {% if s.loyalty_is_active %}checked{% endif %} class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
+                            <span class="text-sm font-bold text-ziggo-ink">Enable Loyalty Points</span>
+                        </label>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Earn rate — Rs. spent per 1 point</label>
+                            <input type="number" step="0.01" min="0.01" name="loyalty_earn_rupees_per_point" value="{{ s.loyalty_earn_rupees_per_point or 10 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                            <p class="text-[10px] text-ziggo-faint font-bold mt-1">e.g. <span class="text-ziggo">10</span> means customer earns 1 point per Rs.10 spent.</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Value per point (Rs.)</label>
+                            <input type="number" step="0.01" min="0.01" name="loyalty_value_per_point" value="{{ s.loyalty_value_per_point or 0.50 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Min points to redeem</label>
+                            <input type="number" min="1" name="loyalty_min_redeem_points" value="{{ s.loyalty_min_redeem_points or 100 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Max % of an order paid with points</label>
+                            <input type="number" step="0.01" min="0" max="100" name="loyalty_max_redeem_order_pct" value="{{ s.loyalty_max_redeem_order_pct or 20 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Gold delivery discount (%)</label>
+                            <input type="number" step="0.01" min="0" max="100" name="gold_delivery_discount_pct" value="{{ s.gold_delivery_discount_pct or 50 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                            <p class="text-[10px] text-ziggo-faint font-bold mt-1">Discount off the delivery fee for Gold members on food &amp; market orders.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Trip Stops & Waiting -->
+                <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="trips">
+                    <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                        <i class="fas fa-map-pin text-ziggo"></i> Trip Stops &amp; Waiting
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Max intermediate stops</label>
+                            <input type="number" min="0" max="5" name="multi_stop_max_count" value="{{ s.multi_stop_max_count or 2 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                            <p class="text-[10px] text-ziggo-faint font-bold mt-1">How many stops a rider can add between pickup &amp; drop.</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Free wait per stop (minutes)</label>
+                            <input type="number" min="0" name="multi_stop_free_minutes" value="{{ s.multi_stop_free_minutes or 3 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Excess wait charge (Rs./minute)</label>
+                            <input type="number" step="0.01" min="0" name="multi_stop_excess_per_minute" value="{{ s.multi_stop_excess_per_minute or 5 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                            <p class="text-[10px] text-ziggo-faint font-bold mt-1">Billed per started minute beyond the free window. Goes to the driver.</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Fee per stop (Rs.)</label>
+                            <input type="number" step="0.01" min="0" name="multi_stop_fee_per_stop" value="{{ s.multi_stop_fee_per_stop or 50 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                            <p class="text-[10px] text-ziggo-faint font-bold mt-1">Fixed surcharge per added stop, on top of the per-km fare.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Incentives -->
+                <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="incentives">
+                    <div class="flex justify-between items-center mb-5">
+                        <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink">
+                            <i class="fas fa-gift text-ziggo"></i> Driver Incentives
+                        </h3>
+                        <button type="button" onclick="openCreateModal()" class="px-3.5 py-2 text-sm bg-ziggo text-white rounded-xl font-semibold shadow-brand hover:bg-ziggo-light transition flex items-center gap-1.5">
+                            <i class="fas fa-plus text-xs"></i> Add Incentive Tier
+                        </button>
+                    </div>
+
+                    <!-- Table -->
+                    <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="bg-gray-50 text-[11px] uppercase text-ziggo-muted font-black tracking-wider">
+                                    <tr>
+                                        <th class="px-6 py-4">Title</th>
+                                        <th class="px-6 py-4">Duration (Days)</th>
+                                        <th class="px-6 py-4">Trips Required</th>
+                                        <th class="px-6 py-4">Reward Amount</th>
+                                        <th class="px-6 py-4">Status</th>
+                                        <th class="px-6 py-4">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-ziggo-line">
+                                    {% for inc in incentives %}
+                                    <tr class="hover:bg-gray-50/50">
+                                        <td class="px-6 py-4 font-bold text-ziggo-ink">{{ inc.title }}</td>
+                                        <td class="px-6 py-4 text-sm text-ziggo-ink font-normal">
+                                            {{ inc.limit_days }} {% if inc.limit_days == 1 %}Day{% else %}Days{% endif %}
+                                        </td>
+                                        <td class="px-6 py-4 text-sm text-ziggo-ink font-normal">{{ inc.trips_required }}</td>
+                                        <td class="px-6 py-4 text-sm text-ziggo-ink font-semibold text-emerald-600">LKR {{ "%.2f"|format(inc.reward_amount or 0) }}</td>
+                                        <td class="px-6 py-4">
+                                            {% if inc.is_active %}
+                                            <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600">Active</span>
+                                            {% else %}
+                                            <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-gray-100 text-gray-500">Inactive</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex items-center gap-2">
+                                                <button type="button"
+                                                    onclick='openEditModal({{ {
+                                                        "id": inc.id,
+                                                        "title": inc.title,
+                                                        "limit_days": inc.limit_days,
+                                                        "trips_required": inc.trips_required,
+                                                        "reward_amount": (inc.reward_amount|float) if inc.reward_amount is not none else 0,
+                                                        "is_active": inc.is_active,
+                                                     }|tojson }})'
+                                                    class="px-3 py-1.5 bg-blue-50 text-ziggo border border-blue-100 rounded-lg text-xs font-bold hover:bg-blue-100 transition flex items-center gap-1.5">
+                                                    <i class="fas fa-edit"></i> Edit
+                                                </button>
+                                                {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
+                                                <button type="button" onclick="confirmDelete({{ inc.id }})" title="Delete" class="px-2.5 py-1.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-lg text-xs font-bold hover:bg-rose-100 transition flex items-center">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="6" class="px-6 py-16 text-center">
+                                            <i class="fas fa-gift text-4xl text-ziggo-faint mb-3"></i>
+                                            <p class="text-ziggo-muted font-bold">No incentive milestones configured. Click <span class="text-ziggo">Add Incentive Tier</span> to create one.</p>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Logo & Favicon -->
+                <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="branding">
+                    <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-5">
+                        <i class="fas fa-image text-ziggo"></i> Logo &amp; Favicon
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-2">Logo</label>
+                            <div id="logoPreviewContainer" class="bg-gray-50 border border-ziggo-line rounded-2xl p-3 flex items-center justify-center h-24 mb-2">
+                                <img src="{{ s.logo_url or '/static/img/logo.jpeg' }}" alt="Logo" class="max-h-full max-w-full object-contain">
+                            </div>
+                            <input type="file" name="logo" id="logoInput" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="w-full text-xs">
+                            <p class="text-[10px] text-ziggo-faint font-bold mt-1">JPG/PNG/WEBP/SVG, max 5 MB.</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-ziggo-muted mb-2">Favicon</label>
+                            <div id="faviconPreviewContainer" class="bg-gray-50 border border-ziggo-line rounded-2xl p-3 flex items-center justify-center h-24 mb-2">
+                                <img src="{{ s.favicon_url or '/static/img/logo.jpeg' }}" alt="Favicon" class="max-h-full max-w-full object-contain">
+                            </div>
+                            <input type="file" name="favicon" id="faviconInput" accept="image/png,image/x-icon,image/vnd.microsoft.icon,image/svg+xml" class="w-full text-xs">
+                            <p class="text-[10px] text-ziggo-faint font-bold mt-1">ICO/PNG/SVG, max 5 MB.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Save (applies to every tab — all fields submit together) -->
+                <div class="flex items-center gap-3 pt-2" id="settingsSaveBar">
+                    <button type="submit" class="px-8 py-4 bg-ziggo text-white rounded-2xl font-black shadow-brand hover:bg-ziggo-light transition flex items-center gap-2">
+                        <i class="fas fa-save"></i> Save All Settings
+                    </button>
+                    <a href="/admin/settings" class="px-6 py-4 border border-ziggo-line rounded-2xl font-black text-ziggo-muted hover:bg-gray-50">Reset</a>
+                    {% if s.updated_at %}
+                    <span class="text-xs text-ziggo-faint font-bold ml-auto">Last updated {{ s.updated_at|colombo_dt("%Y-%m-%d %H:%M") }}</span>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Create / Edit Modal -->
+<div id="incentiveModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-[1100] p-4">
+    <div class="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+        <div class="p-6 border-b border-ziggo-line flex justify-between items-center bg-gray-50/50 flex-shrink-0">
+            <h3 class="text-xl font-black text-ziggo" id="incModalTitle">New Incentive Tier</h3>
+            <button type="button" onclick="closeModal()" class="text-ziggo-faint hover:text-ziggo-ink">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        <form id="incentiveForm" method="POST" class="p-8 space-y-5 overflow-y-auto">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Title</label>
+                    <input type="text" name="title" id="incTitle" required placeholder="e.g. One Day Incentives" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Duration (Days)</label>
+                    <input type="number" min="1" name="limit_days" id="incLimitDays" required placeholder="e.g. 1" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    <p class="text-[10px] text-ziggo-faint font-bold mt-1">Number of days to achieve the trips requirement (e.g. 1 day for daily, 6 days for weekday incentives).</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Trips Required</label>
+                    <input type="number" min="1" name="trips_required" id="incTripsRequired" required placeholder="e.g. 3" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Reward Amount (LKR)</label>
+                    <input type="number" step="0.01" min="0" name="reward_amount" id="incRewardAmount" required placeholder="e.g. 350.00" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div class="flex items-center pt-2">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="is_active" id="incActive" checked class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
+                        <span class="text-sm font-black text-ziggo-ink">Active</span>
+                    </label>
+                </div>
+            </div>
+            <div class="pt-4 flex justify-end gap-3 border-t border-ziggo-line">
+                <button type="button" onclick="closeModal()" class="px-6 py-3 border border-ziggo-line rounded-xl font-black text-ziggo-muted hover:bg-gray-50">Cancel</button>
+                <button type="submit" class="px-8 py-3 bg-ziggo text-white rounded-xl font-black hover:bg-ziggo-light shadow-brand">
+                    <span id="incSubmitText">Create Tier</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<form id="deleteIncentiveForm" method="POST" class="hidden"></form>
+<form id="togglePeakForm" method="POST" class="hidden"></form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        var tabs = document.querySelectorAll('.settings-tab');
+        var panels = document.querySelectorAll('.settings-panel');
+        function show(name) {
+            tabs.forEach(function (t) { t.classList.toggle('active', t.dataset.tab === name); });
+            panels.forEach(function (p) { p.classList.toggle('active', p.dataset.panel === name); });
+            var saveBar = document.getElementById('settingsSaveBar');
+            if (saveBar) {
+                saveBar.style.display = (name === 'incentives') ? 'none' : 'flex';
+            }
+            var activeTabInput = document.getElementById('activeTabInput');
+            if (activeTabInput) {
+                activeTabInput.value = name;
+            }
+            try { sessionStorage.setItem('ziSettingsTab', name); } catch (e) {}
+        }
+        tabs.forEach(function (t) { t.addEventListener('click', function () { show(this.dataset.tab); }); });
+        
+        // Restore the last-opened tab (checking query parameters first, then sessionStorage)
+        var saved = null;
+        try { saved = sessionStorage.getItem('ziSettingsTab'); } catch (e) {}
+        var urlParams = new URLSearchParams(window.location.search);
+        var tabParam = urlParams.get('tab');
+        if (tabParam && document.querySelector('.settings-panel[data-panel="' + tabParam + '"]')) {
+            show(tabParam);
+        } else if (saved && document.querySelector('.settings-panel[data-panel="' + saved + '"]')) {
+            show(saved);
+        }
+
+        // Setup image preview helper
+        function setupPreview(inputId, containerId) {
+            var input = document.getElementById(inputId);
+            var container = document.getElementById(containerId);
+            if (!input || !container) return;
+            var originalHTML = container.innerHTML;
+            
+            input.addEventListener('change', function() {
+                var file = this.files[0];
+                if (file) {
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        container.innerHTML = '<img src="' + e.target.result + '" class="max-h-full max-w-full object-contain">';
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    container.innerHTML = originalHTML;
+                }
+            });
+        }
+        setupPreview('logoInput', 'logoPreviewContainer');
+        setupPreview('faviconInput', 'faviconPreviewContainer');
+
+        // Modal Helpers
+        window.openCreateModal = function() {
+            document.getElementById('incModalTitle').innerText = 'New Incentive Tier';
+            document.getElementById('incSubmitText').innerText = 'Create Tier';
+            document.getElementById('incentiveForm').action = '/admin/incentives/new';
+            document.getElementById('incTitle').value = '';
+            document.getElementById('incLimitDays').value = 1;
+            document.getElementById('incTripsRequired').value = '';
+            document.getElementById('incRewardAmount').value = '';
+            document.getElementById('incActive').checked = true;
+            showModal();
+        };
+
+        window.openEditModal = function(inc) {
+            document.getElementById('incModalTitle').innerText = 'Edit Incentive Tier';
+            document.getElementById('incSubmitText').innerText = 'Save Changes';
+            document.getElementById('incentiveForm').action = '/admin/incentives/' + inc.id + '/edit';
+            document.getElementById('incTitle').value = inc.title;
+            document.getElementById('incLimitDays').value = inc.limit_days;
+            document.getElementById('incTripsRequired').value = inc.trips_required;
+            document.getElementById('incRewardAmount').value = inc.reward_amount;
+            document.getElementById('incActive').checked = !!inc.is_active;
+            showModal();
+        };
+
+        function showModal() {
+            const m = document.getElementById('incentiveModal');
+            if (m) {
+                m.classList.remove('hidden');
+                m.classList.add('flex');
+            }
+        }
+
+        window.closeModal = function() {
+            const m = document.getElementById('incentiveModal');
+            if (m) {
+                m.classList.add('hidden');
+                m.classList.remove('flex');
+            }
+        };
+
+        window.confirmDelete = function(id) {
+            if (confirm('Delete this incentive milestone permanently?')) {
+                var form = document.getElementById('deleteIncentiveForm');
+                if (form) {
+                    form.action = '/admin/incentives/' + id + '/delete';
+                    form.submit();
+                }
+            }
+        };
+
+        window.togglePeak = function(id) {
+            var form = document.getElementById('togglePeakForm');
+            if (form) {
+                form.action = '/admin/settings/peak-hours/' + id + '/toggle';
+                form.submit();
+            }
+        };
+
+        window.addPeakHour = function() {
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/admin/settings/peak-hours/new';
+            document.body.appendChild(form);
+            form.submit();
+        };
+
+        window.deletePeak = function(id) {
+            if (confirm('Are you sure you want to delete this peak hour slot?')) {
+                var form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/admin/settings/peak-hours/' + id + '/delete';
+                document.body.appendChild(form);
+                form.submit();
+            }
+        };
+
+
+        var incModal = document.getElementById('incentiveModal');
+        if (incModal) {
+            incModal.addEventListener('click', function(e) {
+                if (e.target === this) closeModal();
+            });
+        }
+    })();
+</script>
+{% endblock %}

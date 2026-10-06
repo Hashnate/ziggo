@@ -1,0 +1,690 @@
+{% extends "base.html" %}
+
+{% block title %}Market Vendors | Ziggo Admin{% endblock %}
+{% block page_title %}Market Vendor Management{% endblock %}
+
+{% block head %}
+<style>
+    /* Modal overlay stack on top of header (z-200) */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(8px);
+        z-index: 1000 !important;
+        justify-content: center;
+        align-items: center;
+        padding: 1.5rem;
+    }
+    .modal-container {
+        background: #ffffff;
+        border-radius: 1.5rem;
+        box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+        width: 100%;
+        max-width: 52rem;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        border: 1px solid #e2e8f0;
+        animation: modalFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        overflow: hidden;
+    }
+    @keyframes modalFadeIn {
+        from { opacity: 0; transform: translateY(10px) scale(0.98); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .modal-header {
+        flex-shrink: 0;
+        background: #ffffff;
+        border-bottom: 1px solid #f1f5f9;
+        padding: 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        z-index: 10;
+        border-top-left-radius: 1.5rem;
+        border-top-right-radius: 1.5rem;
+    }
+    .modal-body {
+        padding: 1.75rem 2rem 2rem 2rem;
+        overflow-y: auto;
+        flex: 1;
+    }
+    .modal-footer {
+        flex-shrink: 0;
+        background: #ffffff;
+        border-top: 1px solid #f1f5f9;
+        padding: 1.25rem 2rem;
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+    }
+    .section-card-modal {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 1.25rem;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        transition: all 0.2s ease;
+    }
+    .section-card-modal:hover {
+        border-color: #cbd5e1;
+        background: #f1f5f9;
+    }
+    /* Premium Button Gradient */
+    .btn-gradient {
+        background: linear-gradient(135deg, #090d16 0%, #1e40af 100%) !important;
+        color: #ffffff !important;
+        border: none !important;
+        transition: all 0.3s ease !important;
+    }
+    .btn-gradient:hover {
+        opacity: 0.95 !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 6px 20px rgba(30, 64, 175, 0.4) !important;
+    }
+    /* Highlight header borders */
+    .highlight-blue {
+        border-top: 4px solid #3b82f6;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-6xl mx-auto">
+    <div class="flex flex-wrap justify-start gap-4 mb-6">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4 min-w-[250px]">
+            <div class="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                <i class="fas fa-hand-holding-usd text-xl"></i>
+            </div>
+            <div>
+                <p class="text-[10px] uppercase font-bold text-gray-400">Total Commission</p>
+                <p class="text-xl font-black text-ziggo">Rs.{{ "{:,.2f}".format(total_commission) }}</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4 min-w-[250px]">
+            <div class="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center text-green-600">
+                <i class="fas fa-money-bill-wave text-xl"></i>
+            </div>
+            <div>
+                <p class="text-[10px] uppercase font-bold text-gray-400">Total Payout Amount</p>
+                <p class="text-xl font-black text-ziggo">Rs.{{ "{:,.2f}".format(total_payout) }}</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Header Controls -->
+    <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-wrap items-center justify-between gap-4 highlight-blue">
+        <div>
+            <h3 class="text-lg font-black text-ziggo">Mart Vendors</h3>
+            <p class="text-xs text-gray-400">Manage vendor profiles, delivery options, documents, and catalogs</p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+            <form method="GET" action="/admin/market" class="flex items-center gap-2">
+                <input type="text" name="search" value="{{ search }}" placeholder="Search vendor name..."
+                       class="px-3.5 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:border-ziggo w-48 shadow-sm">
+                
+                <select name="status" class="px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:border-ziggo bg-white shadow-sm">
+                    <option value="all" {% if status == 'all' %}selected{% endif %}>All Status</option>
+                    <option value="active" {% if status == 'active' %}selected{% endif %}>Active</option>
+                    <option value="suspended" {% if status == 'suspended' %}selected{% endif %}>Suspended</option>
+                </select>
+
+                <button type="submit" class="p-2.5 bg-ziggo text-white rounded-xl hover:bg-ziggo-light transition shadow-sm">
+                    <i class="fas fa-search"></i>
+                </button>
+                {% if search or status != 'all' %}
+                <a href="/admin/market" class="p-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition">
+                    <i class="fas fa-undo"></i>
+                </a>
+                {% endif %}
+            </form>
+
+            <button type="button" onclick="openAddVendorModal()"
+                    class="bg-ziggo text-white px-3.5 py-2 rounded-xl font-semibold text-sm hover:bg-ziggo-light transition-all shadow-brand inline-flex items-center gap-2">
+                <i class="fas fa-plus text-xs"></i> Add Vendor
+            </button>
+        </div>
+    </div>
+
+    <!-- Vendor List Redesign -->
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-400 font-bold border-b border-gray-100">
+                    <tr>
+                        <th class="px-6 py-4">Vendor Info</th>
+                        <th class="px-6 py-4">Category</th>
+                        <th class="px-6 py-4">Status</th>
+                        <th class="px-6 py-4 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for v in vendors %}
+                    <tr class="hover:bg-slate-50/50 transition-colors">
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-3">
+                                {% if v.logo_url or v.image_url %}
+                                <img src="{{ v.logo_url or v.image_url }}" class="w-10 h-10 rounded-xl object-cover flex-shrink-0 border border-gray-200">
+                                {% else %}
+                                <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-lg flex-shrink-0">
+                                    <i class="fas fa-store"></i>
+                                </div>
+                                {% endif %}
+                                <div>
+                                    <p class="font-bold text-sm text-slate-800">{{ v.name }}</p>
+                                    <p class="text-xs text-gray-400 max-w-[300px] break-words line-clamp-2" title="{{ v.description or '' }}">{{ v.description or '' }}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-sm">
+                            <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700">
+                                {{ v.category or 'Other' }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold
+                                  {% if v.is_active %}bg-green-50 text-green-700{% else %}bg-slate-100 text-slate-500{% endif %}">
+                                <span class="w-1.5 h-1.5 rounded-full {% if v.is_active %}bg-green-500{% else %}bg-slate-400{% endif %}"></span>
+                                {{ 'Active' if v.is_active else 'Suspended' }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex items-center justify-end gap-2 whitespace-nowrap">
+                                {% if v.is_active %}
+                                    <form method="post" action="/admin/market/{{ v.id }}/suspend"
+                                          onsubmit="return confirm('Suspend {{ v.name }}? Customers will stop seeing this vendor immediately.');" class="inline">
+                                        <button class="px-3 py-1.5 rounded-xl border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50 transition">Suspend</button>
+                                    </form>
+                                {% else %}
+                                    <form method="post" action="/admin/market/{{ v.id }}/activate" class="inline">
+                                        <button class="px-3 py-1.5 rounded-xl bg-green-600 text-white text-xs font-bold hover:bg-green-700 transition">Reactivate</button>
+                                    </form>
+                                {% endif %}
+                                <button
+                                    onclick='openEditVendor({{ v.id }}, {{ v.name|tojson }}, {{ (v.category or "")|tojson }}, {{ (v.description or "")|tojson }}, {{ (v.address or "")|tojson }}, {{ (v.phone_number or "")|tojson }}, {{ (v.opening_time or "")|tojson }}, {{ (v.closing_time or "")|tojson }}, {{ (v.delivery_fee or 0)|float }}, {{ (v.eta_minutes or 40) }}, {{ (v.commission_percentage or 10)|float }}, {{ (v.priority_level or "standard")|tojson }}, {{ ("yes" if v.is_featured else "no")|tojson }}, {{ (v.bank_name or "")|tojson }}, {{ (v.account_holder_name or "")|tojson }}, {{ (v.account_number or "")|tojson }}, {{ (v.branch_name or "")|tojson }}, {{ (v.pickup_fee or 70.0)|float }}, {{ (v.per_km_rate or 40.0)|float }}, {{ (v.boost or 0.0)|float }}, {{ (v.lat or 6.9271)|float }}, {{ (v.lng or 79.8612)|float }}, {{ (v.max_settle_amount or 1000.0)|float }})'
+                                    class="px-3 py-1.5 rounded-xl bg-blue-50 text-blue-600 text-xs font-bold hover:bg-blue-600 hover:text-white transition inline-flex items-center gap-1"
+                                    title="Edit Vendor">
+                                    <i class="fas fa-pen text-[10px]"></i>
+                                </button>
+                                {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
+                                <form method="post" action="/admin/market/{{ v.id }}/delete" onsubmit="return confirm('Are you sure you want to delete this vendor? This will also permanently delete all associated products and orders.');" class="inline">
+                                    <button type="submit" class="px-3 py-1.5 rounded-xl bg-red-50 text-red-600 text-xs font-bold hover:bg-red-600 hover:text-white transition inline-flex items-center gap-1" title="Delete Vendor">
+                                        <i class="fas fa-trash text-[10px]"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                                <a href="/admin/market/{{ v.id }}"
+                                   class="bg-ziggo text-white px-3.5 py-2 rounded-xl text-xs font-semibold hover:bg-ziggo-light transition inline-flex items-center gap-1.5">
+                                    Manage Products <i class="fas fa-arrow-right text-[10px]"></i>
+                                </a>
+                            </div>
+                        </td>
+
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="px-6 py-12 text-center text-slate-400">
+                            <i class="fas fa-store-slash text-4xl mb-3 block"></i>
+                            <p class="text-sm font-bold">No vendors found</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if total_pages > 1 %}
+        <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-slate-50/50">
+            <p class="text-sm text-slate-500">
+                Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
+                <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
+                <span class="font-bold text-ziggo">{{ total_vendors }}</span> vendors
+            </p>
+            <div class="flex items-center gap-1.5">
+                {% if page > 1 %}
+                    <a href="/admin/market?page={{ page - 1 }}&search={{ search }}&status={{ status }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
+                {% else %}
+                    <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Previous</span>
+                {% endif %}
+
+                {% for p in page_range %}
+                    {% if p == page %}
+                        <span class="px-3 py-1.5 rounded-lg bg-ziggo text-white text-xs font-black">{{ p }}</span>
+                    {% else %}
+                        <a href="/admin/market?page={{ p }}&search={{ search }}&status={{ status }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page < total_pages %}
+                    <a href="/admin/market?page={{ page + 1 }}&search={{ search }}&status={{ status }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
+                {% else %}
+                    <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Next</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal Popup Form -->
+<div id="addVendorModal" class="modal-overlay">
+    <form method="post" action="/admin/market/new" enctype="multipart/form-data" class="modal-container highlight-blue">
+        <div class="modal-header">
+            <div>
+                <h3 class="text-lg font-black text-ziggo">Add New Market Vendor</h3>
+                <p class="text-xs text-gray-400">Complete the form below to register and onboard a vendor</p>
+            </div>
+            <button type="button" onclick="closeAddVendorModal()" class="text-gray-400 hover:text-red-500 transition text-xl">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body space-y-5">
+                <!-- 1. Basic Information -->
+                <div class="section-card-modal">
+                    <h4 class="text-xs font-black text-ziggo uppercase mb-3 tracking-wider flex items-center gap-1.5">
+                        <i class="fas fa-info-circle text-blue-500"></i> Basic Information
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Vendor Name *</label>
+                            <input name="name" required placeholder="e.g. Daily Fresh"
+                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Owner Full Name *</label>
+                            <input name="owner_full_name" required placeholder="Owner Full Name"
+                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Email Address *</label>
+                            <input type="email" name="owner_email" required placeholder="owner@example.com"
+                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Mobile Number (10 digits) *</label>
+                            <input name="owner_phone" required pattern="\d{10}" placeholder="0712345678"
+                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Vendor Image / Logo (JPG, PNG, WEBP)</label>
+                            <input type="file" name="vendor_image" accept="image/*"
+                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-ziggo-soft file:text-ziggo hover:file:bg-ziggo/10 bg-slate-50/50">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Business Information -->
+                <div class="section-card-modal">
+                    <h4 class="text-xs font-black text-ziggo uppercase mb-3 tracking-wider flex items-center gap-1.5">
+                        <i class="fas fa-briefcase text-green-500"></i> Business Details
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Business Type *</label>
+                            <select name="category" required
+                                    class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white text-sm">
+                                <option value="Grocery">Grocery</option>
+                                <option value="Pharmacy">Pharmacy</option>
+                                <option value="Electronics">Electronics</option>
+                                <option value="Bakery">Bakery</option>
+                                <option value="Liquor">Liquor</option>
+                                <option value="Stationery">Stationery</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Registration No.</label>
+                            <input name="business_registration_number" placeholder="PV-10002"
+                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Tax/VAT Number</label>
+                            <input name="tax_vat_number" placeholder="VAT-202300"
+                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                        </div>
+                        <div class="md:col-span-3">
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Description</label>
+                            <input name="description" placeholder="Short description of products"
+                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Location Selector -->
+                <div class="section-card-modal">
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="text-xs font-black text-ziggo uppercase tracking-wider flex items-center gap-1.5">
+                            <i class="fas fa-map-marked-alt text-red-500"></i> Location Selector
+                        </h4>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div class="md:col-span-2">
+                                <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Store Address *</label>
+                                <input id="vendor_address" name="address" required placeholder="Vendor physical location"
+                                       class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Latitude *</label>
+                                <input id="vendor_lat" name="lat" type="number" step="0.0000001" required value="6.9271"
+                                       class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Longitude *</label>
+                                <input id="vendor_lng" name="lng" type="number" step="0.0000001" required value="79.8612"
+                                       class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Delivery Config -->
+                <div class="section-card-modal">
+                    <h4 class="text-xs font-black text-ziggo uppercase mb-3 tracking-wider flex items-center gap-1.5">
+                        <i class="fas fa-truck text-purple-500"></i> Delivery Settings
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Self Delivery *</label>
+                            <select name="self_delivery" id="self_delivery" onchange="toggleSelfDelivery()" required
+                                    class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white text-sm">
+                                <option value="no">No</option>
+                                <option value="yes">Yes</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Marketplace Delivery *</label>
+                            <select name="marketplace_delivery" required
+                                    class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white text-sm">
+                                <option value="yes">Yes</option>
+                                <option value="no">No</option>
+                            </select>
+                        </div>
+                        <div id="delivery_radius_container">
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase" id="radius_label">Delivery Radius (KM)</label>
+                            <input type="number" step="0.1" name="delivery_radius_km" id="delivery_radius_km" placeholder="5.0"
+                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Prep Time (mins)</label>
+                            <input type="number" name="average_prep_time_minutes" value="30" min="5"
+                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                        </div>
+                    </div>
+                </div>
+
+
+
+                <!-- 7. Marketplace Configuration -->
+                <div class="section-card-modal">
+                    <h4 class="text-xs font-black text-ziggo uppercase mb-3 tracking-wider flex items-center gap-1.5">
+                        <i class="fas fa-sliders-h text-pink-500"></i> Marketplace Configuration
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Status *</label>
+                            <select name="vendor_status" required
+                                    class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white text-sm">
+                                <option value="active">Active</option>
+                                <option value="pending">Pending</option>
+                                <option value="suspended">Suspended</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Commission (%) *</label>
+                            <input type="number" step="0.01" name="commission_percentage" value="10.00" min="0" max="100" required
+                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Max Settle Amount (Rs.) *</label>
+                            <input type="number" step="0.01" name="max_settle_amount" value="1000.00" min="0" required
+                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Pickup Fee (%) *</label>
+                            <input type="number" step="0.01" name="pickup_fee" value="70.00" min="0" max="100" required
+                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Per KM Rate (Rs.) *</label>
+                            <input type="number" step="0.01" name="per_km_rate" value="40.00" min="0" required
+                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Boost (%) *</label>
+                            <input type="number" step="0.01" name="boost" value="0.00" min="0" max="100" required
+                                   class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Priority Level</label>
+                            <select name="priority_level"
+                                    class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white text-sm">
+                                <option value="standard">Standard</option>
+                                <option value="premium">Premium</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 mb-0.5 uppercase">Featured Vendor</label>
+                            <select name="is_featured"
+                                    class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white text-sm">
+                                <option value="no">No</option>
+                                <option value="yes">Yes</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+        </div>
+        <!-- Form actions / Modal footer -->
+        <div class="modal-footer">
+            <button type="button" onclick="closeAddVendorModal()" class="px-5 py-2.5 border border-gray-200 rounded-xl font-bold text-gray-600 text-sm hover:bg-gray-50">Cancel</button>
+            <button type="submit" class="btn-gradient px-7 py-2.5 rounded-xl font-bold text-sm">
+                Create Vendor
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Edit Vendor Modal -->
+<div id="editVendorModal" class="modal-overlay">
+    <form id="editVendorForm" method="post" enctype="multipart/form-data" class="modal-container highlight-blue">
+        <div class="modal-header">
+            <div>
+                <h3 class="text-base font-black text-ziggo flex items-center gap-2"><i class="fas fa-pen-to-square text-blue-500"></i> Edit Vendor</h3>
+                <p class="text-xs text-gray-400 mt-0.5">Update the vendor details below</p>
+            </div>
+            <button type="button" onclick="closeEditVendorModal()" class="text-gray-400 hover:text-red-500 transition text-xl"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Vendor Name *</label>
+                    <input id="ev_name" name="name" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Category</label>
+                    <select id="ev_category" name="category" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white text-sm">
+                        <option value="Grocery">Grocery</option>
+                        <option value="Pharmacy">Pharmacy</option>
+                        <option value="Electronics">Electronics</option>
+                        <option value="Bakery">Bakery</option>
+                        <option value="Liquor">Liquor</option>
+                        <option value="Stationery">Stationery</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Phone Number</label>
+                    <input id="ev_phone" name="phone_number" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Address</label>
+                    <input id="ev_address" name="address" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Latitude *</label>
+                    <input id="ev_lat" name="lat" type="number" step="0.0000001" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Longitude *</label>
+                    <input id="ev_lng" name="lng" type="number" step="0.0000001" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Description</label>
+                    <input id="ev_description" name="description" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Vendor Image / Logo (JPG, PNG, WEBP)</label>
+                    <input type="file" name="vendor_image" accept="image/*" class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-ziggo-soft file:text-ziggo hover:file:bg-ziggo/10 bg-slate-50/50">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Opening Time</label>
+                    <input id="ev_opening" name="opening_time" type="time" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Closing Time</label>
+                    <input id="ev_closing" name="closing_time" type="time" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Delivery Fee (%)</label>
+                    <input id="ev_delivery_fee" name="delivery_fee" type="number" step="0.01" min="0" max="100" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">ETA (minutes)</label>
+                    <input id="ev_eta" name="eta_minutes" type="number" min="5" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Commission (%)</label>
+                    <input id="ev_commission" name="commission_percentage" type="number" step="0.01" min="0" max="100" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Max Settle Amount (Rs.)</label>
+                    <input id="ev_max_settle" name="max_settle_amount" type="number" step="0.01" min="0" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Pickup Fee (%) *</label>
+                    <input id="ev_pickup_fee" name="pickup_fee" type="number" step="0.01" min="0" max="100" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Per KM Rate (Rs.) *</label>
+                    <input id="ev_per_km_rate" name="per_km_rate" type="number" step="0.01" min="0" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Boost (%) *</label>
+                    <input id="ev_boost" name="boost" type="number" step="0.01" min="0" max="100" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Priority Level</label>
+                    <select id="ev_priority" name="priority_level" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white text-sm">
+                        <option value="standard">Standard</option>
+                        <option value="premium">Premium</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Featured Vendor</label>
+                    <select id="ev_featured" name="is_featured" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white text-sm">
+                        <option value="no">No</option>
+                        <option value="yes">Yes</option>
+                    </select>
+                </div>
+
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" onclick="closeEditVendorModal()" class="px-5 py-2.5 border border-gray-200 rounded-xl font-bold text-gray-600 text-sm hover:bg-gray-50">Cancel</button>
+            <button type="submit" class="btn-gradient px-7 py-2.5 rounded-xl font-bold text-sm">Save Changes</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    var map;
+    var marker;
+
+    function openAddVendorModal() {
+        var modal = document.getElementById('addVendorModal');
+        modal.style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('addVendorModal').style.display = 'none';
+    }
+
+    function closeEditVendorModal() {
+        document.getElementById('editVendorModal').style.display = 'none';
+    }
+
+    function openEditVendor(id, name, category, description, address, phone, opening, closing, delivery_fee, eta, commission, priority, featured, bank, account_holder, account_number, branch, pickup_fee, per_km_rate, boost, lat, lng, max_settle) {
+        document.getElementById('editVendorForm').action = '/admin/market/' + id + '/edit';
+        document.getElementById('ev_name').value = name || '';
+        document.getElementById('ev_category').value = category || 'Other';
+        document.getElementById('ev_description').value = description || '';
+        document.getElementById('ev_address').value = address || '';
+        document.getElementById('ev_lat').value = lat !== undefined ? lat : 6.9271;
+        document.getElementById('ev_lng').value = lng !== undefined ? lng : 79.8612;
+        document.getElementById('ev_phone').value = phone || '';
+        document.getElementById('ev_opening').value = opening || '';
+        document.getElementById('ev_closing').value = closing || '';
+        document.getElementById('ev_delivery_fee').value = delivery_fee || 0;
+        document.getElementById('ev_eta').value = eta || 40;
+        document.getElementById('ev_commission').value = commission || 10;
+        document.getElementById('ev_max_settle').value = max_settle || 1000;
+        document.getElementById('ev_priority').value = priority || 'standard';
+        document.getElementById('ev_featured').value = featured || 'no';
+        document.getElementById('ev_pickup_fee').value = pickup_fee !== undefined ? pickup_fee : 70.00;
+        document.getElementById('ev_per_km_rate').value = per_km_rate !== undefined ? per_km_rate : 40.00;
+        document.getElementById('ev_boost').value = boost !== undefined ? boost : 0.00;
+        document.getElementById('editVendorModal').style.display = 'flex';
+    }
+
+    // Close on clicking overlay
+    window.onclick = function(event) {
+        var modal = document.getElementById('addVendorModal');
+        if (event.target == modal) {
+            closeModal();
+        }
+        var editModal = document.getElementById('editVendorModal');
+        if (event.target == editModal) {
+            closeEditVendorModal();
+        }
+    }
+
+    function closeAddVendorModal() {
+        closeModal();
+    }
+
+    // Toggle self delivery fields
+    function toggleSelfDelivery() {
+        var selfDelivery = document.getElementById('self_delivery').value;
+        var radiusContainer = document.getElementById('delivery_radius_container');
+        var radiusInput = document.getElementById('delivery_radius_km');
+        var radiusLabel = document.getElementById('radius_label');
+
+        if (selfDelivery === 'yes') {
+            radiusInput.required = true;
+            radiusLabel.innerHTML = "Delivery Radius (KM) *";
+            radiusContainer.style.opacity = "1";
+        } else {
+            radiusInput.required = false;
+            radiusInput.value = "";
+            radiusLabel.innerHTML = "Delivery Radius (KM)";
+        }
+    }
+
+    // Run toggle on init
+    document.addEventListener("DOMContentLoaded", function() {
+        toggleSelfDelivery();
+    });
+</script>
+{% endblock %}

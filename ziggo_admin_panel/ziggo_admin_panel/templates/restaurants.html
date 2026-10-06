@@ -1,0 +1,365 @@
+{% extends "base.html" %}
+
+{% block title %}Restaurants | Ziggo Admin{% endblock %}
+{% block page_title %}Restaurant Management{% endblock %}
+
+{% block head %}
+<style>
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(8px);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+        padding: 1.5rem;
+    }
+    .modal-container {
+        background: #ffffff;
+        border-radius: 1.5rem;
+        box-shadow: 0 25px 50px -12px rgba(15,23,42,0.25);
+        width: 100%;
+        max-width: 48rem;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid #e2e8f0;
+        animation: modalFadeIn 0.25s cubic-bezier(0.16,1,0.3,1);
+        overflow: hidden;
+    }
+    @keyframes modalFadeIn {
+        from { opacity: 0; transform: translateY(10px) scale(0.98); }
+        to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .modal-header {
+        flex-shrink: 0;
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid #f1f5f9;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .modal-body {
+        padding: 1.5rem;
+        overflow-y: auto;
+        flex: 1;
+    }
+    .modal-footer {
+        flex-shrink: 0;
+        padding: 1rem 1.5rem;
+        border-top: 1px solid #f1f5f9;
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-wrap justify-start gap-4 mb-6">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4 min-w-[250px]">
+        <div class="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+            <i class="fas fa-hand-holding-usd text-xl"></i>
+        </div>
+        <div>
+            <p class="text-[10px] uppercase font-bold text-gray-400">Total Commission</p>
+            <p class="text-xl font-black text-ziggo">Rs.{{ "{:,.2f}".format(total_commission) }}</p>
+        </div>
+    </div>
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4 min-w-[250px]">
+        <div class="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center text-green-600">
+            <i class="fas fa-money-bill-wave text-xl"></i>
+        </div>
+        <div>
+            <p class="text-[10px] uppercase font-bold text-gray-400">Total Payout Amount</p>
+            <p class="text-xl font-black text-ziggo">Rs.{{ "{:,.2f}".format(total_payout) }}</p>
+        </div>
+    </div>
+</div>
+
+<div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="p-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-4">
+        <h3 class="font-bold text-ziggo">Restaurants ({{ total_restaurants }})</h3>
+        
+        <form method="GET" action="/admin/restaurants" class="flex flex-wrap items-center gap-3 ml-auto">
+            <div>
+                <input type="text" name="search" value="{{ search }}" placeholder="Search by name..." class="px-3 py-2 border border-ziggo-line rounded-lg text-sm outline-none focus:border-ziggo w-48">
+            </div>
+            <div class="min-w-[120px]">
+                <select name="status" class="w-full px-3 py-2 border border-ziggo-line rounded-lg text-sm outline-none focus:border-ziggo bg-white">
+                    <option value="all" {% if status == 'all' %}selected{% endif %}>All Status</option>
+                    <option value="active" {% if status == 'active' %}selected{% endif %}>Active</option>
+                    <option value="pending" {% if status == 'pending' %}selected{% endif %}>Pending</option>
+                </select>
+            </div>
+            <button type="submit" class="px-4 py-2 bg-ziggo text-white rounded-lg font-black text-sm hover:bg-ziggo-light transition flex items-center gap-1.5">
+                <i class="fas fa-search"></i>
+            </button>
+            {% if search or status != 'all' %}
+            <a href="/admin/restaurants" class="px-4 py-2 bg-slate-700 text-white rounded-lg font-black text-sm hover:bg-slate-800 transition flex items-center gap-1.5">
+                <i class="fas fa-undo"></i>
+            </a>
+            {% endif %}
+        </form>
+
+        <a href="/admin/restaurants/new"
+           class="bg-ziggo text-white px-3.5 py-2 rounded-xl font-semibold text-sm hover:bg-ziggo-light transition-all inline-flex items-center">
+            <i class="fas fa-plus mr-1.5 text-xs"></i> Add Restaurant
+        </a>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead class="bg-ziggo-canvas/70 text-[11px] uppercase tracking-wider text-ziggo-faint font-black">
+                <tr>
+                    <th class="px-6 py-3">ID</th>
+                    <th class="px-6 py-3">Name</th>
+                    <th class="px-6 py-3">Owner</th>
+                    <th class="px-6 py-3">Cuisine</th>
+                    <th class="px-6 py-3">Address</th>
+                    <th class="px-6 py-3 text-right">Rating</th>
+                    <th class="px-6 py-3 text-right">Delivery</th>
+                    <th class="px-6 py-3">Hours</th>
+                    <th class="px-6 py-3">Status</th>
+                    <th class="px-6 py-3 text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for r in restaurants %}
+                <tr class="hover:bg-gray-50 {% if not r.is_active %}bg-amber-50/40{% endif %}">
+                    <td class="px-6 py-3 text-sm font-medium">#{{ r.id }}</td>
+                    <td class="px-6 py-3">
+                        <p class="text-sm font-bold text-ziggo">{{ r.name }}</p>
+                        <p class="text-xs text-gray-400 max-w-[300px] break-words line-clamp-2" title="{{ r.description or '' }}">{{ r.description or '' }}</p>
+                    </td>
+                    <td class="px-6 py-3 text-xs text-gray-600">
+                        {% if r.owner_phone %}
+                            <span class="font-mono">{{ r.owner_phone }}</span>
+                            <span class="block text-[10px] text-gray-400">self-registered</span>
+                        {% else %}
+                            <span class="text-gray-400">admin-added</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-3 text-sm">{{ r.cuisine or '-' }}</td>
+                    <td class="px-6 py-3 text-xs text-gray-600">{{ r.address or '' }}</td>
+                    <td class="px-6 py-3 text-right text-sm">
+                        <i class="fas fa-star text-yellow-400 text-xs"></i> {{ "{:.1f}".format((r.rating or 0)|float) }}
+                    </td>
+                    <td class="px-6 py-3 text-right text-sm font-normal">Rs.{{ "{:,.0f}".format(r.delivery_fee or 0) }}</td>
+                    <td class="px-6 py-3 text-xs text-gray-500">{{ r.opening_time or '' }} - {{ r.closing_time or '' }}</td>
+                    <td class="px-6 py-3">
+                        {% if r.is_active %}
+                            <span class="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">Active</span>
+                        {% else %}
+                            <span class="px-2 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700">Pending approval</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-3">
+                        <div class="flex items-center justify-end gap-2 whitespace-nowrap">
+                            {% if r.is_active %}
+                                <form method="post" action="/admin/restaurants/{{ r.id }}/suspend" onsubmit="return confirm('Suspend this restaurant? It will stop receiving orders.');" class="inline">
+                                    <button class="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-bold hover:bg-red-600 hover:text-white transition">Suspend</button>
+                                </form>
+                            {% else %}
+                                <form method="post" action="/admin/restaurants/{{ r.id }}/approve" class="inline">
+                                    <button class="px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-bold hover:bg-green-600 hover:text-white transition">Approve</button>
+                                </form>
+                            {% endif %}
+                            <button
+                                onclick='openEditRestaurant({{ r.id }}, {{ r.name|tojson }}, {{ (r.description or "")|tojson }}, {{ (r.cuisine or "")|tojson }}, {{ (r.address or "")|tojson }}, {{ (r.phone_number or "")|tojson }}, {{ (r.opening_time or "")|tojson }}, {{ (r.closing_time or "")|tojson }}, {{ (r.delivery_fee or 0)|float }}, {{ (r.eta_minutes or 30) }}, {{ (r.owner_phone or "")|tojson }}, {{ (r.owner_full_name or "")|tojson }}, {{ (r.lat or 6.9271)|float }}, {{ (r.lng or 79.8612)|float }}, {{ (r.image_url or "")|tojson }}, {{ (r.pickup_fee or 70.0)|float }}, {{ (r.per_km_rate or 40.0)|float }}, {{ (r.boost or 0.0)|float }}, {{ (r.commission_percentage or 20.0)|float }}, {{ (r.max_settle_amount or 1000.0)|float }})'
+                                class="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-xs font-bold hover:bg-blue-600 hover:text-white transition inline-flex items-center gap-1"
+                                title="Edit Restaurant">
+                                <i class="fas fa-pen text-[10px]"></i>
+                            </button>
+                            {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
+                            <form method="post" action="/admin/restaurants/{{ r.id }}/delete" onsubmit="return confirm('Are you sure you want to delete this restaurant? This action cannot be undone.');" class="inline">
+                                <button type="submit" class="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-bold hover:bg-red-600 hover:text-white transition inline-flex items-center gap-1" title="Delete Restaurant">
+                                    <i class="fas fa-trash text-[10px]"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                            <a href="/admin/restaurants/{{ r.id }}" class="px-3 py-1.5 rounded-lg bg-ziggo-soft text-ziggo text-xs font-bold inline-flex items-center gap-1.5 hover:bg-ziggo hover:text-white transition">Manage →</a>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10" class="px-6 py-10 text-center text-gray-400">
+                        No restaurants yet. <a href="/admin/restaurants/new" class="text-blue-600 hover:underline font-bold">Add your first one</a>.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination controls -->
+    {% if total_pages > 1 %}
+    <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
+        <p class="text-sm text-gray-500">
+            Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
+            <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
+            <span class="font-bold text-ziggo">{{ total_restaurants }}</span> restaurants
+        </p>
+        <div class="flex items-center gap-1.5">
+            {% if page > 1 %}
+                <a href="/admin/restaurants?page={{ page - 1 }}&search={{ search }}&status={{ status }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
+            {% else %}
+                <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Previous</span>
+            {% endif %}
+
+            {% for p in page_range %}
+                {% if p == page %}
+                    <span class="px-3 py-1.5 rounded-lg bg-ziggo text-white text-xs font-black">{{ p }}</span>
+                {% else %}
+                    <a href="/admin/restaurants?page={{ p }}&search={{ search }}&status={{ status }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
+                {% endif %}
+            {% endfor %}
+
+            {% if page < total_pages %}
+                <a href="/admin/restaurants?page={{ page + 1 }}&search={{ search }}&status={{ status }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
+            {% else %}
+                <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Next</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Edit Restaurant Modal -->
+<div id="editRestaurantModal" class="modal-overlay">
+    <form id="editRestaurantForm" method="post" enctype="multipart/form-data" class="modal-container">
+        <div class="modal-header">
+            <div>
+                <h3 class="text-base font-black text-ziggo flex items-center gap-2"><i class="fas fa-pen-to-square text-blue-500"></i> Edit Restaurant</h3>
+                <p class="text-xs text-gray-400 mt-0.5">Update the restaurant details below</p>
+            </div>
+            <button type="button" onclick="closeEditRestaurant()" class="text-gray-400 hover:text-red-500 transition text-xl"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Owner phone (10 digits)</label>
+                    <input id="edit_r_owner_phone" name="owner_phone" pattern="\d{10}" placeholder="0712345678" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Owner full name</label>
+                    <input id="edit_r_owner_name" name="owner_full_name" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Restaurant Name *</label>
+                    <input id="edit_r_name" name="name" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Cuisine</label>
+                    <input id="edit_r_cuisine" name="cuisine" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Phone Number</label>
+                    <input id="edit_r_phone" name="phone_number" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Address</label>
+                    <input id="edit_r_address" name="address" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Latitude</label>
+                    <input id="edit_r_lat" name="lat" type="number" step="0.0000001" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Longitude</label>
+                    <input id="edit_r_lng" name="lng" type="number" step="0.0000001" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Description</label>
+                    <input id="edit_r_description" name="description" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Image File (optional)</label>
+                    <input id="edit_r_image" name="image" type="file" accept="image/*" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Opening Time</label>
+                    <input id="edit_r_opening" name="opening_time" type="time" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Closing Time</label>
+                    <input id="edit_r_closing" name="closing_time" type="time" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Delivery Fee (%)</label>
+                    <input id="edit_r_delivery_fee" name="delivery_fee" type="number" step="0.01" min="0" max="100" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">ETA (minutes)</label>
+                    <input id="edit_r_eta" name="eta_minutes" type="number" min="5" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Pickup Fee (%) *</label>
+                    <input id="edit_r_pickup_fee" name="pickup_fee" type="number" step="0.01" min="0" max="100" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Per KM Rate (Rs.) *</label>
+                    <input id="edit_r_per_km_rate" name="per_km_rate" type="number" step="0.01" min="0" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Boost (%) *</label>
+                    <input id="edit_r_boost" name="boost" type="number" step="0.01" min="0" max="100" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Commission Percentage (%) *</label>
+                    <input id="edit_r_commission_percentage" name="commission_percentage" type="number" step="0.01" min="0" max="100" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Max Settle Amount (Rs.) *</label>
+                    <input id="edit_r_max_settle_amount" name="max_settle_amount" type="number" step="0.01" min="0" required class="w-full px-3 py-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" onclick="closeEditRestaurant()" class="px-5 py-2.5 border border-gray-200 rounded-xl font-bold text-gray-600 text-sm hover:bg-gray-50">Cancel</button>
+            <button type="submit" class="px-7 py-2.5 bg-ziggo text-white rounded-xl font-bold text-sm hover:bg-ziggo-light transition">Save Changes</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function openEditRestaurant(id, name, description, cuisine, address, phone, opening, closing, delivery_fee, eta, owner_phone, owner_name, lat, lng, image_url, pickup_fee, per_km_rate, boost, commission_percentage, max_settle_amount) {
+        document.getElementById('editRestaurantForm').action = '/admin/restaurants/' + id + '/edit';
+        document.getElementById('edit_r_name').value = name || '';
+        document.getElementById('edit_r_description').value = description || '';
+        document.getElementById('edit_r_cuisine').value = cuisine || '';
+        document.getElementById('edit_r_address').value = address || '';
+        document.getElementById('edit_r_phone').value = phone || '';
+        document.getElementById('edit_r_opening').value = opening || '';
+        document.getElementById('edit_r_closing').value = closing || '';
+        document.getElementById('edit_r_delivery_fee').value = delivery_fee || 0;
+        document.getElementById('edit_r_eta').value = eta || 30;
+        document.getElementById('edit_r_owner_phone').value = owner_phone || '';
+        document.getElementById('edit_r_owner_name').value = owner_name || '';
+        document.getElementById('edit_r_lat').value = lat || 6.9271;
+        document.getElementById('edit_r_lng').value = lng || 79.8612;
+        document.getElementById('edit_r_image').value = '';
+        document.getElementById('edit_r_pickup_fee').value = pickup_fee !== undefined ? pickup_fee : 70.00;
+        document.getElementById('edit_r_per_km_rate').value = per_km_rate !== undefined ? per_km_rate : 40.00;
+        document.getElementById('edit_r_boost').value = boost !== undefined ? boost : 0.00;
+        document.getElementById('edit_r_commission_percentage').value = commission_percentage !== undefined ? commission_percentage : 20.00;
+        document.getElementById('edit_r_max_settle_amount').value = max_settle_amount !== undefined ? max_settle_amount : 1000.00;
+        document.getElementById('editRestaurantModal').style.display = 'flex';
+    }
+
+    function closeEditRestaurant() {
+        document.getElementById('editRestaurantModal').style.display = 'none';
+    }
+
+    window.addEventListener('click', function(e) {
+        if (e.target === document.getElementById('editRestaurantModal')) {
+            closeEditRestaurant();
+        }
+    });
+</script>
+{% endblock %}

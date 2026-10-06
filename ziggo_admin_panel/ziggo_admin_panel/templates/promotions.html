@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+
+{% block title %}Promotion Management | Ziggo Admin{% endblock %}
+{% block page_title %}Promotion Management{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Header Controls -->
+    <div class="flex justify-end">
+        <button onclick="openCreateModal()" style="padding:7px 12px!important" class="text-sm bg-ziggo text-white rounded-lg font-semibold shadow-brand hover:bg-ziggo-light transition flex items-center gap-1.5">
+            <i class="fas fa-plus text-xs"></i> Add New Promotion
+        </button>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-gray-50 text-[11px] uppercase text-ziggo-muted font-black tracking-wider">
+                    <tr>
+                        <th class="px-6 py-4">Code</th>
+                        <th class="px-6 py-4">Category</th>
+                        <th class="px-6 py-4">Discount</th>
+                        <th class="px-6 py-4">Valid Until</th>
+                        <th class="px-6 py-4">Usage</th>
+                        <th class="px-6 py-4">Status</th>
+                        <th class="px-6 py-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-ziggo-line">
+                    {% for p in promos %}
+                    <tr class="hover:bg-gray-50/50">
+                        <td class="px-6 py-4 font-bold text-ziggo">{{ p.code }}</td>
+                        <td class="px-6 py-4 text-xs font-black uppercase tracking-wider text-ziggo-faint">{{ (p.category or 'all')|upper }}</td>
+                        <td class="px-6 py-4 text-sm font-bold text-ziggo-ink">
+                            {% if p.discount_type == 'percentage' %}{{ "%.2f"|format(p.discount_value or 0) }}%{% else %}Rs.{{ "%.2f"|format(p.discount_value or 0) }}{% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-sm text-ziggo-muted">{{ p.valid_to|colombo_dt("%d %b %Y") if p.valid_to else '—' }}</td>
+                        <td class="px-6 py-4 text-sm text-ziggo-ink">{{ p.used_count or 0 }} / {{ p.usage_limit if p.usage_limit else '∞' }}</td>
+                        <td class="px-6 py-4">
+                            {% if p.is_active %}
+                            <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600">Active</span>
+                            {% else %}
+                            <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-gray-100 text-gray-500">Paused</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-2">
+                                <button title="Edit"
+                                    onclick='openEditModal({{ {
+                                        "id": p.id,
+                                        "code": p.code,
+                                        "description": p.description or "",
+                                        "category": p.category or "all",
+                                        "discount_type": p.discount_type,
+                                        "discount_value": (p.discount_value|float) if p.discount_value is not none else 0,
+                                        "min_order_amount": (p.min_order_amount|float) if p.min_order_amount is not none else 0,
+                                        "max_discount": (p.max_discount|float) if p.max_discount is not none else "",
+                                        "usage_limit": p.usage_limit if p.usage_limit is not none else "",
+                                        "valid_from": p.valid_from.strftime("%Y-%m-%d") if p.valid_from else "",
+                                        "valid_to": p.valid_to.strftime("%Y-%m-%d") if p.valid_to else "",
+                                        "is_active": p.is_active,
+                                    }|tojson }})'
+                                    class="px-3 py-1.5 bg-blue-50 text-ziggo border border-blue-100 rounded-lg text-xs font-bold hover:bg-blue-100 transition flex items-center gap-1.5">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                                <form method="POST" action="/admin/promotions/{{ p.id }}/toggle">
+                                    <button title="{{ 'Pause' if p.is_active else 'Resume' }}" type="submit"
+                                            class="px-2.5 py-1.5 bg-gray-50 text-ziggo-muted border border-ziggo-line rounded-lg text-xs font-bold hover:bg-gray-100 transition flex items-center">
+                                        <i class="fas {{ 'fa-pause' if p.is_active else 'fa-play' }}"></i>
+                                    </button>
+                                </form>
+                                {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
+                                <form method="POST" action="/admin/promotions/{{ p.id }}/delete" onsubmit="return confirm('Delete promo {{ p.code }}? Bookings that already used it keep the discount.');">
+                                    <button title="Delete" type="submit"
+                                            class="px-2.5 py-1.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-lg text-xs font-bold hover:bg-rose-100 transition flex items-center">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="px-6 py-16 text-center">
+                            <i class="fas fa-tag text-4xl text-ziggo-faint mb-3"></i>
+                            <p class="text-ziggo-muted font-bold">No promotions yet. Click <span class="text-ziggo">Add New Promotion</span> to create one.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination controls -->
+        {% if total_pages > 1 %}
+        <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
+            <p class="text-sm text-gray-500">
+                Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
+                <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
+                <span class="font-bold text-ziggo">{{ total_promos }}</span> promotions
+            </p>
+            <div class="flex items-center gap-1.5">
+                {% if page > 1 %}
+                    <a href="/admin/promotions?page={{ page - 1 }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
+                {% else %}
+                    <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Previous</span>
+                {% endif %}
+
+                {% for p in page_range %}
+                    {% if p == page %}
+                        <span class="px-3 py-1.5 rounded-lg bg-ziggo text-white text-xs font-black">{{ p }}</span>
+                    {% else %}
+                        <a href="/admin/promotions?page={{ p }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page < total_pages %}
+                    <a href="/admin/promotions?page={{ page + 1 }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
+                {% else %}
+                    <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Next</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Create / Edit Modal -->
+<div id="promoModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+        <div class="p-6 border-b border-ziggo-line flex justify-between items-center bg-gray-50/50 flex-shrink-0">
+            <h3 class="text-xl font-black text-ziggo" id="pmModalTitle">New promotion</h3>
+            <button onclick="closeModal()" class="text-ziggo-faint hover:text-ziggo-ink">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        <form id="promoForm" method="POST" class="p-8 space-y-5 overflow-y-auto">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Code</label>
+                    <input type="text" name="code" id="pmCode" required pattern="[A-Za-z0-9_-]+" placeholder="e.g. SUMMER20" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo uppercase">
+                    <p class="text-[10px] text-ziggo-faint font-bold mt-1">A-Z, 0-9, _-. Cannot change after create.</p>
+                </div>
+                <div class="flex items-end">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="is_active" id="pmActive" checked class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
+                        <span class="text-sm font-black text-ziggo-ink">Active</span>
+                    </label>
+                </div>
+                <div class="col-span-2">
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Description</label>
+                    <textarea name="description" id="pmDesc" rows="2" placeholder="What riders see in the app" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo"></textarea>
+                </div>
+                <div class="col-span-2">
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Category</label>
+                    <select name="category" id="pmCategory" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white">
+                        <option value="all">All checkouts</option>
+                        <option value="rides">Rides only</option>
+                        <option value="food">Food only</option>
+                        <option value="market">Market only</option>
+                    </select>
+                    <p class="text-[10px] text-ziggo-faint font-bold mt-1">Where this promo can be applied.</p>
+                </div>
+
+                <div class="col-span-2 pt-2">
+                    <p class="text-xs font-black text-ziggo uppercase tracking-wider">Discount</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Discount type</label>
+                    <select name="discount_type" id="pmType" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white">
+                        <option value="percentage">Percentage (%)</option>
+                        <option value="fixed">Fixed amount (Rs)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Value</label>
+                    <input type="number" step="0.01" min="0" name="discount_value" id="pmValue" required class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Min order (Rs)</label>
+                    <input type="number" step="0.01" min="0" name="min_order_amount" id="pmMin" value="0" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Max discount (Rs)</label>
+                    <input type="number" step="0.01" min="0" name="max_discount" id="pmMax" placeholder="leave empty for no cap" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+
+                <div class="col-span-2 pt-2">
+                    <p class="text-xs font-black text-ziggo uppercase tracking-wider">Limits &amp; validity</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Usage limit</label>
+                    <input type="number" min="0" name="usage_limit" id="pmLimit" placeholder="leave empty for unlimited" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div></div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Valid from</label>
+                    <input type="date" name="valid_from" id="pmFrom" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Valid until</label>
+                    <input type="date" name="valid_to" id="pmTo" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                </div>
+            </div>
+            <div class="pt-2 flex justify-end gap-3">
+                <button type="button" onclick="closeModal()" class="px-6 py-3 border border-ziggo-line rounded-xl font-black text-ziggo-muted hover:bg-gray-50">Cancel</button>
+                <button type="submit" class="px-8 py-3 bg-ziggo text-white rounded-xl font-black hover:bg-ziggo-light shadow-brand">
+                    <span id="pmSubmitText">Create promotion</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openCreateModal() {
+    document.getElementById('pmModalTitle').innerText = 'New promotion';
+    document.getElementById('pmSubmitText').innerText = 'Create promotion';
+    document.getElementById('promoForm').action = '/admin/promotions/new';
+    document.getElementById('pmCode').value = '';
+    document.getElementById('pmCode').disabled = false;
+    document.getElementById('pmDesc').value = '';
+    document.getElementById('pmCategory').value = 'all';
+    document.getElementById('pmType').value = 'percentage';
+    document.getElementById('pmValue').value = '';
+    document.getElementById('pmMin').value = 0;
+    document.getElementById('pmMax').value = '';
+    document.getElementById('pmLimit').value = '';
+    document.getElementById('pmFrom').value = '';
+    document.getElementById('pmTo').value = '';
+    document.getElementById('pmActive').checked = true;
+    showModal();
+}
+
+function openEditModal(p) {
+    document.getElementById('pmModalTitle').innerText = 'Edit — ' + p.code;
+    document.getElementById('pmSubmitText').innerText = 'Save changes';
+    document.getElementById('promoForm').action = '/admin/promotions/' + p.id + '/edit';
+    document.getElementById('pmCode').value = p.code;
+    document.getElementById('pmCode').disabled = true;
+    document.getElementById('pmDesc').value = p.description || '';
+    document.getElementById('pmCategory').value = p.category || 'all';
+    document.getElementById('pmType').value = p.discount_type || 'percentage';
+    document.getElementById('pmValue').value = p.discount_value;
+    document.getElementById('pmMin').value = p.min_order_amount || 0;
+    document.getElementById('pmMax').value = p.max_discount === '' ? '' : p.max_discount;
+    document.getElementById('pmLimit').value = p.usage_limit === '' ? '' : p.usage_limit;
+    document.getElementById('pmFrom').value = p.valid_from || '';
+    document.getElementById('pmTo').value = p.valid_to || '';
+    document.getElementById('pmActive').checked = !!p.is_active;
+    showModal();
+}
+
+function showModal() {
+    const m = document.getElementById('promoModal');
+    m.classList.remove('hidden');
+    m.classList.add('flex');
+}
+
+function closeModal() {
+    const m = document.getElementById('promoModal');
+    m.classList.add('hidden');
+    m.classList.remove('flex');
+}
+
+document.getElementById('promoModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+});
+</script>
+{% endblock %}

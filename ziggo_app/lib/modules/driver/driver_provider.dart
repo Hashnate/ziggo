@@ -416,8 +416,8 @@ class DriverProvider extends ChangeNotifier {
     }
   }
 
-  bool get profileComplete => _profile?['profile_complete'] == true;
-  bool get isApproved => _profile?['is_approved'] == true;
+  bool get profileComplete => _profile?['profile_complete'] == true || isApproved;
+  bool get isApproved => _profile?['is_approved'] == true || _profile?['status'] == 'approved';
 
   Future<String?> register({
     required String fullName,

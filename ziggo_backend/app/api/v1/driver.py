@@ -39,17 +39,9 @@ async def _get_driver(db: AsyncSession, user: User) -> Driver:
 
 
 def _is_complete(d: Driver) -> bool:
-    return all(
-        [
-            d.vehicle_type,
-            d.vehicle_number,
-            d.license_number,
-            d.nic_number,
-            d.relative_name,
-            d.relative_contact,
-            d.relative_relationship,
-        ]
-    )
+    if d.is_approved or (d.status and getattr(d.status, "value", str(d.status)) == "approved"):
+        return True
+    return bool(d.vehicle_type and d.vehicle_number and d.license_number and d.nic_number)
 
 
 def _to_response(user: User, d: Driver, paid_payouts: float = 0.0, pending_payout: float = 0.0, peaks: list = None) -> DriverProfileResponse:

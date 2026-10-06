@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}Driver finance | Ziggo Admin{% endblock %}
+{% block page_title %}{{ data.driver.name or 'Driver' }}{% endblock %}
+{% block content %}
+{% set d = data.driver %}{% set t = data.totals %}
+<div class="space-y-6 max-w-6xl mx-auto">
+    <a href="/admin/finance/drivers" class="inline-flex items-center text-sm font-bold text-gray-500 hover:text-ziggo">
+        <i class="fas fa-arrow-left mr-2"></i> Back to driver earnings
+    </a>
+
+    <!-- Driver summary -->
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-wrap items-center gap-6">
+        <div class="w-20 h-20 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-3xl">
+            {% set vt = (d.vehicle_type or '')|lower %}
+            {% if 'tuk' in vt or 'auto' in vt or 'three' in vt or 'rick' in vt %}
+            <svg viewBox="0 0 24 24" class="w-8 h-8" fill="currentColor" aria-hidden="true"><path d="M20 14.05V12.73C20 12.26 19.84 11.8 19.54 11.44L15.6 6.72C15.22 6.26 14.66 6 14.06 6H4C2.9 6 2 6.9 2 8V15C2 16.1 2.9 17 4 17H4.05C4.28 18.14 5.29 19 6.5 19S8.72 18.14 8.95 17H17.05C17.28 18.14 18.29 19 19.5 19C20.88 19 22 17.88 22 16.5C22 15.29 21.14 14.28 20 14.05M3.5 8C3.5 7.73 3.73 7.5 4 7.5H7V12H3.5V8M6.5 17.5C5.95 17.5 5.5 17.05 5.5 16.5S5.95 15.5 6.5 15.5 7.5 15.95 7.5 16.5 7.05 17.5 6.5 17.5M13 15.5H9V14H11V12H9V7.5H13V15.5M15 8.34L18.05 12H15V8.34M19.5 17.5C18.95 17.5 18.5 17.05 18.5 16.5S18.95 15.5 19.5 15.5 20.5 15.95 20.5 16.5 20.05 17.5 19.5 17.5Z"/></svg>
+            {% else %}
+            <i class="fas {% if 'bike' in vt or 'moto' in vt %}fa-motorcycle{% elif 'van' in vt %}fa-shuttle-van{% elif 'truck' in vt or 'lorry' in vt %}fa-truck{% else %}fa-car{% endif %}"></i>
+            {% endif %}
+        </div>
+        <div class="flex-1 min-w-[220px]">
+            <h2 class="text-2xl font-black text-ziggo">{{ d.name or '—' }}</h2>
+            <p class="text-sm text-gray-500">{{ d.phone or '—' }} · <span class="capitalize">{{ d.vehicle_type or '—' }}</span> · {{ d.vehicle_number or '—' }}</p>
+            <div class="mt-2 flex flex-wrap gap-3 text-xs text-gray-600 font-bold">
+                <span><i class="fas fa-star text-yellow-400"></i> {{ "{:.1f}".format((d.rating or 0)|float) }}</span>
+                <span class="px-2 py-0.5 rounded-full {% if d.is_online %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-500{% endif %}">{{ 'ONLINE' if d.is_online else 'OFFLINE' }}</span>
+                <span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 capitalize">{{ d.status or '—' }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Totals -->
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p class="text-[10px] uppercase font-black text-gray-400 tracking-widest">Lifetime earnings</p>
+            <p class="text-xl font-black text-ziggo mt-1">Rs.{{ "{:,.0f}".format(t.lifetime_earnings) }}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p class="text-[10px] uppercase font-black text-gray-400 tracking-widest">Platform fees</p>
+            <p class="text-xl font-black text-amber-600 mt-1">Rs.{{ "{:,.0f}".format(t.lifetime_platform_paid) }}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p class="text-[10px] uppercase font-black text-gray-400 tracking-widest">Commission Due</p>
+            <p class="text-xl font-black {% if (d.settlement_amount or 0) > 0 %}text-rose-600{% else %}text-gray-400{% endif %} mt-1">Rs.{{ "{:,.0f}".format(d.settlement_amount or 0) }}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p class="text-[10px] uppercase font-black text-gray-400 tracking-widest">Pending Payout</p>
+            <p class="text-xl font-black {% if (d.pending_payout or 0) > 0 %}text-emerald-600{% else %}text-gray-400{% endif %} mt-1">Rs.{{ "{:,.0f}".format(d.pending_payout or 0) }}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p class="text-[10px] uppercase font-black text-gray-400 tracking-widest">Rides / Flash</p>
+            <p class="text-xl font-black mt-1">{{ t.rides }} <span class="text-xs text-gray-400">+ {{ t.flash }}</span></p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p class="text-[10px] uppercase font-black text-gray-400 tracking-widest">Food / Market</p>
+            <p class="text-xl font-black mt-1">{{ t.food }} <span class="text-xs text-gray-400">+ {{ t.market }}</span></p>
+        </div>
+    </div>
+
+    <!-- Transactions -->
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-gray-100 flex items-center justify-between">
+            <div class="flex items-baseline gap-4">
+                <h3 class="font-black text-ziggo">Transaction history</h3>
+                <p class="text-xs text-gray-400">{{ data.transactions | length }} latest</p>
+            </div>
+            <button onclick="openIncentiveModal()" class="px-3.5 py-1.5 text-xs bg-ziggo text-white rounded-lg font-bold shadow-sm hover:bg-ziggo-light transition flex items-center gap-1.5">
+                <i class="fas fa-gift"></i> Pay Incentive
+            </button>
+        </div>
+        <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-xs font-black uppercase text-gray-500 tracking-wider">
+                <tr>
+                    <th class="px-4 py-3 text-left">Kind</th>
+                    <th class="px-4 py-3 text-left">Ref</th>
+                    <th class="px-4 py-3 text-left">When</th>
+                    <th class="px-4 py-3 text-left">Status</th>
+                    <th class="px-4 py-3 text-left">Payment</th>
+                    <th class="px-4 py-3 text-right">Customer paid</th>
+                    <th class="px-4 py-3 text-right">Platform fee</th>
+                    <th class="px-4 py-3 text-right">Driver earned</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for t in data.transactions %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3">
+                        <span class="px-2 py-0.5 rounded-full text-xs font-black
+                            {% if t.kind == 'Ride' %}bg-blue-50 text-blue-700
+                            {% elif t.kind == 'Flash parcel' %}bg-cyan-50 text-cyan-700
+                            {% elif t.kind == 'Food delivery' %}bg-orange-50 text-orange-700
+                            {% else %}bg-green-50 text-green-700{% endif %}">
+                            {{ t.kind }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 font-mono text-xs">{{ t.ref }}</td>
+                    <td class="px-4 py-3 text-xs text-gray-500">{{ t.when[:16].replace('T', ' ') if t.when else '—' }}</td>
+                    <td class="px-4 py-3 text-xs capitalize">{{ t.status.replace('_', ' ') }}</td>
+                    <td class="px-4 py-3 text-xs uppercase">{{ t.payment }}</td>
+                    <td class="px-4 py-3 text-right">
+                        <span class="font-bold">Rs.{{ "{:,.2f}".format(t.customer_paid) }}</span>
+                        {% if t.promo_code %}
+                        <div>
+                            <span class="px-1.5 py-0.5 rounded text-[10px] bg-purple-50 text-purple-700 font-bold uppercase tracking-wider">{{ t.promo_code }}</span>
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-right text-amber-600 font-bold">Rs.{{ "{:,.2f}".format(t.platform_fee) }}</td>
+                    <td class="px-4 py-3 text-right">
+                        <span class="font-black text-green-700">Rs.{{ "{:,.2f}".format(t.amount) }}</span>
+                        {% if t.payment == 'cash' and t.customer_paid < t.amount %}
+                        <div class="text-[10px] text-emerald-600 font-bold">
+                            (+Rs.{{ "{:,.2f}".format(t.amount - t.customer_paid) }} Ziggo subsidy)
+                        </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not data.transactions %}
+                <tr><td colspan="8" class="p-10 text-center text-gray-400 text-sm font-bold">No transactions yet.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+
+<!-- Incentive Payout Modal -->
+<div id="incentiveModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col">
+        <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50 flex-shrink-0">
+            <h3 class="text-lg font-black text-ziggo">Pay Driver Incentive</h3>
+            <button onclick="closeIncentiveModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form method="POST" action="/admin/finance/drivers/{{ d.id }}/pay_incentive" class="p-5 space-y-4">
+            <div>
+                <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Amount (LKR)</label>
+                <input type="number" step="0.01" min="0" name="amount" required placeholder="e.g. 500" class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+            </div>
+            <div>
+                <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Note / Description</label>
+                <input type="text" name="note" value="Incentive Payment" required class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+            </div>
+            <div class="pt-3 flex justify-end gap-2">
+                <button type="button" onclick="closeIncentiveModal()" class="px-4 py-2 border border-gray-200 rounded-xl font-bold text-gray-500 hover:bg-gray-50 text-sm">Cancel</button>
+                <button type="submit" class="px-5 py-2 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light shadow-sm text-sm">
+                    Submit Payment
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openIncentiveModal() {
+    const m = document.getElementById('incentiveModal');
+    m.classList.remove('hidden');
+    m.classList.add('flex');
+}
+
+function closeIncentiveModal() {
+    const m = document.getElementById('incentiveModal');
+    m.classList.add('hidden');
+    m.classList.remove('flex');
+}
+
+document.getElementById('incentiveModal').addEventListener('click', function(e) {
+    if (e.target === this) closeIncentiveModal();
+});
+</script>
+
+{% endblock %}
