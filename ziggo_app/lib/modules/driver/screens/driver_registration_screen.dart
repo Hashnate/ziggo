@@ -157,10 +157,10 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
       final driver = context.read<DriverProvider>();
       final prof = driver.profile ?? {};
 
-      final draftName = prefs.getString('driver_reg_name') ?? (auth.user?.fullName ?? (prof['full_name']?.toString() ?? ''));
+      final draftName = prefs.getString('driver_reg_name') ?? (auth.fullName ?? (prof['full_name']?.toString() ?? ''));
       if (draftName.isNotEmpty && _fullName.text.isEmpty) _fullName.text = draftName;
 
-      final draftEmail = prefs.getString('driver_reg_email') ?? (auth.user?.email ?? (prof['email']?.toString() ?? ''));
+      final draftEmail = prefs.getString('driver_reg_email') ?? (auth.email ?? (prof['email']?.toString() ?? ''));
       if (draftEmail.isNotEmpty && _email.text.isEmpty) _email.text = draftEmail;
 
       final draftNic = prefs.getString('driver_reg_nic') ?? (prof['nic_number']?.toString() ?? '');
@@ -193,7 +193,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
       final draftDtype = prefs.getString('driver_reg_dtype') ?? (prof['driver_type']?.toString() ?? 'ride');
       _driverType = draftDtype;
 
-      final existingPhoto = auth.user?.profilePhoto ?? prof['profile_photo']?.toString();
+      final existingPhoto = auth.profilePhoto ?? prof['profile_photo']?.toString();
       if (existingPhoto != null && existingPhoto.isNotEmpty) {
         _profilePhotoUrl = existingPhoto;
       }
@@ -659,7 +659,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                               radius: 36,
                               backgroundColor: kDriverCardLight,
                               backgroundImage: _profilePhoto != null
-                                  ? FileImage(_profilePhoto!)
+                                  ? FileImage(_profilePhoto!) as ImageProvider
                                   : (_profilePhotoUrl != null && _profilePhotoUrl!.isNotEmpty
                                       ? NetworkImage(_absoluteUrl(_profilePhotoUrl!))
                                       : null),
