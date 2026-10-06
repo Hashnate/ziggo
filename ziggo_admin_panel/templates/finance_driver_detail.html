@@ -30,26 +30,30 @@
     </div>
 
     <!-- Totals -->
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Lifetime earnings</p>
-            <p class="text-2xl font-black text-ziggo mt-1">Rs.{{ "{:,.0f}".format(t.lifetime_earnings) }}</p>
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p class="text-[10px] uppercase font-black text-gray-400 tracking-widest">Lifetime earnings</p>
+            <p class="text-xl font-black text-ziggo mt-1">Rs.{{ "{:,.0f}".format(t.lifetime_earnings) }}</p>
         </div>
-        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Platform fees paid</p>
-            <p class="text-2xl font-black text-amber-600 mt-1">Rs.{{ "{:,.0f}".format(t.lifetime_platform_paid) }}</p>
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p class="text-[10px] uppercase font-black text-gray-400 tracking-widest">Platform fees</p>
+            <p class="text-xl font-black text-amber-600 mt-1">Rs.{{ "{:,.0f}".format(t.lifetime_platform_paid) }}</p>
         </div>
-        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Outstanding Settlement</p>
-            <p class="text-2xl font-black text-rose-600 mt-1">Rs.{{ "{:,.0f}".format(d.settlement_amount) }}</p>
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p class="text-[10px] uppercase font-black text-gray-400 tracking-widest">Commission Due</p>
+            <p class="text-xl font-black {% if (d.settlement_amount or 0) > 0 %}text-rose-600{% else %}text-gray-400{% endif %} mt-1">Rs.{{ "{:,.0f}".format(d.settlement_amount or 0) }}</p>
         </div>
-        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Rides / Parcels</p>
-            <p class="text-2xl font-black mt-1">{{ t.rides }} <span class="text-sm text-gray-400">+ {{ t.flash }} flash</span></p>
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p class="text-[10px] uppercase font-black text-gray-400 tracking-widest">Pending Payout</p>
+            <p class="text-xl font-black {% if (d.pending_payout or 0) > 0 %}text-emerald-600{% else %}text-gray-400{% endif %} mt-1">Rs.{{ "{:,.0f}".format(d.pending_payout or 0) }}</p>
         </div>
-        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Food / Market</p>
-            <p class="text-2xl font-black mt-1">{{ t.food }} <span class="text-sm text-gray-400">+ {{ t.market }}</span></p>
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p class="text-[10px] uppercase font-black text-gray-400 tracking-widest">Rides / Flash</p>
+            <p class="text-xl font-black mt-1">{{ t.rides }} <span class="text-xs text-gray-400">+ {{ t.flash }}</span></p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p class="text-[10px] uppercase font-black text-gray-400 tracking-widest">Food / Market</p>
+            <p class="text-xl font-black mt-1">{{ t.food }} <span class="text-xs text-gray-400">+ {{ t.market }}</span></p>
         </div>
     </div>
 
@@ -94,9 +98,23 @@
                     <td class="px-4 py-3 text-xs text-gray-500">{{ t.when[:16].replace('T', ' ') if t.when else '—' }}</td>
                     <td class="px-4 py-3 text-xs capitalize">{{ t.status.replace('_', ' ') }}</td>
                     <td class="px-4 py-3 text-xs uppercase">{{ t.payment }}</td>
-                    <td class="px-4 py-3 text-right">Rs.{{ "{:,.0f}".format(t.customer_paid) }}</td>
-                    <td class="px-4 py-3 text-right text-amber-600">Rs.{{ "{:,.0f}".format(t.platform_fee) }}</td>
-                    <td class="px-4 py-3 text-right font-black text-green-700">Rs.{{ "{:,.0f}".format(t.amount) }}</td>
+                    <td class="px-4 py-3 text-right">
+                        <span class="font-bold">Rs.{{ "{:,.2f}".format(t.customer_paid) }}</span>
+                        {% if t.promo_code %}
+                        <div>
+                            <span class="px-1.5 py-0.5 rounded text-[10px] bg-purple-50 text-purple-700 font-bold uppercase tracking-wider">{{ t.promo_code }}</span>
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-right text-amber-600 font-bold">Rs.{{ "{:,.2f}".format(t.platform_fee) }}</td>
+                    <td class="px-4 py-3 text-right">
+                        <span class="font-black text-green-700">Rs.{{ "{:,.2f}".format(t.amount) }}</span>
+                        {% if t.payment == 'cash' and t.customer_paid < t.amount %}
+                        <div class="text-[10px] text-emerald-600 font-bold">
+                            (+Rs.{{ "{:,.2f}".format(t.amount - t.customer_paid) }} Ziggo subsidy)
+                        </div>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% endfor %}
                 {% if not data.transactions %}

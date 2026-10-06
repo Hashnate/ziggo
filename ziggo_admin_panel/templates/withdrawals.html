@@ -10,7 +10,7 @@
             <div class="stat-icon bg-amber-100 text-amber-600"><i class="fas fa-clock"></i></div>
             <div>
                 <p class="text-[10px] text-ziggo-faint uppercase font-bold">Total pending</p>
-                <p class="text-2xl font-normal text-amber-600">Rs.{{ "{:,.0f}".format(total_pending) }}</p>
+                <p class="text-2xl font-normal text-amber-600">Rs.{{ "{:,.2f}".format(total_pending) }}</p>
             </div>
         </div>
     </div>
@@ -65,24 +65,30 @@
                         <p class="text-[10px] text-ziggo-faint">{{ r.phone }}</p>
                     </td>
                     <td class="px-6 py-3 text-xs capitalize">{{ r.vehicle_type }}</td>
-                    <td class="px-6 py-3 text-right text-sm font-normal">Rs.{{ "{:,.0f}".format(r.earned) }}</td>
-                    <td class="px-6 py-3 text-right text-sm">Rs.{{ "{:,.0f}".format(r.paid) }}</td>
-                    <td class="px-6 py-3 text-right text-sm {% if r.settlement_amount > 0 %}text-rose-600 font-bold{% else %}text-gray-400{% endif %}">Rs.{{ "{:,.0f}".format(r.settlement_amount) }}</td>
-                    <td class="px-6 py-3 text-right text-sm font-normal {% if r.pending > 0 %}text-amber-600{% else %}text-gray-400{% endif %}">
-                        Rs.{{ "{:,.0f}".format(r.pending) }}
+                    <td class="px-6 py-3 text-right text-sm font-normal">Rs.{{ "{:,.2f}".format(r.earned) }}</td>
+                    <td class="px-6 py-3 text-right text-sm">Rs.{{ "{:,.2f}".format(r.paid) }}</td>
+                    <td class="px-6 py-3 text-right text-sm {% if r.settlement_amount > 0 %}text-rose-600 font-bold{% else %}text-gray-400{% endif %}">Rs.{{ "{:,.2f}".format(r.settlement_amount) }}</td>
+                    <td class="px-6 py-3 text-right text-sm font-bold {% if r.pending > 0 %}text-amber-600{% else %}text-gray-400{% endif %}">
+                        Rs.{{ "{:,.2f}".format(r.pending) }}
                     </td>
                     <td class="px-6 py-3 text-right">
                         {% if r.pending > 0 %}
-                        <form method="post" action="/admin/withdrawals/{{ r.driver_id }}/pay" class="inline-flex items-center gap-1">
-                            <input type="number" step="0.01" min="0.01" max="{{ r.pending }}" value="{{ "%.2f"|format(r.pending) }}"
-                                   name="amount" class="w-28 px-2 py-1 rounded-lg border border-gray-200 text-xs text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none">
-                            <input type="hidden" name="note" value="Manual payout">
-                            <button class="px-3 py-1 rounded-lg bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-600">
-                                Pay
-                            </button>
-                        </form>
+                        <button type="button" 
+                                data-driver-id="{{ r.driver_id }}"
+                                data-name="{{ r.name or '' }}"
+                                data-phone="{{ r.phone or '' }}"
+                                data-vehicle="{{ r.vehicle_type or '' }}"
+                                data-pending="{{ "%.2f"|format(r.pending) }}"
+                                data-bank="{{ r.bank_name or '' }}"
+                                data-branch="{{ r.branch_name or '' }}"
+                                data-account="{{ r.account_number or '' }}"
+                                data-holder="{{ r.account_holder_name or '' }}"
+                                onclick="handleOpenPayout(this)" 
+                                class="px-3.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 shadow-sm flex items-center gap-1.5 ml-auto transition">
+                            <i class="fas fa-paper-plane text-[10px]"></i> Process Payout
+                        </button>
                         {% else %}
-                        <span class="text-xs text-gray-400">—</span>
+                        <span class="text-xs text-gray-400 font-bold">Settled</span>
                         {% endif %}
                     </td>
                 </tr>
@@ -126,8 +132,12 @@
 </div>
 
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-    <div class="p-5 border-b border-gray-100">
-        <h3 class="font-black text-ziggo-ink">Recent payouts</h3>
+    <div class="p-5 border-b border-gray-100 flex items-center justify-between">
+        <div>
+            <h3 class="font-black text-ziggo-ink">Payout & Transfer History</h3>
+            <p class="text-xs text-gray-400 mt-0.5">Audit log of all payouts issued to drivers.</p>
+        </div>
+        <span class="text-xs font-bold text-gray-400 bg-gray-50 px-2.5 py-1 rounded-lg">{{ history | length }} records</span>
     </div>
     <div class="overflow-x-auto">
         <table class="w-full text-left">
@@ -136,16 +146,20 @@
                     <th class="px-6 py-3">Date</th>
                     <th class="px-6 py-3">Driver</th>
                     <th class="px-6 py-3 text-right">Amount</th>
-                    <th class="px-6 py-3">Note</th>
+                    <th class="px-6 py-3">Method / Ref</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
                 {% for h in history %}
                 <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-3 text-xs text-gray-500">{{ h.created_at|colombo_dt("%Y-%m-%d %H:%M") }}</td>
+                    <td class="px-6 py-3 text-xs text-gray-500 whitespace-nowrap">{{ h.created_at|colombo_dt("%Y-%m-%d %H:%M") }}</td>
                     <td class="px-6 py-3 text-sm font-semibold">{{ h.user.full_name if h.user else '—' }}</td>
-                    <td class="px-6 py-3 text-right text-sm font-normal text-emerald-600">Rs.{{ "{:,.2f}".format(h.amount|float) }}</td>
-                    <td class="px-6 py-3 text-xs text-gray-500">{{ h.description or '' }}</td>
+                    <td class="px-6 py-3 text-right text-sm font-black text-emerald-600">Rs.{{ "{:,.2f}".format(h.amount|float) }}</td>
+                    <td class="px-6 py-3 text-xs text-gray-600">
+                        <span class="inline-flex items-center gap-1.5 bg-gray-100 px-2 py-0.5 rounded text-[11px] font-semibold text-gray-800">
+                            <i class="fas fa-receipt text-gray-400"></i> {{ h.description or 'Direct Settlement' }}
+                        </span>
+                    </td>
                 </tr>
                 {% else %}
                 <tr><td colspan="4" class="px-6 py-10 text-center text-gray-400">No payouts recorded yet</td></tr>
@@ -154,4 +168,150 @@
         </table>
     </div>
 </div>
+
+<!-- Driver Payout Modal -->
+<div id="payoutModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50 p-4 transition-opacity">
+    <div class="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col transform transition-all">
+        <!-- Header -->
+        <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/80 flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-lg">
+                    <i class="fas fa-paper-plane"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-black text-ziggo-ink">Process Driver Payout</h3>
+                    <p class="text-xs text-gray-400">Verify bank details and transfer details</p>
+                </div>
+            </div>
+            <button type="button" onclick="closePayoutModal()" class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <form id="payoutForm" method="POST" action="" class="p-6 space-y-4">
+            <!-- Driver summary box -->
+            <div class="bg-blue-50/50 rounded-xl p-3.5 border border-blue-100 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-blue-600 uppercase font-black tracking-wider" id="modalDriverType">Bike Driver</p>
+                    <p class="text-sm font-black text-ziggo-ink" id="modalDriverName">Mohamed Faris</p>
+                    <p class="text-xs text-gray-500" id="modalDriverPhone">0771234567</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-[10px] text-gray-400 uppercase font-bold">Total Pending</p>
+                    <p class="text-xl font-black text-emerald-600" id="modalDriverPending">Rs. 44.45</p>
+                </div>
+            </div>
+
+            <!-- Driver Bank Details Box -->
+            <div id="bankDetailsContainer" class="rounded-xl border p-4 bg-gray-50 border-gray-200">
+                <div class="flex items-center gap-2 mb-2">
+                    <i class="fas fa-university text-gray-600 text-sm"></i>
+                    <span class="text-xs font-black text-gray-700 uppercase tracking-wider">Driver Bank Account</span>
+                </div>
+                <div id="hasBankInfo" class="space-y-1.5 text-xs">
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Account Holder:</span>
+                        <span class="font-bold text-gray-800" id="modalAccountHolder">—</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Bank & Branch:</span>
+                        <span class="font-bold text-gray-800" id="modalBankName">—</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Account Number:</span>
+                        <span class="font-mono font-black text-blue-700 text-sm" id="modalAccountNumber">—</span>
+                    </div>
+                </div>
+                <div id="noBankInfo" class="hidden text-xs text-amber-700 font-bold bg-amber-50 p-2.5 rounded-lg border border-amber-200">
+                    <i class="fas fa-exclamation-triangle mr-1"></i> Driver has not entered bank details in their profile yet. You can proceed with Cash or Manual Bank Deposit.
+                </div>
+            </div>
+
+            <!-- Payment Fields -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-black text-gray-600 uppercase tracking-wider mb-1">Payout Amount (LKR)</label>
+                    <input type="number" step="0.01" min="0.01" name="amount" id="modalAmountInput" required
+                           class="w-full p-2.5 border border-gray-200 rounded-xl font-black text-sm outline-none focus:border-ziggo">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-gray-600 uppercase tracking-wider mb-1">Payment Method</label>
+                    <select name="payment_method" id="modalPaymentMethod" class="w-full p-2.5 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:border-ziggo bg-white">
+                        <option value="Direct Bank Transfer (CEFT)">Direct Bank Transfer (CEFT)</option>
+                        <option value="SLIPS Bank Transfer">SLIPS Bank Transfer</option>
+                        <option value="LankaPay / Payout Gateway">LankaPay / Payout Gateway</option>
+                        <option value="Cash Counter Settlement">Cash Counter Settlement</option>
+                        <option value="Cheque">Cheque</option>
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-black text-gray-600 uppercase tracking-wider mb-1">Transfer Ref / Transaction ID</label>
+                <input type="text" name="reference_id" id="modalRefInput" placeholder="e.g. CEFT-8492048 or Bank Deposit Slip No"
+                       class="w-full p-2.5 border border-gray-200 rounded-xl text-xs outline-none focus:border-ziggo">
+            </div>
+
+            <div>
+                <label class="block text-xs font-black text-gray-600 uppercase tracking-wider mb-1">Notes / Remarks (Optional)</label>
+                <input type="text" name="note" placeholder="e.g. Weekly payout batch"
+                       class="w-full p-2.5 border border-gray-200 rounded-xl text-xs outline-none focus:border-ziggo">
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="pt-3 flex justify-end gap-2 border-t border-gray-100">
+                <button type="button" onclick="closePayoutModal()" class="px-4 py-2 border border-gray-200 rounded-xl font-bold text-gray-500 hover:bg-gray-50 text-xs">
+                    Cancel
+                </button>
+                <button type="submit" class="px-5 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-sm text-xs flex items-center gap-1.5">
+                    <i class="fas fa-check-circle"></i> Confirm & Record Transfer
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function handleOpenPayout(btn) {
+    const d = btn.dataset;
+    const modal = document.getElementById('payoutModal');
+    const form = document.getElementById('payoutForm');
+    
+    form.action = `/admin/withdrawals/${d.driverId}/pay`;
+    
+    document.getElementById('modalDriverName').textContent = d.name || `Driver #${d.driverId}`;
+    document.getElementById('modalDriverPhone').textContent = d.phone || '—';
+    document.getElementById('modalDriverType').textContent = `${d.vehicle ? (d.vehicle.charAt(0).toUpperCase() + d.vehicle.slice(1)) : 'Vehicle'} Driver`;
+    
+    const pendingVal = parseFloat(d.pending) || 0;
+    document.getElementById('modalDriverPending').textContent = `Rs. ${pendingVal.toFixed(2)}`;
+    
+    const amountInput = document.getElementById('modalAmountInput');
+    amountInput.value = pendingVal.toFixed(2);
+    amountInput.max = pendingVal.toFixed(2);
+    
+    const hasBank = Boolean(d.bank || d.account);
+    if (hasBank) {
+        document.getElementById('hasBankInfo').classList.remove('hidden');
+        document.getElementById('noBankInfo').classList.add('hidden');
+        document.getElementById('modalAccountHolder').textContent = d.holder || d.name || '—';
+        document.getElementById('modalBankName').textContent = `${d.bank || '—'}${d.branch ? ' (' + d.branch + ')' : ''}`;
+        document.getElementById('modalAccountNumber').textContent = d.account || '—';
+    } else {
+        document.getElementById('hasBankInfo').classList.add('hidden');
+        document.getElementById('noBankInfo').classList.remove('hidden');
+    }
+    
+    document.getElementById('modalRefInput').value = '';
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closePayoutModal() {
+    const modal = document.getElementById('payoutModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+</script>
 {% endblock %}

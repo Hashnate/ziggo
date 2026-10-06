@@ -199,7 +199,12 @@
                           {{ b.status.value }}
                         </span>
                     </td>
-                    <td class="px-6 py-3 text-sm font-normal zi-num">Rs.{{ "{:,.0f}".format(b.final_amount or 0) }}</td>
+                    <td class="px-6 py-3 text-sm font-normal zi-num">
+                        <span class="font-bold">Rs.{{ "{:,.0f}".format(b.final_amount or 0) }}</span>
+                        {% if b.promo_code %}
+                        <div><span class="text-[10px] text-purple-600 font-bold bg-purple-50 px-1.5 py-0.5 rounded uppercase">{{ b.promo_code }}</span></div>
+                        {% endif %}
+                    </td>
                     <td class="px-6 py-3 text-xs text-gray-500 whitespace-nowrap">{{ b.booked_at|colombo_dt("%Y-%m-%d %H:%M") }}</td>
                 </tr>
                 {% else %}

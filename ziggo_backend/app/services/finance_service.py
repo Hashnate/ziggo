@@ -395,6 +395,10 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
             "market_deliveries": market_count,
             "last_location_update": d.last_location_update.isoformat() if d.last_location_update else None,
             "settlement_amount": float(outstanding),
+            "bank_name": d.bank_name or "",
+            "branch_name": d.branch_name or "",
+            "account_number": d.account_number or "",
+            "account_holder_name": d.account_holder_name or "",
         })
 
     rows.sort(key=lambda r: r["total_earnings"], reverse=True)
@@ -434,6 +438,8 @@ async def driver_finance_detail(db: AsyncSession, driver_id: int) -> Optional[di
             "amount": float(_dec(b.driver_earnings)),
             "customer_paid": float(_dec(b.final_amount or b.fare_amount)),
             "platform_fee": float(_dec(b.platform_fee)),
+            "promo_code": b.promo_code,
+            "discount_amount": float(_dec(b.discount_amount)),
             "status": b.status.value if b.status else "",
             "payment": b.payment_method or "",
             "when": (b.completed_at or b.booked_at).isoformat() if (b.completed_at or b.booked_at) else "",
@@ -446,6 +452,8 @@ async def driver_finance_detail(db: AsyncSession, driver_id: int) -> Optional[di
             "amount": float(earn),
             "customer_paid": float(_dec(o.final_amount)),
             "platform_fee": float(platform_fee),
+            "promo_code": None,
+            "discount_amount": 0.0,
             "status": o.status.value if o.status else "",
             "payment": o.payment_method or "",
             "when": (o.delivered_at or o.created_at).isoformat() if (o.delivered_at or o.created_at) else "",
@@ -458,6 +466,8 @@ async def driver_finance_detail(db: AsyncSession, driver_id: int) -> Optional[di
             "amount": float(earn),
             "customer_paid": float(_dec(o.final_amount)),
             "platform_fee": float(platform_fee),
+            "promo_code": None,
+            "discount_amount": 0.0,
             "status": o.status.value if o.status else "",
             "payment": o.payment_method or "",
             "when": (o.delivered_at or o.created_at).isoformat() if (o.delivered_at or o.created_at) else "",
@@ -474,6 +484,8 @@ async def driver_finance_detail(db: AsyncSession, driver_id: int) -> Optional[di
     )
 
     outstanding = await get_driver_outstanding_commission(db, d.id)
+    payout_stats = await get_driver_payout_stats(db, d.id)
+    pending_payout = payout_stats.get("pending", 0.0)
 
     return {
         "driver": {
@@ -490,10 +502,13 @@ async def driver_finance_detail(db: AsyncSession, driver_id: int) -> Optional[di
             "today_earnings": float(_dec(d.today_earnings)),
             "today_rides": int(d.today_rides or 0),
             "settlement_amount": float(outstanding),
+            "pending_payout": float(pending_payout),
         },
         "totals": {
             "lifetime_earnings": float(completed_amt),
             "lifetime_platform_paid": float(platform_paid),
+            "settlement_amount": float(outstanding),
+            "pending_payout": float(pending_payout),
             "rides": sum(1 for t in transactions if t["kind"] == "Ride" and t["status"] == "completed"),
             "flash": sum(1 for t in transactions if t["kind"] == "Flash parcel" and t["status"] == "completed"),
             "food": sum(1 for t in transactions if t["kind"] == "Food delivery" and t["status"] == "delivered"),
@@ -963,11 +978,10 @@ async def get_withdrawals_data(db: AsyncSession, page: int = 1, page_size: int =
     
     for r in all_driver_rows:
         drv_id = r["driver_id"]
-        earned = Decimal(str(r["online_earnings"]))
-        paid = payout_by_driver.get(drv_id, Decimal("0"))
-        pending = earned - paid
-        if pending < 0:
-            pending = Decimal("0")
+        stats = await get_driver_payout_stats(db, drv_id)
+        earned = Decimal(str(stats["earned"]))
+        paid = Decimal(str(stats["paid"]))
+        pending = Decimal(str(stats["pending"]))
         total_pending_all += pending
         
         rows.append({
@@ -975,6 +989,10 @@ async def get_withdrawals_data(db: AsyncSession, page: int = 1, page_size: int =
             "name": r["name"] or f"Driver #{drv_id}",
             "phone": r["phone"] or "",
             "vehicle_type": r["vehicle_type"] or "",
+            "bank_name": r.get("bank_name", ""),
+            "branch_name": r.get("branch_name", ""),
+            "account_number": r.get("account_number", ""),
+            "account_holder_name": r.get("account_holder_name", ""),
             "earned": float(earned),
             "paid": float(paid),
             "pending": float(pending),
@@ -1016,20 +1034,43 @@ async def get_withdrawals_data(db: AsyncSession, page: int = 1, page_size: int =
     }
 
 
-async def execute_driver_payout(db: AsyncSession, driver_id: int, amount: Decimal, note: str) -> None:
-    from app.models import DriverPayout, Driver
+async def execute_driver_payout(
+    db: AsyncSession,
+    driver_id: int,
+    amount: Decimal,
+    payment_method: str = "Bank Transfer",
+    reference_id: str = "",
+    note: str = "",
+) -> None:
+    from app.models import DriverPayout, Driver, Notification
     dq = await db.execute(select(Driver).where(Driver.id == driver_id))
     driver = dq.scalars().first()
     if not driver:
         raise ValueError("Driver not found")
-        
+
+    desc_parts = [payment_method]
+    if reference_id:
+        desc_parts.append(f"Ref: {reference_id}")
+    if note:
+        desc_parts.append(note)
+    full_desc = " · ".join(desc_parts)
+
     payout = DriverPayout(
         driver_id=driver.id,
         user_id=driver.user_id,
         amount=amount,
-        description=note,
+        description=full_desc,
     )
     db.add(payout)
+
+    # In-app notification for the driver
+    notif = Notification(
+        user_id=driver.user_id,
+        title="Payout Processed",
+        body=f"Your payout of Rs.{amount:,.2f} has been transferred via {payment_method}." + (f" (Ref: {reference_id})" if reference_id else ""),
+        type="payment",
+    )
+    db.add(notif)
     await db.commit()
 
 

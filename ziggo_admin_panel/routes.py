@@ -7481,12 +7481,21 @@ async def admin_withdrawals(
 async def admin_withdrawals_pay(
     driver_id: int,
     amount: float = Form(...),
-    note: str = Form("Manual payout"),
+    payment_method: str = Form("Direct Bank Transfer"),
+    reference_id: str = Form(""),
+    note: str = Form(""),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
     from decimal import Decimal
-    await fin.execute_driver_payout(db, driver_id, Decimal(str(amount)), note)
+    await fin.execute_driver_payout(
+        db,
+        driver_id,
+        Decimal(str(amount)),
+        payment_method=payment_method,
+        reference_id=reference_id,
+        note=note,
+    )
     return RedirectResponse(url="/admin/withdrawals", status_code=303)
 
 
@@ -7498,11 +7507,6 @@ async def admin_finance_drivers(
     _: User = Depends(current_admin),
 ):
     rows = await fin.driver_finance_table(db)
-    for r in rows:
-        r["total_earnings"] = 0.0
-        r["today"] = 0.0
-        r["this_week"] = 0.0
-        r["this_month"] = 0.0
     limit = 50
     offset = (page - 1) * limit
     total = len(rows)
@@ -7539,17 +7543,6 @@ async def admin_finance_driver_detail(
     data = await fin.driver_finance_detail(db, driver_id)
     if data is None:
         raise HTTPException(status_code=404, detail="Driver not found")
-    if "driver" in data:
-        data["driver"]["total_earnings"] = 0.0
-        data["driver"]["today_earnings"] = 0.0
-    if "totals" in data:
-        data["totals"]["lifetime_earnings"] = 0.0
-        data["totals"]["lifetime_platform_paid"] = 0.0
-    if "transactions" in data:
-        for t in data["transactions"]:
-            t["amount"] = 0.0
-            t["customer_paid"] = 0.0
-            t["platform_fee"] = 0.0
     return templates.TemplateResponse(
         request, "finance_driver_detail.html",
         {"request": request, "active_page": "finance", "data": data},
