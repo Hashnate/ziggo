@@ -95,13 +95,21 @@
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Vehicle Type</label>
                     <select name="vehicle_type" required
-                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
-                        {% set selected = driver.vehicle_type or 'car' %}
+                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
+                        {% set selected = (driver.vehicle_type or '')|lower %}
+                        {% for c in categories %}
+                        <option value="{{ c.service_type }}" {% if selected == c.service_type|lower %}selected{% endif %}>{{ c.display_name or c.service_type|title }}</option>
+                        {% endfor %}
+                        {% if selected and categories and selected not in categories|map(attribute='service_type')|list %}
+                        <option value="{{ selected }}" selected>{{ selected|title }}</option>
+                        {% endif %}
+                        {% if not categories %}
                         <option value="bike" {% if selected == 'bike' %}selected{% endif %}>Bike</option>
                         <option value="tuk" {% if selected == 'tuk' %}selected{% endif %}>Tuk-tuk</option>
                         <option value="car" {% if selected == 'car' %}selected{% endif %}>Car</option>
                         <option value="van" {% if selected == 'van' %}selected{% endif %}>Van</option>
                         <option value="truck" {% if selected == 'truck' %}selected{% endif %}>Truck</option>
+                        {% endif %}
                     </select>
                 </div>
                 <div>
@@ -395,12 +403,17 @@ function previewDoc(input, kind) {
         <form method="POST" action="/admin/drivers/{{ driver.id }}/vehicles/new" class="space-y-4">
             <div>
                 <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Vehicle Type</label>
-                <select name="vehicle_type" required class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                <select name="vehicle_type" required class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm bg-white">
+                    {% for c in categories %}
+                    <option value="{{ c.service_type }}">{{ c.display_name or c.service_type|title }}</option>
+                    {% endfor %}
+                    {% if not categories %}
                     <option value="bike">🛵 Bike / Motorcycle</option>
                     <option value="tuk">🛺 Three-Wheeler (Tuk-Tuk)</option>
                     <option value="car">🚗 Car / Sedan / Hatchback</option>
                     <option value="van">🚐 Van</option>
                     <option value="truck">🚚 Truck / Lorry</option>
+                    {% endif %}
                 </select>
             </div>
 

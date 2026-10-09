@@ -30,6 +30,17 @@ router = APIRouter()
 VALID_VEHICLE_TYPES = {"bike", "tuk", "car", "van", "truck"}
 
 
+async def _is_valid_vehicle_type(db: AsyncSession, vt: str) -> bool:
+    if not vt:
+        return False
+    vt = vt.strip().lower()
+    if vt in VALID_VEHICLE_TYPES:
+        return True
+    from ...models import FareSetting
+    fs = (await db.execute(select(FareSetting).where(FareSetting.service_type == vt))).scalars().first()
+    return fs is not None
+
+
 async def _get_driver(db: AsyncSession, user: User) -> Driver:
     q = await db.execute(select(Driver).where(Driver.user_id == user.id))
     d = q.scalars().first()
@@ -195,7 +206,7 @@ async def get_my_driver_profile(
     from ...services.finance_service import get_driver_payout_stats
     stats = await get_driver_payout_stats(db, d.id)
     from ...models import PeakHourSetting
-    peaks_q = await db.execute(select(PeakHourSetting))
+    peaks_q = await db.execute(select(PeakHourSetting).order_by(PeakHourSetting.display_order, PeakHourSetting.id))
     peaks = peaks_q.scalars().all()
     return _to_response(user, d, paid_payouts=stats["paid"], pending_payout=stats["pending"], peaks=peaks)
 
@@ -300,10 +311,10 @@ async def register_driver(
     Collects vehicle + license + NIC details so the admin has enough info to
     approve the driver. Until this is done, the driver cannot go online.
     """
-    if body.vehicle_type not in VALID_VEHICLE_TYPES:
+    if not await _is_valid_vehicle_type(db, body.vehicle_type):
         raise HTTPException(
             status_code=400,
-            detail=f"vehicle_type must be one of {sorted(VALID_VEHICLE_TYPES)}",
+            detail="Invalid vehicle_type",
         )
 
     d = await _get_driver(db, user)
@@ -851,7 +862,7 @@ async def update_bank_details(
     from ...services.finance_service import get_driver_payout_stats
     stats = await get_driver_payout_stats(db, d.id)
     from ...models import PeakHourSetting
-    peaks_q = await db.execute(select(PeakHourSetting))
+    peaks_q = await db.execute(select(PeakHourSetting).order_by(PeakHourSetting.display_order, PeakHourSetting.id))
     peaks = peaks_q.scalars().all()
     return _to_response(user, d, paid_payouts=stats["paid"], pending_payout=stats["pending"], peaks=peaks)
 
@@ -949,11 +960,13 @@ async def get_driver_vehicles(
     vehicles = res.scalars().all()
 
     # Legacy fallback: if driver has vehicle details but no driver_vehicles row yet, auto-create it
-    if not vehicles and d.vehicle_number and d.vehicle_type:
+    if not vehicles and (d.vehicle_number or d.vehicle_type):
+        v_num = (d.vehicle_number or "").strip().upper() or "PENDING"
+        v_type = (d.vehicle_type or "bike").strip().lower() or "bike"
         new_v = DriverVehicle(
             driver_id=d.id,
-            vehicle_type=d.vehicle_type,
-            vehicle_number=d.vehicle_number,
+            vehicle_type=v_type,
+            vehicle_number=v_num,
             vehicle_model=d.vehicle_model,
             vehicle_color=d.vehicle_color,
             vehicle_year=d.vehicle_year,
@@ -978,10 +991,10 @@ async def add_driver_vehicle(
 ):
     """Driver adds a new vehicle (e.g. Tuk-Tuk or Bike) to their profile for admin review."""
     vt = body.vehicle_type.lower().strip()
-    if vt not in VALID_VEHICLE_TYPES:
+    if not await _is_valid_vehicle_type(db, vt):
         raise HTTPException(
             status_code=400,
-            detail=f"vehicle_type must be one of {sorted(VALID_VEHICLE_TYPES)}",
+            detail="Invalid vehicle_type",
         )
 
     v_num = body.vehicle_number.strip().upper()

@@ -71,7 +71,10 @@ async def create_driver(
     _: User = Depends(require_role("admin")),
 ):
     """Admin creates a driver manually (e.g., adding a fleet driver)."""
-    if body.vehicle_type not in {"bike", "tuk", "car", "van", "truck"}:
+    from ...models import FareSetting
+    vt = body.vehicle_type.strip().lower()
+    fs = (await db.execute(select(FareSetting).where(FareSetting.service_type == vt))).scalars().first()
+    if not fs and vt not in {"bike", "tuk", "car", "van", "truck"}:
         raise HTTPException(status_code=400, detail="Invalid vehicle_type")
 
     # Phone uniqueness

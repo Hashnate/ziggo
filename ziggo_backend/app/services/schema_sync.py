@@ -107,6 +107,7 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("bookings", "scheduled_dispatch_sent", "BOOLEAN NOT NULL DEFAULT FALSE"),
     ("system_settings", "loyalty_is_active", "BOOLEAN NOT NULL DEFAULT TRUE"),
     ("peak_hour_settings", "vehicle_category", "VARCHAR(50)"),
+    ("peak_hour_settings", "display_order", "INTEGER NOT NULL DEFAULT 0"),
     ("menu_items", "packing_charge", "NUMERIC(10, 2) NOT NULL DEFAULT 0.00"),
     ("food_orders", "packing_charge", "NUMERIC(10, 2) NOT NULL DEFAULT 0.00"),
     ("job_openings", "poster_image", "VARCHAR(500)"),
@@ -426,12 +427,12 @@ async def _seed_peak_hours(conn) -> None:
     
     if not existing_rows:
         defaults = [
-            {"start_hour": 7, "end_hour": 9, "start_time": "07:00", "end_time": "09:00", "extra_amount": Decimal("50.00"), "is_active": True},
-            {"start_hour": 9, "end_hour": 11, "start_time": "09:00", "end_time": "11:00", "extra_amount": Decimal("50.00"), "is_active": True},
-            {"start_hour": 12, "end_hour": 14, "start_time": "12:00", "end_time": "14:00", "extra_amount": Decimal("50.00"), "is_active": False},
-            {"start_hour": 16, "end_hour": 18, "start_time": "16:00", "end_time": "18:00", "extra_amount": Decimal("50.00"), "is_active": False},
-            {"start_hour": 18, "end_hour": 20, "start_time": "18:00", "end_time": "20:00", "extra_amount": Decimal("50.00"), "is_active": False},
-            {"start_hour": 21, "end_hour": 23, "start_time": "21:00", "end_time": "23:00", "extra_amount": Decimal("50.00"), "is_active": False},
+            {"start_hour": 7, "end_hour": 9, "start_time": "07:00", "end_time": "09:00", "extra_amount": Decimal("50.00"), "is_active": True, "display_order": 0},
+            {"start_hour": 9, "end_hour": 11, "start_time": "09:00", "end_time": "11:00", "extra_amount": Decimal("50.00"), "is_active": True, "display_order": 1},
+            {"start_hour": 12, "end_hour": 14, "start_time": "12:00", "end_time": "14:00", "extra_amount": Decimal("50.00"), "is_active": False, "display_order": 2},
+            {"start_hour": 16, "end_hour": 18, "start_time": "16:00", "end_time": "18:00", "extra_amount": Decimal("50.00"), "is_active": False, "display_order": 3},
+            {"start_hour": 18, "end_hour": 20, "start_time": "18:00", "end_time": "20:00", "extra_amount": Decimal("50.00"), "is_active": False, "display_order": 4},
+            {"start_hour": 21, "end_hour": 23, "start_time": "21:00", "end_time": "23:00", "extra_amount": Decimal("50.00"), "is_active": False, "display_order": 5},
         ]
         for row in defaults:
             await conn.execute(PeakHourSetting.__table__.insert().values(**row))

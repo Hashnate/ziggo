@@ -353,10 +353,14 @@ class DriverProvider extends ChangeNotifier {
     try {
       final resp = await ApiClient.instance.dio.get('/driver/vehicles');
       if (resp.data is List) {
-        _vehicles = List<Map<String, dynamic>>.from(resp.data);
+        _vehicles = (resp.data as List)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
         notifyListeners();
       }
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('[driver_provider] Error loading vehicles: $e\n$st');
+    }
   }
 
   Future<bool> selectActiveVehicle(int vehicleId) async {

@@ -300,7 +300,7 @@ async def send_to_users(
     event = (data or {}).get("event")
     urgent = event in _URGENT_EVENTS
 
-    android_channel = "ziggo_ride_alarm_v15" if urgent else "ziggo_general_alerts_v2"
+    android_channel = "ziggo_ride_alarm_v16" if urgent else "ziggo_general_alerts_v2"
     android_sound = "ride_alert" if urgent else "default"
     ios_sound = "ride_alert.caf" if urgent else "default"
 

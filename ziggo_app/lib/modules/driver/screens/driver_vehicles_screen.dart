@@ -17,18 +17,28 @@ class DriverVehiclesScreen extends StatefulWidget {
 }
 
 class _DriverVehiclesScreenState extends State<DriverVehiclesScreen> {
-  bool _loading = false;
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadVehicles();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadVehicles();
+    });
   }
 
   Future<void> _loadVehicles() async {
+    if (!mounted) return;
     setState(() => _loading = true);
-    await context.read<DriverProvider>().loadVehicles();
-    if (mounted) setState(() => _loading = false);
+    try {
+      await context.read<DriverProvider>().loadVehicles();
+    } catch (_) {
+      // Ignored, handled in provider
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
   }
 
   void _showAddVehicleModal() {
@@ -71,34 +81,62 @@ class _DriverVehiclesScreenState extends State<DriverVehiclesScreen> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+              ),
+            )
           : vehicles.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+              ? RefreshIndicator(
+                  onRefresh: _loadVehicles,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
                     children: [
-                      Icon(Icons.directions_car_outlined, size: 64, color: Colors.grey[400]),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'No vehicles registered yet',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      const SizedBox(height: 40),
+                      Center(
+                        child: Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.08),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.directions_car_outlined, size: 44, color: AppColors.primary),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const Center(
+                        child: Text(
+                          'No vehicles registered yet',
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: AppColors.textPrimary),
+                        ),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
-                        'Add your bike, tuk-tuk, or car to get started.',
-                        style: TextStyle(color: Colors.grey, fontSize: 13),
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      const Center(
+                        child: Text(
+                          'Add your bike, tuk-tuk, car, or van to start receiving ride requests.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
                         ),
-                        onPressed: _showAddVehicleModal,
-                        icon: const Icon(Icons.add),
-                        label: const Text('Add Vehicle', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(height: 28),
+                      Center(
+                        child: SizedBox(
+                          width: 200,
+                          height: 48,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                            ),
+                            onPressed: _showAddVehicleModal,
+                            icon: const Icon(Icons.add, size: 20),
+                            label: const Text('Add Vehicle', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -106,6 +144,7 @@ class _DriverVehiclesScreenState extends State<DriverVehiclesScreen> {
               : RefreshIndicator(
                   onRefresh: _loadVehicles,
                   child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(16),
                     children: [
                       Container(

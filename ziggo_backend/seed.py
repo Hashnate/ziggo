@@ -425,7 +425,7 @@ async def main():
         await seed_fare_settings(db)
         await seed_promos(db)
         await seed_drivers(db)
-        await seed_demo_customer(db)
+        # await seed_demo_customer(db)
         await seed_restaurants(db)
         await seed_market(db)
         await seed_food_home(db)
@@ -433,7 +433,6 @@ async def main():
         await db.commit()
         print("[seed] Done.")
         print("  Admin login   : phone 0700000000  password admin123  -> /admin/login")
-        print("  Demo customer : 0771234567 (OTP 123456 in DEV_MODE)")
         print("  Demo drivers  : 077100000{1..6}")
         print("  Promo codes   : ZIGGO50, FLAT100, WELCOME")
 

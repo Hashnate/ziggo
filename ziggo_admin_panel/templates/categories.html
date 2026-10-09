@@ -101,7 +101,21 @@
                                 {% endif %}
                             </div>
                         </td>
-                        <td class="px-6 py-4 font-bold text-ziggo-ink">{{ c.display_name or c.service_type|title }}</td>
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="font-bold text-ziggo-ink">{{ c.display_name or c.service_type|title }}</span>
+                                {% if c.is_truck %}
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">
+                                    <i class="fas fa-truck text-[9px]"></i> Truck
+                                </span>
+                                {% endif %}
+                                {% if c.is_delivery %}
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                    <i class="fas fa-box text-[9px]"></i> Delivery
+                                </span>
+                                {% endif %}
+                            </div>
+                        </td>
                         <td class="px-6 py-4 text-sm text-ziggo-ink font-normal">Rs.{{ "%.2f"|format(c.base_fare or 0) }}</td>
                         <td class="px-6 py-4 text-sm text-ziggo-ink font-normal">Rs.{{ "%.2f"|format(c.per_km_rate or 0) }}</td>
                         <td class="px-6 py-4 text-sm text-ziggo-ink font-normal">Rs.{{ "%.2f"|format(c.per_minute_rate or 0) }}</td>
@@ -265,27 +279,69 @@
                     <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Discount Percentage (%)</label>
                     <input type="number" step="0.01" min="0" max="100" name="discount_percentage" id="catDiscountPercentage" value="0" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                 </div>
-                <div class="col-span-2">
+                <div class="col-span-2 sm:col-span-1">
                     <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Driver Search Radius (km)</label>
-                    <input type="number" min="1" name="search_radius_km" id="catSearchRadius" placeholder="e.g. 15 (Optional - falls back to system settings)" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    <input type="number" min="1" name="search_radius_km" id="catSearchRadius" placeholder="e.g. 15 (Default system settings)" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                 </div>
-                <div>
+                <div class="col-span-2 sm:col-span-1">
                     <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Capacity (persons)</label>
                     <input type="number" min="0" name="capacity" id="catCapacity" value="0" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                 </div>
-                <div class="flex items-end gap-6">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" name="is_active" id="catActive" checked class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
-                        <span class="text-sm font-black text-ziggo-ink">Active</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" name="is_truck" id="catTruck" class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
-                        <span class="text-sm font-black text-ziggo-ink">Is Truck Option?</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" name="is_delivery" id="catDelivery" onchange="togglePricingVisibility()" class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
-                        <span class="text-sm font-black text-ziggo-ink">Is Delivery Option?</span>
-                    </label>
+
+                <div class="col-span-2 pt-1">
+                    <label class="block text-xs font-black text-ziggo-muted mb-2 uppercase tracking-wider">Category Flags &amp; Options</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <!-- Active Status -->
+                        <label for="catActive" class="relative flex items-center justify-between p-3.5 rounded-2xl border-2 border-ziggo-line bg-white cursor-pointer transition-all duration-200 select-none hover:border-emerald-300 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50/40 has-[:checked]:shadow-sm group">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-9 h-9 rounded-xl bg-emerald-100/80 text-emerald-600 flex items-center justify-center text-sm shrink-0 group-hover:scale-105 transition-transform">
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
+                                <div>
+                                    <span class="block text-xs font-black text-ziggo-ink">Active Status</span>
+                                    <span class="block text-[10px] font-bold text-ziggo-muted">Rider booking</span>
+                                </div>
+                            </div>
+                            <div class="relative inline-flex items-center ml-2 shrink-0">
+                                <input type="checkbox" name="is_active" id="catActive" checked class="peer sr-only">
+                                <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                            </div>
+                        </label>
+
+                        <!-- Is Truck Option -->
+                        <label for="catTruck" class="relative flex items-center justify-between p-3.5 rounded-2xl border-2 border-ziggo-line bg-white cursor-pointer transition-all duration-200 select-none hover:border-amber-300 has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50/40 has-[:checked]:shadow-sm group">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-9 h-9 rounded-xl bg-amber-100/80 text-amber-600 flex items-center justify-center text-sm shrink-0 group-hover:scale-105 transition-transform">
+                                    <i class="fas fa-truck"></i>
+                                </div>
+                                <div>
+                                    <span class="block text-xs font-black text-ziggo-ink">Truck Option</span>
+                                    <span class="block text-[10px] font-bold text-ziggo-muted">Heavy / Freight</span>
+                                </div>
+                            </div>
+                            <div class="relative inline-flex items-center ml-2 shrink-0">
+                                <input type="checkbox" name="is_truck" id="catTruck" class="peer sr-only">
+                                <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                            </div>
+                        </label>
+
+                        <!-- Is Delivery Option -->
+                        <label for="catDelivery" class="relative flex items-center justify-between p-3.5 rounded-2xl border-2 border-ziggo-line bg-white cursor-pointer transition-all duration-200 select-none hover:border-indigo-300 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50/40 has-[:checked]:shadow-sm group">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-9 h-9 rounded-xl bg-indigo-100/80 text-indigo-600 flex items-center justify-center text-sm shrink-0 group-hover:scale-105 transition-transform">
+                                    <i class="fas fa-box-open"></i>
+                                </div>
+                                <div>
+                                    <span class="block text-xs font-black text-ziggo-ink">Delivery Option</span>
+                                    <span class="block text-[10px] font-bold text-ziggo-muted">Courier / Parcel</span>
+                                </div>
+                            </div>
+                            <div class="relative inline-flex items-center ml-2 shrink-0">
+                                <input type="checkbox" name="is_delivery" id="catDelivery" onchange="togglePricingVisibility()" class="peer sr-only">
+                                <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                            </div>
+                        </label>
+                    </div>
                 </div>
 
                 <div id="pricingSection" class="col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -418,6 +474,7 @@ function openCreateModal() {
     document.getElementById('catPassengerDeductible').value = 0;
     document.getElementById('catRentalRate').value = '';
     document.getElementById('catActive').checked = true;
+    document.getElementById('catTruck').checked = false;
     document.getElementById('catDelivery').checked = false;
     
     // Reset image input and preview

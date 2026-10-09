@@ -350,6 +350,7 @@ class PeakHourSetting(Base):
     extra_amount = Column(DECIMAL(10, 2), nullable=False, default=50.00)
     is_active = Column(Boolean, nullable=False, default=True)
     vehicle_category = Column(String(50), nullable=True)
+    display_order = Column(Integer, nullable=False, default=0)
 
 
 class SurgeZone(Base):

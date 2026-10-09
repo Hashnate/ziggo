@@ -80,12 +80,17 @@
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Vehicle Type</label>
                     <select name="vehicle_type" required
                             class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
-                        {% set selected = form.vehicle_type or 'car' %}
+                        {% set selected = (form.vehicle_type or (categories[0].service_type if categories else 'car'))|lower %}
+                        {% for c in categories %}
+                        <option value="{{ c.service_type }}" {% if selected == c.service_type|lower %}selected{% endif %}>{{ c.display_name or c.service_type|title }}</option>
+                        {% endfor %}
+                        {% if not categories %}
                         <option value="bike" {% if selected == 'bike' %}selected{% endif %}>Bike</option>
                         <option value="tuk" {% if selected == 'tuk' %}selected{% endif %}>Tuk-tuk</option>
                         <option value="car" {% if selected == 'car' %}selected{% endif %}>Car</option>
                         <option value="van" {% if selected == 'van' %}selected{% endif %}>Van</option>
                         <option value="truck" {% if selected == 'truck' %}selected{% endif %}>Truck</option>
+                        {% endif %}
                     </select>
                 </div>
                 <div>

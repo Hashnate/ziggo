@@ -160,6 +160,7 @@
                                 <table class="w-full text-left border-collapse">
                                     <thead class="bg-gray-50 text-[11px] uppercase text-ziggo-muted font-black tracking-wider border-b border-ziggo-line">
                                         <tr>
+                                            <th class="px-4 py-3.5 w-10"></th>
                                             <th class="px-6 py-3.5">Start Time</th>
                                             <th class="px-6 py-3.5">End Time</th>
                                             <th class="px-6 py-3.5">Vehicle Category</th>
@@ -170,7 +171,10 @@
                                     </thead>
                                     <tbody class="divide-y divide-ziggo-line">
                                         {% for pk in peaks %}
-                                        <tr class="hover:bg-gray-50/50">
+                                        <tr class="hover:bg-gray-50/50 drag-row" data-id="{{ pk.id }}">
+                                            <td class="px-4 py-3 w-10 text-center cursor-grab active:cursor-grabbing text-gray-400 hover:text-ziggo drag-handle" draggable="true" title="Drag to reorder">
+                                                <i class="fas fa-grip-vertical"></i>
+                                            </td>
                                             <td class="px-6 py-3">
                                                 <input type="time" name="peak_start_hour_{{ pk.id }}" value="{{ pk.start_time if pk.start_time is not none else ('%02d:00'|format(pk.start_hour) if pk.start_hour is not none else '') }}" class="p-2 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-semibold w-36">
                                             </td>
@@ -212,9 +216,20 @@
                                                 </div>
                                             </td>
                                         </tr>
+                                        {% else %}
+                                        <tr>
+                                            <td colspan="7" class="px-6 py-12 text-center text-gray-400 font-bold">
+                                                <i class="fas fa-clock text-3xl mb-2 text-ziggo-faint block"></i>
+                                                No peak hours configured yet. Click Add Peak Hour to create one.
+                                            </td>
+                                        </tr>
                                         {% endfor %}
                                     </tbody>
                                 </table>
+                            </div>
+                            <div class="px-6 py-3.5 border-t border-ziggo-line bg-gray-50/50 flex items-center justify-between text-xs text-ziggo-muted">
+                                <span class="font-medium">Total <strong class="text-ziggo-ink">{{ peaks|length }}</strong> peak hour slot{{ 's' if peaks|length != 1 else '' }}</span>
+                                <span class="text-[11px] font-semibold text-gray-400"><i class="fas fa-grip-vertical mr-1"></i>Drag rows to reorder</span>
                             </div>
                         </div>
                     </div>
@@ -633,6 +648,111 @@
             }
         };
 
+
+        // Peak Hours Drag-and-Drop Reordering (like categories)
+        const peakTbody = document.querySelector('[data-panel="peakhours"] tbody');
+        if (peakTbody) {
+            let peakDragEl = null;
+
+            peakTbody.querySelectorAll('.drag-handle').forEach(handle => {
+                const row = handle.closest('tr.drag-row');
+                if (!row) return;
+
+                handle.addEventListener('dragstart', (e) => {
+                    peakDragEl = row;
+                    row.classList.add('bg-blue-50/80', 'opacity-60');
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', row.dataset.id);
+                });
+
+                handle.addEventListener('dragend', () => {
+                    row.classList.remove('bg-blue-50/80', 'opacity-60');
+                    peakTbody.querySelectorAll('tr.drag-row').forEach(r => r.classList.remove('bg-gray-50/50'));
+                    saveNewPeakOrder();
+                });
+            });
+
+            peakTbody.querySelectorAll('tr.drag-row').forEach(row => {
+                row.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+
+                    const target = e.target.closest('tr.drag-row');
+                    if (target && target !== peakDragEl && target.parentNode === peakTbody) {
+                        const rect = target.getBoundingClientRect();
+                        const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
+                        peakTbody.insertBefore(peakDragEl, next ? target.nextSibling : target);
+                    }
+                });
+
+                row.addEventListener('dragenter', (e) => {
+                    const target = e.target.closest('tr.drag-row');
+                    if (target && target !== peakDragEl) {
+                        target.classList.add('bg-gray-50/50');
+                    }
+                });
+
+                row.addEventListener('dragleave', (e) => {
+                    const target = e.target.closest('tr.drag-row');
+                    if (target && target !== peakDragEl) {
+                        target.classList.remove('bg-gray-50/50');
+                    }
+                });
+            });
+
+            function saveNewPeakOrder() {
+                const rows = peakTbody.querySelectorAll('tr.drag-row');
+                const order = Array.from(rows).map(row => parseInt(row.dataset.id));
+
+                showPeakToast('Saving peak hours order...', 'info');
+
+                fetch('/admin/settings/peak-hours/reorder', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ order: order })
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to save order');
+                    return response.json();
+                })
+                .then(data => {
+                    showPeakToast('Peak hours order saved successfully!', 'success');
+                })
+                .catch(err => {
+                    console.error(err);
+                    showPeakToast('Failed to save peak hours order', 'error');
+                });
+            }
+
+            function showPeakToast(message, type = 'info') {
+                let toast = document.getElementById('drag-toast');
+                if (!toast) {
+                    toast = document.createElement('div');
+                    toast.id = 'drag-toast';
+                    toast.className = 'fixed bottom-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg text-white font-bold transition-all duration-300 transform translate-y-10 opacity-0 flex items-center gap-2';
+                    document.body.appendChild(toast);
+                }
+
+                if (type === 'success') {
+                    toast.className = 'fixed bottom-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg text-white font-semibold transition-all duration-300 transform translate-y-0 opacity-100 bg-emerald-500 flex items-center gap-2';
+                    toast.innerHTML = '<i class="fas fa-check-circle"></i> ' + message;
+                } else if (type === 'error') {
+                    toast.className = 'fixed bottom-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg text-white font-semibold transition-all duration-300 transform translate-y-0 opacity-100 bg-rose-500 flex items-center gap-2';
+                    toast.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + message;
+                } else {
+                    toast.className = 'fixed bottom-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg text-white font-semibold transition-all duration-300 transform translate-y-0 opacity-100 bg-blue-500 flex items-center gap-2';
+                    toast.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + message;
+                }
+
+                if (type !== 'info') {
+                    setTimeout(() => {
+                        toast.className = 'fixed bottom-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg text-white font-semibold transition-all duration-300 transform translate-y-10 opacity-0 bg-blue-500 flex items-center gap-2';
+                    }, 3000);
+                }
+            }
+        }
 
         var incModal = document.getElementById('incentiveModal');
         if (incModal) {

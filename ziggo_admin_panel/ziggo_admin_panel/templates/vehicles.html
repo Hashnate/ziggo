@@ -159,12 +159,14 @@
                                 </button>
                                 {% if s == 'approved' %}
                                 <form method="POST" action="/admin/vehicles/{{ v.id }}/revoke" onsubmit="return confirm('Revoke verification for this vehicle? Driver will go offline.');">
+                                    <input type="hidden" name="next" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
                                     <button type="submit" class="px-3 py-1.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-lg text-xs font-bold hover:bg-rose-100 transition flex items-center gap-1.5">
                                         <i class="fas fa-ban"></i> Revoke
                                     </button>
                                 </form>
                                 {% else %}
                                 <form method="POST" action="/admin/vehicles/{{ v.id }}/verify">
+                                    <input type="hidden" name="next" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
                                     <button type="submit" class="px-3 py-1.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-lg text-xs font-bold hover:bg-emerald-100 transition flex items-center gap-1.5">
                                         <i class="fas fa-check"></i> Verify
                                     </button>
@@ -229,6 +231,7 @@
             </button>
         </div>
         <form id="vehicleForm" method="POST" enctype="multipart/form-data" class="p-8 space-y-5 overflow-y-auto">
+            <input type="hidden" name="next" id="vehNext" value="">
             <p class="text-xs text-ziggo-muted font-bold">Owner: <span class="text-ziggo-ink" id="vehOwner">—</span></p>
             <div class="grid grid-cols-2 gap-4">
                 <div class="col-span-2">
@@ -273,6 +276,7 @@
 function openEditModal(v) {
     document.getElementById('vehModalTitle').innerText = 'Edit vehicle — ' + (v.vehicle_model || v.vehicle_number || '');
     document.getElementById('vehicleForm').action = '/admin/vehicles/' + v.id + '/edit';
+    document.getElementById('vehNext').value = window.location.pathname + window.location.search;
     document.getElementById('vehOwner').innerText = v.owner || '—';
     document.getElementById('vehType').value = v.vehicle_type || '';
     document.getElementById('vehNumber').value = v.vehicle_number || '';

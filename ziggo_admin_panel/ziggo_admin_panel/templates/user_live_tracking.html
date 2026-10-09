@@ -1,0 +1,734 @@
+{% extends "base.html" %}
+
+{% block title %}User Live Tracking | Ziggo Admin{% endblock %}
+{% block page_title %}User Live Tracking{% endblock %}
+
+{% block head %}
+<style>
+    .pulse-dot {
+        width: 10px; height: 10px; border-radius: 50%;
+        background: #10B981; box-shadow: 0 0 0 0 rgba(16,185,129,0.7);
+        animation: pulseRing 1.5s ease-out infinite;
+    }
+    .pulse-dot-trip {
+        width: 10px; height: 10px; border-radius: 50%;
+        background: #3B82F6; box-shadow: 0 0 0 0 rgba(59,130,246,0.7);
+        animation: pulseRingTrip 1.5s ease-out infinite;
+    }
+    @keyframes pulseRing {
+        0%   { box-shadow: 0 0 0 0 rgba(16,185,129,0.7); }
+        70%  { box-shadow: 0 0 0 10px rgba(16,185,129,0); }
+        100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+    }
+    @keyframes pulseRingTrip {
+        0%   { box-shadow: 0 0 0 0 rgba(59,130,246,0.7); }
+        70%  { box-shadow: 0 0 0 10px rgba(59,130,246,0); }
+        100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); }
+    }
+    .layer-toggle {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 14px -4px rgba(15,23,42,0.18);
+        padding: 4px;
+        display: inline-flex;
+        gap: 2px;
+    }
+    .layer-toggle button {
+        padding: 6px 14px;
+        font-weight: 800;
+        font-size: 12px;
+        border-radius: 9px;
+        color: #475569;
+        transition: all 0.15s ease;
+    }
+    .layer-toggle button.active {
+        background: #0f172a;
+        color: #ffffff;
+    }
+    .map-fab {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 14px -4px rgba(15,23,42,0.18);
+        width: 40px; height: 40px;
+        display: flex; align-items: center; justify-content: center;
+        color: #0f172a;
+        cursor: pointer;
+        transition: transform 0.15s ease;
+    }
+    .map-fab:hover { transform: scale(1.05); }
+    .leaflet-control-attribution { font-size: 9px !important; opacity: 0.7; }
+    #liveMap:fullscreen { background: white; }
+    .leaflet-top.leaflet-left {
+        margin-top: 50px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Top Navigation & Live Header Controls -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <!-- View Toggle Pills -->
+        <div class="inline-flex p-1 bg-slate-100 rounded-2xl border border-ziggo-line shadow-soft-sm">
+            <a href="/admin/live-tracking" class="px-4 py-2 rounded-xl text-xs font-black text-slate-600 hover:text-ziggo flex items-center gap-2 transition">
+                <i class="fas fa-car"></i> <span>Drivers Live Tracking</span>
+            </a>
+            <a href="/admin/user-live-tracking" class="px-4 py-2 rounded-xl text-xs font-black bg-white text-ziggo shadow-sm flex items-center gap-2 transition">
+                <i class="fas fa-user-friends"></i> <span>Users Live Tracking</span>
+            </a>
+        </div>
+
+        <!-- Live Feed Indicator -->
+        <div class="flex items-center gap-3 bg-white px-4 py-2 rounded-2xl border border-ziggo-line shadow-soft-sm">
+            <span class="pulse-dot"></span>
+            <span class="text-xs font-black text-emerald-600 uppercase tracking-wider" id="liveFeedLabel">Live Feed Active</span>
+            <span class="text-xs text-ziggo-muted font-bold">
+                · <span id="liveOnlineLabel">{{ online_users }}</span> Active ·
+                Updated <span id="liveUpdated">--:--:--</span>
+            </span>
+        </div>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-4 flex items-center justify-between">
+            <div>
+                <span class="text-[11px] font-black text-ziggo-muted uppercase tracking-wider block mb-1">Users Online</span>
+                <span class="text-2xl font-black text-ziggo-ink leading-none" id="statOnline">{{ online_users }}</span>
+            </div>
+            <div class="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg">
+                <i class="fas fa-wifi"></i>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-4 flex items-center justify-between">
+            <div>
+                <span class="text-[11px] font-black text-ziggo-muted uppercase tracking-wider block mb-1">In Active Trip</span>
+                <span class="text-2xl font-black text-blue-600 leading-none" id="statInTrip">{{ in_trip_users }}</span>
+            </div>
+            <div class="w-11 h-11 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-lg">
+                <i class="fas fa-route"></i>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-4 flex items-center justify-between">
+            <div>
+                <span class="text-[11px] font-black text-ziggo-muted uppercase tracking-wider block mb-1">Users Offline</span>
+                <span class="text-2xl font-black text-slate-500 leading-none" id="statOffline">{{ offline_users }}</span>
+            </div>
+            <div class="w-11 h-11 rounded-2xl bg-slate-100 text-slate-500 flex items-center justify-center text-lg">
+                <i class="fas fa-moon"></i>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-4 flex items-center justify-between">
+            <div>
+                <span class="text-[11px] font-black text-ziggo-muted uppercase tracking-wider block mb-1">Total Registered</span>
+                <span class="text-2xl font-black text-ziggo leading-none" id="statTotal">{{ total_users }}</span>
+            </div>
+            <div class="w-11 h-11 rounded-2xl bg-blue-50 text-ziggo flex items-center justify-center text-lg">
+                <i class="fas fa-users"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Map container -->
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div id="mapWrap" class="relative">
+            <div id="liveMap" style="height: 600px; min-height: 480px;"></div>
+
+            <!-- Top-left Map / Satellite toggle -->
+            <div class="absolute top-3 left-3 z-[400] layer-toggle">
+                <button id="layerMap" class="active" type="button">Map</button>
+                <button id="layerSat" type="button">Satellite</button>
+            </div>
+
+            <!-- Top-right action buttons -->
+            <div class="absolute top-3 right-3 z-[400] flex flex-col gap-2">
+                <button id="fitAllBtn" type="button" class="map-fab" title="Fit all users">
+                    <i class="fas fa-expand-arrows-alt"></i>
+                </button>
+                <button id="fullscreenBtn" type="button" class="map-fab" title="Toggle fullscreen">
+                    <i class="fas fa-expand"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- All Users List -->
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-ziggo-line flex items-center justify-between flex-wrap gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center text-lg">
+                    <i class="fas fa-street-view"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-black text-ziggo-ink">All Users / Riders</h3>
+                    <p class="text-[11px] text-ziggo-muted font-bold">
+                        <span id="listOnlineCount" class="text-emerald-600">0</span> online ·
+                        <span id="listTripCount" class="text-blue-600">0</span> in trip ·
+                        <span id="listOfflineCount">0</span> offline
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 flex-wrap">
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-ziggo-muted text-xs"></i>
+                    <input type="text" id="userSearch" placeholder="Search user by name, phone, email…"
+                           class="pl-8 pr-3 py-2 rounded-xl border border-ziggo-line text-sm w-64 sm:w-72 focus:outline-none focus:border-ziggo">
+                </div>
+                <div class="layer-toggle">
+                    <button data-filter="all" class="active" type="button">All</button>
+                    <button data-filter="online" type="button">Online</button>
+                    <button data-filter="trip" type="button">In-Trip</button>
+                    <button data-filter="offline" type="button">Offline</button>
+                </div>
+            </div>
+        </div>
+        <div id="usersGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-6">
+            <!-- Cards populated dynamically by JS -->
+        </div>
+        <div id="usersEmpty" class="p-12 text-center hidden">
+            <i class="fas fa-user-slash text-4xl text-slate-300 mb-3"></i>
+            <p class="text-ziggo-muted font-bold">No users match your criteria.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    var map;
+    var markers = new Map();
+    var infoWindow;
+    var HTMLMarker;
+
+    window.gm_authFailure = function() {
+        var mapEl = document.getElementById('liveMap');
+        if (mapEl) {
+            mapEl.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;color:#6b7280;">' +
+                '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>' +
+                '<p style="font-weight:700;font-size:14px;margin:0;">Map unavailable</p>' +
+                '<p style="font-size:12px;margin:0;text-align:center;max-width:280px;">Google Maps API key is missing or invalid. Configure <strong>GOOGLE_MAPS_API_KEY</strong> in your .env file.</p>' +
+                '</div>';
+        }
+    };
+
+    function initMap() {
+        HTMLMarker = class extends google.maps.OverlayView {
+            constructor(latlng, html, onClick) {
+                super();
+                this.latlng = latlng;
+                this.html = html;
+                this.onClick = onClick;
+                this.div = null;
+            }
+            onAdd() {
+                this.div = document.createElement('div');
+                this.div.style.position = 'absolute';
+                this.div.style.cursor = 'pointer';
+                this.div.style.zIndex = '99999';
+                this.div.innerHTML = this.html;
+                if (this.onClick) {
+                    this.div.addEventListener('click', this.onClick);
+                }
+                const panes = this.getPanes();
+                panes.overlayMouseTarget.appendChild(this.div);
+            }
+            draw() {
+                const projection = this.getProjection();
+                if (!projection) return;
+                const position = projection.fromLatLngToDivPixel(this.latlng);
+                if (position) {
+                    this.div.style.left = (position.x - 22) + 'px';
+                    this.div.style.top = (position.y - 22) + 'px';
+                }
+            }
+            onRemove() {
+                if (this.div) {
+                    this.div.parentNode.removeChild(this.div);
+                    this.div = null;
+                }
+            }
+            setPosition(latlng) {
+                this.latlng = latlng;
+                this.draw();
+            }
+            setHtml(html) {
+                this.html = html;
+                if (this.div) this.div.innerHTML = html;
+            }
+        };
+
+        map = new google.maps.Map(document.getElementById('liveMap'), {
+            center: {lat: 6.9271, lng: 79.8612},
+            zoom: 13,
+            mapTypeControl: false,
+            streetViewControl: false
+        });
+
+        infoWindow = new google.maps.InfoWindow();
+
+        const layerMapBtn = document.getElementById('layerMap');
+        const layerSatBtn = document.getElementById('layerSat');
+        layerMapBtn.addEventListener('click', () => {
+            map.setMapTypeId(google.maps.MapTypeId.ROADMAP);
+            layerMapBtn.classList.add('active'); layerSatBtn.classList.remove('active');
+        });
+        layerSatBtn.addEventListener('click', () => {
+            map.setMapTypeId(google.maps.MapTypeId.SATELLITE);
+            layerSatBtn.classList.add('active'); layerMapBtn.classList.remove('active');
+        });
+
+        document.getElementById('fitAllBtn').addEventListener('click', () => {
+            const bounds = new google.maps.LatLngBounds();
+            let count = 0;
+            for (const m of markers.values()) {
+                bounds.extend(m.latlng);
+                count++;
+            }
+            if (count > 0) {
+                map.fitBounds(bounds);
+            }
+        });
+
+        document.getElementById('fullscreenBtn').addEventListener('click', () => {
+            const el = document.getElementById('liveMap');
+            if (!document.fullscreenElement) {
+                el.requestFullscreen?.();
+            } else {
+                document.exitFullscreen?.();
+            }
+        });
+
+        loadInitial().then(openWs);
+    }
+
+    function formatTime(iso) {
+        try {
+            const d = iso ? new Date(iso) : new Date();
+            return d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Colombo', hour12: false });
+        } catch (_) {
+            return '--:--:--';
+        }
+    }
+
+    const usersState = new Map();
+
+    function escapeHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({
+            '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+        }[c]));
+    }
+
+    function formatLastSeen(iso) {
+        if (!iso) return 'never';
+        const t = new Date(iso).getTime();
+        if (isNaN(t)) return 'never';
+        const diff = Math.floor((Date.now() - t) / 1000);
+        if (diff < 5) return 'just now';
+        if (diff < 60) return diff + 's ago';
+        if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+        if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+        return Math.floor(diff / 86400) + 'd ago';
+    }
+
+    function getInitials(name) {
+        if (!name) return 'U';
+        const parts = name.trim().split(/\s+/);
+        if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+
+    function userPopupHtml(u) {
+        let tripSection = '';
+        if (u.active_booking) {
+            const ab = u.active_booking;
+            tripSection = `
+                <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e2e8f0; font-size: 11px;">
+                    <div style="font-weight: 800; color: #2563eb; margin-bottom: 2px;">
+                        🚗 Trip #${escapeHtml(ab.ref || '')} (${escapeHtml(ab.status)})
+                    </div>
+                    <div style="color: #475569; margin-bottom: 2px;">
+                        <strong>From:</strong> ${escapeHtml(ab.pickup_address || 'Pickup location')}
+                    </div>
+                    <div style="color: #475569; margin-bottom: 2px;">
+                        <strong>To:</strong> ${escapeHtml(ab.drop_address || 'Drop location')}
+                    </div>
+                    ${ab.driver_name ? `<div style="color: #0f172a; font-weight:700;">Driver: ${escapeHtml(ab.driver_name)} (${escapeHtml(ab.vehicle_number || '')})</div>` : ''}
+                </div>
+            `;
+        }
+
+        const statusLabel = u.is_in_trip
+            ? '<span style="color:#2563eb; font-weight:800;">● IN ACTIVE TRIP</span>'
+            : (u.is_online
+                ? '<span style="color:#059669; font-weight:800;">● ONLINE</span>'
+                : '<span style="color:#94a3b8; font-weight:800;">○ OFFLINE</span>');
+
+        return `<div style="font-family: inherit; max-width: 250px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                <div style="width: 32px; height: 32px; border-radius: 10px; background: #ede9fe; color: #7c3aed; font-weight: 900; display: flex; align-items: center; justify-content: center; font-size: 12px;">
+                    ${escapeHtml(getInitials(u.name))}
+                </div>
+                <div>
+                    <p style="font-weight:900; color:#0f172a; margin:0; font-size: 13px;">${escapeHtml(u.name)}</p>
+                    <p style="font-size: 10px; margin: 0;">${statusLabel}</p>
+                </div>
+            </div>
+            <p style="font-size:11px; color:#64748b; margin:2px 0;">📞 ${escapeHtml(u.phone || 'No phone')}</p>
+            ${u.email ? `<p style="font-size:11px; color:#64748b; margin:2px 0;">✉️ ${escapeHtml(u.email)}</p>` : ''}
+            <div style="display:flex; justify-content:space-between; margin-top: 6px; font-size: 11px; background: #f8fafc; padding: 4px 8px; border-radius: 8px;">
+                <span style="color:#475569;">Wallet: <strong>Rs. ${Number(u.wallet_balance || 0).toFixed(2)}</strong></span>
+                <span style="color:#7c3aed; font-weight:700;">⭐ ${u.loyalty_points || 0} pts</span>
+            </div>
+            ${tripSection}
+            <p style="font-size:9px; color:#94a3b8; margin:6px 0 0; text-align:right;">Last seen: ${formatLastSeen(u.last_seen)}</p>
+        </div>`;
+    }
+
+    function upsertUserMarker(u) {
+        usersState.set(u.id, u);
+        if (u.lat == null || u.lng == null) {
+            if (markers.has(u.id)) {
+                markers.get(u.id).setMap(null);
+                markers.delete(u.id);
+            }
+            return;
+        }
+
+        const gLatLng = new google.maps.LatLng(u.lat, u.lng);
+        let bg = 'linear-gradient(135deg, #64748b, #94a3b8)';
+        let borderClr = '#cbd5e1';
+        let badgeIcon = '👤';
+
+        if (u.is_in_trip) {
+            bg = 'linear-gradient(135deg, #1d4ed8, #3b82f6)';
+            borderClr = '#60a5fa';
+            badgeIcon = '🚕';
+        } else if (u.is_online) {
+            bg = 'linear-gradient(135deg, #059669, #10b981)';
+            borderClr = '#34d399';
+            badgeIcon = '👤';
+        }
+
+        const dim = (u.is_online || u.is_in_trip) ? '' : 'filter: grayscale(0.5); opacity: 0.7;';
+        const pulseEffect = (u.is_online || u.is_in_trip)
+            ? `box-shadow: 0 0 0 4px ${u.is_in_trip ? 'rgba(59,130,246,0.35)' : 'rgba(16,185,129,0.35)'}, 0 6px 16px -4px rgba(15,23,42,0.4);`
+            : 'box-shadow: 0 4px 10px -2px rgba(15,23,42,0.25);';
+
+        const htmlContent = `<div style="
+            width: 44px; height: 44px; border-radius: 50%;
+            background: ${bg};
+            color: white; display: flex; align-items: center; justify-content: center;
+            font-size: 15px; font-weight: 900;
+            border: 2.5px solid white; ${pulseEffect} ${dim}">
+            ${badgeIcon}
+        </div>`;
+
+        if (markers.has(u.id)) {
+            const m = markers.get(u.id);
+            m.setPosition(gLatLng);
+            m.setHtml(htmlContent);
+            if (infoWindow.getMap() && infoWindow.getPosition().equals(gLatLng)) {
+                infoWindow.setContent(userPopupHtml(u));
+            }
+        } else {
+            const m = new HTMLMarker(gLatLng, htmlContent, () => {
+                infoWindow.setContent(userPopupHtml(u));
+                infoWindow.setPosition(gLatLng);
+                infoWindow.open(map);
+            });
+            m.setMap(map);
+            markers.set(u.id, m);
+        }
+    }
+
+    let listFilter = 'all';
+    let listSearch = '';
+
+    function userMatchesFilter(u) {
+        if (listFilter === 'online' && !u.is_online) return false;
+        if (listFilter === 'trip' && !u.is_in_trip) return false;
+        if (listFilter === 'offline' && (u.is_online || u.is_in_trip)) return false;
+
+        if (listSearch) {
+            const ref = (u.active_booking && u.active_booking.ref) ? u.active_booking.ref : '';
+            const hay = (u.name + ' ' + u.phone + ' ' + u.email + ' ' + ref).toLowerCase();
+            if (!hay.includes(listSearch)) return false;
+        }
+        return true;
+    }
+
+    function renderUsersList() {
+        const grid = document.getElementById('usersGrid');
+        const empty = document.getElementById('usersEmpty');
+
+        const all = Array.from(usersState.values()).sort((a, b) => {
+            if (a.is_in_trip !== b.is_in_trip) return a.is_in_trip ? -1 : 1;
+            if (a.is_online !== b.is_online) return a.is_online ? -1 : 1;
+            return a.name.localeCompare(b.name);
+        });
+
+        const onlineTotal = all.filter(u => u.is_online).length;
+        const inTripTotal = all.filter(u => u.is_in_trip).length;
+        const offlineTotal = all.filter(u => !u.is_online && !u.is_in_trip).length;
+
+        document.getElementById('listOnlineCount').textContent = onlineTotal;
+        document.getElementById('listTripCount').textContent = inTripTotal;
+        document.getElementById('listOfflineCount').textContent = offlineTotal;
+
+        const visible = all.filter(userMatchesFilter);
+        if (visible.length === 0) {
+            grid.innerHTML = '';
+            empty.classList.remove('hidden');
+            return;
+        }
+        empty.classList.add('hidden');
+
+        grid.innerHTML = visible.map(u => {
+            let pillCls = 'bg-gray-100 text-gray-500';
+            let pillText = 'Offline';
+            let dot = '<span class="w-2.5 h-2.5 rounded-full bg-gray-300"></span>';
+
+            if (u.is_in_trip) {
+                pillCls = 'bg-blue-50 text-blue-600 border border-blue-200';
+                pillText = 'In Trip';
+                dot = '<span class="pulse-dot-trip" style="width:8px;height:8px;"></span>';
+            } else if (u.is_online) {
+                pillCls = 'bg-emerald-50 text-emerald-600 border border-emerald-200';
+                pillText = 'Online';
+                dot = '<span class="pulse-dot" style="width:8px;height:8px;"></span>';
+            }
+
+            const focusable = u.lat != null && u.lng != null;
+            const initials = getInitials(u.name);
+
+            let activeTripSnippet = '';
+            if (u.active_booking) {
+                const b = u.active_booking;
+                activeTripSnippet = `
+                    <div class="mt-2.5 p-2 bg-blue-50/70 rounded-xl border border-blue-100 text-[11px]">
+                        <div class="flex items-center justify-between text-blue-700 font-black mb-1">
+                            <span><i class="fas fa-car-side mr-1"></i> ${escapeHtml(b.ref || 'Ride')}</span>
+                            <span class="capitalize text-[10px] bg-blue-200/80 px-1.5 py-0.5 rounded">${escapeHtml(b.status)}</span>
+                        </div>
+                        <p class="text-slate-600 truncate text-[10px]"><i class="fas fa-map-marker-alt text-emerald-500 mr-1"></i> ${escapeHtml(b.pickup_address || 'Pickup')}</p>
+                        <p class="text-slate-600 truncate text-[10px] mt-0.5"><i class="fas fa-flag-checkered text-rose-500 mr-1"></i> ${escapeHtml(b.drop_address || 'Dropoff')}</p>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="border border-ziggo-line rounded-2xl p-4 bg-white hover:shadow-soft-sm hover:border-ziggo/40 transition cursor-pointer flex flex-col justify-between ${focusable ? '' : 'opacity-80'}"
+                     ${focusable ? `onclick='focusUser(${u.id})'` : ''}>
+                    <div>
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-11 h-11 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center font-black text-sm border border-purple-100 shrink-0">
+                                ${escapeHtml(initials)}
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-1.5">
+                                    <p class="text-sm font-black text-ziggo-ink truncate">${escapeHtml(u.name)}</p>
+                                    ${u.gold_member ? '<span class="text-[9px] bg-amber-100 text-amber-700 font-extrabold px-1 rounded">GOLD</span>' : ''}
+                                </div>
+                                <p class="text-[11px] text-ziggo-muted truncate">${escapeHtml(u.phone || 'No phone')}</p>
+                            </div>
+                            ${dot}
+                        </div>
+
+                        <div class="flex items-center justify-between text-[11px] mb-2 bg-slate-50 p-2 rounded-xl">
+                            <span class="text-slate-600 font-bold">Wallet: <strong class="text-ziggo-ink">Rs. ${Number(u.wallet_balance || 0).toFixed(0)}</strong></span>
+                            <span class="${pillCls} px-2 py-0.5 rounded-md font-black uppercase text-[10px] tracking-wider">
+                                ${pillText}
+                            </span>
+                        </div>
+
+                        ${activeTripSnippet}
+                    </div>
+
+                    <div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-ziggo-faint font-bold">
+                        <span>${focusable ? '<i class="fas fa-map-pin text-ziggo mr-1"></i> GPS Active' : 'No GPS Fix'}</span>
+                        <span>${formatLastSeen(u.last_seen)}</span>
+                    </div>
+                </div>`;
+        }).join('');
+    }
+
+    function focusUser(id) {
+        const u = usersState.get(id);
+        if (!u || u.lat == null || u.lng == null) return;
+        const gLatLng = new google.maps.LatLng(u.lat, u.lng);
+        map.panTo(gLatLng);
+        map.setZoom(16);
+        infoWindow.setContent(userPopupHtml(u));
+        infoWindow.setPosition(gLatLng);
+        infoWindow.open(map);
+        document.getElementById('liveMap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    document.getElementById('userSearch').addEventListener('input', (e) => {
+        listSearch = e.target.value.trim().toLowerCase();
+        renderUsersList();
+    });
+
+    document.querySelectorAll('[data-filter]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            listFilter = btn.dataset.filter;
+            renderUsersList();
+        });
+    });
+
+    setInterval(renderUsersList, 10000);
+
+    function recomputeStats() {
+        let online = 0;
+        let inTrip = 0;
+        for (const u of usersState.values()) {
+            if (u.is_in_trip) inTrip++;
+            if (u.is_online) online++;
+        }
+        const total = usersState.size;
+        document.getElementById('statOnline').textContent = online;
+        document.getElementById('statInTrip').textContent = inTrip;
+        document.getElementById('statOffline').textContent = Math.max(0, total - online);
+        document.getElementById('statTotal').textContent = total;
+        document.getElementById('liveOnlineLabel').textContent = online;
+    }
+
+    function markUpdated(iso) {
+        document.getElementById('liveUpdated').textContent = formatTime(iso);
+    }
+
+    async function loadInitial() {
+        try {
+            const r = await fetch('/admin/user-live-tracking/feed');
+            if (!r.ok) return;
+            const j = await r.json();
+
+            usersState.clear();
+            const seen = new Set();
+            j.users.forEach(u => {
+                upsertUserMarker(u);
+                seen.add(u.id);
+            });
+            for (const [id, m] of markers.entries()) {
+                if (!seen.has(id)) {
+                    m.setMap(null);
+                    markers.delete(id);
+                }
+            }
+
+            document.getElementById('statOnline').textContent = j.totals.online;
+            document.getElementById('statInTrip').textContent = j.totals.in_trip;
+            document.getElementById('statOffline').textContent = j.totals.offline;
+            document.getElementById('statTotal').textContent = j.totals.total;
+            document.getElementById('liveOnlineLabel').textContent = j.totals.online;
+            markUpdated(j.server_time);
+
+            const gpsUsers = j.users.filter(u => u.lat != null && u.lng != null);
+            if (!window._fittedOnce && gpsUsers.length > 0) {
+                const bounds = new google.maps.LatLngBounds();
+                gpsUsers.forEach(u => {
+                    bounds.extend(new google.maps.LatLng(u.lat, u.lng));
+                });
+                map.fitBounds(bounds);
+                window._fittedOnce = true;
+            }
+            renderUsersList();
+        } catch (e) {
+            console.error('initial user load failed', e);
+        }
+    }
+
+    const liveStatusEl = document.querySelector('.pulse-dot');
+    const liveLabelEl = document.getElementById('liveFeedLabel');
+
+    function setLive(state) {
+        if (!liveStatusEl || !liveLabelEl) return;
+        if (state === 'live') {
+            liveStatusEl.style.background = '#10B981';
+            liveStatusEl.style.animation = 'pulseRing 1.5s ease-out infinite';
+            liveLabelEl.textContent = 'Live Feed Active';
+            liveLabelEl.className = 'text-xs font-black text-emerald-600 uppercase tracking-wider';
+        } else if (state === 'reconnecting') {
+            liveStatusEl.style.background = '#F59E0B';
+            liveStatusEl.style.animation = 'none';
+            liveLabelEl.textContent = 'Reconnecting…';
+            liveLabelEl.className = 'text-xs font-black text-amber-600 uppercase tracking-wider';
+        } else {
+            liveStatusEl.style.background = '#94a3b8';
+            liveStatusEl.style.animation = 'none';
+            liveLabelEl.textContent = 'Disconnected';
+            liveLabelEl.className = 'text-xs font-black text-slate-500 uppercase tracking-wider';
+        }
+    }
+
+    let ws = null;
+    let reconnectDelay = 1000;
+    let pollFallbackId = null;
+
+    function openWs() {
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${proto}//${location.host}/ws/admin`);
+
+        ws.addEventListener('open', () => {
+            setLive('live');
+            reconnectDelay = 1000;
+            if (pollFallbackId) {
+                clearInterval(pollFallbackId);
+                pollFallbackId = null;
+            }
+            ws._ping = setInterval(() => {
+                try { ws.send('ping'); } catch (_) {}
+            }, 30000);
+        });
+
+        ws.addEventListener('message', (ev) => {
+            let msg;
+            try { msg = JSON.parse(ev.data); } catch (_) { return; }
+            if (!msg || !msg.event) return;
+            const d = msg.data || {};
+
+            if (msg.event === 'user_location_update') {
+                const cur = usersState.get(d.id) || {};
+                upsertUserMarker({ ...cur, ...d });
+                recomputeStats();
+                markUpdated(d.last_seen);
+                renderUsersList();
+            } else if (msg.event === 'user_status_update') {
+                const cur = usersState.get(d.id);
+                if (cur && d.lat != null && d.lng != null) {
+                    upsertUserMarker({ ...cur, ...d });
+                } else if (cur) {
+                    cur.is_online = !!d.is_online;
+                    usersState.set(d.id, cur);
+                }
+                recomputeStats();
+                markUpdated(new Date().toISOString());
+                renderUsersList();
+            } else if (msg.event === 'booking_update' || msg.event === 'booking_created') {
+                loadInitial();
+            }
+        });
+
+        ws.addEventListener('close', () => {
+            if (ws && ws._ping) clearInterval(ws._ping);
+            setLive('reconnecting');
+            if (!pollFallbackId) {
+                pollFallbackId = setInterval(loadInitial, 5000);
+            }
+            const delay = reconnectDelay;
+            reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+            setTimeout(openWs, delay);
+        });
+
+        ws.addEventListener('error', () => {});
+    }
+</script>
+{% if google_maps_api_key %}
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&v=weekly&callback=initMap&loading=async" async defer></script>
+{% else %}
+<script>
+    window.addEventListener('DOMContentLoaded', function() { window.gm_authFailure(); });
+</script>
+{% endif %}
+{% endblock %}

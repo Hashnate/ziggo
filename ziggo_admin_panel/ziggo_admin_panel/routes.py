@@ -4,11 +4,13 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 import os
+import urllib.parse
 from decimal import Decimal
 
 from fastapi import APIRouter, Request, Form, Depends, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 from itsdangerous import URLSafeSerializer, BadSignature
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc, or_, and_
@@ -864,8 +866,15 @@ async def admin_drivers_export(
 @router.get("/drivers/new", response_class=HTMLResponse)
 async def admin_drivers_new_form(
     request: Request,
+    db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
+    from app.models import FareSetting
+    cats_q = await db.execute(
+        select(FareSetting).where(FareSetting.is_active == True).order_by(FareSetting.display_order, FareSetting.id)
+    )
+    categories = cats_q.scalars().all()
+
     docs = []
     for kind, label in [
         ("nic_front", "NIC Front"),
@@ -890,7 +899,7 @@ async def admin_drivers_new_form(
         })
     return templates.TemplateResponse(
         request, "driver_new.html",
-        {"request": request, "active_page": "drivers", "error": None, "form": {}, "documents": docs},
+        {"request": request, "active_page": "drivers", "error": None, "form": {}, "documents": docs, "categories": categories},
     )
 
 
@@ -969,10 +978,17 @@ async def admin_drivers_new_submit(
             "uploaded_at": None,
         })
 
-    if vehicle_type not in {"bike", "tuk", "car", "van", "truck"}:
+    from app.models import FareSetting
+    cats_q = await db.execute(
+        select(FareSetting).where(FareSetting.is_active == True).order_by(FareSetting.display_order, FareSetting.id)
+    )
+    categories = cats_q.scalars().all()
+    valid_types = {c.service_type.lower() for c in categories} | {"bike", "tuk", "car", "van", "truck"}
+
+    if vehicle_type.strip().lower() not in valid_types:
         return templates.TemplateResponse(
             request, "driver_new.html",
-            {"request": request, "active_page": "drivers", "error": "Invalid vehicle type", "form": form, "documents": docs},
+            {"request": request, "active_page": "drivers", "error": "Invalid vehicle type", "form": form, "documents": docs, "categories": categories},
             status_code=400,
         )
 
@@ -982,7 +998,7 @@ async def admin_drivers_new_submit(
     if existing:
         return templates.TemplateResponse(
             request, "driver_new.html",
-            {"request": request, "active_page": "drivers", "error": "Phone number already registered", "form": form, "documents": docs},
+            {"request": request, "active_page": "drivers", "error": "Phone number already registered", "form": form, "documents": docs, "categories": categories},
             status_code=409,
         )
 
@@ -994,7 +1010,7 @@ async def admin_drivers_new_submit(
         if (await db.execute(select(Driver).where(field == value))).scalars().first():
             return templates.TemplateResponse(
                 request, "driver_new.html",
-                {"request": request, "active_page": "drivers", "error": f"{label} already in use", "form": form, "documents": docs},
+                {"request": request, "active_page": "drivers", "error": f"{label} already in use", "form": form, "documents": docs, "categories": categories},
                 status_code=409,
             )
 
@@ -1155,6 +1171,12 @@ async def admin_drivers_edit_form(
             logger.error(f"Error querying DriverVehicle: {ex}")
             driver_vehicles = []
 
+        from app.models import FareSetting
+        cats_q = await db.execute(
+            select(FareSetting).where(FareSetting.is_active == True).order_by(FareSetting.display_order, FareSetting.id)
+        )
+        categories = cats_q.scalars().all()
+
         return templates.TemplateResponse(
             request, "driver_edit.html",
             {
@@ -1164,6 +1186,7 @@ async def admin_drivers_edit_form(
                 "user": d.user if d else None,
                 "documents": docs,
                 "vehicles": driver_vehicles,
+                "categories": categories,
                 "error": None,
             },
         )
@@ -1226,6 +1249,13 @@ async def admin_drivers_edit_submit(
         raise HTTPException(status_code=404, detail="Driver not found")
     user = d.user
 
+    from app.models import FareSetting
+    cats_q = await db.execute(
+        select(FareSetting).where(FareSetting.is_active == True).order_by(FareSetting.display_order, FareSetting.id)
+    )
+    categories = cats_q.scalars().all()
+    valid_types = {c.service_type.lower() for c in categories} | {"bike", "tuk", "car", "van", "truck"}
+
     def _err(msg: str, status: int = 400):
         return templates.TemplateResponse(
             request, "driver_edit.html",
@@ -1235,12 +1265,13 @@ async def admin_drivers_edit_submit(
                 "driver": d,
                 "user": user,
                 "documents": [],
+                "categories": categories,
                 "error": msg,
             },
             status_code=status,
         )
 
-    if vehicle_type not in {"bike", "tuk", "car", "van", "truck"}:
+    if vehicle_type.strip().lower() not in valid_types:
         return _err("Invalid vehicle type")
 
     # Phone-number uniqueness (excluding this user)
@@ -2658,7 +2689,7 @@ async def admin_settings_get(
     s = await _get_or_create_settings(db)
     q = await db.execute(select(DriverIncentive).order_by(DriverIncentive.trips_required))
     incentives = q.scalars().all()
-    peaks_q = await db.execute(select(PeakHourSetting).order_by(PeakHourSetting.id))
+    peaks_q = await db.execute(select(PeakHourSetting).order_by(PeakHourSetting.display_order, PeakHourSetting.id))
     peaks = peaks_q.scalars().all()
     cat_q = await db.execute(select(FareSetting).order_by(FareSetting.display_order, FareSetting.id))
     categories = cat_q.scalars().all()
@@ -2814,7 +2845,7 @@ async def admin_settings_save(
 
     # Peak Hours saving
     from app.models import PeakHourSetting
-    peaks_q = await db.execute(select(PeakHourSetting).order_by(PeakHourSetting.id))
+    peaks_q = await db.execute(select(PeakHourSetting).order_by(PeakHourSetting.display_order, PeakHourSetting.id))
     peaks = peaks_q.scalars().all()
     
     form_data = await request.form()
@@ -2946,18 +2977,45 @@ async def admin_peak_hours_new(
     _: User = Depends(require_superadmin),
 ):
     from decimal import Decimal
+    from sqlalchemy import func
     from app.models import PeakHourSetting
+
+    max_order_res = await db.execute(select(func.max(PeakHourSetting.display_order)))
+    max_order = max_order_res.scalar()
+    display_order = (max_order + 1) if max_order is not None else 0
+
     p = PeakHourSetting(
         start_hour=None,
         end_hour=None,
         start_time=None,
         end_time=None,
         extra_amount=Decimal("0.00"),
-        is_active=True
+        is_active=True,
+        display_order=display_order,
     )
     db.add(p)
     await db.commit()
     return RedirectResponse(url="/admin/settings?tab=peakhours&saved=1", status_code=303)
+
+
+class ReorderPeakHoursRequest(BaseModel):
+    order: list[int]
+
+
+@router.post("/settings/peak-hours/reorder")
+async def admin_peak_hours_reorder(
+    payload: ReorderPeakHoursRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    from app.models import PeakHourSetting
+    for index, peak_id in enumerate(payload.order):
+        q = await db.execute(select(PeakHourSetting).where(PeakHourSetting.id == peak_id))
+        p = q.scalars().first()
+        if p:
+            p.display_order = index
+    await db.commit()
+    return {"status": "success"}
 
 
 @router.post("/settings/peak-hours/{id}/delete")
@@ -3007,7 +3065,18 @@ async def admin_categories(
 
 def _safe_admin_next(next_url: str, default: str) -> str:
     """Only honor next= when it points back inside /admin/ — avoids open-redirects."""
-    if next_url and next_url.startswith("/admin/"):
+    if not next_url:
+        return default
+    try:
+        parsed = urllib.parse.urlparse(next_url)
+        path_with_query = parsed.path
+        if parsed.query:
+            path_with_query += f"?{parsed.query}"
+        if path_with_query.startswith("/admin/"):
+            return path_with_query
+    except Exception:
+        pass
+    if next_url.startswith("/admin/"):
         return next_url
     return default
 
@@ -3360,11 +3429,13 @@ async def admin_vehicles(
 @router.post("/vehicles/{driver_id}/edit")
 async def admin_vehicles_edit(
     driver_id: int,
+    request: Request,
     vehicle_type: str = Form(...),
     vehicle_number: str = Form(""),
     vehicle_model: str = Form(""),
     vehicle_color: str = Form(""),
     vehicle_year: str = Form(""),
+    next: str = Form(""),
     photo: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
@@ -3392,12 +3463,15 @@ async def admin_vehicles_edit(
     if new_photo:
         d.vehicle_photo_url = new_photo
     await db.commit()
-    return RedirectResponse(url="/admin/vehicles", status_code=303)
+    next_url = next or request.headers.get("referer") or "/admin/vehicles"
+    return RedirectResponse(url=_safe_admin_next(next_url, "/admin/vehicles"), status_code=303)
 
 
 @router.post("/vehicles/{driver_id}/verify")
 async def admin_vehicles_verify(
     driver_id: int,
+    request: Request,
+    next: str = Form(""),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -3408,12 +3482,15 @@ async def admin_vehicles_verify(
         d.status = DriverStatus.APPROVED
         d.approved_at = datetime.now(timezone.utc)
         await db.commit()
-    return RedirectResponse(url="/admin/vehicles", status_code=303)
+    next_url = next or request.headers.get("referer") or "/admin/vehicles"
+    return RedirectResponse(url=_safe_admin_next(next_url, "/admin/vehicles"), status_code=303)
 
 
 @router.post("/vehicles/{driver_id}/revoke")
 async def admin_vehicles_revoke(
     driver_id: int,
+    request: Request,
+    next: str = Form(""),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -3424,7 +3501,8 @@ async def admin_vehicles_revoke(
         d.is_online = False
         d.status = DriverStatus.SUSPENDED
         await db.commit()
-    return RedirectResponse(url="/admin/vehicles", status_code=303)
+    next_url = next or request.headers.get("referer") or "/admin/vehicles"
+    return RedirectResponse(url=_safe_admin_next(next_url, "/admin/vehicles"), status_code=303)
 
 
 # ---------- Flash pricing ----------
@@ -8165,8 +8243,8 @@ async def admin_messages(
     # Count the groups
     subq = (
         select(Notification.title)
-        .where(Notification.type == "broadcast")
-        .group_by(Notification.title, Notification.body, Notification.created_at, Notification.data)
+        .where(Notification.type.in_(["broadcast", "broadcast_sms"]))
+        .group_by(Notification.title, Notification.body, Notification.created_at, Notification.data, Notification.type)
         .subquery()
     )
     total = (await db.execute(select(func.count()).select_from(subq))).scalar() or 0
@@ -8178,22 +8256,25 @@ async def admin_messages(
             Notification.body,
             Notification.created_at.label("sent_at"),
             Notification.data,
+            Notification.type,
             func.count(Notification.id).label("count")
         )
-        .where(Notification.type == "broadcast")
-        .group_by(Notification.title, Notification.body, Notification.created_at, Notification.data)
+        .where(Notification.type.in_(["broadcast", "broadcast_sms"]))
+        .group_by(Notification.title, Notification.body, Notification.created_at, Notification.data, Notification.type)
         .order_by(desc(Notification.created_at))
         .offset(offset)
         .limit(limit)
     )
     res = await db.execute(stmt)
     batches = []
-    for title, body, sent_at, data_str, count in res.all():
+    for title, body, sent_at, data_str, n_type, count in res.all():
         audience = "all"
+        channel = "sms" if n_type == "broadcast_sms" else "app"
         if data_str:
             try:
                 parsed = json.loads(data_str)
-                audience = parsed.get("audience", "all")
+                audience = parsed.get("audience", audience)
+                channel = parsed.get("channel", channel)
             except Exception:
                 pass
         batches.append({
@@ -8201,6 +8282,7 @@ async def admin_messages(
             "body": body,
             "sent_at": sent_at,
             "audience": audience,
+            "channel": channel,
             "count": count
         })
 
@@ -8236,7 +8318,7 @@ async def _async_broadcast_worker(audience: str, title: str, body: str, user_ids
         return
 
     created_at_now = datetime.now(timezone.utc)
-    data_str = json.dumps({"audience": audience})
+    data_str = json.dumps({"audience": audience, "channel": "app"})
 
     # 1. Bulk insert Notification records in chunks
     try:
@@ -8275,9 +8357,74 @@ async def _async_broadcast_worker(audience: str, title: str, body: str, user_ids
         print(f"[broadcast] FCM send failed: {e}")
 
 
+async def _async_sms_broadcast_worker(audience: str, title: str, body: str, users: list[tuple[int, str | None]]) -> None:
+    from app.database import AsyncSessionLocal
+    from app.models import Notification
+    from app.services import notify_lk_service
+    import asyncio
+    import json
+    from datetime import datetime, timezone
+
+    if not users:
+        return
+
+    created_at_now = datetime.now(timezone.utc)
+    data_str = json.dumps({"audience": audience, "channel": "sms"})
+    user_ids = [uid for uid, _ in users]
+
+    # 1. Bulk insert Notification records in chunks for audit/history
+    try:
+        async with AsyncSessionLocal() as bg_db:
+            chunk_size = 500
+            for i in range(0, len(user_ids), chunk_size):
+                chunk = user_ids[i : i + chunk_size]
+                notifications = [
+                    Notification(
+                        user_id=uid,
+                        title=title,
+                        body=body,
+                        type="broadcast_sms",
+                        data=data_str,
+                        created_at=created_at_now,
+                    )
+                    for uid in chunk
+                ]
+                bg_db.add_all(notifications)
+                await bg_db.commit()
+    except Exception as e:
+        print(f"[sms_broadcast] DB bulk insert failed: {e}")
+
+    # 2. Format SMS message
+    sms_message = body.strip()
+    if title and title.strip() and title.strip().lower() not in sms_message.lower():
+        sms_message = f"{title.strip()}:\n{sms_message}"
+
+    # Extract distinct valid phone numbers
+    phone_numbers = []
+    seen = set()
+    for _, phone in users:
+        if phone:
+            cleaned = str(phone).strip()
+            if cleaned and cleaned not in seen:
+                seen.add(cleaned)
+                phone_numbers.append(cleaned)
+
+    # Concurrently send SMS with semaphore
+    sem = asyncio.Semaphore(5)
+
+    async def _send_one(p: str):
+        async with sem:
+            await notify_lk_service.send_sms(p, sms_message)
+
+    tasks = [_send_one(p) for p in phone_numbers]
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+
 @router.post("/messages/send")
 async def admin_messages_send(
     request: Request,
+    channel: str = Form("app"),
     audience: str = Form(...),
     title: str = Form(...),
     body: str = Form(...),
@@ -8287,18 +8434,23 @@ async def admin_messages_send(
     from app.models import User, UserRole
 
     if audience == "customer":
-        q = await db.execute(select(User.id).where(User.role == UserRole.CUSTOMER, User.is_active == True))
+        stmt = select(User.id, User.phone_number).where(User.role == UserRole.CUSTOMER, User.is_active == True)
     elif audience == "driver":
-        q = await db.execute(select(User.id).where(User.role == UserRole.DRIVER, User.is_active == True))
+        stmt = select(User.id, User.phone_number).where(User.role == UserRole.DRIVER, User.is_active == True)
     else:
-        q = await db.execute(select(User.id).where(User.role.in_([UserRole.CUSTOMER, UserRole.DRIVER]), User.is_active == True))
+        stmt = select(User.id, User.phone_number).where(User.role.in_([UserRole.CUSTOMER, UserRole.DRIVER]), User.is_active == True)
 
-    user_ids = [uid for uid in q.scalars().all()]
+    q = await db.execute(stmt)
+    user_rows = q.all()
 
-    if user_ids:
-        asyncio.create_task(_async_broadcast_worker(audience, title, body, user_ids))
+    if user_rows:
+        if channel == "sms":
+            asyncio.create_task(_async_sms_broadcast_worker(audience, title, body, user_rows))
+        else:
+            user_ids = [row[0] for row in user_rows]
+            asyncio.create_task(_async_broadcast_worker(audience, title, body, user_ids))
 
-    return RedirectResponse(url="/admin/messages?queued=1", status_code=303)
+    return RedirectResponse(url=f"/admin/messages?queued=1&channel={channel}", status_code=303)
 
 
 # ---------- Corporate Billing (BRD: PY-05 / AD-12) ----------

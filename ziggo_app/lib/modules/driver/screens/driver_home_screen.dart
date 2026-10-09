@@ -3724,28 +3724,35 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
   // Loop the ride-alert sound for as long as the request sheet is open (foreground or background).
   Future<void> _startAlertSound() async {
     if (_alertSoundPlaying) return;
+    _alertSoundPlaying = true;
     try {
-      _alertSoundPlaying = true;
-      await _alertPlayer.setAudioContext(
-        AudioContext(
-          android: const AudioContextAndroid(
-            isSpeakerphoneOn: true,
-            stayAwake: true,
-            contentType: AndroidContentType.music,
-            usageType: AndroidUsageType.alarm,
-            audioMode: AndroidAudioMode.normal,
+      try {
+        await _alertPlayer.setAudioContext(
+          AudioContext(
+            android: const AudioContextAndroid(
+              isSpeakerphoneOn: true,
+              stayAwake: true,
+              contentType: AndroidContentType.music,
+              usageType: AndroidUsageType.alarm,
+              audioMode: AndroidAudioMode.normal,
+            ),
+            iOS: AudioContextIOS(
+              category: AVAudioSessionCategory.playback,
+              options: const {
+                AVAudioSessionOptions.defaultToSpeaker,
+              },
+            ),
           ),
-          iOS: AudioContextIOS(
-            category: AVAudioSessionCategory.playback,
-            options: const {
-              AVAudioSessionOptions.defaultToSpeaker,
-            },
-          ),
-        ),
-      );
+        );
+      } catch (e) {
+        debugPrint('[audio] setAudioContext failed: $e');
+      }
+      await _alertPlayer.setVolume(1.0);
       await _alertPlayer.setReleaseMode(ReleaseMode.loop);
       await _alertPlayer.play(AssetSource('sounds/ride_alert.mp3'));
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[audio] play ride_alert failed: $e');
+    }
   }
 
   Future<void> _stopAlertSound() async {

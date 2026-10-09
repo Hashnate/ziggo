@@ -71,3 +71,36 @@ async def send_otp(phone_number: str, code: str, site_name: str) -> bool:
     except Exception as e:
         print(f"[notify.lk] exception sending to {to}: {type(e).__name__}: {e}")
         return False
+
+
+async def send_sms(phone_number: str, message: str) -> bool:
+    """Send arbitrary SMS via Notify.lk gateway. Returns True on HTTP 200 with success status."""
+    if not _enabled():
+        print("[notify.lk] SMS gateway credentials not configured")
+        return False
+
+    to = _normalize(phone_number)
+    if not to or len(to) < 9:
+        print(f"[notify.lk] skipped sending SMS, invalid phone: {phone_number}")
+        return False
+
+    params = {
+        "user_id": settings.NOTIFY_LK_USER_ID,
+        "api_key": settings.NOTIFY_LK_API_KEY,
+        "sender_id": settings.NOTIFY_LK_SENDER_ID,
+        "to": to,
+        "message": message,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.get(_ENDPOINT, params=params)
+        ok = r.status_code == 200 and '"status":"success"' in r.text
+        if not ok:
+            print(f"[notify.lk] failed for {to}: HTTP {r.status_code} {r.text[:200]}")
+        else:
+            print(f"[notify.lk] sent SMS to {to}")
+        return ok
+    except Exception as e:
+        print(f"[notify.lk] exception sending to {to}: {type(e).__name__}: {e}")
+        return False
+

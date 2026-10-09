@@ -55,16 +55,27 @@
 {% endblock %}
 
 {% block content %}
-<div class="space-y-6">
+    <!-- Top Navigation & Live Header Controls -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <!-- View Toggle Pills -->
+        <div class="inline-flex p-1 bg-slate-100 rounded-2xl border border-ziggo-line shadow-soft-sm">
+            <a href="/admin/live-tracking" class="px-4 py-2 rounded-xl text-xs font-black bg-white text-ziggo shadow-sm flex items-center gap-2 transition">
+                <i class="fas fa-car"></i> <span>Drivers Live Tracking</span>
+            </a>
+            <a href="/admin/user-live-tracking" class="px-4 py-2 rounded-xl text-xs font-black text-slate-600 hover:text-ziggo flex items-center gap-2 transition">
+                <i class="fas fa-user-friends"></i> <span>Users Live Tracking</span>
+            </a>
+        </div>
 
-    <!-- Header Controls -->
-    <div class="flex justify-end items-center gap-3">
-        <span class="pulse-dot"></span>
-        <span class="text-xs font-black text-emerald-600 uppercase tracking-wider">Live Feed Active</span>
-        <span class="text-xs text-ziggo-muted font-bold">
-            · <span id="liveOnlineLabel">{{ online_drivers }}</span> Online ·
-            Updated <span id="liveUpdated">--:--:--</span>
-        </span>
+        <!-- Live Feed Indicator -->
+        <div class="flex items-center gap-3 bg-white px-4 py-2 rounded-2xl border border-ziggo-line shadow-soft-sm">
+            <span class="pulse-dot"></span>
+            <span class="text-xs font-black text-emerald-600 uppercase tracking-wider">Live Feed Active</span>
+            <span class="text-xs text-ziggo-muted font-bold">
+                · <span id="liveOnlineLabel">{{ online_drivers }}</span> Online ·
+                Updated <span id="liveUpdated">--:--:--</span>
+            </span>
+        </div>
     </div>
 
     <!-- Stat cards -->
