@@ -356,8 +356,12 @@ class DriverProvider extends ChangeNotifier {
         _vehicles = (resp.data as List)
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
-        notifyListeners();
+      } else if (resp.data is Map && resp.data['vehicles'] is List) {
+        _vehicles = (resp.data['vehicles'] as List)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
       }
+      notifyListeners();
     } catch (e, st) {
       debugPrint('[driver_provider] Error loading vehicles: $e\n$st');
     }

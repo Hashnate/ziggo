@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -18,22 +16,26 @@ class DriverVehiclesScreen extends StatefulWidget {
 
 class _DriverVehiclesScreenState extends State<DriverVehiclesScreen> {
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadVehicles();
-    });
+    _loadVehicles();
   }
 
   Future<void> _loadVehicles() async {
     if (!mounted) return;
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       await context.read<DriverProvider>().loadVehicles();
-    } catch (_) {
-      // Ignored, handled in provider
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = 'Could not load vehicles. Pull down to retry.');
+      }
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -82,111 +84,151 @@ class _DriverVehiclesScreenState extends State<DriverVehiclesScreen> {
       ),
       body: _loading
           ? const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'Loading vehicles...',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  ),
+                ],
               ),
             )
-          : vehicles.isEmpty
-              ? RefreshIndicator(
-                  onRefresh: _loadVehicles,
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
-                    children: [
-                      const SizedBox(height: 40),
-                      Center(
-                        child: Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.08),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.directions_car_outlined, size: 44, color: AppColors.primary),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      const Center(
-                        child: Text(
-                          'No vehicles registered yet',
-                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: AppColors.textPrimary),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Center(
-                        child: Text(
-                          'Add your bike, tuk-tuk, car, or van to start receiving ride requests.',
+          : _error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.error_outline_rounded, size: 48, color: AppColors.error),
+                        const SizedBox(height: 12),
+                        Text(
+                          _error!,
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
+                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
                         ),
-                      ),
-                      const SizedBox(height: 28),
-                      Center(
-                        child: SizedBox(
-                          width: 200,
-                          height: 48,
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                            ),
-                            onPressed: _showAddVehicleModal,
-                            icon: const Icon(Icons.add, size: 20),
-                            label: const Text('Add Vehicle', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: _loadVehicles,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Retry'),
+                          style: ElevatedButton.styleFrom(
+                            minimumSize: const Size(120, 44),
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 )
-              : RefreshIndicator(
-                  onRefresh: _loadVehicles,
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEFF6FF),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFFBFDBFE)),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.info_outline, color: Color(0xFF2563EB), size: 20),
-                            SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'You can register multiple vehicles (e.g. Bike + Tuk-Tuk). Switch your active vehicle anytime before going online.',
-                                style: TextStyle(fontSize: 12, color: Color(0xFF1E40AF), height: 1.3),
+              : vehicles.isEmpty
+                  ? RefreshIndicator(
+                      onRefresh: _loadVehicles,
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+                        children: [
+                          const SizedBox(height: 40),
+                          Center(
+                            child: Container(
+                              width: 80,
+                              height: 80,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.08),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.directions_car_outlined, size: 44, color: AppColors.primary),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          const Center(
+                            child: Text(
+                              'No vehicles registered yet',
+                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: AppColors.textPrimary),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Center(
+                            child: Text(
+                              'Add your bike, tuk-tuk, car, or van to start receiving ride requests.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
+                            ),
+                          ),
+                          const SizedBox(height: 28),
+                          Center(
+                            child: SizedBox(
+                              width: 200,
+                              height: 48,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  minimumSize: const Size(180, 48),
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                ),
+                                onPressed: _showAddVehicleModal,
+                                icon: const Icon(Icons.add, size: 20),
+                                label: const Text('Add Vehicle', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 16),
-                      ...vehicles.map((v) => _VehicleCard(vehicle: v, onRefresh: _loadVehicles)),
-                      const SizedBox(height: 20),
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primary,
-                          side: const BorderSide(color: AppColors.primary, width: 1.5),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                        onPressed: _showAddVehicleModal,
-                        icon: const Icon(Icons.add_circle_outline),
-                        label: const Text(
-                          '+ Add Another Vehicle',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                        ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _loadVehicles,
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(16),
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFBFDBFE)),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.info_outline, color: Color(0xFF2563EB), size: 20),
+                                SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'You can register multiple vehicles (e.g. Bike + Tuk-Tuk). Switch your active vehicle anytime before going online.',
+                                    style: TextStyle(fontSize: 12, color: Color(0xFF1E40AF), height: 1.3),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          ...vehicles.map((v) => _VehicleCard(vehicle: v, onRefresh: _loadVehicles)),
+                          const SizedBox(height: 20),
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.primary,
+                              side: const BorderSide(color: AppColors.primary, width: 1.5),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            onPressed: _showAddVehicleModal,
+                            icon: const Icon(Icons.add_circle_outline),
+                            label: const Text(
+                              '+ Add Another Vehicle',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
+                    ),
     );
   }
 }
@@ -200,14 +242,16 @@ class _VehicleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final driver = context.read<DriverProvider>();
-    final int id = vehicle['id'] ?? 0;
+    final int id = vehicle['id'] is int
+        ? (vehicle['id'] as int)
+        : int.tryParse(vehicle['id']?.toString() ?? '0') ?? 0;
     final String vType = (vehicle['vehicle_type'] ?? 'car').toString().toUpperCase();
     final String vNum = (vehicle['vehicle_number'] ?? '').toString().toUpperCase();
-    final String vModel = vehicle['vehicle_model'] ?? '';
-    final String vColor = vehicle['vehicle_color'] ?? '';
-    final bool isActive = vehicle['is_active'] == true;
-    final bool isApproved = vehicle['is_approved'] == true;
-    final String? rejectionReason = vehicle['rejection_reason'];
+    final String vModel = vehicle['vehicle_model']?.toString() ?? '';
+    final String vColor = vehicle['vehicle_color']?.toString() ?? '';
+    final bool isActive = vehicle['is_active'] == true || vehicle['is_active'] == 1;
+    final bool isApproved = vehicle['is_approved'] == true || vehicle['is_approved'] == 1;
+    final String? rejectionReason = vehicle['rejection_reason']?.toString();
 
     IconData iconData = Icons.directions_car_filled;
     if (vType.contains('BIKE')) iconData = Icons.two_wheeler;
@@ -227,7 +271,7 @@ class _VehicleCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -369,9 +413,10 @@ class _VehicleCard extends StatelessWidget {
               if (isApproved && !isActive)
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(0, 36),
                     backgroundColor: const Color(0xFF1E293B),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   onPressed: () async {
@@ -541,7 +586,7 @@ class _AddVehicleSheetState extends State<_AddVehicleSheet> {
               const Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                value: _vehicleType,
+                initialValue: _vehicleType,
                 decoration: InputDecoration(
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -675,6 +720,7 @@ class _AddVehicleSheetState extends State<_AddVehicleSheet> {
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 50),
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
