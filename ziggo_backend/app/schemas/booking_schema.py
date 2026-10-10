@@ -183,6 +183,8 @@ class BookingResponse(BaseModel):
 
     customer_rating: Optional[int] = None
     customer_feedback: Optional[str] = None
+    driver_rating: Optional[int] = None
+    driver_feedback: Optional[str] = None
     driver: Optional[DriverMini] = None
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None

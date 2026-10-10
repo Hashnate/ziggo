@@ -4493,7 +4493,6 @@ class _Drawer extends StatelessWidget {
     final photoUrl = (photoPath != null && photoPath.isNotEmpty)
         ? (photoPath.startsWith('http') ? photoPath : '${ApiConfig.baseHost}$photoPath')
         : null;
-    final driverId = (profile['id'] ?? '—').toString();
 
     return Drawer(
       backgroundColor: _kPanel,
@@ -4534,29 +4533,15 @@ class _Drawer extends StatelessWidget {
                 ),
                 const SizedBox(width: 14),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 18,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        driverId,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
                 GestureDetector(
