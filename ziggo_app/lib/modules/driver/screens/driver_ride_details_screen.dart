@@ -585,15 +585,16 @@ class DriverRideDetailsScreen extends StatelessWidget {
                       _breakdownRow('Pickup fee (included)', fmt.format((rideData['pickup_fee'] as num?) ?? 0)),
                     if (((rideData['peak_surcharge'] as num?) ?? 0) > 0)
                       _breakdownRow('Peak hours extra earnings', fmt.format((rideData['peak_surcharge'] as num?) ?? 0)),
-                    _breakdownRow('App usage charges', fmt.format((rideData['app_usage_charges'] as num?) ?? (rideData['platform_fee'] as num?) ?? 0)),
-                    _breakdownRow('Passenger deductibles', fmt.format((rideData['passenger_deductible'] as num?) ?? 0)),
+                    if (((rideData['passenger_deductible'] as num?) ?? 0) > 0)
+                      _breakdownRow('Passenger deductibles', fmt.format((rideData['passenger_deductible'] as num?) ?? 0)),
                     
                     const Divider(height: 24),
                     _breakdownRow('Gross total', fmt.format((rideData['final_amount'] as num?)?.toDouble() ?? 0.0), isBold: true),
                     const SizedBox(height: 16),
                     
                     _breakdownRow('App usage charges', fmt.format((rideData['app_usage_charges'] as num?) ?? (rideData['platform_fee'] as num?) ?? 0), isNegative: true),
-                    _breakdownRow('Passenger deductibles', fmt.format((rideData['passenger_deductible'] as num?) ?? 0), isNegative: true),
+                    if (((rideData['passenger_deductible'] as num?) ?? 0) > 0)
+                      _breakdownRow('Passenger deductibles', fmt.format((rideData['passenger_deductible'] as num?) ?? 0), isNegative: true),
                     
                     const Divider(height: 24),
                     _breakdownRow('Deduction', fmt.format((((rideData['app_usage_charges'] as num?) ?? (rideData['platform_fee'] as num?) ?? 0) + ((rideData['passenger_deductible'] as num?) ?? 0))), isBold: true, isNegative: true),

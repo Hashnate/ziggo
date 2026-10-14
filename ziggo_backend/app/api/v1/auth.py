@@ -93,6 +93,18 @@ async def verify_otp(request: OTPVerify, db: AsyncSession = Depends(get_db)):
 
         await db.commit()
         await db.refresh(user)
+
+        if request.role == UserRole.DRIVER:
+            try:
+                from ...services.ws_manager import manager
+                await manager.publish("admin_live", "driver_joined", {
+                    "driver_id": None,
+                    "driver_name": user.full_name or "New Driver",
+                    "phone": user.phone_number,
+                    "status": "pending",
+                })
+            except Exception as e:
+                print(f"[ws] driver_joined publish error: {e}")
     else:
         # Existing user — handle role switching.
         #

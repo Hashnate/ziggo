@@ -152,7 +152,7 @@ async def calculate_fare(
 
         final = max(0, fare - discount)
         platform_fee = fare * (platform_pct / 100.0)
-        passenger_pays = final + platform_fee
+        passenger_pays = final
         driver_earnings = fare - platform_fee
 
         rental_dict = {
@@ -214,7 +214,7 @@ async def calculate_fare(
 
         final = max(0, fare - discount)
         platform_fee = fare * (platform_pct / 100.0)
-        passenger_pays = final + platform_fee
+        passenger_pays = final
         driver_earnings = fare - platform_fee
 
         courier_dict = {
@@ -420,14 +420,14 @@ async def calculate_fare(
 
     final_pre_deductible = max(0.0, fare_val - discount)
     passenger_deductible_val = final_pre_deductible * (passenger_deductible_pct / 100.0)
-    gross_total = final_pre_deductible + passenger_deductible_val + app_usage_charges
+    gross_total = final_pre_deductible + passenger_deductible_val
     deductions = app_usage_charges + passenger_deductible_val
 
     feeable_amount_original = max(0.0, fare_val_original - boost_val)
     app_usage_charges_original = feeable_amount_original * (platform_pct / 100.0)
     final_pre_deductible_original = max(0.0, fare_val_original - discount_original)
     passenger_deductible_val_original = final_pre_deductible_original * (passenger_deductible_pct / 100.0)
-    gross_total_original = final_pre_deductible_original + passenger_deductible_val_original + app_usage_charges_original
+    gross_total_original = final_pre_deductible_original + passenger_deductible_val_original
 
     fare_dict = {
         "distance_km": round(distance_km, 2),
@@ -708,7 +708,7 @@ async def calculate_fares_bulk(
 
                 final = max(0, fare - discount)
                 platform_fee = fare * (platform_pct / 100.0)
-                passenger_pays = final + platform_fee
+                passenger_pays = final
                 driver_earnings = fare - platform_fee
 
                 rental_dict = {
@@ -775,7 +775,7 @@ async def calculate_fares_bulk(
 
                 final = max(0, fare - discount)
                 platform_fee = fare * (platform_pct / 100.0)
-                passenger_pays = final + platform_fee
+                passenger_pays = final
                 driver_earnings = fare - platform_fee
 
                 courier_dict = {
@@ -923,14 +923,14 @@ async def calculate_fares_bulk(
 
             final_pre_deductible = max(0.0, fare_val - discount)
             passenger_deductible_val = final_pre_deductible * (passenger_deductible_pct / 100.0)
-            gross_total = final_pre_deductible + passenger_deductible_val + app_usage_charges
+            gross_total = final_pre_deductible + passenger_deductible_val
             deductions = app_usage_charges + passenger_deductible_val
 
             feeable_amount_original = max(0.0, fare_val_original - boost_val)
             app_usage_charges_original = feeable_amount_original * (platform_pct / 100.0)
             final_pre_deductible_original = max(0.0, fare_val_original - discount_original)
             passenger_deductible_val_original = final_pre_deductible_original * (passenger_deductible_pct / 100.0)
-            gross_total_original = final_pre_deductible_original + passenger_deductible_val_original + app_usage_charges_original
+            gross_total_original = final_pre_deductible_original + passenger_deductible_val_original
 
             fare_dict = {
                 "service_type": service_type,

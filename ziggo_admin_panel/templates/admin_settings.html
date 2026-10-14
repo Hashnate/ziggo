@@ -146,13 +146,21 @@
 
                 <!-- Peak Hours -->
                 <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="peakhours">
-                    <div class="flex justify-between items-center mb-5">
+                    <div class="flex flex-wrap justify-between items-center gap-3 mb-5">
                         <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink">
                             <i class="fas fa-clock text-ziggo"></i> Peak Hours Settings
                         </h3>
-                        <button type="button" onclick="addPeakHour()" class="px-4 py-2 bg-ziggo text-white rounded-xl text-xs font-black shadow-brand hover:bg-ziggo-light transition flex items-center gap-1.5">
-                            <i class="fas fa-plus"></i> Add Peak Hour
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="addPeakHour()" class="px-4 py-2 bg-ziggo text-white rounded-xl text-xs font-black shadow-brand hover:bg-ziggo-light transition flex items-center gap-1.5">
+                                <i class="fas fa-plus"></i> Add Peak Hour
+                            </button>
+                            <button type="submit" class="px-4 py-2 bg-ziggo text-white rounded-xl text-xs font-black shadow-brand hover:bg-ziggo-light transition flex items-center gap-1.5" title="Save All Settings">
+                                <i class="fas fa-save"></i> Save All Settings
+                            </button>
+                            <a href="/admin/settings?tab=peakhours" class="px-4 py-2 border border-ziggo-line rounded-xl text-xs font-black text-ziggo-muted hover:bg-gray-50 transition flex items-center">
+                                Reset
+                            </a>
+                        </div>
                     </div>
                     <div class="space-y-4">
                         <div class="bg-white rounded-2xl border border-ziggo-line overflow-hidden shadow-soft-sm mb-4">
@@ -527,7 +535,7 @@
             panels.forEach(function (p) { p.classList.toggle('active', p.dataset.panel === name); });
             var saveBar = document.getElementById('settingsSaveBar');
             if (saveBar) {
-                saveBar.style.display = (name === 'incentives') ? 'none' : 'flex';
+                saveBar.style.display = (name === 'incentives' || name === 'peakhours') ? 'none' : 'flex';
             }
             var activeTabInput = document.getElementById('activeTabInput');
             if (activeTabInput) {

@@ -595,6 +595,19 @@ async def verify_preregister(
     await db.commit()
     await db.refresh(user)
 
+    if req.role == "driver":
+        try:
+            from ...services.ws_manager import manager
+            await manager.publish("admin_live", "driver_joined", {
+                "driver_id": getattr(user.driver_profile, "id", None) if getattr(user, "driver_profile", None) else None,
+                "driver_name": user.full_name or "New Driver",
+                "phone": user.phone_number,
+                "vehicle_type": getattr(req, "vehicle_type", None) or "",
+                "status": "pending",
+            })
+        except Exception as e:
+            print(f"[ws] public driver_joined publish error: {e}")
+
     return {
         "ok": True,
         "message": "Verification successful! You can now log in via the mobile app."

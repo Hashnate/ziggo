@@ -88,6 +88,10 @@
                     <i class="fas fa-tower-broadcast text-emerald-600 mt-0.5 shrink-0"></i>
                     <span>Dispatched via <strong>Notify.lk</strong> Gateway to recipients' verified phone numbers.</span>
                 </div>
+                <div class="flex items-center gap-1.5 mt-1.5 text-[10px] text-emerald-700">
+                    <i class="fas fa-language text-emerald-600"></i>
+                    <span>Supports <strong>Sinhala</strong>, <strong>Tamil</strong>, and English (automatic Unicode encoding enabled).</span>
+                </div>
             </div>
             
             <button class="zi-btn-primary w-full shadow-md">
@@ -204,9 +208,12 @@ function onChannelChange(channel) {
 function updateCharCount() {
     const body = document.getElementById('msg-body').value;
     const len = body.length;
-    const segments = len === 0 ? 0 : Math.ceil(len / 160);
+    const isUnicode = /[^\u0000-\u007F]/.test(body);
+    const limit = isUnicode ? 70 : 160;
+    const segments = len === 0 ? 0 : Math.ceil(len / limit);
     const counter = document.getElementById('char-counter');
-    counter.textContent = `${len} chars (${segments} SMS segment${segments === 1 ? '' : 's'})`;
+    const modeTag = isUnicode ? ' • Unicode (Sinhala/Tamil)' : '';
+    counter.textContent = `${len} chars (${segments} SMS segment${segments === 1 ? '' : 's'}${modeTag})`;
 }
 </script>
 {% endblock %}

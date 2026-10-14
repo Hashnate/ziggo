@@ -1071,6 +1071,19 @@ async def admin_drivers_new_submit(
 
     await db.commit()
 
+    try:
+        from app.services.ws_manager import manager
+        await manager.publish("admin_live", "driver_joined", {
+            "driver_id": driver.id,
+            "driver_name": user.full_name or "New Driver",
+            "phone": user.phone_number,
+            "vehicle_number": driver.vehicle_number or "",
+            "vehicle_type": driver.vehicle_type or "",
+            "status": driver.status.value if hasattr(driver.status, "value") else str(driver.status),
+        })
+    except Exception as e:
+        print(f"[ws] admin new driver publish error: {e}")
+
     return RedirectResponse(url="/admin/drivers", status_code=303)
 
 
@@ -1378,6 +1391,15 @@ async def approve_driver_form(
         d.status = DriverStatus.APPROVED
         d.approved_at = datetime.now(timezone.utc)
         await db.commit()
+        try:
+            from app.services.ws_manager import manager
+            await manager.publish("admin_live", "driver_status_update", {
+                "id": d.id,
+                "status": "approved",
+                "is_approved": True,
+            })
+        except Exception:
+            pass
     return RedirectResponse(url="/admin/drivers?success=Driver+approved+successfully", status_code=303)
 
 
@@ -1394,6 +1416,16 @@ async def suspend_driver_form(
         d.is_online = False
         d.status = DriverStatus.SUSPENDED
         await db.commit()
+        try:
+            from app.services.ws_manager import manager
+            await manager.publish("admin_live", "driver_status_update", {
+                "id": d.id,
+                "status": "suspended",
+                "is_approved": False,
+                "is_online": False,
+            })
+        except Exception:
+            pass
     return RedirectResponse(url="/admin/drivers", status_code=303)
 
 

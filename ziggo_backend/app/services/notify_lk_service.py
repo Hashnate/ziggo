@@ -73,8 +73,48 @@ async def send_otp(phone_number: str, code: str, site_name: str) -> bool:
         return False
 
 
+def _is_unicode(text: str) -> bool:
+    """Check if text contains characters outside GSM standard charset (e.g. Sinhala, Tamil, emojis)."""
+    return any(ord(c) > 127 for c in text)
+
+
+def _split_sms_message(msg: str, is_unicode: bool) -> list[str]:
+    """Split message into segments if it exceeds Notify.lk maximum limit (603 chars for Unicode)."""
+    max_len = 550 if is_unicode else 900
+    if len(msg) <= max_len:
+        return [msg]
+
+    paragraphs = msg.split("\n")
+    chunks: list[str] = []
+    curr = ""
+    for p in paragraphs:
+        candidate = (curr + "\n" + p).strip() if curr else p
+        if len(candidate) <= max_len:
+            curr = candidate
+        else:
+            if curr:
+                chunks.append(curr)
+                curr = p
+            else:
+                words = p.split(" ")
+                for w in words:
+                    cand_w = (curr + " " + w).strip() if curr else w
+                    if len(cand_w) <= max_len:
+                        curr = cand_w
+                    else:
+                        if curr:
+                            chunks.append(curr)
+                        curr = w
+    if curr:
+        chunks.append(curr)
+
+    if len(chunks) > 1:
+        return [f"({i+1}/{len(chunks)})\n{c}" for i, c in enumerate(chunks)]
+    return chunks
+
+
 async def send_sms(phone_number: str, message: str) -> bool:
-    """Send arbitrary SMS via Notify.lk gateway. Returns True on HTTP 200 with success status."""
+    """Send arbitrary SMS via Notify.lk gateway. Automatically splits long messages exceeding 603 chars."""
     if not _enabled():
         print("[notify.lk] SMS gateway credentials not configured")
         return False
@@ -84,22 +124,31 @@ async def send_sms(phone_number: str, message: str) -> bool:
         print(f"[notify.lk] skipped sending SMS, invalid phone: {phone_number}")
         return False
 
-    params = {
-        "user_id": settings.NOTIFY_LK_USER_ID,
-        "api_key": settings.NOTIFY_LK_API_KEY,
-        "sender_id": settings.NOTIFY_LK_SENDER_ID,
-        "to": to,
-        "message": message,
-    }
+    is_uni = _is_unicode(message)
+    parts = _split_sms_message(message, is_uni)
+
+    all_ok = True
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            r = await client.get(_ENDPOINT, params=params)
-        ok = r.status_code == 200 and '"status":"success"' in r.text
-        if not ok:
-            print(f"[notify.lk] failed for {to}: HTTP {r.status_code} {r.text[:200]}")
-        else:
-            print(f"[notify.lk] sent SMS to {to}")
-        return ok
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            for part in parts:
+                params = {
+                    "user_id": settings.NOTIFY_LK_USER_ID,
+                    "api_key": settings.NOTIFY_LK_API_KEY,
+                    "sender_id": settings.NOTIFY_LK_SENDER_ID,
+                    "to": to,
+                    "message": part,
+                }
+                if is_uni:
+                    params["type"] = "unicode"
+
+                r = await client.get(_ENDPOINT, params=params)
+                ok = r.status_code == 200 and '"status":"success"' in r.text
+                if not ok:
+                    print(f"[notify.lk] failed for {to}: HTTP {r.status_code} {r.text[:200]}")
+                    all_ok = False
+                else:
+                    print(f"[notify.lk] sent SMS part to {to} (unicode={is_uni}, len={len(part)})")
+        return all_ok
     except Exception as e:
         print(f"[notify.lk] exception sending to {to}: {type(e).__name__}: {e}")
         return False

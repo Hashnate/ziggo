@@ -850,6 +850,21 @@ async def create_booking(
     await db.commit()
     await db.refresh(booking)
 
+    # Broadcast to admin live feed
+    try:
+        await manager.publish("admin_live", "booking_created", {
+            "booking_id": booking.id,
+            "booking_ref": booking.booking_ref,
+            "service_type": booking.service_type,
+            "fare": float(booking.final_amount or 0),
+            "customer_name": user.full_name or user.phone_number,
+            "pickup_address": booking.pickup_address,
+            "drop_address": booking.drop_address,
+            "status": booking.status.value,
+        })
+    except Exception as e:
+        print(f"[ws] booking_created publish error: {e}")
+
     # Notify customer of status (so the WS-listening client gets the initial state)
     await manager.send(
         user.id,
@@ -1162,6 +1177,19 @@ async def get_active_booking(
                 description=f"Refund — {b.booking_ref} auto-cancelled",
             )
             await db.commit()
+
+            try:
+                await manager.publish("admin_live", "booking_status_update", {
+                    "booking_id": b.id,
+                    "booking_ref": b.booking_ref,
+                    "status": "cancelled",
+                    "cancelled_by": "system",
+                    "reason": "No driver available within search window",
+                    "amount": float(b.final_amount or 0),
+                })
+            except Exception:
+                pass
+
             return None
 
     return await _booking_to_response(db, b) if b else None
@@ -1365,6 +1393,19 @@ async def accept_booking(
             )
         )
         await db.commit()
+
+    # Broadcast to admin live feed
+    try:
+        await manager.publish("admin_live", "booking_status_update", {
+            "booking_id": b.id,
+            "booking_ref": b.booking_ref,
+            "status": "accepted",
+            "driver_name": user.full_name or "Driver",
+            "driver_id": driver.id,
+            "amount": float(b.final_amount or 0),
+        })
+    except Exception as e:
+        print(f"[ws] booking accept publish error: {e}")
 
     return await _booking_to_response(db, b)
 
@@ -1959,6 +2000,19 @@ async def update_booking_status(
                 {"booking_id": b.id, "booking_ref": b.booking_ref},
             )
     await db.commit()
+
+    # Broadcast to admin live feed (for auto-refresh on cancel, complete, etc.)
+    try:
+        await manager.publish("admin_live", "booking_status_update", {
+            "booking_id": b.id,
+            "booking_ref": b.booking_ref,
+            "status": b.status.value,
+            "cancelled_by": b.cancelled_by,
+            "reason": b.cancellation_reason,
+            "amount": float(b.final_amount or 0),
+        })
+    except Exception as e:
+        print(f"[ws] booking_status_update publish error: {e}")
 
     return await _booking_to_response(db, b)
 

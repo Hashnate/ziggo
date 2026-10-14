@@ -409,6 +409,20 @@ async def register_driver(
     await db.commit()
     await db.refresh(d)
     await db.refresh(user)
+
+    # Broadcast to admin live feed
+    try:
+        await manager.publish("admin_live", "driver_joined", {
+            "driver_id": d.id,
+            "driver_name": user.full_name or "New Driver",
+            "phone": user.phone_number,
+            "vehicle_number": d.vehicle_number or "",
+            "vehicle_type": d.vehicle_type or "",
+            "status": d.status.value if hasattr(d.status, "value") else str(d.status),
+        })
+    except Exception as e:
+        print(f"[ws] driver_joined publish error: {e}")
+
     return _to_response(user, d)
 
 

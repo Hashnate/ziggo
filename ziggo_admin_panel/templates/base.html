@@ -245,6 +245,46 @@
         @keyframes zi-shake { 0%,100%{transform:rotate(0)} 20%{transform:rotate(-12deg)} 40%{transform:rotate(12deg)} 60%{transform:rotate(-8deg)} 80%{transform:rotate(6deg)} }
         .zi-bell-shake { animation: zi-shake 0.7s ease; }
 
+        /* ===== Live Toast Notifications ===== */
+        .zi-toast {
+            pointer-events: auto;
+            background: #ffffff;
+            border-radius: 14px;
+            padding: 11px 14px;
+            box-shadow: 0 10px 30px -6px rgba(15, 23, 42, 0.14), 0 2px 6px rgba(15, 23, 42, 0.04);
+            border: 1px solid #E2E8F0;
+            display: flex;
+            align-items: flex-start;
+            gap: 11px;
+            animation: ziToastSlideIn 260ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            transition: all 240ms ease;
+            position: relative;
+        }
+        .zi-toast.zi-toast-hiding {
+            opacity: 0;
+            transform: translateX(24px) scale(0.96);
+        }
+        @keyframes ziToastSlideIn {
+            from { opacity: 0; transform: translateY(-8px) scale(0.96); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .zi-toast .zi-toast-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 14px;
+        }
+        .zi-toast-booking-complete .zi-toast-icon { background: #DCFCE7; color: #16A34A; }
+        .zi-toast-booking-cancel .zi-toast-icon { background: #FEE2E2; color: #DC2626; }
+        .zi-toast-booking-create .zi-toast-icon { background: #EFF6FF; color: #2563EB; }
+        .zi-toast-driver-join .zi-toast-icon { background: #FEF3C7; color: #D97706; }
+        .zi-toast-info .zi-toast-icon,
+        .zi-toast-default .zi-toast-icon { background: #F1F5F9; color: #475569; }
+
         /* ===== Buttons ===== */
         .zi-btn-primary,
         .bg-ziggo:not(.sidebar-item):not(.zi-logo),
@@ -555,6 +595,21 @@
                 {% endblock %}
             </div>
             <div class="flex items-center gap-3">
+                <!-- Live Auto-Sync / Auto-Refresh Control -->
+                <div class="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-ziggo-line shadow-soft-sm text-xs select-none" id="autoSyncContainer">
+                    <button type="button" id="autoSyncToggleBtn" class="flex items-center gap-2 hover:opacity-85 transition cursor-pointer" title="Auto-refresh on live driver joins & hire updates. Click to toggle ON/OFF">
+                        <span class="relative flex h-2 w-2">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" id="autoSyncPing"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" id="autoSyncDot"></span>
+                        </span>
+                        <span class="text-[11px] font-bold text-ziggo-ink hidden md:inline" id="autoSyncLabel">Live Auto-Sync</span>
+                    </button>
+                    <span class="w-px h-3.5 bg-ziggo-line"></span>
+                    <button type="button" id="manualRefreshBtn" class="text-ziggo-muted hover:text-ziggo transition p-0.5 rounded cursor-pointer" title="Refresh data now">
+                        <i class="fas fa-rotate-right text-[11px]" id="manualRefreshIcon"></i>
+                    </button>
+                </div>
+
                 <div class="zi-notif" id="ziNotif">
                     <button type="button" class="zi-bell flex items-center justify-center" id="ziBellBtn" aria-label="Notifications">
                         <i class="far fa-bell"></i>
@@ -860,7 +915,339 @@
         setTimeout(restoreScrollPosition, 150);
         setTimeout(restoreScrollPosition, 350);
       })();
+
+      // =========================================================================
+      // Live Auto-Refresh & Real-Time Event Sync via /ws/admin
+      // =========================================================================
+      (function () {
+        var autoSyncEnabled = localStorage.getItem('zi_auto_sync') !== 'false'; // default ON
+        var ws = null;
+        var pingInterval = null;
+        var reconnectTimer = null;
+        var reconnectDelay = 2000;
+        var refreshDebounceTimer = null;
+
+        var dot = document.getElementById('autoSyncDot');
+        var ping = document.getElementById('autoSyncPing');
+        var label = document.getElementById('autoSyncLabel');
+        var toggleBtn = document.getElementById('autoSyncToggleBtn');
+        var refreshBtn = document.getElementById('manualRefreshBtn');
+        var refreshIcon = document.getElementById('manualRefreshIcon');
+        var toastContainer = document.getElementById('ziLiveToastContainer');
+
+        function updateStatusUI(status) {
+          if (!dot || !label) return;
+          if (!autoSyncEnabled) {
+            dot.className = 'relative inline-flex rounded-full h-2 w-2 bg-slate-400';
+            if (ping) ping.style.display = 'none';
+            label.textContent = 'Auto-Sync: Paused';
+            label.className = 'text-[11px] font-bold text-slate-400 hidden md:inline';
+            return;
+          }
+          if (status === 'connected') {
+            dot.className = 'relative inline-flex rounded-full h-2 w-2 bg-emerald-500';
+            if (ping) {
+              ping.style.display = '';
+              ping.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75';
+            }
+            label.textContent = 'Live Auto-Sync';
+            label.className = 'text-[11px] font-bold text-emerald-700 hidden md:inline';
+          } else if (status === 'connecting') {
+            dot.className = 'relative inline-flex rounded-full h-2 w-2 bg-amber-500';
+            if (ping) ping.style.display = 'none';
+            label.textContent = 'Sync: Connecting…';
+            label.className = 'text-[11px] font-bold text-amber-600 hidden md:inline';
+          } else {
+            dot.className = 'relative inline-flex rounded-full h-2 w-2 bg-slate-400';
+            if (ping) ping.style.display = 'none';
+            label.textContent = 'Sync: Polling';
+            label.className = 'text-[11px] font-bold text-slate-500 hidden md:inline';
+          }
+        }
+
+        // Toggle button handler
+        if (toggleBtn) {
+          toggleBtn.addEventListener('click', function () {
+            autoSyncEnabled = !autoSyncEnabled;
+            localStorage.setItem('zi_auto_sync', autoSyncEnabled ? 'true' : 'false');
+            if (autoSyncEnabled) {
+              showToast({
+                type: 'info',
+                title: 'Auto-Sync Activated',
+                message: 'Auto-refreshes on new driver joins, cancellations, and completed hires.',
+                icon: 'fa-bolt'
+              });
+              if (!ws || ws.readyState !== WebSocket.OPEN) {
+                initWebSocket();
+              } else {
+                updateStatusUI('connected');
+              }
+            } else {
+              showToast({
+                type: 'info',
+                title: 'Auto-Sync Paused',
+                message: 'Automatic page refreshing is paused. Click anytime to re-enable.',
+                icon: 'fa-pause'
+              });
+              updateStatusUI('paused');
+            }
+          });
+        }
+
+        // Manual refresh button handler
+        if (refreshBtn) {
+          refreshBtn.addEventListener('click', function () {
+            triggerPageRefresh(true);
+          });
+        }
+
+        // Beautiful floating Toast notification
+        function showToast(opt) {
+          if (!toastContainer) return;
+          var t = document.createElement('div');
+          t.className = 'zi-toast zi-toast-' + (opt.type || 'default');
+
+          var iconClass = 'fa-circle-info';
+          if (opt.icon) iconClass = opt.icon;
+          else if (opt.type === 'booking-complete') iconClass = 'fa-circle-check';
+          else if (opt.type === 'booking-cancel') iconClass = 'fa-circle-xmark';
+          else if (opt.type === 'booking-create') iconClass = 'fa-route';
+          else if (opt.type === 'driver-join') iconClass = 'fa-id-card';
+
+          var linkHtml = opt.url ? ' <a href="' + opt.url + '" class="underline font-bold hover:text-ziggo ml-1">View</a>' : '';
+
+          t.innerHTML = 
+            '<div class="zi-toast-icon"><i class="fas ' + iconClass + '"></i></div>' +
+            '<div class="flex-1 min-w-0 pr-1">' +
+              '<p class="text-xs font-black text-ziggo-ink leading-tight">' + opt.title + '</p>' +
+              '<p class="text-[11px] text-slate-600 font-medium mt-0.5 leading-snug">' + opt.message + linkHtml + '</p>' +
+            '</div>' +
+            '<button type="button" class="text-slate-400 hover:text-slate-700 transition text-xs -mt-1 -mr-1 p-1"><i class="fas fa-times"></i></button>';
+
+          t.querySelector('button').addEventListener('click', function () {
+            t.classList.add('zi-toast-hiding');
+            setTimeout(function () { t.remove(); }, 260);
+          });
+
+          toastContainer.appendChild(t);
+
+          // Auto remove after 5.5s
+          setTimeout(function () {
+            if (t.parentNode) {
+              t.classList.add('zi-toast-hiding');
+              setTimeout(function () { t.remove(); }, 260);
+            }
+          }, 5500);
+        }
+
+        // Check if user is actively interacting with forms/inputs
+        function isUserBusy() {
+          var active = document.activeElement;
+          if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT' || active.isContentEditable)) {
+            return true;
+          }
+          if (document.querySelector('.modal.open, [role="dialog"]:not(.hidden), .zi-modal-open')) {
+            return true;
+          }
+          return false;
+        }
+
+        // Trigger page refresh with scroll preservation and safety checks
+        function triggerPageRefresh(force) {
+          if (!force && !autoSyncEnabled) return;
+
+          if (!force && isUserBusy()) {
+            var active = document.activeElement;
+            if (active) {
+              var onBlur = function () {
+                active.removeEventListener('blur', onBlur);
+                setTimeout(function () { triggerPageRefresh(false); }, 1500);
+              };
+              active.addEventListener('blur', onBlur);
+            }
+            return;
+          }
+
+          if (refreshIcon) {
+            refreshIcon.classList.add('fa-spin');
+          }
+
+          // Save current scroll position
+          try {
+            var sc = document.getElementById('mainContent') || window;
+            var pos = (sc === window) ? window.scrollY : sc.scrollTop;
+            if (pos > 0) {
+              sessionStorage.setItem('ziggo_admin_scroll_' + window.location.pathname, String(pos));
+            }
+          } catch (e) {}
+
+          // Gentle reload
+          setTimeout(function () {
+            window.location.reload();
+          }, 350);
+        }
+
+        // Debounced refresh scheduler
+        function scheduleAutoRefresh(reason) {
+          if (!autoSyncEnabled) return;
+          if (refreshDebounceTimer) clearTimeout(refreshDebounceTimer);
+          refreshDebounceTimer = setTimeout(function () {
+            triggerPageRefresh(false);
+          }, 1200); // 1.2s debounce
+        }
+
+        // Determine if an event is relevant to current admin page
+        function handleLiveEvent(evt, data) {
+          var path = window.location.pathname;
+          var onDashboard = path === '/admin' || path === '/admin/' || path === '/admin/dashboard';
+          var onBookings = path.indexOf('/admin/bookings') === 0;
+          var onDrivers = path.indexOf('/admin/drivers') === 0;
+          var onRiders = path.indexOf('/admin/riders') === 0;
+
+          // Trigger live notification bell shake
+          var bellBtn = document.getElementById('ziBellBtn');
+          if (bellBtn) {
+            bellBtn.classList.add('zi-bell-shake');
+            setTimeout(function(){ bellBtn.classList.remove('zi-bell-shake'); }, 700);
+          }
+
+          if (evt === 'driver_joined') {
+            showToast({
+              type: 'driver-join',
+              title: 'New Driver Joined',
+              message: (data.driver_name || 'Driver') + ' registered' + (data.vehicle_type ? ' (' + data.vehicle_type + ')' : '') + '.',
+              url: '/admin/drivers',
+              icon: 'fa-id-card'
+            });
+            if (onDashboard || onDrivers || onRiders) {
+              scheduleAutoRefresh('driver_joined');
+            }
+          }
+          else if (evt === 'booking_created') {
+            showToast({
+              type: 'booking-create',
+              title: 'New Hire Created',
+              message: 'Booking ' + (data.booking_ref || '') + ' (' + (data.service_type || 'ride') + ') • Rs.' + (data.fare ? Math.round(data.fare).toLocaleString() : '0'),
+              url: '/admin/bookings',
+              icon: 'fa-route'
+            });
+            if (onDashboard || onBookings) {
+              scheduleAutoRefresh('booking_created');
+            }
+          }
+          else if (evt === 'booking_status_update') {
+            var st = (data.status || '').toLowerCase();
+            if (st === 'completed') {
+              showToast({
+                type: 'booking-complete',
+                title: 'Hire Completed',
+                message: 'Booking ' + (data.booking_ref || '') + ' completed • Rs.' + (data.amount ? Math.round(data.amount).toLocaleString() : '0'),
+                url: '/admin/bookings',
+                icon: 'fa-circle-check'
+              });
+              if (onDashboard || onBookings) {
+                scheduleAutoRefresh('booking_completed');
+              }
+            } else if (st === 'cancelled') {
+              var by = data.cancelled_by ? ' (by ' + data.cancelled_by + ')' : '';
+              var r = data.reason ? ': ' + data.reason : '';
+              showToast({
+                type: 'booking-cancel',
+                title: 'Hire Cancelled',
+                message: 'Booking ' + (data.booking_ref || '') + ' cancelled' + by + r,
+                url: '/admin/bookings',
+                icon: 'fa-circle-xmark'
+              });
+              if (onDashboard || onBookings) {
+                scheduleAutoRefresh('booking_cancelled');
+              }
+            } else if (st === 'accepted' || st === 'arrived' || st === 'started') {
+              if (onBookings) {
+                scheduleAutoRefresh('booking_' + st);
+              }
+            }
+          }
+          else if (evt === 'driver_status_update') {
+            if (onDashboard || onDrivers || onRiders) {
+              scheduleAutoRefresh('driver_status_update');
+            }
+          }
+        }
+
+        // WebSocket connection manager
+        function initWebSocket() {
+          if (!autoSyncEnabled) {
+            updateStatusUI('paused');
+            return;
+          }
+          updateStatusUI('connecting');
+
+          var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+          var url = proto + '//' + location.host + '/ws/admin';
+
+          try {
+            ws = new WebSocket(url);
+          } catch (e) {
+            console.warn('[auto-sync] WebSocket init failed:', e);
+            updateStatusUI('fallback');
+            return;
+          }
+
+          ws.onopen = function () {
+            reconnectDelay = 2000;
+            updateStatusUI('connected');
+            if (pingInterval) clearInterval(pingInterval);
+            pingInterval = setInterval(function () {
+              if (ws && ws.readyState === WebSocket.OPEN) {
+                try { ws.send('ping'); } catch (e) {}
+              }
+            }, 25000);
+          };
+
+          ws.onmessage = function (e) {
+            try {
+              var payload = JSON.parse(e.data);
+              var evt = payload.event;
+              var data = payload.data || {};
+              handleLiveEvent(evt, data);
+            } catch (err) {}
+          };
+
+          ws.onclose = function () {
+            if (pingInterval) clearInterval(pingInterval);
+            updateStatusUI('connecting');
+            if (autoSyncEnabled) {
+              if (reconnectTimer) clearTimeout(reconnectTimer);
+              reconnectTimer = setTimeout(initWebSocket, reconnectDelay);
+              reconnectDelay = Math.min(reconnectDelay * 1.5, 15000);
+            }
+          };
+
+          ws.onerror = function () {
+            try { ws.close(); } catch (err) {}
+          };
+        }
+
+        // Start WebSocket on page load
+        initWebSocket();
+
+        // Safety fallback periodic background poll:
+        // On Bookings or Dashboard, perform a gentle sync every 40 seconds if idle
+        setInterval(function () {
+          if (!autoSyncEnabled) return;
+          var path = window.location.pathname;
+          var isMonitorPage = path === '/admin' || path === '/admin/' || path === '/admin/dashboard' || path.indexOf('/admin/bookings') === 0;
+          if (isMonitorPage && !isUserBusy() && (!ws || ws.readyState !== WebSocket.OPEN)) {
+            triggerPageRefresh(false);
+          }
+        }, 40000);
+
+      })();
     </script>
+
+    <!-- Global Live Toast Container -->
+    <div id="ziLiveToastContainer" class="fixed top-5 right-5 z-[9999] flex flex-col gap-2.5 max-w-sm pointer-events-none"></div>
+
     {% block scripts %}{% endblock %}
 </body>
 </html>

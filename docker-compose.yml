@@ -99,6 +99,7 @@ services:
       # existing uploads keep working after the admin_panel move.
       - ziggo_uploads:/app/ziggo_admin_panel/static/uploads
       - ./ziggo_admin_panel:/app/ziggo_admin_panel
+      - ./ziggo_backend/app:/app/app
     ports:
       # Public binding — accepts traffic from outside the server on
       # ${ZIGGO_PORT}. Switch back to "127.0.0.1:..." once nginx is fronting
