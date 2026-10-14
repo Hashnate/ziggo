@@ -3691,7 +3691,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed && !_busy && mounted && _secondsLeft > 0) {
       _startAlertSound();
     }
   }
@@ -3723,7 +3723,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
 
   // Loop the ride-alert sound for as long as the request sheet is open (foreground or background).
   Future<void> _startAlertSound() async {
-    if (_alertSoundPlaying) return;
+    if (_alertSoundPlaying || _busy || !mounted) return;
     _alertSoundPlaying = true;
     try {
       try {
@@ -3747,8 +3747,10 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
       } catch (e) {
         debugPrint('[audio] setAudioContext failed: $e');
       }
+      if (!_alertSoundPlaying || _busy || !mounted) return;
       await _alertPlayer.setVolume(1.0);
       await _alertPlayer.setReleaseMode(ReleaseMode.loop);
+      if (!_alertSoundPlaying || _busy || !mounted) return;
       await _alertPlayer.play(AssetSource('sounds/ride_alert.mp3'));
     } catch (e) {
       debugPrint('[audio] play ride_alert failed: $e');
@@ -3756,7 +3758,6 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
   }
 
   Future<void> _stopAlertSound() async {
-    if (!_alertSoundPlaying) return;
     _alertSoundPlaying = false;
     try {
       await _alertPlayer.stop();
@@ -3767,8 +3768,11 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
-    _stopAlertSound();
-    _alertPlayer.dispose();
+    _alertSoundPlaying = false;
+    try {
+      _alertPlayer.stop();
+      _alertPlayer.dispose();
+    } catch (_) {}
     super.dispose();
   }
 
@@ -3792,8 +3796,8 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
     HapticFeedback.mediumImpact();
     setState(() => _busy = true);
     _timer?.cancel();
-    // Cancel the persistent full-screen notification immediately so the
-    // looping sound and ongoing overlay stop the moment the driver accepts.
+    // Stop the looping alert sound immediately so audio halts the moment the driver taps Accept
+    await _stopAlertSound();
     unawaited(FcmService.instance.cancelRideAlert());
     bool ok = false;
     try {
@@ -3819,9 +3823,8 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
     if (_busy) return;
     setState(() => _busy = true);
     _timer?.cancel();
-    // Cancel the persistent full-screen notification so the overlay and
-    // looping sound stop when the driver explicitly declines or the
-    // 30-second window elapses.
+    // Stop the looping alert sound immediately
+    await _stopAlertSound();
     unawaited(FcmService.instance.cancelRideAlert());
     try {
       await context.read<DriverProvider>().declineRide(_requestId);

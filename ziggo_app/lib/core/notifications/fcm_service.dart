@@ -429,6 +429,7 @@ class FcmService {
       await _local.initialize(
         const InitializationSettings(android: androidInit, iOS: iosInit),
         onDidReceiveNotificationResponse: (NotificationResponse response) {
+          unawaited(cancelRideAlert());
           final payload = response.payload;
           if (payload != null && payload.isNotEmpty) {
             try {
@@ -511,6 +512,7 @@ class FcmService {
         if (callEvent == null) return;
         switch (callEvent.event) {
           case Event.actionCallAccept:
+            unawaited(cancelRideAlert());
             final extra = callEvent.body?['extra'];
             if (extra is Map<String, dynamic>) {
               _handleNotificationDataClick(extra);
@@ -521,6 +523,7 @@ class FcmService {
           case Event.actionCallDecline:
           case Event.actionCallEnded:
           case Event.actionCallTimeout:
+            unawaited(cancelRideAlert());
             break;
           default:
             break;
