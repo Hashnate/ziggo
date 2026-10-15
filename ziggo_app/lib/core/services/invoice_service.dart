@@ -344,7 +344,7 @@ class InvoiceService {
                     pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.end,
                       children: [
-                        pw.Text('$vehicleType ${driverPlate.isNotEmpty ? "• $driverPlate" : ""}',
+                        pw.Text('$vehicleType ${driverPlate.isNotEmpty ? "| $driverPlate" : ""}',
                             style: pw.TextStyle(
                                 fontSize: 11,
                                 fontWeight: pw.FontWeight.bold,
@@ -381,7 +381,16 @@ class InvoiceService {
                     pw.Row(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        pw.Text('• Pickup: ',
+                        pw.Container(
+                          width: 6,
+                          height: 6,
+                          margin: const pw.EdgeInsets.only(top: 3, right: 6),
+                          decoration: const pw.BoxDecoration(
+                            shape: pw.BoxShape.circle,
+                            color: PdfColors.black,
+                          ),
+                        ),
+                        pw.Text('Pickup: ',
                             style: pw.TextStyle(
                                 fontWeight: pw.FontWeight.bold,
                                 fontSize: 10,
@@ -395,7 +404,16 @@ class InvoiceService {
                     pw.Row(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        pw.Text('• Drop-off: ',
+                        pw.Container(
+                          width: 6,
+                          height: 6,
+                          margin: const pw.EdgeInsets.only(top: 3, right: 6),
+                          decoration: const pw.BoxDecoration(
+                            shape: pw.BoxShape.circle,
+                            color: PdfColors.green800,
+                          ),
+                        ),
+                        pw.Text('Drop-off: ',
                             style: pw.TextStyle(
                                 fontWeight: pw.FontWeight.bold,
                                 fontSize: 10,
@@ -479,7 +497,7 @@ class InvoiceService {
                             fontWeight: pw.FontWeight.bold,
                             color: PdfColors.grey800)),
                     pw.SizedBox(height: 2),
-                    pw.Text('Ziggo Super App • For questions, contact support@ziggo.lk',
+                    pw.Text('Ziggo Super App | For questions, contact support@ziggo.lk',
                         style: const pw.TextStyle(
                             fontSize: 9, color: PdfColors.grey500)),
                   ],
@@ -706,7 +724,16 @@ class InvoiceService {
                     pw.Row(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        pw.Text('• Pickup: ',
+                        pw.Container(
+                          width: 6,
+                          height: 6,
+                          margin: const pw.EdgeInsets.only(top: 3, right: 6),
+                          decoration: const pw.BoxDecoration(
+                            shape: pw.BoxShape.circle,
+                            color: PdfColors.black,
+                          ),
+                        ),
+                        pw.Text('Pickup: ',
                             style: pw.TextStyle(
                                 fontWeight: pw.FontWeight.bold,
                                 fontSize: 10)),
@@ -719,7 +746,16 @@ class InvoiceService {
                     pw.Row(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        pw.Text('• Drop-off: ',
+                        pw.Container(
+                          width: 6,
+                          height: 6,
+                          margin: const pw.EdgeInsets.only(top: 3, right: 6),
+                          decoration: const pw.BoxDecoration(
+                            shape: pw.BoxShape.circle,
+                            color: PdfColors.green800,
+                          ),
+                        ),
+                        pw.Text('Drop-off: ',
                             style: pw.TextStyle(
                                 fontWeight: pw.FontWeight.bold,
                                 fontSize: 10,
@@ -794,7 +830,7 @@ class InvoiceService {
                             fontWeight: pw.FontWeight.bold,
                             color: PdfColors.grey800)),
                     pw.SizedBox(height: 2),
-                    pw.Text('Ziggo Driver Partner • support@ziggo.lk',
+                    pw.Text('Ziggo Driver Partner | support@ziggo.lk',
                         style: const pw.TextStyle(
                             fontSize: 9, color: PdfColors.grey500)),
                   ],
