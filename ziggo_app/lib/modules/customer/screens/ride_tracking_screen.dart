@@ -291,7 +291,10 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
     }
   }
 
-  ({String label, String hint, Color color, IconData icon}) _statusMeta(String? status) {
+  ({String label, String hint, Color color, IconData icon}) _statusMeta(
+    String? status, {
+    bool isFinishingPriorTrip = false,
+  }) {
     switch (status) {
       case 'searching':
         return (
@@ -301,6 +304,14 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
           icon: Icons.search_rounded,
         );
       case 'accepted':
+        if (isFinishingPriorTrip) {
+          return (
+            label: 'Driver completing nearby trip',
+            hint: 'Your driver is dropping off a passenger nearby',
+            color: const Color(0xFFF59E0B),
+            icon: Icons.electric_bolt_rounded,
+          );
+        }
         return (
           label: 'Driver on the way',
           hint: 'Your driver is heading to pickup',
@@ -413,7 +424,8 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
     final currentDisplayLatLng = _animatedDriverLatLng ?? driverLatLng;
     final currentDisplayHeading = _animatedDriverHeading ?? targetHeading;
 
-    final meta = _statusMeta(status);
+    final isPriorTrip = active['is_driver_completing_prior_trip'] == true;
+    final meta = _statusMeta(status, isFinishingPriorTrip: isPriorTrip);
     final serviceType = active['service_type'] as String?;
 
     if (_lastStatus != status) {
@@ -1042,20 +1054,21 @@ class _BottomCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 12),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
-                          gradient: AppColors.goldGradient,
+                          color: AppColors.surfaceMuted,
+                          border: Border.all(color: AppColors.divider),
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.payments_rounded, color: Colors.white, size: 18),
+                            const Icon(Icons.payments_rounded, color: AppColors.primary, size: 18),
                             const SizedBox(width: 6),
                             Text(
                               'Rs.$amount',
                               style: const TextStyle(
-                                color: Colors.white,
+                                color: AppColors.textPrimary,
                                 fontWeight: FontWeight.w900,
                                 fontSize: 15,
                               ),
@@ -1985,19 +1998,21 @@ class _ActionRow extends StatelessWidget {
           flex: canCancel ? 1 : 2,
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 16),
+            alignment: Alignment.center,
             decoration: BoxDecoration(
-              gradient: AppColors.goldGradient,
+              color: AppColors.surfaceMuted,
+              border: Border.all(color: AppColors.divider),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.payments_rounded, color: Colors.white, size: 18),
+                const Icon(Icons.payments_rounded, color: AppColors.primary, size: 18),
                 const SizedBox(width: 6),
                 Text(
                   'Rs.$amount',
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                     fontWeight: FontWeight.w900,
                     fontSize: 15,
                   ),

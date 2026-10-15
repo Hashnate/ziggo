@@ -48,7 +48,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _autoRedirected = false;
   bool _ratingPromptOpen = false;
@@ -62,12 +62,15 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
   }
 
   void _bootstrap() {
     context.read<WalletProvider>().refresh();
-    context.read<BookingProvider>().loadActive();
+    context.read<BookingProvider>().loadActive().whenComplete(() {
+      _checkPendingRating();
+    });
     context.read<NotificationsProvider>().refresh();
     
     context.read<FoodProvider>().fetchHome();
@@ -110,12 +113,52 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (mounted) {
+        context.read<BookingProvider>().loadActive().whenComplete(() {
+          _checkPendingRating();
+        });
+      }
+    }
+  }
+
   Future<void> _checkPendingRating() async {
-    // Rating screen is presented directly upon ride completion via RideTrackingScreen.
+    if (!mounted || _ratingPromptOpen) return;
+    final auth = context.read<AuthProvider>();
+    if (auth.isNewUser || auth.status != AuthStatus.authenticated) return;
+
+    final bp = context.read<BookingProvider>();
+    if (bp.activeBooking != null) {
+      final s = bp.activeBooking!['status'];
+      if (s == 'searching' || s == 'accepted' || s == 'arrived' || s == 'started') {
+        return;
+      }
+    }
+
+    final pending = await bp.checkPendingRating();
+    if (pending != null && mounted && !_ratingPromptOpen) {
+      final isCurrent = ModalRoute.of(context)?.isCurrent ?? false;
+      if (isCurrent) {
+        _ratingPromptOpen = true;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RatingScreen(
+              bookingId: pending['id'] as int,
+              booking: pending,
+            ),
+          ),
+        );
+        _ratingPromptOpen = false;
+      }
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _foodBannerTimer?.cancel();
     _marketBannerTimer?.cancel();
     _foodBannerCtrl.dispose();
@@ -716,6 +759,29 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     } else if (!isRideActive) {
       _autoRedirected = false;
+    }
+
+    final pendingRating = booking.pendingRatingBooking;
+    if (!isRideActive &&
+        pendingRating != null &&
+        !auth.isNewUser &&
+        !_ratingPromptOpen &&
+        isCurrent) {
+      _ratingPromptOpen = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RatingScreen(
+              bookingId: pendingRating['id'] as int,
+              booking: pendingRating,
+            ),
+          ),
+        ).then((_) {
+          _ratingPromptOpen = false;
+        });
+      });
     }
 
 

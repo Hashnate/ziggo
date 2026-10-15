@@ -223,6 +223,9 @@ class BookingResponse(BaseModel):
     restaurant_name: Optional[str] = None
     vendor_name: Optional[str] = None
 
+    # Back-to-back indicator
+    is_driver_completing_prior_trip: bool = False
+
     class Config:
         from_attributes = True
 

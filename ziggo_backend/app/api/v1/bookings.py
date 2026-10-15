@@ -41,7 +41,11 @@ from ...schemas import (
 )
 from ...services.auth_service import get_current_user
 from ...services.fare_service import calculate_fare, calculate_fares_bulk, to_decimal
-from ...services.matching_service import find_all_nearby_drivers, find_nearest_driver
+from ...services.matching_service import (
+    find_all_nearby_drivers,
+    find_nearest_driver,
+    can_driver_accept_ride,
+)
 from ...services.ws_manager import manager
 from ...services import ipay_service
 
@@ -126,6 +130,18 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
     customer_name = b.customer.user.full_name if b.customer and b.customer.user else None
     customer_phone = b.customer.user.phone_number if b.customer and b.customer.user else None
 
+    is_driver_completing_prior_trip = False
+    if b.driver_id and b.status == BookingStatus.ACCEPTED:
+        prior_q = await db.execute(
+            select(Booking.id).where(
+                Booking.driver_id == b.driver_id,
+                Booking.id != b.id,
+                Booking.status.in_((BookingStatus.STARTED, BookingStatus.ARRIVED)),
+            )
+        )
+        if prior_q.scalars().first():
+            is_driver_completing_prior_trip = True
+
     return BookingResponse(
         id=b.id,
         booking_ref=b.booking_ref,
@@ -181,6 +197,7 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
         deductions=float(b.deductions) if b.deductions is not None else 0.0,
         driver_earnings=float(b.driver_earnings) if b.driver_earnings is not None else 0.0,
         waiting_charge=float(b.waiting_charge or 0.0),
+        is_driver_completing_prior_trip=is_driver_completing_prior_trip,
         stops=[
             {
                 "order_index": s.order_index,
@@ -737,7 +754,12 @@ async def create_booking(
     nearby = []
     if not is_scheduled_future:
         nearby = await find_all_nearby_drivers(
-            db, req.pickup_lat, req.pickup_lng, dispatch_vehicle, max_distance_km=max_radius
+            db,
+            req.pickup_lat,
+            req.pickup_lng,
+            dispatch_vehicle,
+            max_distance_km=max_radius,
+            allow_back_to_back=not (booking.is_flash or booking.is_courier or booking.is_rental),
         )
         # Only ride-type drivers receive ride-hailing/parcel booking dispatches
         nearby = [d for d in nearby if getattr(d, 'driver_type', 'ride') == 'ride']
@@ -827,14 +849,27 @@ async def create_booking(
 
     if not is_scheduled_future:
         for driver in nearby:
-            await manager.send(driver.user_id, "new_ride_request", ride_request_payload)
+            is_b2b = getattr(driver, "_is_back_to_back", False)
+            curr_drop = getattr(driver, "_current_drop_address", None)
+            driver_payload = {
+                **ride_request_payload,
+                "is_back_to_back": is_b2b,
+                "current_drop_address": curr_drop,
+            }
+            await manager.send(driver.user_id, "new_ride_request", driver_payload)
+            req_title = "Next ride request" if is_b2b else n_title
+            req_body = (
+                f"Next ride: {n_body} (starts after current drop-off)"
+                if is_b2b
+                else n_body
+            )
             db.add(
                 Notification(
                     user_id=driver.user_id,
-                    title=n_title,
-                    body=n_body,
-                    type=n_type,
-                    data=f'{{"booking_id":{booking.id}}}',
+                    title=req_title,
+                    body=req_body,
+                    type="next_ride_request" if is_b2b else n_type,
+                    data=f'{{"booking_id":{booking.id},"is_back_to_back":{str(is_b2b).lower()}}}',
                 )
             )
 
@@ -1110,11 +1145,20 @@ async def get_active_booking(
             .order_by(Booking.id.desc())
         )
     elif user.role == UserRole.DRIVER:
+        from sqlalchemy import case
         driver = await _get_driver(db, user)
         q = await db.execute(
             select(Booking)
             .where(Booking.driver_id == driver.id, Booking.status.in_(active))
-            .order_by(Booking.id.desc())
+            .order_by(
+                case(
+                    (Booking.status == BookingStatus.STARTED, 1),
+                    (Booking.status == BookingStatus.ARRIVED, 2),
+                    (Booking.status == BookingStatus.ACCEPTED, 3),
+                    else_=4,
+                ),
+                Booking.id.asc(),
+            )
         )
     else:
         return None
@@ -1229,6 +1273,7 @@ async def get_pending_rating(
         .where(
             Booking.customer_id == customer.id,
             Booking.status == BookingStatus.COMPLETED,
+            Booking.customer_rating.is_(None),
             Booking.is_flash.is_not(True),
             Booking.is_courier.is_not(True),
             Booking.is_rental.is_not(True),
@@ -1237,11 +1282,52 @@ async def get_pending_rating(
         .limit(1)
     )
     b = q.scalars().first()
-    if not b or b.customer_rating is not None:
+    if not b:
         return None
-    if not b.completed_at or b.completed_at < cutoff:
-        return None
+    completed_time = b.completed_at or b.booked_at
+    if completed_time:
+        if completed_time.tzinfo is None:
+            completed_time = completed_time.replace(tzinfo=timezone.utc)
+        else:
+            completed_time = completed_time.astimezone(timezone.utc)
+        if completed_time < cutoff:
+            return None
     return await _booking_to_response(db, b)
+
+
+@router.get("/queued", response_model=Optional[BookingResponse])
+async def get_queued_booking(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Return the driver's queued next booking, if any."""
+    if user.role != UserRole.DRIVER:
+        return None
+    driver = await _get_driver(db, user)
+
+    # Check if driver has an active trip in STARTED or ARRIVED
+    in_progress_q = await db.execute(
+        select(Booking.id).where(
+            Booking.driver_id == driver.id,
+            Booking.status.in_((BookingStatus.STARTED, BookingStatus.ARRIVED)),
+        )
+    )
+    if not in_progress_q.scalars().first():
+        return None
+
+    # Find the queued ACCEPTED booking
+    q = await db.execute(
+        select(Booking)
+        .where(
+            Booking.driver_id == driver.id,
+            Booking.status == BookingStatus.ACCEPTED,
+        )
+        .order_by(Booking.id.asc())
+    )
+    queued_b = q.scalars().first()
+    if not queued_b:
+        return None
+    return await _booking_to_response(db, queued_b)
 
 
 @router.get("/{booking_id}", response_model=BookingResponse)
@@ -1292,12 +1378,12 @@ async def accept_booking(
         )
 
     # Dispatch already skips busy drivers, but a request can be in flight when
-    # the driver picks up another job — never let one driver hold two rides.
-    from ...services.matching_service import busy_driver_ids
-    if driver.id in await busy_driver_ids(db):
+    # the driver picks up another job — support back-to-back rides if driver is mid-trip (STARTED).
+    allowed, is_b2b, reject_reason = await can_driver_accept_ride(db, driver.id)
+    if not allowed:
         raise HTTPException(
             status_code=409,
-            detail="Finish your current trip before accepting another ride",
+            detail=reject_reason,
         )
 
     # Claim the ride
@@ -1306,9 +1392,24 @@ async def accept_booking(
     b.status = BookingStatus.ACCEPTED
     b.accepted_at = now
     
-    if driver.current_lat is not None and driver.current_lng is not None:
-        b.driver_accepted_lat = Decimal(str(driver.current_lat))
-        b.driver_accepted_lng = Decimal(str(driver.current_lng))
+    if is_b2b:
+        curr_b_q = await db.execute(
+            select(Booking).where(
+                Booking.driver_id == driver.id,
+                Booking.status == BookingStatus.STARTED,
+            )
+        )
+        curr_b = curr_b_q.scalars().first()
+        if curr_b and curr_b.drop_lat is not None and curr_b.drop_lng is not None:
+            b.driver_accepted_lat = Decimal(str(curr_b.drop_lat))
+            b.driver_accepted_lng = Decimal(str(curr_b.drop_lng))
+        elif driver.current_lat is not None and driver.current_lng is not None:
+            b.driver_accepted_lat = Decimal(str(driver.current_lat))
+            b.driver_accepted_lng = Decimal(str(driver.current_lng))
+    else:
+        if driver.current_lat is not None and driver.current_lng is not None:
+            b.driver_accepted_lat = Decimal(str(driver.current_lat))
+            b.driver_accepted_lng = Decimal(str(driver.current_lng))
 
     from ...models import BookingStop
     sq = await db.execute(select(BookingStop).where(BookingStop.booking_id == b.id))
@@ -1389,13 +1490,21 @@ async def accept_booking(
         await manager.send(
             c.user_id,
             "booking_update",
-            {"booking_id": b.id, "status": b.status.value},
+            {
+                "booking_id": b.id,
+                "status": b.status.value,
+                "is_driver_completing_prior_trip": is_b2b,
+            },
         )
         db.add(
             Notification(
                 user_id=c.user_id,
-                title="Driver on the way",
-                body=f"{user.full_name or 'Driver'} accepted your ride {b.booking_ref}",
+                title="Driver assigned (completing nearby trip)" if is_b2b else "Driver on the way",
+                body=(
+                    f"{user.full_name or 'Driver'} accepted your ride. They are currently finishing a nearby drop-off and will head to you right after."
+                    if is_b2b
+                    else f"{user.full_name or 'Driver'} accepted your ride {b.booking_ref}"
+                ),
                 type="ride_update",
             )
         )
@@ -1995,6 +2104,52 @@ async def update_booking_status(
                     "booking_ref": b.booking_ref,
                 },
             )
+            if b.status == BookingStatus.COMPLETED:
+                queued_q = await db.execute(
+                    select(Booking)
+                    .where(
+                        Booking.driver_id == b.driver_id,
+                        Booking.status == BookingStatus.ACCEPTED,
+                        Booking.id != b.id,
+                    )
+                    .order_by(Booking.id.asc())
+                )
+                queued_b = queued_q.scalars().first()
+                if queued_b:
+                    # Notify driver that queued ride is now their active trip
+                    await manager.send(
+                        drv.user_id,
+                        "queued_ride_activated",
+                        {
+                            "booking_id": queued_b.id,
+                            "booking_ref": queued_b.booking_ref,
+                            "pickup_address": queued_b.pickup_address,
+                            "pickup_lat": float(queued_b.pickup_lat),
+                            "pickup_lng": float(queued_b.pickup_lng),
+                        },
+                    )
+                    # Notify customer that driver has completed prior trip and is heading to them
+                    cust_next_q = await db.execute(select(Customer).where(Customer.id == queued_b.customer_id))
+                    cust_next = cust_next_q.scalars().first()
+                    if cust_next:
+                        await manager.send(
+                            cust_next.user_id,
+                            "booking_update",
+                            {
+                                "booking_id": queued_b.id,
+                                "status": "accepted",
+                                "is_driver_completing_prior_trip": False,
+                                "driver_heading_to_pickup": True,
+                            },
+                        )
+                        db.add(
+                            Notification(
+                                user_id=cust_next.user_id,
+                                title="Driver on the way",
+                                body="Your driver has completed their prior drop-off and is now heading to your pickup location!",
+                                type="ride_update",
+                            )
+                        )
             if b.status == BookingStatus.CANCELLED and b.cancelled_by == "customer":
                 reason_msg = f" Reason: {b.cancellation_reason}" if b.cancellation_reason else ""
                 db.add(
@@ -2171,10 +2326,8 @@ async def rate_booking(
         c = await _get_customer(db, user)
         if b.customer_id != c.id:
             raise HTTPException(status_code=403, detail="Not your booking")
-        b.customer_rating = body.rating
-        b.customer_feedback = body.feedback
-        # update driver aggregate rating
-        if b.driver_id:
+        # update driver aggregate rating only if customer hasn't rated this trip yet
+        if b.customer_rating is None and b.driver_id:
             dq = await db.execute(select(Driver).where(Driver.id == b.driver_id))
             drv = dq.scalars().first()
             if drv and drv.user_id:
@@ -2186,27 +2339,45 @@ async def rate_booking(
                     new_total = total + 1
                     duser.rating = Decimal(str(round((prev * total + body.rating) / new_total, 2)))
                     duser.total_rides = new_total
+        b.customer_rating = body.rating
+        b.customer_feedback = body.feedback
     elif user.role == UserRole.DRIVER:
         d = await _get_driver(db, user)
         if b.driver_id != d.id:
             raise HTTPException(status_code=403, detail="Not your booking")
+        # update customer aggregate rating only if driver hasn't rated this trip yet
+        if b.driver_rating is None:
+            cq = await db.execute(select(Customer).where(Customer.id == b.customer_id))
+            cust = cq.scalars().first()
+            if cust and cust.user_id:
+                uq = await db.execute(select(User).where(User.id == cust.user_id))
+                cuser = uq.scalars().first()
+                if cuser:
+                    prev = float(cuser.rating or 0)
+                    total = cuser.total_rides or 0
+                    new_total = total + 1
+                    cuser.rating = Decimal(str(round((prev * total + body.rating) / new_total, 2)))
+                    cuser.total_rides = new_total
         b.driver_rating = body.rating
         b.driver_feedback = body.feedback
-        # update customer aggregate rating
-        cq = await db.execute(select(Customer).where(Customer.id == b.customer_id))
-        cust = cq.scalars().first()
-        if cust and cust.user_id:
-            uq = await db.execute(select(User).where(User.id == cust.user_id))
-            cuser = uq.scalars().first()
-            if cuser:
-                prev = float(cuser.rating or 0)
-                total = cuser.total_rides or 0
-                new_total = total + 1
-                cuser.rating = Decimal(str(round((prev * total + body.rating) / new_total, 2)))
-                cuser.total_rides = new_total
 
     await db.commit()
     await db.refresh(b)
+
+    try:
+        from ...services.ws_manager import manager
+        await manager.broadcast_all(
+            "admin_config_update",
+            {
+                "type": "booking_rated",
+                "booking_id": b.id,
+                "customer_rating": b.customer_rating,
+                "driver_rating": b.driver_rating,
+            },
+        )
+    except Exception:
+        pass
+
     return await _booking_to_response(db, b)
 
 

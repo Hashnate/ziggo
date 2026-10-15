@@ -63,6 +63,8 @@ class BookingProvider extends ChangeNotifier {
               ..._activeBooking!,
               'status': newStatus,
               if (data['otp'] != null) 'otp': data['otp'],
+              if (data.containsKey('is_driver_completing_prior_trip'))
+                'is_driver_completing_prior_trip': data['is_driver_completing_prior_trip'],
             };
           }
           notifyListeners();
@@ -464,7 +466,8 @@ class BookingProvider extends ChangeNotifier {
 
       final prefs = await SharedPreferences.getInstance();
       final dismissedId = prefs.getInt('dismissed_rating_booking_id');
-      if (dismissedId == bookingId) {
+      final dismissedList = prefs.getStringList('dismissed_rating_booking_ids') ?? [];
+      if (dismissedId == bookingId || dismissedList.contains(bookingId.toString())) {
         _pendingRatingBooking = null;
         return null;
       }
@@ -491,6 +494,11 @@ class BookingProvider extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('dismissed_rating_booking_id', bookingId);
+      final dismissedList = prefs.getStringList('dismissed_rating_booking_ids') ?? [];
+      if (!dismissedList.contains(bookingId.toString())) {
+        dismissedList.add(bookingId.toString());
+        await prefs.setStringList('dismissed_rating_booking_ids', dismissedList);
+      }
     } catch (_) {}
   }
 
@@ -519,6 +527,11 @@ class BookingProvider extends ChangeNotifier {
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove('dismissed_rating_booking_id');
+        final dismissedList = prefs.getStringList('dismissed_rating_booking_ids') ?? [];
+        if (dismissedList.contains(bookingId.toString())) {
+          dismissedList.remove(bookingId.toString());
+          await prefs.setStringList('dismissed_rating_booking_ids', dismissedList);
+        }
       } catch (_) {}
       _pendingRatingBooking = null;
       _activeBooking = null;

@@ -1222,7 +1222,7 @@ async def delete_driver_vehicle(
 # Notification row per driver per offer, so the app can ask for its current
 # one whenever it opens or resumes — the way Uber's driver app does.
 
-_REQUEST_NOTIFICATION_TYPES = ("ride_request", "flash_request", "rental_request", "courier_request")
+_REQUEST_NOTIFICATION_TYPES = ("ride_request", "flash_request", "rental_request", "courier_request", "next_ride_request")
 _OFFER_WINDOW_SECONDS = 120   # matches the search auto-cancel window
 _OFFER_ACCEPT_SECONDS = 30    # matches expires_in_seconds at dispatch
 
@@ -1236,10 +1236,10 @@ async def get_pending_request(
     `new_ride_request` WebSocket payload, or null."""
     from sqlalchemy.orm import selectinload
     from ...models import Customer
-    from ...services.matching_service import busy_driver_ids
+    from ...services.matching_service import strictly_busy_driver_ids
 
     driver = await _get_driver(db, user)
-    if driver.id in await busy_driver_ids(db):
+    if driver.id in await strictly_busy_driver_ids(db):
         return None
 
     now = datetime.now(timezone.utc)
@@ -1255,8 +1255,9 @@ async def get_pending_request(
         .limit(5)
     )
     for n in nq.scalars().all():
+        n_data = json.loads(n.data or "{}")
         try:
-            booking_id = int(json.loads(n.data or "{}").get("booking_id"))
+            booking_id = int(n_data.get("booking_id"))
         except (TypeError, ValueError):
             continue
 
@@ -1276,6 +1277,7 @@ async def get_pending_request(
         remaining = max(10, int(_OFFER_ACCEPT_SECONDS - elapsed))
 
         cu = b.customer.user if b.customer else None
+        is_b2b = (n.type == "next_ride_request") or bool(n_data.get("is_back_to_back"))
         return {
             "booking_id": b.id,
             "booking_ref": b.booking_ref,
@@ -1305,6 +1307,7 @@ async def get_pending_request(
             "rental_hours": b.rental_hours,
             "is_courier": bool(b.is_courier),
             "courier_eta_days": b.courier_eta_days,
+            "is_back_to_back": is_b2b,
             "stop_count": b.stop_count or 0,
             "stops": [
                 {"order_index": s.order_index, "lat": float(s.lat), "lng": float(s.lng), "address": s.address or ""}

@@ -28,6 +28,9 @@ class DriverProvider extends ChangeNotifier {
   Map<String, dynamic>? _activeRide;
   Map<String, dynamic>? get activeRide => _activeRide;
 
+  Map<String, dynamic>? _queuedRide;
+  Map<String, dynamic>? get queuedRide => _queuedRide;
+
   Map<String, dynamic>? _activeFoodOrder;
   Map<String, dynamic>? get activeFoodOrder => _activeFoodOrder;
 
@@ -250,6 +253,9 @@ class DriverProvider extends ChangeNotifier {
         FcmService.instance.cancelRideAlert();
         notifyListeners();
       }
+    } else if (event == 'queued_ride_activated') {
+      loadActive();
+      notifyListeners();
     }
   }
 
@@ -274,7 +280,12 @@ class DriverProvider extends ChangeNotifier {
         _activeRide = null;
         await loadActiveMarketOrder();
       } else {
-        _activeRide = Map<String, dynamic>.from(resp.data);
+        if (_activeRide != null && _activeRide!['status'] == 'started') {
+          // Mid-trip back-to-back ride accepted! Keep activeRide as primary, store as queuedRide.
+          _queuedRide = Map<String, dynamic>.from(resp.data);
+        } else {
+          _activeRide = Map<String, dynamic>.from(resp.data);
+        }
       }
       notifyListeners();
       return true;
@@ -474,8 +485,19 @@ class DriverProvider extends ChangeNotifier {
       } else {
         _activeRide = Map<String, dynamic>.from(resp.data);
       }
-      notifyListeners();
     } catch (_) {}
+
+    try {
+      final qResp = await ApiClient.instance.dio.get('/bookings/queued');
+      if (qResp.data == null || (qResp.data is String && qResp.data == '')) {
+        _queuedRide = null;
+      } else {
+        _queuedRide = Map<String, dynamic>.from(qResp.data);
+      }
+    } catch (_) {
+      _queuedRide = null;
+    }
+    notifyListeners();
   }
 
   Future<void> loadActiveFoodOrder() async {
@@ -694,9 +716,15 @@ class DriverProvider extends ChangeNotifier {
         _lastCompletedRide = updated;
       }
       if (status == 'completed' || status == 'cancelled') {
-        _activeRide = null;
+        if (_queuedRide != null) {
+          _activeRide = _queuedRide;
+          _queuedRide = null;
+        } else {
+          _activeRide = null;
+        }
         await loadProfile();
         await loadIncentives();
+        await loadActive();
       }
       notifyListeners();
       return true;
@@ -770,7 +798,9 @@ class DriverProvider extends ChangeNotifier {
   /// for the first and the second didn't route, the offer was invisible. Now
   /// it's fetched on every open and resume — the way Uber's driver app does.
   Future<void> loadPendingRequest() async {
-    if (_activeRide != null || _activeFoodOrder != null || _activeMarketOrder != null) return;
+    if (_activeFoodOrder != null || _activeMarketOrder != null) return;
+    if (_queuedRide != null) return;
+    if (_activeRide != null && _activeRide!['status'] != 'started') return;
     try {
       final resp = await ApiClient.instance.dio.get('/driver/pending-request');
       final data = resp.data;

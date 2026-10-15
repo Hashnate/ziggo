@@ -61,9 +61,10 @@
             <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Verification status</label>
             <select name="status" class="w-full text-sm border border-ziggo-line rounded-xl outline-none focus:border-ziggo bg-white px-3 py-2">
                 <option value="">All Status</option>
-                {% for s in statuses %}
-                <option value="{{ s }}" {% if filter_status == s %}selected{% endif %}>{{ s|title }}</option>
-                {% endfor %}
+                <option value="approved" {% if filter_status == 'approved' or filter_status == 'verified' %}selected{% endif %}>Verified</option>
+                <option value="pending" {% if filter_status == 'pending' %}selected{% endif %}>Pending</option>
+                <option value="rejected" {% if filter_status == 'rejected' %}selected{% endif %}>Rejected</option>
+                <option value="suspended" {% if filter_status == 'suspended' %}selected{% endif %}>Suspended</option>
             </select>
         </div>
         <div class="w-48 min-w-[160px]">
@@ -100,17 +101,27 @@
                 </thead>
                 <tbody class="divide-y divide-ziggo-line">
                     {% for v in vehicles %}
+                    {% set drv = v.driver if v.driver else None %}
+                    {% set usr = drv.user if (drv and drv.user) else None %}
+                    {% set v_photo = v.vehicle_photo_url or (drv.vehicle_photo_url if drv and (drv.vehicle_number == v.vehicle_number or v.is_active) else (drv.vehicle_photo_url if drv else None)) %}
                     <tr class="hover:bg-gray-50/50">
                         <td class="px-6 py-4">
                             <div class="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center">
-                                {% if v.vehicle_photo_url %}
-                                <img src="{{ v.vehicle_photo_url }}" alt="" class="w-full h-full object-cover">
+                                {% if v_photo %}
+                                <img src="{{ v_photo }}" alt="" class="w-full h-full object-cover">
                                 {% else %}
                                 <i class="fas fa-car text-ziggo-faint"></i>
                                 {% endif %}
                             </div>
                         </td>
-                        <td class="px-6 py-4 font-black text-ziggo-ink">{{ v.vehicle_model or '—' }}</td>
+                        <td class="px-6 py-4 font-black text-ziggo-ink">
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span>{{ v.vehicle_model or '—' }}</span>
+                                {% if v.is_active %}
+                                <span class="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-blue-100 text-blue-700" title="Active vehicle for rides">Active</span>
+                                {% endif %}
+                            </div>
+                        </td>
                         <td class="px-6 py-4">
                             <span class="inline-flex items-center gap-2 text-sm text-ziggo font-bold">
                                 {% set vt = (v.vehicle_type or '')|lower %}
@@ -126,39 +137,77 @@
                                 <span class="capitalize">{{ v.vehicle_type or '—' }}</span>
                             </span>
                         </td>
-                        <td class="px-6 py-4 text-sm font-bold text-ziggo">{{ v.vehicle_number or '—' }}</td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm font-bold text-ziggo">{{ v.vehicle_number or '—' }}</div>
+                            {% if v.registration_doc_url or v.insurance_doc_url or v.revenue_license_doc_url %}
+                            <div class="flex items-center gap-1.5 mt-1">
+                                {% if v.registration_doc_url %}
+                                <a href="{{ v.registration_doc_url }}" target="_blank" title="CR Book / Registration Document" class="text-[10px] font-bold text-ziggo-muted hover:text-ziggo bg-gray-100 hover:bg-blue-50 px-1.5 py-0.5 rounded">
+                                    CR
+                                </a>
+                                {% endif %}
+                                {% if v.insurance_doc_url %}
+                                <a href="{{ v.insurance_doc_url }}" target="_blank" title="Insurance Document" class="text-[10px] font-bold text-ziggo-muted hover:text-ziggo bg-gray-100 hover:bg-blue-50 px-1.5 py-0.5 rounded">
+                                    INS
+                                </a>
+                                {% endif %}
+                                {% if v.revenue_license_doc_url %}
+                                <a href="{{ v.revenue_license_doc_url }}" target="_blank" title="Revenue License Document" class="text-[10px] font-bold text-ziggo-muted hover:text-ziggo bg-gray-100 hover:bg-blue-50 px-1.5 py-0.5 rounded">
+                                    REV
+                                </a>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </td>
                         <td class="px-6 py-4 text-sm text-ziggo-muted whitespace-nowrap">
                             {{ v.vehicle_year or '—' }} <span class="text-ziggo-faint">|</span> {{ (v.vehicle_color or '—')|title }}
                         </td>
-                        <td class="px-6 py-4 text-sm font-bold text-ziggo-ink">{{ v.user.full_name if v.user else '—' }}</td>
-                        <td class="px-6 py-4 text-sm text-ziggo-muted">{{ v.user.phone_number if v.user else '—' }}</td>
+                        <td class="px-6 py-4 text-sm font-bold text-ziggo-ink">
+                            {% if drv %}
+                            <a href="/admin/drivers/{{ drv.id }}/edit" class="hover:text-ziggo hover:underline">
+                                {{ usr.full_name if usr else ('Driver #' ~ drv.id) }}
+                            </a>
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-sm text-ziggo-muted">{{ usr.phone_number if usr else '—' }}</td>
                         <td class="px-6 py-4">
-                            {% set s = v.status.value if v.status else 'pending' %}
-                            <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider
-                                {% if s == 'approved' %}bg-emerald-50 text-emerald-600
-                                {% elif s == 'pending' %}bg-amber-50 text-amber-600
-                                {% elif s == 'suspended' %}bg-rose-50 text-rose-600
-                                {% else %}bg-gray-100 text-gray-500{% endif %}">
-                                {% if s == 'approved' %}Verified{% else %}{{ s|title }}{% endif %}
+                            {% if v.is_approved %}
+                            <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600">
+                                Verified
                             </span>
+                            {% elif v.rejection_reason %}
+                            <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-rose-50 text-rose-600" title="{{ v.rejection_reason }}">
+                                Rejected
+                            </span>
+                            {% elif drv and drv.status.value == 'suspended' %}
+                            <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-rose-50 text-rose-600">
+                                Suspended
+                            </span>
+                            {% else %}
+                            <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-amber-50 text-amber-600">
+                                Pending
+                            </span>
+                            {% endif %}
                         </td>
                         <td class="px-6 py-4">
                             <div class="flex items-center justify-end gap-2">
                                 <button
-                                    onclick='openEditModal({{ {
-                                        "id": v.id,
-                                        "vehicle_type": v.vehicle_type or "",
-                                        "vehicle_number": v.vehicle_number or "",
-                                        "vehicle_model": v.vehicle_model or "",
-                                        "vehicle_color": v.vehicle_color or "",
-                                        "vehicle_year": v.vehicle_year or "",
-                                        "owner": (v.user.full_name if v.user else "") or "",
-                                    }|tojson }})'
+                                    type="button"
+                                    data-id="{{ v.id }}"
+                                    data-type="{{ v.vehicle_type or '' }}"
+                                    data-number="{{ v.vehicle_number or '' }}"
+                                    data-model="{{ v.vehicle_model or '' }}"
+                                    data-color="{{ v.vehicle_color or '' }}"
+                                    data-year="{{ v.vehicle_year or '' }}"
+                                    data-owner="{{ usr.full_name if usr else '' }}"
+                                    onclick="handleEditClick(this)"
                                     class="px-3 py-1.5 bg-blue-50 text-ziggo border border-blue-100 rounded-lg text-xs font-bold hover:bg-blue-100 transition flex items-center gap-1.5">
                                     <i class="fas fa-edit"></i> Edit
                                 </button>
-                                {% if s == 'approved' %}
-                                <form method="POST" action="/admin/vehicles/{{ v.id }}/revoke" onsubmit="return confirm('Revoke verification for this vehicle? Driver will go offline.');">
+                                {% if v.is_approved %}
+                                <form method="POST" action="/admin/vehicles/{{ v.id }}/revoke" onsubmit="return confirm('Revoke verification for this vehicle?');">
                                     <input type="hidden" name="next" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
                                     <button type="submit" class="px-3 py-1.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-lg text-xs font-bold hover:bg-rose-100 transition flex items-center gap-1.5">
                                         <i class="fas fa-ban"></i> Revoke
@@ -169,6 +218,12 @@
                                     <input type="hidden" name="next" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
                                     <button type="submit" class="px-3 py-1.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-lg text-xs font-bold hover:bg-emerald-100 transition flex items-center gap-1.5">
                                         <i class="fas fa-check"></i> Verify
+                                    </button>
+                                </form>
+                                <form method="POST" action="/admin/vehicles/{{ v.id }}/reject" onsubmit="return confirm('Reject this vehicle?');">
+                                    <input type="hidden" name="next" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                                    <button type="submit" class="px-3 py-1.5 bg-gray-50 text-rose-500 border border-gray-200 rounded-lg text-xs font-bold hover:bg-rose-50 transition flex items-center gap-1.5" title="Reject Vehicle">
+                                        <i class="fas fa-times"></i> Reject
                                     </button>
                                 </form>
                                 {% endif %}
@@ -273,6 +328,18 @@
 </div>
 
 <script>
+function handleEditClick(btn) {
+    openEditModal({
+        id: btn.getAttribute('data-id'),
+        vehicle_type: btn.getAttribute('data-type'),
+        vehicle_number: btn.getAttribute('data-number'),
+        vehicle_model: btn.getAttribute('data-model'),
+        vehicle_color: btn.getAttribute('data-color'),
+        vehicle_year: btn.getAttribute('data-year'),
+        owner: btn.getAttribute('data-owner')
+    });
+}
+
 function openEditModal(v) {
     document.getElementById('vehModalTitle').innerText = 'Edit vehicle — ' + (v.vehicle_model || v.vehicle_number || '');
     document.getElementById('vehicleForm').action = '/admin/vehicles/' + v.id + '/edit';

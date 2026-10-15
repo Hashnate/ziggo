@@ -32,6 +32,11 @@
             <div>
                 <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Completed</p>
                 <p class="text-2xl font-black text-ziggo-ink leading-none mt-1.5">{{ stat_completed }}</p>
+                {% if stat_rated is defined and stat_rated > 0 %}
+                <p class="text-[10px] text-green-700 font-bold mt-1 flex items-center gap-1">
+                    <i class="fas fa-star text-amber-400"></i> {{ stat_rated }} rated {% if stat_avg_rating > 0 %}({{ "{:.1f}".format(stat_avg_rating) }}){% endif %}
+                </p>
+                {% endif %}
             </div>
         </div>
         <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
@@ -68,6 +73,8 @@
             <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Status</label>
             <select name="status" class="w-full px-3 py-2 border border-ziggo-line rounded-lg text-sm outline-none focus:border-ziggo bg-white">
                 <option value="all" {% if status == 'all' %}selected{% endif %}>All</option>
+                <option value="rated" {% if status == 'rated' %}selected{% endif %}>★ Rated</option>
+                <option value="unrated" {% if status == 'unrated' %}selected{% endif %}>Unrated</option>
                 <option value="searching" {% if status == 'searching' %}selected{% endif %}>Searching</option>
                 <option value="accepted" {% if status == 'accepted' %}selected{% endif %}>Accepted</option>
                 <option value="arrived" {% if status == 'arrived' %}selected{% endif %}>Arrived</option>
@@ -164,6 +171,7 @@
                     <th class="px-6 py-4">Driver</th>
                     <th class="px-6 py-4">Route</th>
                     <th class="px-6 py-4">Status</th>
+                    <th class="px-6 py-4">Rating</th>
                     <th class="px-6 py-4 zi-num">Fare</th>
                     <th class="px-6 py-4">Booked</th>
                 </tr>
@@ -199,6 +207,26 @@
                           {{ b.status.value }}
                         </span>
                     </td>
+                    <td class="px-6 py-3 text-sm">
+                        {% if b.customer_rating %}
+                        <div>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                <i class="fas fa-star text-amber-400 mr-1 text-[11px]"></i>{{ b.customer_rating }}/5
+                            </span>
+                            {% if b.customer_feedback %}
+                            <p class="text-[11px] text-gray-500 italic mt-1 max-w-[170px] truncate" title="{{ b.customer_feedback }}">
+                                "{{ b.customer_feedback }}"
+                            </p>
+                            {% endif %}
+                        </div>
+                        {% elif b.status.value == 'completed' %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-gray-100 text-gray-500">
+                            Unrated
+                        </span>
+                        {% else %}
+                        <span class="text-gray-400 text-xs">—</span>
+                        {% endif %}
+                    </td>
                     <td class="px-6 py-3 text-sm font-normal zi-num">
                         <span class="font-bold">Rs.{{ "{:,.0f}".format(b.final_amount or 0) }}</span>
                         {% if b.promo_code %}
@@ -208,7 +236,7 @@
                     <td class="px-6 py-3 text-xs text-gray-500 whitespace-nowrap">{{ b.booked_at|colombo_dt("%Y-%m-%d %H:%M") }}</td>
                 </tr>
                 {% else %}
-                <tr><td colspan="7" class="px-6 py-10 text-center text-gray-400">No bookings yet</td></tr>
+                <tr><td colspan="8" class="px-6 py-10 text-center text-gray-400">No bookings yet</td></tr>
                 {% endfor %}
             </tbody>
         </table>

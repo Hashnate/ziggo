@@ -62,6 +62,12 @@ if DriverVehicle is None:
         approved_at = Column(DateTime(timezone=True), nullable=True)
         created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+        driver = relationship("Driver", back_populates="vehicles")
+
+        @property
+        def user(self):
+            return self.driver.user if self.driver else None
+
 router = APIRouter()
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1055,6 +1061,19 @@ async def admin_drivers_new_submit(
     db.add(driver)
     await db.flush()
 
+    if vehicle_number:
+        new_v = DriverVehicle(
+            driver_id=driver.id,
+            vehicle_type=vehicle_type,
+            vehicle_number=vehicle_number,
+            vehicle_model=vehicle_model,
+            vehicle_color=vehicle_color,
+            is_approved=approved,
+            is_active=True,
+            approved_at=datetime.now(timezone.utc) if approved else None,
+        )
+        db.add(new_v)
+
     from app.models import DriverDocument
     for kind in ("nic_front", "nic_back", "license_front", "license_back", "vehicle_reg", "insurance", "year_license", "eco_test", "vehicle_front", "vehicle_back", "vehicle_side"):
         file_input = locals().get(f"doc_{kind}")
@@ -1997,14 +2016,20 @@ async def admin_bookings(
             func.count(Booking.id).filter(Booking.status == BookingStatus.COMPLETED),
             func.count(Booking.id).filter(Booking.status == BookingStatus.CANCELLED),
             func.coalesce(func.sum(Booking.final_amount).filter(Booking.status == BookingStatus.COMPLETED), 0),
+            func.count(Booking.id).filter(Booking.customer_rating.is_not(None)),
+            func.coalesce(func.avg(Booking.customer_rating).filter(Booking.customer_rating.is_not(None)), 0),
         )
         .where(and_(*base_where))
     )
-    stat_total, stat_completed, stat_cancelled, stat_revenue = stats_q.one()
+    stat_total, stat_completed, stat_cancelled, stat_revenue, stat_rated, stat_avg_rating = stats_q.one()
 
     # Table query conditions (base + optional status filter)
     table_where = list(base_where)
-    if status and status != "all":
+    if status == "rated":
+        table_where.append(Booking.customer_rating.is_not(None))
+    elif status == "unrated":
+        table_where.append(and_(Booking.status == BookingStatus.COMPLETED, Booking.customer_rating.is_(None)))
+    elif status and status != "all":
         table_where.append(Booking.status == status)
 
     # Total count of filtered bookings
@@ -2051,7 +2076,9 @@ async def admin_bookings(
             "stat_total": stat_total,
             "stat_completed": stat_completed,
             "stat_cancelled": stat_cancelled,
-            "stat_revenue": 0.0,
+            "stat_revenue": stat_revenue,
+            "stat_rated": stat_rated,
+            "stat_avg_rating": float(stat_avg_rating or 0),
             "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY or "",
         },
     )
@@ -3375,28 +3402,99 @@ async def admin_vehicles(
     from sqlalchemy import or_, and_
     from app.models import FareSetting
 
+    # Auto-sync any legacy drivers with vehicle_number missing in DriverVehicle
+    try:
+        missing_legacy = await db.execute(
+            select(Driver).outerjoin(DriverVehicle, Driver.id == DriverVehicle.driver_id)
+            .where(DriverVehicle.id.is_(None), Driver.vehicle_number.isnot(None), Driver.vehicle_number != "")
+        )
+        for ld in missing_legacy.scalars().all():
+            yr_val = None
+            if ld.vehicle_year:
+                try:
+                    yr_val = int(ld.vehicle_year)
+                except (ValueError, TypeError):
+                    yr_val = None
+            db.add(DriverVehicle(
+                driver_id=ld.id,
+                vehicle_type=ld.vehicle_type or "bike",
+                vehicle_number=ld.vehicle_number,
+                vehicle_model=ld.vehicle_model,
+                vehicle_color=ld.vehicle_color,
+                vehicle_year=yr_val,
+                vehicle_photo_url=ld.vehicle_photo_url,
+                is_approved=bool(ld.is_approved),
+                is_active=True,
+                approved_at=ld.approved_at,
+            ))
+        # Auto-sync missing vehicle photos from Driver.vehicle_photo_url
+        missing_photos = await db.execute(
+            select(DriverVehicle, Driver)
+            .join(Driver, DriverVehicle.driver_id == Driver.id)
+            .where(
+                or_(DriverVehicle.vehicle_photo_url.is_(None), DriverVehicle.vehicle_photo_url == ""),
+                Driver.vehicle_photo_url.isnot(None),
+                Driver.vehicle_photo_url != "",
+            )
+        )
+        for dv, d in missing_photos.all():
+            if dv.vehicle_number == d.vehicle_number or dv.is_active or not dv.vehicle_photo_url:
+                dv.vehicle_photo_url = d.vehicle_photo_url
+        await db.commit()
+    except Exception as ex:
+        await db.rollback()
+        logger.warning(f"Error checking legacy driver vehicles: {ex}")
+
     limit = 50
     offset = (page - 1) * limit
 
-    q = select(Driver).outerjoin(User, Driver.user_id == User.id).options(selectinload(Driver.user)).order_by(Driver.id)
-    count_q = select(func.count(Driver.id)).outerjoin(User, Driver.user_id == User.id)
+    q = (
+        select(DriverVehicle)
+        .join(Driver, DriverVehicle.driver_id == Driver.id)
+        .outerjoin(User, Driver.user_id == User.id)
+        .options(selectinload(DriverVehicle.driver).selectinload(Driver.user))
+        .order_by(DriverVehicle.id.desc())
+    )
+    count_q = (
+        select(func.count(DriverVehicle.id))
+        .join(Driver, DriverVehicle.driver_id == Driver.id)
+        .outerjoin(User, Driver.user_id == User.id)
+    )
 
     conditions = []
     if status:
-        try:
-            conditions.append(Driver.status == DriverStatus(status))
-        except ValueError:
-            pass
+        st = status.strip().lower()
+        if st in ("approved", "verified"):
+            conditions.append(DriverVehicle.is_approved == True)
+        elif st == "pending":
+            conditions.append(
+                and_(
+                    DriverVehicle.is_approved == False,
+                    or_(DriverVehicle.rejection_reason.is_(None), DriverVehicle.rejection_reason == ""),
+                )
+            )
+        elif st == "rejected":
+            conditions.append(
+                and_(
+                    DriverVehicle.rejection_reason.isnot(None),
+                    DriverVehicle.rejection_reason != "",
+                    DriverVehicle.is_approved == False,
+                )
+            )
+        elif st == "suspended":
+            conditions.append(Driver.status == DriverStatus.SUSPENDED)
+
     if category:
-        conditions.append(Driver.vehicle_type == category)
+        conditions.append(DriverVehicle.vehicle_type == category.strip().lower())
+
     if search.strip():
         s = f"%{search.strip()}%"
         conditions.append(
             or_(
-                Driver.vehicle_number.ilike(s),
-                Driver.vehicle_model.ilike(s),
-                Driver.vehicle_color.ilike(s),
-                Driver.vehicle_type.ilike(s),
+                DriverVehicle.vehicle_number.ilike(s),
+                DriverVehicle.vehicle_model.ilike(s),
+                DriverVehicle.vehicle_color.ilike(s),
+                DriverVehicle.vehicle_type.ilike(s),
                 User.full_name.ilike(s),
                 User.phone_number.ilike(s),
                 User.email.ilike(s),
@@ -3414,12 +3512,21 @@ async def admin_vehicles(
     result = await db.execute(q)
     vehicles = result.scalars().all()
 
-    # Totals are unfiltered (the stat cards always show overall numbers).
-    totals_q = await db.execute(select(Driver.status, func.count(Driver.id)).group_by(Driver.status))
-    by_status = {s.value: n for s, n in totals_q.all()}
-    total_vehicles = sum(by_status.values())
-    pending = by_status.get(DriverStatus.PENDING.value, 0)
-    verified = by_status.get(DriverStatus.APPROVED.value, 0)
+    # Totals are unfiltered for the stat cards
+    total_vehicles = (await db.execute(select(func.count(DriverVehicle.id)))).scalar() or 0
+    pending = (
+        await db.execute(
+            select(func.count(DriverVehicle.id)).where(
+                DriverVehicle.is_approved == False,
+                or_(DriverVehicle.rejection_reason.is_(None), DriverVehicle.rejection_reason == ""),
+            )
+        )
+    ).scalar() or 0
+    verified = (
+        await db.execute(
+            select(func.count(DriverVehicle.id)).where(DriverVehicle.is_approved == True)
+        )
+    ).scalar() or 0
 
     cats_q = await db.execute(
         select(FareSetting).where(FareSetting.is_active == True).order_by(FareSetting.display_order, FareSetting.id)  # noqa: E712
@@ -3446,7 +3553,7 @@ async def admin_vehicles(
             "filter_category": category,
             "filter_search": search,
             "search": search,
-            "statuses": [s.value for s in DriverStatus],
+            "statuses": ["approved", "pending", "rejected", "suspended"],
             "page": page,
             "total_pages": total_pages,
             "total_filtered": total_filtered,
@@ -3457,10 +3564,9 @@ async def admin_vehicles(
     )
 
 
-
-@router.post("/vehicles/{driver_id}/edit")
+@router.post("/vehicles/{vehicle_id}/edit")
 async def admin_vehicles_edit(
-    driver_id: int,
+    vehicle_id: int,
     request: Request,
     vehicle_type: str = Form(...),
     vehicle_number: str = Form(""),
@@ -3472,66 +3578,157 @@ async def admin_vehicles_edit(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    q = await db.execute(select(Driver).where(Driver.id == driver_id))
-    d = q.scalars().first()
-    if not d:
+    q = await db.execute(
+        select(DriverVehicle)
+        .options(selectinload(DriverVehicle.driver))
+        .where(DriverVehicle.id == vehicle_id)
+    )
+    v = q.scalars().first()
+    if not v:
         raise HTTPException(status_code=404, detail="Vehicle not found")
 
     # Plate uniqueness if changed
-    plate = (vehicle_number or "").strip()
-    if plate and plate != (d.vehicle_number or ""):
+    plate = (vehicle_number or "").strip().upper()
+    if plate and plate != (v.vehicle_number or "").upper():
         dup = await db.execute(
-            select(Driver).where(Driver.vehicle_number == plate, Driver.id != driver_id)
+            select(DriverVehicle).where(
+                DriverVehicle.vehicle_number == plate,
+                DriverVehicle.id != vehicle_id,
+            )
         )
         if dup.scalars().first():
             raise HTTPException(status_code=400, detail=f"Reg. number '{plate}' is already in use")
 
-    d.vehicle_type = vehicle_type.strip().lower() or d.vehicle_type
-    d.vehicle_number = plate or None
-    d.vehicle_model = vehicle_model.strip() or None
-    d.vehicle_color = vehicle_color.strip() or None
-    d.vehicle_year = int(vehicle_year) if vehicle_year.strip().isdigit() else None
+    v.vehicle_type = vehicle_type.strip().lower() or v.vehicle_type
+    v.vehicle_number = plate or v.vehicle_number
+    v.vehicle_model = vehicle_model.strip() or None
+    v.vehicle_color = vehicle_color.strip() or None
+    v.vehicle_year = int(vehicle_year) if vehicle_year.strip().isdigit() else None
     new_photo = await _save_vehicle_photo(photo)
     if new_photo:
-        d.vehicle_photo_url = new_photo
+        v.vehicle_photo_url = new_photo
+
+    # If this is the driver's active vehicle, sync changes back to Driver record
+    if v.driver and (v.is_active or v.driver.vehicle_number == v.vehicle_number or not v.driver.vehicle_number):
+        v.driver.vehicle_type = v.vehicle_type
+        v.driver.vehicle_number = v.vehicle_number
+        v.driver.vehicle_model = v.vehicle_model
+        v.driver.vehicle_color = v.vehicle_color
+        v.driver.vehicle_year = v.vehicle_year
+        if new_photo:
+            v.driver.vehicle_photo_url = new_photo
+
     await db.commit()
     next_url = next or request.headers.get("referer") or "/admin/vehicles"
     return RedirectResponse(url=_safe_admin_next(next_url, "/admin/vehicles"), status_code=303)
 
 
-@router.post("/vehicles/{driver_id}/verify")
+@router.post("/vehicles/{vehicle_id}/verify")
 async def admin_vehicles_verify(
-    driver_id: int,
+    vehicle_id: int,
     request: Request,
     next: str = Form(""),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    q = await db.execute(select(Driver).where(Driver.id == driver_id))
-    d = q.scalars().first()
-    if d:
-        d.is_approved = True
-        d.status = DriverStatus.APPROVED
-        d.approved_at = datetime.now(timezone.utc)
+    q = await db.execute(
+        select(DriverVehicle)
+        .options(selectinload(DriverVehicle.driver))
+        .where(DriverVehicle.id == vehicle_id)
+    )
+    v = q.scalars().first()
+    if v:
+        v.is_approved = True
+        v.rejection_reason = None
+        v.approved_at = datetime.now(timezone.utc)
+        if v.driver:
+            if not v.driver.vehicle_number or v.is_active:
+                v.is_active = True
+                v.driver.vehicle_type = v.vehicle_type
+                v.driver.vehicle_number = v.vehicle_number
+                v.driver.vehicle_model = v.vehicle_model
+                v.driver.vehicle_color = v.vehicle_color
+                v.driver.vehicle_year = v.vehicle_year
+                if v.vehicle_photo_url:
+                    v.driver.vehicle_photo_url = v.vehicle_photo_url
+
+            # If driver was pending and this is approved, approve the driver too
+            if v.driver.status == DriverStatus.PENDING and not v.driver.is_approved:
+                v.driver.is_approved = True
+                v.driver.status = DriverStatus.APPROVED
+                v.driver.approved_at = datetime.now(timezone.utc)
+
         await db.commit()
     next_url = next or request.headers.get("referer") or "/admin/vehicles"
     return RedirectResponse(url=_safe_admin_next(next_url, "/admin/vehicles"), status_code=303)
 
 
-@router.post("/vehicles/{driver_id}/revoke")
+@router.post("/vehicles/{vehicle_id}/reject")
+async def admin_vehicles_reject(
+    vehicle_id: int,
+    request: Request,
+    reason: str = Form(""),
+    next: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    q = await db.execute(
+        select(DriverVehicle)
+        .options(selectinload(DriverVehicle.driver))
+        .where(DriverVehicle.id == vehicle_id)
+    )
+    v = q.scalars().first()
+    if v:
+        v.is_approved = False
+        v.is_active = False
+        v.rejection_reason = reason.strip() if reason else "Rejected by admin"
+        v.approved_at = None
+        await db.commit()
+    next_url = next or request.headers.get("referer") or "/admin/vehicles"
+    return RedirectResponse(url=_safe_admin_next(next_url, "/admin/vehicles"), status_code=303)
+
+
+@router.post("/vehicles/{vehicle_id}/revoke")
 async def admin_vehicles_revoke(
-    driver_id: int,
+    vehicle_id: int,
     request: Request,
     next: str = Form(""),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    q = await db.execute(select(Driver).where(Driver.id == driver_id))
-    d = q.scalars().first()
-    if d:
-        d.is_approved = False
-        d.is_online = False
-        d.status = DriverStatus.SUSPENDED
+    q = await db.execute(
+        select(DriverVehicle)
+        .options(selectinload(DriverVehicle.driver))
+        .where(DriverVehicle.id == vehicle_id)
+    )
+    v = q.scalars().first()
+    if v:
+        v.is_approved = False
+        v.is_active = False
+        v.approved_at = None
+        if v.driver and v.driver.vehicle_number == v.vehicle_number:
+            # Check if driver has another approved vehicle to switch to
+            other_q = await db.execute(
+                select(DriverVehicle).where(
+                    DriverVehicle.driver_id == v.driver_id,
+                    DriverVehicle.id != v.id,
+                    DriverVehicle.is_approved == True,
+                )
+            )
+            other_v = other_q.scalars().first()
+            if other_v:
+                other_v.is_active = True
+                v.driver.vehicle_type = other_v.vehicle_type
+                v.driver.vehicle_number = other_v.vehicle_number
+                v.driver.vehicle_model = other_v.vehicle_model
+                v.driver.vehicle_color = other_v.vehicle_color
+                v.driver.vehicle_year = other_v.vehicle_year
+                v.driver.vehicle_photo_url = other_v.vehicle_photo_url
+            else:
+                v.driver.is_online = False
+                v.driver.is_approved = False
+                v.driver.status = DriverStatus.SUSPENDED
+
         await db.commit()
     next_url = next or request.headers.get("referer") or "/admin/vehicles"
     return RedirectResponse(url=_safe_admin_next(next_url, "/admin/vehicles"), status_code=303)

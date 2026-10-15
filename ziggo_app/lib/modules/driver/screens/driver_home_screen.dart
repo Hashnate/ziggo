@@ -1369,8 +1369,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
             Align(
               alignment: Alignment.bottomCenter,
               child: _buildBottomCard(driver, ride, food, market),
-            )
-          else if (pending != null)
+            ),
+          if (pending != null)
             Align(
               alignment: Alignment.bottomCenter,
               child: _RideRequestSheet(
@@ -1400,7 +1400,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
                 },
               ),
             )
-          else
+          else if (ride == null && food == null && market == null)
             Align(
               alignment: Alignment.bottomCenter,
               child: _buildPickMeIdle(driver),
@@ -2440,6 +2440,70 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (driver.queuedRide != null) ...[
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.primary.withOpacity(0.12),
+                  AppColors.primary.withOpacity(0.04),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.electric_bolt_rounded, color: Colors.white, size: 14),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'NEXT RIDE QUEUED',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 10,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                      Text(
+                        '${driver.queuedRide!['customer_name'] ?? 'Customer'} • Pickup: ${driver.queuedRide!['pickup_address'] ?? 'Nearby'}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Rs.${driver.queuedRide!['final_amount'] ?? 0}',
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         if (expanded) ...[
           Row(
             children: [
@@ -3920,6 +3984,15 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
     bool ok = false;
     try {
       ok = await context.read<DriverProvider>().acceptRide(_requestId);
+      if (ok && mounted && context.read<DriverProvider>().queuedRide != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Next ride queued! Complete your current trip first.'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -3973,16 +4046,23 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
     final isFlash = r['is_flash'] == true;
     final isFood = r['is_food'] == true;
     final isMarket = r['is_market'] == true;
-    final badgeIcon = isMarket
-        ? Icons.storefront_rounded
-        : isFood
-            ? Icons.restaurant_rounded
-            : (isFlash ? Icons.inventory_2_rounded : Icons.bolt_rounded);
-    final badgeLabel = isMarket
-        ? 'MARKET DELIVERY'
-        : isFood
-            ? 'FOOD DELIVERY'
-            : (isFlash ? 'PARCEL DELIVERY' : 'NEW RIDE');
+    final isB2b = r['is_back_to_back'] == true ||
+        (context.watch<DriverProvider>().activeRide != null &&
+            context.watch<DriverProvider>().activeRide!['status'] == 'started');
+    final badgeIcon = isB2b
+        ? Icons.electric_bolt_rounded
+        : (isMarket
+            ? Icons.storefront_rounded
+            : isFood
+                ? Icons.restaurant_rounded
+                : (isFlash ? Icons.inventory_2_rounded : Icons.bolt_rounded));
+    final badgeLabel = isB2b
+        ? 'NEXT RIDE (BACK-TO-BACK)'
+        : (isMarket
+            ? 'MARKET DELIVERY'
+            : isFood
+                ? 'FOOD DELIVERY'
+                : (isFlash ? 'PARCEL DELIVERY' : 'NEW RIDE'));
 
     if (widget.isCollapsed) {
       return Container(
@@ -4148,6 +4228,35 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                   ),
                 ],
               ),
+              if (isB2b) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFFB45309)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          r['current_drop_address'] != null && r['current_drop_address'].toString().isNotEmpty
+                              ? 'Starts after drop-off at ${r['current_drop_address']}'
+                              : 'Starts immediately after your current drop-off',
+                          style: const TextStyle(
+                            color: Color(0xFFB45309),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               // Customer + fare
               Row(
@@ -4504,14 +4613,14 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                                   strokeWidth: 3,
                                 ),
                               )
-                            : const Row(
+                            : Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.check_rounded, color: Colors.white, size: 18),
-                                  SizedBox(width: 6),
+                                  const Icon(Icons.check_rounded, color: Colors.white, size: 18),
+                                  const SizedBox(width: 6),
                                   Text(
-                                    'ACCEPT RIDE',
-                                    style: TextStyle(
+                                    isB2b ? 'ACCEPT NEXT RIDE' : 'ACCEPT RIDE',
+                                    style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w900,
                                       letterSpacing: 0.8,

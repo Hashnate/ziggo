@@ -183,6 +183,10 @@ class DriverVehicle(Base):
 
     driver = relationship("Driver", back_populates="vehicles")
 
+    @property
+    def user(self):
+        return self.driver.user if self.driver else None
+
 
 class DriverDocument(Base):
     __tablename__ = "driver_documents"
