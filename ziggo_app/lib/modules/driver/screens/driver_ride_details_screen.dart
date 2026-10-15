@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../app/app_colors.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/widgets/download_invoice_button.dart';
 
 class DriverRideDetailsScreen extends StatelessWidget {
   final Map<String, dynamic> rideData;
@@ -687,6 +688,16 @@ class DriverRideDetailsScreen extends StatelessWidget {
             // --- TRIP REF INFO ---
             Center(
               child: Text('Trip ID: $bookingRef', style: const TextStyle(fontSize: 12, color: Colors.black38, fontWeight: FontWeight.w600)),
+            ),
+
+            const SizedBox(height: 20),
+
+            // --- DOWNLOAD INVOICE BUTTON ---
+            Center(
+              child: DownloadInvoiceButton(
+                rideData: rideData,
+                isDriver: true,
+              ),
             ),
 
             const SizedBox(height: 40),

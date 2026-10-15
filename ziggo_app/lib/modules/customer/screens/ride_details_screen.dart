@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../../app/app_colors.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/widgets/download_invoice_button.dart';
 import '../booking_provider.dart';
 
 class RideDetailsScreen extends StatelessWidget {
@@ -809,6 +810,16 @@ class RideDetailsScreen extends StatelessWidget {
                 children: [
                   Text('Trip ID: $bookingRef', style: const TextStyle(fontSize: 12, color: Colors.black38, fontWeight: FontWeight.w600)),
                 ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // --- DOWNLOAD INVOICE BUTTON ---
+            Center(
+              child: DownloadInvoiceButton(
+                rideData: rideData,
+                isDriver: false,
               ),
             ),
             
