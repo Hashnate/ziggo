@@ -180,14 +180,21 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
         app_usage_charges=float(b.app_usage_charges) if b.app_usage_charges is not None else 0.0,
         deductions=float(b.deductions) if b.deductions is not None else 0.0,
         driver_earnings=float(b.driver_earnings) if b.driver_earnings is not None else 0.0,
+        waiting_charge=float(b.waiting_charge or 0.0),
         stops=[
             {
                 "order_index": s.order_index,
                 "lat": float(s.lat),
                 "lng": float(s.lng),
                 "address": s.address,
+                "arrived_at": s.arrived_at.isoformat() if s.arrived_at else None,
+                "departed_at": s.departed_at.isoformat() if s.departed_at else None,
+                "free_wait_seconds": int(s.free_wait_seconds or 0),
+                "excess_seconds": int(s.excess_seconds or 0),
+                "excess_rate_per_minute": float(s.excess_rate_per_minute or 0),
+                "wait_charge": float(s.wait_charge or 0),
             }
-            for s in (b.stops or [])
+            for s in sorted((b.stops or []), key=lambda x: x.order_index)
         ],
     )
 
@@ -1564,6 +1571,10 @@ async def driver_arrived_at_stop(
                 "arrived_at": now.isoformat(),
                 "free_wait_seconds": stop.free_wait_seconds,
             })
+            await manager.send(c.user_id, "booking_update", {
+                "booking_id": b.id,
+                "status": b.status.value,
+            })
     return {
         "ok": True, "arrived_at": now.isoformat(),
         "free_wait_seconds": stop.free_wait_seconds,
@@ -1604,6 +1615,15 @@ async def driver_departed_from_stop(
     stop.departed_at = now
     stop.excess_seconds = excess_sec
     stop.wait_charge = charge
+
+    # Settle total waiting charge on booking so it is up-to-date
+    from ...models import BookingStop
+    sq = await db.execute(
+        select(BookingStop).where(BookingStop.booking_id == b.id)
+    )
+    all_stops = sq.scalars().all()
+    total_wait = sum((Decimal(str(s.wait_charge or 0))) for s in all_stops)
+    b.waiting_charge = total_wait.quantize(Decimal("0.01"))
     await db.commit()
 
     if b.customer_id:
@@ -1616,6 +1636,10 @@ async def driver_departed_from_stop(
                 "waited_seconds": waited_sec,
                 "excess_seconds": excess_sec,
                 "wait_charge": float(charge),
+            })
+            await manager.send(c.user_id, "booking_update", {
+                "booking_id": b.id,
+                "status": b.status.value,
             })
     return {
         "ok": True,

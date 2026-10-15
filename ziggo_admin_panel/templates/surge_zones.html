@@ -193,16 +193,17 @@
             const initialColor = document.getElementById('zoneColor').value || '#dc3545';
             drawingManager = new google.maps.drawing.DrawingManager({
                 drawingMode: google.maps.drawing.OverlayType.POLYGON,
-                drawingControl: true,
-                drawingControlOptions: { position: google.maps.ControlPosition.TOP_CENTER, drawingModes: [google.maps.drawing.OverlayType.POLYGON] },
+                drawingControl: false,
                 polygonOptions: { fillColor: initialColor, fillOpacity: 0.5, strokeColor: initialColor, strokeWeight: 2, clickable: true, editable: true, zIndex: 1 }
             });
             drawingManager.setMap(modalMap);
+            setupCustomDrawingToolbar(modalMap);
             
             google.maps.event.addListener(drawingManager, 'polygoncomplete', function(polygon) {
                 if (currentModalPolygon) currentModalPolygon.setMap(null);
                 currentModalPolygon = polygon;
                 drawingManager.setDrawingMode(null);
+                setDrawingToolActive('pan');
                 updateCoordinatesInput(polygon);
                 polygon.getPaths().forEach(function(path, index){
                     google.maps.event.addListener(path, 'insert_at', function(){ updateCoordinatesInput(polygon); });
@@ -213,6 +214,83 @@
         } catch (error) {
             console.error("Error initializing modal map or drawing manager:", error);
             alert("Error loading drawing tools: " + error.message);
+        }
+    }
+
+    let customToolPanBtn = null;
+    let customToolPolygonBtn = null;
+
+    function setupCustomDrawingToolbar(map) {
+        if (document.getElementById('customDrawingToolbar')) return;
+
+        const toolbarDiv = document.createElement('div');
+        toolbarDiv.id = 'customDrawingToolbar';
+        toolbarDiv.style.marginRight = '10px';
+        toolbarDiv.style.marginTop = '8px';
+        toolbarDiv.style.boxShadow = '0 2px 6px rgba(0,0,0,0.2)';
+        toolbarDiv.className = 'flex flex-col bg-white rounded-lg border border-gray-300 overflow-hidden';
+
+        const btnPan = document.createElement('button');
+        btnPan.type = 'button';
+        btnPan.id = 'btnToolPan';
+        btnPan.title = 'Pan / Navigate Map (Stop Drawing)';
+        btnPan.className = 'w-10 h-10 flex items-center justify-center transition-all border-b border-gray-200 bg-blue-600 text-white font-bold shadow-inner cursor-pointer';
+        btnPan.innerHTML = '<i class="fas fa-hand text-base pointer-events-none"></i>';
+
+        const btnPolygon = document.createElement('button');
+        btnPolygon.type = 'button';
+        btnPolygon.id = 'btnToolPolygon';
+        btnPolygon.title = 'Draw Surge Zone Polygon';
+        btnPolygon.className = 'w-10 h-10 flex items-center justify-center transition-all text-gray-700 hover:bg-gray-100 hover:text-black bg-white cursor-pointer';
+        btnPolygon.innerHTML = '<i class="fas fa-draw-polygon text-base pointer-events-none"></i>';
+
+        customToolPanBtn = btnPan;
+        customToolPolygonBtn = btnPolygon;
+
+        const handlePan = function(e) {
+            if (e) { e.preventDefault(); e.stopPropagation(); }
+            if (drawingManager) drawingManager.setDrawingMode(null);
+            if (currentModalPolygon) {
+                currentModalPolygon.setOptions({ clickable: true });
+            }
+            setDrawingToolActive('pan');
+        };
+
+        const handlePolygon = function(e) {
+            if (e) { e.preventDefault(); e.stopPropagation(); }
+            if (currentModalPolygon) {
+                currentModalPolygon.setMap(null);
+                currentModalPolygon = null;
+                document.getElementById('zoneCoordinates').value = '';
+            }
+            if (drawingManager) {
+                drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+            }
+            setDrawingToolActive('polygon');
+        };
+
+        btnPan.onclick = handlePan;
+        btnPolygon.onclick = handlePolygon;
+        btnPan.addEventListener('click', handlePan);
+        btnPolygon.addEventListener('click', handlePolygon);
+
+        toolbarDiv.appendChild(btnPan);
+        toolbarDiv.appendChild(btnPolygon);
+
+        map.controls[google.maps.ControlPosition.RIGHT_TOP].push(toolbarDiv);
+    }
+
+    function setDrawingToolActive(tool) {
+        const btnPan = customToolPanBtn || document.getElementById('btnToolPan');
+        const btnPolygon = customToolPolygonBtn || document.getElementById('btnToolPolygon');
+        if (!btnPan || !btnPolygon) return;
+
+        if (tool === 'polygon') {
+            btnPolygon.className = 'w-10 h-10 flex items-center justify-center transition-all bg-blue-600 text-white font-bold shadow-inner cursor-pointer';
+            btnPan.className = 'w-10 h-10 flex items-center justify-center transition-all border-b border-gray-200 text-gray-700 hover:bg-gray-100 hover:text-black bg-white cursor-pointer';
+        } else {
+            btnPan.className = 'w-10 h-10 flex items-center justify-center transition-all border-b border-gray-200 bg-blue-600 text-white font-bold shadow-inner cursor-pointer';
+            btnPolygon.className = 'w-10 h-10 flex items-center justify-center transition-all text-gray-700 hover:bg-gray-100 hover:text-black bg-white cursor-pointer';
         }
     }
     
@@ -279,7 +357,11 @@
         document.getElementById('zoneModalTitle').innerText = 'Create Surge Zone';
         if (currentModalPolygon) { currentModalPolygon.setMap(null); currentModalPolygon = null; }
         document.getElementById('zoneModal').classList.remove('hidden');
-        setTimeout(() => { initModalMap(); if (drawingManager) drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON); }, 100);
+        setTimeout(() => {
+            initModalMap();
+            if (drawingManager) drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+            setDrawingToolActive('polygon');
+        }, 100);
     };
     
     window.closeZoneModal = function() {
@@ -317,12 +399,16 @@
                 const bounds = new google.maps.LatLngBounds();
                 coords.forEach(c => bounds.extend(new google.maps.LatLng(c.lat, c.lng)));
                 modalMap.fitBounds(bounds);
-                drawingManager.setDrawingMode(null);
+                if (drawingManager) drawingManager.setDrawingMode(null);
+                setDrawingToolActive('pan');
                 currentModalPolygon.getPaths().forEach(function(path, index){
                     google.maps.event.addListener(path, 'insert_at', function(){ updateCoordinatesInput(currentModalPolygon); });
                     google.maps.event.addListener(path, 'remove_at', function(){ updateCoordinatesInput(currentModalPolygon); });
                     google.maps.event.addListener(path, 'set_at', function(){ updateCoordinatesInput(currentModalPolygon); });
                 });
+            } else {
+                if (drawingManager) drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+                setDrawingToolActive('polygon');
             }
         }, 100);
     };

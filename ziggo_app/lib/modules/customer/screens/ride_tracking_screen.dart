@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -1147,6 +1148,26 @@ class _BottomCard extends StatelessWidget {
                                 ),
                               ),
                             ],
+                            if ((active['stops'] as List?)?.isNotEmpty == true) ...[
+                              Builder(builder: (context) {
+                                final activeStopsList = (active['stops'] as List? ?? []);
+                                Map<String, dynamic>? activeWaitingStop;
+                                for (final s in activeStopsList) {
+                                  if (s is Map && s['arrived_at'] != null && s['departed_at'] == null) {
+                                    activeWaitingStop = Map<String, dynamic>.from(s);
+                                    break;
+                                  }
+                                }
+                                if (activeWaitingStop == null) return const SizedBox.shrink();
+                                return _CustomerStopWaitingTimerWidget(
+                                  arrivedAtIso: activeWaitingStop['arrived_at'].toString(),
+                                  stopIndex: (activeWaitingStop['order_index'] as num?)?.toInt() ?? 1,
+                                  address: activeWaitingStop['address']?.toString() ?? '',
+                                  freeWaitSeconds: (activeWaitingStop['free_wait_seconds'] as num?)?.toInt() ?? 180,
+                                  excessRatePerMinute: (activeWaitingStop['excess_rate_per_minute'] as num?)?.toDouble() ?? 5.0,
+                                );
+                              }),
+                            ],
                             const SizedBox(height: 16),
                             // 3. Ride Details Box
                             Container(
@@ -1263,11 +1284,35 @@ class _BottomCard extends StatelessWidget {
                                               if ((active['stops'] as List?)?.isNotEmpty == true)
                                                 for (final stop in (active['stops'] as List)) ...[
                                                   const SizedBox(height: 12),
-                                                  Text(
-                                                    stop['address']?.toString() ?? '',
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textSecondary),
+                                                  Row(
+                                                    children: [
+                                                      Expanded(
+                                                        child: Text(
+                                                          stop['address']?.toString() ?? '',
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow.ellipsis,
+                                                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textSecondary),
+                                                        ),
+                                                      ),
+                                                      if (stop['departed_at'] != null)
+                                                        Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                          decoration: BoxDecoration(
+                                                            color: AppColors.success.withOpacity(0.12),
+                                                            borderRadius: BorderRadius.circular(6),
+                                                          ),
+                                                          child: const Text('DEPARTED', style: TextStyle(color: AppColors.success, fontSize: 9, fontWeight: FontWeight.w900)),
+                                                        )
+                                                      else if (stop['arrived_at'] != null)
+                                                        Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                          decoration: BoxDecoration(
+                                                            color: const Color(0xFFF59E0B).withOpacity(0.15),
+                                                            borderRadius: BorderRadius.circular(6),
+                                                          ),
+                                                          child: const Text('WAITING', style: TextStyle(color: Color(0xFFD97706), fontSize: 9, fontWeight: FontWeight.w900)),
+                                                        ),
+                                                    ],
                                                   ),
                                                 ],
                                               const SizedBox(height: 12),
@@ -2061,5 +2106,197 @@ class _SearchingIndicator extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _CustomerStopWaitingTimerWidget extends StatefulWidget {
+  final String arrivedAtIso;
+  final int stopIndex;
+  final String address;
+  final int freeWaitSeconds;
+  final double excessRatePerMinute;
+
+  const _CustomerStopWaitingTimerWidget({
+    Key? key,
+    required this.arrivedAtIso,
+    required this.stopIndex,
+    required this.address,
+    this.freeWaitSeconds = 180,
+    this.excessRatePerMinute = 5.0,
+  }) : super(key: key);
+
+  @override
+  State<_CustomerStopWaitingTimerWidget> createState() => _CustomerStopWaitingTimerWidgetState();
+}
+
+class _CustomerStopWaitingTimerWidgetState extends State<_CustomerStopWaitingTimerWidget> {
+  Timer? _ticker;
+  late DateTime _arrivedAt;
+
+  @override
+  void initState() {
+    super.initState();
+    _arrivedAt = DateTime.tryParse(widget.arrivedAtIso)?.toUtc() ?? DateTime.now().toUtc();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _CustomerStopWaitingTimerWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.arrivedAtIso != widget.arrivedAtIso) {
+      _arrivedAt = DateTime.tryParse(widget.arrivedAtIso)?.toUtc() ?? DateTime.now().toUtc();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  String _formatSeconds(int sec) {
+    final m = (sec ~/ 60).toString().padLeft(2, '0');
+    final s = (sec % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now().toUtc();
+    final waitedSec = math.max(0, now.difference(_arrivedAt).inSeconds);
+    final freeSec = widget.freeWaitSeconds;
+    final isExcess = waitedSec > freeSec;
+
+    if (!isExcess) {
+      final remaining = freeSec - waitedSec;
+      return Container(
+        margin: const EdgeInsets.only(top: 14),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEFF6FF),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFBFDBFE), width: 1.5),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2563EB).withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.timer_rounded, size: 20, color: Color(0xFF2563EB)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Driver waiting at Stop ${widget.stopIndex}',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1E40AF),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Free wait time: ${_formatSeconds(remaining)} remaining',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1E3A8A),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2563EB),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                _formatSeconds(remaining),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      final excessSec = waitedSec - freeSec;
+      final excessMin = (excessSec + 59) ~/ 60;
+      final charge = excessMin * widget.excessRatePerMinute;
+      return Container(
+        margin: const EdgeInsets.only(top: 14),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFFBEB),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFFDE68A), width: 1.5),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFD97706).withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.warning_amber_rounded, size: 20, color: Color(0xFFD97706)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Waiting at Stop ${widget.stopIndex} (Chargeable)',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFFB45309),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Exceeded by ${_formatSeconds(excessSec)} (Rs. ${widget.excessRatePerMinute.toStringAsFixed(0)}/min)',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF92400E),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFD97706),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '+Rs.${charge.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
   }
 }

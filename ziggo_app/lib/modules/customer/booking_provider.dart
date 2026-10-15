@@ -71,6 +71,8 @@ class BookingProvider extends ChangeNotifier {
         if (newStatus != 'cancelled' && newStatus != 'completed') {
           loadActive();
         }
+      } else if (event == 'stop_arrived' || event == 'stop_departed') {
+        loadActive();
       } else if (event == 'no_drivers_available') {
         final bid = data['booking_id'];
         if (_activeBooking != null && (bid == null || _activeBooking!['id'] == bid)) {

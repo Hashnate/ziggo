@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io' show Platform;
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -2382,6 +2383,19 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
     final note = ride['parcel_instructions'] as String?;
     final secondaryPhone = ride['receiver_phone'] as String?;
 
+    final stops = (ride['stops'] as List? ?? []);
+    Map<String, dynamic>? activeStop;
+    bool isWaitingAtStop = false;
+    if (status == 'started' && stops.isNotEmpty) {
+      for (final s in stops) {
+        if (s is Map && s['departed_at'] == null) {
+          activeStop = Map<String, dynamic>.from(s);
+          isWaitingAtStop = activeStop['arrived_at'] != null;
+          break;
+        }
+      }
+    }
+
     String nextAction = 'COMPLETE';
     String nextStatus = 'completed';
     Color actionColor = AppColors.success;
@@ -2400,10 +2414,24 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
         actionIcon = Icons.play_arrow_rounded;
         break;
       case 'started':
-        nextAction = 'COMPLETE TRIP';
-        nextStatus = 'completed';
-        actionColor = AppColors.success;
-        actionIcon = Icons.check_rounded;
+        if (activeStop != null) {
+          if (!isWaitingAtStop) {
+            nextAction = "ARRIVED AT STOP ${activeStop['order_index']}";
+            nextStatus = 'stop_arrive';
+            actionColor = const Color(0xFFF59E0B);
+            actionIcon = Icons.pin_drop_rounded;
+          } else {
+            nextAction = "DEPART STOP ${activeStop['order_index']}";
+            nextStatus = 'stop_depart';
+            actionColor = AppColors.primary;
+            actionIcon = Icons.navigation_rounded;
+          }
+        } else {
+          nextAction = 'COMPLETE TRIP';
+          nextStatus = 'completed';
+          actionColor = AppColors.success;
+          actionIcon = Icons.check_rounded;
+        }
         break;
     }
 
@@ -2670,11 +2698,35 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
                             if ((ride['stops'] as List?)?.isNotEmpty == true)
                               for (final stop in (ride['stops'] as List)) ...[
                                 const SizedBox(height: 12),
-                                Text(
-                                  stop['address']?.toString() ?? '',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textSecondary),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        stop['address']?.toString() ?? '',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.textSecondary),
+                                      ),
+                                    ),
+                                    if (stop['departed_at'] != null)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.success.withOpacity(0.12),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: const Text('DEPARTED', style: TextStyle(color: AppColors.success, fontSize: 9, fontWeight: FontWeight.w900)),
+                                      )
+                                    else if (stop['arrived_at'] != null)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF59E0B).withOpacity(0.15),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: const Text('WAITING', style: TextStyle(color: Color(0xFFD97706), fontSize: 9, fontWeight: FontWeight.w900)),
+                                      ),
+                                  ],
                                 ),
                               ],
                             const SizedBox(height: 12),
@@ -2695,6 +2747,40 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
           ),
           const SizedBox(height: 14),
         ],
+        if (activeStop != null && isWaitingAtStop && activeStop['arrived_at'] != null)
+          _StopWaitingTimerWidget(
+            arrivedAtIso: activeStop['arrived_at'].toString(),
+            freeWaitSeconds: (activeStop['free_wait_seconds'] as num?)?.toInt() ?? 180,
+            excessRatePerMinute: (activeStop['excess_rate_per_minute'] as num?)?.toDouble() ?? 5.0,
+          )
+        else if (activeStop != null && !isWaitingAtStop)
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF3C7),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFFDE68A)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.pin_drop_rounded, size: 20, color: Color(0xFFD97706)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Next destination: Stop ${activeStop['order_index']} (${activeStop['address'] ?? ''})',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF92400E),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         Row(
           children: [
             Expanded(
@@ -2733,11 +2819,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
             const SizedBox(width: 10),
             Expanded(
               child: GestureDetector(
-                onTap: () {
+                onTap: () async {
                   if (nextStatus == 'completed') {
                     _handleCompleteTrip(driver, ride);
                   } else if (nextStatus == 'started') {
                     _handleStartTrip(driver, ride);
+                  } else if (nextStatus == 'stop_arrive' && activeStop != null) {
+                    final orderIndex = (activeStop['order_index'] as num?)?.toInt() ?? 1;
+                    await driver.arriveAtStop(ride['id'], orderIndex);
+                  } else if (nextStatus == 'stop_depart' && activeStop != null) {
+                    final orderIndex = (activeStop['order_index'] as num?)?.toInt() ?? 1;
+                    await driver.departFromStop(ride['id'], orderIndex);
                   } else {
                     driver.updateRideStatus(nextStatus);
                   }
@@ -2780,6 +2872,32 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
             ),
           ],
         ),
+        if (activeStop != null && status == 'started') ...[
+          const SizedBox(height: 6),
+          Center(
+            child: GestureDetector(
+              onTap: () => _handleCompleteTrip(driver, ride),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.flag_rounded, size: 13, color: AppColors.textSecondary),
+                    SizedBox(width: 4),
+                    Text(
+                      'Customer ending trip early? Complete Trip',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -5044,5 +5162,181 @@ class _DriverHUD extends StatelessWidget {
         ],
       ],
     );
+  }
+}
+
+class _StopWaitingTimerWidget extends StatefulWidget {
+  final String arrivedAtIso;
+  final int freeWaitSeconds;
+  final double excessRatePerMinute;
+
+  const _StopWaitingTimerWidget({
+    Key? key,
+    required this.arrivedAtIso,
+    this.freeWaitSeconds = 180,
+    this.excessRatePerMinute = 5.0,
+  }) : super(key: key);
+
+  @override
+  State<_StopWaitingTimerWidget> createState() => _StopWaitingTimerWidgetState();
+}
+
+class _StopWaitingTimerWidgetState extends State<_StopWaitingTimerWidget> {
+  Timer? _ticker;
+  late DateTime _arrivedAt;
+
+  @override
+  void initState() {
+    super.initState();
+    _arrivedAt = DateTime.tryParse(widget.arrivedAtIso)?.toUtc() ?? DateTime.now().toUtc();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _StopWaitingTimerWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.arrivedAtIso != widget.arrivedAtIso) {
+      _arrivedAt = DateTime.tryParse(widget.arrivedAtIso)?.toUtc() ?? DateTime.now().toUtc();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  String _formatSeconds(int sec) {
+    final m = (sec ~/ 60).toString().padLeft(2, '0');
+    final s = (sec % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now().toUtc();
+    final waitedSec = math.max(0, now.difference(_arrivedAt).inSeconds);
+    final freeSec = widget.freeWaitSeconds;
+    final isExcess = waitedSec > freeSec;
+
+    if (!isExcess) {
+      final remaining = freeSec - waitedSec;
+      return Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEFF6FF),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFBFDBFE)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.timer_rounded, size: 20, color: Color(0xFF2563EB)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Free Waiting Window',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E40AF),
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Total wait: ${_formatSeconds(waitedSec)} (Free: ${_formatSeconds(remaining)} left)',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1E3A8A),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2563EB),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                _formatSeconds(remaining),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      final excessSec = waitedSec - freeSec;
+      final excessMin = (excessSec + 59) ~/ 60;
+      final charge = excessMin * widget.excessRatePerMinute;
+      return Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFFBEB),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFFDE68A), width: 1.5),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, size: 22, color: Color(0xFFD97706)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Excess Wait Time Charged',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFB45309),
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Wait: ${_formatSeconds(waitedSec)} (+${_formatSeconds(excessSec)} excess)',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF92400E),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFD97706),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '+Rs.${charge.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
   }
 }

@@ -292,6 +292,7 @@ class RideDetailsScreen extends StatelessWidget {
     final redeemDiscount = _parseNum(rideData['redeem_discount']);
     final totalDiscount = discountAmount + redeemDiscount;
     final fareAmount = rideData['fare_amount'] != null ? _parseNum(rideData['fare_amount']) : finalAmount;
+    final waitingCharge = _parseNum(rideData['waiting_charge']);
     final actualGrossFare = finalAmount + totalDiscount;
 
     return Scaffold(
@@ -629,6 +630,14 @@ class RideDetailsScreen extends StatelessWidget {
                   _receiptSectionDetail('Actual Duration', _formatDurationDetail(rideData)),
                   _receiptSectionDetail('Actual Distance', _formatDistanceDetail(rideData)),
                   
+                  if (waitingCharge > 0) ...[
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Divider(height: 1, color: Colors.black12),
+                    ),
+                    _receiptRow('Waiting Surcharge', '+${fmt.format(waitingCharge)}'),
+                  ],
+
                   if (totalDiscount > 0) ...[
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 12),

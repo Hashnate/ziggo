@@ -213,6 +213,7 @@ class BookingResponse(BaseModel):
     app_usage_charges: Optional[float] = 0
     deductions: Optional[float] = 0
     driver_earnings: Optional[float] = 0
+    waiting_charge: Optional[float] = 0
     stops: List[dict] = Field(default_factory=list)
 
     # Food/Market specific fields

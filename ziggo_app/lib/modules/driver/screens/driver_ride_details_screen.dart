@@ -581,6 +581,8 @@ class DriverRideDetailsScreen extends StatelessWidget {
                   ] else ...[
                     // Standard ride breakdown
                     _breakdownRow('Trip fare', fmt.format((rideData['fare_amount'] as num?) ?? 0)),
+                    if (((rideData['waiting_charge'] as num?) ?? 0) > 0)
+                      _breakdownRow('Waiting surcharge (100% to you)', fmt.format((rideData['waiting_charge'] as num?) ?? 0)),
                     if (((rideData['pickup_fee'] as num?) ?? 0) > 0)
                       _breakdownRow('Pickup fee (included)', fmt.format((rideData['pickup_fee'] as num?) ?? 0)),
                     if (((rideData['peak_surcharge'] as num?) ?? 0) > 0)

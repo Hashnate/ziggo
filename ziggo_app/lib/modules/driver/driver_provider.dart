@@ -183,7 +183,7 @@ class DriverProvider extends ChangeNotifier {
       if (SchedulerBinding.instance.lifecycleState != AppLifecycleState.resumed) {
         unawaited(FcmService.instance.showRideAlarmFromApp(data));
       }
-    } else if (event == 'booking_update' || event == 'destination_updated') {
+    } else if (event == 'booking_update' || event == 'destination_updated' || event == 'stop_arrived' || event == 'stop_departed') {
       loadActive();
       // If the booking was cancelled by the customer while the driver still has
       // a pending request for the same booking, dismiss the request card now so
@@ -698,6 +698,32 @@ class DriverProvider extends ChangeNotifier {
         await loadProfile();
         await loadIncentives();
       }
+      notifyListeners();
+      return true;
+    } on DioException {
+      return false;
+    }
+  }
+
+  Future<bool> arriveAtStop(int bookingId, int orderIndex) async {
+    try {
+      await ApiClient.instance.dio.post(
+        '/bookings/$bookingId/stops/$orderIndex/arrive',
+      );
+      await loadActive();
+      notifyListeners();
+      return true;
+    } on DioException {
+      return false;
+    }
+  }
+
+  Future<bool> departFromStop(int bookingId, int orderIndex) async {
+    try {
+      await ApiClient.instance.dio.post(
+        '/bookings/$bookingId/stops/$orderIndex/depart',
+      );
+      await loadActive();
       notifyListeners();
       return true;
     } on DioException {
