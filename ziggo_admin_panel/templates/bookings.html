@@ -11,11 +11,10 @@
         cursor: pointer;
         z-index: 200;
         pointer-events: auto;
-        will-change: left, top, transform;
-        transition: left 0.8s linear, top 0.8s linear;
+        user-select: none;
     }
     .vehicle-top-overlay img {
-        transition: transform 0.4s ease-out;
+        transition: transform 0.25s ease-out;
     }
     .vehicle-tip {
         position: absolute;
@@ -151,13 +150,8 @@
             </div>
             <!-- Interactive Map Controls -->
             <div class="flex items-center gap-2">
-                <button type="button" id="toggleOnlineDriversBtn" onclick="toggleOnlineDrivers()"
-                        class="px-3 py-1.5 rounded-xl border border-ziggo-line bg-white hover:bg-slate-50 text-ziggo-ink text-xs font-bold shadow-soft-sm flex items-center gap-1.5 transition">
-                    <img src="/static/img/top_car.png" class="w-3.5 h-3.5 object-contain" alt="">
-                    <span>Online Vehicles (<span id="onlineCountLabel">{{ online_drivers_count if online_drivers_count is defined else 0 }}</span>)</span>
-                </button>
                 <button type="button" onclick="fitAllMapBounds()"
-                        class="px-3 py-1.5 rounded-xl border border-ziggo-line bg-white hover:bg-slate-50 text-ziggo-ink text-xs font-bold shadow-soft-sm flex items-center gap-1.5 transition" title="Fit to all rides and vehicles">
+                        class="px-3 py-1.5 rounded-xl border border-ziggo-line bg-white hover:bg-slate-50 text-ziggo-ink text-xs font-bold shadow-soft-sm flex items-center gap-1.5 transition" title="Center map to active rides">
                     <i class="fas fa-expand-arrows-alt text-gray-500"></i> Fit Map
                 </button>
                 <button type="button" id="resetTrackingBtn" onclick="resetRideTracking()"
@@ -241,18 +235,14 @@
                 </p>
             </div>
             {% else %}
-            <div class="text-center py-8 px-2 space-y-3">
+            <div class="text-center py-10 px-3 space-y-3">
                 <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto text-xl">
-                    <img src="/static/img/top_car.png" class="w-8 h-8 object-contain opacity-40" alt="">
+                    <i class="fas fa-route text-slate-300 text-xl"></i>
                 </div>
                 <div>
                     <p class="font-bold text-gray-700 text-sm">No active rides right now</p>
-                    <p class="text-gray-400 text-xs mt-1">Select any booking from below to inspect its road route, or toggle Online Vehicles.</p>
+                    <p class="text-gray-400 text-xs mt-1">When a ride starts, its live road route and top-view vehicle will appear here automatically.</p>
                 </div>
-                <button type="button" onclick="toggleOnlineDrivers(true)" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-ziggo text-white text-xs font-bold shadow-soft hover:bg-ziggo-light transition">
-                    <img src="/static/img/top_car.png" class="w-3.5 h-3.5 object-contain brightness-0 invert" alt="">
-                    <span>View Online Vehicles ({{ online_drivers_count if online_drivers_count is defined else 0 }})</span>
-                </button>
             </div>
             {% endfor %}
         </div>
@@ -401,7 +391,6 @@
 {% block scripts %}
 <script type="application/json" id="activeBookingsData">{{ active_bookings_json | safe if active_bookings_json is defined else '[]' }}</script>
 <script type="application/json" id="tableBookingsData">{{ table_bookings_json | safe if table_bookings_json is defined else '[]' }}</script>
-<script type="application/json" id="onlineDriversData">{{ online_drivers_json | safe if online_drivers_json is defined else '[]' }}</script>
 
 <script>
     var map;
@@ -409,19 +398,15 @@
     var activeMarkers = [];
     var activeRoutePolylines = [];
     var vehicleOverlays = new Map(); // bookingId -> VehicleTopOverlay
-    var onlineDriverOverlays = new Map(); // driverId -> VehicleTopOverlay
-    var showOnlineDriversState = false;
     var currentTrackedBookingId = null;
 
     // Injected Data from Backend
     var rawActiveBookings = [];
     var rawTableBookings = [];
-    var rawOnlineDrivers = [];
 
     try {
         rawActiveBookings = JSON.parse(document.getElementById('activeBookingsData').textContent || '[]');
         rawTableBookings = JSON.parse(document.getElementById('tableBookingsData').textContent || '[]');
-        rawOnlineDrivers = JSON.parse(document.getElementById('onlineDriversData').textContent || '[]');
     } catch (e) {
         console.error('Failed to parse bookings JSON:', e);
     }
@@ -467,7 +452,6 @@
 
         // 1. Update data sets
         if (data.active_bookings) rawActiveBookings = data.active_bookings;
-        if (data.online_drivers) rawOnlineDrivers = data.online_drivers;
         if (data.recent_bookings) rawTableBookings = data.recent_bookings;
 
         // 2. Update KPI metrics smoothly
@@ -485,10 +469,8 @@
         // 3. Update counter badges
         var activeBadge = document.getElementById('activeCountBadge');
         var sidebarCount = document.getElementById('sidebarActiveCount');
-        var onlineLabel = document.getElementById('onlineCountLabel');
         if (activeBadge) activeBadge.textContent = rawActiveBookings.length;
         if (sidebarCount) sidebarCount.textContent = rawActiveBookings.length;
-        if (onlineLabel && data.online_drivers_count !== undefined) onlineLabel.textContent = data.online_drivers_count;
 
         // 4. Update Active Rides sidebar in-place
         renderActiveRidesSidebar(rawActiveBookings);
@@ -511,12 +493,16 @@
                 }
             }
         } else {
-            syncMapActiveVehicles(rawActiveBookings);
-        }
-
-        // 7. Update Online Drivers overlay if layer is active
-        if (showOnlineDriversState) {
-            syncOnlineDriversOverlay(rawOnlineDrivers);
+            if (rawActiveBookings.length > 0) {
+                if (activeMarkers.length === 0) {
+                    renderAllActiveBookings();
+                } else {
+                    syncMapActiveVehicles(rawActiveBookings);
+                }
+            } else {
+                clearTrackedRideMarkers();
+                clearActiveRoutes();
+            }
         }
     }
 
@@ -525,18 +511,14 @@
         if (!container) return;
 
         if (activeList.length === 0) {
-            container.innerHTML = '<div class="text-center py-8 px-2 space-y-3">' +
+            container.innerHTML = '<div class="text-center py-10 px-3 space-y-3">' +
                 '<div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto text-xl">' +
-                '<img src="/static/img/top_car.png" class="w-8 h-8 object-contain opacity-40" alt="">' +
+                '<i class="fas fa-route text-slate-300 text-xl"></i>' +
                 '</div>' +
                 '<div>' +
                 '<p class="font-bold text-gray-700 text-sm">No active rides right now</p>' +
-                '<p class="text-gray-400 text-xs mt-1">Select any booking from below to inspect its road route, or toggle Online Vehicles.</p>' +
+                '<p class="text-gray-400 text-xs mt-1">When a ride starts, its live road route and top-view vehicle will appear here automatically.</p>' +
                 '</div>' +
-                '<button type="button" onclick="toggleOnlineDrivers(true)" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-ziggo text-white text-xs font-bold shadow-soft hover:bg-ziggo-light transition">' +
-                '<img src="/static/img/top_car.png" class="w-3.5 h-3.5 object-contain brightness-0 invert" alt="">' +
-                '<span>View Online Vehicles</span>' +
-                '</button>' +
                 '</div>';
             return;
         }
@@ -640,39 +622,6 @@
             if (!activeIds.has(id)) {
                 overlay.setMap(null);
                 vehicleOverlays.delete(id);
-            }
-        });
-    }
-
-    function syncOnlineDriversOverlay(driversList) {
-        if (!map || !showOnlineDriversState) return;
-        var driverIds = new Set();
-        driversList.forEach(function(d) {
-            driverIds.add(d.id);
-            if (d.lat && d.lng) {
-                if (onlineDriverOverlays.has(d.id)) {
-                    onlineDriverOverlays.get(d.id).update(d.lat, d.lng, d.heading);
-                } else {
-                    var overlay = new VehicleTopOverlay({
-                        lat: d.lat,
-                        lng: d.lng,
-                        heading: d.heading || 0,
-                        vehicleType: d.vehicle_type,
-                        driverName: d.name,
-                        vehicleNumber: d.vehicle_number,
-                        statusText: 'Online',
-                        driverId: d.id,
-                        map: map
-                    });
-                    onlineDriverOverlays.set(d.id, overlay);
-                }
-            }
-        });
-
-        onlineDriverOverlays.forEach(function(overlay, id) {
-            if (!driverIds.has(id)) {
-                overlay.setMap(null);
-                onlineDriverOverlays.delete(id);
             }
         });
     }
@@ -889,16 +838,10 @@
             fullscreenControl: false
         });
 
-        // Check if there was a saved tracked booking or layer preference before reload
+        // Clear any previous online vehicles setting
+        try { sessionStorage.removeItem('zi_show_online_vehicles'); } catch (_) {}
+
         var savedTrackId = sessionStorage.getItem('zi_tracked_booking_id');
-        var savedOnlineState = sessionStorage.getItem('zi_show_online_vehicles');
-
-        if (savedOnlineState === 'true') {
-            toggleOnlineDrivers(true);
-        } else if (savedOnlineState === 'false') {
-            toggleOnlineDrivers(false);
-        }
-
         if (savedTrackId) {
             var trackIdNum = parseInt(savedTrackId, 10);
             var found = rawActiveBookings.find(function(item) { return item.id === trackIdNum; }) ||
@@ -910,15 +853,14 @@
                 renderAllActiveBookings();
             } else {
                 sessionStorage.removeItem('zi_tracked_booking_id');
-                if (savedOnlineState === null) {
-                    toggleOnlineDrivers(true);
-                }
+                map.setCenter({lat: 6.9271, lng: 79.8612});
+                map.setZoom(12);
             }
         } else if (rawActiveBookings.length > 0) {
             renderAllActiveBookings();
-        } else if (savedOnlineState === null) {
-            // If no active rides, enable online vehicles layer by default so the map is vibrant with live drivers
-            toggleOnlineDrivers(true);
+        } else {
+            map.setCenter({lat: 6.9271, lng: 79.8612});
+            map.setZoom(12);
         }
 
         // Connect to WebSocket for real-time live driver updates
@@ -1289,76 +1231,13 @@
             renderAllActiveBookings();
         } else {
             clearTrackedRideMarkers();
-            if (showOnlineDriversState) {
-                fitAllMapBounds();
-            } else {
-                map.setCenter({lat: 6.9271, lng: 79.8612});
-                map.setZoom(12);
-            }
+            clearActiveRoutes();
+            map.setCenter({lat: 6.9271, lng: 79.8612});
+            map.setZoom(12);
         }
     }
 
-    // Toggle Online Drivers layer with top-view vehicles
-    function toggleOnlineDrivers(forceState) {
-        if (forceState !== undefined) {
-            showOnlineDriversState = forceState;
-        } else {
-            showOnlineDriversState = !showOnlineDriversState;
-        }
-        try {
-            sessionStorage.setItem('zi_show_online_vehicles', showOnlineDriversState ? 'true' : 'false');
-        } catch (_) {}
-
-        var btn = document.getElementById('toggleOnlineDriversBtn');
-        if (showOnlineDriversState) {
-            if (btn) btn.classList.add('bg-blue-50', 'border-ziggo', 'text-ziggo');
-            var bounds = new google.maps.LatLngBounds();
-            var count = 0;
-
-            rawOnlineDrivers.forEach(function(d) {
-                if (d.lat && d.lng) {
-                    var overlay = new VehicleTopOverlay({
-                        lat: d.lat,
-                        lng: d.lng,
-                        heading: d.heading || 0,
-                        vehicleType: d.vehicle_type,
-                        driverName: d.name,
-                        vehicleNumber: d.vehicle_number,
-                        statusText: 'Online',
-                        driverId: d.id,
-                        map: map,
-                        onClick: function() {
-                            var win = new google.maps.InfoWindow({
-                                content: '<div style="font-family:inherit;padding:3px;">' +
-                                         '<p style="font-weight:900;color:#0f172a;margin:0 0 2px;">' + d.name + '</p>' +
-                                         '<p style="font-size:11px;color:#64748b;margin:0;">' + (d.vehicle_number || '') + ' (' + d.vehicle_type + ')</p>' +
-                                         '<p style="font-size:11px;color:#64748b;margin:2px 0 0;">' + (d.phone || '') + '</p>' +
-                                         '<p style="font-size:10px;color:#059669;font-weight:800;margin:4px 0 0;text-transform:uppercase;">● Online Driver</p>' +
-                                         '</div>'
-                            });
-                            win.setPosition({ lat: d.lat, lng: d.lng });
-                            win.open(map);
-                        }
-                    });
-                    onlineDriverOverlays.set(d.id, overlay);
-                    bounds.extend({ lat: d.lat, lng: d.lng });
-                    count++;
-                }
-            });
-
-            if (count > 0 && !currentTrackedBookingId && rawActiveBookings.length === 0) {
-                map.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
-            }
-        } else {
-            if (btn) btn.classList.remove('bg-blue-50', 'border-ziggo', 'text-ziggo');
-            onlineDriverOverlays.forEach(function(overlay) {
-                overlay.setMap(null);
-            });
-            onlineDriverOverlays.clear();
-        }
-    }
-
-    // Fit camera to all rides or vehicles
+    // Fit camera to all active rides or vehicles
     function fitAllMapBounds() {
         if (!map) return;
         var bounds = new google.maps.LatLngBounds();
@@ -1373,12 +1252,6 @@
             if (v.position) { bounds.extend(v.position); count++; }
         });
 
-        if (showOnlineDriversState) {
-            onlineDriverOverlays.forEach(function(v) {
-                if (v.position) { bounds.extend(v.position); count++; }
-            });
-        }
-
         if (count > 0) {
             map.fitBounds(bounds, { top: 60, right: 40, bottom: 40, left: 40 });
         } else {
@@ -1387,28 +1260,15 @@
         }
     }
 
-    // Update real-time GPS position & bearing of drivers
+    // Update real-time GPS position & bearing of drivers in active rides
     function handleDriverLocationUpdate(d) {
         if (!d) return;
-        // 1. Update online drivers overlay
-        if (onlineDriverOverlays.has(d.id)) {
-            onlineDriverOverlays.get(d.id).update(d.lat, d.lng, d.heading);
-        }
-
-        // 2. Update tracked booking's vehicle
+        // Update tracked or active booking's vehicle overlay
         vehicleOverlays.forEach(function(v) {
             if (v.driverId === d.id) {
                 v.update(d.lat, d.lng, d.heading);
             }
         });
-
-        // 3. Update raw driver data in array
-        var targetOnline = rawOnlineDrivers.find(function(item) { return item.id === d.id; });
-        if (targetOnline) {
-            targetOnline.lat = d.lat;
-            targetOnline.lng = d.lng;
-            targetOnline.heading = d.heading;
-        }
     }
 
     // Listen to admin events dispatched by base.html WebSocket
@@ -1494,7 +1354,6 @@
         if (currentTrackedBookingId) {
             sessionStorage.setItem('zi_tracked_booking_id', String(currentTrackedBookingId));
         }
-        sessionStorage.setItem('zi_show_online_vehicles', showOnlineDriversState ? 'true' : 'false');
     });
 
     // Legacy fallback

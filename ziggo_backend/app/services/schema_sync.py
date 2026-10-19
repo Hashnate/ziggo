@@ -632,10 +632,10 @@ async def _backfill_driver_vehicles(conn) -> None:
             if not v_num or not v_type:
                 continue
 
+            # If the driver already has ANY vehicles registered, do not create duplicate
             v_check = await conn.execute(
                 select(DriverVehicle.id).where(
                     DriverVehicle.driver_id == d_id,
-                    DriverVehicle.vehicle_number == v_num,
                 )
             )
             if v_check.first() is None:

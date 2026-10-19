@@ -378,29 +378,49 @@ async def register_driver(
     if body.driver_type:
         d.driver_type = body.driver_type
 
-    # Ensure primary DriverVehicle record is synced
-    v_stmt = select(DriverVehicle).where(
-        DriverVehicle.driver_id == d.id,
-        DriverVehicle.vehicle_number == body.vehicle_number,
+    v_num = (body.vehicle_number or "").strip().upper()
+    d.vehicle_number = v_num
+
+    # Ensure primary DriverVehicle record is synced without duplicating
+    import re
+    norm_v_num = re.sub(r'[^A-Z0-9]', '', v_num)
+    all_veh_q = await db.execute(
+        select(DriverVehicle).where(DriverVehicle.driver_id == d.id)
     )
-    v_obj = (await db.execute(v_stmt)).scalars().first()
-    if not v_obj:
-        v_obj = DriverVehicle(
+    all_vehs = list(all_veh_q.scalars().all())
+
+    matching_veh = None
+    for veh in all_vehs:
+        if re.sub(r'[^A-Z0-9]', '', (veh.vehicle_number or '').upper()) == norm_v_num:
+            matching_veh = veh
+            break
+
+    if not matching_veh and len(all_vehs) == 1:
+        matching_veh = all_vehs[0]
+
+    if matching_veh:
+        matching_veh.vehicle_type = body.vehicle_type.strip().lower()
+        matching_veh.vehicle_number = v_num
+        matching_veh.vehicle_model = body.vehicle_model
+        matching_veh.vehicle_color = body.vehicle_color
+        matching_veh.is_active = True
+        for other_v in all_vehs:
+            if other_v.id != matching_veh.id:
+                other_v.is_active = False
+    else:
+        new_v = DriverVehicle(
             driver_id=d.id,
-            vehicle_type=body.vehicle_type,
-            vehicle_number=body.vehicle_number,
+            vehicle_type=body.vehicle_type.strip().lower(),
+            vehicle_number=v_num,
             vehicle_model=body.vehicle_model,
             vehicle_color=body.vehicle_color,
             is_approved=bool(d.is_approved),
             is_active=True,
             approved_at=d.approved_at,
         )
-        db.add(v_obj)
-    else:
-        v_obj.vehicle_type = body.vehicle_type
-        v_obj.vehicle_model = body.vehicle_model
-        v_obj.vehicle_color = body.vehicle_color
-        v_obj.is_active = True
+        db.add(new_v)
+        for other_v in all_vehs:
+            other_v.is_active = False
 
     # Stay in PENDING; admin will approve.
     if d.status == DriverStatus.PENDING:
@@ -1024,33 +1044,29 @@ async def add_driver_vehicle(
 
     d = await _get_driver(db, user)
 
+    import re
+    norm_v_num = re.sub(r'[^A-Z0-9]', '', v_num)
+
+    # Check if driver already registered this exact plate (normalized)
+    all_my_veh = list((await db.execute(select(DriverVehicle).where(DriverVehicle.driver_id == d.id))).scalars().all())
+    for my_v in all_my_veh:
+        if re.sub(r'[^A-Z0-9]', '', (my_v.vehicle_number or '').upper()) == norm_v_num:
+            raise HTTPException(
+                status_code=409,
+                detail=f"You have already added vehicle '{v_num}' to your profile",
+            )
+
     # Plate collision check across other drivers
-    existing_veh = await db.execute(
-        select(DriverVehicle).where(
-            DriverVehicle.vehicle_number == v_num,
-            DriverVehicle.driver_id != d.id,
-        )
-    )
-    if existing_veh.scalars().first():
-        raise HTTPException(
-            status_code=409,
-            detail=f"Vehicle number '{v_num}' is already registered to another driver",
-        )
+    other_vehs = (await db.execute(
+        select(DriverVehicle).where(DriverVehicle.driver_id != d.id)
+    )).scalars().all()
+    for ov in other_vehs:
+        if re.sub(r'[^A-Z0-9]', '', (ov.vehicle_number or '').upper()) == norm_v_num:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Vehicle number '{v_num}' is already registered to another driver",
+            )
 
-    # Check if driver already registered this exact plate
-    my_veh = await db.execute(
-        select(DriverVehicle).where(
-            DriverVehicle.driver_id == d.id,
-            DriverVehicle.vehicle_number == v_num,
-        )
-    )
-    if my_veh.scalars().first():
-        raise HTTPException(
-            status_code=409,
-            detail=f"You have already added vehicle '{v_num}' to your profile",
-        )
-
-    all_my_veh = (await db.execute(select(DriverVehicle).where(DriverVehicle.driver_id == d.id))).scalars().all()
     is_first = len(all_my_veh) == 0
 
     new_vehicle = DriverVehicle(

@@ -23,6 +23,12 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
   String? _busyKind;
   bool _loading = true;
 
+  static const _optionalDocKeys = {
+    'vehicle_reg',
+    'eco_test',
+    'vehicle_side',
+  };
+
   static const _typeLabels = {
     'nic_front': 'NIC (front)',
     'nic_back': 'NIC (back)',
@@ -32,6 +38,9 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
     'insurance': 'Insurance',
     'year_license': 'Year License',
     'eco_test': 'Eco Test Report',
+    'vehicle_front': 'Vehicle Photo (front)',
+    'vehicle_back': 'Vehicle Photo (back)',
+    'vehicle_side': 'Vehicle Photo (side)',
   };
 
   @override
@@ -118,7 +127,9 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final missingCount = _docs.where((d) => d['document_url'] == null).length;
+    final missingCount = _docs
+        .where((d) => d['document_url'] == null && !_optionalDocKeys.contains(d['document_type']))
+        .length;
     final pendingCount =
         _docs.where((d) => d['document_url'] != null && d['is_verified'] != true).length;
     final verifiedCount = _docs.where((d) => d['is_verified'] == true).length;
@@ -195,9 +206,12 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
     final busy = _busyKind == kind;
     final label = _typeLabels[kind] ?? kind;
 
+    final isOptional = _optionalDocKeys.contains(kind);
     final pill = verified
         ? ('Verified', AppColors.success)
-        : (url == null ? ('Not uploaded', AppColors.error) : ('Pending review', AppColors.warning));
+        : (url == null
+            ? (isOptional ? ('Optional', AppColors.textTertiary) : ('Not uploaded', AppColors.error))
+            : ('Pending review', AppColors.warning));
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -235,8 +249,32 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label,
-                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(label,
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+                    ),
+                    if (isOptional) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.divider.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'Optional',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textTertiary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
                 const SizedBox(height: 4),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

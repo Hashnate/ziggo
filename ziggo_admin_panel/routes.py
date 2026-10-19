@@ -984,6 +984,7 @@ async def admin_drivers_new_form(
             "document_url": None,
             "is_verified": False,
             "uploaded_at": None,
+            "is_optional": kind in ("vehicle_reg", "eco_test", "vehicle_side"),
         })
     return templates.TemplateResponse(
         request, "driver_new.html",
@@ -1064,6 +1065,7 @@ async def admin_drivers_new_submit(
             "document_url": None,
             "is_verified": False,
             "uploaded_at": None,
+            "is_optional": kind in ("vehicle_reg", "eco_test", "vehicle_side"),
         })
 
     from app.models import FareSetting
@@ -1244,6 +1246,7 @@ async def admin_drivers_edit_form(
                 "document_url": row.document_url if row else None,
                 "is_verified": bool(row.is_verified) if row else False,
                 "uploaded_at": up_str,
+                "is_optional": kind in ("vehicle_reg", "eco_test", "vehicle_side"),
             })
 
         # BRD: load registered vehicles for multi-vehicle management
@@ -1252,8 +1255,8 @@ async def admin_drivers_edit_form(
             vq = await db.execute(
                 select(DriverVehicle).where(DriverVehicle.driver_id == d.id).order_by(DriverVehicle.created_at.asc())
             )
-            driver_vehicles = list(vq.scalars().all())
-            if not driver_vehicles and d.vehicle_number and d.vehicle_type:
+            raw_vehicles = list(vq.scalars().all())
+            if not raw_vehicles and d.vehicle_number and d.vehicle_type:
                 try:
                     yr_val = None
                     if d.vehicle_year:
@@ -1265,7 +1268,7 @@ async def admin_drivers_edit_form(
                     new_v = DriverVehicle(
                         driver_id=d.id,
                         vehicle_type=d.vehicle_type,
-                        vehicle_number=d.vehicle_number,
+                        vehicle_number=(d.vehicle_number or "").strip().upper(),
                         vehicle_model=d.vehicle_model,
                         vehicle_color=d.vehicle_color,
                         vehicle_year=yr_val,
@@ -1277,10 +1280,41 @@ async def admin_drivers_edit_form(
                     db.add(new_v)
                     await db.commit()
                     await db.refresh(new_v)
-                    driver_vehicles = [new_v]
+                    raw_vehicles = [new_v]
                 except Exception as ex:
                     await db.rollback()
                     logger.warning(f"Could not auto-create primary DriverVehicle: {ex}")
+
+            # Deduplicate by clean plate (alphanumeric uppercase) for display
+            import re
+            seen_plates = {}
+            unique_vehs = []
+            for veh in raw_vehicles:
+                cp = re.sub(r'[^A-Z0-9]', '', (veh.vehicle_number or '').upper())
+                if not cp:
+                    unique_vehs.append(veh)
+                    continue
+                if cp in seen_plates:
+                    existing = seen_plates[cp]
+                    # Prefer approved, or active, or higher ID
+                    if (not existing.is_approved and veh.is_approved) or (not existing.is_active and veh.is_active) or veh.id > existing.id:
+                        idx = unique_vehs.index(existing)
+                        unique_vehs[idx] = veh
+                        seen_plates[cp] = veh
+                else:
+                    seen_plates[cp] = veh
+                    unique_vehs.append(veh)
+
+            # Ensure at most one vehicle shows as active
+            has_active = False
+            for veh in unique_vehs:
+                if veh.is_active:
+                    if has_active:
+                        veh.is_active = False
+                    else:
+                        has_active = True
+
+            driver_vehicles = unique_vehs
         except Exception as ex:
             logger.error(f"Error querying DriverVehicle: {ex}")
             driver_vehicles = []
@@ -1444,6 +1478,55 @@ async def admin_drivers_edit_submit(
         d.is_approved = False
         d.is_online = False
         d.status = DriverStatus.SUSPENDED
+
+    # Synchronize primary/active DriverVehicle record
+    import re
+    norm_v_num = re.sub(r'[^A-Z0-9]', '', (d.vehicle_number or '').upper())
+    vq = await db.execute(
+        select(DriverVehicle).where(DriverVehicle.driver_id == d.id)
+    )
+    existing_vehs = list(vq.scalars().all())
+
+    target_v = None
+    for v in existing_vehs:
+        if re.sub(r'[^A-Z0-9]', '', (v.vehicle_number or '').upper()) == norm_v_num:
+            target_v = v
+            break
+    if not target_v:
+        for v in existing_vehs:
+            if v.is_active:
+                target_v = v
+                break
+    if not target_v and len(existing_vehs) == 1:
+        target_v = existing_vehs[0]
+
+    if target_v:
+        target_v.vehicle_number = (d.vehicle_number or "").strip().upper()
+        target_v.vehicle_type = d.vehicle_type
+        target_v.vehicle_model = d.vehicle_model
+        target_v.vehicle_color = d.vehicle_color
+        target_v.is_active = True
+        if d.is_approved:
+            target_v.is_approved = True
+            if not target_v.approved_at:
+                target_v.approved_at = d.approved_at
+        for ov in existing_vehs:
+            if ov.id != target_v.id:
+                ov.is_active = False
+    elif d.vehicle_number and d.vehicle_type:
+        new_v = DriverVehicle(
+            driver_id=d.id,
+            vehicle_type=d.vehicle_type,
+            vehicle_number=(d.vehicle_number or "").strip().upper(),
+            vehicle_model=d.vehicle_model,
+            vehicle_color=d.vehicle_color,
+            is_approved=bool(d.is_approved),
+            is_active=True,
+            approved_at=d.approved_at if d.is_approved else None,
+        )
+        db.add(new_v)
+        for ov in existing_vehs:
+            ov.is_active = False
 
     from app.models import DriverDocument
     for kind in ("nic_front", "nic_back", "license_front", "license_back", "vehicle_reg", "insurance", "year_license", "eco_test", "vehicle_front", "vehicle_back", "vehicle_side"):
@@ -2139,18 +2222,6 @@ async def admin_bookings(
     end_idx = min(page * limit, total_bookings)
     page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
 
-    # Online drivers for live tracking map layer
-    online_q = await db.execute(
-        select(Driver)
-        .options(selectinload(Driver.user))
-        .where(
-            Driver.status == DriverStatus.APPROVED,
-            Driver.is_online == True,
-            Driver.current_lat.is_not(None),
-        )
-    )
-    online_drivers_list = online_q.scalars().all()
-
     import json
 
     def _serialize_booking(b):
@@ -2183,20 +2254,7 @@ async def admin_bookings(
 
     active_bookings_json = json.dumps([_serialize_booking(b) for b in active_bookings])
     table_bookings_json = json.dumps([_serialize_booking(b) for b in bookings])
-    online_drivers_json = json.dumps([
-        {
-            "id": d.id,
-            "name": (d.user.full_name if d.user else "Driver") or "Driver",
-            "phone": (d.user.phone_number if d.user else "") or "",
-            "vehicle_type": d.vehicle_type or "car",
-            "vehicle_number": d.vehicle_number or "",
-            "lat": float(d.current_lat) if d.current_lat is not None else None,
-            "lng": float(d.current_lng) if d.current_lng is not None else None,
-            "heading": float(d.current_heading) if d.current_heading is not None else 0.0,
-            "is_online": True,
-        }
-        for d in online_drivers_list
-    ])
+    online_drivers_json = "[]"
 
     return templates.TemplateResponse(
         request, "bookings.html",
@@ -2208,7 +2266,7 @@ async def admin_bookings(
             "active_bookings_json": active_bookings_json,
             "table_bookings_json": table_bookings_json,
             "online_drivers_json": online_drivers_json,
-            "online_drivers_count": len(online_drivers_list),
+            "online_drivers_count": 0,
             "page": page,
             "total_pages": total_pages,
             "total_bookings": total_bookings,
@@ -2257,17 +2315,6 @@ async def admin_bookings_feed(
         .order_by(desc(Booking.id))
     )
     active_bookings = active_q.scalars().all()
-
-    online_q = await db.execute(
-        select(Driver)
-        .options(selectinload(Driver.user))
-        .where(
-            Driver.status == DriverStatus.APPROVED,
-            Driver.is_online == True,
-            Driver.current_lat.is_not(None),
-        )
-    )
-    online_drivers = online_q.scalars().all()
 
     recent_q = await db.execute(
         select(Booking)
@@ -2324,21 +2371,8 @@ async def admin_bookings_feed(
 
     return {
         "active_bookings": [_fmt_booking(b) for b in active_bookings],
-        "online_drivers": [
-            {
-                "id": d.id,
-                "name": (d.user.full_name if d.user else "Driver") or "Driver",
-                "phone": (d.user.phone_number if d.user else "") or "",
-                "vehicle_type": d.vehicle_type or "car",
-                "vehicle_number": d.vehicle_number or "",
-                "lat": float(d.current_lat) if d.current_lat is not None else None,
-                "lng": float(d.current_lng) if d.current_lng is not None else None,
-                "heading": float(d.current_heading) if d.current_heading is not None else 0.0,
-                "is_online": True,
-            }
-            for d in online_drivers
-        ],
-        "online_drivers_count": len(online_drivers),
+        "online_drivers": [],
+        "online_drivers_count": 0,
         "recent_bookings": [_fmt_booking(b) for b in recent_bookings],
         "stats": {
             "total": total or 0,
@@ -7697,14 +7731,23 @@ async def admin_driver_vehicle_add(
     if not d:
         raise HTTPException(status_code=404, detail="Driver not found")
 
-    # Plate collision check across other drivers
-    clash = (await db.execute(
-        select(DriverVehicle).where(
-            DriverVehicle.vehicle_number == v_num,
-            DriverVehicle.driver_id != driver_id,
+    import re
+    norm_v_num = re.sub(r'[^A-Z0-9]', '', v_num)
+
+    all_veh = list((await db.execute(select(DriverVehicle).where(DriverVehicle.driver_id == driver_id))).scalars().all())
+
+    # Check if driver already has this plate (case/space-insensitive)
+    if any(re.sub(r'[^A-Z0-9]', '', (v.vehicle_number or '').upper()) == norm_v_num for v in all_veh):
+        return RedirectResponse(
+            url=f"/admin/drivers/{driver_id}/edit?error=This+vehicle+plate+is+already+registered+for+this+driver",
+            status_code=303,
         )
-    )).scalars().first()
-    if clash:
+
+    # Plate collision check across other drivers
+    other_vehs = (await db.execute(
+        select(DriverVehicle).where(DriverVehicle.driver_id != driver_id)
+    )).scalars().all()
+    if any(re.sub(r'[^A-Z0-9]', '', (ov.vehicle_number or '').upper()) == norm_v_num for ov in other_vehs):
         return RedirectResponse(
             url=f"/admin/drivers/{driver_id}/edit?error=Vehicle+plate+already+registered+to+another+driver",
             status_code=303,
@@ -7713,7 +7756,6 @@ async def admin_driver_vehicle_add(
     yr = int(vehicle_year.strip()) if (vehicle_year and vehicle_year.strip().isdigit()) else None
 
     # Check if this is the first vehicle
-    all_veh = (await db.execute(select(DriverVehicle).where(DriverVehicle.driver_id == driver_id))).scalars().all()
     is_first = len(all_veh) == 0
 
     new_veh = DriverVehicle(

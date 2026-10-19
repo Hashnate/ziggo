@@ -176,7 +176,12 @@
                         {% endif %}
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="font-black text-sm text-ziggo-ink">{{ doc.label }}</p>
+                        <p class="font-black text-sm text-ziggo-ink">
+                            {{ doc.label }}
+                            {% if doc.is_optional %}
+                            <span class="ml-1.5 px-2 py-0.5 text-[10px] font-bold text-gray-500 bg-gray-200/70 rounded-md uppercase tracking-wider">Optional</span>
+                            {% endif %}
+                        </p>
                         {% if doc.document_url %}
                         <p class="text-[11px] text-ziggo-muted truncate" id="{{ doc.kind }}Status">Uploaded {{ doc.uploaded_at|colombo_dt("%Y-%m-%d") }}</p>
                         {% if doc.is_verified %}
@@ -185,7 +190,11 @@
                         <span class="px-2 py-0.5 mt-1 inline-block text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-700 rounded-full" id="{{ doc.kind }}VerifyBadge">Pending review</span>
                         {% endif %}
                         {% else %}
-                        <p class="text-[11px] text-rose-500 font-bold" id="{{ doc.kind }}Status">Not uploaded yet</p>
+                            {% if doc.is_optional %}
+                            <p class="text-[11px] text-gray-400 font-medium" id="{{ doc.kind }}Status">Not uploaded (Optional)</p>
+                            {% else %}
+                            <p class="text-[11px] text-rose-500 font-bold" id="{{ doc.kind }}Status">Not uploaded yet</p>
+                            {% endif %}
                         {% endif %}
                     </div>
                     <div class="flex flex-col gap-1.5 items-end">

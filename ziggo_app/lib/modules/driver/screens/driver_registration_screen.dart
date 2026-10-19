@@ -55,14 +55,17 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
     'nic_back',
     'license_front',
     'license_back',
-    'vehicle_reg',
     'insurance',
     'year_license',
-    'eco_test',
     'vehicle_front',
     'vehicle_back',
-    'vehicle_side',
   ];
+
+  static const _optionalDocKeys = {
+    'vehicle_reg',
+    'eco_test',
+    'vehicle_side',
+  };
 
   static const _typeLabels = {
     'nic_front': 'NIC (front)',
@@ -379,24 +382,27 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
         _profilePhotoUrl = res.data?['profile_photo']?.toString();
       }
 
-      // 2. Ensure all locally selected docs are uploaded
+      // 2. Ensure all locally selected docs are uploaded (both required and optional)
+      final docsToUpload = _localDocs.entries.where((e) {
+        final isRemote = _remoteDocs[e.key] != null && _remoteDocs[e.key]!.isNotEmpty;
+        return !isRemote && e.value != null;
+      }).toList();
+
       int idx = 0;
-      for (final kind in _requiredDocKeys) {
+      for (final entry in docsToUpload) {
         idx++;
-        final isRemote = _remoteDocs[kind] != null && _remoteDocs[kind]!.isNotEmpty;
-        final localFile = _localDocs[kind];
-        if (!isRemote && localFile != null) {
-          final label = _typeLabels[kind] ?? kind;
-          if (mounted) {
-            setState(() => _uploadStatus = 'Uploading $label ($idx/${_requiredDocKeys.length})...');
-          }
-          final docForm = FormData.fromMap({
-            'document_type': kind,
-            'document': await MultipartFile.fromFile(localFile.path),
-          });
-          final res = await ApiClient.instance.dio.post('/driver/documents', data: docForm);
-          _remoteDocs[kind] = res.data?['document_url']?.toString() ?? 'uploaded';
+        final kind = entry.key;
+        final localFile = entry.value!;
+        final label = _typeLabels[kind] ?? kind;
+        if (mounted) {
+          setState(() => _uploadStatus = 'Uploading $label ($idx/${docsToUpload.length})...');
         }
+        final docForm = FormData.fromMap({
+          'document_type': kind,
+          'document': await MultipartFile.fromFile(localFile.path),
+        });
+        final res = await ApiClient.instance.dio.post('/driver/documents', data: docForm);
+        _remoteDocs[kind] = res.data?['document_url']?.toString() ?? 'uploaded';
       }
 
       // 3. Submit registration details
@@ -794,19 +800,19 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                           const Divider(height: 20),
                           _docUploadRow('license_back', 'Driving License (back)'),
                           const Divider(height: 20),
-                          _docUploadRow('vehicle_reg', 'Vehicle Registration Book'),
+                          _docUploadRow('vehicle_reg', 'Vehicle Registration Book', isOptional: true),
                           const Divider(height: 20),
                           _docUploadRow('insurance', 'Insurance Document'),
                           const Divider(height: 20),
                           _docUploadRow('year_license', 'Year License'),
                           const Divider(height: 20),
-                          _docUploadRow('eco_test', 'Eco Test Report'),
+                          _docUploadRow('eco_test', 'Eco Test Report', isOptional: true),
                           const Divider(height: 20),
                           _docUploadRow('vehicle_front', 'Vehicle Photo (front)'),
                           const Divider(height: 20),
                           _docUploadRow('vehicle_back', 'Vehicle Photo (back)'),
                           const Divider(height: 20),
-                          _docUploadRow('vehicle_side', 'Vehicle Photo (side)'),
+                          _docUploadRow('vehicle_side', 'Vehicle Photo (side)', isOptional: true),
                         ],
                       ),
                     ),
@@ -1012,7 +1018,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
     );
   }
 
-  Widget _docUploadRow(String kind, String label) {
+  Widget _docUploadRow(String kind, String label, {bool isOptional = false}) {
     final localFile = _localDocs[kind];
     final remoteUrl = _remoteDocs[kind];
     final isUploading = _uploadingDocs[kind] == true;
@@ -1047,9 +1053,33 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                label,
-                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      label,
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+                    ),
+                  ),
+                  if (isOptional) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.divider.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'Optional',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
               const SizedBox(height: 2),
               if (isUploading)
@@ -1072,9 +1102,13 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                 )
               else
                 Text(
-                  isUploaded ? '✓ Uploaded & Ready' : 'Not uploaded yet',
+                  isUploaded
+                      ? '✓ Uploaded & Ready'
+                      : (isOptional ? 'Optional · Not uploaded' : 'Not uploaded yet'),
                   style: TextStyle(
-                    color: isUploaded ? AppColors.success : AppColors.textSecondary,
+                    color: isUploaded
+                        ? AppColors.success
+                        : (isOptional ? AppColors.textTertiary : AppColors.textSecondary),
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
