@@ -139,8 +139,11 @@ class ApiClient {
 
   static final ApiClient _instance = ApiClient._();
   static ApiClient get instance => _instance;
+  static Dio get client => _instance._dio;
+  static Dio get dio => _instance._dio;
 
   late final Dio _dio;
+  Dio get dioClient => _dio;
   Dio get dio => _dio;
 
   static Future<void> init() async {

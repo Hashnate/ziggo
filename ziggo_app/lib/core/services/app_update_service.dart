@@ -25,7 +25,7 @@ class AppUpdateService {
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version.trim(); // e.g. "1.0.15"
 
-      final response = await ApiClient.client.get('/misc/app-version');
+      final response = await ApiClient.instance.dio.get('/misc/app-version');
       if (response.statusCode != 200 || response.data == null) return;
 
       final data = response.data as Map<String, dynamic>;
