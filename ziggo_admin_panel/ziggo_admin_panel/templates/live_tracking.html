@@ -287,6 +287,26 @@
         </div>`;
     }
 
+    function getVehicleTopAsset(type) {
+        if (!type) return '/static/img/top_car.png';
+        const vt = String(type).toLowerCase();
+        if (vt.includes('bike') || vt.includes('motor')) return '/static/img/top_bike.png';
+        if (vt.includes('tuk') || vt.includes('three') || vt.includes('auto')) return '/static/img/top_tuk.png';
+        if (vt.includes('truck') || vt.includes('lorry')) return '/static/img/top_truck.png';
+        return '/static/img/top_car.png';
+    }
+
+    function getMarkerHtml(d) {
+        if (d.is_online) {
+            const heading = d.heading || 0;
+            return `<div style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
+                <img src="${getVehicleTopAsset(d.vehicle_type)}" style="width: 38px; height: 38px; object-fit: contain; transform: rotate(${heading}deg); filter: drop-shadow(0 4px 8px rgba(0,0,0,0.45)); transition: transform 0.4s ease-out;" alt="${d.vehicle_type}">
+                <span style="position: absolute; bottom: 2px; right: 2px; width: 8px; height: 8px; border-radius: 50%; background: #10B981; border: 1.5px solid white; box-shadow: 0 0 6px rgba(16,185,129,0.9);"></span>
+            </div>`;
+        }
+        return `<div style="width: 34px; height: 34px; border-radius: 10px; background: #64748b; color: white; display: flex; align-items: center; justify-content: center; font-size: 15px; opacity: 0.55; border: 1.5px solid white;">${vehicleEmoji(d.vehicle_type)}</div>`;
+    }
+
     function upsertMarker(d) {
         driversState.set(d.id, d);
         if (d.lat == null || d.lng == null) {
@@ -297,16 +317,7 @@
             return;
         }
         const gLatLng = new google.maps.LatLng(d.lat, d.lng);
-        const bg = d.is_online
-            ? 'linear-gradient(135deg, #1E40AF, #3B82F6)'
-            : 'linear-gradient(135deg, #64748b, #94a3b8)';
-        const dim = d.is_online ? '' : 'filter: grayscale(0.6); opacity: 0.55;';
-        const htmlContent = `<div style="
-            width: 40px; height: 40px; border-radius: 14px;
-            background: ${bg};
-            color: white; display: flex; align-items: center; justify-content: center;
-            font-size: 18px; box-shadow: 0 6px 16px -4px rgba(30,64,175,0.6);
-            border: 2px solid white; ${dim}">${vehicleEmoji(d.vehicle_type)}</div>`;
+        const htmlContent = getMarkerHtml(d);
 
         if (markers.has(d.id)) {
             const m = markers.get(d.id);
@@ -554,17 +565,7 @@
                     cur.is_online = !!d.is_online;
                     driversState.set(d.id, cur);
                     if (markers.has(d.id)) {
-                        const bg = cur.is_online
-                            ? 'linear-gradient(135deg, #1E40AF, #3B82F6)'
-                            : 'linear-gradient(135deg, #64748b, #94a3b8)';
-                        const dim = cur.is_online ? '' : 'filter: grayscale(0.6); opacity: 0.55;';
-                        const htmlContent = `<div style="
-                            width: 40px; height: 40px; border-radius: 14px;
-                            background: ${bg};
-                            color: white; display: flex; align-items: center; justify-content: center;
-                            font-size: 18px; box-shadow: 0 6px 16px -4px rgba(30,64,175,0.6);
-                            border: 2px solid white; ${dim}">${vehicleEmoji(cur.vehicle_type)}</div>`;
-                        markers.get(d.id).setHtml(htmlContent);
+                        markers.get(d.id).setHtml(getMarkerHtml(cur));
                     }
                 }
                 recomputeStats();

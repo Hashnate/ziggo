@@ -149,6 +149,7 @@
                 <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Status</label>
                 <select name="status" onchange="this.form.submit()" class="bg-white border border-gray-200 rounded-lg px-4 py-2 text-sm font-semibold outline-none shadow-soft-sm cursor-pointer hover:border-ziggo transition-all min-w-[160px]">
                     <option value="all" {% if status == 'all' %}selected{% endif %}>All Registered</option>
+                    <option value="all_with_draft" {% if status == 'all_with_draft' %}selected{% endif %}>🌐 All (Including Drafts)</option>
                     <option value="pending" {% if status == 'pending' %}selected{% endif %}>🟡 Pending Review</option>
                     <option value="approved" {% if status == 'approved' %}selected{% endif %}>🔵 Approved</option>
                     <option value="online" {% if status == 'online' %}selected{% endif %}>🟢 Online</option>
@@ -171,12 +172,77 @@
             {% endif %}
         </form>
         {% if view != 'applications' %}
-        <div class="flex gap-3 self-end mb-[2px]">
-            <a href="/admin/drivers/export" class="bg-white border border-gray-200 text-gray-600 px-4 py-2 rounded-xl font-bold text-sm hover:bg-gray-50 transition-all shadow-sm inline-flex items-center">
-                <i class="fas fa-download mr-2"></i> Export
-            </a>
-            <a href="/admin/drivers/new" class="bg-ziggo text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-ziggo-light transition-all shadow-lg shadow-blue-900/20 inline-flex items-center">
-                <i class="fas fa-plus mr-2"></i> Add New Driver
+        <div class="flex items-center gap-3 self-end mb-[2px]">
+            <!-- Export button with dropdown -->
+            <div class="relative inline-block text-left" id="exportDropdownContainer">
+                <button type="button" 
+                        id="exportDropdownBtn" 
+                        onclick="toggleExportMenu(event)" 
+                        title="Export options (All drivers, Drafts only, or Registered)"
+                        class="h-[38px] bg-white border border-gray-200 text-gray-700 px-4 rounded-xl font-bold text-sm hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm inline-flex items-center gap-2">
+                    <i class="fas fa-download text-ziggo text-xs"></i>
+                    <span>Export</span>
+                    <i class="fas fa-chevron-down text-gray-400 text-[10px] ml-0.5"></i>
+                </button>
+                
+                <!-- Dropdown menu -->
+                <div id="exportMenu" class="hidden absolute right-0 mt-2 w-72 rounded-2xl bg-white shadow-xl border border-gray-100 z-50 py-2 ring-1 ring-black/5">
+                    <div class="px-4 py-2 border-b border-gray-100">
+                        <p class="text-[10px] font-black uppercase tracking-wider text-gray-400">Export Drivers to CSV</p>
+                    </div>
+                    
+                    <!-- Option 1: All Drivers Including Drafts -->
+                    <a href="/admin/drivers/export?scope=all" class="flex items-start gap-3 px-4 py-2.5 hover:bg-blue-50/70 transition group text-left">
+                        <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-blue-600 group-hover:text-white transition">
+                            <i class="fas fa-users-cog text-xs"></i>
+                        </div>
+                        <div>
+                            <div class="text-sm font-bold text-gray-800 group-hover:text-ziggo">All Drivers (Inc. Drafts)</div>
+                            <div class="text-xs text-gray-500">All {{ (stats.total or 0) + (stats.incomplete or 0) }} registered & draft signups</div>
+                        </div>
+                    </a>
+
+                    <!-- Option 2: Draft / Incomplete Only -->
+                    <a href="/admin/drivers/export?status=incomplete" class="flex items-start gap-3 px-4 py-2.5 hover:bg-amber-50/70 transition group text-left">
+                        <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-amber-600 group-hover:text-white transition">
+                            <i class="fas fa-user-clock text-xs"></i>
+                        </div>
+                        <div>
+                            <div class="text-sm font-bold text-gray-800 group-hover:text-amber-700">Drafts / Incomplete Only</div>
+                            <div class="text-xs text-gray-500">{{ stats.incomplete or 0 }} incomplete signup profiles</div>
+                        </div>
+                    </a>
+
+                    <!-- Option 3: Registered Only -->
+                    <a href="/admin/drivers/export?status=all" class="flex items-start gap-3 px-4 py-2.5 hover:bg-emerald-50/70 transition group text-left">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-emerald-600 group-hover:text-white transition">
+                            <i class="fas fa-id-card text-xs"></i>
+                        </div>
+                        <div>
+                            <div class="text-sm font-bold text-gray-800 group-hover:text-emerald-700">Registered Drivers Only</div>
+                            <div class="text-xs text-gray-500">{{ stats.total or 0 }} completed vehicle registrations</div>
+                        </div>
+                    </a>
+
+                    {% if status and status != 'all' and status != 'incomplete' and status != 'all_with_draft' %}
+                    <div class="border-t border-gray-100 my-1"></div>
+                    <!-- Option 4: Current Filtered View -->
+                    <a href="/admin/drivers/export?status={{ status }}{% if search %}&search={{ search }}{% endif %}" class="flex items-start gap-3 px-4 py-2.5 hover:bg-purple-50/70 transition group text-left">
+                        <div class="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-purple-600 group-hover:text-white transition">
+                            <i class="fas fa-filter text-xs"></i>
+                        </div>
+                        <div>
+                            <div class="text-sm font-bold text-gray-800 group-hover:text-purple-700">Current Filter ({{ status|capitalize }})</div>
+                            <div class="text-xs text-gray-500">Export active filtered view</div>
+                        </div>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <a href="/admin/drivers/new" class="h-[38px] bg-ziggo text-white px-4 rounded-xl font-bold text-sm hover:bg-ziggo-light transition-all shadow-lg shadow-blue-900/20 inline-flex items-center gap-2">
+                <i class="fas fa-plus text-xs"></i>
+                <span>Add New Driver</span>
             </a>
         </div>
         {% endif %}
@@ -522,5 +588,18 @@ function closeAddDriverModal() {
         document.getElementById('verifyModal').classList.add('hidden');
         document.getElementById('verifyModal').classList.remove('flex');
     }
+
+    function toggleExportMenu(e) {
+        if (e) e.stopPropagation();
+        const menu = document.getElementById('exportMenu');
+        if (menu) menu.classList.toggle('hidden');
+    }
+    document.addEventListener('click', function(e) {
+        const container = document.getElementById('exportDropdownContainer');
+        const menu = document.getElementById('exportMenu');
+        if (container && menu && !container.contains(e.target)) {
+            menu.classList.add('hidden');
+        }
+    });
 </script>
 {% endblock %}

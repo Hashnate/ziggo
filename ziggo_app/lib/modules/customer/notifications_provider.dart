@@ -16,7 +16,8 @@ class NotificationsProvider extends ChangeNotifier {
     notifyListeners();
     try {
       final resp = await ApiClient.instance.dio.get('/customer/notifications');
-      _items = List<Map<String, dynamic>>.from(resp.data as List);
+      final list = List<Map<String, dynamic>>.from(resp.data as List);
+      _items = list.where((n) => n['type'] != 'broadcast_sms').toList();
     } on DioException {
       // ignore
     } finally {

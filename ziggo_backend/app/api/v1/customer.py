@@ -3,7 +3,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select, update, or_
 
 from ...database import get_db
 from ...models import Customer, User, UserRole, SavedAddress, WalletTransaction, Notification, WalletTopupRequest
@@ -312,7 +312,10 @@ async def list_notifications(
 ):
     q = await db.execute(
         select(Notification)
-        .where(Notification.user_id == user.id)
+        .where(
+            Notification.user_id == user.id,
+            or_(Notification.type.is_(None), Notification.type != "broadcast_sms"),
+        )
         .order_by(Notification.id.desc())
         .limit(50)
     )
@@ -352,10 +355,13 @@ async def mark_all_notifications_read(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_role("customer", "driver")),
 ):
-    from sqlalchemy import update
     await db.execute(
         update(Notification)
-        .where(Notification.user_id == user.id, Notification.is_read == False)
+        .where(
+            Notification.user_id == user.id,
+            Notification.is_read == False,
+            or_(Notification.type.is_(None), Notification.type != "broadcast_sms"),
+        )
         .values(is_read=True)
     )
     await db.commit()

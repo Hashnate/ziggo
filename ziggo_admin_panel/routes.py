@@ -751,6 +751,9 @@ async def admin_drivers(
             where_clauses.append(is_submitted_driver)
         elif status == "incomplete":
             where_clauses.append(or_(Driver.vehicle_number.is_(None), Driver.vehicle_number == ""))
+        elif status in ("all_with_draft", "all_with_drafts", "all_drivers", "everything"):
+            # Show all drivers including drafts
+            pass
         elif status == "all":
             # Show completed / submitted registrations by default
             where_clauses.append(is_submitted_driver)
@@ -816,56 +819,135 @@ async def admin_drivers(
 
 @router.get("/drivers/export")
 async def admin_drivers_export(
+    status: str = "all",
+    search: str = "",
+    scope: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    """Download the driver list as CSV. Read-only export over the existing
-    Driver/User tables — changes nothing else in the app."""
+    """Download the driver list as CSV. Supports exporting all registered drivers,
+    draft / incomplete signups, or all drivers including draft profiles."""
     import csv
     import io
     from fastapi.responses import Response
-    from sqlalchemy import and_
+    from sqlalchemy import and_, or_
 
     is_submitted_driver = and_(Driver.vehicle_number.isnot(None), Driver.vehicle_number != "")
-    q = await db.execute(
-        select(Driver)
-        .options(selectinload(Driver.user))
-        .where(is_submitted_driver)
-        .order_by(Driver.id.desc())
-    )
+    is_incomplete_driver = or_(Driver.vehicle_number.is_(None), Driver.vehicle_number == "")
+
+    stmt = select(Driver).outerjoin(User, Driver.user_id == User.id)
+    where_clauses = []
+
+    # Determine scope / status filter
+    export_all = scope == "all" or status in ("all_with_draft", "all_with_drafts", "all_including_drafts", "everything")
+
+    if export_all:
+        filename = "ziggo-all-drivers-including-drafts.csv"
+        # No status filter - exports both registered and incomplete/drafts
+    elif status == "incomplete" or status == "draft":
+        where_clauses.append(is_incomplete_driver)
+        filename = "ziggo-drivers-drafts.csv"
+    elif status == "approved":
+        where_clauses.append(Driver.is_approved == True)
+        where_clauses.append(Driver.status != DriverStatus.PENDING)
+        where_clauses.append(is_submitted_driver)
+        filename = "ziggo-drivers-approved.csv"
+    elif status == "online":
+        where_clauses.append(Driver.is_online == True)
+        where_clauses.append(Driver.is_approved == True)
+        filename = "ziggo-drivers-online.csv"
+    elif status == "offline":
+        where_clauses.append(Driver.is_online == False)
+        where_clauses.append(Driver.is_approved == True)
+        where_clauses.append(is_submitted_driver)
+        filename = "ziggo-drivers-offline.csv"
+    elif status == "pending":
+        where_clauses.append(or_(Driver.status == DriverStatus.PENDING, Driver.is_approved == False))
+        where_clauses.append(is_submitted_driver)
+        filename = "ziggo-drivers-pending.csv"
+    else:
+        # Default: all registered (submitted) drivers
+        where_clauses.append(is_submitted_driver)
+        filename = "ziggo-drivers-registered.csv"
+
+    if search and search.strip():
+        search_term = f"%{search.strip()}%"
+        where_clauses.append(
+            or_(
+                User.full_name.ilike(search_term),
+                User.phone_number.ilike(search_term),
+                User.email.ilike(search_term),
+                Driver.vehicle_number.ilike(search_term),
+                Driver.vehicle_model.ilike(search_term),
+            )
+        )
+
+    if where_clauses:
+        stmt = stmt.where(*where_clauses)
+
+    stmt = stmt.options(selectinload(Driver.user)).order_by(Driver.id.desc())
+    q = await db.execute(stmt)
     drivers = q.scalars().all()
+
+    def _csv_cell(val):
+        if val is None:
+            return ""
+        s = str(val).strip()
+        # Prevent formula injection in spreadsheet applications (CWE-1236)
+        if s.startswith(("=", "+", "-", "@", "\t", "\r")):
+            return "'" + s
+        return s
 
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow([
-        "ID", "Name", "Phone", "NIC", "License", "Vehicle Type", "Vehicle No",
+        "ID", "Name", "Phone", "Email", "NIC", "License", "Vehicle Type", "Vehicle No",
         "Model", "Color", "Year", "Status", "Online", "Rating", "Total Rides",
-        "Total Earnings",
+        "Total Earnings (Rs.)", "Joined Date",
     ])
     for d in drivers:
         u = d.user
+
+        # Human-readable status accurately distinguishing drafts vs verified/pending
+        if not d.vehicle_number or not d.nic_number:
+            status_label = "Draft / Incomplete Signup"
+        elif not d.is_approved or (d.status and (d.status == DriverStatus.PENDING or d.status.value == "pending")):
+            status_label = "Pending Review"
+        elif d.status and (d.status == DriverStatus.SUSPENDED or d.status.value == "suspended"):
+            status_label = "Suspended"
+        elif d.is_online:
+            status_label = "Online"
+        else:
+            status_label = "Offline"
+
+        joined_str = ""
+        if u and u.created_at:
+            joined_str = u.created_at.strftime("%Y-%m-%d %H:%M")
+
         w.writerow([
             d.id,
-            (u.full_name if u else "") or "",
-            (u.phone_number if u else "") or "",
-            d.nic_number or "",
-            d.license_number or "",
-            d.vehicle_type or "",
-            d.vehicle_number or "",
-            d.vehicle_model or "",
-            d.vehicle_color or "",
-            d.vehicle_year or "",
-            d.status.value if d.status else "",
+            _csv_cell(u.full_name if u else ""),
+            _csv_cell(u.phone_number if u else ""),
+            _csv_cell(u.email if u else ""),
+            _csv_cell(d.nic_number or ""),
+            _csv_cell(d.license_number or ""),
+            _csv_cell(d.vehicle_type or ""),
+            _csv_cell(d.vehicle_number or ""),
+            _csv_cell(d.vehicle_model or ""),
+            _csv_cell(d.vehicle_color or ""),
+            _csv_cell(d.vehicle_year or ""),
+            status_label,
             "Yes" if d.is_online else "No",
-            (u.rating if u else "") or "",
-            (u.total_rides if u else "") or "",
-            0,
+            (u.rating if u and u.rating is not None else 0),
+            (u.total_rides if u and u.total_rides is not None else 0),
+            float(d.total_earnings or 0),
+            joined_str,
         ])
 
     return Response(
         content=buf.getvalue(),
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=ziggo-drivers.csv"},
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 
@@ -2057,6 +2139,65 @@ async def admin_bookings(
     end_idx = min(page * limit, total_bookings)
     page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
 
+    # Online drivers for live tracking map layer
+    online_q = await db.execute(
+        select(Driver)
+        .options(selectinload(Driver.user))
+        .where(
+            Driver.status == DriverStatus.APPROVED,
+            Driver.is_online == True,
+            Driver.current_lat.is_not(None),
+        )
+    )
+    online_drivers_list = online_q.scalars().all()
+
+    import json
+
+    def _serialize_booking(b):
+        return {
+            "id": b.id,
+            "booking_ref": b.booking_ref,
+            "status": b.status.value if hasattr(b.status, "value") else str(b.status),
+            "service_type": b.service_type or "car",
+            "pickup_lat": float(b.pickup_lat) if b.pickup_lat is not None else None,
+            "pickup_lng": float(b.pickup_lng) if b.pickup_lng is not None else None,
+            "pickup_address": b.pickup_address or "Pickup Location",
+            "drop_lat": float(b.drop_lat) if b.drop_lat is not None else None,
+            "drop_lng": float(b.drop_lng) if b.drop_lng is not None else None,
+            "drop_address": b.drop_address or "Drop Location",
+            "customer_name": (b.customer.user.full_name or b.customer.user.phone_number) if b.customer and b.customer.user else "Customer",
+            "customer_phone": b.customer.user.phone_number if b.customer and b.customer.user else "",
+            "driver_id": b.driver.id if b.driver else None,
+            "driver_name": b.driver.user.full_name if b.driver and b.driver.user else "Driver",
+            "driver_phone": b.driver.user.phone_number if b.driver and b.driver.user else "",
+            "vehicle_type": (b.driver.vehicle_type if b.driver and b.driver.vehicle_type else b.service_type) or "car",
+            "vehicle_number": b.driver.vehicle_number if b.driver else "",
+            "driver_lat": float(b.driver.current_lat) if b.driver and b.driver.current_lat is not None else None,
+            "driver_lng": float(b.driver.current_lng) if b.driver and b.driver.current_lng is not None else None,
+            "driver_heading": float(b.driver.current_heading) if b.driver and b.driver.current_heading is not None else 0.0,
+            "fare": float(b.final_amount or 0),
+            "distance_km": float(b.distance_km or 0),
+            "duration_min": int(b.duration_min or 0),
+            "booked_at": b.booked_at.isoformat() if b.booked_at else "",
+        }
+
+    active_bookings_json = json.dumps([_serialize_booking(b) for b in active_bookings])
+    table_bookings_json = json.dumps([_serialize_booking(b) for b in bookings])
+    online_drivers_json = json.dumps([
+        {
+            "id": d.id,
+            "name": (d.user.full_name if d.user else "Driver") or "Driver",
+            "phone": (d.user.phone_number if d.user else "") or "",
+            "vehicle_type": d.vehicle_type or "car",
+            "vehicle_number": d.vehicle_number or "",
+            "lat": float(d.current_lat) if d.current_lat is not None else None,
+            "lng": float(d.current_lng) if d.current_lng is not None else None,
+            "heading": float(d.current_heading) if d.current_heading is not None else 0.0,
+            "is_online": True,
+        }
+        for d in online_drivers_list
+    ])
+
     return templates.TemplateResponse(
         request, "bookings.html",
         {
@@ -2064,6 +2205,10 @@ async def admin_bookings(
             "active_page": "bookings",
             "bookings": bookings,
             "active_bookings": active_bookings,
+            "active_bookings_json": active_bookings_json,
+            "table_bookings_json": table_bookings_json,
+            "online_drivers_json": online_drivers_json,
+            "online_drivers_count": len(online_drivers_list),
             "page": page,
             "total_pages": total_pages,
             "total_bookings": total_bookings,
@@ -2082,6 +2227,127 @@ async def admin_bookings(
             "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY or "",
         },
     )
+
+
+@router.get("/bookings/feed")
+async def admin_bookings_feed(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    """Real-time JSON feed for the live tracking and bookings page.
+    Enables seamless in-place DOM & map updates without full page reloads.
+    """
+    active_statuses = [
+        BookingStatus.SEARCHING,
+        BookingStatus.ACCEPTED,
+        BookingStatus.ARRIVED,
+        BookingStatus.STARTED,
+    ]
+    active_q = await db.execute(
+        select(Booking)
+        .options(
+            selectinload(Booking.customer).selectinload(Customer.user),
+            selectinload(Booking.driver).selectinload(Driver.user),
+        )
+        .where(
+            Booking.is_flash == False,
+            Booking.is_courier == False,
+            Booking.status.in_(active_statuses),
+        )
+        .order_by(desc(Booking.id))
+    )
+    active_bookings = active_q.scalars().all()
+
+    online_q = await db.execute(
+        select(Driver)
+        .options(selectinload(Driver.user))
+        .where(
+            Driver.status == DriverStatus.APPROVED,
+            Driver.is_online == True,
+            Driver.current_lat.is_not(None),
+        )
+    )
+    online_drivers = online_q.scalars().all()
+
+    recent_q = await db.execute(
+        select(Booking)
+        .options(
+            selectinload(Booking.customer).selectinload(Customer.user),
+            selectinload(Booking.driver).selectinload(Driver.user),
+        )
+        .where(Booking.is_flash == False, Booking.is_courier == False)
+        .order_by(desc(Booking.id))
+        .limit(50)
+    )
+    recent_bookings = recent_q.scalars().all()
+
+    kpi_q = await db.execute(
+        select(
+            func.count(Booking.id),
+            func.count(Booking.id).filter(Booking.status == BookingStatus.COMPLETED),
+            func.count(Booking.id).filter(Booking.status == BookingStatus.CANCELLED),
+            func.coalesce(func.sum(Booking.final_amount).filter(Booking.status == BookingStatus.COMPLETED), 0),
+        ).where(Booking.is_flash == False, Booking.is_courier == False)
+    )
+    total, completed, cancelled, revenue = kpi_q.one()
+
+    def _fmt_booking(b):
+        return {
+            "id": b.id,
+            "booking_ref": b.booking_ref,
+            "status": b.status.value if hasattr(b.status, "value") else str(b.status),
+            "service_type": b.service_type or "car",
+            "pickup_lat": float(b.pickup_lat) if b.pickup_lat is not None else None,
+            "pickup_lng": float(b.pickup_lng) if b.pickup_lng is not None else None,
+            "pickup_address": b.pickup_address or "Pickup Location",
+            "drop_lat": float(b.drop_lat) if b.drop_lat is not None else None,
+            "drop_lng": float(b.drop_lng) if b.drop_lng is not None else None,
+            "drop_address": b.drop_address or "Drop Location",
+            "customer_name": (b.customer.user.full_name or b.customer.user.phone_number) if b.customer and b.customer.user else "Customer",
+            "customer_phone": b.customer.user.phone_number if b.customer and b.customer.user else "",
+            "driver_id": b.driver.id if b.driver else None,
+            "driver_name": b.driver.user.full_name if b.driver and b.driver.user else None,
+            "driver_phone": b.driver.user.phone_number if b.driver and b.driver.user else "",
+            "vehicle_type": (b.driver.vehicle_type if b.driver and b.driver.vehicle_type else b.service_type) or "car",
+            "vehicle_number": b.driver.vehicle_number if b.driver else "",
+            "driver_lat": float(b.driver.current_lat) if b.driver and b.driver.current_lat is not None else None,
+            "driver_lng": float(b.driver.current_lng) if b.driver and b.driver.current_lng is not None else None,
+            "driver_heading": float(b.driver.current_heading) if b.driver and b.driver.current_heading is not None else 0.0,
+            "fare": float(b.final_amount or 0),
+            "distance_km": float(b.distance_km or 0),
+            "duration_min": int(b.duration_min or 0),
+            "customer_rating": float(b.customer_rating) if b.customer_rating is not None else None,
+            "customer_feedback": b.customer_feedback or "",
+            "promo_code": b.promo_code or "",
+            "booked_at": b.booked_at.strftime("%Y-%m-%d %H:%M") if b.booked_at else "",
+        }
+
+    return {
+        "active_bookings": [_fmt_booking(b) for b in active_bookings],
+        "online_drivers": [
+            {
+                "id": d.id,
+                "name": (d.user.full_name if d.user else "Driver") or "Driver",
+                "phone": (d.user.phone_number if d.user else "") or "",
+                "vehicle_type": d.vehicle_type or "car",
+                "vehicle_number": d.vehicle_number or "",
+                "lat": float(d.current_lat) if d.current_lat is not None else None,
+                "lng": float(d.current_lng) if d.current_lng is not None else None,
+                "heading": float(d.current_heading) if d.current_heading is not None else 0.0,
+                "is_online": True,
+            }
+            for d in online_drivers
+        ],
+        "online_drivers_count": len(online_drivers),
+        "recent_bookings": [_fmt_booking(b) for b in recent_bookings],
+        "stats": {
+            "total": total or 0,
+            "completed": completed or 0,
+            "cancelled": cancelled or 0,
+            "revenue": float(revenue or 0),
+            "active_count": len(active_bookings),
+        },
+    }
 
 
 
@@ -2835,6 +3101,16 @@ async def admin_settings_save(
     peak_start_hour_6: str = Form("21:00"),
     peak_end_hour_6: str = Form("23:00"),
     peak_extra_amount_6: float = Form(50.00),
+    # App Version Management
+    app_min_version_android: str = Form("1.0.0"),
+    app_latest_version_android: str = Form("1.0.15"),
+    app_min_version_ios: str = Form("1.0.0"),
+    app_latest_version_ios: str = Form("1.0.15"),
+    app_update_title: str = Form("Update Available"),
+    app_update_message: str = Form("A new version of Ziggo is ready with improvements and bug fixes."),
+    app_force_update_message: str = Form("This version of Ziggo is no longer supported. Please update to continue using Ziggo."),
+    app_play_store_url: str = Form("https://play.google.com/store/apps/details?id=lk.ziggo.app"),
+    app_app_store_url: str = Form("https://apps.apple.com/app/ziggo-app/id6778739956"),
     # Branding
     logo: UploadFile | None = File(None),
     favicon: UploadFile | None = File(None),
@@ -2901,6 +3177,17 @@ async def admin_settings_save(
     s.multi_stop_free_minutes = max(0, int(multi_stop_free_minutes))
     s.multi_stop_excess_per_minute = Decimal(str(multi_stop_excess_per_minute))
     s.multi_stop_fee_per_stop = Decimal(str(multi_stop_fee_per_stop))
+
+    # Mobile App Version & Force Update
+    s.app_min_version_android = app_min_version_android.strip() or "1.0.0"
+    s.app_latest_version_android = app_latest_version_android.strip() or "1.0.15"
+    s.app_min_version_ios = app_min_version_ios.strip() or "1.0.0"
+    s.app_latest_version_ios = app_latest_version_ios.strip() or "1.0.15"
+    s.app_update_title = app_update_title.strip() or "Update Available"
+    s.app_update_message = app_update_message.strip() or "A new version of Ziggo is ready with improvements and bug fixes."
+    s.app_force_update_message = app_force_update_message.strip() or "This version of Ziggo is no longer supported. Please update to continue using Ziggo."
+    s.app_play_store_url = app_play_store_url.strip() or "https://play.google.com/store/apps/details?id=lk.ziggo.app"
+    s.app_app_store_url = app_app_store_url.strip() or "https://apps.apple.com/app/ziggo-app/id6778739956"
 
     # Peak Hours saving
     from app.models import PeakHourSetting
@@ -6909,6 +7196,7 @@ async def admin_live_tracking_feed(
                 "vehicle_number": d.vehicle_number or "",
                 "lat": float(d.current_lat) if d.current_lat is not None else None,
                 "lng": float(d.current_lng) if d.current_lng is not None else None,
+                "heading": float(d.current_heading) if d.current_heading is not None else 0.0,
                 "is_online": bool(d.is_online),
                 "last_seen": d.last_location_update.isoformat() if d.last_location_update else None,
             }

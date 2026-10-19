@@ -7,7 +7,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 
 from ...database import get_db
 from ...models import Driver, DriverDocument, DriverStatus, FareSetting, Notification, User, DriverVehicle, Booking, BookingStatus
@@ -888,7 +888,10 @@ async def list_driver_notifications(
 ):
     q = await db.execute(
         select(Notification)
-        .where(Notification.user_id == user.id)
+        .where(
+            Notification.user_id == user.id,
+            or_(Notification.type.is_(None), Notification.type != "broadcast_sms"),
+        )
         .order_by(Notification.id.desc())
         .limit(100)
     )
@@ -932,7 +935,11 @@ async def mark_all_driver_notifications_read(
     from sqlalchemy import update
     await db.execute(
         update(Notification)
-        .where(Notification.user_id == user.id, Notification.is_read == False)
+        .where(
+            Notification.user_id == user.id,
+            Notification.is_read == False,
+            or_(Notification.type.is_(None), Notification.type != "broadcast_sms"),
+        )
         .values(is_read=True)
     )
     await db.commit()

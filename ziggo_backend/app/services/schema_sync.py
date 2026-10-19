@@ -113,6 +113,15 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("job_openings", "poster_image", "VARCHAR(500)"),
     ("bookings", "dispatch_started_at", "TIMESTAMP WITH TIME ZONE"),
     ("system_settings", "last_daily_reset_date", "VARCHAR(10)"),
+    ("system_settings", "app_min_version_android", "VARCHAR(20) NOT NULL DEFAULT '1.0.0'"),
+    ("system_settings", "app_latest_version_android", "VARCHAR(20) NOT NULL DEFAULT '1.0.15'"),
+    ("system_settings", "app_min_version_ios", "VARCHAR(20) NOT NULL DEFAULT '1.0.0'"),
+    ("system_settings", "app_latest_version_ios", "VARCHAR(20) NOT NULL DEFAULT '1.0.15'"),
+    ("system_settings", "app_update_title", "VARCHAR(100) NOT NULL DEFAULT 'Update Available'"),
+    ("system_settings", "app_update_message", "TEXT NOT NULL DEFAULT 'A new version of Ziggo is ready with improvements and bug fixes.'"),
+    ("system_settings", "app_force_update_message", "TEXT NOT NULL DEFAULT 'This version of Ziggo is no longer supported. Please update to continue using Ziggo.'"),
+    ("system_settings", "app_play_store_url", "VARCHAR(255) NOT NULL DEFAULT 'https://play.google.com/store/apps/details?id=lk.ziggo.app'"),
+    ("system_settings", "app_app_store_url", "VARCHAR(255) NOT NULL DEFAULT 'https://apps.apple.com/app/ziggo-app/id6778739956'"),
 )
 
 

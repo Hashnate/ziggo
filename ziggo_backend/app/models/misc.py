@@ -199,6 +199,16 @@ class SystemSettings(Base):
     # Branding
     logo_url = Column(String(255))
     favicon_url = Column(String(255))
+    # Mobile App Version Control & Force Update
+    app_min_version_android = Column(String(20), nullable=False, default="1.0.0")
+    app_latest_version_android = Column(String(20), nullable=False, default="1.0.15")
+    app_min_version_ios = Column(String(20), nullable=False, default="1.0.0")
+    app_latest_version_ios = Column(String(20), nullable=False, default="1.0.15")
+    app_update_title = Column(String(100), nullable=False, default="Update Available")
+    app_update_message = Column(Text, nullable=False, default="A new version of Ziggo is ready with improvements and bug fixes.")
+    app_force_update_message = Column(Text, nullable=False, default="This version of Ziggo is no longer supported. Please update to continue using Ziggo.")
+    app_play_store_url = Column(String(255), nullable=False, default="https://play.google.com/store/apps/details?id=lk.ziggo.app")
+    app_app_store_url = Column(String(255), nullable=False, default="https://apps.apple.com/app/ziggo-app/id6778739956")
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

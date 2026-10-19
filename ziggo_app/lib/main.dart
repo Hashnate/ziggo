@@ -13,6 +13,7 @@ import 'core/map/maps_web_loader_stub.dart'
 import 'core/network/api_client.dart';
 import 'core/notifications/fcm_service.dart';
 import 'core/notifications/notification_router.dart';
+import 'core/services/app_update_service.dart';
 import 'core/services/floating_overlay_service.dart';
 import 'core/services/referral_tracker.dart';
 import 'modules/auth/auth_provider.dart';
@@ -158,6 +159,7 @@ class _RootState extends State<_Root> with WidgetsBindingObserver {
         setState(() => _splashed = true);
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _checkPendingNotification();
+          AppUpdateService.checkForUpdates(context);
         });
       }
     });
@@ -194,7 +196,10 @@ class _RootState extends State<_Root> with WidgetsBindingObserver {
       }
       // A notification tapped while the app was merely backgrounded resumes it
       // instead of rebuilding _Root, so initState's drain never runs.
-      if (_splashed) _checkPendingNotification();
+      if (_splashed) {
+        _checkPendingNotification();
+        AppUpdateService.checkForUpdates(context);
+      }
       // Drivers: pick up any ride offer that arrived while the app was asleep,
       // whether or not a notification tap brought them back.
       if (auth.status == AuthStatus.authenticated && auth.role == 'driver') {

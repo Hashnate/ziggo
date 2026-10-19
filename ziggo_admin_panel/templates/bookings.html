@@ -5,7 +5,46 @@
 
 {% block head %}
 <style>
-    #map { height: 100%; min-height: 500px; border-radius: 1rem; z-index: 1; }
+    #map { height: 100%; min-height: 560px; border-radius: 1rem; z-index: 1; }
+    .vehicle-top-overlay {
+        position: absolute;
+        cursor: pointer;
+        z-index: 200;
+        pointer-events: auto;
+        will-change: left, top, transform;
+        transition: left 0.8s linear, top 0.8s linear;
+    }
+    .vehicle-top-overlay img {
+        transition: transform 0.4s ease-out;
+    }
+    .vehicle-tip {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%) translateY(-6px);
+        background: #0F172A;
+        color: #FFFFFF;
+        padding: 5px 9px;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 800;
+        white-space: nowrap;
+        pointer-events: none;
+        box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+        opacity: 0;
+        transition: opacity 0.2s ease, transform 0.2s ease;
+        z-index: 250;
+    }
+    .pulse-dot-live {
+        width: 8px; height: 8px; border-radius: 50%;
+        background: #10B981; box-shadow: 0 0 0 0 rgba(16,185,129,0.7);
+        animation: pulseLiveRing 1.5s ease-out infinite;
+    }
+    @keyframes pulseLiveRing {
+        0%   { box-shadow: 0 0 0 0 rgba(16,185,129,0.7); }
+        70%  { box-shadow: 0 0 0 10px rgba(16,185,129,0); }
+        100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+    }
 </style>
 {% endblock %}
 
@@ -22,7 +61,7 @@
             </div>
             <div>
                 <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Total Bookings</p>
-                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1.5">{{ stat_total }}</p>
+                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1.5" id="kpiStatTotal">{{ stat_total }}</p>
             </div>
         </div>
         <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
@@ -31,7 +70,7 @@
             </div>
             <div>
                 <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Completed</p>
-                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1.5">{{ stat_completed }}</p>
+                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1.5" id="kpiStatCompleted">{{ stat_completed }}</p>
                 {% if stat_rated is defined and stat_rated > 0 %}
                 <p class="text-[10px] text-green-700 font-bold mt-1 flex items-center gap-1">
                     <i class="fas fa-star text-amber-400"></i> {{ stat_rated }} rated {% if stat_avg_rating > 0 %}({{ "{:.1f}".format(stat_avg_rating) }}){% endif %}
@@ -45,7 +84,7 @@
             </div>
             <div>
                 <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Cancelled</p>
-                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1.5">{{ stat_cancelled }}</p>
+                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1.5" id="kpiStatCancelled">{{ stat_cancelled }}</p>
             </div>
         </div>
         <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
@@ -54,7 +93,7 @@
             </div>
             <div>
                 <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Revenue</p>
-                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1.5">Rs. {{ "{:,.0f}".format(stat_revenue) }}</p>
+                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1.5" id="kpiStatRevenue">Rs. {{ "{:,.0f}".format(stat_revenue) }}</p>
             </div>
         </div>
     </div>
@@ -94,21 +133,77 @@
     </form>
 </div>
 
-<div class="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-280px)] min-h-[600px]">
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-260px)] min-h-[620px]">
     <!-- Map Area -->
     <div class="lg:col-span-3 zi-card p-5 relative flex flex-col h-full">
-        <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-black text-ziggo-ink">Live Map View</h3>
-            <span class="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full flex items-center gap-2">
-                <span class="w-2 h-2 bg-green-500 rounded-full inline-block"></span>
-                {{ active_bookings | length }} active
-            </span>
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <div class="flex items-center gap-3">
+                <h3 class="text-lg font-black text-ziggo-ink">Live Ride Tracking</h3>
+                <span class="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full flex items-center gap-2">
+                    <span class="pulse-dot-live"></span>
+                    <span id="activeCountBadge">{{ active_bookings | length }}</span> active
+                </span>
+                <button type="button" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-bold transition cursor-pointer select-none" id="liveSyncStatusBadge" title="Real-time live updates active • Click to sync now" onclick="fetchBookingsFeed()">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span id="liveSyncLabel">Real-Time Updates Active</span>
+                    <i class="fas fa-arrows-rotate text-emerald-500 text-[10px] ml-0.5" id="liveSyncIcon"></i>
+                </button>
+            </div>
+            <!-- Interactive Map Controls -->
+            <div class="flex items-center gap-2">
+                <button type="button" id="toggleOnlineDriversBtn" onclick="toggleOnlineDrivers()"
+                        class="px-3 py-1.5 rounded-xl border border-ziggo-line bg-white hover:bg-slate-50 text-ziggo-ink text-xs font-bold shadow-soft-sm flex items-center gap-1.5 transition">
+                    <img src="/static/img/top_car.png" class="w-3.5 h-3.5 object-contain" alt="">
+                    <span>Online Vehicles (<span id="onlineCountLabel">{{ online_drivers_count if online_drivers_count is defined else 0 }}</span>)</span>
+                </button>
+                <button type="button" onclick="fitAllMapBounds()"
+                        class="px-3 py-1.5 rounded-xl border border-ziggo-line bg-white hover:bg-slate-50 text-ziggo-ink text-xs font-bold shadow-soft-sm flex items-center gap-1.5 transition" title="Fit to all rides and vehicles">
+                    <i class="fas fa-expand-arrows-alt text-gray-500"></i> Fit Map
+                </button>
+                <button type="button" id="resetTrackingBtn" onclick="resetRideTracking()"
+                        class="hidden px-3 py-1.5 rounded-xl bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold shadow-soft-sm flex items-center gap-1.5 transition">
+                    <i class="fas fa-times"></i> Clear Focus
+                </button>
+            </div>
         </div>
-        <div class="flex-1 bg-gray-50 rounded-xl overflow-hidden" id="map"></div>
-        <div class="absolute left-7 top-[76px] z-[5] bg-white/95 backdrop-blur rounded-xl shadow-md border border-ziggo-line px-3 py-2.5 text-[11px] font-bold text-ziggo-ink space-y-1.5 pointer-events-none">
-            <div class="flex items-center gap-2"><span class="w-4 h-4 rounded-full flex items-center justify-center text-white text-[8px]" style="background:#16A34A"><i class="fas fa-user"></i></span> Pickup</div>
-            <div class="flex items-center gap-2"><span class="w-4 h-4 rounded-full flex items-center justify-center text-white text-[8px]" style="background:#EF4444"><i class="fas fa-flag"></i></span> Drop-off</div>
-            <div class="flex items-center gap-2"><img src="/static/img/car-icon.png" class="w-4 h-3 object-contain" alt=""> Driver</div>
+
+        <div class="flex-1 bg-gray-50 rounded-xl overflow-hidden relative" id="mapWrap">
+            <div id="map" class="w-full h-full"></div>
+
+            <!-- Floating Selected Ride Card (shows when a ride is tracked like in mobile app) -->
+            <div id="trackedRideCard" class="hidden absolute top-3 left-3 right-3 md:left-24 md:right-auto md:min-w-[340px] md:max-w-md z-10 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-ziggo-line p-3.5 transition-all">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="px-2 py-0.5 rounded-md bg-ziggo text-white text-xs font-black" id="trackedRef">BK-XXXX</span>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider" id="trackedStatusBadge">STARTED</span>
+                            <span class="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-ping"></span> Road Tracking
+                            </span>
+                        </div>
+                        <div class="text-xs text-gray-800 font-bold truncate" id="trackedCustomer">Customer Name</div>
+                        <div class="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5 truncate" id="trackedDriverWrap">
+                            <i class="fas fa-car text-ziggo"></i>
+                            <span id="trackedDriver">Driver Name • Car</span>
+                        </div>
+                    </div>
+                    <button type="button" onclick="resetRideTracking()" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-xs flex-shrink-0 transition">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-gray-600 font-medium">
+                    <span id="trackedDistance"><i class="fas fa-route text-blue-500 mr-1"></i> Road: -- km</span>
+                    <span id="trackedDuration"><i class="fas fa-clock text-amber-500 mr-1"></i> Est: -- min</span>
+                </div>
+            </div>
+
+            <!-- Map Legend -->
+            <div class="absolute left-3 bottom-6 z-[5] bg-white/95 backdrop-blur rounded-xl shadow-md border border-ziggo-line px-3.5 py-2.5 text-[11px] font-bold text-ziggo-ink space-y-1.5 pointer-events-none">
+                <div class="flex items-center gap-2"><span class="w-4 h-4 rounded-full flex items-center justify-center text-white text-[8px]" style="background:#16A34A"><i class="fas fa-user"></i></span> Pickup</div>
+                <div class="flex items-center gap-2"><span class="w-4 h-4 rounded-full flex items-center justify-center text-white text-[8px]" style="background:#EF4444"><i class="fas fa-flag"></i></span> Drop-off</div>
+                <div class="flex items-center gap-2"><img src="/static/img/top_car.png" class="w-4 h-4 object-contain" alt=""> Vehicle Top View</div>
+                <div class="flex items-center gap-2"><span class="w-4 h-1 rounded bg-blue-600 inline-block"></span> Road Route</div>
+            </div>
         </div>
     </div>
 
@@ -116,12 +211,13 @@
     <div class="zi-card flex flex-col overflow-hidden">
         <div class="p-4 border-b border-ziggo-line flex items-center justify-between">
             <h3 class="font-black text-ziggo-ink">Active Rides</h3>
-            <span class="bg-ziggo text-white text-xs font-bold px-2.5 py-1 rounded-lg">{{ active_bookings | length }}</span>
+            <span class="bg-ziggo text-white text-xs font-bold px-2.5 py-1 rounded-lg" id="sidebarActiveCount">{{ active_bookings | length }}</span>
         </div>
-        <div class="flex-1 overflow-y-auto p-4 space-y-3">
+        <div class="flex-1 overflow-y-auto p-4 space-y-3" id="activeRidesContainer">
             {% for b in active_bookings %}
-            <div class="p-3.5 rounded-2xl border border-ziggo-line bg-white hover:border-ziggo/25 hover:shadow-soft transition-all cursor-pointer"
-                 onclick="focusRide({{ b.pickup_lat }}, {{ b.pickup_lng }})">
+            <div class="p-3.5 rounded-2xl border border-ziggo-line bg-white hover:border-ziggo/25 hover:shadow-soft transition-all cursor-pointer active-ride-card"
+                 id="ride-card-{{ b.id }}"
+                 data-booking-id="{{ b.id }}">
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-xs font-black text-ziggo bg-ziggo-soft px-2.5 py-1 rounded-lg">{{ b.booking_ref }}</span>
                     <span class="text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1.5
@@ -135,9 +231,9 @@
                     {{ b.customer.user.full_name or b.customer.user.phone_number if b.customer else 'Customer' }}
                 </p>
                 {% if b.driver %}
-                <p class="text-xs text-gray-500 mt-1">
-                    <i class="fas fa-car text-ziggo-accent mr-1"></i>
-                    {{ b.driver.user.full_name if b.driver.user else '' }} • {{ b.driver.vehicle_number or '' }}
+                <p class="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
+                    <img src="/static/img/top_{{ b.driver.vehicle_type if b.driver.vehicle_type in ['bike','tuk','truck'] else 'car' }}.png" class="w-3.5 h-3.5 object-contain" alt="">
+                    <span>{{ b.driver.user.full_name if b.driver.user else '' }} • {{ b.driver.vehicle_number or '' }}</span>
                 </p>
                 {% endif %}
                 <p class="text-xs text-gray-400 mt-1">
@@ -145,7 +241,19 @@
                 </p>
             </div>
             {% else %}
-            <p class="text-center text-gray-400 text-sm py-10">No active rides</p>
+            <div class="text-center py-8 px-2 space-y-3">
+                <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto text-xl">
+                    <img src="/static/img/top_car.png" class="w-8 h-8 object-contain opacity-40" alt="">
+                </div>
+                <div>
+                    <p class="font-bold text-gray-700 text-sm">No active rides right now</p>
+                    <p class="text-gray-400 text-xs mt-1">Select any booking from below to inspect its road route, or toggle Online Vehicles.</p>
+                </div>
+                <button type="button" onclick="toggleOnlineDrivers(true)" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-ziggo text-white text-xs font-bold shadow-soft hover:bg-ziggo-light transition">
+                    <img src="/static/img/top_car.png" class="w-3.5 h-3.5 object-contain brightness-0 invert" alt="">
+                    <span>View Online Vehicles ({{ online_drivers_count if online_drivers_count is defined else 0 }})</span>
+                </button>
+            </div>
             {% endfor %}
         </div>
 
@@ -159,7 +267,10 @@
 
 <div id="all-bookings" class="mt-8 zi-card overflow-hidden">
     <div class="p-6 border-b border-gray-100 flex items-center justify-between">
-        <h3 class="text-lg font-bold text-ziggo">All Bookings</h3>
+        <div>
+            <h3 class="text-lg font-bold text-ziggo">All Bookings</h3>
+            <p class="text-xs text-gray-400 mt-0.5">Click "Track on Map" on any booking to inspect its exact road route and vehicle top view.</p>
+        </div>
         <span class="text-xs font-bold text-gray-400 bg-gray-50 px-2.5 py-1 rounded-lg">Showing {{ start_idx }}-{{ end_idx }} of {{ total_bookings }}</span>
     </div>
     <div class="overflow-x-auto">
@@ -169,7 +280,7 @@
                     <th class="px-6 py-4">Ref</th>
                     <th class="px-6 py-4">Customer</th>
                     <th class="px-6 py-4">Driver</th>
-                    <th class="px-6 py-4">Route</th>
+                    <th class="px-6 py-4">Route & Actions</th>
                     <th class="px-6 py-4">Status</th>
                     <th class="px-6 py-4">Rating</th>
                     <th class="px-6 py-4 zi-num">Fare</th>
@@ -178,22 +289,33 @@
             </thead>
             <tbody class="divide-y divide-gray-100">
                 {% for b in bookings %}
-                <tr class="hover:bg-ziggo-soft/30 transition-colors">
-                    <td class="px-6 py-3.5"><span class="text-xs font-bold text-ziggo bg-ziggo-soft px-2.5 py-1 rounded-lg">{{ b.booking_ref }}</span></td>
+                <tr class="hover:bg-ziggo-soft/30 transition-colors" id="table-row-{{ b.id }}">
+                    <td class="px-6 py-3.5">
+                        <span class="text-xs font-bold text-ziggo bg-ziggo-soft px-2.5 py-1 rounded-lg">{{ b.booking_ref }}</span>
+                    </td>
                     <td class="px-6 py-3 text-sm">
                         {{ b.customer.user.full_name or b.customer.user.phone_number if b.customer else '-' }}
                     </td>
-                    <td class="px-6 py-3 text-sm">
+                    <td class="px-6 py-3 text-sm row-driver-cell">
                         {% if b.driver %}
-                            {{ b.driver.user.full_name if b.driver.user else '' }}
-                            <span class="text-xs text-gray-400 ml-1.5">{{ b.driver.vehicle_number or '' }}</span>
+                            <div class="flex items-center gap-1.5">
+                                <img src="/static/img/top_{{ b.driver.vehicle_type if b.driver.vehicle_type in ['bike','tuk','truck'] else 'car' }}.png" class="w-3.5 h-3.5 object-contain" alt="">
+                                <span>{{ b.driver.user.full_name if b.driver.user else '' }}</span>
+                            </div>
+                            <span class="text-xs text-gray-400 block">{{ b.driver.vehicle_number or '' }}</span>
                         {% else %}<span class="text-gray-400">—</span>{% endif %}
                     </td>
                     <td class="px-6 py-3 text-xs text-gray-600">
                         <div>{{ b.pickup_address[:30] if b.pickup_address else '' }}…</div>
                         <div class="text-gray-400">→ {{ b.drop_address[:30] if b.drop_address else '' }}…</div>
+                        {% if b.pickup_lat and b.drop_lat %}
+                        <button type="button" data-track-id="{{ b.id }}"
+                                class="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-ziggo hover:bg-ziggo hover:text-white transition font-black text-[11px] shadow-sm">
+                            <i class="fas fa-route"></i> Track on Map
+                        </button>
+                        {% endif %}
                     </td>
-                    <td class="px-6 py-3 text-sm">
+                    <td class="px-6 py-3 text-sm row-status-cell">
                         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide
                           {% if b.status.value == 'completed' %}bg-green-100 text-green-700
                           {% elif b.status.value == 'cancelled' %}bg-red-100 text-red-700
@@ -277,9 +399,357 @@
 {% endblock %}
 
 {% block scripts %}
+<script type="application/json" id="activeBookingsData">{{ active_bookings_json | safe if active_bookings_json is defined else '[]' }}</script>
+<script type="application/json" id="tableBookingsData">{{ table_bookings_json | safe if table_bookings_json is defined else '[]' }}</script>
+<script type="application/json" id="onlineDriversData">{{ online_drivers_json | safe if online_drivers_json is defined else '[]' }}</script>
+
 <script>
     var map;
-    var markers = [];
+    var directionsService;
+    var activeMarkers = [];
+    var activeRoutePolylines = [];
+    var vehicleOverlays = new Map(); // bookingId -> VehicleTopOverlay
+    var onlineDriverOverlays = new Map(); // driverId -> VehicleTopOverlay
+    var showOnlineDriversState = false;
+    var currentTrackedBookingId = null;
+
+    // Injected Data from Backend
+    var rawActiveBookings = [];
+    var rawTableBookings = [];
+    var rawOnlineDrivers = [];
+
+    try {
+        rawActiveBookings = JSON.parse(document.getElementById('activeBookingsData').textContent || '[]');
+        rawTableBookings = JSON.parse(document.getElementById('tableBookingsData').textContent || '[]');
+        rawOnlineDrivers = JSON.parse(document.getElementById('onlineDriversData').textContent || '[]');
+    } catch (e) {
+        console.error('Failed to parse bookings JSON:', e);
+    }
+
+    // =========================================================================
+    // Real-Time Background Synchronization (Zero Page Reloads)
+    // =========================================================================
+    var feedPollTimer = null;
+    var isFetchingFeed = false;
+
+    function fetchBookingsFeed() {
+        if (isFetchingFeed) return;
+        isFetchingFeed = true;
+
+        var syncIcon = document.getElementById('liveSyncIcon');
+        if (syncIcon) syncIcon.classList.add('fa-spin');
+
+        fetch('/admin/bookings/feed', { credentials: 'same-origin' })
+            .then(function(res) {
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return res.json();
+            })
+            .then(function(data) {
+                isFetchingFeed = false;
+                if (syncIcon) syncIcon.classList.remove('fa-spin');
+                updateRealtimeState(data);
+            })
+            .catch(function(err) {
+                isFetchingFeed = false;
+                if (syncIcon) syncIcon.classList.remove('fa-spin');
+                console.debug('Live feed sync error:', err);
+            });
+    }
+
+    function startRealtimeSync() {
+        if (feedPollTimer) clearInterval(feedPollTimer);
+        // Seamless background polling every 5 seconds (zero screen disruption)
+        feedPollTimer = setInterval(fetchBookingsFeed, 5000);
+    }
+
+    function updateRealtimeState(data) {
+        if (!data) return;
+
+        // 1. Update data sets
+        if (data.active_bookings) rawActiveBookings = data.active_bookings;
+        if (data.online_drivers) rawOnlineDrivers = data.online_drivers;
+        if (data.recent_bookings) rawTableBookings = data.recent_bookings;
+
+        // 2. Update KPI metrics smoothly
+        if (data.stats) {
+            var elTotal = document.getElementById('kpiStatTotal');
+            var elCompleted = document.getElementById('kpiStatCompleted');
+            var elCancelled = document.getElementById('kpiStatCancelled');
+            var elRevenue = document.getElementById('kpiStatRevenue');
+            if (elTotal) elTotal.textContent = data.stats.total;
+            if (elCompleted) elCompleted.textContent = data.stats.completed;
+            if (elCancelled) elCancelled.textContent = data.stats.cancelled;
+            if (elRevenue) elRevenue.textContent = 'Rs. ' + Math.round(data.stats.revenue).toLocaleString();
+        }
+
+        // 3. Update counter badges
+        var activeBadge = document.getElementById('activeCountBadge');
+        var sidebarCount = document.getElementById('sidebarActiveCount');
+        var onlineLabel = document.getElementById('onlineCountLabel');
+        if (activeBadge) activeBadge.textContent = rawActiveBookings.length;
+        if (sidebarCount) sidebarCount.textContent = rawActiveBookings.length;
+        if (onlineLabel && data.online_drivers_count !== undefined) onlineLabel.textContent = data.online_drivers_count;
+
+        // 4. Update Active Rides sidebar in-place
+        renderActiveRidesSidebar(rawActiveBookings);
+
+        // 5. Update All Bookings table rows in-place
+        if (data.recent_bookings && data.recent_bookings.length > 0) {
+            updateTableRowsInPlace(data.recent_bookings);
+        }
+
+        // 6. Update map elements smoothly
+        if (currentTrackedBookingId) {
+            var tracked = rawActiveBookings.find(function(b) { return b.id === currentTrackedBookingId; }) ||
+                          (data.recent_bookings || []).find(function(b) { return b.id === currentTrackedBookingId; });
+            if (tracked) {
+                updateTrackedRideCard(tracked);
+                if (tracked.driver_lat && tracked.driver_lng) {
+                    if (vehicleOverlays.has(tracked.id)) {
+                        vehicleOverlays.get(tracked.id).update(tracked.driver_lat, tracked.driver_lng, tracked.driver_heading);
+                    }
+                }
+            }
+        } else {
+            syncMapActiveVehicles(rawActiveBookings);
+        }
+
+        // 7. Update Online Drivers overlay if layer is active
+        if (showOnlineDriversState) {
+            syncOnlineDriversOverlay(rawOnlineDrivers);
+        }
+    }
+
+    function renderActiveRidesSidebar(activeList) {
+        var container = document.getElementById('activeRidesContainer');
+        if (!container) return;
+
+        if (activeList.length === 0) {
+            container.innerHTML = '<div class="text-center py-8 px-2 space-y-3">' +
+                '<div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto text-xl">' +
+                '<img src="/static/img/top_car.png" class="w-8 h-8 object-contain opacity-40" alt="">' +
+                '</div>' +
+                '<div>' +
+                '<p class="font-bold text-gray-700 text-sm">No active rides right now</p>' +
+                '<p class="text-gray-400 text-xs mt-1">Select any booking from below to inspect its road route, or toggle Online Vehicles.</p>' +
+                '</div>' +
+                '<button type="button" onclick="toggleOnlineDrivers(true)" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-ziggo text-white text-xs font-bold shadow-soft hover:bg-ziggo-light transition">' +
+                '<img src="/static/img/top_car.png" class="w-3.5 h-3.5 object-contain brightness-0 invert" alt="">' +
+                '<span>View Online Vehicles</span>' +
+                '</button>' +
+                '</div>';
+            return;
+        }
+
+        var html = '';
+        activeList.forEach(function(b) {
+            var isSelected = (currentTrackedBookingId === b.id);
+            var vAsset = getVehicleTopAsset(b.vehicle_type);
+            var statusClass = (b.status === 'searching') ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700';
+            var dotClass = (b.status === 'searching') ? 'bg-amber-500' : 'bg-blue-500';
+            var borderClass = isSelected ? 'border-ziggo bg-blue-50/40' : 'border-ziggo-line bg-white';
+
+            html += '<div class="p-3.5 rounded-2xl border ' + borderClass + ' hover:border-ziggo/25 hover:shadow-soft transition-all cursor-pointer active-ride-card" id="ride-card-' + b.id + '" data-booking-id="' + b.id + '">' +
+                    '<div class="flex items-center justify-between mb-2">' +
+                      '<span class="text-xs font-black text-ziggo bg-ziggo-soft px-2.5 py-1 rounded-lg">' + b.booking_ref + '</span>' +
+                      '<span class="text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1.5 ' + statusClass + '">' +
+                        '<span class="w-1.5 h-1.5 rounded-full ' + dotClass + '"></span>' +
+                        b.status +
+                      '</span>' +
+                    '</div>' +
+                    '<p class="text-sm font-medium text-gray-800"><i class="fas fa-user text-gray-400 mr-1"></i> ' + (b.customer_name || 'Customer') + '</p>';
+            if (b.driver_name) {
+                html += '<p class="text-xs text-gray-500 mt-1 flex items-center gap-1.5">' +
+                        '<img src="' + vAsset + '" class="w-3.5 h-3.5 object-contain" alt="">' +
+                        '<span>' + b.driver_name + (b.vehicle_number ? ' • ' + b.vehicle_number : '') + '</span>' +
+                        '</p>';
+            }
+            html += '<p class="text-xs text-gray-400 mt-1">Rs.' + Math.round(b.fare).toLocaleString() + ' • ' + b.service_type + '</p>' +
+                    '</div>';
+        });
+        container.innerHTML = html;
+    }
+
+    function updateTableRowsInPlace(recentList) {
+        recentList.forEach(function(b) {
+            var row = document.getElementById('table-row-' + b.id);
+            if (!row) return;
+
+            // 1. Update status pill
+            var statusCell = row.querySelector('.row-status-cell');
+            if (statusCell) {
+                var statusClass = 'bg-gray-100 text-gray-600';
+                var dotClass = 'bg-gray-400';
+                if (b.status === 'completed') {
+                    statusClass = 'bg-green-100 text-green-700'; dotClass = 'bg-green-500';
+                } else if (b.status === 'cancelled') {
+                    statusClass = 'bg-red-100 text-red-700'; dotClass = 'bg-red-500';
+                } else if (['searching', 'accepted', 'arrived', 'started'].includes(b.status)) {
+                    statusClass = 'bg-amber-100 text-amber-700'; dotClass = 'bg-amber-500';
+                }
+
+                var currentPill = statusCell.querySelector('span');
+                if (currentPill && !currentPill.textContent.includes(b.status)) {
+                    statusCell.innerHTML = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide ' + statusClass + '">' +
+                        '<span class="w-1.5 h-1.5 rounded-full ' + dotClass + '"></span>' +
+                        b.status +
+                        '</span>';
+                }
+            }
+
+            // 2. Update driver info if assigned
+            var driverCell = row.querySelector('.row-driver-cell');
+            if (driverCell && b.driver_name) {
+                var vAsset = getVehicleTopAsset(b.vehicle_type);
+                driverCell.innerHTML = '<div class="flex items-center gap-1.5">' +
+                    '<img src="' + vAsset + '" class="w-3.5 h-3.5 object-contain" alt="">' +
+                    '<span>' + b.driver_name + '</span>' +
+                    '</div>' +
+                    '<span class="text-xs text-gray-400 block">' + (b.vehicle_number || '') + '</span>';
+            }
+        });
+    }
+
+    function syncMapActiveVehicles(activeList) {
+        if (!map) return;
+        var activeIds = new Set();
+        activeList.forEach(function(b) {
+            activeIds.add(b.id);
+            if (b.driver_lat && b.driver_lng) {
+                if (vehicleOverlays.has(b.id)) {
+                    vehicleOverlays.get(b.id).update(b.driver_lat, b.driver_lng, b.driver_heading);
+                } else {
+                    var vOverlay = new VehicleTopOverlay({
+                        lat: b.driver_lat,
+                        lng: b.driver_lng,
+                        heading: b.driver_heading || 0,
+                        vehicleType: b.vehicle_type,
+                        driverName: b.driver_name,
+                        vehicleNumber: b.vehicle_number,
+                        statusText: b.status,
+                        driverId: b.driver_id,
+                        map: map,
+                        onClick: function() { trackBooking(b); }
+                    });
+                    vehicleOverlays.set(b.id, vOverlay);
+                }
+            }
+        });
+
+        vehicleOverlays.forEach(function(overlay, id) {
+            if (!activeIds.has(id)) {
+                overlay.setMap(null);
+                vehicleOverlays.delete(id);
+            }
+        });
+    }
+
+    function syncOnlineDriversOverlay(driversList) {
+        if (!map || !showOnlineDriversState) return;
+        var driverIds = new Set();
+        driversList.forEach(function(d) {
+            driverIds.add(d.id);
+            if (d.lat && d.lng) {
+                if (onlineDriverOverlays.has(d.id)) {
+                    onlineDriverOverlays.get(d.id).update(d.lat, d.lng, d.heading);
+                } else {
+                    var overlay = new VehicleTopOverlay({
+                        lat: d.lat,
+                        lng: d.lng,
+                        heading: d.heading || 0,
+                        vehicleType: d.vehicle_type,
+                        driverName: d.name,
+                        vehicleNumber: d.vehicle_number,
+                        statusText: 'Online',
+                        driverId: d.id,
+                        map: map
+                    });
+                    onlineDriverOverlays.set(d.id, overlay);
+                }
+            }
+        });
+
+        onlineDriverOverlays.forEach(function(overlay, id) {
+            if (!driverIds.has(id)) {
+                overlay.setMap(null);
+                onlineDriverOverlays.delete(id);
+            }
+        });
+    }
+
+    function updateTrackedRideCard(b) {
+        var card = document.getElementById('trackedRideCard');
+        if (!card || !b) return;
+        document.getElementById('trackedRef').textContent = b.booking_ref;
+        var statusBadge = document.getElementById('trackedStatusBadge');
+        if (statusBadge) {
+            statusBadge.textContent = b.status;
+            statusBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ' +
+                (b.status === 'completed' ? 'bg-green-100 text-green-700' :
+                 b.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700');
+        }
+        var driverEl = document.getElementById('trackedDriver');
+        if (driverEl) {
+            driverEl.textContent = (b.driver_name || 'Unassigned') + (b.vehicle_number ? ' • ' + b.vehicle_number : ' • ' + (b.vehicle_type || 'car').toUpperCase());
+        }
+        if (b.distance_km) {
+            var distEl = document.getElementById('trackedDistance');
+            if (distEl) distEl.innerHTML = '<i class="fas fa-route text-blue-500 mr-1"></i> Road: ' + b.distance_km + ' km';
+        }
+        if (b.duration_min) {
+            var durEl = document.getElementById('trackedDuration');
+            if (durEl) durEl.innerHTML = '<i class="fas fa-clock text-amber-500 mr-1"></i> Est: ' + b.duration_min + ' min';
+        }
+    }
+
+    // Start real-time sync immediately
+    startRealtimeSync();
+
+    // Helper: Map vehicle type to top-view asset
+    function getVehicleTopAsset(vehicleType) {
+        if (!vehicleType) return '/static/img/top_car.png';
+        var vt = String(vehicleType).toLowerCase();
+        if (vt.includes('bike') || vt.includes('motor')) return '/static/img/top_bike.png';
+        if (vt.includes('tuk') || vt.includes('three') || vt.includes('auto')) return '/static/img/top_tuk.png';
+        if (vt.includes('truck') || vt.includes('lorry')) return '/static/img/top_truck.png';
+        return '/static/img/top_car.png';
+    }
+
+    // Helper: Compute forward azimuth heading between two lat/lngs (degrees 0-360)
+    function computeBearing(fromLat, fromLng, toLat, toLng) {
+        var toRad = Math.PI / 180;
+        var toDeg = 180 / Math.PI;
+        var lat1 = fromLat * toRad;
+        var lon1 = fromLng * toRad;
+        var lat2 = toLat * toRad;
+        var lon2 = toLng * toRad;
+        var dLon = lon2 - lon1;
+        var y = Math.sin(dLon) * Math.cos(lat2);
+        var x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+        var brng = Math.atan2(y, x) * toDeg;
+        return (brng + 360) % 360;
+    }
+
+    // Pickup & Drop marker pin SVGs (matching mobile app visual hierarchy)
+    var pickSymbol = {
+        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 34 34">' +
+            '<circle cx="17" cy="17" r="15.5" fill="#16A34A" stroke="#ffffff" stroke-width="2.5"/>' +
+            '<path transform="translate(17 17) scale(0.033) translate(-224 -256)" fill="#ffffff" d="M224 256A128 128 0 1 0 224 0a128 128 0 1 0 0 256zm-45.7 48C79.8 304 0 383.8 0 482.3C0 498.7 13.3 512 29.7 512l388.6 0c16.4 0 29.7-13.3 29.7-29.7C448 383.8 368.2 304 269.7 304l-91.4 0z"/></svg>'),
+        scaledSize: new google.maps.Size(36, 36),
+        anchor: new google.maps.Point(18, 18)
+    };
+
+    var dropSymbol = {
+        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 34 34">' +
+            '<circle cx="17" cy="17" r="15.5" fill="#EF4444" stroke="#ffffff" stroke-width="2.5"/>' +
+            '<path transform="translate(17 17) scale(0.030) translate(-224 -256)" fill="#ffffff" d="M64 32C64 14.3 49.7 0 32 0S0 14.3 0 32L0 64 0 368 0 480c0 17.7 14.3 32 32 32s32-14.3 32-32l0-128 64.3-16.1c41.1-10.3 84.6-5.5 122.5 13.4c44.2 22.1 95.5 24.8 141.7 7.4l34.7-13c12.5-4.7 20.8-16.6 20.8-30l0-247.7c0-23-24.2-38-44.8-27.7l-9.6 4.8c-46.3 23.2-100.8 23.2-147.1 0c-35.1-17.6-75.4-22-113.5-12.5L64 48l0-16z"/></svg>'),
+        scaledSize: new google.maps.Size(36, 36),
+        anchor: new google.maps.Point(18, 18)
+    };
+
+    var VehicleTopOverlay;
 
     window.gm_authFailure = function() {
         var mapEl = document.getElementById('map');
@@ -293,103 +763,741 @@
     };
 
     function initMap() {
+        directionsService = new google.maps.DirectionsService();
+
+        // Custom Vehicle Top Overlay Class
+        VehicleTopOverlay = class extends google.maps.OverlayView {
+            constructor(opts) {
+                super();
+                this.lat = opts.lat;
+                this.lng = opts.lng;
+                this.position = new google.maps.LatLng(opts.lat, opts.lng);
+                this.heading = opts.heading || 0;
+                this.vehicleType = opts.vehicleType || 'car';
+                this.driverName = opts.driverName || 'Driver';
+                this.vehicleNumber = opts.vehicleNumber || '';
+                this.statusText = opts.statusText || '';
+                this.driverId = opts.driverId;
+                this.onClick = opts.onClick;
+                this.div = null;
+                this.img = null;
+                this.tip = null;
+                this.setMap(opts.map);
+            }
+
+            onAdd() {
+                var div = document.createElement('div');
+                div.className = 'vehicle-top-overlay';
+                div.style.position = 'absolute';
+                div.style.cursor = 'pointer';
+                div.style.zIndex = '220';
+                div.style.width = '42px';
+                div.style.height = '42px';
+                div.style.display = 'flex';
+                div.style.alignItems = 'center';
+                div.style.justifyContent = 'center';
+
+                // Tooltip
+                var tip = document.createElement('div');
+                tip.className = 'vehicle-tip';
+                tip.innerHTML = '<div style="font-size:11px;font-weight:900;">' + this.driverName + '</div>' +
+                                '<div style="font-size:9px;color:#94a3b8;font-weight:600;">' + (this.vehicleNumber || this.vehicleType.toUpperCase()) + (this.statusText ? ' • ' + this.statusText : '') + '</div>';
+                this.tip = tip;
+
+                // Vehicle top view image
+                var img = document.createElement('img');
+                img.src = getVehicleTopAsset(this.vehicleType);
+                img.style.width = '40px';
+                img.style.height = '40px';
+                img.style.objectFit = 'contain';
+                img.style.display = 'block';
+                img.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.45))';
+                img.style.transform = 'rotate(' + this.heading + 'deg)';
+                this.img = img;
+
+                div.appendChild(tip);
+                div.appendChild(img);
+
+                div.addEventListener('mouseenter', function() {
+                    tip.style.opacity = '1';
+                    tip.style.transform = 'translateX(-50%) translateY(-8px)';
+                });
+                div.addEventListener('mouseleave', function() {
+                    tip.style.opacity = '0';
+                    tip.style.transform = 'translateX(-50%) translateY(-6px)';
+                });
+
+                if (this.onClick) {
+                    var clickHandler = this.onClick;
+                    div.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        clickHandler();
+                    });
+                }
+
+                this.div = div;
+                var panes = this.getPanes();
+                panes.overlayMouseTarget.appendChild(div);
+            }
+
+            draw() {
+                var projection = this.getProjection();
+                if (!projection || !this.div || !this.position) return;
+                var pos = projection.fromLatLngToDivPixel(this.position);
+                if (pos) {
+                    this.div.style.left = (pos.x - 21) + 'px';
+                    this.div.style.top = (pos.y - 21) + 'px';
+                }
+            }
+
+            update(lat, lng, heading) {
+                var newPos = new google.maps.LatLng(lat, lng);
+                if (heading === undefined || heading === null || isNaN(heading) || heading === 0) {
+                    if (this.lat !== lat || this.lng !== lng) {
+                        heading = computeBearing(this.lat, this.lng, lat, lng);
+                    } else {
+                        heading = this.heading;
+                    }
+                }
+                this.lat = lat;
+                this.lng = lng;
+                this.position = newPos;
+                this.heading = heading;
+                if (this.img) {
+                    this.img.style.transform = 'rotate(' + this.heading + 'deg)';
+                }
+                this.draw();
+            }
+
+            onRemove() {
+                if (this.div && this.div.parentNode) {
+                    this.div.parentNode.removeChild(this.div);
+                    this.div = null;
+                }
+            }
+        };
+
         map = new google.maps.Map(document.getElementById('map'), {
             center: {lat: 6.9271, lng: 79.8612},
             zoom: 12,
-            mapTypeControl: false,
-            streetViewControl: false
+            mapTypeControl: true,
+            mapTypeControlOptions: {
+                style: google.maps.MapTypeControlStyle.DROPDOWN_MENU,
+                position: google.maps.ControlPosition.TOP_RIGHT
+            },
+            streetViewControl: false,
+            fullscreenControl: false
         });
 
-        const pickSymbol = {
-            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
-                '<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 34 34">' +
-                '<circle cx="17" cy="17" r="15.5" fill="#16A34A" stroke="#ffffff" stroke-width="2.5"/>' +
-                '<path transform="translate(17 17) scale(0.033) translate(-224 -256)" fill="#ffffff" d="M224 256A128 128 0 1 0 224 0a128 128 0 1 0 0 256zm-45.7 48C79.8 304 0 383.8 0 482.3C0 498.7 13.3 512 29.7 512l388.6 0c16.4 0 29.7-13.3 29.7-29.7C448 383.8 368.2 304 269.7 304l-91.4 0z"/></svg>'),
-            scaledSize: new google.maps.Size(34, 34),
-            anchor: new google.maps.Point(17, 17)
-        };
+        // Check if there was a saved tracked booking or layer preference before reload
+        var savedTrackId = sessionStorage.getItem('zi_tracked_booking_id');
+        var savedOnlineState = sessionStorage.getItem('zi_show_online_vehicles');
 
-        const lineSymbol = {
-            path: 'M 0,-1 0,1',
-            strokeOpacity: 1,
-            scale: 2
-        };
+        if (savedOnlineState === 'true') {
+            toggleOnlineDrivers(true);
+        } else if (savedOnlineState === 'false') {
+            toggleOnlineDrivers(false);
+        }
 
-        {% for b in active_bookings %}
-        (function() {
-            const pickupLoc = {lat: {{ b.pickup_lat }}, lng: {{ b.pickup_lng }}};
-            const dropLoc = {lat: {{ b.drop_lat }}, lng: {{ b.drop_lng }}};
+        if (savedTrackId) {
+            var trackIdNum = parseInt(savedTrackId, 10);
+            var found = rawActiveBookings.find(function(item) { return item.id === trackIdNum; }) ||
+                        rawTableBookings.find(function(item) { return item.id === trackIdNum; });
+            if (found) {
+                trackBooking(found);
+            } else if (rawActiveBookings.length > 0) {
+                sessionStorage.removeItem('zi_tracked_booking_id');
+                renderAllActiveBookings();
+            } else {
+                sessionStorage.removeItem('zi_tracked_booking_id');
+                if (savedOnlineState === null) {
+                    toggleOnlineDrivers(true);
+                }
+            }
+        } else if (rawActiveBookings.length > 0) {
+            renderAllActiveBookings();
+        } else if (savedOnlineState === null) {
+            // If no active rides, enable online vehicles layer by default so the map is vibrant with live drivers
+            toggleOnlineDrivers(true);
+        }
 
-            // Pickup Marker
-            const pickMarker = new google.maps.Marker({
-                position: pickupLoc,
-                map: map,
-                icon: pickSymbol,
-                title: "Pickup"
-            });
-            const pickInfoWindow = new google.maps.InfoWindow({
-                content: "<b>{{ b.booking_ref }}</b><br>Pickup • {{ b.service_type }}"
-            });
-            pickMarker.addListener('click', () => {
-                pickInfoWindow.open(map, pickMarker);
-            });
-
-            // Drop Marker
-            const dropMarker = new google.maps.Marker({
-                position: dropLoc,
-                map: map,
-                icon: {
-                    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
-                        '<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 34 34">' +
-                        '<circle cx="17" cy="17" r="15.5" fill="#EF4444" stroke="#ffffff" stroke-width="2.5"/>' +
-                        '<path transform="translate(17 17) scale(0.030) translate(-224 -256)" fill="#ffffff" d="M64 32C64 14.3 49.7 0 32 0S0 14.3 0 32L0 64 0 368 0 480c0 17.7 14.3 32 32 32s32-14.3 32-32l0-128 64.3-16.1c41.1-10.3 84.6-5.5 122.5 13.4c44.2 22.1 95.5 24.8 141.7 7.4l34.7-13c12.5-4.7 20.8-16.6 20.8-30l0-247.7c0-23-24.2-38-44.8-27.7l-9.6 4.8c-46.3 23.2-100.8 23.2-147.1 0c-35.1-17.6-75.4-22-113.5-12.5L64 48l0-16z"/></svg>'),
-                    scaledSize: new google.maps.Size(34, 34),
-                    anchor: new google.maps.Point(17, 17)
-                },
-                title: "Drop"
-            });
-            const dropInfoWindow = new google.maps.InfoWindow({
-                content: "<b>{{ b.booking_ref }}</b><br>Drop"
-            });
-            dropMarker.addListener('click', () => {
-                dropInfoWindow.open(map, dropMarker);
-            });
-
-            // Dashed Polyline
-            new google.maps.Polyline({
-                path: [pickupLoc, dropLoc],
-                strokeOpacity: 0,
-                icons: [{
-                    icon: lineSymbol,
-                    offset: '0',
-                    repeat: '15px'
-                }],
-                map: map
-            });
-
-            {% if b.driver and b.driver.current_lat %}
-            const driverLoc = {lat: {{ b.driver.current_lat }}, lng: {{ b.driver.current_lng }}};
-            const driverMarker = new google.maps.Marker({
-                position: driverLoc,
-                map: map,
-                icon: {
-                    url: '/static/img/{{ b.driver.vehicle_type if b.driver.vehicle_type in ['bike','tuk','car','van','truck'] else 'car' }}-icon.png',
-                    scaledSize: new google.maps.Size(40, 30),
-                    anchor: new google.maps.Point(20, 15)
-                },
-                title: "Driver"
-            });
-            const driverInfoWindow = new google.maps.InfoWindow({
-                content: "<b>{{ b.driver.user.full_name if b.driver.user else 'Driver' }}</b><br>{{ b.driver.vehicle_number }}"
-            });
-            driverMarker.addListener('click', () => {
-                driverInfoWindow.open(map, driverMarker);
-            });
-            {% endif %}
-        })();
-        {% endfor %}
+        // Connect to WebSocket for real-time live driver updates
+        initAdminWebSocket();
     }
 
+    function clearActiveRoutes() {
+        for (var i = 0; i < activeRoutePolylines.length; i++) {
+            activeRoutePolylines[i].setMap(null);
+        }
+        activeRoutePolylines = [];
+    }
+
+    function clearTrackedRideMarkers() {
+        for (var i = 0; i < activeMarkers.length; i++) {
+            activeMarkers[i].setMap(null);
+        }
+        activeMarkers = [];
+        vehicleOverlays.forEach(function(overlay) {
+            overlay.setMap(null);
+        });
+        vehicleOverlays.clear();
+        clearActiveRoutes();
+    }
+
+    // Draw the real road route using DirectionsService (like in mobile app)
+    function drawRoadRoute(pickupLoc, dropLoc, driverLoc, status, onRouteReady) {
+        clearActiveRoutes();
+        if (!pickupLoc || !dropLoc) return;
+
+        directionsService.route({
+            origin: pickupLoc,
+            destination: dropLoc,
+            travelMode: google.maps.TravelMode.DRIVING
+        }, function(result, dirStatus) {
+            if (dirStatus === google.maps.DirectionsStatus.OK) {
+                var path = result.routes[0].overview_path;
+
+                // Outer casing line for high contrast
+                var casingPolyline = new google.maps.Polyline({
+                    path: path,
+                    strokeColor: '#0F172A',
+                    strokeOpacity: 0.25,
+                    strokeWeight: 8,
+                    zIndex: 10,
+                    map: map
+                });
+                activeRoutePolylines.push(casingPolyline);
+
+                // Vibrant road route line
+                var routePolyline = new google.maps.Polyline({
+                    path: path,
+                    strokeColor: '#2563EB',
+                    strokeOpacity: 0.95,
+                    strokeWeight: 5,
+                    zIndex: 11,
+                    map: map
+                });
+                activeRoutePolylines.push(routePolyline);
+
+                if (result.routes[0].legs && result.routes[0].legs[0]) {
+                    var leg = result.routes[0].legs[0];
+                    if (onRouteReady) {
+                        onRouteReady({
+                            distanceText: leg.distance ? leg.distance.text : '',
+                            durationText: leg.duration ? leg.duration.text : '',
+                            path: path
+                        });
+                    }
+                }
+
+                // If driver is accepted / arrived and en route to pickup
+                if (driverLoc && (status === 'accepted' || status === 'arrived')) {
+                    directionsService.route({
+                        origin: driverLoc,
+                        destination: pickupLoc,
+                        travelMode: google.maps.TravelMode.DRIVING
+                    }, function(driverRes, driverDirStatus) {
+                        if (driverDirStatus === google.maps.DirectionsStatus.OK) {
+                            var dPath = driverRes.routes[0].overview_path;
+                            var driverApproachLine = new google.maps.Polyline({
+                                path: dPath,
+                                strokeColor: '#0EA5E9',
+                                strokeOpacity: 0.9,
+                                strokeWeight: 4.5,
+                                zIndex: 12,
+                                icons: [{
+                                    icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 2 },
+                                    offset: '0',
+                                    repeat: '12px'
+                                }],
+                                map: map
+                            });
+                            activeRoutePolylines.push(driverApproachLine);
+                        }
+                    });
+                }
+            } else {
+                // Fallback straight line if directions quota exceeded or route unresolvable
+                var fallbackLine = new google.maps.Polyline({
+                    path: [pickupLoc, dropLoc],
+                    strokeColor: '#2563EB',
+                    strokeOpacity: 0.85,
+                    strokeWeight: 4,
+                    map: map
+                });
+                activeRoutePolylines.push(fallbackLine);
+            }
+        });
+    }
+
+    // Render all active bookings on initial load
+    function renderAllActiveBookings() {
+        clearTrackedRideMarkers();
+        if (rawActiveBookings.length === 0) return;
+
+        var bounds = new google.maps.LatLngBounds();
+        var count = 0;
+
+        rawActiveBookings.forEach(function(b) {
+            var pickupLoc = (b.pickup_lat != null && b.pickup_lng != null) ? { lat: b.pickup_lat, lng: b.pickup_lng } : null;
+            var dropLoc = (b.drop_lat != null && b.drop_lng != null) ? { lat: b.drop_lat, lng: b.drop_lng } : null;
+            var driverLoc = (b.driver_lat != null && b.driver_lng != null) ? { lat: b.driver_lat, lng: b.driver_lng } : null;
+
+            if (pickupLoc) {
+                var pickMarker = new google.maps.Marker({
+                    position: pickupLoc,
+                    map: map,
+                    icon: pickSymbol,
+                    title: "Pickup • " + b.booking_ref,
+                    zIndex: 50
+                });
+                pickMarker.addListener('click', function() { trackBooking(b); });
+                activeMarkers.push(pickMarker);
+                bounds.extend(pickupLoc);
+                count++;
+            }
+
+            if (dropLoc) {
+                var dropMarker = new google.maps.Marker({
+                    position: dropLoc,
+                    map: map,
+                    icon: dropSymbol,
+                    title: "Drop • " + b.booking_ref,
+                    zIndex: 50
+                });
+                dropMarker.addListener('click', function() { trackBooking(b); });
+                activeMarkers.push(dropMarker);
+                bounds.extend(dropLoc);
+                count++;
+            }
+
+            // Driver top view vehicle
+            if (driverLoc) {
+                var heading = b.driver_heading || 0;
+                if (!heading && pickupLoc) {
+                    heading = computeBearing(driverLoc.lat, driverLoc.lng, pickupLoc.lat, pickupLoc.lng);
+                }
+                var vOverlay = new VehicleTopOverlay({
+                    lat: driverLoc.lat,
+                    lng: driverLoc.lng,
+                    heading: heading,
+                    vehicleType: b.vehicle_type,
+                    driverName: b.driver_name,
+                    vehicleNumber: b.vehicle_number,
+                    statusText: b.status,
+                    driverId: b.driver_id,
+                    map: map,
+                    onClick: function() { trackBooking(b); }
+                });
+                vehicleOverlays.set(b.id, vOverlay);
+                bounds.extend(driverLoc);
+                count++;
+            }
+
+            // Draw road route for the primary active booking
+            if (rawActiveBookings.length === 1 && pickupLoc && dropLoc) {
+                drawRoadRoute(pickupLoc, dropLoc, driverLoc, b.status);
+            } else if (pickupLoc && dropLoc) {
+                // For multiple rides draw quick road line
+                drawRoadRoute(pickupLoc, dropLoc, driverLoc, b.status);
+            }
+        });
+
+        if (count > 0) {
+            map.fitBounds(bounds, { top: 60, right: 40, bottom: 40, left: 40 });
+        }
+    }
+
+    // Track a specific booking (from Active Rides sidebar or All Bookings table)
+    function trackBooking(b) {
+        if (!b || !map) return;
+        currentTrackedBookingId = b.id;
+        try {
+            sessionStorage.setItem('zi_tracked_booking_id', String(b.id));
+        } catch (_) {}
+
+        clearTrackedRideMarkers();
+
+        var pickupLoc = (b.pickup_lat != null && b.pickup_lng != null) ? { lat: b.pickup_lat, lng: b.pickup_lng } : null;
+        var dropLoc = (b.drop_lat != null && b.drop_lng != null) ? { lat: b.drop_lat, lng: b.drop_lng } : null;
+        var driverLoc = (b.driver_lat != null && b.driver_lng != null) ? { lat: b.driver_lat, lng: b.driver_lng } : null;
+
+        if (!pickupLoc || !dropLoc) {
+            alert("This booking does not have valid coordinates to map.");
+            return;
+        }
+
+        var bounds = new google.maps.LatLngBounds();
+        bounds.extend(pickupLoc);
+        bounds.extend(dropLoc);
+        if (driverLoc) bounds.extend(driverLoc);
+
+        // Pickup Marker
+        var pickMarker = new google.maps.Marker({
+            position: pickupLoc,
+            map: map,
+            icon: pickSymbol,
+            title: "Pickup: " + b.pickup_address,
+            zIndex: 60
+        });
+        var pickInfo = new google.maps.InfoWindow({
+            content: '<div style="font-family:inherit;padding:2px;">' +
+                     '<span style="background:#16a34a;color:#fff;font-weight:900;font-size:10px;padding:2px 6px;border-radius:4px;">PICKUP</span>' +
+                     '<p style="font-weight:800;color:#0f172a;margin:4px 0 2px;">' + (b.pickup_address || 'Pickup') + '</p>' +
+                     '<p style="font-size:11px;color:#64748b;margin:0;">Ref: ' + b.booking_ref + ' • ' + (b.customer_name || '') + '</p>' +
+                     '</div>'
+        });
+        pickMarker.addListener('click', function() { pickInfo.open(map, pickMarker); });
+        activeMarkers.push(pickMarker);
+
+        // Drop Marker
+        var dropMarker = new google.maps.Marker({
+            position: dropLoc,
+            map: map,
+            icon: dropSymbol,
+            title: "Drop: " + b.drop_address,
+            zIndex: 60
+        });
+        var dropInfo = new google.maps.InfoWindow({
+            content: '<div style="font-family:inherit;padding:2px;">' +
+                     '<span style="background:#ef4444;color:#fff;font-weight:900;font-size:10px;padding:2px 6px;border-radius:4px;">DROP-OFF</span>' +
+                     '<p style="font-weight:800;color:#0f172a;margin:4px 0 2px;">' + (b.drop_address || 'Destination') + '</p>' +
+                     '<p style="font-size:11px;color:#64748b;margin:0;">Ref: ' + b.booking_ref + '</p>' +
+                     '</div>'
+        });
+        dropMarker.addListener('click', function() { dropInfo.open(map, dropMarker); });
+        activeMarkers.push(dropMarker);
+
+        // Vehicle Top View Marker
+        var vehiclePlaced = false;
+        if (driverLoc) {
+            var heading = b.driver_heading || 0;
+            if (!heading) {
+                heading = computeBearing(driverLoc.lat, driverLoc.lng, dropLoc.lat, dropLoc.lng);
+            }
+            var vOverlay = new VehicleTopOverlay({
+                lat: driverLoc.lat,
+                lng: driverLoc.lng,
+                heading: heading,
+                vehicleType: b.vehicle_type,
+                driverName: b.driver_name,
+                vehicleNumber: b.vehicle_number,
+                statusText: b.status,
+                driverId: b.driver_id,
+                map: map,
+                onClick: function() {
+                    var win = new google.maps.InfoWindow({
+                        content: '<div style="font-family:inherit;padding:2px;">' +
+                                 '<p style="font-weight:900;color:#0f172a;margin:0 0 2px;">' + b.driver_name + '</p>' +
+                                 '<p style="font-size:11px;color:#64748b;margin:0;">' + (b.vehicle_number || '') + ' (' + b.vehicle_type + ')</p>' +
+                                 '<p style="font-size:10px;color:#2563eb;font-weight:800;margin:4px 0 0;text-transform:uppercase;">Status: ' + b.status + '</p>' +
+                                 '</div>'
+                    });
+                    win.setPosition(driverLoc);
+                    win.open(map);
+                }
+            });
+            vehicleOverlays.set(b.id, vOverlay);
+            vehiclePlaced = true;
+        }
+
+        // Fetch & Draw Road Route
+        drawRoadRoute(pickupLoc, dropLoc, driverLoc, b.status, function(legData) {
+            var distEl = document.getElementById('trackedDistance');
+            var durEl = document.getElementById('trackedDuration');
+            if (distEl) distEl.innerHTML = '<i class="fas fa-route text-blue-500 mr-1"></i> Road: ' + legData.distanceText;
+            if (durEl) durEl.innerHTML = '<i class="fas fa-clock text-amber-500 mr-1"></i> Est: ' + legData.durationText;
+
+            // If driver wasn't already positioned, place vehicle top view at start of route or pickup
+            if (!vehiclePlaced && legData.path && legData.path.length > 1) {
+                var pt1 = legData.path[0];
+                var pt2 = legData.path[1];
+                var computedH = computeBearing(pt1.lat(), pt1.lng(), pt2.lat(), pt2.lng());
+                var fallbackOverlay = new VehicleTopOverlay({
+                    lat: pt1.lat(),
+                    lng: pt1.lng(),
+                    heading: computedH,
+                    vehicleType: b.vehicle_type,
+                    driverName: b.driver_name || 'Vehicle',
+                    vehicleNumber: b.vehicle_number,
+                    statusText: b.status,
+                    driverId: b.driver_id,
+                    map: map
+                });
+                vehicleOverlays.set(b.id, fallbackOverlay);
+            }
+        });
+
+        // Fit map bounds
+        map.fitBounds(bounds, { top: 80, right: 40, bottom: 50, left: 40 });
+
+        // Update floating ride card
+        var card = document.getElementById('trackedRideCard');
+        var resetBtn = document.getElementById('resetTrackingBtn');
+        if (card) {
+            document.getElementById('trackedRef').textContent = b.booking_ref;
+            var statusBadge = document.getElementById('trackedStatusBadge');
+            statusBadge.textContent = b.status;
+            statusBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ' +
+                (b.status === 'completed' ? 'bg-green-100 text-green-700' :
+                 b.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700');
+            document.getElementById('trackedCustomer').innerHTML = '<i class="fas fa-user text-gray-400 mr-1"></i> ' + b.customer_name + (b.customer_phone ? ' • ' + b.customer_phone : '');
+            document.getElementById('trackedDriver').textContent = (b.driver_name || 'Unassigned') + (b.vehicle_number ? ' • ' + b.vehicle_number : ' • ' + b.vehicle_type.toUpperCase());
+            document.getElementById('trackedDistance').innerHTML = '<i class="fas fa-route text-blue-500 mr-1"></i> ' + (b.distance_km ? b.distance_km + ' km' : 'Calculating…');
+            document.getElementById('trackedDuration').innerHTML = '<i class="fas fa-clock text-amber-500 mr-1"></i> ' + (b.duration_min ? b.duration_min + ' min' : '--');
+            card.classList.remove('hidden');
+        }
+        if (resetBtn) resetBtn.classList.remove('hidden');
+
+        // Highlight selected ride card / table row
+        document.querySelectorAll('.active-ride-card').forEach(function(el) { el.classList.remove('border-ziggo', 'bg-blue-50/40'); });
+        var activeCardEl = document.getElementById('ride-card-' + b.id);
+        if (activeCardEl) activeCardEl.classList.add('border-ziggo', 'bg-blue-50/40');
+
+        // Scroll to map smoothly if needed
+        var mapWrapEl = document.getElementById('mapWrap');
+        if (mapWrapEl && window.scrollY > 400) {
+            mapWrapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    // Track booking by ID (lookup in rawActiveBookings or rawTableBookings)
+    function trackBookingById(bookingId) {
+        var found = rawActiveBookings.find(function(item) { return item.id === bookingId; }) ||
+                    rawTableBookings.find(function(item) { return item.id === bookingId; });
+        if (found) {
+            trackBooking(found);
+        } else {
+            console.warn('Booking ID not found in current dataset:', bookingId);
+        }
+    }
+
+    // Reset tracking and return to overview
+    function resetRideTracking() {
+        currentTrackedBookingId = null;
+        try {
+            sessionStorage.removeItem('zi_tracked_booking_id');
+        } catch (_) {}
+
+        var card = document.getElementById('trackedRideCard');
+        var resetBtn = document.getElementById('resetTrackingBtn');
+        if (card) card.classList.add('hidden');
+        if (resetBtn) resetBtn.classList.add('hidden');
+        document.querySelectorAll('.active-ride-card').forEach(function(el) { el.classList.remove('border-ziggo', 'bg-blue-50/40'); });
+
+        if (rawActiveBookings.length > 0) {
+            renderAllActiveBookings();
+        } else {
+            clearTrackedRideMarkers();
+            if (showOnlineDriversState) {
+                fitAllMapBounds();
+            } else {
+                map.setCenter({lat: 6.9271, lng: 79.8612});
+                map.setZoom(12);
+            }
+        }
+    }
+
+    // Toggle Online Drivers layer with top-view vehicles
+    function toggleOnlineDrivers(forceState) {
+        if (forceState !== undefined) {
+            showOnlineDriversState = forceState;
+        } else {
+            showOnlineDriversState = !showOnlineDriversState;
+        }
+        try {
+            sessionStorage.setItem('zi_show_online_vehicles', showOnlineDriversState ? 'true' : 'false');
+        } catch (_) {}
+
+        var btn = document.getElementById('toggleOnlineDriversBtn');
+        if (showOnlineDriversState) {
+            if (btn) btn.classList.add('bg-blue-50', 'border-ziggo', 'text-ziggo');
+            var bounds = new google.maps.LatLngBounds();
+            var count = 0;
+
+            rawOnlineDrivers.forEach(function(d) {
+                if (d.lat && d.lng) {
+                    var overlay = new VehicleTopOverlay({
+                        lat: d.lat,
+                        lng: d.lng,
+                        heading: d.heading || 0,
+                        vehicleType: d.vehicle_type,
+                        driverName: d.name,
+                        vehicleNumber: d.vehicle_number,
+                        statusText: 'Online',
+                        driverId: d.id,
+                        map: map,
+                        onClick: function() {
+                            var win = new google.maps.InfoWindow({
+                                content: '<div style="font-family:inherit;padding:3px;">' +
+                                         '<p style="font-weight:900;color:#0f172a;margin:0 0 2px;">' + d.name + '</p>' +
+                                         '<p style="font-size:11px;color:#64748b;margin:0;">' + (d.vehicle_number || '') + ' (' + d.vehicle_type + ')</p>' +
+                                         '<p style="font-size:11px;color:#64748b;margin:2px 0 0;">' + (d.phone || '') + '</p>' +
+                                         '<p style="font-size:10px;color:#059669;font-weight:800;margin:4px 0 0;text-transform:uppercase;">● Online Driver</p>' +
+                                         '</div>'
+                            });
+                            win.setPosition({ lat: d.lat, lng: d.lng });
+                            win.open(map);
+                        }
+                    });
+                    onlineDriverOverlays.set(d.id, overlay);
+                    bounds.extend({ lat: d.lat, lng: d.lng });
+                    count++;
+                }
+            });
+
+            if (count > 0 && !currentTrackedBookingId && rawActiveBookings.length === 0) {
+                map.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
+            }
+        } else {
+            if (btn) btn.classList.remove('bg-blue-50', 'border-ziggo', 'text-ziggo');
+            onlineDriverOverlays.forEach(function(overlay) {
+                overlay.setMap(null);
+            });
+            onlineDriverOverlays.clear();
+        }
+    }
+
+    // Fit camera to all rides or vehicles
+    function fitAllMapBounds() {
+        if (!map) return;
+        var bounds = new google.maps.LatLngBounds();
+        var count = 0;
+
+        activeMarkers.forEach(function(m) {
+            bounds.extend(m.getPosition());
+            count++;
+        });
+
+        vehicleOverlays.forEach(function(v) {
+            if (v.position) { bounds.extend(v.position); count++; }
+        });
+
+        if (showOnlineDriversState) {
+            onlineDriverOverlays.forEach(function(v) {
+                if (v.position) { bounds.extend(v.position); count++; }
+            });
+        }
+
+        if (count > 0) {
+            map.fitBounds(bounds, { top: 60, right: 40, bottom: 40, left: 40 });
+        } else {
+            map.setCenter({lat: 6.9271, lng: 79.8612});
+            map.setZoom(12);
+        }
+    }
+
+    // Update real-time GPS position & bearing of drivers
+    function handleDriverLocationUpdate(d) {
+        if (!d) return;
+        // 1. Update online drivers overlay
+        if (onlineDriverOverlays.has(d.id)) {
+            onlineDriverOverlays.get(d.id).update(d.lat, d.lng, d.heading);
+        }
+
+        // 2. Update tracked booking's vehicle
+        vehicleOverlays.forEach(function(v) {
+            if (v.driverId === d.id) {
+                v.update(d.lat, d.lng, d.heading);
+            }
+        });
+
+        // 3. Update raw driver data in array
+        var targetOnline = rawOnlineDrivers.find(function(item) { return item.id === d.id; });
+        if (targetOnline) {
+            targetOnline.lat = d.lat;
+            targetOnline.lng = d.lng;
+            targetOnline.heading = d.heading;
+        }
+    }
+
+    // Listen to admin events dispatched by base.html WebSocket
+    window.addEventListener('zi:admin_event', function(ev) {
+        if (!ev || !ev.detail) return;
+        var evt = ev.detail.event;
+        var data = ev.detail.data || {};
+        if (evt === 'driver_location_update') {
+            handleDriverLocationUpdate(data);
+        } else if (evt === 'booking_created' || evt === 'booking_status_update' || evt === 'driver_status_update' || evt === 'driver_joined') {
+            // Immediate real-time fetch on live events (zero page reload)
+            fetchBookingsFeed();
+        }
+    });
+
+    // Dedicated WebSocket connection fallback
+    function initAdminWebSocket() {
+        var proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        var wsUrl = proto + '//' + window.location.host + '/ws/admin';
+        var ws;
+
+        try {
+            ws = new WebSocket(wsUrl);
+        } catch (_) {
+            return;
+        }
+
+        ws.addEventListener('open', function() {
+            ws._pingInterval = setInterval(function() {
+                if (ws.readyState === WebSocket.OPEN) ws.send('ping');
+            }, 25000);
+        });
+
+        ws.addEventListener('message', function(ev) {
+            var msg;
+            try { msg = JSON.parse(ev.data); } catch (_) { return; }
+            if (!msg || !msg.event) return;
+            if (msg.event === 'driver_location_update') {
+                handleDriverLocationUpdate(msg.data);
+            } else if (msg.event === 'booking_created' || msg.event === 'booking_status_update' || msg.event === 'driver_status_update' || msg.event === 'driver_joined') {
+                fetchBookingsFeed();
+            }
+        });
+
+        ws.addEventListener('close', function() {
+            if (ws && ws._pingInterval) clearInterval(ws._pingInterval);
+            setTimeout(initAdminWebSocket, 10000);
+        });
+    }
+
+    // Lifecycle initialization
+    function initLifecycle() {
+        startRealtimeSync();
+
+        // Delegated click handler for active ride cards and table buttons
+        document.addEventListener('click', function(e) {
+            var trackBtn = e.target.closest('[data-track-id]');
+            if (trackBtn) {
+                e.preventDefault();
+                var tid = parseInt(trackBtn.getAttribute('data-track-id'), 10);
+                if (!isNaN(tid)) trackBookingById(tid);
+                return;
+            }
+
+            var rideCard = e.target.closest('.active-ride-card[data-booking-id]');
+            if (rideCard) {
+                e.preventDefault();
+                var bid = parseInt(rideCard.getAttribute('data-booking-id'), 10);
+                if (!isNaN(bid)) trackBookingById(bid);
+                return;
+            }
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initLifecycle);
+    } else {
+        initLifecycle();
+    }
+
+    // Persist active state before reload
+    window.addEventListener('beforeunload', function() {
+        if (currentTrackedBookingId) {
+            sessionStorage.setItem('zi_tracked_booking_id', String(currentTrackedBookingId));
+        }
+        sessionStorage.setItem('zi_show_online_vehicles', showOnlineDriversState ? 'true' : 'false');
+    });
+
+    // Legacy fallback
     function focusRide(lat, lng) {
         if (map) {
             map.panTo({lat: lat, lng: lng});

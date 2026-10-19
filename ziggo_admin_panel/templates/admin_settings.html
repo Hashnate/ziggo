@@ -57,6 +57,7 @@
                 <button type="button" class="settings-tab" data-tab="trips"><i class="fas fa-map-pin"></i> Trip Stops &amp; Waiting</button>
                 <button type="button" class="settings-tab" data-tab="incentives"><i class="fas fa-gift"></i> Incentives</button>
                 <button type="button" class="settings-tab" data-tab="branding"><i class="fas fa-image"></i> Logo &amp; Favicon</button>
+                <button type="button" class="settings-tab" data-tab="appversion"><i class="fas fa-mobile-alt"></i> App Updates</button>
             </aside>
 
             <!-- Right content -->
@@ -456,6 +457,88 @@
                             </div>
                             <input type="file" name="favicon" id="faviconInput" accept="image/png,image/x-icon,image/vnd.microsoft.icon,image/svg+xml" class="w-full text-xs">
                             <p class="text-[10px] text-ziggo-faint font-bold mt-1">ICO/PNG/SVG, max 5 MB.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- App Updates -->
+                <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="appversion">
+                    <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-2">
+                        <i class="fas fa-mobile-alt text-ziggo"></i> Mobile App Version &amp; Force Update
+                    </h3>
+                    <p class="text-xs text-ziggo-muted mb-6">
+                        Manage app versioning for Android &amp; iOS. When you raise the <b>Minimum Supported Version</b>, any user or driver on an older build will be blocked by a non-dismissible Force Update dialog until they update.
+                    </p>
+
+                    <div class="space-y-6">
+                        <!-- Android Version Control -->
+                        <div class="p-5 bg-emerald-50/50 border border-emerald-100 rounded-2xl">
+                            <h4 class="text-sm font-black text-emerald-900 mb-3 flex items-center gap-2">
+                                <i class="fab fa-android text-emerald-600"></i> Android (Google Play Store)
+                            </h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-black text-ziggo-muted mb-1">
+                                        Minimum Supported Version <span class="text-rose-500 font-bold">(Force Update Below This)</span>
+                                    </label>
+                                    <input type="text" name="app_min_version_android" value="{{ s.app_min_version_android or '1.0.0' }}" placeholder="e.g. 1.0.15" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo font-mono text-sm bg-white">
+                                    <p class="text-[10px] text-ziggo-faint mt-1">Users below this version cannot open or use the app.</p>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-black text-ziggo-muted mb-1">
+                                        Latest Released Version <span class="text-blue-500 font-bold">(Soft Prompt)</span>
+                                    </label>
+                                    <input type="text" name="app_latest_version_android" value="{{ s.app_latest_version_android or '1.0.15' }}" placeholder="e.g. 1.0.16" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo font-mono text-sm bg-white">
+                                    <p class="text-[10px] text-ziggo-faint mt-1">Users on older versions get a friendly "Update Available" popup.</p>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <label class="block text-xs font-black text-ziggo-muted mb-1">Google Play Store URL</label>
+                                <input type="url" name="app_play_store_url" value="{{ s.app_play_store_url or 'https://play.google.com/store/apps/details?id=lk.ziggo.app' }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-xs bg-white">
+                            </div>
+                        </div>
+
+                        <!-- iOS Version Control -->
+                        <div class="p-5 bg-sky-50/50 border border-sky-100 rounded-2xl">
+                            <h4 class="text-sm font-black text-sky-900 mb-3 flex items-center gap-2">
+                                <i class="fab fa-apple text-sky-600"></i> iOS (Apple App Store)
+                            </h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-black text-ziggo-muted mb-1">
+                                        Minimum Supported Version <span class="text-rose-500 font-bold">(Force Update Below This)</span>
+                                    </label>
+                                    <input type="text" name="app_min_version_ios" value="{{ s.app_min_version_ios or '1.0.0' }}" placeholder="e.g. 1.0.15" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo font-mono text-sm bg-white">
+                                    <p class="text-[10px] text-ziggo-faint mt-1">Users below this version cannot open or use the app.</p>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-black text-ziggo-muted mb-1">
+                                        Latest Released Version <span class="text-blue-500 font-bold">(Soft Prompt)</span>
+                                    </label>
+                                    <input type="text" name="app_latest_version_ios" value="{{ s.app_latest_version_ios or '1.0.15' }}" placeholder="e.g. 1.0.16" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo font-mono text-sm bg-white">
+                                    <p class="text-[10px] text-ziggo-faint mt-1">Users on older versions get a friendly "Update Available" popup.</p>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <label class="block text-xs font-black text-ziggo-muted mb-1">Apple App Store URL</label>
+                                <input type="url" name="app_app_store_url" value="{{ s.app_app_store_url or 'https://apps.apple.com/app/ziggo-app/id6778739956' }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-xs bg-white">
+                            </div>
+                        </div>
+
+                        <!-- Update Dialog Messages -->
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-black text-ziggo-muted mb-1">Popup Dialog Title</label>
+                                <input type="text" name="app_update_title" value="{{ s.app_update_title or 'Update Available' }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-black text-ziggo-muted mb-1">Optional Update Message (Soft Prompt)</label>
+                                <textarea name="app_update_message" rows="2" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">{{ s.app_update_message or 'A new version of Ziggo is ready with improvements and bug fixes.' }}</textarea>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-black text-ziggo-muted mb-1">Mandatory Update Message (Force Update)</label>
+                                <textarea name="app_force_update_message" rows="2" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">{{ s.app_force_update_message or 'This version of Ziggo is no longer supported. Please update to continue using Ziggo.' }}</textarea>
+                            </div>
                         </div>
                     </div>
                 </section>

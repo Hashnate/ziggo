@@ -1040,13 +1040,16 @@
           }, 5500);
         }
 
-        // Check if user is actively interacting with forms/inputs
+        var lastKeystrokeTime = 0;
+        document.addEventListener('input', function () { lastKeystrokeTime = Date.now(); }, true);
+        document.addEventListener('keydown', function () { lastKeystrokeTime = Date.now(); }, true);
+
+        // Check if user is actively typing or inside a modal
         function isUserBusy() {
-          var active = document.activeElement;
-          if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT' || active.isContentEditable)) {
+          if (Date.now() - lastKeystrokeTime < 4000) {
             return true;
           }
-          if (document.querySelector('.modal.open, [role="dialog"]:not(.hidden), .zi-modal-open')) {
+          if (document.querySelector('.modal.open, .zi-modal-open')) {
             return true;
           }
           return false;
@@ -1131,7 +1134,7 @@
               url: '/admin/bookings',
               icon: 'fa-route'
             });
-            if (onDashboard || onBookings) {
+            if (onDashboard) {
               scheduleAutoRefresh('booking_created');
             }
           }
@@ -1145,7 +1148,7 @@
                 url: '/admin/bookings',
                 icon: 'fa-circle-check'
               });
-              if (onDashboard || onBookings) {
+              if (onDashboard) {
                 scheduleAutoRefresh('booking_completed');
               }
             } else if (st === 'cancelled') {
@@ -1158,12 +1161,8 @@
                 url: '/admin/bookings',
                 icon: 'fa-circle-xmark'
               });
-              if (onDashboard || onBookings) {
+              if (onDashboard) {
                 scheduleAutoRefresh('booking_cancelled');
-              }
-            } else if (st === 'accepted' || st === 'arrived' || st === 'started') {
-              if (onBookings) {
-                scheduleAutoRefresh('booking_' + st);
               }
             }
           }
@@ -1210,6 +1209,8 @@
               var evt = payload.event;
               var data = payload.data || {};
               handleLiveEvent(evt, data);
+              // Dispatch to window for page-specific event listeners (e.g. driver_location_update on bookings map)
+              window.dispatchEvent(new CustomEvent('zi:admin_event', { detail: { event: evt, data: data } }));
             } catch (err) {}
           };
 
@@ -1231,16 +1232,23 @@
         // Start WebSocket on page load
         initWebSocket();
 
-        // Safety fallback periodic background poll:
-        // On Bookings or Dashboard, perform a gentle sync every 40 seconds if idle
+        // Expose helpers globally so pages like bookings.html can interact with auto-sync
+        window.ziTriggerPageRefresh = triggerPageRefresh;
+        window.ziIsAutoSyncEnabled = function () { return autoSyncEnabled; };
+        window.ziIsUserBusy = isUserBusy;
+
+        // Periodic background auto-refresh:
+        // On Dashboard and other monitor pages, refresh every 25 seconds if not busy
+        // Note: Bookings page (/admin/bookings) updates live in real-time via /bookings/feed without page reloads
         setInterval(function () {
           if (!autoSyncEnabled) return;
           var path = window.location.pathname;
-          var isMonitorPage = path === '/admin' || path === '/admin/' || path === '/admin/dashboard' || path.indexOf('/admin/bookings') === 0;
-          if (isMonitorPage && !isUserBusy() && (!ws || ws.readyState !== WebSocket.OPEN)) {
+          if (path.indexOf('/admin/bookings') === 0) return;
+          var isMonitorPage = path === '/admin' || path === '/admin/' || path === '/admin/dashboard';
+          if (isMonitorPage && !isUserBusy()) {
             triggerPageRefresh(false);
           }
-        }, 40000);
+        }, 25000);
 
       })();
     </script>
