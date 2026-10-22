@@ -190,10 +190,15 @@ class _FlashTrackingScreenState extends State<FlashTrackingScreen> with SingleTi
   String _vehicleAsset(String? type) {
     switch (type) {
       case 'bike':
+      case 'parcel bike':
         return 'assets/icons/top_bike.png';
+      case 'moto scooter':
+        return 'assets/icons/top_scooter.png';
       case 'tuk':
+      case 'parcel tuk':
         return 'assets/icons/top_tuk.png';
       case 'truck':
+      case 'mover':
         return 'assets/icons/top_truck.png';
       case 'van':
       case 'car':

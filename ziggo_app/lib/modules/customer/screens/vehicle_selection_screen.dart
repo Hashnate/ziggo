@@ -347,33 +347,45 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
 
   IconData _vehicleIcon(String? type) {
     switch (type) {
-      case 'bike': return Icons.motorcycle_rounded;
-      case 'tuk': return Icons.electric_rickshaw_rounded;
+      case 'bike':
+      case 'moto scooter':
+      case 'parcel bike': return Icons.motorcycle_rounded;
+      case 'tuk':
+      case 'parcel tuk': return Icons.electric_rickshaw_rounded;
       case 'car': return Icons.directions_car_filled_rounded;
       case 'van': return Icons.airport_shuttle_rounded;
       case 'mini': return Icons.directions_car_filled_rounded;
-      case 'truck': return Icons.local_shipping_rounded;
+      case 'truck':
+      case 'mover': return Icons.local_shipping_rounded;
       default: return Icons.local_taxi_rounded;
     }
   }
 
   Color _vehicleColor(String? type) {
     switch (type) {
-      case 'bike': return AppColors.bike;
-      case 'tuk': return AppColors.warning;
+      case 'bike':
+      case 'moto scooter':
+      case 'parcel bike': return AppColors.bike;
+      case 'tuk':
+      case 'parcel tuk': return AppColors.warning;
       case 'car': return AppColors.primary;
       case 'van': return AppColors.market;
       case 'mini': return AppColors.primary;
-      case 'truck': return AppColors.truck;
+      case 'truck':
+      case 'mover': return AppColors.truck;
       default: return AppColors.primary;
     }
   }
 
   String _vehicleAsset(String? type) {
     switch (type) {
-      case 'bike': return 'assets/icons/top_bike.png';
-      case 'tuk': return 'assets/icons/top_tuk.png';
-      case 'truck': return 'assets/icons/top_truck.png';
+      case 'bike':
+      case 'parcel bike': return 'assets/icons/top_bike.png';
+      case 'moto scooter': return 'assets/icons/top_scooter.png';
+      case 'tuk':
+      case 'parcel tuk': return 'assets/icons/top_tuk.png';
+      case 'truck':
+      case 'mover': return 'assets/icons/top_truck.png';
       case 'mini': return 'assets/icons/top_car.png';
       case 'van':
       case 'car':
@@ -1181,6 +1193,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
 
     final meta = {
       'bike': ('Bike', 'assets/icons/bike.png', 1),
+      'moto scooter': ('Scooter', 'assets/icons/scooter.png', 1),
       'tuk': ('Tuk', 'assets/icons/tuk.png', 3),
       'car': ('Flex', 'assets/icons/car.png', 4),
       'mini': ('Mini', 'assets/icons/car.png', 4),
