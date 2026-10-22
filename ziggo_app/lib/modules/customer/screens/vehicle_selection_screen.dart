@@ -787,8 +787,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
               markers: [
                 if (!_loadingEstimates && _serviceType != null)
                   for (final d in _nearbyDrivers)
-                    if (((widget.isTruckMode && (d['vehicle_type']?.toString().toLowerCase().trim() == 'truck')) ||
-                        (!widget.isTruckMode && (d['vehicle_type']?.toString().toLowerCase().trim() ?? '') == _serviceType?.toLowerCase().trim())) &&
+                    if ((d['vehicle_type']?.toString().toLowerCase().trim() ?? '') == _serviceType?.toLowerCase().trim() &&
                         _isDriverInCategoryRadius(d))
                       pinMarker(
                         point: LatLng((d['lat'] as num).toDouble(), (d['lng'] as num).toDouble()),
