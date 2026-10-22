@@ -122,6 +122,7 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("system_settings", "app_force_update_message", "TEXT NOT NULL DEFAULT 'This version of Ziggo is no longer supported. Please update to continue using Ziggo.'"),
     ("system_settings", "app_play_store_url", "VARCHAR(255) NOT NULL DEFAULT 'https://play.google.com/store/apps/details?id=lk.ziggo.app'"),
     ("system_settings", "app_app_store_url", "VARCHAR(255) NOT NULL DEFAULT 'https://apps.apple.com/app/ziggo-app/id6778739956'"),
+    ("bookings", "packages", "JSON"),
 )
 
 

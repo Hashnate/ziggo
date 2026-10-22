@@ -495,8 +495,8 @@ async def create_market_order(
     promo_discount = Decimal("0")
     promo_code_applied = None
     if body.promo_code:
-        from ...models import PromoCode
-        p_q = await db.execute(select(PromoCode).where(PromoCode.code == body.promo_code.upper()))
+        from ...services.promo_service import usable_promo_query
+        p_q = await db.execute(usable_promo_query(body.promo_code.upper()))
         p = p_q.scalars().first()
         if p and p.is_active and p.category in ("all", "market") and (
             p.usage_limit is None or p.used_count < p.usage_limit

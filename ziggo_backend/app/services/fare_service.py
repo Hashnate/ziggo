@@ -8,8 +8,9 @@ from sqlalchemy import select
 
 from shapely.geometry import Point, Polygon
 
-from ..models import FareSetting, FlashWeightTier, PromoCode, SurgeZone
+from ..models import FareSetting, FlashWeightTier, SurgeZone
 from ..api.v1.surge_zones import is_time_in_range
+from .promo_service import usable_promo_query
 
 # Fallback fare table (used if DB has no row yet for a service type)
 DEFAULTS = {
@@ -135,9 +136,7 @@ async def calculate_fare(
         discount = 0.0
         promo_applied = None
         if promo:
-            promo_q = await db.execute(
-                select(PromoCode).where(PromoCode.code == promo.upper())
-            )
+            promo_q = await db.execute(usable_promo_query(promo.upper()))
             p = promo_q.scalars().first()
             if p and p.is_active and (
                 p.usage_limit is None or p.used_count < p.usage_limit
@@ -197,9 +196,7 @@ async def calculate_fare(
         discount = 0.0
         promo_applied = None
         if promo:
-            promo_q = await db.execute(
-                select(PromoCode).where(PromoCode.code == promo.upper())
-            )
+            promo_q = await db.execute(usable_promo_query(promo.upper()))
             p = promo_q.scalars().first()
             if p and p.is_active and (
                 p.usage_limit is None or p.used_count < p.usage_limit
@@ -400,7 +397,7 @@ async def calculate_fare(
     discount_original = 0.0
     promo_applied = None
     if promo:
-        promo_q = await db.execute(select(PromoCode).where(PromoCode.code == promo.upper()))
+        promo_q = await db.execute(usable_promo_query(promo.upper()))
         p = promo_q.scalars().first()
         if p and p.is_active and (p.usage_limit is None or p.used_count < p.usage_limit):
             if p.discount_type == "percentage":
@@ -539,7 +536,7 @@ async def calculate_fares_bulk(
     """High-performance bulk fare calculator that batches all DB queries into a single round."""
     from datetime import datetime, timezone, timedelta
     from ..models import (
-        SystemSettings, FareSetting, PeakHourSetting, SurgeZone, PromoCode,
+        SystemSettings, FareSetting, PeakHourSetting, SurgeZone,
         FlashWeightTier, Driver, DriverStatus
     )
     from .matching_service import busy_driver_ids
@@ -568,7 +565,7 @@ async def calculate_fares_bulk(
     # 5. Query PromoCode if provided
     promo_code_obj = None
     if promo:
-        promo_q = await db.execute(select(PromoCode).where(PromoCode.code == promo.upper()))
+        promo_q = await db.execute(usable_promo_query(promo.upper()))
         promo_code_obj = promo_q.scalars().first()
 
     # 6. Query Flash tiers if needed

@@ -686,6 +686,7 @@ async def create_booking(
         parcel_instructions=req.parcel_instructions,
         is_courier=req.is_courier,
         courier_eta_days=fare.get("courier_eta_days") if req.is_courier else None,
+        packages=[p.model_dump() for p in req.packages] or None,
         is_rental=req.is_rental,
         rental_hours=req.rental_hours,
         is_corporate=req.payment_method == "corporate",
@@ -953,6 +954,7 @@ async def scan_and_go_booking(
         is_rental=req.is_rental,
         rental_hours=req.rental_hours,
         is_courier=req.is_courier,
+        packages=[p.model_dump() for p in (req.packages or [])],
         customer=customer,
         redeem_points=req.redeem_points or 0,
         stops=[s.model_dump() for s in (req.stops or [])],
@@ -1004,6 +1006,7 @@ async def scan_and_go_booking(
         parcel_instructions=req.parcel_instructions,
         is_courier=req.is_courier,
         courier_eta_days=fare.get("courier_eta_days") if req.is_courier else None,
+        packages=[p.model_dump() for p in req.packages] or None,
         is_rental=req.is_rental,
         rental_hours=req.rental_hours,
         pickup_fee=to_decimal(fare.get("pickup_fee", 0)),
@@ -1437,6 +1440,7 @@ async def accept_booking(
         is_rental=b.is_rental,
         rental_hours=b.rental_hours,
         is_courier=b.is_courier,
+        packages=b.packages,
         customer=None, # Not modifying loyalty here
         redeem_points=int(b.redeem_points) if b.redeem_points else 0,
         stops=stops_list,
@@ -1819,6 +1823,7 @@ async def update_booking_status(
                 is_rental=b.is_rental,
                 rental_hours=b.rental_hours,
                 is_courier=b.is_courier,
+                packages=b.packages,
                 customer=customer,
                 redeem_points=int(b.redeem_points) if b.redeem_points else 0,
                 stops=stops_list,
@@ -1998,7 +2003,6 @@ async def update_booking_status(
 
         # Charge cancellation fee if cancelled by customer after grace period
         if b.cancelled_by == "customer":
-            from ...models import WalletTransaction
             ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
             ss = ss_q.scalars().first()
             grace_period_mins = ss.cancellation_grace_period_minutes if (ss and ss.cancellation_grace_period_minutes is not None) else 3
@@ -2417,6 +2421,7 @@ async def update_booking_destination(
         is_rental=b.is_rental,
         rental_hours=b.rental_hours,
         is_courier=b.is_courier,
+        packages=b.packages,
         customer=c,
         redeem_points=int(b.redeem_points) if b.redeem_points else 0,
         stops=[s.model_dump() for s in (body.stops or [])],

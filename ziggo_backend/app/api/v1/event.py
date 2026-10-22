@@ -253,12 +253,10 @@ async def book_tickets(
     # Optional promo (events-eligible). Unknown / ineligible codes are ignored.
     discount = Decimal("0")
     if body.promo_code:
-        from ...models import PromoCode
+        from ...services.promo_service import usable_promo_query
 
         p = (
-            await db.execute(
-                select(PromoCode).where(PromoCode.code == body.promo_code.upper())
-            )
+            await db.execute(usable_promo_query(body.promo_code.upper()))
         ).scalars().first()
         if (
             p

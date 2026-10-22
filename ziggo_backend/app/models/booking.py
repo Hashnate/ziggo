@@ -7,6 +7,7 @@ from sqlalchemy import (
     DECIMAL,
     ForeignKey,
     Text,
+    JSON,
     Enum as SQLEnum,
 )
 # Boolean already imported above
@@ -110,6 +111,9 @@ class Booking(Base):
     # courier_eta_days is the promised SLA snapshot (2 or 3) shown to the user.
     is_courier = Column(Boolean, default=False, index=True)
     courier_eta_days = Column(Integer, nullable=True)
+    # Courier packages as booked ([{"weight_kg": .., "type": ..}]), so re-pricing at
+    # accept, completion and destination change keeps each package's weight charge.
+    packages = Column(JSON, nullable=True)
 
     # Rental / vehicle-hire fields. is_rental=True means the customer hires a
     # vehicle for `rental_hours` and the fare is hourly_rate * hours (no drop
