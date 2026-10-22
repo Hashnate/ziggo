@@ -2,8 +2,9 @@
 
 When IPAY_MERCHANT_ID is empty, `is_enabled()` returns False and the API
 layer returns 503 from /payments/ipay/* endpoints. Simulated payments (mock
-cards, mock card charges, the direct-credit top-up) are allowed only on test
-servers; on live, new card payments are refused until the gateway is set up.
+cards, mock card charges, the direct-credit top-up) and sandbox-mode payments
+are allowed only on test servers; on live, the gateway stays off and new card
+payments are refused until it runs in live mode (IPAY_MODE=live).
 
 Flow:
   1. Client POSTs /payments/ipay/checkout with {amount, purpose}.
@@ -37,11 +38,16 @@ STATUS_CHARGEDBACK = "-3"
 
 
 def is_enabled() -> bool:
-    """Returns True if iPay is configured (or fallback PayHere credentials exist)."""
-    return bool(
+    """Returns True if iPay (or fallback PayHere) can take payments on this server.
+
+    Sandbox keys only count on test servers: on live, a sandbox payment would
+    credit wallets and mark orders paid with no real money moving.
+    """
+    configured = bool(
         (settings.IPAY_MERCHANT_ID and (settings.IPAY_SECRET_KEY or settings.IPAY_API_KEY))
         or (settings.PAYHERE_MERCHANT_ID and settings.PAYHERE_MERCHANT_SECRET)
     )
+    return configured and (mode() == "live" or simulated_payments_allowed())
 
 
 CARD_PAYMENTS_COMING_SOON = "Card payments are coming soon. Please pay with cash or wallet."
@@ -64,13 +70,14 @@ def simulated_payments_allowed() -> bool:
 def card_payments_available() -> bool:
     """Whether a NEW card payment may be taken.
 
-    Without token credentials `charge_tokenized_card` only simulates the charge,
-    which on live would mark the order paid with no money collected. The charge
-    itself still falls back to the simulation, so bookings already made by card
-    complete normally.
+    Only live-mode gateway keys move real money: without keys
+    `charge_tokenized_card` simulates the charge, and with sandbox keys it charges
+    the gateway's test system. On live either would mark the order paid with
+    nothing collected. The charge itself is unchanged, so bookings already made
+    by card complete as before.
     """
     app_id, app_secret = _token_credentials()
-    return bool(app_id and app_secret) or simulated_payments_allowed()
+    return (bool(app_id and app_secret) and mode() == "live") or simulated_payments_allowed()
 
 
 def merchant_id() -> str:
