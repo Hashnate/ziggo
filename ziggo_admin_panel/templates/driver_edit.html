@@ -198,6 +198,7 @@
                             <span class="ml-1.5 px-2 py-0.5 text-[10px] font-bold text-gray-500 bg-gray-200/70 rounded-md uppercase tracking-wider">Optional</span>
                             {% endif %}
                         </p>
+                        <div data-live="doc-{{ doc.kind }}">
                         {% if doc.document_url %}
                         <p class="text-[11px] text-ziggo-muted truncate" id="{{ doc.kind }}Status">Uploaded {{ doc.uploaded_at or '' }}</p>
                         {% if doc.is_verified %}
@@ -212,6 +213,7 @@
                             <p class="text-[11px] text-rose-500 font-bold" id="{{ doc.kind }}Status">Not uploaded yet</p>
                             {% endif %}
                         {% endif %}
+                        </div>
                     </div>
                     <div class="flex flex-col gap-1.5 items-end">
                         <label for="doc_{{ doc.kind }}" class="cursor-pointer px-3 py-1.5 bg-ziggo-soft text-ziggo rounded-lg text-xs font-black hover:bg-ziggo-soft/70 transition whitespace-nowrap">
@@ -219,6 +221,7 @@
                         </label>
                         <input id="doc_{{ doc.kind }}" name="doc_{{ doc.kind }}" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden" onchange="previewDoc(this, '{{ doc.kind }}')">
 
+                        <div data-live="doc-{{ doc.kind }}" class="contents">
                         {% if doc.id %}
                             {% if not doc.is_verified %}
                             <button form="verify_doc_{{ doc.id }}" class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-black hover:bg-emerald-700 whitespace-nowrap w-full text-center">
@@ -230,6 +233,7 @@
                             </button>
                             {% endif %}
                         {% endif %}
+                        </div>
                     </div>
                 </div>
                 {% endfor %}
@@ -250,7 +254,7 @@
             {% if vehicles %}
             <div class="space-y-3">
                 {% for veh in vehicles %}
-                <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div data-live="veh-{{ veh.id }}" class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div class="flex items-center gap-3">
                         <div class="w-12 h-12 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-xl text-ziggo">
                             {% if veh.vehicle_type == 'bike' %}
@@ -334,16 +338,16 @@
 {% if documents %}
 {% for doc in documents %}
     {% if doc.id %}
-    <form id="verify_doc_{{ doc.id }}" method="POST" action="/admin/drivers/{{ driver.id }}/documents/{{ doc.id }}/verify" class="hidden"></form>
-    <form id="revoke_doc_{{ doc.id }}" method="POST" action="/admin/drivers/{{ driver.id }}/documents/{{ doc.id }}/reject" class="hidden" onsubmit="return confirm('Mark this document as not verified? The driver will need to re-upload.');"></form>
+    <form id="verify_doc_{{ doc.id }}" data-inplace="doc-{{ doc.kind }}" method="POST" action="/admin/drivers/{{ driver.id }}/documents/{{ doc.id }}/verify" class="hidden"></form>
+    <form id="revoke_doc_{{ doc.id }}" data-inplace="doc-{{ doc.kind }}" method="POST" action="/admin/drivers/{{ driver.id }}/documents/{{ doc.id }}/reject" class="hidden" onsubmit="return confirm('Mark this document as not verified? The driver will need to re-upload.');"></form>
     {% endif %}
 {% endfor %}
 {% endif %}
 
 {% if vehicles %}
 {% for veh in vehicles %}
-    <form id="approve_veh_{{ veh.id }}" method="POST" action="/admin/drivers/{{ driver.id }}/vehicles/{{ veh.id }}/approve" class="hidden"></form>
-    <form id="reject_veh_{{ veh.id }}" method="POST" action="/admin/drivers/{{ driver.id }}/vehicles/{{ veh.id }}/reject" class="hidden" onsubmit="return confirm('Reject this vehicle for the driver?');"></form>
+    <form id="approve_veh_{{ veh.id }}" data-inplace="veh-{{ veh.id }}" method="POST" action="/admin/drivers/{{ driver.id }}/vehicles/{{ veh.id }}/approve" class="hidden"></form>
+    <form id="reject_veh_{{ veh.id }}" data-inplace="veh-{{ veh.id }}" method="POST" action="/admin/drivers/{{ driver.id }}/vehicles/{{ veh.id }}/reject" class="hidden" onsubmit="return confirm('Reject this vehicle for the driver?');"></form>
 {% endfor %}
 {% endif %}
 
@@ -396,6 +400,30 @@ function previewDoc(input, kind) {
         reader.readAsDataURL(file);
     }
 }
+
+// Verify/Revoke and vehicle Approve/Reject swap in the re-rendered card instead of
+// reloading the page, so the admin keeps their place while reviewing.
+document.addEventListener('submit', async function (e) {
+    const form = e.target;
+    if (!form.dataset.inplace || e.defaultPrevented) return;
+    e.preventDefault();
+    document.querySelectorAll('button[form="' + form.id + '"]').forEach(function (b) {
+        b.disabled = true;
+        b.classList.add('opacity-60', 'cursor-wait');
+    });
+    try {
+        const resp = await fetch(form.action, { method: 'POST', body: new FormData(form), credentials: 'same-origin' });
+        if (!resp.ok || new URL(resp.url).pathname !== window.location.pathname) throw new Error('unexpected response');
+        const fresh = new DOMParser().parseFromString(await resp.text(), 'text/html');
+        const selector = '[data-live="' + form.dataset.inplace + '"]';
+        const next = fresh.querySelectorAll(selector);
+        document.querySelectorAll(selector).forEach(function (el, i) {
+            if (next[i]) el.replaceWith(next[i]);
+        });
+    } catch (err) {
+        form.submit();
+    }
+});
 </script>
 <!-- Add Vehicle Modal -->
 <div id="addVehicleModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

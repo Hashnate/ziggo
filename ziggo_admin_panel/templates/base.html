@@ -1093,6 +1093,8 @@
         // Debounced refresh scheduler
         function scheduleAutoRefresh(reason) {
           if (!autoSyncEnabled) return;
+          // Never auto-reload an edit/new form: it discards unsaved input and loses the scroll position.
+          if (/\/(edit|new)\/?$/.test(window.location.pathname)) return;
           if (refreshDebounceTimer) clearTimeout(refreshDebounceTimer);
           refreshDebounceTimer = setTimeout(function () {
             triggerPageRefresh(false);

@@ -969,13 +969,10 @@ async def admin_drivers_new_form(
         ("nic_back", "NIC Back"),
         ("license_front", "Driving License Front"),
         ("license_back", "Driving License Back"),
-        ("vehicle_reg", "Vehicle Registration"),
         ("insurance", "Insurance"),
         ("year_license", "Year License"),
-        ("eco_test", "Eco Test Report"),
         ("vehicle_front", "Vehicle Photo — Front"),
         ("vehicle_back", "Vehicle Photo — Back"),
-        ("vehicle_side", "Vehicle Photo — Side"),
     ]:
         docs.append({
             "kind": kind,
@@ -984,7 +981,6 @@ async def admin_drivers_new_form(
             "document_url": None,
             "is_verified": False,
             "uploaded_at": None,
-            "is_optional": kind in ("vehicle_reg", "eco_test", "vehicle_side"),
         })
     return templates.TemplateResponse(
         request, "driver_new.html",
@@ -1050,13 +1046,10 @@ async def admin_drivers_new_submit(
         ("nic_back", "NIC Back"),
         ("license_front", "Driving License Front"),
         ("license_back", "Driving License Back"),
-        ("vehicle_reg", "Vehicle Registration"),
         ("insurance", "Insurance"),
         ("year_license", "Year License"),
-        ("eco_test", "Eco Test Report"),
         ("vehicle_front", "Vehicle Photo — Front"),
         ("vehicle_back", "Vehicle Photo — Back"),
-        ("vehicle_side", "Vehicle Photo — Side"),
     ]:
         docs.append({
             "kind": kind,
@@ -1065,7 +1058,6 @@ async def admin_drivers_new_submit(
             "document_url": None,
             "is_verified": False,
             "uploaded_at": None,
-            "is_optional": kind in ("vehicle_reg", "eco_test", "vehicle_side"),
         })
 
     from app.models import FareSetting
@@ -1223,13 +1215,10 @@ async def admin_drivers_edit_form(
             ("nic_back", "NIC Back"),
             ("license_front", "Driving License Front"),
             ("license_back", "Driving License Back"),
-            ("vehicle_reg", "Vehicle Registration"),
             ("insurance", "Insurance"),
             ("year_license", "Year License"),
-            ("eco_test", "Eco Test Report"),
             ("vehicle_front", "Vehicle Photo — Front"),
             ("vehicle_back", "Vehicle Photo — Back"),
-            ("vehicle_side", "Vehicle Photo — Side"),
         ]:
             row = docs_by_kind.get(kind)
             up_str = ""
@@ -1246,7 +1235,6 @@ async def admin_drivers_edit_form(
                 "document_url": row.document_url if row else None,
                 "is_verified": bool(row.is_verified) if row else False,
                 "uploaded_at": up_str,
-                "is_optional": kind in ("vehicle_reg", "eco_test", "vehicle_side"),
             })
 
         # BRD: load registered vehicles for multi-vehicle management
