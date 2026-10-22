@@ -292,9 +292,13 @@ class RideDetailsScreen extends StatelessWidget {
     final discountAmount = _parseNum(rideData['discount_amount']);
     final redeemDiscount = _parseNum(rideData['redeem_discount']);
     final totalDiscount = discountAmount + redeemDiscount;
-    final fareAmount = rideData['fare_amount'] != null ? _parseNum(rideData['fare_amount']) : finalAmount;
     final waitingCharge = _parseNum(rideData['waiting_charge']);
     final actualGrossFare = finalAmount + totalDiscount;
+    // fare_amount leaves out the passenger fee that the booking quote included, so the
+    // estimate comes from the same total, minus waiting that only accrues during the trip.
+    final estimatedFare = actualGrossFare - waitingCharge;
+    final isCompleted = status.toLowerCase() == 'completed';
+    final isCancelled = status.toLowerCase() == 'cancelled';
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -318,7 +322,13 @@ class RideDetailsScreen extends StatelessWidget {
               children: [
                 Text(
                   fmt.format(finalAmount),
-                  style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: Colors.black, letterSpacing: -1),
+                  style: TextStyle(
+                    fontSize: 40,
+                    fontWeight: FontWeight.w900,
+                    color: isCancelled ? Colors.black38 : Colors.black,
+                    letterSpacing: -1,
+                    decoration: isCancelled ? TextDecoration.lineThrough : null,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Container(
@@ -617,93 +627,120 @@ class RideDetailsScreen extends StatelessWidget {
                   const SizedBox(height: 16),
                   
                   // Estimated Fare block
-                  _receiptSectionHeader('Estimated Fare', fmt.format(fareAmount)),
+                  _receiptSectionHeader('Estimated Fare', fmt.format(estimatedFare)),
                   _receiptSectionDetail('Estimated Duration', _formatEstimatedDuration(rideData)),
                   _receiptSectionDetail('Estimated Distance', _formatDistanceDetail(rideData)),
-                  
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Divider(height: 1, color: Colors.black12),
-                  ),
-                  
-                  // Actual Fare block
-                  _receiptSectionHeader('Actual Fare', fmt.format(actualGrossFare)),
-                  _receiptSectionDetail('Actual Duration', _formatDurationDetail(rideData)),
-                  _receiptSectionDetail('Actual Distance', _formatDistanceDetail(rideData)),
-                  
-                  if (waitingCharge > 0) ...[
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      child: Divider(height: 1, color: Colors.black12),
-                    ),
-                    _receiptRow('Waiting Surcharge', '+${fmt.format(waitingCharge)}'),
-                  ],
 
-                  if (totalDiscount > 0) ...[
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      child: Divider(height: 1, color: Colors.black12),
-                    ),
-                    _receiptRow('Discount', '-${fmt.format(totalDiscount)}', isNegative: true),
-                  ],
-                  
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Divider(height: 1, color: Colors.black12),
-                  ),
-                  
-                  _receiptRow('Total Trip Fare', fmt.format(actualGrossFare), isBold: true),
-                  _receiptRow('Paid Amount', fmt.format(finalAmount), isBold: true),
-                  
-                  const SizedBox(height: 12),
-                  
-                  // Paid by
-                  Row(
-                    children: [
-                      const Text(
-                        'Paid by',
-                        style: TextStyle(fontSize: 13, color: Colors.black54, fontWeight: FontWeight.w500),
-                      ),
-                      const Spacer(),
-                      Icon(_getPaymentIcon(rideData['payment_method']?.toString()), size: 16, color: Colors.black54),
-                      const SizedBox(width: 6),
-                      Text(
-                        _getPaymentLabel(rideData['payment_method']?.toString()),
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        fmt.format(finalAmount),
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87),
-                      ),
-                    ],
-                  ),
-                  
-                  // Savings banner if savings > 0
-                  if (totalDiscount > 0) ...[
+                  if (isCancelled) ...[
                     const SizedBox(height: 16),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade50,
+                        color: Colors.grey.shade50,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.green.shade100),
+                        border: Border.all(color: Colors.grey.shade200),
                       ),
-                      child: Row(
+                      child: const Row(
                         children: [
-                          Icon(Icons.local_offer_rounded, color: Colors.green.shade700, size: 18),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Your saving ${fmt.format(totalDiscount)} on this bill!',
-                            style: TextStyle(
-                              color: Colors.green.shade700,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
+                          Icon(Icons.info_outline_rounded, color: Colors.black54, size: 18),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'This ride was cancelled. You were not charged this fare.',
+                              style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600, fontSize: 13),
                             ),
                           ),
                         ],
                       ),
                     ),
+                  ],
+
+                  // The actual fare and payment only exist once the trip is completed.
+                  if (isCompleted) ...[
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Divider(height: 1, color: Colors.black12),
+                    ),
+
+                    // Actual Fare block
+                    _receiptSectionHeader('Actual Fare', fmt.format(actualGrossFare)),
+                    _receiptSectionDetail('Actual Duration', _formatDurationDetail(rideData)),
+                    _receiptSectionDetail('Actual Distance', _formatDistanceDetail(rideData)),
+
+                    if (waitingCharge > 0) ...[
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Divider(height: 1, color: Colors.black12),
+                      ),
+                      _receiptRow('Waiting Surcharge', '+${fmt.format(waitingCharge)}'),
+                    ],
+
+                    if (totalDiscount > 0) ...[
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Divider(height: 1, color: Colors.black12),
+                      ),
+                      _receiptRow('Discount', '-${fmt.format(totalDiscount)}', isNegative: true),
+                    ],
+
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Divider(height: 1, color: Colors.black12),
+                    ),
+
+                    _receiptRow('Total Trip Fare', fmt.format(actualGrossFare), isBold: true),
+                    _receiptRow('Paid Amount', fmt.format(finalAmount), isBold: true),
+
+                    const SizedBox(height: 12),
+
+                    // Paid by
+                    Row(
+                      children: [
+                        const Text(
+                          'Paid by',
+                          style: TextStyle(fontSize: 13, color: Colors.black54, fontWeight: FontWeight.w500),
+                        ),
+                        const Spacer(),
+                        Icon(_getPaymentIcon(rideData['payment_method']?.toString()), size: 16, color: Colors.black54),
+                        const SizedBox(width: 6),
+                        Text(
+                          _getPaymentLabel(rideData['payment_method']?.toString()),
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          fmt.format(finalAmount),
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87),
+                        ),
+                      ],
+                    ),
+
+                    // Savings banner if savings > 0
+                    if (totalDiscount > 0) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.green.shade100),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.local_offer_rounded, color: Colors.green.shade700, size: 18),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Your saving ${fmt.format(totalDiscount)} on this bill!',
+                              style: TextStyle(
+                                color: Colors.green.shade700,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ],
               ),
@@ -813,15 +850,17 @@ class RideDetailsScreen extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 20),
+            if (isCompleted) ...[
+              const SizedBox(height: 20),
 
-            // --- DOWNLOAD INVOICE BUTTON ---
-            Center(
-              child: DownloadInvoiceButton(
-                rideData: rideData,
-                isDriver: false,
+              // --- DOWNLOAD INVOICE BUTTON ---
+              Center(
+                child: DownloadInvoiceButton(
+                  rideData: rideData,
+                  isDriver: false,
+                ),
               ),
-            ),
+            ],
             
             const SizedBox(height: 40),
           ],

@@ -98,6 +98,7 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
               itemBuilder: (_, i) {
                 final r = rides[i];
                 final status = (r['status'] ?? '').toString();
+                final isCancelled = status.toLowerCase() == 'cancelled';
                 final meta = _statusMeta(status);
                 final serviceType = (r['service_type'] ?? 'car').toString();
                 return EntranceSlide(
@@ -237,9 +238,11 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                             const Spacer(),
                             Text(
                               fmt.format((r['final_amount'] as num?)?.toDouble() ?? 0),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.w900,
                                 fontSize: 15,
+                                color: isCancelled ? AppColors.textTertiary : null,
+                                decoration: isCancelled ? TextDecoration.lineThrough : null,
                               ),
                             ),
                           ],
