@@ -404,7 +404,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                         : null,
                   ),
                 ),
-                Divider(height: 1, thickness: 1, color: AppColors.divider.withOpacity(0.5)),
+                const SizedBox(height: 12),
                 TextField(
                   controller: _dropController,
                   focusNode: _dropFocus,
@@ -450,7 +450,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
                   ),
                 ),
                 if (_tripType == 'return') ...[
-                  Divider(height: 1, thickness: 1, color: AppColors.divider.withOpacity(0.5)),
+                  const SizedBox(height: 12),
                   Container(
                     height: 52,
                     alignment: Alignment.centerLeft,

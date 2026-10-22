@@ -113,6 +113,7 @@ class ZiggoApp extends StatelessWidget {
       ],
       child: MaterialApp(
         navigatorKey: rootNavigatorKey,
+        navigatorObservers: [_keyboardDismissObserver],
         title: 'Ziggo',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
@@ -125,7 +126,7 @@ class ZiggoApp extends StatelessWidget {
               systemNavigationBarColor: Colors.white,
               systemNavigationBarIconBrightness: Brightness.dark,
             ),
-            child: child ?? const SizedBox.shrink(),
+            child: _DismissKeyboardOnTap(child: child ?? const SizedBox.shrink()),
           );
         },
         scrollBehavior: const MaterialScrollBehavior().copyWith(
@@ -133,6 +134,38 @@ class ZiggoApp extends StatelessWidget {
         ),
         home: const _Root(),
       ),
+    );
+  }
+}
+
+void _dismissKeyboard() => FocusManager.instance.primaryFocus?.unfocus();
+
+// Unfocusing on push also stops Flutter from re-focusing the old field (and
+// reopening the keyboard) when the user comes back to that screen.
+class _KeyboardDismissObserver extends NavigatorObserver {
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) => _dismissKeyboard();
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) => _dismissKeyboard();
+}
+
+final _keyboardDismissObserver = _KeyboardDismissObserver();
+
+// Tapping outside a text field closes the keyboard. The tap handler only exists
+// while the keyboard is up, so it never takes taps away from maps or buttons
+// the rest of the time.
+class _DismissKeyboardOnTap extends StatelessWidget {
+  const _DismissKeyboardOnTap({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    return GestureDetector(
+      onTap: keyboardOpen ? _dismissKeyboard : null,
+      child: child,
     );
   }
 }
