@@ -215,6 +215,9 @@ def build_cases() -> list[dict]:
         yield "courier_3kg", trip("fort_to_kandy", is_courier=True, parcel_weight_kg=3.0)
         yield "courier_packages", trip("fort_to_kandy", is_courier=True, packages=PACKAGES)
         yield "courier_PCT10", trip("nugegoda_medium", is_courier=True, parcel_weight_kg=8.0, promo="PCT10")
+        yield "rental_3h_redeem_150", trip("fort_short", is_rental=True, rental_hours=3, customer="rider", redeem_points=150)
+        yield "courier_3kg_redeem_150", trip("fort_to_kandy", is_courier=True, parcel_weight_kg=3.0,
+                                             customer="rider", redeem_points=150)
 
     for variant, keep in [
         ("base", lambda name: True),

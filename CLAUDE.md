@@ -173,7 +173,7 @@ On rate: customer rating updates the driver's aggregate `User.rating` and `User.
 
 `calculate_fare` (one vehicle type: estimates, booking create / accept / completion / destination change, public pages) and `calculate_fares_bulk` (the vehicle cards) share one set of pricing rules: (base + per-km + per-minute) × surge, minimum fare, category discount, boost, pickup fee, peak-hour and surge-zone surcharges, stop fees, flash weight tiers, return trips, promo codes, passenger deductible and commission. Rentals and courier have their own simpler rules.
 
-Prices must not change by accident: `ziggo_backend/tests/test_fare_golden.py` holds both functions to 2,310 recorded results. If a change is intended, re-record with `deploy/staging/run-backend-tests.sh record-fare-golden` and review the diff.
+Prices must not change by accident: `ziggo_backend/tests/test_fare_golden.py` holds both functions to 2,535 recorded results and checks that every vehicle card shows the same price, pickup fee and loyalty points as booking that vehicle. If a change is intended, re-record with `deploy/staging/run-backend-tests.sh record-fare-golden` and review the diff.
 
 Rates come from `FareSetting` rows (admin-editable at `/admin/fare-settings`); falls back to `DEFAULTS` constant if a row is missing.
 

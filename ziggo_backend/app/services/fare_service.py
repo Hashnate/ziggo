@@ -2,9 +2,9 @@
 
 calculate_fare (one vehicle type: estimates, bookings, completion) and
 calculate_fares_bulk (every vehicle card at once) share the pricing rules
-below, so each rule is written once. Where the two used to behave
-differently, the difference is kept and noted where it happens; the golden
-tests in tests/test_fare_golden.py hold both to their recorded results.
+below, so each rule is written once and a vehicle card always shows the same
+price, pickup fee and loyalty points as booking that vehicle. The golden tests
+in tests/test_fare_golden.py check both.
 """
 from dataclasses import dataclass
 from decimal import Decimal
@@ -262,8 +262,8 @@ def _courier_fare(rules: _Rules, setting, pickup_lat, pickup_lng, drop_lat, drop
 
 
 def _standard_fare(rules: _Rules, service_type: str, setting, route, pickup_distance_km: float,
-                   zone_surcharge: float, is_flash: bool, parcel_weight_kg, trip_type: str) -> tuple[dict, float]:
-    """Rides and flash parcels. Returns the fare snapshot and the unrounded passenger total."""
+                   zone_surcharge: float, is_flash: bool, parcel_weight_kg, trip_type: str) -> dict:
+    """Rides and flash parcels."""
     clean_stops, distance_km, duration_min = route
     if setting:
         base = float(setting.base_fare or 0)
@@ -370,7 +370,7 @@ def _standard_fare(rules: _Rules, service_type: str, setting, route, pickup_dist
     passenger_deductible_val_original = final_pre_deductible_original * (passenger_deductible_pct / 100.0)
     gross_total_original = final_pre_deductible_original + passenger_deductible_val_original
 
-    fare_dict = {
+    return {
         "distance_km": round(distance_km, 2),
         "pickup_distance_km": round(pickup_distance_km, 2),
         "duration_min": round(duration_min),
@@ -395,7 +395,6 @@ def _standard_fare(rules: _Rules, service_type: str, setting, route, pickup_dist
         "app_usage_charges": round(app_usage_charges, 2),
         "deductions": round(deductions, 2),
     }
-    return fare_dict, gross_total
 
 
 async def calculate_fare(
@@ -470,14 +469,13 @@ async def calculate_fare(
     if driver_accepted_lat is not None and driver_accepted_lng is not None:
         pickup_distance_km = haversine_km(driver_accepted_lat, driver_accepted_lng, pickup_lat, pickup_lng)
     else:
-        # Exact vehicle-type match here; the bulk estimate matches case-insensitively.
         from .matching_service import find_nearest_driver
         search_radius = float(setting.search_radius_km) if (setting and setting.search_radius_km is not None) else 10.0
         nearest = await find_nearest_driver(db, pickup_lat, pickup_lng, service_type, max_distance_km=search_radius)
         if nearest and nearest.current_lat is not None and nearest.current_lng is not None:
             pickup_distance_km = haversine_km(float(nearest.current_lat), float(nearest.current_lng), pickup_lat, pickup_lng)
 
-    fare_dict, _ = _standard_fare(
+    fare_dict = _standard_fare(
         rules, service_type, setting, _route(pickup_lat, pickup_lng, drop_lat, drop_lng, stops),
         pickup_distance_km, _zone_surcharge(rules, pickup_lat, pickup_lng), is_flash, parcel_weight_kg, trip_type,
     )
@@ -573,8 +571,9 @@ async def calculate_fares_bulk(
         need_flash_tiers=(is_flash and parcel_weight_kg is not None) or is_courier,
     )
 
-    # Pre-fetch online drivers & busy driver IDs once for all vehicle types. Types
-    # are matched case-insensitively here; calculate_fare's search matches exactly.
+    # Nearest free online driver of each vehicle type, found once for all cards.
+    # Types match exactly, as in dispatch and calculate_fare, so each card's pickup
+    # fee is the one the booking would charge.
     busy = await busy_driver_ids(db)
     drv_q = await db.execute(
         select(Driver.id, Driver.vehicle_type, Driver.current_lat, Driver.current_lng).where(
@@ -586,22 +585,12 @@ async def calculate_fares_bulk(
     for d in drv_q.all():
         if d.id in busy or d.current_lat is None or d.current_lng is None:
             continue
-        vt = (d.vehicle_type or "").lower().strip()
-        dist = haversine_km(pickup_lat, pickup_lng, float(d.current_lat), float(d.current_lng))
-        if vt not in nearest_dist_by_type or dist < nearest_dist_by_type[vt]:
-            nearest_dist_by_type[vt] = dist
+        dist = haversine_km(float(d.current_lat), float(d.current_lng), pickup_lat, pickup_lng)
+        if d.vehicle_type not in nearest_dist_by_type or dist < nearest_dist_by_type[d.vehicle_type]:
+            nearest_dist_by_type[d.vehicle_type] = dist
 
     route = _route(pickup_lat, pickup_lng, drop_lat, drop_lng, stops)
     zone_surcharge = _zone_surcharge(rules, pickup_lat, pickup_lng)
-
-    def points_earnable_calc(amount: float) -> int:
-        ss = rules.settings
-        if not ss or not ss.loyalty_is_active:
-            return 0
-        rate = float(ss.loyalty_earn_rupees_per_point or 0)
-        if rate <= 0:
-            return 0
-        return int(Decimal(str(amount or 0)) // Decimal(str(rate)))
 
     def flat_estimate(service_type: str, fields: dict, platform_fee: float, passenger_pays: float) -> dict:
         # Rentals and courier carry no surcharges; their snapshot keys are zero.
@@ -618,10 +607,6 @@ async def calculate_fares_bulk(
             "passenger_deductible": 0.0,
             "app_usage_charges": round(platform_fee, 2),
             "deductions": round(platform_fee, 2),
-            "points_earnable": points_earnable_calc(passenger_pays),
-            "redeem_points_used": 0,
-            "redeem_discount": 0.0,
-            "redeem_reason": None,
         }
 
     results: dict[str, dict] = {}
@@ -630,7 +615,7 @@ async def calculate_fares_bulk(
         try:
             if is_rental:
                 r = _rental_fare(rules, rules.fare_settings.get(service_type), service_type, rental_hours)
-                results[service_type] = flat_estimate(service_type, {
+                fare_dict = flat_estimate(service_type, {
                     "distance_km": 0.0,
                     "pickup_distance_km": 0.0,
                     "duration_min": r["hours"] * 60,
@@ -643,15 +628,10 @@ async def calculate_fares_bulk(
                     "surge_multiplier": 1.0,
                     "flash_surcharge": 0.0,
                 }, r["platform_fee"], r["final"])
-                continue
-
-            if is_courier:
-                # Unlike calculate_fare, falls back to the vehicle's own rates when
-                # there is no "courier" fare row.
-                setting = rules.fare_settings.get("courier") or rules.fare_settings.get(service_type)
-                c = _courier_fare(rules, setting, pickup_lat, pickup_lng, drop_lat, drop_lng,
-                                  parcel_weight_kg, packages)
-                results[service_type] = flat_estimate(service_type, {
+            elif is_courier:
+                c = _courier_fare(rules, rules.fare_settings.get("courier"), pickup_lat, pickup_lng,
+                                  drop_lat, drop_lng, parcel_weight_kg, packages)
+                fare_dict = flat_estimate(service_type, {
                     "distance_km": round(c["distance_km"], 2),
                     "pickup_distance_km": 0.0,
                     "duration_min": round(c["eta_days"] * 24 * 60),
@@ -665,35 +645,22 @@ async def calculate_fares_bulk(
                     "flash_surcharge": round(c["weight_surcharge"], 2),
                     "courier_eta_days": c["eta_days"],
                 }, c["platform_fee"], c["final"])
-                continue
+            else:
+                # Standard Ride / Flash Calculation
+                setting = rules.fare_settings.get(service_type)
+                search_radius = float(setting.search_radius_km) if (setting and setting.search_radius_km is not None) else 10.0
+                pickup_distance_km = 0.0
+                d_dist = nearest_dist_by_type.get(service_type)
+                if d_dist is not None and d_dist <= search_radius:
+                    pickup_distance_km = d_dist
+                fare_dict = {
+                    "service_type": service_type,
+                    **_standard_fare(rules, service_type, setting, route, pickup_distance_km,
+                                     zone_surcharge, is_flash, parcel_weight_kg, trip_type),
+                }
 
-            # Standard Ride / Flash Calculation
-            setting = rules.fare_settings.get(service_type)
-            search_radius = float(setting.search_radius_km) if (setting and setting.search_radius_km is not None) else 10.0
-            pickup_distance_km = 0.0
-            d_dist = nearest_dist_by_type.get(service_type.lower().strip())
-            if d_dist is not None and d_dist <= search_radius:
-                pickup_distance_km = d_dist
-
-            fare_dict, gross_total = _standard_fare(
-                rules, service_type, setting, route, pickup_distance_km, zone_surcharge,
-                is_flash, parcel_weight_kg, trip_type,
-            )
-            fare_dict = {
-                "service_type": service_type,
-                **fare_dict,
-                # Points on the unrounded total; calculate_fare uses the rounded final_amount.
-                "points_earnable": points_earnable_calc(gross_total),
-                "redeem_points_used": 0,
-                "redeem_discount": 0.0,
-                "redeem_reason": None,
-            }
-
-            # If loyalty redemption requested, apply it
-            if customer is not None and (redeem_points or 0) > 0:
-                fare_dict = await _enrich_with_loyalty(db, fare_dict, customer, redeem_points)
-
-            results[service_type] = fare_dict
+            # Same loyalty points and redemption as booking this vehicle.
+            results[service_type] = await _enrich_with_loyalty(db, fare_dict, customer, redeem_points)
         except Exception as e:
             import logging
             logging.error(f"Error calculating bulk fare for {service_type}: {e}", exc_info=True)
