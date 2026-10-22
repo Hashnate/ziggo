@@ -9,15 +9,26 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Discovers the Ziggo backend's reachable URL at runtime.
 ///
 /// Production: Uses the secure https://ziggo.lk endpoint exclusively.
-/// Dev: override with `--dart-define=API_HOST=http://your-dev-pc:8030`.
+/// Dev / staging: override with `--dart-define=API_HOST=https://test.ziggo.lk`.
+/// An override is final: if that host is down the app shows connection errors
+/// instead of switching to production, so test builds never touch live data.
 class HostResolver {
   HostResolver._();
 
   static const String productionHost = 'https://ziggo.lk';
-  static const String fallbackHost = productionHost;
   static const String _prefsKey = 'ziggo_api_host';
   static const String _envHost =
       String.fromEnvironment('API_HOST', defaultValue: '');
+
+  /// Used until [resolve] completes; startup only waits a few seconds for it.
+  static String get fallbackHost =>
+      _envHost.isNotEmpty ? _envHost : productionHost;
+
+  /// Corner-banner text for builds pointed away from production, else null.
+  static String? get bannerLabel {
+    if (_envHost.isEmpty || _envHost == productionHost) return null;
+    return _envHost.contains('test.ziggo.lk') ? 'STAGING' : 'DEV';
+  }
 
   static String? _cached;
   static Future<String>? _inFlight;
@@ -35,9 +46,12 @@ class HostResolver {
   }
 
   static Future<String> _resolve() async {
-    // 1. Explicit override via --dart-define (dev testing)
-    if (_envHost.isNotEmpty && await _probe(_envHost)) {
-      return _save(_envHost);
+    // 1. Explicit override via --dart-define. Not probed on purpose: falling
+    // back to production when a test server is down would let a staging
+    // build create real bookings.
+    if (_envHost.isNotEmpty) {
+      _cached = _envHost;
+      return _envHost;
     }
 
     // 2. Wipe any stale raw-IP or legacy port entries from SharedPreferences

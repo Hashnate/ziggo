@@ -11,6 +11,7 @@ import 'app/app_theme.dart';
 import 'core/map/maps_web_loader_stub.dart'
     if (dart.library.html) 'core/map/maps_web_loader.dart';
 import 'core/network/api_client.dart';
+import 'core/network/host_resolver.dart';
 import 'core/notifications/fcm_service.dart';
 import 'core/notifications/notification_router.dart';
 import 'core/services/app_update_service.dart';
@@ -118,7 +119,7 @@ class ZiggoApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
         builder: (context, child) {
-          return AnnotatedRegion<SystemUiOverlayStyle>(
+          final app = AnnotatedRegion<SystemUiOverlayStyle>(
             value: const SystemUiOverlayStyle(
               statusBarColor: Colors.transparent,
               statusBarIconBrightness: Brightness.dark,
@@ -127,6 +128,13 @@ class ZiggoApp extends StatelessWidget {
               systemNavigationBarIconBrightness: Brightness.dark,
             ),
             child: _DismissKeyboardOnTap(child: child ?? const SizedBox.shrink()),
+          );
+          final envLabel = HostResolver.bannerLabel;
+          if (envLabel == null) return app;
+          return Banner(
+            message: envLabel,
+            location: BannerLocation.topEnd,
+            child: app,
           );
         },
         scrollBehavior: const MaterialScrollBehavior().copyWith(
