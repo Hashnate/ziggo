@@ -1,4 +1,12 @@
-"""Fare estimation + distance helpers."""
+"""Fare estimation + distance helpers.
+
+calculate_fare (one vehicle type: estimates, bookings, completion) and
+calculate_fares_bulk (every vehicle card at once) share the pricing rules
+below, so each rule is written once. Where the two used to behave
+differently, the difference is kept and noted where it happens; the golden
+tests in tests/test_fare_golden.py hold both to their recorded results.
+"""
+from dataclasses import dataclass
 from decimal import Decimal
 from math import radians, sin, cos, asin, sqrt
 from typing import Optional
@@ -63,19 +71,100 @@ def estimate_duration_min(distance_km: float) -> int:
 RETURN_TRIP_MULTIPLIER = 2.1
 
 
-async def _flash_surcharge(db: AsyncSession, weight_kg: float) -> float:
-    """Look up the admin-configured surcharge for a parcel weight.
+@dataclass
+class _Rules:
+    """Everything a fare depends on besides the trip itself, read once per request."""
+    settings: object                  # SystemSettings row, or None
+    sys_commission: float
+    fare_settings: dict               # service_type -> FareSetting
+    peaks: list
+    hhmm: str                         # Colombo time, for peak-hour windows
+    zones: list                       # active surge zones whose time window is open
+    promo: Optional[PromoCode]
+    flash_tiers: list
+    system_surge: Optional[float]     # system surge multiplier while its window is open
 
-    Finds the active tier whose [min, max) band covers the given weight. The
-    top tier may have ``max_weight_kg is None`` (open-ended). Returns 0 if no
-    matching tier is configured.
-    """
-    q = await db.execute(
-        select(FlashWeightTier)
-        .where(FlashWeightTier.is_active == True)  # noqa: E712
-        .order_by(FlashWeightTier.display_order, FlashWeightTier.id)
+
+async def _load_rules(db: AsyncSession, service_types: list[str], promo: Optional[str],
+                      need_flash_tiers: bool) -> _Rules:
+    from ..models import PeakHourSetting, SystemSettings
+    from datetime import datetime, timezone, timedelta
+
+    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    ss = ss_q.scalars().first()
+    sys_commission = float(ss.commission_rate) if (ss and ss.commission_rate is not None) else 15.0
+
+    setting_q = await db.execute(select(FareSetting).where(FareSetting.service_type.in_(service_types)))
+    fare_settings = {s.service_type: s for s in setting_q.scalars().all()}
+    peak_q = await db.execute(select(PeakHourSetting).where(PeakHourSetting.is_active == True))  # noqa: E712
+    zone_q = await db.execute(select(SurgeZone).where(SurgeZone.is_active == True))  # noqa: E712
+
+    promo_row = None
+    if promo:
+        promo_q = await db.execute(select(PromoCode).where(PromoCode.code == promo.upper()))
+        promo_row = promo_q.scalars().first()
+
+    flash_tiers = []
+    if need_flash_tiers:
+        flash_q = await db.execute(
+            select(FlashWeightTier)
+            .where(FlashWeightTier.is_active == True)  # noqa: E712
+            .order_by(FlashWeightTier.display_order, FlashWeightTier.id)
+        )
+        flash_tiers = flash_q.scalars().all()
+
+    # Dynamic surge pricing window check from SystemSettings
+    now_colombo = datetime.now(timezone(timedelta(hours=5, minutes=30)))
+    system_surge = None
+    if ss and ss.surge_start_hour is not None and ss.surge_end_hour is not None:
+        start, end = ss.surge_start_hour, ss.surge_end_hour
+        if start <= end:
+            in_surge = start <= now_colombo.hour < end
+        else:
+            in_surge = now_colombo.hour >= start or now_colombo.hour < end
+        if in_surge:
+            system_surge = float(ss.surge_multiplier or 1.0)
+
+    # Surge zone windows use the server's local clock (Asia/Colombo in the containers).
+    now_local = datetime.now()
+    open_zones = [z for z in zone_q.scalars().all() if is_time_in_range(z.start_time, z.end_time, now_local)]
+
+    return _Rules(
+        settings=ss, sys_commission=sys_commission, fare_settings=fare_settings,
+        peaks=peak_q.scalars().all(), hhmm=now_colombo.strftime("%H:%M"), zones=open_zones,
+        promo=promo_row, flash_tiers=flash_tiers, system_surge=system_surge,
     )
-    tiers = q.scalars().all()
+
+
+def _platform_pct(setting, sys_commission: float) -> float:
+    # A category commission of 0 counts as unset and falls back to the system rate.
+    if setting and setting.platform_fee_percent is not None and float(setting.platform_fee_percent) > 0:
+        return float(setting.platform_fee_percent)
+    return sys_commission
+
+
+def _promo_discount(p, amount: float) -> float:
+    if p.discount_type == "percentage":
+        discount = amount * (float(p.discount_value) / 100.0)
+        if p.max_discount:
+            discount = min(discount, float(p.max_discount))
+        return discount
+    return float(p.discount_value)
+
+
+def _apply_promo(p, amount: float) -> tuple[float, Optional[str]]:
+    """Discount on `amount` and the applied code, or (0.0, None) if the promo can't be used."""
+    if p and p.is_active and (p.usage_limit is None or p.used_count < p.usage_limit):
+        return _promo_discount(p, amount), p.code
+    return 0.0, None
+
+
+def _flash_surcharge(tiers, weight_kg: float) -> float:
+    """Surcharge of the active tier whose [min, max) band covers `weight_kg`.
+
+    The top tier may have ``max_weight_kg is None`` (open-ended). Returns 0 if
+    no tier matches.
+    """
     for t in tiers:
         min_w = float(t.min_weight_kg or 0)
         max_w = float(t.max_weight_kg) if t.max_weight_kg is not None else None
@@ -84,158 +173,13 @@ async def _flash_surcharge(db: AsyncSession, weight_kg: float) -> float:
     return 0.0
 
 
-async def calculate_fare(
-    db: AsyncSession,
-    service_type: str,
-    pickup_lat: float,
-    pickup_lng: float,
-    drop_lat: float,
-    drop_lng: float,
-    promo: Optional[str] = None,
-    trip_type: str = "one_way",
-    is_flash: bool = False,
-    parcel_weight_kg: Optional[float] = None,
-    is_rental: bool = False,
-    rental_hours: Optional[int] = None,
-    is_courier: bool = False,
-    packages: Optional[list] = None,
-    # BRD: RW-01 (earn) + RW-02 (redeem) + RS-07 (display)
-    customer=None,
-    redeem_points: int = 0,
-    # BRD: CD-19 / BE-16 / BR-9 — intermediate stops
-    # Each stop is {"lat": float, "lng": float, "address": str?}.
-    stops: Optional[list] = None,
-    driver_accepted_lat: Optional[float] = None,
-    driver_accepted_lng: Optional[float] = None,
-) -> dict:
-    from ..models import SystemSettings
-    from datetime import datetime, timezone, timedelta
-    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
-    ss = ss_q.scalars().first()
-    sys_commission = float(ss.commission_rate) if (ss and ss.commission_rate is not None) else 15.0
+def _route(pickup_lat, pickup_lng, drop_lat, drop_lng, stops) -> tuple[list, float, int]:
+    """Clean stops, total distance and estimated duration of pickup → stops → drop.
 
-    # Rental: short-circuit the distance-based math. Fare = hourly * hours,
-    # promo discount still applies, platform-fee split still applies.
-    if is_rental:
-        hours = max(1, int(rental_hours or 1))
-        setting_q = await db.execute(
-            select(FareSetting).where(FareSetting.service_type == service_type)
-        )
-        setting = setting_q.scalars().first()
-        platform_pct = float(setting.platform_fee_percent) if (setting and setting.platform_fee_percent is not None and float(setting.platform_fee_percent) > 0) else sys_commission
-        
-        # Use dynamic rental_hourly_rate if defined, otherwise fallback to RENTAL_HOURLY dictionary
-        if setting and setting.rental_hourly_rate is not None:
-            hourly = float(setting.rental_hourly_rate)
-        else:
-            hourly = float(RENTAL_HOURLY.get(service_type, RENTAL_HOURLY["car"]))
-            
-        fare = hourly * hours
-
-        discount = 0.0
-        promo_applied = None
-        if promo:
-            promo_q = await db.execute(
-                select(PromoCode).where(PromoCode.code == promo.upper())
-            )
-            p = promo_q.scalars().first()
-            if p and p.is_active and (
-                p.usage_limit is None or p.used_count < p.usage_limit
-            ):
-                if p.discount_type == "percentage":
-                    discount = fare * (float(p.discount_value) / 100.0)
-                    if p.max_discount:
-                        discount = min(discount, float(p.max_discount))
-                else:
-                    discount = float(p.discount_value)
-                promo_applied = p.code
-
-        final = max(0, fare - discount)
-        platform_fee = fare * (platform_pct / 100.0)
-        passenger_pays = final
-        driver_earnings = fare - platform_fee
-
-        rental_dict = {
-            "distance_km": 0.0,
-            "pickup_distance_km": 0.0,
-            "duration_min": hours * 60,
-            "fare_amount": round(fare, 2),
-            "discount_amount": round(discount, 2),
-            "final_amount": round(passenger_pays, 2),
-            "platform_fee": round(platform_fee, 2),
-            "driver_earnings": round(driver_earnings, 2),
-            "promo_code": promo_applied,
-            "surge_multiplier": 1.0,
-            "flash_surcharge": 0.0,
-            "hourly_rate": hourly,
-            "rental_hours": hours,
-        }
-        return await _enrich_with_loyalty(db, rental_dict, customer, redeem_points)
-
-    if is_courier:
-        setting_q = await db.execute(
-            select(FareSetting).where(FareSetting.service_type == "courier")
-        )
-        setting = setting_q.scalars().first()
-        platform_pct = float(setting.platform_fee_percent) if (setting and setting.platform_fee_percent is not None and float(setting.platform_fee_percent) > 0) else sys_commission
-
-        distance_km = haversine_km(pickup_lat, pickup_lng, drop_lat, drop_lng)
-        weight_surcharge = 0.0
-        if packages:
-            for pkg in packages:
-                pkg_weight = float(pkg.get("weight_kg") or 0.0) if isinstance(pkg, dict) else float(getattr(pkg, "weight_kg", 0.0))
-                weight_surcharge += await _flash_surcharge(db, pkg_weight)
-        elif parcel_weight_kg is not None:
-            weight_surcharge = await _flash_surcharge(db, float(parcel_weight_kg))
-        
-        courier_base = float(setting.base_fare) if setting and setting.base_fare is not None else COURIER_BASE
-        courier_per_km = float(setting.per_km_rate) if setting and setting.per_km_rate is not None else COURIER_PER_KM
-        
-        fare = courier_base + weight_surcharge + courier_per_km * distance_km
-        eta_days = courier_eta_days(distance_km)
-
-        discount = 0.0
-        promo_applied = None
-        if promo:
-            promo_q = await db.execute(
-                select(PromoCode).where(PromoCode.code == promo.upper())
-            )
-            p = promo_q.scalars().first()
-            if p and p.is_active and (
-                p.usage_limit is None or p.used_count < p.usage_limit
-            ):
-                if p.discount_type == "percentage":
-                    discount = fare * (float(p.discount_value) / 100.0)
-                    if p.max_discount:
-                        discount = min(discount, float(p.max_discount))
-                else:
-                    discount = float(p.discount_value)
-                promo_applied = p.code
-
-        final = max(0, fare - discount)
-        platform_fee = fare * (platform_pct / 100.0)
-        passenger_pays = final
-        driver_earnings = fare - platform_fee
-
-        courier_dict = {
-            "distance_km": round(distance_km, 2),
-            "pickup_distance_km": 0.0,
-            "duration_min": round(eta_days * 24 * 60),
-            "fare_amount": round(fare, 2),
-            "discount_amount": round(discount, 2),
-            "final_amount": round(passenger_pays, 2),
-            "platform_fee": round(platform_fee, 2),
-            "driver_earnings": round(driver_earnings, 2),
-            "promo_code": promo_applied,
-            "surge_multiplier": 1.0,
-            "flash_surcharge": round(weight_surcharge, 2),
-            "courier_eta_days": eta_days,
-        }
-        return await _enrich_with_loyalty(db, courier_dict, customer, redeem_points)
-
-    # BRD: CD-19 — sum of leg distances when intermediate stops are present.
-    # Stops are an ordered list between pickup and drop; legs cover every
-    # consecutive pair. With 2 stops the route is pickup→stop1→stop2→drop.
+    BRD: CD-19 — sum of leg distances when intermediate stops are present.
+    Stops are an ordered list between pickup and drop; legs cover every
+    consecutive pair. With 2 stops the route is pickup→stop1→stop2→drop.
+    """
     waypoints = [(pickup_lat, pickup_lng)]
     clean_stops = []
     if stops:
@@ -255,18 +199,77 @@ async def calculate_fare(
     distance_km = 0.0
     for (a_lat, a_lng), (b_lat, b_lng) in zip(waypoints, waypoints[1:]):
         distance_km += haversine_km(a_lat, a_lng, b_lat, b_lng)
-    duration_min = estimate_duration_min(distance_km)
-    setting_q = await db.execute(
-        select(FareSetting).where(FareSetting.service_type == service_type)
-    )
-    setting = setting_q.scalars().first()
+    return clean_stops, distance_km, estimate_duration_min(distance_km)
 
+
+def _zone_surcharge(rules: _Rules, pickup_lat: float, pickup_lng: float) -> float:
+    """Geographic surge: flat charge of every open zone containing the pickup."""
+    zone_surcharge = 0.0
+    pickup_point = Point(pickup_lng, pickup_lat)
+    for z in rules.zones:
+        # Create a Shapely Polygon from the coordinates (lng, lat)
+        try:
+            poly_coords = [(float(pt["lng"]), float(pt["lat"])) for pt in z.coordinates]
+            if len(poly_coords) >= 3:
+                poly = Polygon(poly_coords)
+                if poly.contains(pickup_point):
+                    zone_surcharge += float(z.flat_extra_charge or 0.0)
+        except Exception:
+            pass
+    return zone_surcharge
+
+
+def _rental_fare(rules: _Rules, setting, service_type: str, rental_hours) -> dict:
+    """Rental: hourly rate × hours; promo discount and platform-fee split still apply."""
+    hours = max(1, int(rental_hours or 1))
+    platform_pct = _platform_pct(setting, rules.sys_commission)
+    # Use dynamic rental_hourly_rate if defined, otherwise fallback to RENTAL_HOURLY dictionary
+    if setting and setting.rental_hourly_rate is not None:
+        hourly = float(setting.rental_hourly_rate)
+    else:
+        hourly = float(RENTAL_HOURLY.get(service_type, RENTAL_HOURLY["car"]))
+    fare = hourly * hours
+    discount, promo_applied = _apply_promo(rules.promo, fare)
+    final = max(0, fare - discount)
+    platform_fee = fare * (platform_pct / 100.0)
+    return {"hours": hours, "hourly": hourly, "fare": fare, "discount": discount, "promo_code": promo_applied,
+            "final": final, "platform_fee": platform_fee, "driver_earnings": fare - platform_fee}
+
+
+def _courier_fare(rules: _Rules, setting, pickup_lat, pickup_lng, drop_lat, drop_lng,
+                  parcel_weight_kg, packages) -> dict:
+    """Courier: handling base + parcel weight surcharge + a small per-km component."""
+    platform_pct = _platform_pct(setting, rules.sys_commission)
+    distance_km = haversine_km(pickup_lat, pickup_lng, drop_lat, drop_lng)
+    weight_surcharge = 0.0
+    if packages:
+        for pkg in packages:
+            pkg_weight = float(pkg.get("weight_kg") or 0.0) if isinstance(pkg, dict) else float(getattr(pkg, "weight_kg", 0.0))
+            weight_surcharge += _flash_surcharge(rules.flash_tiers, pkg_weight)
+    elif parcel_weight_kg is not None:
+        weight_surcharge = _flash_surcharge(rules.flash_tiers, float(parcel_weight_kg))
+
+    courier_base = float(setting.base_fare) if setting and setting.base_fare is not None else COURIER_BASE
+    courier_per_km = float(setting.per_km_rate) if setting and setting.per_km_rate is not None else COURIER_PER_KM
+    fare = courier_base + weight_surcharge + courier_per_km * distance_km
+    discount, promo_applied = _apply_promo(rules.promo, fare)
+    final = max(0, fare - discount)
+    platform_fee = fare * (platform_pct / 100.0)
+    return {"distance_km": distance_km, "eta_days": courier_eta_days(distance_km),
+            "weight_surcharge": weight_surcharge, "fare": fare, "discount": discount,
+            "promo_code": promo_applied, "final": final, "platform_fee": platform_fee,
+            "driver_earnings": fare - platform_fee}
+
+
+def _standard_fare(rules: _Rules, service_type: str, setting, route, pickup_distance_km: float,
+                   zone_surcharge: float, is_flash: bool, parcel_weight_kg, trip_type: str) -> tuple[dict, float]:
+    """Rides and flash parcels. Returns the fare snapshot and the unrounded passenger total."""
+    clean_stops, distance_km, duration_min = route
     if setting:
         base = float(setting.base_fare or 0)
         per_km = float(setting.per_km_rate or 0)
         per_min = float(setting.per_minute_rate or 0)
         min_fare = float(setting.min_fare or 0)
-        platform_pct = float(setting.platform_fee_percent) if (setting.platform_fee_percent is not None and float(setting.platform_fee_percent) > 0) else sys_commission
         surge = float(setting.surge_multiplier or 1)
         boost_val = float(setting.boost or 0)
         passenger_deductible_pct = float(setting.passenger_deductible or 0)
@@ -274,47 +277,21 @@ async def calculate_fare(
     else:
         d = DEFAULTS.get(service_type, DEFAULTS["car"])
         base, per_km, per_min, min_fare = d["base"], d["per_km"], d["per_min"], d["min"]
-        platform_pct = sys_commission
         surge = 1.0
         boost_val, passenger_deductible_pct, pickup_fee_pct = 0.0, 0.0, 0.0
+    platform_pct = _platform_pct(setting, rules.sys_commission)
 
-    pickup_distance_km = 0.0
-    if driver_accepted_lat is not None and driver_accepted_lng is not None:
-        pickup_distance_km = haversine_km(driver_accepted_lat, driver_accepted_lng, pickup_lat, pickup_lng)
-    else:
-        from .matching_service import find_nearest_driver
-        search_radius = float(setting.search_radius_km) if (setting and setting.search_radius_km is not None) else 10.0
-        nearest = await find_nearest_driver(db, pickup_lat, pickup_lng, service_type, max_distance_km=search_radius)
-        if nearest and nearest.current_lat is not None and nearest.current_lng is not None:
-            pickup_distance_km = haversine_km(float(nearest.current_lat), float(nearest.current_lng), pickup_lat, pickup_lng)
-    
-    # Recalculate pickup fee as percentage of distance * per_km rate
+    # Pickup fee: a percentage of the per-km charge for the driver's distance to the pickup
     base_pickup_fee = pickup_distance_km * per_km
     pickup_fee_val = base_pickup_fee * (pickup_fee_pct / 100.0)
 
-    # Dynamic surge pricing window check from SystemSettings
-    if ss:
-        start = ss.surge_start_hour
-        end = ss.surge_end_hour
-        mult = float(ss.surge_multiplier or 1.0)
-        
-        colombo_tz = timezone(timedelta(hours=5, minutes=30))
-        current_hour = datetime.now(colombo_tz).hour
-        
-        in_surge = False
-        if start is not None and end is not None:
-            if start <= end:
-                in_surge = start <= current_hour < end
-            else:
-                in_surge = current_hour >= start or current_hour < end
-                
-        if in_surge:
-            surge = mult
+    if rules.system_surge is not None:
+        surge = rules.system_surge
 
     raw = (base + per_km * distance_km + per_min * duration_min) * surge
     fare_val = max(raw, min_fare)
-    
     fare_val_original = fare_val
+
     # Apply category discount percentage before applying anything else
     if setting and setting.discount_percentage:
         discount_pct = float(setting.discount_percentage)
@@ -329,66 +306,41 @@ async def calculate_fare(
 
     # Peak hours surcharge check
     peak_surcharge = 0.0
-    from ..models import PeakHourSetting
-    peak_q = await db.execute(select(PeakHourSetting).where(PeakHourSetting.is_active == True))
-    active_peaks = peak_q.scalars().all()
-    if active_peaks:
-        colombo_tz = timezone(timedelta(hours=5, minutes=30))
-        current_time_str = datetime.now(colombo_tz).strftime("%H:%M")
-        for ap in active_peaks:
-            if ap.vehicle_category and ap.vehicle_category != service_type:
-                continue
-            in_peak = False
-            start = ap.start_time
-            end = ap.end_time
-            if start and end:
-                if start <= end:
-                    in_peak = start <= current_time_str < end
-                else:
-                    in_peak = current_time_str >= start or current_time_str < end
-            if in_peak:
-                peak_surcharge += float(ap.extra_amount or 0.0)
-        fare_val += peak_surcharge
-        fare_val_original += peak_surcharge
-        
-    # Geographic Surge Zones check
-    zone_surcharge = 0.0
-    zone_q = await db.execute(select(SurgeZone).where(SurgeZone.is_active == True))
-    active_zones = zone_q.scalars().all()
-    if active_zones:
-        now_local = datetime.now()
-        pickup_point = Point(pickup_lng, pickup_lat)
-        for z in active_zones:
-            if is_time_in_range(z.start_time, z.end_time, now_local):
-                # Create a Shapely Polygon from the coordinates (lng, lat)
-                try:
-                    poly_coords = [(float(pt["lng"]), float(pt["lat"])) for pt in z.coordinates]
-                    if len(poly_coords) >= 3:
-                        poly = Polygon(poly_coords)
-                        if poly.contains(pickup_point):
-                            zone_surcharge += float(z.flat_extra_charge or 0.0)
-                except Exception:
-                    pass
-        fare_val += zone_surcharge
-        fare_val_original += zone_surcharge
+    for ap in rules.peaks:
+        if ap.vehicle_category and ap.vehicle_category != service_type:
+            continue
+        in_peak = False
+        start = ap.start_time
+        end = ap.end_time
+        if start and end:
+            if start <= end:
+                in_peak = start <= rules.hhmm < end
+            else:
+                in_peak = rules.hhmm >= start or rules.hhmm < end
+        if in_peak:
+            peak_surcharge += float(ap.extra_amount or 0.0)
+    fare_val += peak_surcharge
+    fare_val_original += peak_surcharge
 
+    fare_val += zone_surcharge
+    fare_val_original += zone_surcharge
 
     # BRD: CD-19 — per-stop fee compensates the driver for the detour.
     stop_fee_total = 0.0
     if clean_stops:
+        ss = rules.settings
         per_stop = float(ss.multi_stop_fee_per_stop) if ss and ss.multi_stop_fee_per_stop is not None else 50.0
         stop_fee_total = per_stop * len(clean_stops)
-        fare_val += stop_fee_total
-        fare_val_original += stop_fee_total
+    fare_val += stop_fee_total
+    fare_val_original += stop_fee_total
 
     flash_surcharge = 0.0
     if is_flash and parcel_weight_kg is not None:
-        flash_surcharge = await _flash_surcharge(db, float(parcel_weight_kg))
+        flash_surcharge = _flash_surcharge(rules.flash_tiers, float(parcel_weight_kg))
         fare_val += flash_surcharge
         fare_val_original += flash_surcharge
 
-    is_return = trip_type == "return"
-    if is_return:
+    if trip_type == "return":
         # Customer travels the route twice; fare gets a small return discount
         # (1.8x instead of 2x) to reflect that the driver doesn't drive empty back.
         fare_val *= RETURN_TRIP_MULTIPLIER
@@ -399,20 +351,11 @@ async def calculate_fare(
     discount = 0.0
     discount_original = 0.0
     promo_applied = None
-    if promo:
-        promo_q = await db.execute(select(PromoCode).where(PromoCode.code == promo.upper()))
-        p = promo_q.scalars().first()
-        if p and p.is_active and (p.usage_limit is None or p.used_count < p.usage_limit):
-            if p.discount_type == "percentage":
-                discount = fare_val * (float(p.discount_value) / 100.0)
-                discount_original = fare_val_original * (float(p.discount_value) / 100.0)
-                if p.max_discount:
-                    discount = min(discount, float(p.max_discount))
-                    discount_original = min(discount_original, float(p.max_discount))
-            else:
-                discount = float(p.discount_value)
-                discount_original = float(p.discount_value)
-            promo_applied = p.code
+    p = rules.promo
+    if p and p.is_active and (p.usage_limit is None or p.used_count < p.usage_limit):
+        discount = _promo_discount(p, fare_val)
+        discount_original = _promo_discount(p, fare_val_original)
+        promo_applied = p.code
 
     feeable_amount = max(0.0, fare_val - boost_val)
     app_usage_charges = feeable_amount * (platform_pct / 100.0)
@@ -423,8 +366,6 @@ async def calculate_fare(
     gross_total = final_pre_deductible + passenger_deductible_val
     deductions = app_usage_charges + passenger_deductible_val
 
-    feeable_amount_original = max(0.0, fare_val_original - boost_val)
-    app_usage_charges_original = feeable_amount_original * (platform_pct / 100.0)
     final_pre_deductible_original = max(0.0, fare_val_original - discount_original)
     passenger_deductible_val_original = final_pre_deductible_original * (passenger_deductible_pct / 100.0)
     gross_total_original = final_pre_deductible_original + passenger_deductible_val_original
@@ -454,7 +395,94 @@ async def calculate_fare(
         "app_usage_charges": round(app_usage_charges, 2),
         "deductions": round(deductions, 2),
     }
+    return fare_dict, gross_total
+
+
+async def calculate_fare(
+    db: AsyncSession,
+    service_type: str,
+    pickup_lat: float,
+    pickup_lng: float,
+    drop_lat: float,
+    drop_lng: float,
+    promo: Optional[str] = None,
+    trip_type: str = "one_way",
+    is_flash: bool = False,
+    parcel_weight_kg: Optional[float] = None,
+    is_rental: bool = False,
+    rental_hours: Optional[int] = None,
+    is_courier: bool = False,
+    packages: Optional[list] = None,
+    # BRD: RW-01 (earn) + RW-02 (redeem) + RS-07 (display)
+    customer=None,
+    redeem_points: int = 0,
+    # BRD: CD-19 / BE-16 / BR-9 — intermediate stops
+    # Each stop is {"lat": float, "lng": float, "address": str?}.
+    stops: Optional[list] = None,
+    driver_accepted_lat: Optional[float] = None,
+    driver_accepted_lng: Optional[float] = None,
+) -> dict:
+    rules = await _load_rules(
+        db, [service_type, "courier"], promo,
+        need_flash_tiers=(is_flash and parcel_weight_kg is not None) or is_courier,
+    )
+
+    if is_rental:
+        r = _rental_fare(rules, rules.fare_settings.get(service_type), service_type, rental_hours)
+        rental_dict = {
+            "distance_km": 0.0,
+            "pickup_distance_km": 0.0,
+            "duration_min": r["hours"] * 60,
+            "fare_amount": round(r["fare"], 2),
+            "discount_amount": round(r["discount"], 2),
+            "final_amount": round(r["final"], 2),
+            "platform_fee": round(r["platform_fee"], 2),
+            "driver_earnings": round(r["driver_earnings"], 2),
+            "promo_code": r["promo_code"],
+            "surge_multiplier": 1.0,
+            "flash_surcharge": 0.0,
+            "hourly_rate": r["hourly"],
+            "rental_hours": r["hours"],
+        }
+        return await _enrich_with_loyalty(db, rental_dict, customer, redeem_points)
+
+    if is_courier:
+        c = _courier_fare(rules, rules.fare_settings.get("courier"), pickup_lat, pickup_lng,
+                          drop_lat, drop_lng, parcel_weight_kg, packages)
+        courier_dict = {
+            "distance_km": round(c["distance_km"], 2),
+            "pickup_distance_km": 0.0,
+            "duration_min": round(c["eta_days"] * 24 * 60),
+            "fare_amount": round(c["fare"], 2),
+            "discount_amount": round(c["discount"], 2),
+            "final_amount": round(c["final"], 2),
+            "platform_fee": round(c["platform_fee"], 2),
+            "driver_earnings": round(c["driver_earnings"], 2),
+            "promo_code": c["promo_code"],
+            "surge_multiplier": 1.0,
+            "flash_surcharge": round(c["weight_surcharge"], 2),
+            "courier_eta_days": c["eta_days"],
+        }
+        return await _enrich_with_loyalty(db, courier_dict, customer, redeem_points)
+
+    setting = rules.fare_settings.get(service_type)
+    pickup_distance_km = 0.0
+    if driver_accepted_lat is not None and driver_accepted_lng is not None:
+        pickup_distance_km = haversine_km(driver_accepted_lat, driver_accepted_lng, pickup_lat, pickup_lng)
+    else:
+        # Exact vehicle-type match here; the bulk estimate matches case-insensitively.
+        from .matching_service import find_nearest_driver
+        search_radius = float(setting.search_radius_km) if (setting and setting.search_radius_km is not None) else 10.0
+        nearest = await find_nearest_driver(db, pickup_lat, pickup_lng, service_type, max_distance_km=search_radius)
+        if nearest and nearest.current_lat is not None and nearest.current_lng is not None:
+            pickup_distance_km = haversine_km(float(nearest.current_lat), float(nearest.current_lng), pickup_lat, pickup_lng)
+
+    fare_dict, _ = _standard_fare(
+        rules, service_type, setting, _route(pickup_lat, pickup_lng, drop_lat, drop_lng, stops),
+        pickup_distance_km, _zone_surcharge(rules, pickup_lat, pickup_lng), is_flash, parcel_weight_kg, trip_type,
+    )
     return await _enrich_with_loyalty(db, fare_dict, customer, redeem_points)
+
 
 def to_decimal(x: float) -> Decimal:
     return Decimal(str(round(x, 2)))
@@ -537,70 +565,25 @@ async def calculate_fares_bulk(
     stops: Optional[list] = None,
 ) -> dict[str, dict]:
     """High-performance bulk fare calculator that batches all DB queries into a single round."""
-    from datetime import datetime, timezone, timedelta
-    from ..models import (
-        SystemSettings, FareSetting, PeakHourSetting, SurgeZone, PromoCode,
-        FlashWeightTier, Driver, DriverStatus
-    )
+    from ..models import Driver, DriverStatus
     from .matching_service import busy_driver_ids
-    from . import loyalty_service as L
 
-    # 1. Query SystemSettings
-    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
-    ss = ss_q.scalars().first()
-    sys_commission = float(ss.commission_rate) if (ss and ss.commission_rate is not None) else 15.0
-
-    # 2. Query FareSettings for all requested service types + courier
-    all_needed_types = list(set(service_types + (["courier"] if is_courier else [])))
-    setting_q = await db.execute(
-        select(FareSetting).where(FareSetting.service_type.in_(all_needed_types))
+    rules = await _load_rules(
+        db, list(set(service_types + (["courier"] if is_courier else []))), promo,
+        need_flash_tiers=(is_flash and parcel_weight_kg is not None) or is_courier,
     )
-    settings_map = {s.service_type: s for s in setting_q.scalars().all()}
 
-    # 3. Query Active PeakHourSettings
-    peak_q = await db.execute(select(PeakHourSetting).where(PeakHourSetting.is_active == True))
-    active_peaks = peak_q.scalars().all()
-
-    # 4. Query Active SurgeZones
-    zone_q = await db.execute(select(SurgeZone).where(SurgeZone.is_active == True))
-    active_zones = zone_q.scalars().all()
-
-    # 5. Query PromoCode if provided
-    promo_code_obj = None
-    if promo:
-        promo_q = await db.execute(select(PromoCode).where(PromoCode.code == promo.upper()))
-        promo_code_obj = promo_q.scalars().first()
-
-    # 6. Query Flash tiers if needed
-    flash_tiers = []
-    if (is_flash and parcel_weight_kg is not None) or is_courier:
-        flash_q = await db.execute(
-            select(FlashWeightTier)
-            .where(FlashWeightTier.is_active == True)
-            .order_by(FlashWeightTier.display_order, FlashWeightTier.id)
-        )
-        flash_tiers = flash_q.scalars().all()
-
-    def get_flash_surcharge(weight: float) -> float:
-        for t in flash_tiers:
-            min_w = float(t.min_weight_kg or 0)
-            max_w = float(t.max_weight_kg) if t.max_weight_kg is not None else None
-            if weight >= min_w and (max_w is None or weight < max_w):
-                return float(t.surcharge or 0)
-        return 0.0
-
-    # 7. Pre-fetch online drivers & busy driver IDs once for all vehicle types
+    # Pre-fetch online drivers & busy driver IDs once for all vehicle types. Types
+    # are matched case-insensitively here; calculate_fare's search matches exactly.
     busy = await busy_driver_ids(db)
     drv_q = await db.execute(
         select(Driver.id, Driver.vehicle_type, Driver.current_lat, Driver.current_lng).where(
-            Driver.is_online == True,
+            Driver.is_online == True,  # noqa: E712
             Driver.status == DriverStatus.APPROVED,
         )
     )
-    online_drivers = drv_q.all()
-
     nearest_dist_by_type: dict[str, float] = {}
-    for d in online_drivers:
+    for d in drv_q.all():
         if d.id in busy or d.current_lat is None or d.current_lng is None:
             continue
         vt = (d.vehicle_type or "").lower().strip()
@@ -608,70 +591,11 @@ async def calculate_fares_bulk(
         if vt not in nearest_dist_by_type or dist < nearest_dist_by_type[vt]:
             nearest_dist_by_type[vt] = dist
 
-    # Common Route Calculation
-    waypoints = [(pickup_lat, pickup_lng)]
-    clean_stops = []
-    if stops:
-        for st in stops:
-            lat = st.get("lat") if isinstance(st, dict) else None
-            lng = st.get("lng") if isinstance(st, dict) else None
-            if lat is None or lng is None:
-                continue
-            clean_stops.append({
-                "lat": float(lat),
-                "lng": float(lng),
-                "address": (st.get("address") if isinstance(st, dict) else None) or "",
-            })
-            waypoints.append((float(lat), float(lng)))
-    waypoints.append((drop_lat, drop_lng))
-
-    base_distance_km = 0.0
-    for (a_lat, a_lng), (b_lat, b_lng) in zip(waypoints, waypoints[1:]):
-        base_distance_km += haversine_km(a_lat, a_lng, b_lat, b_lng)
-    base_duration_min = estimate_duration_min(base_distance_km)
-
-    # Dynamic surge pricing window check from SystemSettings
-    colombo_tz = timezone(timedelta(hours=5, minutes=30))
-    current_hour = datetime.now(colombo_tz).hour
-    current_time_str = datetime.now(colombo_tz).strftime("%H:%M")
-    
-    in_system_surge = False
-    system_surge_mult = 1.0
-    if ss:
-        start = ss.surge_start_hour
-        end = ss.surge_end_hour
-        mult = float(ss.surge_multiplier or 1.0)
-        if start is not None and end is not None:
-            if start <= end:
-                in_system_surge = start <= current_hour < end
-            else:
-                in_system_surge = current_hour >= start or current_hour < end
-        if in_system_surge:
-            system_surge_mult = mult
-
-    # Common Geographic Surge Zones check
-    zone_surcharge = 0.0
-    if active_zones:
-        now_local = datetime.now()
-        pickup_point = Point(pickup_lng, pickup_lat)
-        for z in active_zones:
-            if is_time_in_range(z.start_time, z.end_time, now_local):
-                try:
-                    poly_coords = [(float(pt["lng"]), float(pt["lat"])) for pt in z.coordinates]
-                    if len(poly_coords) >= 3:
-                        poly = Polygon(poly_coords)
-                        if poly.contains(pickup_point):
-                            zone_surcharge += float(z.flat_extra_charge or 0.0)
-                except Exception:
-                    pass
-
-    # Common Stop fee total
-    stop_fee_total = 0.0
-    if clean_stops:
-        per_stop = float(ss.multi_stop_fee_per_stop) if ss and ss.multi_stop_fee_per_stop is not None else 50.0
-        stop_fee_total = per_stop * len(clean_stops)
+    route = _route(pickup_lat, pickup_lng, drop_lat, drop_lng, stops)
+    zone_surcharge = _zone_surcharge(rules, pickup_lat, pickup_lng)
 
     def points_earnable_calc(amount: float) -> int:
+        ss = rules.settings
         if not ss or not ss.loyalty_is_active:
             return 0
         rate = float(ss.loyalty_earn_rupees_per_point or 0)
@@ -679,282 +603,86 @@ async def calculate_fares_bulk(
             return 0
         return int(Decimal(str(amount or 0)) // Decimal(str(rate)))
 
+    def flat_estimate(service_type: str, fields: dict, platform_fee: float, passenger_pays: float) -> dict:
+        # Rentals and courier carry no surcharges; their snapshot keys are zero.
+        return {
+            "service_type": service_type,
+            **fields,
+            "original_amount": round(passenger_pays, 2),
+            "peak_surcharge": 0.0,
+            "zone_surcharge": 0.0,
+            "stop_count": 0,
+            "stops_fee": 0.0,
+            "pickup_fee": 0.0,
+            "boost": 0.0,
+            "passenger_deductible": 0.0,
+            "app_usage_charges": round(platform_fee, 2),
+            "deductions": round(platform_fee, 2),
+            "points_earnable": points_earnable_calc(passenger_pays),
+            "redeem_points_used": 0,
+            "redeem_discount": 0.0,
+            "redeem_reason": None,
+        }
+
     results: dict[str, dict] = {}
 
     for service_type in service_types:
         try:
-            # Rental logic
             if is_rental:
-                hours = max(1, int(rental_hours or 1))
-                setting = settings_map.get(service_type)
-                platform_pct = float(setting.platform_fee_percent) if (setting and setting.platform_fee_percent is not None and float(setting.platform_fee_percent) > 0) else sys_commission
-                if setting and setting.rental_hourly_rate is not None:
-                    hourly = float(setting.rental_hourly_rate)
-                else:
-                    hourly = float(RENTAL_HOURLY.get(service_type, RENTAL_HOURLY["car"]))
-                fare = hourly * hours
-                discount = 0.0
-                promo_applied = None
-                if promo_code_obj and promo_code_obj.is_active and (
-                    promo_code_obj.usage_limit is None or promo_code_obj.used_count < promo_code_obj.usage_limit
-                ):
-                    if promo_code_obj.discount_type == "percentage":
-                        discount = fare * (float(promo_code_obj.discount_value) / 100.0)
-                        if promo_code_obj.max_discount:
-                            discount = min(discount, float(promo_code_obj.max_discount))
-                    else:
-                        discount = float(promo_code_obj.discount_value)
-                    promo_applied = promo_code_obj.code
-
-                final = max(0, fare - discount)
-                platform_fee = fare * (platform_pct / 100.0)
-                passenger_pays = final
-                driver_earnings = fare - platform_fee
-
-                rental_dict = {
-                    "service_type": service_type,
+                r = _rental_fare(rules, rules.fare_settings.get(service_type), service_type, rental_hours)
+                results[service_type] = flat_estimate(service_type, {
                     "distance_km": 0.0,
                     "pickup_distance_km": 0.0,
-                    "duration_min": hours * 60,
-                    "fare_amount": round(fare, 2),
-                    "discount_amount": round(discount, 2),
-                    "final_amount": round(passenger_pays, 2),
-                    "original_amount": round(passenger_pays, 2),
-                    "platform_fee": round(platform_fee, 2),
-                    "driver_earnings": round(driver_earnings, 2),
-                    "promo_code": promo_applied,
+                    "duration_min": r["hours"] * 60,
+                    "fare_amount": round(r["fare"], 2),
+                    "discount_amount": round(r["discount"], 2),
+                    "final_amount": round(r["final"], 2),
+                    "platform_fee": round(r["platform_fee"], 2),
+                    "driver_earnings": round(r["driver_earnings"], 2),
+                    "promo_code": r["promo_code"],
                     "surge_multiplier": 1.0,
                     "flash_surcharge": 0.0,
-                    "peak_surcharge": 0.0,
-                    "zone_surcharge": 0.0,
-                    "stop_count": 0,
-                    "stops_fee": 0.0,
-                    "pickup_fee": 0.0,
-                    "boost": 0.0,
-                    "passenger_deductible": 0.0,
-                    "app_usage_charges": round(platform_fee, 2),
-                    "deductions": round(platform_fee, 2),
-                    "points_earnable": points_earnable_calc(passenger_pays),
-                    "redeem_points_used": 0,
-                    "redeem_discount": 0.0,
-                    "redeem_reason": None,
-                }
-                results[service_type] = rental_dict
+                }, r["platform_fee"], r["final"])
                 continue
 
-            # Courier logic
             if is_courier:
-                setting = settings_map.get("courier") or settings_map.get(service_type)
-                platform_pct = float(setting.platform_fee_percent) if (setting and setting.platform_fee_percent is not None and float(setting.platform_fee_percent) > 0) else sys_commission
-                distance_km = haversine_km(pickup_lat, pickup_lng, drop_lat, drop_lng)
-                weight_surcharge = 0.0
-                if packages:
-                    for pkg in packages:
-                        pkg_w = float(pkg.get("weight_kg") or 0.0) if isinstance(pkg, dict) else float(getattr(pkg, "weight_kg", 0.0))
-                        weight_surcharge += get_flash_surcharge(pkg_w)
-                elif parcel_weight_kg is not None:
-                    weight_surcharge = get_flash_surcharge(float(parcel_weight_kg))
-
-                courier_base = float(setting.base_fare) if setting and setting.base_fare is not None else COURIER_BASE
-                courier_per_km = float(setting.per_km_rate) if setting and setting.per_km_rate is not None else COURIER_PER_KM
-                fare = courier_base + weight_surcharge + courier_per_km * distance_km
-                eta_days = courier_eta_days(distance_km)
-
-                discount = 0.0
-                promo_applied = None
-                if promo_code_obj and promo_code_obj.is_active and (
-                    promo_code_obj.usage_limit is None or promo_code_obj.used_count < promo_code_obj.usage_limit
-                ):
-                    if promo_code_obj.discount_type == "percentage":
-                        discount = fare * (float(promo_code_obj.discount_value) / 100.0)
-                        if promo_code_obj.max_discount:
-                            discount = min(discount, float(promo_code_obj.max_discount))
-                    else:
-                        discount = float(promo_code_obj.discount_value)
-                    promo_applied = promo_code_obj.code
-
-                final = max(0, fare - discount)
-                platform_fee = fare * (platform_pct / 100.0)
-                passenger_pays = final
-                driver_earnings = fare - platform_fee
-
-                courier_dict = {
-                    "service_type": service_type,
-                    "distance_km": round(distance_km, 2),
+                # Unlike calculate_fare, falls back to the vehicle's own rates when
+                # there is no "courier" fare row.
+                setting = rules.fare_settings.get("courier") or rules.fare_settings.get(service_type)
+                c = _courier_fare(rules, setting, pickup_lat, pickup_lng, drop_lat, drop_lng,
+                                  parcel_weight_kg, packages)
+                results[service_type] = flat_estimate(service_type, {
+                    "distance_km": round(c["distance_km"], 2),
                     "pickup_distance_km": 0.0,
-                    "duration_min": round(eta_days * 24 * 60),
-                    "fare_amount": round(fare, 2),
-                    "discount_amount": round(discount, 2),
-                    "final_amount": round(passenger_pays, 2),
-                    "original_amount": round(passenger_pays, 2),
-                    "platform_fee": round(platform_fee, 2),
-                    "driver_earnings": round(driver_earnings, 2),
-                    "promo_code": promo_applied,
+                    "duration_min": round(c["eta_days"] * 24 * 60),
+                    "fare_amount": round(c["fare"], 2),
+                    "discount_amount": round(c["discount"], 2),
+                    "final_amount": round(c["final"], 2),
+                    "platform_fee": round(c["platform_fee"], 2),
+                    "driver_earnings": round(c["driver_earnings"], 2),
+                    "promo_code": c["promo_code"],
                     "surge_multiplier": 1.0,
-                    "flash_surcharge": round(weight_surcharge, 2),
-                    "courier_eta_days": eta_days,
-                    "peak_surcharge": 0.0,
-                    "zone_surcharge": 0.0,
-                    "stop_count": 0,
-                    "stops_fee": 0.0,
-                    "pickup_fee": 0.0,
-                    "boost": 0.0,
-                    "passenger_deductible": 0.0,
-                    "app_usage_charges": round(platform_fee, 2),
-                    "deductions": round(platform_fee, 2),
-                    "points_earnable": points_earnable_calc(passenger_pays),
-                    "redeem_points_used": 0,
-                    "redeem_discount": 0.0,
-                    "redeem_reason": None,
-                }
-                results[service_type] = courier_dict
+                    "flash_surcharge": round(c["weight_surcharge"], 2),
+                    "courier_eta_days": c["eta_days"],
+                }, c["platform_fee"], c["final"])
                 continue
 
             # Standard Ride / Flash Calculation
-            distance_km = base_distance_km
-            duration_min = base_duration_min
-
-            setting = settings_map.get(service_type)
-            if setting:
-                base = float(setting.base_fare or 0)
-                per_km = float(setting.per_km_rate or 0)
-                per_min = float(setting.per_minute_rate or 0)
-                min_fare = float(setting.min_fare or 0)
-                platform_pct = float(setting.platform_fee_percent) if (setting.platform_fee_percent is not None and float(setting.platform_fee_percent) > 0) else sys_commission
-                surge = float(setting.surge_multiplier or 1)
-                boost_val = float(setting.boost or 0)
-                passenger_deductible_pct = float(setting.passenger_deductible or 0)
-                pickup_fee_pct = float(setting.pickup_fee or 0)
-                search_radius = float(setting.search_radius_km) if setting.search_radius_km is not None else 10.0
-            else:
-                d = DEFAULTS.get(service_type, DEFAULTS["car"])
-                base, per_km, per_min, min_fare = d["base"], d["per_km"], d["per_min"], d["min"]
-                platform_pct = sys_commission
-                surge = 1.0
-                boost_val, passenger_deductible_pct, pickup_fee_pct = 0.0, 0.0, 0.0
-                search_radius = 10.0
-
-            # Pickup distance from pre-computed nearest online driver map
-            st_key = service_type.lower().strip()
+            setting = rules.fare_settings.get(service_type)
+            search_radius = float(setting.search_radius_km) if (setting and setting.search_radius_km is not None) else 10.0
             pickup_distance_km = 0.0
-            if st_key in nearest_dist_by_type:
-                d_dist = nearest_dist_by_type[st_key]
-                if d_dist <= search_radius:
-                    pickup_distance_km = d_dist
+            d_dist = nearest_dist_by_type.get(service_type.lower().strip())
+            if d_dist is not None and d_dist <= search_radius:
+                pickup_distance_km = d_dist
 
-            base_pickup_fee = pickup_distance_km * per_km
-            pickup_fee_val = base_pickup_fee * (pickup_fee_pct / 100.0)
-
-            if in_system_surge:
-                surge = system_surge_mult
-
-            raw = (base + per_km * distance_km + per_min * duration_min) * surge
-            fare_val = max(raw, min_fare)
-            fare_val_original = fare_val
-
-            if setting and setting.discount_percentage:
-                discount_pct = float(setting.discount_percentage)
-                if discount_pct > 0:
-                    category_discount = fare_val * (discount_pct / 100.0)
-                    fare_val = max(0.0, fare_val - category_discount)
-
-            fare_val += boost_val
-            fare_val_original += boost_val
-            fare_val += pickup_fee_val
-            fare_val_original += pickup_fee_val
-
-            # Peak hour surcharge check
-            peak_surcharge = 0.0
-            for ap in active_peaks:
-                if ap.vehicle_category and ap.vehicle_category != service_type:
-                    continue
-                in_peak = False
-                start = ap.start_time
-                end = ap.end_time
-                if start and end:
-                    if start <= end:
-                        in_peak = start <= current_time_str < end
-                    else:
-                        in_peak = current_time_str >= start or current_time_str < end
-                if in_peak:
-                    peak_surcharge += float(ap.extra_amount or 0.0)
-            fare_val += peak_surcharge
-            fare_val_original += peak_surcharge
-
-            fare_val += zone_surcharge
-            fare_val_original += zone_surcharge
-
-            fare_val += stop_fee_total
-            fare_val_original += stop_fee_total
-
-            flash_surcharge = 0.0
-            if is_flash and parcel_weight_kg is not None:
-                flash_surcharge = get_flash_surcharge(float(parcel_weight_kg))
-                fare_val += flash_surcharge
-                fare_val_original += flash_surcharge
-
-            is_return = trip_type == "return"
-            if is_return:
-                fare_val *= RETURN_TRIP_MULTIPLIER
-                fare_val_original *= RETURN_TRIP_MULTIPLIER
-                distance_km *= 2
-                duration_min = round(duration_min * 2)
-
-            discount = 0.0
-            discount_original = 0.0
-            promo_applied = None
-            if promo_code_obj and promo_code_obj.is_active and (
-                promo_code_obj.usage_limit is None or promo_code_obj.used_count < promo_code_obj.usage_limit
-            ):
-                if promo_code_obj.discount_type == "percentage":
-                    discount = fare_val * (float(promo_code_obj.discount_value) / 100.0)
-                    discount_original = fare_val_original * (float(promo_code_obj.discount_value) / 100.0)
-                    if promo_code_obj.max_discount:
-                        discount = min(discount, float(promo_code_obj.max_discount))
-                        discount_original = min(discount_original, float(promo_code_obj.max_discount))
-                else:
-                    discount = float(promo_code_obj.discount_value)
-                    discount_original = float(promo_code_obj.discount_value)
-                promo_applied = promo_code_obj.code
-
-            feeable_amount = max(0.0, fare_val - boost_val)
-            app_usage_charges = feeable_amount * (platform_pct / 100.0)
-            driver_earnings = max(0.0, fare_val - app_usage_charges)
-
-            final_pre_deductible = max(0.0, fare_val - discount)
-            passenger_deductible_val = final_pre_deductible * (passenger_deductible_pct / 100.0)
-            gross_total = final_pre_deductible + passenger_deductible_val
-            deductions = app_usage_charges + passenger_deductible_val
-
-            feeable_amount_original = max(0.0, fare_val_original - boost_val)
-            app_usage_charges_original = feeable_amount_original * (platform_pct / 100.0)
-            final_pre_deductible_original = max(0.0, fare_val_original - discount_original)
-            passenger_deductible_val_original = final_pre_deductible_original * (passenger_deductible_pct / 100.0)
-            gross_total_original = final_pre_deductible_original + passenger_deductible_val_original
-
+            fare_dict, gross_total = _standard_fare(
+                rules, service_type, setting, route, pickup_distance_km, zone_surcharge,
+                is_flash, parcel_weight_kg, trip_type,
+            )
             fare_dict = {
                 "service_type": service_type,
-                "distance_km": round(distance_km, 2),
-                "pickup_distance_km": round(pickup_distance_km, 2),
-                "duration_min": round(duration_min),
-                "fare_amount": round(fare_val, 2),
-                "discount_amount": round(discount, 2),
-                "final_amount": round(gross_total, 2),
-                "original_amount": round(gross_total_original, 2),
-                "platform_fee": round(app_usage_charges, 2),
-                "driver_earnings": round(driver_earnings, 2),
-                "promo_code": promo_applied,
-                "surge_multiplier": surge,
-                "flash_surcharge": round(flash_surcharge, 2),
-                "peak_surcharge": round(peak_surcharge, 2),
-                "zone_surcharge": round(zone_surcharge, 2),
-                "stop_count": len(clean_stops),
-                "stops_fee": round(stop_fee_total, 2),
-                "pickup_fee": round(pickup_fee_val, 2),
-                "boost": round(boost_val, 2),
-                "passenger_deductible": round(passenger_deductible_val, 2),
-                "app_usage_charges": round(app_usage_charges, 2),
-                "deductions": round(deductions, 2),
+                **fare_dict,
+                # Points on the unrounded total; calculate_fare uses the rounded final_amount.
                 "points_earnable": points_earnable_calc(gross_total),
                 "redeem_points_used": 0,
                 "redeem_discount": 0.0,
@@ -972,5 +700,3 @@ async def calculate_fares_bulk(
             continue
 
     return results
-
-
