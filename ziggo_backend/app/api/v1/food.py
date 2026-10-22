@@ -756,7 +756,7 @@ async def create_food_order(
     # fires later, when the restaurant taps "Mark Ready" (see
     # /restaurant/orders/{id}/ready). Until then, the order sits in PENDING
     # and the customer's timeline shows "Waiting for restaurant".
-    items_count = sum(qty for _, qty, _, _ in line_items)
+    items_count = sum(qty for _, qty, *_ in line_items)
     if r.owner_id is not None:
         await manager.send(
             r.owner_id,
