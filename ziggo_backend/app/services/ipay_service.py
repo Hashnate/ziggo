@@ -1,8 +1,9 @@
 """iPay — Sri Lankan payment gateway (LOLC / LankaPay).
 
 When IPAY_MERCHANT_ID is empty, `is_enabled()` returns False and the API
-layer returns 503 from /payments/ipay/* endpoints. The wallet top-up flow
-auto-falls back to the existing mock direct-credit path.
+layer returns 503 from /payments/ipay/* endpoints. Simulated payments (mock
+cards, mock card charges, the direct-credit top-up) are allowed only on test
+servers; on live, new card payments are refused until the gateway is set up.
 
 Flow:
   1. Client POSTs /payments/ipay/checkout with {amount, purpose}.
@@ -41,6 +42,35 @@ def is_enabled() -> bool:
         (settings.IPAY_MERCHANT_ID and (settings.IPAY_SECRET_KEY or settings.IPAY_API_KEY))
         or (settings.PAYHERE_MERCHANT_ID and settings.PAYHERE_MERCHANT_SECRET)
     )
+
+
+CARD_PAYMENTS_COMING_SOON = "Card payments are coming soon. Please pay with cash or wallet."
+SETTLE_COMMISSION_AT_OFFICE = "Please settle your commission with the Ziggo office."
+
+
+def _token_credentials() -> tuple[Optional[str], Optional[str]]:
+    """App credentials for the saved-card (token) charge API."""
+    return (
+        settings.IPAY_APP_ID or settings.IPAY_MERCHANT_ID or settings.PAYHERE_APP_ID,
+        settings.IPAY_APP_SECRET or settings.IPAY_SECRET_KEY or settings.PAYHERE_APP_SECRET,
+    )
+
+
+def simulated_payments_allowed() -> bool:
+    """Test servers (DEV_MODE) may fake payments: mock cards, mock charges, free top-ups."""
+    return bool(settings.DEV_MODE)
+
+
+def card_payments_available() -> bool:
+    """Whether a NEW card payment may be taken.
+
+    Without token credentials `charge_tokenized_card` only simulates the charge,
+    which on live would mark the order paid with no money collected. The charge
+    itself still falls back to the simulation, so bookings already made by card
+    complete normally.
+    """
+    app_id, app_secret = _token_credentials()
+    return bool(app_id and app_secret) or simulated_payments_allowed()
 
 
 def merchant_id() -> str:
@@ -232,8 +262,7 @@ async def charge_tokenized_card(
     import httpx
     import secrets
 
-    app_id = settings.IPAY_APP_ID or settings.IPAY_MERCHANT_ID or settings.PAYHERE_APP_ID
-    app_secret = settings.IPAY_APP_SECRET or settings.IPAY_SECRET_KEY or settings.PAYHERE_APP_SECRET
+    app_id, app_secret = _token_credentials()
 
     if not app_id or not app_secret:
         # Mock mode fallback for development/testing

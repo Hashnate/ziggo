@@ -613,6 +613,8 @@ async def create_booking(
         if not corporate_acct or float(corporate_acct.balance or 0) < fare["final_amount"]:
             raise HTTPException(status_code=400, detail="Insufficient corporate balance")
     elif req.payment_method and req.payment_method.startswith("card_"):
+        if not ipay_service.card_payments_available():
+            raise HTTPException(status_code=400, detail=ipay_service.CARD_PAYMENTS_COMING_SOON)
         try:
             card_id = int(req.payment_method.split("_")[1])
         except (ValueError, IndexError):
@@ -926,6 +928,8 @@ async def scan_and_go_booking(
     user: User = Depends(get_current_user),
 ):
     customer = await _get_customer(db, user)
+    if (req.payment_method or "").startswith("card_") and not ipay_service.card_payments_available():
+        raise HTTPException(status_code=400, detail=ipay_service.CARD_PAYMENTS_COMING_SOON)
 
     # Verify driver exists and is approved
     dq = await db.execute(

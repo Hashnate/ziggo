@@ -746,6 +746,9 @@ async def settle_commission(
     description = "Commission settled (Cash balance offset)"
     
     if body and body.card_id is not None:
+        from ...services.ipay_service import SETTLE_COMMISSION_AT_OFFICE, card_payments_available
+        if not card_payments_available():
+            raise HTTPException(status_code=400, detail=SETTLE_COMMISSION_AT_OFFICE)
         from ...models import Customer, CustomerCard
         cq = await db.execute(select(Customer).where(Customer.user_id == user.id))
         customer = cq.scalars().first()

@@ -634,6 +634,8 @@ async def create_food_order(
     if body.payment_method == "wallet" and (customer.wallet_balance or Decimal(0)) < final:
         raise HTTPException(status_code=400, detail="Insufficient wallet balance")
     elif body.payment_method and body.payment_method.startswith("card_"):
+        if not ipay_service.card_payments_available():
+            raise HTTPException(status_code=400, detail=ipay_service.CARD_PAYMENTS_COMING_SOON)
         try:
             card_id = int(body.payment_method.split("_")[1])
         except (ValueError, IndexError):
