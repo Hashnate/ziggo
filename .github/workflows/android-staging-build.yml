@@ -1,9 +1,10 @@
 name: Android Staging Build (test.ziggo.lk)
 
 # Builds an APK that talks to the STAGING backend (https://test.ziggo.lk), for
-# internal testers only. Nothing is uploaded to a store. No keystore secrets are
-# used, so Gradle signs with the debug key and Play would reject the APK; testers
-# uninstall the store app before installing it.
+# internal testers only. Nothing is uploaded to a store. It is signed with a
+# throwaway key generated in each run, never the upload keystore, so Play would
+# reject it. Testers uninstall the store app (and any older staging build, whose
+# key differs) before installing it.
 #
 # Run it by pushing a tag that starts with "staging-app-" on the commit to build:
 #   git tag staging-app-2026-10-22.1 origin/dev && git push origin staging-app-2026-10-22.1
@@ -56,8 +57,22 @@ jobs:
           echo "GOOGLE_MAPS_API_KEY=$MAPS_API_KEY" > .env
           echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 -di > android/app/google-services.json
 
+      - name: Create a throwaway signing key
+        run: |
+          keytool -genkeypair -noprompt -keystore android/app/staging-keystore.jks \
+            -storepass ziggo-staging -keypass ziggo-staging -alias staging \
+            -keyalg RSA -keysize 2048 -validity 3650 -dname "CN=Ziggo Staging"
+          printf 'storePassword=ziggo-staging\nkeyPassword=ziggo-staging\nkeyAlias=staging\nstoreFile=staging-keystore.jks\n' > android/key.properties
+
       - name: Build APK against staging
-        run: flutter build apk --release --dart-define=API_HOST=https://test.ziggo.lk
+        run: |
+          set -o pipefail
+          flutter build apk --release --dart-define=API_HOST=https://test.ziggo.lk 2>&1 | tee build.log || {
+            # Job logs need a GitHub login; an annotation shows on the public run page.
+            msg=$(grep -E "error|Error|FAILURE|What went wrong|Exception" build.log | tail -25 | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error title=flutter build apk failed::$msg"
+            exit 1
+          }
 
       - name: Upload staging APK
         uses: actions/upload-artifact@v4
