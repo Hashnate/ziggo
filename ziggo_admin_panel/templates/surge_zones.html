@@ -130,9 +130,30 @@
         </div>
             
         <div>
-            <label class="block font-semibold mb-1 text-ziggo-light"><i class="fas fa-map-marked-alt"></i> Draw Zone Polygon</label>
-            <p class="text-gray-500 text-sm mb-3">Draw a polygon on the map below to define this zone. Complete the shape to save the coordinates.</p>
-            <div id="modalMap" class="w-full h-[300px] bg-gray-100 rounded-xl overflow-hidden border border-gray-200"></div>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1.5">
+                <label class="font-semibold text-ziggo-light m-0 flex items-center gap-1.5">
+                    <i class="fas fa-map-marked-alt"></i> Draw Zone Polygon
+                </label>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="toggleModalMapExpand()" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-200 transition-colors" title="Expand / Shrink map view">
+                        <i class="fas fa-expand-arrows-alt text-gray-500" id="expandIcon"></i>
+                        <span id="expandText">Expand map</span>
+                    </button>
+                    <label class="inline-flex items-center gap-1.5 cursor-pointer select-none text-xs text-gray-700 bg-gray-100 hover:bg-gray-200 px-2.5 py-1 rounded-md border border-gray-200 transition-colors">
+                        <input type="checkbox" id="toggleExistingZones" class="rounded text-ziggo-light w-3.5 h-3.5" checked onchange="toggleReferenceZones(this.checked)">
+                        <span>Show existing zones</span>
+                        <span class="bg-white px-1.5 py-0.2 rounded text-[11px] font-bold text-gray-600 border border-gray-200">{{ zones|length }}</span>
+                    </label>
+                </div>
+            </div>
+            <p class="text-gray-500 text-xs mb-2.5">
+                Previous zones are shown on the map as reference overlays to help prevent overlapping boundaries. Complete the shape to define this zone.
+            </p>
+
+            <!-- Dynamic overlap warning / status container -->
+            <div id="overlapWarning" class="hidden mb-3 p-3 rounded-xl text-xs transition-all"></div>
+
+            <div id="modalMap" class="w-full h-[360px] bg-gray-100 rounded-xl overflow-hidden border border-gray-200"></div>
             <input type="hidden" id="zoneCoordinates" required>
         </div>
       </div>
@@ -146,12 +167,31 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://maps.googleapis.com/maps/api/js?key={{ gmap_key }}&v=3.64&libraries=drawing"></script>
+<style>
+.zone-reference-label {
+    background: rgba(255, 255, 255, 0.94) !important;
+    color: #0f172a !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    padding: 2px 7px !important;
+    border-radius: 6px !important;
+    border: 1px solid rgba(0, 0, 0, 0.25) !important;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.18) !important;
+    white-space: nowrap !important;
+    pointer-events: none !important;
+    user-select: none !important;
+}
+</style>
+<script src="https://maps.googleapis.com/maps/api/js?key={{ gmap_key }}&v=3.64&libraries=drawing,geometry"></script>
 <script>
+    const allZones = {{ zones|tojson|safe }};
     let mainMap;
     let modalMap;
     let drawingManager;
     let currentModalPolygon = null;
+    let referencePolygons = [];
+    let referenceMarkers = [];
+    let isReferenceZonesVisible = true;
 
     function initMainMap() {
         const colombo = { lat: 6.9271, lng: 79.8612 };
@@ -161,14 +201,16 @@
             mapTypeId: 'terrain'
         });
         
-        const zones = {{ zones|tojson|safe }};
-        zones.forEach(z => {
-            if (!z.coordinates) return;
+        const bounds = new google.maps.LatLngBounds();
+        let hasBounds = false;
+
+        allZones.forEach(z => {
+            if (!z.coordinates || !Array.isArray(z.coordinates) || z.coordinates.length < 3) return;
             const color = z.is_active ? (z.color || '#dc3545') : '#6c757d';
             const poly = new google.maps.Polygon({
                 paths: z.coordinates,
                 strokeColor: color,
-                strokeOpacity: 0.8,
+                strokeOpacity: 0.85,
                 strokeWeight: 2,
                 fillColor: color,
                 fillOpacity: 0.35,
@@ -177,24 +219,43 @@
             poly.addListener('click', () => {
                 viewZone(z.id, z.name, z.flat_extra_charge, z.start_time, z.end_time, z.is_active, z.coordinates, z.color);
             });
+            z.coordinates.forEach(c => {
+                bounds.extend(new google.maps.LatLng(c.lat, c.lng));
+                hasBounds = true;
+            });
         });
+
+        if (hasBounds) {
+            mainMap.fitBounds(bounds);
+        }
     }
 
     function initModalMap() {
         if (modalMap) return;
         try {
-            const colombo = { lat: 6.9271, lng: 79.8612 };
+            const initialCenter = mainMap ? mainMap.getCenter() : { lat: 6.9271, lng: 79.8612 };
+            const initialZoom = mainMap ? mainMap.getZoom() : 13;
             modalMap = new google.maps.Map(document.getElementById("modalMap"), {
-                zoom: 13,
-                center: colombo,
-                mapTypeId: 'roadmap'
+                zoom: initialZoom,
+                center: initialCenter,
+                mapTypeId: 'roadmap',
+                fullscreenControl: true
             });
             
             const initialColor = document.getElementById('zoneColor').value || '#dc3545';
             drawingManager = new google.maps.drawing.DrawingManager({
                 drawingMode: google.maps.drawing.OverlayType.POLYGON,
                 drawingControl: false,
-                polygonOptions: { fillColor: initialColor, fillOpacity: 0.5, strokeColor: initialColor, strokeWeight: 2, clickable: true, editable: true, zIndex: 1 }
+                polygonOptions: { 
+                    fillColor: initialColor, 
+                    
+                    fillOpacity: 0.45, 
+                    strokeColor: initialColor, 
+                    strokeWeight: 2.5, 
+                    clickable: true, 
+                    editable: true, 
+                    zIndex: 10 
+                }
             });
             drawingManager.setMap(modalMap);
             setupCustomDrawingToolbar(modalMap);
@@ -205,16 +266,246 @@
                 drawingManager.setDrawingMode(null);
                 setDrawingToolActive('pan');
                 updateCoordinatesInput(polygon);
-                polygon.getPaths().forEach(function(path, index){
-                    google.maps.event.addListener(path, 'insert_at', function(){ updateCoordinatesInput(polygon); });
-                    google.maps.event.addListener(path, 'remove_at', function(){ updateCoordinatesInput(polygon); });
-                    google.maps.event.addListener(path, 'set_at', function(){ updateCoordinatesInput(polygon); });
+                checkAllOverlaps(polygon);
+
+                polygon.getPaths().forEach(function(path){
+                    google.maps.event.addListener(path, 'insert_at', function(){ 
+                        updateCoordinatesInput(polygon); 
+                        checkAllOverlaps(polygon);
+                    });
+                    google.maps.event.addListener(path, 'remove_at', function(){ 
+                        updateCoordinatesInput(polygon); 
+                        checkAllOverlaps(polygon);
+                    });
+                    google.maps.event.addListener(path, 'set_at', function(){ 
+                        updateCoordinatesInput(polygon); 
+                        checkAllOverlaps(polygon);
+                    });
                 });
             });
         } catch (error) {
             console.error("Error initializing modal map or drawing manager:", error);
             alert("Error loading drawing tools: " + error.message);
         }
+    }
+
+    function clearReferenceZones() {
+        referencePolygons.forEach(p => p.setMap(null));
+        referencePolygons = [];
+        referenceMarkers.forEach(m => m.setMap(null));
+        referenceMarkers = [];
+    }
+
+    function renderReferenceZones(excludeZoneId = null) {
+        clearReferenceZones();
+        if (!modalMap) return;
+
+        allZones.forEach(z => {
+            if (excludeZoneId !== null && excludeZoneId !== undefined && String(z.id) === String(excludeZoneId)) {
+                return;
+            }
+            if (!z.coordinates || !Array.isArray(z.coordinates) || z.coordinates.length < 3) return;
+
+            const color = z.is_active ? (z.color || '#dc3545') : '#94a3b8';
+            const poly = new google.maps.Polygon({
+                paths: z.coordinates,
+                strokeColor: color,
+                strokeOpacity: 0.9,
+                strokeWeight: 2,
+                fillColor: color,
+                fillOpacity: 0.22,
+                clickable: false, // Critical: don't intercept mouse clicks while drawing
+                zIndex: 1,
+                map: isReferenceZonesVisible ? modalMap : null
+            });
+            poly._zoneData = z;
+            referencePolygons.push(poly);
+
+            // Compute center of zone for label
+            const bounds = new google.maps.LatLngBounds();
+            z.coordinates.forEach(pt => bounds.extend(new google.maps.LatLng(pt.lat, pt.lng)));
+            const center = bounds.getCenter();
+
+            const marker = new google.maps.Marker({
+                position: center,
+                map: isReferenceZonesVisible ? modalMap : null,
+                clickable: false,
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 0
+                },
+                label: {
+                    text: z.name + (!z.is_active ? ' (Inactive)' : ''),
+                    className: 'zone-reference-label'
+                },
+                zIndex: 2
+            });
+            marker._zoneData = z;
+            referenceMarkers.push(marker);
+        });
+    }
+
+    window.toggleReferenceZones = function(show) {
+        isReferenceZonesVisible = show;
+        referencePolygons.forEach(p => p.setMap(show ? modalMap : null));
+        referenceMarkers.forEach(m => m.setMap(show ? modalMap : null));
+    };
+
+    // Geometry Helpers for Polygon Overlap Detection
+    function isPointInPolygon(point, polygon) {
+        let inside = false;
+        const x = Number(point.lng), y = Number(point.lat);
+        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+            const xi = Number(polygon[i].lng), yi = Number(polygon[i].lat);
+            const xj = Number(polygon[j].lng), yj = Number(polygon[j].lat);
+            const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+            if (intersect) inside = !inside;
+        }
+        return inside;
+    }
+
+    function doSegmentsIntersect(p1, p2, p3, p4) {
+        function ccw(a, b, c) {
+            return (Number(c.lat) - Number(a.lat)) * (Number(b.lng) - Number(a.lng)) > (Number(b.lat) - Number(a.lat)) * (Number(c.lng) - Number(a.lng));
+        }
+        return (ccw(p1, p3, p4) !== ccw(p2, p3, p4)) && (ccw(p1, p2, p3) !== ccw(p1, p2, p4));
+    }
+
+    function checkPolygonOverlap(polyA, polyB) {
+        if (!polyA || !polyB || polyA.length < 3 || polyB.length < 3) return false;
+        
+        let minLatA = Infinity, maxLatA = -Infinity, minLngA = Infinity, maxLngA = -Infinity;
+        for (let i = 0; i < polyA.length; i++) {
+            const lat = Number(polyA[i].lat), lng = Number(polyA[i].lng);
+            if (lat < minLatA) minLatA = lat;
+            if (lat > maxLatA) maxLatA = lat;
+            if (lng < minLngA) minLngA = lng;
+            if (lng > maxLngA) maxLngA = lng;
+        }
+        let minLatB = Infinity, maxLatB = -Infinity, minLngB = Infinity, maxLngB = -Infinity;
+        for (let i = 0; i < polyB.length; i++) {
+            const lat = Number(polyB[i].lat), lng = Number(polyB[i].lng);
+            if (lat < minLatB) minLatB = lat;
+            if (lat > maxLatB) maxLatB = lat;
+            if (lng < minLngB) minLngB = lng;
+            if (lng > maxLngB) maxLngB = lng;
+        }
+
+        // Quick bounding box check
+        if (minLatA > maxLatB || maxLatA < minLatB || minLngA > maxLngB || maxLngA < minLngB) {
+            return false;
+        }
+
+        // 1. Any edge of A intersects any edge of B
+        for (let i = 0; i < polyA.length; i++) {
+            const a1 = polyA[i];
+            const a2 = polyA[(i + 1) % polyA.length];
+            for (let j = 0; j < polyB.length; j++) {
+                const b1 = polyB[j];
+                const b2 = polyB[(j + 1) % polyB.length];
+                if (doSegmentsIntersect(a1, a2, b1, b2)) return true;
+            }
+        }
+
+        // 2. Any vertex of A inside B
+        for (let i = 0; i < polyA.length; i++) {
+            if (isPointInPolygon(polyA[i], polyB)) return true;
+        }
+
+        // 3. Any vertex of B inside A
+        for (let j = 0; j < polyB.length; j++) {
+            if (isPointInPolygon(polyB[j], polyA)) return true;
+        }
+
+        return false;
+    }
+
+    function getOverlappingZones(newCoords, excludeZoneId = null) {
+        if (!newCoords || newCoords.length < 3) return [];
+        const overlapping = [];
+        allZones.forEach(z => {
+            if (excludeZoneId !== null && excludeZoneId !== undefined && String(z.id) === String(excludeZoneId)) {
+                return;
+            }
+            if (!z.coordinates || !Array.isArray(z.coordinates) || z.coordinates.length < 3) return;
+            if (checkPolygonOverlap(newCoords, z.coordinates)) {
+                overlapping.push(z);
+            }
+        });
+        return overlapping;
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/[&<>"']/g, function(m) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+        });
+    }
+
+    function showOverlapWarning(overlappingZones) {
+        const el = document.getElementById('overlapWarning');
+        if (!el) return;
+        if (!overlappingZones || overlappingZones.length === 0) {
+            el.className = 'mb-3 p-2.5 rounded-xl text-xs flex items-center gap-2 bg-emerald-50 text-emerald-800 border border-emerald-200';
+            el.innerHTML = '<i class="fas fa-check-circle text-emerald-600 text-sm"></i> <span><strong>No overlap:</strong> This zone boundary does not overlap with any existing zones.</span>';
+            el.classList.remove('hidden');
+            return;
+        }
+        
+        const zoneBadges = overlappingZones.map(z => {
+            const timeInfo = (z.start_time && z.end_time) ? `${z.start_time} - ${z.end_time}` : 'Always Active';
+            const status = z.is_active ? 'Active' : 'Inactive';
+            const color = z.color || '#dc3545';
+            return `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white border border-amber-300 font-semibold text-gray-800 shadow-xs">
+                <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${color};"></span>
+                <span>${escapeHtml(z.name)}</span>
+                <span class="text-[10px] text-gray-500 font-normal">(${status}, ${timeInfo})</span>
+            </span>`;
+        }).join(' ');
+
+        el.className = 'mb-3 p-3 rounded-xl text-xs flex items-start gap-2.5 bg-amber-50 text-amber-900 border border-amber-300 shadow-xs';
+        el.innerHTML = `
+            <i class="fas fa-exclamation-triangle text-amber-600 text-base shrink-0 mt-0.5"></i>
+            <div class="flex-1 min-w-0">
+                <div class="font-bold text-amber-900 mb-1 flex items-center justify-between">
+                    <span>Boundary Overlap Detected with ${overlappingZones.length} Zone${overlappingZones.length > 1 ? 's' : ''}</span>
+                </div>
+                <div class="flex flex-wrap gap-1.5 mb-1.5">
+                    ${zoneBadges}
+                </div>
+                <div class="text-amber-800 text-[11px] leading-relaxed">
+                    <strong>Note:</strong> Active surge zones that overlap simultaneously will double-charge riders inside the overlapping area. Consider adjusting polygon boundaries to prevent unintended overlapping.
+                </div>
+            </div>
+        `;
+        el.classList.remove('hidden');
+    }
+
+    function clearOverlapWarning() {
+        const el = document.getElementById('overlapWarning');
+        if (!el) return;
+        el.classList.add('hidden');
+        el.innerHTML = '';
+    }
+
+    function checkAllOverlaps(polygon, excludeZoneId = null) {
+        if (!polygon) {
+            clearOverlapWarning();
+            return;
+        }
+        const vertices = polygon.getPath();
+        const coords = [];
+        for (let i = 0; i < vertices.getLength(); i++) {
+            const xy = vertices.getAt(i);
+            coords.push({ lat: xy.lat(), lng: xy.lng() });
+        }
+        if (coords.length < 3) {
+            clearOverlapWarning();
+            return;
+        }
+        const currentId = excludeZoneId !== null ? excludeZoneId : (document.getElementById('zoneId').value || null);
+        const overlappingZones = getOverlappingZones(coords, currentId);
+        showOverlapWarning(overlappingZones);
     }
 
     let customToolPanBtn = null;
@@ -262,6 +553,7 @@
                 currentModalPolygon.setMap(null);
                 currentModalPolygon = null;
                 document.getElementById('zoneCoordinates').value = '';
+                clearOverlapWarning();
             }
             if (drawingManager) {
                 drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
@@ -331,7 +623,7 @@
     function updatePolygonColor(color) {
         if (drawingManager) {
             drawingManager.setOptions({
-                polygonOptions: { fillColor: color, fillOpacity: 0.5, strokeColor: color, strokeWeight: 2, clickable: true, editable: true, zIndex: 1 }
+                polygonOptions: { fillColor: color, fillOpacity: 0.45, strokeColor: color, strokeWeight: 2.5, clickable: true, editable: true, zIndex: 10 }
             });
         }
         if (currentModalPolygon) {
@@ -342,6 +634,38 @@
         }
     }
 
+    let isModalMapExpanded = false;
+    window.toggleModalMapExpand = function() {
+        const mapDiv = document.getElementById('modalMap');
+        const icon = document.getElementById('expandIcon');
+        const text = document.getElementById('expandText');
+        const form = document.getElementById('zoneForm');
+        
+        isModalMapExpanded = !isModalMapExpanded;
+        if (isModalMapExpanded) {
+            mapDiv.classList.remove('h-[360px]');
+            mapDiv.classList.add('h-[550px]');
+            if (icon) icon.className = 'fas fa-compress-arrows-alt text-gray-500';
+            if (text) text.innerText = 'Collapse map';
+            if (form) {
+                form.classList.remove('max-w-3xl');
+                form.classList.add('max-w-5xl');
+            }
+        } else {
+            mapDiv.classList.remove('h-[550px]');
+            mapDiv.classList.add('h-[360px]');
+            if (icon) icon.className = 'fas fa-expand-arrows-alt text-gray-500';
+            if (text) text.innerText = 'Expand map';
+            if (form) {
+                form.classList.remove('max-w-5xl');
+                form.classList.add('max-w-3xl');
+            }
+        }
+        if (modalMap) {
+            google.maps.event.trigger(modalMap, 'resize');
+        }
+    };
+
     window.openZoneModal = function() {
         document.getElementById('zoneForm').reset();
         document.getElementById('zoneId').value = '';
@@ -349,24 +673,53 @@
         document.getElementById('zoneColor').value = '#dc3545';
         document.getElementById('colorPreview').style.backgroundColor = '#dc3545';
         highlightSwatch('#dc3545');
+        clearOverlapWarning();
+        
+        const toggleCheck = document.getElementById('toggleExistingZones');
+        if (toggleCheck) toggleCheck.checked = true;
+        isReferenceZonesVisible = true;
+
         if (drawingManager) {
             drawingManager.setOptions({
-                polygonOptions: { fillColor: '#dc3545', fillOpacity: 0.5, strokeColor: '#dc3545', strokeWeight: 2, clickable: true, editable: true, zIndex: 1 }
+                polygonOptions: { fillColor: '#dc3545', fillOpacity: 0.45, strokeColor: '#dc3545', strokeWeight: 2.5, clickable: true, editable: true, zIndex: 10 }
             });
         }
         document.getElementById('zoneModalTitle').innerText = 'Create Surge Zone';
         if (currentModalPolygon) { currentModalPolygon.setMap(null); currentModalPolygon = null; }
+        
         document.getElementById('zoneModal').classList.remove('hidden');
+        
         setTimeout(() => {
             initModalMap();
+            google.maps.event.trigger(modalMap, 'resize');
+            renderReferenceZones(null);
+
+            // Center and zoom modal map to match current main map view or existing zones
+            if (mainMap) {
+                modalMap.setCenter(mainMap.getCenter());
+                modalMap.setZoom(mainMap.getZoom());
+            } else if (allZones && allZones.length > 0) {
+                const bounds = new google.maps.LatLngBounds();
+                let hasBounds = false;
+                allZones.forEach(z => {
+                    if (z.coordinates && z.coordinates.length > 0) {
+                        z.coordinates.forEach(c => { bounds.extend(new google.maps.LatLng(c.lat, c.lng)); hasBounds = true; });
+                    }
+                });
+                if (hasBounds) modalMap.fitBounds(bounds);
+            }
+            
             if (drawingManager) drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
             setDrawingToolActive('polygon');
-        }, 100);
+        }, 150);
     };
     
     window.closeZoneModal = function() {
+        if (drawingManager) drawingManager.setDrawingMode(null);
+        clearOverlapWarning();
+        if (isModalMapExpanded) toggleModalMapExpand();
         document.getElementById('zoneModal').classList.add('hidden');
-    }
+    };
     
     window.viewZone = function(id, name, charge, start, end, active, coords, color) {
         document.getElementById('zoneId').value = id;
@@ -381,6 +734,11 @@
         document.getElementById('zoneColor').value = activeColor;
         document.getElementById('colorPreview').style.backgroundColor = activeColor;
         highlightSwatch(activeColor);
+        clearOverlapWarning();
+
+        const toggleCheck = document.getElementById('toggleExistingZones');
+        if (toggleCheck) toggleCheck.checked = true;
+        isReferenceZonesVisible = true;
         
         document.getElementById('zoneModalTitle').innerText = 'Edit Surge Zone';
         
@@ -388,29 +746,53 @@
         
         setTimeout(() => {
             initModalMap();
+            google.maps.event.trigger(modalMap, 'resize');
+            renderReferenceZones(id);
+
             if (currentModalPolygon) currentModalPolygon.setMap(null);
             if (drawingManager) {
                 drawingManager.setOptions({
-                    polygonOptions: { fillColor: activeColor, fillOpacity: 0.5, strokeColor: activeColor, strokeWeight: 2, clickable: true, editable: true, zIndex: 1 }
+                    polygonOptions: { fillColor: activeColor, fillOpacity: 0.45, strokeColor: activeColor, strokeWeight: 2.5, clickable: true, editable: true, zIndex: 10 }
                 });
             }
             if (coords && coords.length > 0) {
-                currentModalPolygon = new google.maps.Polygon({ paths: coords, fillColor: activeColor, fillOpacity: 0.5, strokeColor: activeColor, strokeWeight: 2, editable: true, map: modalMap });
+                currentModalPolygon = new google.maps.Polygon({ 
+                    paths: coords, 
+                    fillColor: activeColor, 
+                    fillOpacity: 0.45, 
+                    strokeColor: activeColor, 
+                    strokeWeight: 2.5, 
+                    editable: true, 
+                    zIndex: 10,
+                    map: modalMap 
+                });
                 const bounds = new google.maps.LatLngBounds();
                 coords.forEach(c => bounds.extend(new google.maps.LatLng(c.lat, c.lng)));
                 modalMap.fitBounds(bounds);
                 if (drawingManager) drawingManager.setDrawingMode(null);
                 setDrawingToolActive('pan');
-                currentModalPolygon.getPaths().forEach(function(path, index){
-                    google.maps.event.addListener(path, 'insert_at', function(){ updateCoordinatesInput(currentModalPolygon); });
-                    google.maps.event.addListener(path, 'remove_at', function(){ updateCoordinatesInput(currentModalPolygon); });
-                    google.maps.event.addListener(path, 'set_at', function(){ updateCoordinatesInput(currentModalPolygon); });
+
+                checkAllOverlaps(currentModalPolygon, id);
+
+                currentModalPolygon.getPaths().forEach(function(path){
+                    google.maps.event.addListener(path, 'insert_at', function(){ 
+                        updateCoordinatesInput(currentModalPolygon); 
+                        checkAllOverlaps(currentModalPolygon, id);
+                    });
+                    google.maps.event.addListener(path, 'remove_at', function(){ 
+                        updateCoordinatesInput(currentModalPolygon); 
+                        checkAllOverlaps(currentModalPolygon, id);
+                    });
+                    google.maps.event.addListener(path, 'set_at', function(){ 
+                        updateCoordinatesInput(currentModalPolygon); 
+                        checkAllOverlaps(currentModalPolygon, id);
+                    });
                 });
             } else {
                 if (drawingManager) drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
                 setDrawingToolActive('polygon');
             }
-        }, 100);
+        }, 150);
     };
 
     window.saveZone = async function(e) {
@@ -421,17 +803,33 @@
         let coords = [];
         try { coords = JSON.parse(coordsStr); } catch(err) { alert('Invalid polygon data'); return; }
         
+        const id = document.getElementById('zoneId').value;
+        const currentActive = document.getElementById('zoneActive').checked;
+        const overlappingZones = getOverlappingZones(coords, id);
+        
+        if (overlappingZones.length > 0 && currentActive) {
+            const activeOverlaps = overlappingZones.filter(z => z.is_active);
+            if (activeOverlaps.length > 0) {
+                const names = activeOverlaps.map(z => `• ${z.name}`).join('\n');
+                const proceed = confirm(
+                    `⚠️ Attention: This zone boundary overlaps with active zone(s):\n${names}\n\n` +
+                    `When active zones overlap, customers in the shared area may be charged multiple surge fees simultaneously.\n\n` +
+                    `Do you want to save this zone anyway?`
+                );
+                if (!proceed) return;
+            }
+        }
+
         const payload = {
             name: document.getElementById('zoneName').value,
             flat_extra_charge: parseFloat(document.getElementById('zoneCharge').value),
             start_time: document.getElementById('zoneStart').value || null,
             end_time: document.getElementById('zoneEnd').value || null,
-            is_active: document.getElementById('zoneActive').checked,
+            is_active: currentActive,
             coordinates: coords,
             color: document.getElementById('zoneColor').value
         };
         
-        const id = document.getElementById('zoneId').value;
         const method = id ? 'PUT' : 'POST';
         const url = id ? `/api/v1/surge-zones/${id}` : '/api/v1/surge-zones';
         
