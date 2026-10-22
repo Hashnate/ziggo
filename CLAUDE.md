@@ -4,26 +4,35 @@ Read this file first whenever you receive a task in this repo. It is the single 
 
 ---
 
+## 0. Live site, staging and branches (read first)
+
+Ziggo is **live in production**. Two checkouts sit on the same server:
+
+| | Live (ziggo.lk) | Staging (test.ziggo.lk) |
+| --- | --- | --- |
+| Folder | `/var/www/ziggo` | `/var/www/ziggo-staging` |
+| Branch | `main` only | `dev` |
+| Backend | `ziggo_backend` on `:8030`, Postgres `ziggo_postgres` | `ziggo_backend_staging` on `127.0.0.1:8031`, Postgres `ziggo_postgres_staging` |
+
+- **Only `main` is ever deployed to the live site.** New work goes feature branch → `dev` (runs on staging) → `main` only at a release the owner approves.
+- **Never edit files or switch branches in `/var/www/ziggo`.** A git hook puts that folder back on `main` after any checkout, and its branch list only knows `main`.
+- **The live backend runs a sealed image.** `docker-compose.override.yml` in the live folder removes the code bind mounts, so code reaches customers only through a deliberate deploy: `git pull --ff-only`, then `docker build --network=host -f ziggo_backend/Dockerfile -t ziggo-ziggo_backend:latest .`, then `docker compose up -d`.
+- **Staging** has its own `.env`: `DEV_MODE=true` (the API returns the OTP), no SMS or push credentials, payments in sandbox mode. `deploy/staging/refresh-data.sh` rebuilds its data from production's business setup plus generated customers, drivers and trips (no personal data). `deploy/staging/run-backend-tests.sh` runs the backend tests. Pushing a `staging-app-*` tag builds a test APK that talks only to test.ziggo.lk.
+- Docker builds on this server need `--network=host`; on the default bridge network, package downloads crawl.
+
+---
+
 ## 1. What this project is
 
-Ziggo is a PickMe-style **ride + food + market + flash-parcel** super app for Sri Lanka. It runs entirely locally — no paid third-party APIs are required.
+Ziggo is a PickMe-style **ride + food + market + flash-parcel** super app for Sri Lanka.
 
 Three deliverables live in this repo:
 
 1. **`ziggo_app/`** — single Flutter binary that contains both the **customer** and **driver** UIs (chosen at the role-selection screen after login).
-2. **`ziggo_backend/`** — FastAPI + SQLAlchemy (async) backend that also serves a server-rendered **admin web panel** at `/admin/*`.
+2. **`ziggo_backend/`** — FastAPI + SQLAlchemy (async) backend. It also serves the server-rendered **admin web panel** at `/admin/*`, whose code lives in the top-level `ziggo_admin_panel/`.
 3. **`README.md`** — onboarding doc for a fresh dev (setup steps, demo credentials, end-to-end test flow).
 
-Real services are stubbed with local replacements:
-
-| Real service       | Local replacement                                            |
-| ------------------ | ------------------------------------------------------------ |
-| Twilio SMS         | OTP printed to console + returned in API when `DEV_MODE=true` |
-| Google Maps SDK    | `flutter_map` + OpenStreetMap tiles (no API key)             |
-| Google Places      | Hard-coded SL POI list in [ziggo_app/lib/core/map/places.dart](ziggo_app/lib/core/map/places.dart) |
-| Stripe / PayHere   | Wallet top-up is a direct DB credit                          |
-| Firebase FCM       | WebSocket events from FastAPI (`ws_manager.py`)              |
-| Cloud Storage      | Local file paths (driver document upload UI not yet built)   |
+Production uses Postgres 16, Notify.lk (OTP SMS), Firebase Cloud Messaging, Google Maps and Places, and the iPay / PayHere gateways. An integration whose credentials are empty falls back to a stub, which is how staging runs: the OTP is printed and returned by the API when `DEV_MODE=true`, and push notifications are skipped.
 
 ---
 
@@ -91,14 +100,13 @@ ziggo/
         │   ├── fare_service.py                Haversine + fare engine + promo
         │   ├── matching_service.py            Nearest online+approved driver
         │   └── ws_manager.py                  In-memory pub/sub keyed by user_id
-        ├── api/v1/                            JSON routers: auth, customer, driver,
-        │                                      bookings, food, market, admin, misc, ws
-        └── admin_panel/                       Jinja2 server-rendered admin (cookie session)
-            ├── routes.py
-            ├── templates/                     login, dashboard, drivers, customers,
-            │                                  bookings, flash, restaurants, market,
-            │                                  promotions, complaints, settings, …
-            └── static/{css,js}/
+        └── api/v1/                            JSON routers: auth, customer, driver,
+                                               bookings, food, market, admin, misc, ws, …
+
+ziggo_admin_panel/                             Jinja2 admin served at /admin/* (cookie session),
+├── routes.py                                  a top-level sibling of ziggo_backend/
+├── templates/                                 login, dashboard, drivers, bookings, flash, …
+└── static/
 ```
 
 ---
@@ -132,13 +140,13 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 | `/api/v1/admin`         | [app/api/v1/admin.py](ziggo_backend/app/api/v1/admin.py)       | stats, create/approve/suspend drivers (JSON)       |
 | `/api/v1` (misc)        | [app/api/v1/misc.py](ziggo_backend/app/api/v1/misc.py)         | promos, complaints, gold subscription              |
 | `/ws`                   | [app/api/v1/ws.py](ziggo_backend/app/api/v1/ws.py)             | JWT-authed WebSocket (`?token=<jwt>`)              |
-| `/admin/*`              | [app/admin_panel/routes.py](ziggo_backend/app/admin_panel/routes.py) | Jinja2 admin UI (cookie session via itsdangerous)  |
+| `/admin/*`              | [ziggo_admin_panel/routes.py](ziggo_admin_panel/routes.py) | Jinja2 admin UI (cookie session via itsdangerous)  |
 
 ### Auth model
 
-- Phone-OTP only (no passwords for customers/drivers). Admin login uses `phone + 'admin123'` against the seeded admin user.
+- Phone-OTP only (no passwords for customers/drivers). Admin panel login is phone + the admin user's stored password; an admin with no password set falls back to `admin123` (`ziggo_admin_panel/routes.py::admin_login_post`).
 - `services/auth_service.py::get_current_user` is the OAuth2 bearer dependency. Use `require_role("customer"|"driver"|"admin")` to gate routes.
-- Admin panel uses a separate signed cookie (`ziggo_admin`) via `itsdangerous.URLSafeSerializer`, NOT the JWT — see `admin_panel/routes.py::current_admin`.
+- Admin panel uses a separate signed cookie (`ziggo_admin`) via `itsdangerous.URLSafeSerializer`, NOT the JWT — see `ziggo_admin_panel/routes.py::current_admin`.
 - WebSocket auth: token passed as `?token=` query param, decoded inline in `ws.py`.
 
 ### Booking state machine (see [app/api/v1/bookings.py](ziggo_backend/app/api/v1/bookings.py))
@@ -163,8 +171,9 @@ On rate: customer rating updates the driver's aggregate `User.rating` and `User.
 
 ### Fare engine (see [app/services/fare_service.py](ziggo_backend/app/services/fare_service.py))
 
-`final = max(base + per_km*distance + per_min*duration, min_fare) * surge - promo_discount`
-Then `platform_fee = final * pct`, `driver_earnings = final - platform_fee`.
+`calculate_fare` (one vehicle type: estimates, booking create / accept / completion / destination change, public pages) and `calculate_fares_bulk` (the vehicle cards) share one set of pricing rules: (base + per-km + per-minute) × surge, minimum fare, category discount, boost, pickup fee, peak-hour and surge-zone surcharges, stop fees, flash weight tiers, return trips, promo codes, passenger deductible and commission. Rentals and courier have their own simpler rules.
+
+Prices must not change by accident: `ziggo_backend/tests/test_fare_golden.py` holds both functions to 2,310 recorded results. If a change is intended, re-record with `deploy/staging/run-backend-tests.sh record-fare-golden` and review the diff.
 
 Rates come from `FareSetting` rows (admin-editable at `/admin/fare-settings`); falls back to `DEFAULTS` constant if a row is missing.
 
@@ -180,11 +189,12 @@ A `Booking` row with `is_flash=True`. Same state machine, but requires `receiver
 | `booking_update`       | both     | `booking_id`, `status` (string)                               |
 | `no_drivers_available` | customer | `booking_id`, `booking_ref`                                   |
 
-Customer dispatch: when a booking is created, the **nearest driver only** is pinged via `new_ride_request` — they tap Accept (`POST /bookings/{id}/accept`) or Decline (`POST /bookings/{id}/decline`). On decline the backend forwards to the next nearest driver, excluding the one who just declined.
+Customer dispatch: when a booking is created, **every** available online, approved driver within the search radius gets `new_ride_request` at once (`find_all_nearby_drivers`). Rides go only to the booked vehicle type, flash and courier parcels to any type, and a driver about to finish a nearby trip can get a ride as a back-to-back request. The first to accept (`POST /bookings/{id}/accept`) wins, and the others get `ride_taken`.
 
 ### Database
 
-- Config is in `.env`. The default is **SQLite** (`sqlite+aiosqlite:///./ziggo.db`), not PostgreSQL — the README's PostgreSQL section is the optional production path. Don't assume Postgres is running.
+- Production and staging run **Postgres 16** in Docker; the containers get `DATABASE_URL` from docker-compose. SQLite (`sqlite+aiosqlite:///./ziggo.db`) is only the bare local-dev fallback.
+- Schema changes are applied when the backend starts, by `app/services/schema_sync.py` (`create_all` for new tables, `PENDING_COLUMNS` for new columns), not by Alembic. It cannot add values to Postgres enum types (`user_role`, `booking_status`, …), so avoid new enum values.
 - `DATABASE_URL` is the async URL (used by the app). `SYNC_DATABASE_URL` is what alembic uses.
 - Models live in [app/models/](ziggo_backend/app/models/) — split per domain (`user.py`, `booking.py`, `food.py`, `market.py`, `misc.py`) and re-exported from `__init__.py`.
 - All `created_at`/`updated_at` use `server_default=func.now()`.
@@ -192,7 +202,7 @@ Customer dispatch: when a booking is created, the **nearest driver only** is pin
 ### Seed data ([seed.py](ziggo_backend/seed.py))
 
 Idempotent — safe to re-run. Creates:
-- 1 admin (`0700000000` / password `admin123`)
+- 3 admins (`0700000000`–`0700000002`); seed.py resets their passwords to `admin123` on every run, so never run it against production
 - 1 demo customer (`0771234567`, wallet Rs. 2450)
 - 6 demo drivers across Colombo, all APPROVED + online, mixed `vehicle_type`
 - 5 fare-setting rows (bike/tuk/car/van/truck)
@@ -214,13 +224,11 @@ flutter pub get
 flutter run
 ```
 
-### Host detection ([lib/core/network/api_client.dart](ziggo_app/lib/core/network/api_client.dart))
+### Host detection ([lib/core/network/host_resolver.dart](ziggo_app/lib/core/network/host_resolver.dart))
 
-- Web → `http://localhost:8000`
-- Android/iOS (emulator or device) → hard-coded `_lanIp = 'http://192.168.1.114:8000'`
-- Desktop → `http://localhost:8000`
-
-If the dev's LAN IP changes, edit `_lanIp` in `api_client.dart`. (The README mentions `10.0.2.2` for Android emulator but the current code uses the LAN IP for all mobile platforms.)
+- Release builds use `https://ziggo.lk`.
+- A build made with `--dart-define=API_HOST=...` uses only that host, never falling back to production, and shows a STAGING (test.ziggo.lk) or DEV banner.
+- Debug builds without `API_HOST` also probe `http://localhost:8030` and `http://10.0.2.2:8030`.
 
 ### State management
 
@@ -237,9 +245,9 @@ Pattern: each provider holds a `Map<String, dynamic>?` of the current entity (e.
 
 ### Map
 
-- All maps use [`ZiggoMap`](ziggo_app/lib/core/map/ziggo_map.dart) backed by OSM tiles. No Google Maps key needed.
-- "Place autocomplete" is actually a static list ([places.dart](ziggo_app/lib/core/map/places.dart)).
-- Live location uses the OS GPS via `geolocator` (no Google Places).
+- Maps use Google Maps (`google_maps_flutter`), wrapped by [`ZiggoMap`](ziggo_app/lib/core/map/ziggo_map.dart). The key comes from the build: `MAPS_API_KEY` in CI, `GOOGLE_MAPS_API_KEY` in the app's `.env`.
+- Place search uses Google Places via [maps_service.dart](ziggo_app/lib/core/map/maps_service.dart); [places.dart](ziggo_app/lib/core/map/places.dart) still holds Sri Lanka POIs used by some screens.
+- Live location uses the OS GPS via `geolocator`.
 
 ### Theming — "soft-shadow" design language
 
@@ -283,12 +291,12 @@ Material 3, royal-blue brand seed in [app_colors.dart](ziggo_app/lib/app/app_col
 | If the user asks…                                       | Start here                                                                 |
 | ------------------------------------------------------- | -------------------------------------------------------------------------- |
 | Add a backend endpoint                                  | New handler in the matching `app/api/v1/<domain>.py`; if it needs auth use `Depends(get_current_user)` or `require_role(...)`. Add a schema to `app/schemas/<domain>_schema.py`. |
-| Add a new SQLAlchemy column / table                     | Edit the model under `app/models/`, then `alembic revision --autogenerate -m "..." && alembic upgrade head`. |
+| Add a new SQLAlchemy column / table                     | Edit the model under `app/models/`. New tables are created at startup; a new column on an existing table also needs an entry in `PENDING_COLUMNS` in `app/services/schema_sync.py` (nullable or with a default). |
 | Wire a Flutter screen to a new endpoint                 | Pick (or create) a provider under `lib/modules/<area>/`. Use `ApiClient.instance.dio`. Match the error-handling pattern of existing providers. |
-| Tweak fare math                                         | [services/fare_service.py](ziggo_backend/app/services/fare_service.py). Admin can also live-edit at `/admin/fare-settings`. |
+| Tweak fare math                                         | [services/fare_service.py](ziggo_backend/app/services/fare_service.py). Admin can also live-edit at `/admin/fare-settings`. Keep `tests/test_fare_golden.py` passing. |
 | Change driver matching                                  | [services/matching_service.py](ziggo_backend/app/services/matching_service.py) — the in-memory scan is the only place. |
 | Push a new realtime event                               | Add `await manager.send(user_id, "<event>", {...})` in the backend; handle in `BookingProvider` or `DriverProvider` `_onWsEvent`. |
-| Modify the admin panel                                  | Add route in [admin_panel/routes.py](ziggo_backend/app/admin_panel/routes.py); template under `admin_panel/templates/`. Pages all extend `base.html` and pass `active_page` for nav highlighting. |
+| Modify the admin panel                                  | Add route in [ziggo_admin_panel/routes.py](ziggo_admin_panel/routes.py); template under `ziggo_admin_panel/templates/`. Pages all extend `base.html` and pass `active_page` for nav highlighting. |
 | Real Twilio / Stripe                                    | The README lists the 5 files to touch. Don't refactor anything else when wiring real keys — the rest of the app is intentionally stub-friendly. |
 | Driver document upload UI                               | `DriverDocument` model + endpoint exist; the Flutter screen is the missing piece (`modules/driver/screens/driver_registration_screen.dart` is the natural place). |
 
@@ -301,16 +309,18 @@ Material 3, royal-blue brand seed in [app_colors.dart](ziggo_app/lib/app/app_col
 - **Decline forwarding hits the DB twice with nested executes** — see `decline_booking`'s `(await db.execute(select(Customer.user_id)...))` inside a `select(User)`. Works, but ugly. If you touch it, use two clean queries.
 - **`Booking.is_flash` index split**: `/admin/bookings` filters `is_flash == False`, `/admin/flash` filters `is_flash == True`. Anything booking-listing-related on the admin side has to honor this split.
 - **Schemas mismatch with model fields**: some response models (e.g. `FoodOrderResponse`) don't include `items` even though the model has them. Re-check the schema before assuming a field is round-tripped.
-- **Two different "places" sources**: backend uses lat/lng + free-form address strings everywhere; the Flutter UI picks from the hard-coded list in `core/map/places.dart`. There is no Google Places call. If you add a destination picker, use that list (or build a real one) — don't introduce a Google Places dependency.
-- **No tests**: the `ziggo_app/test/` dir is the default Flutter scaffold; the backend has no test suite at all. Don't claim you've "verified" anything by running tests — there aren't any. Verify by running the server / app and exercising the endpoint.
+- **Places**: the backend stores lat/lng plus free-form address strings everywhere; the app's place search uses Google Places (`core/map/maps_service.dart`) plus the static POIs in `core/map/places.dart`.
+- **Tests**: the backend's only automated tests are the fare golden tests in `ziggo_backend/tests/`, run with `deploy/staging/run-backend-tests.sh`. `ziggo_app/test/` is still the default Flutter scaffold. Verify anything else by running it on staging (test.ziggo.lk) and exercising the endpoint.
 
 ---
 
-## 8. Demo credentials (after `seed.py`)
+## 8. Test logins (staging only)
 
-| Who              | Login                       | Password / OTP                                   |
-| ---------------- | --------------------------- | ------------------------------------------------ |
-| Admin (web)      | `0700000000` (or `+94700000000`) | `admin123`                                  |
-| Demo customer    | `0771234567`                | any OTP the API returns (`dev_otp` in response)  |
-| Demo drivers     | `0771000001` … `0771000006` | any OTP the API returns                          |
-| Promo codes      | `ZIGGO50`, `FLAT100`, `WELCOME` | —                                            |
+| Who | Login |
+| --- | --- |
+| Admin (web, test.ziggo.lk/admin) | `0700000000` (superadmin), `0700000001`, `0700000002`; passwords are in `/root/ziggo-staging-admin-logins.txt` on the server |
+| Test customer | `0771234567`; the staging API returns the OTP and the app fills it in |
+| Test drivers | `0771000001` … `0771000006` (tuk, bike, car, mini, van, moto scooter) |
+| Restaurant / vendor owner | `0771100001` / `0771200001` |
+
+These exist only on staging. Never use test logins or default passwords on the live site.
