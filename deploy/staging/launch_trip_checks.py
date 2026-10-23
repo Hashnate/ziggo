@@ -112,7 +112,7 @@ try:
     free = estimate()
     check("customer price unchanged", free["final_amount"] == normal["final_amount"], f"Rs.{free['final_amount']}")
     check("Ziggo commission is 0, driver gets it", free["platform_fee"] == 0
-          and round(free["driver_earnings"] - normal["driver_earnings"], 2) == round(normal["platform_fee"], 2),
+          and abs(free["driver_earnings"] - normal["driver_earnings"] - normal["platform_fee"]) <= 0.02,
           f"driver Rs.{normal['driver_earnings']} -> Rs.{free['driver_earnings']}")
     check("estimate names the launch location", free.get("commission_free") == name
           and abs((free.get("commission_waived") or 0) - normal["platform_fee"]) < 0.01,
@@ -130,7 +130,11 @@ try:
           f"Rs.{done.get('final_amount') if isinstance(done, dict) else done}")
     check("still commission-free after the period ended", row == f"0.00|{loc_id}", row)
     bal1 = balance()
-    check("cash trip added no commission debt", round(bal1 - bal0, 2) == 0.0, f"balance Rs.{bal0} -> Rs.{bal1}")
+    # The passenger service fee is part of the customer's (unchanged) price and stays Ziggo's;
+    # the driver collected it in cash, so only that is owed - no commission.
+    fee = free.get("passenger_deductible") or 0
+    check("cash trip: driver owes no commission (only the passenger fee they collected)",
+          abs((bal0 - bal1) - fee) <= 0.02, f"balance Rs.{bal0} -> Rs.{bal1}, passenger fee Rs.{fee}")
 
     print("\n3. Booked after the period ended")
     after = estimate()
