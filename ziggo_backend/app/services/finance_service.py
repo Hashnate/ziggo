@@ -1139,6 +1139,31 @@ async def get_driver_outstanding_commission(db: AsyncSession, driver_id: int) ->
     return max(Decimal("0"), outstanding)
 
 
+COMMISSION_BLOCK_MESSAGE = "Your account is deactivated due to outstanding commission. Please settle it."
+
+
+async def _driver_commission_limit(db: AsyncSession) -> Decimal:
+    from app.models import SystemSettings
+
+    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    ss = ss_q.scalars().first()
+    if ss and ss.max_settle_amount is not None:
+        return ss.max_settle_amount
+    return Decimal("1000.00")
+
+
+async def driver_blocked_for_commission(db: AsyncSession, driver) -> bool:
+    """Whether the driver may not take a new job: suspended for unpaid commission, or
+    already over the limit before their status caught up. Read-only, unlike
+    check_and_deactivate_driver (admin suspensions also clear is_approved, which
+    callers check separately)."""
+    from app.models import DriverStatus
+
+    if driver.status == DriverStatus.SUSPENDED:
+        return True
+    return await get_driver_outstanding_commission(db, driver.id) > await _driver_commission_limit(db)
+
+
 async def check_and_deactivate_driver(db: AsyncSession, driver_id: int) -> bool:
     """Check driver's outstanding commission against system settings.
     If they exceed the limit, change status to SUSPENDED and turn offline.
@@ -1152,13 +1177,8 @@ async def check_and_deactivate_driver(db: AsyncSession, driver_id: int) -> bool:
         return False
         
     outstanding = await get_driver_outstanding_commission(db, driver_id)
-    
-    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
-    ss = ss_q.scalars().first()
-    max_limit = Decimal("1000.00")
-    if ss and ss.max_settle_amount is not None:
-        max_limit = ss.max_settle_amount
-        
+    max_limit = await _driver_commission_limit(db)
+
     if outstanding > max_limit:
         if drv.status != DriverStatus.SUSPENDED:
             drv.status = DriverStatus.SUSPENDED

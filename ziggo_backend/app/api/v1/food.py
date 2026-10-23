@@ -1181,6 +1181,9 @@ async def accept_food_order(
     driver = await _get_driver(db, user)
     if not driver.is_approved:
         raise HTTPException(status_code=403, detail="Account not approved")
+    from ...services.finance_service import COMMISSION_BLOCK_MESSAGE, driver_blocked_for_commission
+    if await driver_blocked_for_commission(db, driver):
+        raise HTTPException(status_code=403, detail=COMMISSION_BLOCK_MESSAGE)
 
     q = await db.execute(select(FoodOrder).where(FoodOrder.id == order_id))
     order = q.scalars().first()

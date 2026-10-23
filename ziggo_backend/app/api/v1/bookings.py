@@ -40,6 +40,7 @@ from ...schemas import (
     BookingUpdateDestinationRequest,
 )
 from ...services.auth_service import get_current_user
+from ...services.finance_service import COMMISSION_BLOCK_MESSAGE, driver_blocked_for_commission
 from ...services.fare_service import calculate_fare, calculate_fares_bulk, to_decimal
 from ...services.matching_service import (
     find_all_nearby_drivers,
@@ -942,6 +943,8 @@ async def scan_and_go_booking(
         raise HTTPException(status_code=404, detail="Driver not found")
     if not driver.is_approved:
         raise HTTPException(status_code=400, detail="Driver is not approved")
+    if await driver_blocked_for_commission(db, driver):
+        raise HTTPException(status_code=400, detail="This driver can't take bookings right now. Please choose another ride.")
 
     # Calculate fare
     fare = await calculate_fare(
@@ -1372,6 +1375,8 @@ async def accept_booking(
     driver = await _get_driver(db, user)
     if not driver.is_approved:
         raise HTTPException(status_code=403, detail="Account not approved")
+    if await driver_blocked_for_commission(db, driver):
+        raise HTTPException(status_code=403, detail=COMMISSION_BLOCK_MESSAGE)
 
     q = await db.execute(select(Booking).where(Booking.id == booking_id))
     b = q.scalars().first()
