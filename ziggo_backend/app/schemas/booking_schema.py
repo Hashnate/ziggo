@@ -92,6 +92,10 @@ class FareEstimateResponse(BaseModel):
     # Phase 2, feature 04 — set only when a district base fare was used
     district: Optional[str] = None
     district_base_fare: Optional[float] = None
+    # Phase 2, feature 02 — set only for a commission-free launch location
+    commission_free: Optional[str] = None
+    launch_location_id: Optional[int] = None
+    commission_waived: Optional[float] = None
 
 
 class BookingCreate(BaseModel):

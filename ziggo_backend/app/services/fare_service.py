@@ -7,6 +7,7 @@ price, pickup fee and loyalty points as booking that vehicle. The golden tests
 in tests/test_fare_golden.py check both.
 """
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from decimal import Decimal
 from math import radians, sin, cos, asin, sqrt
 from typing import Optional
@@ -19,6 +20,7 @@ from shapely.geometry import Point, Polygon
 from ..models import FareSetting, FlashWeightTier, PromoCode, SurgeZone
 from ..api.v1.surge_zones import is_time_in_range
 from .district_service import district_for
+from .launch_service import launch_location_for, service_of_booking
 from .promo_service import usable_promo_query
 
 # Fallback fare table (used if DB has no row yet for a service type)
@@ -87,11 +89,13 @@ class _Rules:
     system_surge: Optional[float]     # system surge multiplier while its window is open
     district: Optional[str] = None    # pickup district, only looked up while district fares are on
     district_base_fares: dict = field(default_factory=dict)  # service_type -> that district's base fare
+    launch_location: object = None    # commission-free launch location this job falls in, if any
 
 
 async def _load_rules(db: AsyncSession, service_types: list[str], promo: Optional[str],
-                      need_flash_tiers: bool, pickup: Optional[tuple] = None) -> _Rules:
-    from ..models import DistrictFare, PeakHourSetting, SystemSettings
+                      need_flash_tiers: bool, pickup: Optional[tuple] = None,
+                      launch_service: Optional[str] = None, launch_location_id: Optional[int] = None) -> _Rules:
+    from ..models import DistrictFare, LaunchLocation, PeakHourSetting, SystemSettings
     from datetime import datetime, timezone, timedelta
 
     ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
@@ -142,11 +146,22 @@ async def _load_rules(db: AsyncSession, service_types: list[str], promo: Optiona
                 DistrictFare.district == district, DistrictFare.service_type.in_(service_types)))
             district_base_fares = {r.service_type: float(r.base_fare) for r in df_q.scalars().all()}
 
+    # Commission-free launch locations (Phase 2, feature 02). launch_location_id comes
+    # from a booking being re-priced: its own decision stands (0 = not free) even if
+    # the period has since ended or started.
+    launch_location = None
+    if launch_location_id:
+        launch_location = (await db.execute(
+            select(LaunchLocation).where(LaunchLocation.id == launch_location_id))).scalars().first() \
+            or SimpleNamespace(id=launch_location_id, name="Launch location")
+    elif launch_location_id is None and launch_service and pickup is not None:
+        launch_location = await launch_location_for(db, pickup[0], pickup[1], launch_service)
+
     return _Rules(
         settings=ss, sys_commission=sys_commission, fare_settings=fare_settings,
         peaks=peak_q.scalars().all(), hhmm=now_colombo.strftime("%H:%M"), zones=open_zones,
         promo=promo_row, flash_tiers=flash_tiers, system_surge=system_surge,
-        district=district, district_base_fares=district_base_fares,
+        district=district, district_base_fares=district_base_fares, launch_location=launch_location,
     )
 
 
@@ -155,6 +170,20 @@ def _platform_pct(setting, sys_commission: float) -> float:
     if setting and setting.platform_fee_percent is not None and float(setting.platform_fee_percent) > 0:
         return float(setting.platform_fee_percent)
     return sys_commission
+
+
+def _commission_pct(rules: _Rules, setting) -> tuple[float, float]:
+    """(percentage charged, normal percentage). Zero in a commission-free launch location."""
+    normal = _platform_pct(setting, rules.sys_commission)
+    return (0.0 if rules.launch_location is not None else normal), normal
+
+
+def _launch_keys(rules: _Rules, waived: float) -> dict:
+    """Extra quote fields for a commission-free job; nothing otherwise."""
+    if rules.launch_location is None:
+        return {}
+    return {"commission_free": rules.launch_location.name, "launch_location_id": rules.launch_location.id,
+            "commission_waived": round(waived, 2)}
 
 
 def _promo_discount(p, amount: float) -> float:
@@ -236,7 +265,7 @@ def _zone_surcharge(rules: _Rules, pickup_lat: float, pickup_lng: float) -> floa
 def _rental_fare(rules: _Rules, setting, service_type: str, rental_hours) -> dict:
     """Rental: hourly rate × hours; promo discount and platform-fee split still apply."""
     hours = max(1, int(rental_hours or 1))
-    platform_pct = _platform_pct(setting, rules.sys_commission)
+    platform_pct, normal_pct = _commission_pct(rules, setting)
     # Use dynamic rental_hourly_rate if defined, otherwise fallback to RENTAL_HOURLY dictionary
     if setting and setting.rental_hourly_rate is not None:
         hourly = float(setting.rental_hourly_rate)
@@ -247,13 +276,14 @@ def _rental_fare(rules: _Rules, setting, service_type: str, rental_hours) -> dic
     final = max(0, fare - discount)
     platform_fee = fare * (platform_pct / 100.0)
     return {"hours": hours, "hourly": hourly, "fare": fare, "discount": discount, "promo_code": promo_applied,
-            "final": final, "platform_fee": platform_fee, "driver_earnings": fare - platform_fee}
+            "final": final, "platform_fee": platform_fee, "driver_earnings": fare - platform_fee,
+            "waived": fare * (normal_pct / 100.0)}
 
 
 def _courier_fare(rules: _Rules, setting, pickup_lat, pickup_lng, drop_lat, drop_lng,
                   parcel_weight_kg, packages) -> dict:
     """Courier: handling base + parcel weight surcharge + a small per-km component."""
-    platform_pct = _platform_pct(setting, rules.sys_commission)
+    platform_pct, normal_pct = _commission_pct(rules, setting)
     distance_km = haversine_km(pickup_lat, pickup_lng, drop_lat, drop_lng)
     weight_surcharge = 0.0
     if packages:
@@ -272,7 +302,7 @@ def _courier_fare(rules: _Rules, setting, pickup_lat, pickup_lng, drop_lat, drop
     return {"distance_km": distance_km, "eta_days": courier_eta_days(distance_km),
             "weight_surcharge": weight_surcharge, "fare": fare, "discount": discount,
             "promo_code": promo_applied, "final": final, "platform_fee": platform_fee,
-            "driver_earnings": fare - platform_fee}
+            "driver_earnings": fare - platform_fee, "waived": fare * (normal_pct / 100.0)}
 
 
 def _standard_fare(rules: _Rules, service_type: str, setting, route, pickup_distance_km: float,
@@ -296,7 +326,7 @@ def _standard_fare(rules: _Rules, service_type: str, setting, route, pickup_dist
     district_base = rules.district_base_fares.get(service_type)
     if district_base is not None:
         base = district_base
-    platform_pct = _platform_pct(setting, rules.sys_commission)
+    platform_pct, normal_pct = _commission_pct(rules, setting)
 
     # Pickup fee: a percentage of the per-km charge for the driver's distance to the pickup
     base_pickup_fee = pickup_distance_km * per_km
@@ -415,6 +445,7 @@ def _standard_fare(rules: _Rules, service_type: str, setting, route, pickup_dist
     if district_base is not None:
         result["district"] = rules.district
         result["district_base_fare"] = round(district_base, 2)
+    result.update(_launch_keys(rules, feeable_amount * (normal_pct / 100.0)))
     return result
 
 
@@ -441,11 +472,14 @@ async def calculate_fare(
     stops: Optional[list] = None,
     driver_accepted_lat: Optional[float] = None,
     driver_accepted_lng: Optional[float] = None,
+    # Re-pricing a booking: its launch location (0 = it wasn't commission-free).
+    launch_location_id: Optional[int] = None,
 ) -> dict:
     rules = await _load_rules(
         db, [service_type, "courier"], promo,
         need_flash_tiers=(is_flash and parcel_weight_kg is not None) or is_courier,
         pickup=(pickup_lat, pickup_lng),
+        launch_service=service_of_booking(is_flash, is_courier), launch_location_id=launch_location_id,
     )
 
     if is_rental:
@@ -464,6 +498,7 @@ async def calculate_fare(
             "flash_surcharge": 0.0,
             "hourly_rate": r["hourly"],
             "rental_hours": r["hours"],
+            **_launch_keys(rules, r["waived"]),
         }
         return await _enrich_with_loyalty(db, rental_dict, customer, redeem_points)
 
@@ -483,6 +518,7 @@ async def calculate_fare(
             "surge_multiplier": 1.0,
             "flash_surcharge": round(c["weight_surcharge"], 2),
             "courier_eta_days": c["eta_days"],
+            **_launch_keys(rules, c["waived"]),
         }
         return await _enrich_with_loyalty(db, courier_dict, customer, redeem_points)
 
@@ -592,6 +628,7 @@ async def calculate_fares_bulk(
         db, list(set(service_types + (["courier"] if is_courier else []))), promo,
         need_flash_tiers=(is_flash and parcel_weight_kg is not None) or is_courier,
         pickup=(pickup_lat, pickup_lng),
+        launch_service=service_of_booking(is_flash, is_courier),
     )
 
     # Nearest free online driver of each vehicle type, found once for all cards.
@@ -650,6 +687,7 @@ async def calculate_fares_bulk(
                     "promo_code": r["promo_code"],
                     "surge_multiplier": 1.0,
                     "flash_surcharge": 0.0,
+                    **_launch_keys(rules, r["waived"]),
                 }, r["platform_fee"], r["final"])
             elif is_courier:
                 c = _courier_fare(rules, rules.fare_settings.get("courier"), pickup_lat, pickup_lng,
@@ -667,6 +705,7 @@ async def calculate_fares_bulk(
                     "surge_multiplier": 1.0,
                     "flash_surcharge": round(c["weight_surcharge"], 2),
                     "courier_eta_days": c["eta_days"],
+                    **_launch_keys(rules, c["waived"]),
                 }, c["platform_fee"], c["final"])
             else:
                 # Standard Ride / Flash Calculation

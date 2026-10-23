@@ -118,6 +118,9 @@ class Booking(Base):
     # trip's amounts came from, so reports never have to re-price old trips.
     district = Column(String(30), nullable=True)
     fare_breakdown = Column(JSON, nullable=True)
+    # Commission-free launch location this trip was booked in (Phase 2, feature 02).
+    # Re-pricing keeps the decision made at booking, even after the period ends.
+    launch_location_id = Column(Integer, nullable=True)
 
     # Rental / vehicle-hire fields. is_rental=True means the customer hires a
     # vehicle for `rental_hours` and the fare is hourly_rate * hours (no drop
