@@ -10100,6 +10100,10 @@ async def admin_launch_locations(
     rows = [{"loc": l, "status": status_of(l, today), "days_left": (l.end_date - today).days + 1,
              "starts_in": (l.start_date - today).days} for l in locs]
     current = next((l for l in locs if l.id == edit), None)
+    summary = await fin.launch_location_summary(db)
+    for r in rows:
+        r["summary"] = summary.get(r["loc"].id, {"jobs": 0, "trips": 0, "orders": 0, "income": 0.0,
+                                                 "driver_earnings": 0.0, "waived": 0.0})
     return templates.TemplateResponse(
         request, "launch_locations.html",
         {"request": request, "active_page": "launch_locations", "rows": rows, "current": current,
@@ -10167,7 +10171,7 @@ async def admin_launch_locations_save(
     loc.name, loc.kind, loc.district, loc.coordinates = name, kind, district, coords
     loc.start_date, loc.end_date, loc.services = start, end, services
     loc.waive_delivery_cut = form.get("waive_delivery_cut") == "on"
-    loc.waive_merchant_commission = form.get("waive_merchant_commission") == "on"
+    loc.waive_merchant_commission = False  # merchants always pay their commission (owner's decision)
     loc.is_active = form.get("is_active") == "on"
     await db.commit()
     return RedirectResponse(url="/admin/launch-locations", status_code=303)

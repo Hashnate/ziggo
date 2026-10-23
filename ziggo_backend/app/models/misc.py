@@ -164,8 +164,9 @@ class LaunchLocation(Base):
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=False)
     services = Column(JSON, nullable=False, default=list)            # subset of LAUNCH_SERVICES
-    # Food/market only: waive the driver's cut of the delivery fee and/or the
-    # restaurant's or shop's commission on the items.
+    # Food/market only: waive Ziggo's cut of the driver's delivery fee. Restaurants
+    # and shops always pay their commission (owner's decision, 2026-10-23); the
+    # column stays so it could be added later, but nothing sets or applies it.
     waive_delivery_cut = Column(Boolean, nullable=False, default=True)
     waive_merchant_commission = Column(Boolean, nullable=False, default=False)
     is_active = Column(Boolean, nullable=False, default=True)

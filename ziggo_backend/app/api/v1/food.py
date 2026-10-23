@@ -660,7 +660,6 @@ async def create_food_order(
         district=district_for(r.lat, r.lng),
         launch_location_id=launch.id if launch else None,
         waive_delivery_cut=bool(launch and launch.waive_delivery_cut),
-        waive_merchant_commission=bool(launch and launch.waive_merchant_commission),
         status=FoodOrderStatus.PENDING,
         total_amount=total,
         delivery_fee=delivery_fee,

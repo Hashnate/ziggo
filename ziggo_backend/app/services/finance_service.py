@@ -363,6 +363,42 @@ async def district_report(db: AsyncSession, start_day, end_day, service: str = "
     return {"rows": [as_float(r) for r in ordered], "totals": as_float(totals)}
 
 
+
+async def launch_location_summary(db: AsyncSession) -> dict[int, dict]:
+    """Per launch location: completed jobs, what customers paid, what drivers earned
+    and the commission Ziggo waived (Phase 2, feature 02). Trips use the waived
+    amount recorded in their quote; food/market orders the delivery cut."""
+    out: dict[int, dict] = {}
+
+    def row(lid):
+        return out.setdefault(lid, {"jobs": 0, "trips": 0, "orders": 0, "income": 0.0,
+                                    "driver_earnings": 0.0, "waived": 0.0})
+
+    bq = await db.execute(select(Booking).where(
+        Booking.launch_location_id.isnot(None), Booking.status == BookingStatus.COMPLETED))
+    for b in bq.scalars().all():
+        r = row(b.launch_location_id)
+        r["jobs"] += 1
+        r["trips"] += 1
+        r["income"] += float(_dec(b.final_amount or b.fare_amount))
+        r["driver_earnings"] += float(_dec(b.driver_earnings))
+        r["waived"] += float((b.fare_breakdown or {}).get("commission_waived") or 0)
+    for model, status, split in ((FoodOrder, FoodOrderStatus.DELIVERED, _food_split),
+                                 (MarketOrder, MarketOrderStatus.DELIVERED, _market_split)):
+        opts = joinedload(FoodOrder.restaurant) if model is FoodOrder else joinedload(MarketOrder.vendor)
+        q = await db.execute(select(model).options(opts).where(
+            model.launch_location_id.isnot(None), model.status == status))
+        for o in q.scalars().all():
+            r = row(o.launch_location_id)
+            r["jobs"] += 1
+            r["orders"] += 1
+            r["income"] += float(_dec(o.final_amount))
+            r["driver_earnings"] += float(split(o)[0])
+            if o.waive_delivery_cut:
+                r["waived"] += float((_dec(o.delivery_fee) * _PLATFORM_DELIVERY_CUT).quantize(Decimal("0.01")))
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Driver financials
 # ---------------------------------------------------------------------------

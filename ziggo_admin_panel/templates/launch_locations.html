@@ -65,10 +65,9 @@
                     </div>
                 </div>
                 <div class="p-3 rounded-xl bg-gray-50 border border-gray-100">
-                    <p class="text-xs font-black text-gray-500 uppercase tracking-wider mb-2">Food and market orders: waive</p>
-                    <label class="block text-sm font-bold"><input type="checkbox" name="waive_delivery_cut" {% if not c or c.waive_delivery_cut %}checked{% endif %}> Ziggo's cut of the delivery fee (the driver keeps it all)</label>
-                    <label class="block text-sm font-bold mt-1"><input type="checkbox" name="waive_merchant_commission" {% if c and c.waive_merchant_commission %}checked{% endif %}> The restaurant's / shop's commission on the items
-                        <span class="block text-[11px] text-amber-600 font-bold ml-5">Recorded on each order, but not applied to restaurant/shop settlements yet.</span></label>
+                    <p class="text-xs font-black text-gray-500 uppercase tracking-wider mb-2">Food and market orders</p>
+                    <label class="block text-sm font-bold"><input type="checkbox" name="waive_delivery_cut" {% if not c or c.waive_delivery_cut %}checked{% endif %}> Waive Ziggo's cut of the delivery fee (the driver keeps it all)</label>
+                    <p class="text-[11px] text-gray-400 mt-1">Restaurants and shops pay their normal commission.</p>
                 </div>
                 <label class="block text-sm font-bold"><input type="checkbox" name="is_active" {% if not c or c.is_active %}checked{% endif %}> Switched on</label>
             </div>
@@ -96,6 +95,10 @@
                     <th class="px-4 py-3 text-left">Period</th>
                     <th class="px-4 py-3 text-left">Status</th>
                     <th class="px-4 py-3 text-left">Commission-free for</th>
+                    <th class="px-4 py-3 text-right">Jobs done</th>
+                    <th class="px-4 py-3 text-right">Customers paid</th>
+                    <th class="px-4 py-3 text-right">Drivers earned</th>
+                    <th class="px-4 py-3 text-right">Commission waived</th>
                     <th class="px-4 py-3"></th>
                 </tr>
             </thead>
@@ -113,8 +116,13 @@
                     </td>
                     <td class="px-4 py-3 text-xs">
                         {% for s in l.services %}{{ svc_names.get(s, s) }}{{ ', ' if not loop.last }}{% endfor %}
-                        {% if 'food' in l.services or 'market' in l.services %}<div class="text-gray-400">waives: {{ 'delivery cut' if l.waive_delivery_cut }}{{ ' + ' if l.waive_delivery_cut and l.waive_merchant_commission }}{{ 'merchant commission' if l.waive_merchant_commission }}{{ 'nothing' if not l.waive_delivery_cut and not l.waive_merchant_commission }}</div>{% endif %}
+                        {% if 'food' in l.services or 'market' in l.services %}<div class="text-gray-400">{{ 'delivery cut waived' if l.waive_delivery_cut else 'delivery cut charged' }}</div>{% endif %}
                     </td>
+                    {% set m = r.summary %}
+                    <td class="px-4 py-3 text-right">{{ m.jobs }}<div class="text-[10px] text-gray-400">{{ m.trips }} trips · {{ m.orders }} orders</div></td>
+                    <td class="px-4 py-3 text-right">Rs.{{ "{:,.2f}".format(m.income) }}</td>
+                    <td class="px-4 py-3 text-right text-green-700">Rs.{{ "{:,.2f}".format(m.driver_earnings) }}</td>
+                    <td class="px-4 py-3 text-right font-black text-amber-600">Rs.{{ "{:,.2f}".format(m.waived) }}</td>
                     <td class="px-4 py-3 text-right whitespace-nowrap">
                         <a href="/admin/launch-locations?edit={{ l.id }}" class="text-xs font-bold text-ziggo mr-3">Edit</a>
                         <form method="POST" action="/admin/launch-locations/{{ l.id }}/delete" class="inline" onsubmit="return confirm('Delete {{ l.name }}? Trips already booked keep their commission-free status.')">
@@ -123,7 +131,7 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="6" class="p-10 text-center text-gray-400 text-sm font-bold">No launch locations yet.</td></tr>
+                <tr><td colspan="10" class="p-10 text-center text-gray-400 text-sm font-bold">No launch locations yet.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
