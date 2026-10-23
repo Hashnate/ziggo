@@ -67,7 +67,8 @@
                 <div class="p-3 rounded-xl bg-gray-50 border border-gray-100">
                     <p class="text-xs font-black text-gray-500 uppercase tracking-wider mb-2">Food and market orders: waive</p>
                     <label class="block text-sm font-bold"><input type="checkbox" name="waive_delivery_cut" {% if not c or c.waive_delivery_cut %}checked{% endif %}> Ziggo's cut of the delivery fee (the driver keeps it all)</label>
-                    <label class="block text-sm font-bold mt-1"><input type="checkbox" name="waive_merchant_commission" {% if c and c.waive_merchant_commission %}checked{% endif %}> The restaurant's / shop's commission on the items</label>
+                    <label class="block text-sm font-bold mt-1"><input type="checkbox" name="waive_merchant_commission" {% if c and c.waive_merchant_commission %}checked{% endif %}> The restaurant's / shop's commission on the items
+                        <span class="block text-[11px] text-amber-600 font-bold ml-5">Recorded on each order, but not applied to restaurant/shop settlements yet.</span></label>
                 </div>
                 <label class="block text-sm font-bold"><input type="checkbox" name="is_active" {% if not c or c.is_active %}checked{% endif %}> Switched on</label>
             </div>
