@@ -476,14 +476,27 @@ class ZiggoCircle {
 
 class ZiggoMapController {
   gmaps.GoogleMapController? _c;
+  // A move requested before the map exists, applied once it's created.
+  // Otherwise the map stays on its initial centre (Colombo by default).
+  gmaps.CameraUpdate? _pendingMove;
 
-  void _attach(gmaps.GoogleMapController c) => _c = c;
+  void _attach(gmaps.GoogleMapController c) {
+    _c = c;
+    final pending = _pendingMove;
+    _pendingMove = null;
+    if (pending != null) c.moveCamera(pending);
+  }
 
   bool get isReady => _c != null;
 
   Future<void> moveTo(LatLng target, {double zoom = 15}) async {
+    final update = gmaps.CameraUpdate.newLatLngZoom(_g(target), zoom);
+    if (_c == null) {
+      _pendingMove = update;
+      return;
+    }
     try {
-      await _c?.animateCamera(gmaps.CameraUpdate.newLatLngZoom(_g(target), zoom));
+      await _c!.animateCamera(update);
     } catch (e) {
       debugPrint("ZiggoMapController.moveTo error: $e");
     }

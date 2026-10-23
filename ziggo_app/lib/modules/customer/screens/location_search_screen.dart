@@ -11,7 +11,6 @@ import '../../../core/map/maps_service.dart';
 import '../../../core/map/place_search_sheet.dart';
 import '../../../core/map/places.dart';
 import '../../../core/map/recent_places.dart';
-import '../../../core/map/ziggo_map.dart';
 import '../../customer/addresses_provider.dart';
 import 'vehicle_selection_screen.dart';
 import 'confirm_pickup_screen.dart';
@@ -119,8 +118,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
     }
     setState(() => _loading = true);
     _debounce = Timer(const Duration(milliseconds: 350), () async {
-      final near = _pickup?.location ?? kColomboCenter;
-      final r = await MapsService.instance.autocomplete(q, near: near);
+      final r = await MapsService.instance.autocomplete(q, near: _pickup?.location);
       if (!mounted) return;
       setState(() {
         _results = r;
