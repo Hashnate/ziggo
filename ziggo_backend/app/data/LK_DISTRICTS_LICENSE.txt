@@ -1,0 +1,9 @@
+lk_districts.geojson — outlines of Sri Lanka's 25 districts.
+
+Source: geoBoundaries gbOpen LKA ADM2 (simplified), release 9469f09,
+https://www.geoboundaries.org — data from OpenStreetMap.
+© OpenStreetMap contributors. Available under the Open Database License (ODbL) 1.0:
+https://opendatacommons.org/licenses/odbl/1-0/  —  https://www.openstreetmap.org/copyright
+
+Changes: properties reduced to the district name ("Kandy District" -> "Kandy");
+geometry unchanged. This file is likewise available under the ODbL 1.0.

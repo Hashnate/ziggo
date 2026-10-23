@@ -43,7 +43,7 @@ LOCAL = timezone(timedelta(hours=5, minutes=30))
 DISTRICTS = {
     "Colombo": (30, [("Fort", 6.9344, 79.8500), ("Bambalapitiya", 6.8942, 79.8580), ("Borella", 6.9147, 79.8778),
                      ("Nugegoda", 6.8649, 79.8997), ("Maharagama", 6.8480, 79.9265), ("Rajagiriya", 6.9094, 79.8939),
-                     ("Dehiwala", 6.8511, 79.8700), ("Moratuwa", 6.7730, 79.8900), ("Kottawa", 6.8412, 79.9654),
+                     ("Dehiwala", 6.8511, 79.8700), ("Moratuwa", 6.7730, 79.8822), ("Kottawa", 6.8412, 79.9654),
                      ("Homagama", 6.8441, 80.0024), ("Kaduwela", 6.9330, 79.9850), ("Wellawatte", 6.8746, 79.8640)]),
     "Gampaha": (15, [("Gampaha", 7.0917, 79.9997), ("Negombo", 7.2008, 79.8737), ("Kadawatha", 7.0010, 79.9530),
                      ("Ja-Ela", 7.0744, 79.8919), ("Wattala", 6.9897, 79.8925), ("Kiribathgoda", 6.9800, 79.9290),
