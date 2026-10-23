@@ -7,6 +7,8 @@ vehicle card, booking, driver accept, arrive, start with the customer's code,
 stops, destination change, completion and payment. Prices are compared at
 every step. Staging-only database tweaks are used to simulate waiting time at
 a stop and to add a temporary expired promo code (removed afterwards).
+Related checks: checkout_checks.py, live_mode_payment_checks.py,
+driver_block_checks.py and driver_balance_checks.py in this folder.
 """
 import json
 import subprocess
@@ -266,8 +268,8 @@ trip("11. Scheduled ride, 2 hours ahead", "tuk", BORELLA, NUGEGODA, schedule=Tru
 # 12. Cancel after accept
 trip("12. Customer cancels after the driver accepted", "tuk", BORELLA, NUGEGODA, cancel_after_accept=True)
 
-# 13. Known issue check: expired promo codes
-print("\n13. Expired promo code (known issue check)")
+# 13. Expired promo code
+print("\n13. Expired promo code")
 sql("insert into promo_codes (code, description, category, discount_type, discount_value, min_order_amount, used_count, "
     "is_active, valid_to) values ('STGEXPIRED', 'staging test', 'rides', 'fixed', 100, 0, 0, true, now() - interval '1 day')")
 try:
