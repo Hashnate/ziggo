@@ -330,6 +330,9 @@ class DriverPayout(Base):
     driver_id = Column(Integer, ForeignKey("drivers.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     amount = Column(DECIMAL(10, 2), nullable=False)
+    # payout | commission_payment | bonus | incentive_paid | offset — how the row
+    # moves the driver's balance (see finance_service). NULL on older rows.
+    kind = Column(String(30), nullable=True)
     description = Column(String(255))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

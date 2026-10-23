@@ -8218,7 +8218,28 @@ async def admin_finance_driver_pay_incentive(
     _: User = Depends(current_admin),
 ):
     from decimal import Decimal
-    await fin.execute_driver_payout(db, driver_id, Decimal(str(amount)), note)
+    await fin.execute_driver_payout(db, driver_id, Decimal(str(amount)), note, kind=fin.INCENTIVE_PAID)
+    return RedirectResponse(url=f"/admin/finance/drivers/{driver_id}", status_code=303)
+
+
+@router.post("/finance/drivers/{driver_id}/commission_payment")
+async def admin_finance_driver_commission_payment(
+    driver_id: int,
+    amount: float = Form(...),
+    payment_method: str = Form("Cash at office"),
+    reference_id: str = Form(""),
+    note: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    """The driver paid their commission (e.g. cash at the office)."""
+    from decimal import Decimal
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be greater than zero")
+    await fin.record_driver_commission_payment(
+        db, driver_id, Decimal(str(amount)),
+        payment_method=payment_method, reference_id=reference_id, note=note,
+    )
     return RedirectResponse(url=f"/admin/finance/drivers/{driver_id}", status_code=303)
 
 

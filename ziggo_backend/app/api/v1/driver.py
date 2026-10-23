@@ -724,75 +724,62 @@ async def settle_commission(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_role("driver")),
 ):
-    """Settle outstanding admin commission.
-    If card_id is provided, charges the driver's card. Otherwise, does the cash balance offset payout."""
+    """Settle outstanding commission by card. Card and wallet earnings already
+    count against commission automatically (see finance_service.get_driver_balance),
+    so there is no separate offset; anything else is paid at the office."""
     d = await _get_driver(db, user)
-    from ...services.finance_service import get_driver_earnings_summary
-    summary = await get_driver_earnings_summary(db, d.id)
-    
-    commission = Decimal(str(summary["outstanding_commission"]))
-    pending = Decimal(str(summary["pending"]))
-    
+    from ...services.finance_service import COMMISSION_PAYMENT, get_driver_outstanding_commission
+    from ...services.ipay_service import SETTLE_COMMISSION_AT_OFFICE, card_payments_available
+
+    commission = await get_driver_outstanding_commission(db, d.id)
     if commission <= 0:
         raise HTTPException(status_code=400, detail="No commission to settle")
 
     settle_amount = commission
     if body and body.amount is not None and body.amount > 0:
-        settle_amount = Decimal(str(body.amount))
-        if settle_amount > commission:
-            settle_amount = commission
-            
-    payout_amount = min(settle_amount, pending)
-    description = "Commission settled (Cash balance offset)"
-    
-    if body and body.card_id is not None:
-        from ...models import Customer, CustomerCard
-        cq = await db.execute(select(Customer).where(Customer.user_id == user.id))
-        customer = cq.scalars().first()
-        if not customer:
-            raise HTTPException(status_code=404, detail="Customer/Payment profile not found")
-            
-        card_q = await db.execute(
-            select(CustomerCard).where(CustomerCard.id == body.card_id, CustomerCard.customer_id == customer.id)
-        )
-        card = card_q.scalars().first()
-        if not card:
-            raise HTTPException(status_code=404, detail="Selected card not found")
-            
-        from ...services.ipay_service import charge_tokenized_card
-        import secrets
-        order_id = "SC" + secrets.token_hex(6).upper()
-        res = await charge_tokenized_card(
-            customer_token=card.customer_token,
-            amount=settle_amount,
-            order_id=order_id,
-            items=f"Admin Commission Settlement ({order_id})",
-        )
-        if not res.get("success"):
-            raise HTTPException(status_code=400, detail=res.get("message", "Payment failed"))
-            
-        payout_amount = settle_amount
-        description = f"Commission settled (Card payment ref {order_id})"
-    else:
-        # Fallback/default offset settlement
-        if pending <= 0:
-            raise HTTPException(status_code=400, detail="No pending balance to offset commission")
-            
-    from ...models import DriverPayout
-    payout = DriverPayout(
+        settle_amount = min(Decimal(str(body.amount)), commission)
+
+    if not (body and body.card_id is not None) or not card_payments_available():
+        raise HTTPException(status_code=400, detail=SETTLE_COMMISSION_AT_OFFICE)
+    from ...models import Customer, CustomerCard, DriverPayout
+    cq = await db.execute(select(Customer).where(Customer.user_id == user.id))
+    customer = cq.scalars().first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer/Payment profile not found")
+
+    card_q = await db.execute(
+        select(CustomerCard).where(CustomerCard.id == body.card_id, CustomerCard.customer_id == customer.id)
+    )
+    card = card_q.scalars().first()
+    if not card:
+        raise HTTPException(status_code=404, detail="Selected card not found")
+
+    from ...services.ipay_service import charge_tokenized_card
+    import secrets
+    order_id = "SC" + secrets.token_hex(6).upper()
+    res = await charge_tokenized_card(
+        customer_token=card.customer_token,
+        amount=settle_amount,
+        order_id=order_id,
+        items=f"Admin Commission Settlement ({order_id})",
+    )
+    if not res.get("success"):
+        raise HTTPException(status_code=400, detail=res.get("message", "Payment failed"))
+
+    db.add(DriverPayout(
         driver_id=d.id,
         user_id=d.user_id,
-        amount=payout_amount,
-        description=description,
-    )
-    db.add(payout)
+        amount=settle_amount,
+        kind=COMMISSION_PAYMENT,
+        description=f"Commission settled (Card payment ref {order_id})",
+    ))
     await db.commit()
-    
-    # Check outstanding commission to auto-reactivate if settled
+
+    # Lift a commission block once the debt is back under the limit
     from ...services.finance_service import check_and_deactivate_driver
     await check_and_deactivate_driver(db, d.id)
-    
-    return {"ok": True, "settled_amount": float(commission)}
+
+    return {"ok": True, "settled_amount": float(settle_amount)}
 
 
 @router.get("/incentives")

@@ -40,6 +40,7 @@ from ...schemas import (
     BookingUpdateDestinationRequest,
 )
 from ...services.auth_service import get_current_user
+from ...services.finance_service import COMMISSION_BLOCK_MESSAGE, driver_blocked_for_commission
 from ...services.fare_service import calculate_fare, calculate_fares_bulk, to_decimal
 from ...services.matching_service import (
     find_all_nearby_drivers,
@@ -613,6 +614,8 @@ async def create_booking(
         if not corporate_acct or float(corporate_acct.balance or 0) < fare["final_amount"]:
             raise HTTPException(status_code=400, detail="Insufficient corporate balance")
     elif req.payment_method and req.payment_method.startswith("card_"):
+        if not ipay_service.card_payments_available():
+            raise HTTPException(status_code=400, detail=ipay_service.CARD_PAYMENTS_COMING_SOON)
         try:
             card_id = int(req.payment_method.split("_")[1])
         except (ValueError, IndexError):
@@ -686,6 +689,7 @@ async def create_booking(
         parcel_instructions=req.parcel_instructions,
         is_courier=req.is_courier,
         courier_eta_days=fare.get("courier_eta_days") if req.is_courier else None,
+        packages=[p.model_dump() for p in req.packages] or None,
         is_rental=req.is_rental,
         rental_hours=req.rental_hours,
         is_corporate=req.payment_method == "corporate",
@@ -925,6 +929,8 @@ async def scan_and_go_booking(
     user: User = Depends(get_current_user),
 ):
     customer = await _get_customer(db, user)
+    if (req.payment_method or "").startswith("card_") and not ipay_service.card_payments_available():
+        raise HTTPException(status_code=400, detail=ipay_service.CARD_PAYMENTS_COMING_SOON)
 
     # Verify driver exists and is approved
     dq = await db.execute(
@@ -937,6 +943,8 @@ async def scan_and_go_booking(
         raise HTTPException(status_code=404, detail="Driver not found")
     if not driver.is_approved:
         raise HTTPException(status_code=400, detail="Driver is not approved")
+    if await driver_blocked_for_commission(db, driver):
+        raise HTTPException(status_code=400, detail="This driver can't take bookings right now. Please choose another ride.")
 
     # Calculate fare
     fare = await calculate_fare(
@@ -953,6 +961,7 @@ async def scan_and_go_booking(
         is_rental=req.is_rental,
         rental_hours=req.rental_hours,
         is_courier=req.is_courier,
+        packages=[p.model_dump() for p in (req.packages or [])],
         customer=customer,
         redeem_points=req.redeem_points or 0,
         stops=[s.model_dump() for s in (req.stops or [])],
@@ -1004,6 +1013,7 @@ async def scan_and_go_booking(
         parcel_instructions=req.parcel_instructions,
         is_courier=req.is_courier,
         courier_eta_days=fare.get("courier_eta_days") if req.is_courier else None,
+        packages=[p.model_dump() for p in req.packages] or None,
         is_rental=req.is_rental,
         rental_hours=req.rental_hours,
         pickup_fee=to_decimal(fare.get("pickup_fee", 0)),
@@ -1365,6 +1375,8 @@ async def accept_booking(
     driver = await _get_driver(db, user)
     if not driver.is_approved:
         raise HTTPException(status_code=403, detail="Account not approved")
+    if await driver_blocked_for_commission(db, driver):
+        raise HTTPException(status_code=403, detail=COMMISSION_BLOCK_MESSAGE)
 
     q = await db.execute(select(Booking).where(Booking.id == booking_id))
     b = q.scalars().first()
@@ -1437,6 +1449,7 @@ async def accept_booking(
         is_rental=b.is_rental,
         rental_hours=b.rental_hours,
         is_courier=b.is_courier,
+        packages=b.packages,
         customer=None, # Not modifying loyalty here
         redeem_points=int(b.redeem_points) if b.redeem_points else 0,
         stops=stops_list,
@@ -1570,9 +1583,22 @@ async def _reverse_geocode_coordinates(lat: float, lng: float) -> Optional[str]:
             )
             if resp.status_code == 200:
                 data = resp.json()
-                results = data.get("results", [])
+                # Google sometimes ranks an unrelated place first (points in
+                # Kinniya come back with a street in Hanoi), so only keep
+                # results within 10 km of the point.
+                from ...services.fare_service import haversine_km
 
-                plus_code_re = re.compile(r"^[A-Z0-9]{4,8}\+[A-Z0-9]{2,3}\b")
+                def near_point(r):
+                    loc = (r.get("geometry") or {}).get("location") or {}
+                    return (
+                        loc.get("lat") is not None
+                        and loc.get("lng") is not None
+                        and haversine_km(lat, lng, loc["lat"], loc["lng"]) <= 10
+                    )
+
+                results = [r for r in data.get("results", []) if near_point(r)]
+
+                plus_code_re = re.compile(r"^[A-Z0-9]{4,8}\+[A-Z0-9]{2,7}\b")
 
                 for r in results:
                     types = r.get("types", [])
@@ -1819,6 +1845,7 @@ async def update_booking_status(
                 is_rental=b.is_rental,
                 rental_hours=b.rental_hours,
                 is_courier=b.is_courier,
+                packages=b.packages,
                 customer=customer,
                 redeem_points=int(b.redeem_points) if b.redeem_points else 0,
                 stops=stops_list,
@@ -1998,7 +2025,6 @@ async def update_booking_status(
 
         # Charge cancellation fee if cancelled by customer after grace period
         if b.cancelled_by == "customer":
-            from ...models import WalletTransaction
             ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
             ss = ss_q.scalars().first()
             grace_period_mins = ss.cancellation_grace_period_minutes if (ss and ss.cancellation_grace_period_minutes is not None) else 3
@@ -2417,6 +2443,7 @@ async def update_booking_destination(
         is_rental=b.is_rental,
         rental_hours=b.rental_hours,
         is_courier=b.is_courier,
+        packages=b.packages,
         customer=c,
         redeem_points=int(b.redeem_points) if b.redeem_points else 0,
         stops=[s.model_dump() for s in (body.stops or [])],

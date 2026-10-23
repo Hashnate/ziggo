@@ -18,6 +18,7 @@ from shapely.geometry import Point, Polygon
 
 from ..models import FareSetting, FlashWeightTier, PromoCode, SurgeZone
 from ..api.v1.surge_zones import is_time_in_range
+from .promo_service import usable_promo_query
 
 # Fallback fare table (used if DB has no row yet for a service type)
 DEFAULTS = {
@@ -101,7 +102,7 @@ async def _load_rules(db: AsyncSession, service_types: list[str], promo: Optiona
 
     promo_row = None
     if promo:
-        promo_q = await db.execute(select(PromoCode).where(PromoCode.code == promo.upper()))
+        promo_q = await db.execute(usable_promo_query(promo.upper()))
         promo_row = promo_q.scalars().first()
 
     flash_tiers = []

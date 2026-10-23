@@ -603,8 +603,8 @@ async def create_food_order(
     promo_discount = Decimal("0")
     promo_code_applied = None
     if body.promo_code:
-        from ...models import PromoCode
-        p_q = await db.execute(select(PromoCode).where(PromoCode.code == body.promo_code.upper()))
+        from ...services.promo_service import usable_promo_query
+        p_q = await db.execute(usable_promo_query(body.promo_code.upper()))
         p = p_q.scalars().first()
         if p and p.is_active and p.category in ("all", "food") and (
             p.usage_limit is None or p.used_count < p.usage_limit
@@ -634,6 +634,8 @@ async def create_food_order(
     if body.payment_method == "wallet" and (customer.wallet_balance or Decimal(0)) < final:
         raise HTTPException(status_code=400, detail="Insufficient wallet balance")
     elif body.payment_method and body.payment_method.startswith("card_"):
+        if not ipay_service.card_payments_available():
+            raise HTTPException(status_code=400, detail=ipay_service.CARD_PAYMENTS_COMING_SOON)
         try:
             card_id = int(body.payment_method.split("_")[1])
         except (ValueError, IndexError):
@@ -756,7 +758,7 @@ async def create_food_order(
     # fires later, when the restaurant taps "Mark Ready" (see
     # /restaurant/orders/{id}/ready). Until then, the order sits in PENDING
     # and the customer's timeline shows "Waiting for restaurant".
-    items_count = sum(qty for _, qty, _, _ in line_items)
+    items_count = sum(qty for _, qty, *_ in line_items)
     if r.owner_id is not None:
         await manager.send(
             r.owner_id,
@@ -1179,6 +1181,9 @@ async def accept_food_order(
     driver = await _get_driver(db, user)
     if not driver.is_approved:
         raise HTTPException(status_code=403, detail="Account not approved")
+    from ...services.finance_service import COMMISSION_BLOCK_MESSAGE, driver_blocked_for_commission
+    if await driver_blocked_for_commission(db, driver):
+        raise HTTPException(status_code=403, detail=COMMISSION_BLOCK_MESSAGE)
 
     q = await db.execute(select(FoodOrder).where(FoodOrder.id == order_id))
     order = q.scalars().first()

@@ -98,10 +98,24 @@ class MapsService {
     ),
   );
 
-  /// Places Autocomplete — biased to Sri Lanka.
+  static const double _maxGeocodeDistanceMeters = 10000;
+
+  /// The device's last known position, without prompting or waiting for a fix.
+  Future<LatLng?> _lastKnownPoint() async {
+    try {
+      final p = await Geolocator.getLastKnownPosition();
+      return p == null ? null : LatLng(p.latitude, p.longitude);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Places Autocomplete — limited to Sri Lanka, biased to [near] or else to
+  /// where the device is (otherwise Google guesses from the IP, usually Colombo).
   Future<List<PlacePrediction>> autocomplete(String query, {LatLng? near}) async {
     if (query.trim().length < 2) return const [];
     if (_apiKey.isEmpty) return const [];
+    near ??= await _lastKnownPoint();
     try {
       final resp = await _dio.get(
         'https://maps.googleapis.com/maps/api/place/autocomplete/json',
@@ -167,8 +181,18 @@ class MapsService {
           'key': _apiKey,
         },
       );
-      final results = (resp.data['results'] as List?) ?? const [];
-      final plusCodeRe = RegExp(r'^[A-Z0-9]{4,8}\+[A-Z0-9]{2,3}\b');
+      // Google sometimes ranks an unrelated place first (points in Kinniya come
+      // back with a street in Hanoi), so only use results near the point.
+      final results = ((resp.data['results'] as List?) ?? const []).where((r) {
+        final loc = r['geometry']?['location'];
+        final lat = (loc?['lat'] as num?)?.toDouble();
+        final lng = (loc?['lng'] as num?)?.toDouble();
+        return lat != null &&
+            lng != null &&
+            Geolocator.distanceBetween(point.latitude, point.longitude, lat, lng) <=
+                _maxGeocodeDistanceMeters;
+      }).toList();
+      final plusCodeRe = RegExp(r'^[A-Z0-9]{4,8}\+[A-Z0-9]{2,7}\b');
 
       String stripPlusPrefix(String s) {
         var out = s;

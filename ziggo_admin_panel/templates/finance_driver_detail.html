@@ -64,9 +64,14 @@
                 <h3 class="font-black text-ziggo">Transaction history</h3>
                 <p class="text-xs text-gray-400">{{ data.transactions | length }} latest</p>
             </div>
-            <button onclick="openIncentiveModal()" class="px-3.5 py-1.5 text-xs bg-ziggo text-white rounded-lg font-bold shadow-sm hover:bg-ziggo-light transition flex items-center gap-1.5">
-                <i class="fas fa-gift"></i> Pay Incentive
-            </button>
+            <div class="flex items-center gap-2">
+                <button onclick="openModal('commissionModal')" class="px-3.5 py-1.5 text-xs bg-rose-600 text-white rounded-lg font-bold shadow-sm hover:bg-rose-500 transition flex items-center gap-1.5">
+                    <i class="fas fa-hand-holding-usd"></i> Record Commission Payment
+                </button>
+                <button onclick="openIncentiveModal()" class="px-3.5 py-1.5 text-xs bg-ziggo text-white rounded-lg font-bold shadow-sm hover:bg-ziggo-light transition flex items-center gap-1.5">
+                    <i class="fas fa-gift"></i> Pay Incentive
+                </button>
+            </div>
         </div>
         <div class="overflow-x-auto">
         <table class="w-full text-sm">
@@ -154,21 +159,67 @@
     </div>
 </div>
 
+<!-- Commission Payment Modal -->
+<div id="commissionModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col">
+        <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50 flex-shrink-0">
+            <h3 class="text-lg font-black text-ziggo">Record Commission Payment</h3>
+            <button onclick="closeModal('commissionModal')" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form method="POST" action="/admin/finance/drivers/{{ d.id }}/commission_payment" class="p-5 space-y-4">
+            <p class="text-xs text-gray-500">The driver paid Ziggo. Commission due now: <span class="font-black text-rose-600">Rs.{{ "{:,.2f}".format(d.settlement_amount or 0) }}</span>. If the payment brings it under the limit, the driver is unblocked.</p>
+            <div>
+                <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Amount received (LKR)</label>
+                <input type="number" step="0.01" min="0.01" name="amount" required value="{{ '%.2f' % (d.settlement_amount or 0) if (d.settlement_amount or 0) > 0 else '' }}" class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+            </div>
+            <div>
+                <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Paid by</label>
+                <select name="payment_method" class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    <option>Cash at office</option>
+                    <option>Bank deposit</option>
+                    <option>Bank transfer</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Receipt / reference (optional)</label>
+                <input type="text" name="reference_id" class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+            </div>
+            <div>
+                <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Note (optional)</label>
+                <input type="text" name="note" class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+            </div>
+            <div class="pt-3 flex justify-end gap-2">
+                <button type="button" onclick="closeModal('commissionModal')" class="px-4 py-2 border border-gray-200 rounded-xl font-bold text-gray-500 hover:bg-gray-50 text-sm">Cancel</button>
+                <button type="submit" class="px-5 py-2 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-500 shadow-sm text-sm">
+                    Record Payment
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
-function openIncentiveModal() {
-    const m = document.getElementById('incentiveModal');
+function openModal(id) {
+    const m = document.getElementById(id);
     m.classList.remove('hidden');
     m.classList.add('flex');
 }
 
-function closeIncentiveModal() {
-    const m = document.getElementById('incentiveModal');
+function closeModal(id) {
+    const m = document.getElementById(id);
     m.classList.add('hidden');
     m.classList.remove('flex');
 }
 
-document.getElementById('incentiveModal').addEventListener('click', function(e) {
-    if (e.target === this) closeIncentiveModal();
+function openIncentiveModal() { openModal('incentiveModal'); }
+function closeIncentiveModal() { closeModal('incentiveModal'); }
+
+['incentiveModal', 'commissionModal'].forEach(function(id) {
+    document.getElementById(id).addEventListener('click', function(e) {
+        if (e.target === this) closeModal(id);
+    });
 });
 </script>
 

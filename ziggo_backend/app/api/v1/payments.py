@@ -20,7 +20,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...database import get_db
-from ...models import Customer, User, WalletTransaction, CustomerCard, Restaurant, MarketVendor
+from ...models import Customer, User, UserRole, WalletTransaction, CustomerCard, Restaurant, MarketVendor
 from ...schemas import (
     WalletTransactionResponse,
     QRResolveRequest,
@@ -417,6 +417,14 @@ async def add_mock_card(
     user: User = Depends(require_role("customer", "driver")),
 ):
     """Add a mock card for testing when PayHere is not configured."""
+    # A mock card's token can only ever be charged in simulation, so mock cards
+    # belong on test servers. On live they'd be "paid" with no money collected.
+    if not ipay_service.simulated_payments_allowed():
+        raise HTTPException(
+            status_code=400,
+            detail=ipay_service.SETTLE_COMMISSION_AT_OFFICE if user.role == UserRole.DRIVER
+            else ipay_service.CARD_PAYMENTS_COMING_SOON,
+        )
     cq = await db.execute(select(Customer).where(Customer.user_id == user.id))
     customer = cq.scalars().first()
     if not customer:

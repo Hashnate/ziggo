@@ -13,6 +13,7 @@ Commission model:
   - Market orders      : same split as food — vendor gets items total, rider
                          gets 80% of delivery_fee, platform keeps the 20%.
 """
+import re
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
@@ -1041,7 +1042,10 @@ async def execute_driver_payout(
     payment_method: str = "Bank Transfer",
     reference_id: str = "",
     note: str = "",
+    kind: str = "payout",
 ) -> None:
+    """Ziggo pays the driver. kind="incentive_paid" for a reward given and paid at
+    once, which doesn't come out of what Ziggo owes them."""
     from app.models import DriverPayout, Driver, Notification
     dq = await db.execute(select(Driver).where(Driver.id == driver_id))
     driver = dq.scalars().first()
@@ -1059,6 +1063,7 @@ async def execute_driver_payout(
         driver_id=driver.id,
         user_id=driver.user_id,
         amount=amount,
+        kind=kind,
         description=full_desc,
     )
     db.add(payout)
@@ -1074,69 +1079,163 @@ async def execute_driver_payout(
     await db.commit()
 
 
-async def get_driver_outstanding_commission(db: AsyncSession, driver_id: int) -> Decimal:
-    """Calculate unpaid outstanding commission driver owes platform from cash bookings/orders."""
-    from app.models import Booking, BookingStatus, FoodOrder, FoodOrderStatus, MarketOrder, MarketOrderStatus, DriverPayout
-    
-    # 1. Net platform balance from completed cash bookings (cash collected - driver entitlement)
-    # When promo discount is applied, cash collected is lower and the promo difference is subsidized by the platform.
+# ---------------------------------------------------------------------------
+# Driver balance
+#
+# Each driver has one running balance: what they earned on completed jobs,
+# minus the cash they collected themselves, plus/minus the money ledger in
+# driver_payouts. Above zero Ziggo owes the driver (pending payout); below
+# zero the driver owes Ziggo commission. Card and wallet earnings therefore
+# pay off cash commission automatically, with no separate "offset" step.
+# ---------------------------------------------------------------------------
+
+PAYOUT = "payout"                          # Ziggo paid the driver          -> balance down
+COMMISSION_PAYMENT = "commission_payment"  # driver paid Ziggo commission   -> balance up
+BONUS = "bonus"                            # incentive earned, not yet paid -> balance up
+INCENTIVE_PAID = "incentive_paid"          # incentive given and paid at once
+OFFSET = "offset"                          # old manual offsets; netting is automatic now
+_LEDGER_SIGN = {PAYOUT: -1, COMMISSION_PAYMENT: 1, BONUS: 1, INCENTIVE_PAID: 0, OFFSET: 0}
+
+
+def ledger_kind(p) -> str:
+    """The driver_payouts row's kind. Rows from before the column existed are
+    classified by the descriptions the code used to write."""
+    if getattr(p, "kind", None) in _LEDGER_SIGN:
+        return p.kind
+    d = (p.description or "").lower()
+    if "cash balance offset" in d:
+        return OFFSET
+    if "commission settled" in d or "commission settlement" in d:
+        return COMMISSION_PAYMENT
+    if re.search(r"bonus \(\d+ trips completed\)", d):
+        return BONUS
+    if "incentive payment" in d:
+        return INCENTIVE_PAID
+    return PAYOUT
+
+
+def _ledger_total(rows) -> Decimal:
+    return sum((_LEDGER_SIGN[ledger_kind(p)] * _dec(p.amount) for p in rows), Decimal("0"))
+
+
+def _paid_out(rows) -> Decimal:
+    """Money actually handed to the driver (payouts and incentives paid)."""
+    return sum((_dec(p.amount) for p in rows if ledger_kind(p) in (PAYOUT, INCENTIVE_PAID)), Decimal("0"))
+
+
+async def _driver_job_totals(db: AsyncSession, driver_id: int) -> tuple[Decimal, Decimal]:
+    """(earned, cash collected) over the driver's completed rides and deliveries.
+    On a cash job the driver keeps the cash, so earned - collected is minus Ziggo's
+    commission (or plus a promo subsidy); on card/wallet jobs it's the earnings."""
+    from app.models import Booking, BookingStatus, FoodOrder, FoodOrderStatus, MarketOrder, MarketOrderStatus
+
+    earned = Decimal("0")
+    collected = Decimal("0")
     bq = await db.execute(
-        select(Booking).where(
-            Booking.driver_id == driver_id,
-            Booking.status == BookingStatus.COMPLETED,
-            Booking.payment_method == "cash"
-        )
+        select(Booking).where(Booking.driver_id == driver_id, Booking.status == BookingStatus.COMPLETED)
     )
-    cash_bookings = bq.scalars().all()
-    cash_booking_commission = sum(((_dec(b.final_amount or b.fare_amount) - _dec(b.driver_earnings)) for b in cash_bookings), Decimal("0"))
-    
-    # 2. Platform fee from completed cash food orders
+    for b in bq.scalars().all():
+        earned += _dec(b.driver_earnings)
+        if b.payment_method == "cash":
+            collected += _dec(b.final_amount or b.fare_amount)
     fq = await db.execute(
         select(FoodOrder).options(joinedload(FoodOrder.restaurant)).where(
-            FoodOrder.driver_id == driver_id,
-            FoodOrder.status == FoodOrderStatus.DELIVERED,
-            FoodOrder.payment_method == "cash"
+            FoodOrder.driver_id == driver_id, FoodOrder.status == FoodOrderStatus.DELIVERED
         )
     )
-    cash_foods = fq.scalars().all()
-    cash_food_commission = Decimal("0")
-    for o in cash_foods:
-        df = _dec(o.delivery_fee)
-        earn, _ = _food_split(o)
-        cash_food_commission += (df - earn)
-        
-    # 3. Platform fee from completed cash market orders
+    for o in fq.scalars().all():
+        earned += _food_split(o)[0]
+        if o.payment_method == "cash":
+            collected += _dec(o.delivery_fee)
     mq = await db.execute(
         select(MarketOrder).options(joinedload(MarketOrder.vendor)).where(
-            MarketOrder.driver_id == driver_id,
-            MarketOrder.status == MarketOrderStatus.DELIVERED,
-            MarketOrder.payment_method == "cash"
+            MarketOrder.driver_id == driver_id, MarketOrder.status == MarketOrderStatus.DELIVERED
         )
     )
-    cash_markets = mq.scalars().all()
-    cash_market_commission = Decimal("0")
-    for o in cash_markets:
-        df = _dec(o.delivery_fee)
-        earn, _ = _market_split(o)
-        cash_market_commission += (df - earn)
-        
-    total_owed = cash_booking_commission + cash_food_commission + cash_market_commission
-    
-    # 4. Total settled by driver (DriverPayout rows with settlement descriptions)
-    pq = await db.execute(
-        select(DriverPayout).where(
-            DriverPayout.driver_id == driver_id
-        )
-    )
-    payouts = pq.scalars().all()
-    total_settled = Decimal("0")
-    for p in payouts:
-        desc = (p.description or "").lower()
-        if "commission settled" in desc or "commission settlement" in desc:
-            total_settled += _dec(p.amount)
-            
-    outstanding = total_owed - total_settled
-    return max(Decimal("0"), outstanding)
+    for o in mq.scalars().all():
+        earned += _market_split(o)[0]
+        if o.payment_method == "cash":
+            collected += _dec(o.delivery_fee)
+    return earned, collected
+
+
+async def get_driver_balance(db: AsyncSession, driver_id: int) -> Decimal:
+    """Above zero: Ziggo owes the driver. Below zero: the driver owes Ziggo."""
+    from app.models import DriverPayout
+
+    earned, collected = await _driver_job_totals(db, driver_id)
+    pq = await db.execute(select(DriverPayout).where(DriverPayout.driver_id == driver_id))
+    return earned - collected + _ledger_total(pq.scalars().all())
+
+
+async def get_driver_outstanding_commission(db: AsyncSession, driver_id: int) -> Decimal:
+    """Commission the driver owes Ziggo, after their card/wallet earnings, bonuses,
+    payments and payouts are netted off."""
+    return max(Decimal("0"), -(await get_driver_balance(db, driver_id)))
+
+
+async def record_driver_commission_payment(
+    db: AsyncSession,
+    driver_id: int,
+    amount: Decimal,
+    payment_method: str = "Cash at office",
+    reference_id: str = "",
+    note: str = "",
+) -> None:
+    """A driver paid their commission (e.g. cash at the office). Lifts a
+    commission block once the debt is back under the limit."""
+    from app.models import DriverPayout, Driver, Notification
+
+    dq = await db.execute(select(Driver).where(Driver.id == driver_id))
+    driver = dq.scalars().first()
+    if not driver:
+        raise ValueError("Driver not found")
+
+    desc_parts = ["Commission settlement", payment_method]
+    if reference_id:
+        desc_parts.append(f"Ref: {reference_id}")
+    if note:
+        desc_parts.append(note)
+    db.add(DriverPayout(
+        driver_id=driver.id,
+        user_id=driver.user_id,
+        amount=amount,
+        kind=COMMISSION_PAYMENT,
+        description=" · ".join(desc_parts),
+    ))
+    db.add(Notification(
+        user_id=driver.user_id,
+        title="Commission payment received",
+        body=f"We received your commission payment of Rs.{amount:,.2f} ({payment_method}). Thank you.",
+        type="payment",
+    ))
+    await db.commit()
+    await check_and_deactivate_driver(db, driver.id)
+
+
+COMMISSION_BLOCK_MESSAGE = "Your account is deactivated due to outstanding commission. Please settle it."
+
+
+async def _driver_commission_limit(db: AsyncSession) -> Decimal:
+    from app.models import SystemSettings
+
+    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
+    ss = ss_q.scalars().first()
+    if ss and ss.max_settle_amount is not None:
+        return ss.max_settle_amount
+    return Decimal("1000.00")
+
+
+async def driver_blocked_for_commission(db: AsyncSession, driver) -> bool:
+    """Whether the driver may not take a new job: suspended for unpaid commission, or
+    already over the limit before their status caught up. Read-only, unlike
+    check_and_deactivate_driver (admin suspensions also clear is_approved, which
+    callers check separately)."""
+    from app.models import DriverStatus
+
+    if driver.status == DriverStatus.SUSPENDED:
+        return True
+    return await get_driver_outstanding_commission(db, driver.id) > await _driver_commission_limit(db)
 
 
 async def check_and_deactivate_driver(db: AsyncSession, driver_id: int) -> bool:
@@ -1152,13 +1251,8 @@ async def check_and_deactivate_driver(db: AsyncSession, driver_id: int) -> bool:
         return False
         
     outstanding = await get_driver_outstanding_commission(db, driver_id)
-    
-    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
-    ss = ss_q.scalars().first()
-    max_limit = Decimal("1000.00")
-    if ss and ss.max_settle_amount is not None:
-        max_limit = ss.max_settle_amount
-        
+    max_limit = await _driver_commission_limit(db)
+
     if outstanding > max_limit:
         if drv.status != DriverStatus.SUSPENDED:
             drv.status = DriverStatus.SUSPENDED
@@ -1249,40 +1343,20 @@ async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
     earnings = ride_earnings + delivery_earnings
 
     pq = await db.execute(select(DriverPayout).where(DriverPayout.driver_id == driver_id))
-    payouts = pq.scalars().all()
-    total_paid_out = Decimal("0")
-    total_settled_in = Decimal("0")
-    for p in payouts:
-        desc = (p.description or "").lower()
-        if "commission settled" in desc or "commission settlement" in desc:
-            total_settled_in += _dec(p.amount)
-        else:
-            total_paid_out += _dec(p.amount)
-
-    # Net amount platform owes driver (from online trips and promo discounts where cash collected < driver earnings)
-    net_admin_debt = (earnings - cash_collected) - total_paid_out + total_settled_in
-    pending = max(Decimal("0"), net_admin_debt)
-
-    outstanding = await get_driver_outstanding_commission(db, driver_id)
-
-    from app.models import SystemSettings
-    ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
-    ss = ss_q.scalars().first()
-    max_limit = 1000.0
-    if ss and ss.max_settle_amount is not None:
-        max_limit = float(ss.max_settle_amount)
+    ledger = pq.scalars().all()
+    balance = earnings - cash_collected + _ledger_total(ledger)
 
     return {
         "collected": float(collected),
         "commission": float(collected - earnings),
-        "outstanding_commission": float(outstanding),
+        "outstanding_commission": float(max(Decimal("0"), -balance)),
         "earnings": float(earnings),
-        "paid": float(total_paid_out),
-        "pending": float(pending),
+        "paid": float(_paid_out(ledger)),
+        "pending": float(max(Decimal("0"), balance)),
         "trips": ride_count + delivery_count,
         "rides": ride_count,
         "deliveries": delivery_count,
-        "max_settle_amount": max_limit,
+        "max_settle_amount": float(await _driver_commission_limit(db)),
     }
 
 
@@ -1315,22 +1389,13 @@ async def get_driver_payout_stats(db: AsyncSession, driver_id: int) -> dict:
     total_earned = ride_earn + food_earn + market_earn
 
     pq = await db.execute(select(DriverPayout).where(DriverPayout.driver_id == driver_id))
-    payouts = pq.scalars().all()
-    total_paid_out = Decimal("0")
-    total_settled_in = Decimal("0")
-    for p in payouts:
-        desc = (p.description or "").lower()
-        if "commission settled" in desc or "commission settlement" in desc:
-            total_settled_in += _dec(p.amount)
-        else:
-            total_paid_out += _dec(p.amount)
-
-    pending = max(Decimal("0"), (total_earned - cash_collected) - total_paid_out + total_settled_in)
+    ledger = pq.scalars().all()
+    balance = total_earned - cash_collected + _ledger_total(ledger)
 
     return {
         "earned": float(total_earned),
-        "paid": float(total_paid_out),
-        "pending": float(pending),
+        "paid": float(_paid_out(ledger)),
+        "pending": float(max(Decimal("0"), balance)),
     }
 
 async def evaluate_and_award_driver_incentives(db: AsyncSession, driver_id: int) -> None:
@@ -1378,6 +1443,7 @@ async def evaluate_and_award_driver_incentives(db: AsyncSession, driver_id: int)
                     driver_id=drv.id,
                     user_id=drv.user_id,
                     amount=amt,
+                    kind=BONUS,
                     description=f"{inc.title} Bonus ({inc.trips_required} trips completed)"
                 ))
                 db.add(Notification(

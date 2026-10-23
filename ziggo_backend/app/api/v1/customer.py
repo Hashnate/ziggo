@@ -17,6 +17,7 @@ from ...schemas import (
     UserUpdate,
     UserResponse,
 )
+from ...services import ipay_service
 from ...services.auth_service import require_role
 
 router = APIRouter()
@@ -243,6 +244,8 @@ async def wallet_topup(
     user: User = Depends(require_role("customer")),
 ):
     """Mock top-up (no real payment gateway). Adds amount to wallet immediately."""
+    if not ipay_service.simulated_payments_allowed():
+        raise HTTPException(status_code=403, detail="Please request a wallet top-up from the app.")
     c = await _get_customer(db, user)
     c.wallet_balance = (c.wallet_balance or Decimal(0)) + Decimal(str(body.amount))
     txn = WalletTransaction(
