@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}Launch Locations | Ziggo Admin{% endblock %}
+{% block page_title %}Launch Locations{% endblock %}
+
+{% block content %}
+{% set svc_names = {'rides': 'Rides', 'parcels': 'Parcels (Flash + courier)', 'food': 'Food delivery', 'market': 'Market delivery'} %}
+<div class="space-y-6">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex items-start justify-between gap-4 flex-wrap">
+        <div class="max-w-3xl">
+            <h3 class="text-lg font-black text-ziggo">Commission-free periods for new launch locations</h3>
+            <p class="text-sm text-gray-500 font-bold mt-1">Jobs that start inside an active launch location, for the services you tick, pay Ziggo no commission:
+                the driver keeps the whole fare. Customer prices don't change. A trip booked during the period stays commission-free even if the period ends before it finishes.</p>
+        </div>
+        <a href="/admin/launch-locations?edit=-1" class="px-5 py-2.5 bg-ziggo text-white rounded-xl font-bold text-sm shadow-sm hover:bg-ziggo-light"><i class="fas fa-plus mr-1"></i> New launch location</a>
+    </div>
+
+    {% if error %}
+    <div class="p-4 rounded-xl bg-rose-50 border border-rose-100 text-rose-700 text-sm font-bold"><i class="fas fa-exclamation-triangle mr-1"></i> {{ error }}</div>
+    {% endif %}
+
+    {% if current or request.query_params.get('edit') == '-1' %}
+    {% set c = current %}
+    <form method="POST" action="/admin/launch-locations/save" class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden" onsubmit="return beforeSave()">
+        <input type="hidden" name="id" value="{{ c.id if c else '' }}">
+        <input type="hidden" name="coordinates" id="coordinates" value='{{ (c.coordinates if c and c.coordinates else [])|tojson }}'>
+        <div class="p-6 border-b border-gray-100 bg-gray-50/50">
+            <h3 class="text-lg font-black text-ziggo">{{ 'Edit ' ~ c.name if c else 'New launch location' }}</h3>
+        </div>
+        <div class="p-6 grid md:grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Name</label>
+                    <input type="text" name="name" required value="{{ c.name if c else '' }}" placeholder="e.g. Kinniya launch" class="w-full p-2.5 border border-gray-200 rounded-xl">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Area</label>
+                    <div class="flex gap-4 text-sm font-bold">
+                        <label><input type="radio" name="kind" value="district" {% if not c or c.kind == 'district' %}checked{% endif %} onchange="kindChanged()"> A whole district</label>
+                        <label><input type="radio" name="kind" value="area" {% if c and c.kind == 'area' %}checked{% endif %} onchange="kindChanged()"> An area drawn on the map</label>
+                    </div>
+                </div>
+                <div id="districtBox">
+                    <select name="district" class="w-full p-2.5 border border-gray-200 rounded-xl">
+                        <option value="">Choose a district…</option>
+                        {% for d in districts %}<option {% if c and c.district == d %}selected{% endif %}>{{ d }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">From</label>
+                        <input type="date" name="start_date" required value="{{ c.start_date.isoformat() if c else today }}" class="w-full p-2.5 border border-gray-200 rounded-xl">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">To (inclusive)</label>
+                        <input type="date" name="end_date" required value="{{ c.end_date.isoformat() if c else '' }}" class="w-full p-2.5 border border-gray-200 rounded-xl">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Commission-free for</label>
+                    <div class="grid grid-cols-2 gap-2 text-sm font-bold">
+                        {% for s in services %}
+                        <label><input type="checkbox" name="services" value="{{ s }}" {% if not c or s in (c.services or []) %}checked{% endif %}> {{ svc_names[s] }}</label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="p-3 rounded-xl bg-gray-50 border border-gray-100">
+                    <p class="text-xs font-black text-gray-500 uppercase tracking-wider mb-2">Food and market orders: waive</p>
+                    <label class="block text-sm font-bold"><input type="checkbox" name="waive_delivery_cut" {% if not c or c.waive_delivery_cut %}checked{% endif %}> Ziggo's cut of the delivery fee (the driver keeps it all)</label>
+                    <label class="block text-sm font-bold mt-1"><input type="checkbox" name="waive_merchant_commission" {% if c and c.waive_merchant_commission %}checked{% endif %}> The restaurant's / shop's commission on the items</label>
+                </div>
+                <label class="block text-sm font-bold"><input type="checkbox" name="is_active" {% if not c or c.is_active %}checked{% endif %}> Switched on</label>
+            </div>
+            <div id="areaBox">
+                <div class="flex items-center justify-between mb-2">
+                    <p class="text-xs font-black text-gray-500 uppercase tracking-wider">Draw the area: click points on the map, then click the first point to close it</p>
+                    <button type="button" onclick="clearArea()" class="text-xs font-bold text-rose-600">Clear</button>
+                </div>
+                <div id="map" class="w-full h-96 rounded-xl border border-gray-200 bg-gray-100"></div>
+            </div>
+        </div>
+        <div class="p-5 border-t border-gray-100 flex justify-between">
+            <a href="/admin/launch-locations" class="px-4 py-2 border border-gray-200 rounded-xl font-bold text-gray-500 hover:bg-gray-50 text-sm">Cancel</a>
+            <button type="submit" class="px-6 py-2.5 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light shadow-sm text-sm">Save</button>
+        </div>
+    </form>
+    {% endif %}
+
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-xs font-black uppercase text-gray-500 tracking-wider">
+                <tr>
+                    <th class="px-4 py-3 text-left">Name</th>
+                    <th class="px-4 py-3 text-left">Area</th>
+                    <th class="px-4 py-3 text-left">Period</th>
+                    <th class="px-4 py-3 text-left">Status</th>
+                    <th class="px-4 py-3 text-left">Commission-free for</th>
+                    <th class="px-4 py-3"></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for r in rows %}{% set l = r.loc %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 font-bold text-ziggo">{{ l.name }}</td>
+                    <td class="px-4 py-3">{{ l.district ~ ' district' if l.kind == 'district' else 'Drawn area (' ~ (l.coordinates|length) ~ ' points)' }}</td>
+                    <td class="px-4 py-3 text-xs">{{ l.start_date }} → {{ l.end_date }}</td>
+                    <td class="px-4 py-3">
+                        {% if r.status == 'active' %}<span class="px-2 py-0.5 rounded-full text-xs font-black bg-emerald-50 text-emerald-700">Active · {{ r.days_left }} day{{ 's' if r.days_left != 1 }} left</span>
+                        {% elif r.status == 'upcoming' %}<span class="px-2 py-0.5 rounded-full text-xs font-black bg-blue-50 text-blue-700">Starts in {{ r.starts_in }} day{{ 's' if r.starts_in != 1 }}</span>
+                        {% elif r.status == 'ended' %}<span class="px-2 py-0.5 rounded-full text-xs font-black bg-gray-100 text-gray-500">Ended</span>
+                        {% else %}<span class="px-2 py-0.5 rounded-full text-xs font-black bg-amber-50 text-amber-700">Switched off</span>{% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-xs">
+                        {% for s in l.services %}{{ svc_names.get(s, s) }}{{ ', ' if not loop.last }}{% endfor %}
+                        {% if 'food' in l.services or 'market' in l.services %}<div class="text-gray-400">waives: {{ 'delivery cut' if l.waive_delivery_cut }}{{ ' + ' if l.waive_delivery_cut and l.waive_merchant_commission }}{{ 'merchant commission' if l.waive_merchant_commission }}{{ 'nothing' if not l.waive_delivery_cut and not l.waive_merchant_commission }}</div>{% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-right whitespace-nowrap">
+                        <a href="/admin/launch-locations?edit={{ l.id }}" class="text-xs font-bold text-ziggo mr-3">Edit</a>
+                        <form method="POST" action="/admin/launch-locations/{{ l.id }}/delete" class="inline" onsubmit="return confirm('Delete {{ l.name }}? Trips already booked keep their commission-free status.')">
+                            <button class="text-xs font-bold text-rose-600">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="p-10 text-center text-gray-400 text-sm font-bold">No launch locations yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if current or request.query_params.get('edit') == '-1' %}
+<script>
+let map, drawing, polygon = null;
+const coordsInput = document.getElementById('coordinates');
+
+function kind() { return document.querySelector('input[name="kind"]:checked').value; }
+function kindChanged() {
+    document.getElementById('districtBox').style.display = kind() === 'district' ? '' : 'none';
+    document.getElementById('areaBox').style.opacity = kind() === 'area' ? '1' : '0.35';
+}
+function storePath() {
+    coordsInput.value = JSON.stringify(polygon ? polygon.getPath().getArray().map(p => ({lat: p.lat(), lng: p.lng()})) : []);
+}
+function setPolygon(p) {
+    polygon = p;
+    ['insert_at', 'remove_at', 'set_at'].forEach(ev => google.maps.event.addListener(p.getPath(), ev, storePath));
+    storePath();
+}
+function clearArea() {
+    if (polygon) polygon.setMap(null);
+    polygon = null;
+    storePath();
+    if (drawing) drawing.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+}
+function beforeSave() {
+    if (kind() === 'area' && JSON.parse(coordsInput.value || '[]').length < 3) {
+        alert('Please draw the area on the map first.');
+        return false;
+    }
+    return true;
+}
+function initMap() {
+    const existing = JSON.parse(coordsInput.value || '[]');
+    map = new google.maps.Map(document.getElementById('map'), {center: {lat: 7.8731, lng: 80.7718}, zoom: 7, mapTypeControl: false, streetViewControl: false});
+    const style = {fillColor: '#16a34a', fillOpacity: 0.2, strokeColor: '#16a34a', strokeWeight: 2, editable: true};
+    if (existing.length >= 3) {
+        setPolygon(new google.maps.Polygon({paths: existing, map, ...style}));
+        const b = new google.maps.LatLngBounds();
+        existing.forEach(p => b.extend(p));
+        map.fitBounds(b);
+    }
+    drawing = new google.maps.drawing.DrawingManager({
+        drawingMode: existing.length >= 3 ? null : google.maps.drawing.OverlayType.POLYGON,
+        drawingControl: false, polygonOptions: style,
+    });
+    drawing.setMap(map);
+    google.maps.event.addListener(drawing, 'polygoncomplete', p => {
+        if (polygon) polygon.setMap(null);
+        setPolygon(p);
+        drawing.setDrawingMode(null);
+    });
+}
+kindChanged();
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key={{ gmap_key }}&v=3.64&libraries=drawing&callback=initMap" async defer></script>
+{% endif %}
+{% endblock %}

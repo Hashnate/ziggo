@@ -10082,6 +10082,112 @@ async def admin_delete_admin(
 # --- SURGE ZONES UI ---
 from app.models import SurgeZone
 
+# ---------- Launch locations: commission-free periods (Phase 2, feature 02) ----------
+@router.get("/launch-locations", response_class=HTMLResponse)
+async def admin_launch_locations(
+    request: Request,
+    edit: int = 0,
+    error: str = "",
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    from app.models import LaunchLocation
+    from app.services.district_service import DISTRICTS
+    from app.services.launch_service import LAUNCH_SERVICES, status_of, today_lk
+
+    locs = (await db.execute(select(LaunchLocation).order_by(desc(LaunchLocation.start_date), desc(LaunchLocation.id)))).scalars().all()
+    today = today_lk()
+    rows = [{"loc": l, "status": status_of(l, today), "days_left": (l.end_date - today).days + 1,
+             "starts_in": (l.start_date - today).days} for l in locs]
+    current = next((l for l in locs if l.id == edit), None)
+    return templates.TemplateResponse(
+        request, "launch_locations.html",
+        {"request": request, "active_page": "launch_locations", "rows": rows, "current": current,
+         "districts": DISTRICTS, "services": LAUNCH_SERVICES, "today": today.isoformat(), "error": error,
+         "gmap_key": settings.GOOGLE_MAPS_API_KEY or ""},
+    )
+
+
+@router.post("/launch-locations/save")
+async def admin_launch_locations_save(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    import json as _json
+    from datetime import date
+    from app.models import LaunchLocation
+    from app.services.district_service import DISTRICTS
+    from app.services.launch_service import LAUNCH_SERVICES
+
+    form = await request.form()
+    loc_id = int(form.get("id") or 0)
+    back = f"/admin/launch-locations?edit={loc_id}" if loc_id else "/admin/launch-locations?edit=-1"
+
+    def fail(msg):
+        return RedirectResponse(url=back + "&error=" + urllib.parse.quote(msg), status_code=303)
+
+    name = str(form.get("name") or "").strip()
+    kind = str(form.get("kind") or "district")
+    district = str(form.get("district") or "")
+    services = [x for x in form.getlist("services") if x in LAUNCH_SERVICES]
+    try:
+        start = date.fromisoformat(str(form.get("start_date")))
+        end = date.fromisoformat(str(form.get("end_date")))
+    except ValueError:
+        return fail("Please give a start and end date.")
+    coords = None
+    if not name:
+        return fail("Please give the launch location a name.")
+    if kind == "district":
+        if district not in DISTRICTS:
+            return fail("Please choose a district.")
+    elif kind == "area":
+        try:
+            coords = _json.loads(str(form.get("coordinates") or "[]"))
+            coords = [{"lat": float(p["lat"]), "lng": float(p["lng"])} for p in coords]
+        except (ValueError, KeyError, TypeError):
+            coords = []
+        if len(coords) < 3:
+            return fail("Please draw the area on the map (at least 3 points).")
+        district = None
+    else:
+        return fail("Unknown area type.")
+    if end < start:
+        return fail("The end date can't be before the start date.")
+    if not services:
+        return fail("Tick at least one service.")
+
+    loc = None
+    if loc_id:
+        loc = (await db.execute(select(LaunchLocation).where(LaunchLocation.id == loc_id))).scalars().first()
+    if loc is None:
+        loc = LaunchLocation()
+        db.add(loc)
+    loc.name, loc.kind, loc.district, loc.coordinates = name, kind, district, coords
+    loc.start_date, loc.end_date, loc.services = start, end, services
+    loc.waive_delivery_cut = form.get("waive_delivery_cut") == "on"
+    loc.waive_merchant_commission = form.get("waive_merchant_commission") == "on"
+    loc.is_active = form.get("is_active") == "on"
+    await db.commit()
+    return RedirectResponse(url="/admin/launch-locations", status_code=303)
+
+
+@router.post("/launch-locations/{loc_id}/delete")
+async def admin_launch_locations_delete(
+    loc_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    from app.models import LaunchLocation
+
+    loc = (await db.execute(select(LaunchLocation).where(LaunchLocation.id == loc_id))).scalars().first()
+    if loc is not None:
+        await db.delete(loc)
+        await db.commit()
+    return RedirectResponse(url="/admin/launch-locations", status_code=303)
+
+
 @router.get("/surge-zones", response_class=HTMLResponse)
 async def surge_zones_page(request: Request, db: AsyncSession = Depends(get_db), admin_user: User = Depends(current_admin)):
     q = await db.execute(select(SurgeZone).order_by(desc(SurgeZone.id)))

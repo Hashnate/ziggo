@@ -4,6 +4,7 @@ from sqlalchemy import (
     String,
     Boolean,
     DateTime,
+    Date,
     DECIMAL,
     ForeignKey,
     Text,
@@ -145,6 +146,30 @@ class DistrictFare(Base):
     district = Column(String(30), nullable=False, index=True)
     service_type = Column(String(20), nullable=False)
     base_fare = Column(DECIMAL(10, 2), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class LaunchLocation(Base):
+    """A new launch area where Ziggo waives its commission for a while (Phase 2,
+    feature 02). The area is a whole district or a polygon drawn on the map; jobs
+    starting there between start_date and end_date (Sri Lanka days, inclusive)
+    for the ticked services pay no commission. Customer prices don't change."""
+    __tablename__ = "launch_locations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    kind = Column(String(10), nullable=False, default="district")   # district | area
+    district = Column(String(30), nullable=True)
+    coordinates = Column(JSON, nullable=True)                        # [{"lat": .., "lng": ..}, ...]
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+    services = Column(JSON, nullable=False, default=list)            # subset of LAUNCH_SERVICES
+    # Food/market only: waive the driver's cut of the delivery fee and/or the
+    # restaurant's or shop's commission on the items.
+    waive_delivery_cut = Column(Boolean, nullable=False, default=True)
+    waive_merchant_commission = Column(Boolean, nullable=False, default=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 

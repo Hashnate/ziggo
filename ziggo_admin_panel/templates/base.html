@@ -503,6 +503,9 @@
             <a href="/admin/surge-zones" class="sidebar-item {% if active_page == 'surge_zones' %}active{% endif %}">
                 <i class="fas fa-map-marked-alt"></i><span>Surge Zones</span>
             </a>
+            <a href="/admin/launch-locations" class="sidebar-item {% if active_page == 'launch_locations' %}active{% endif %}">
+                <i class="fas fa-rocket"></i><span>Launch Locations</span>
+            </a>
 
             {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
             <p class="zi-nav-group">Finance</p>
