@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}District Report | Ziggo Admin{% endblock %}
+{% block page_title %}District Report{% endblock %}
+
+{% block content %}
+{% set t = data.totals %}
+{% set qs = 'start=' ~ start ~ '&end=' ~ end ~ '&service=' ~ service ~ '&vehicle=' ~ (vehicle | urlencode) %}
+<div class="space-y-6">
+    <!-- Filters -->
+    <form method="GET" action="/admin/reports/districts" class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-wrap items-end gap-4">
+        <div>
+            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">From</label>
+            <input type="date" name="start" value="{{ start }}" class="p-2 border border-gray-200 rounded-lg text-sm">
+        </div>
+        <div>
+            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">To</label>
+            <input type="date" name="end" value="{{ end }}" class="p-2 border border-gray-200 rounded-lg text-sm">
+        </div>
+        <div>
+            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Service</label>
+            <select name="service" class="p-2 border border-gray-200 rounded-lg text-sm">
+                {% for s in services %}<option value="{{ s }}" {% if s == service %}selected{% endif %}>{{ {'all': 'All services', 'rides': 'Rides', 'parcels': 'Parcels (Flash + courier)', 'food': 'Food delivery', 'market': 'Market delivery'}[s] }}</option>{% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Vehicle (trips only)</label>
+            <select name="vehicle" class="p-2 border border-gray-200 rounded-lg text-sm">
+                <option value="">All vehicles</option>
+                {% for v in vehicles %}<option value="{{ v }}" {% if v == vehicle %}selected{% endif %}>{{ v }}</option>{% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="px-5 py-2 bg-ziggo text-white rounded-xl font-bold text-sm shadow-sm hover:bg-ziggo-light">Show</button>
+        <a href="/admin/reports/districts.csv?{{ qs }}" class="px-5 py-2 bg-white border border-gray-200 rounded-xl font-bold text-sm text-ziggo hover:bg-gray-50 shadow-sm">
+            <i class="fas fa-file-csv mr-1"></i> Download CSV (Excel)
+        </a>
+    </form>
+
+    <!-- Totals -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+        {% for label, value, color in [('Completed jobs', '{:,}'.format(t.completed), 'text-ziggo'),
+                                       ('Customers paid', 'Rs.{:,.0f}'.format(t.income), 'text-ziggo'),
+                                       ('Ziggo commission', 'Rs.{:,.0f}'.format(t.commission), 'text-amber-600'),
+                                       ('Driver earnings', 'Rs.{:,.0f}'.format(t.driver_earnings), 'text-green-700'),
+                                       ('Cancelled', '{:,}'.format(t.cancelled), 'text-gray-500')] %}
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p class="text-[10px] uppercase font-black text-gray-400 tracking-widest">{{ label }}</p>
+            <p class="text-xl font-black {{ color }} mt-1">{{ value }}</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Per district -->
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-gray-100">
+            <h3 class="font-black text-ziggo">By district</h3>
+            <p class="text-xs text-gray-500 mt-1">Trips count in the district where they started; food and market orders in the restaurant's or shop's district. Dates are Sri Lanka days: a job counts on the day it finished, a cancellation on the day it was cancelled.</p>
+        </div>
+        <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-xs font-black uppercase text-gray-500 tracking-wider">
+                <tr>
+                    <th class="px-4 py-3 text-left">District</th>
+                    <th class="px-4 py-3 text-right">Completed</th>
+                    <th class="px-4 py-3 text-right">Cancelled</th>
+                    <th class="px-4 py-3 text-right">Customers paid</th>
+                    <th class="px-4 py-3 text-left w-40">Share</th>
+                    <th class="px-4 py-3 text-right">Discounts</th>
+                    <th class="px-4 py-3 text-right">Ziggo commission</th>
+                    <th class="px-4 py-3 text-right">Driver earnings</th>
+                    <th class="px-4 py-3 text-right">Cash</th>
+                    <th class="px-4 py-3 text-right">Card / wallet</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for r in data.rows %}
+                {% set share = (r.income / t.income * 100) if t.income else 0 %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2.5 font-bold {% if r.district == 'Unknown' %}text-gray-400{% else %}text-ziggo{% endif %}">{{ r.district }}</td>
+                    <td class="px-4 py-2.5 text-right">{{ '{:,}'.format(r.completed) }}</td>
+                    <td class="px-4 py-2.5 text-right text-gray-500">{{ '{:,}'.format(r.cancelled) }}</td>
+                    <td class="px-4 py-2.5 text-right font-bold">Rs.{{ '{:,.2f}'.format(r.income) }}</td>
+                    <td class="px-4 py-2.5">
+                        <div class="h-2 rounded-full bg-gray-100"><div class="h-2 rounded-full bg-ziggo" style="width: {{ '%.1f' % share }}%"></div></div>
+                        <span class="text-[10px] text-gray-400">{{ '%.1f' % share }}%</span>
+                    </td>
+                    <td class="px-4 py-2.5 text-right text-purple-700">Rs.{{ '{:,.2f}'.format(r.discounts) }}</td>
+                    <td class="px-4 py-2.5 text-right text-amber-600 font-bold">Rs.{{ '{:,.2f}'.format(r.commission) }}</td>
+                    <td class="px-4 py-2.5 text-right text-green-700">Rs.{{ '{:,.2f}'.format(r.driver_earnings) }}</td>
+                    <td class="px-4 py-2.5 text-right">Rs.{{ '{:,.2f}'.format(r.cash) }}</td>
+                    <td class="px-4 py-2.5 text-right">Rs.{{ '{:,.2f}'.format(r.card_wallet) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="10" class="p-10 text-center text-gray-400 text-sm font-bold">No jobs in this period.</td></tr>
+                {% endfor %}
+            </tbody>
+            {% if data.rows %}
+            <tfoot class="bg-gray-50 font-black">
+                <tr>
+                    <td class="px-4 py-3">Total</td>
+                    <td class="px-4 py-3 text-right">{{ '{:,}'.format(t.completed) }}</td>
+                    <td class="px-4 py-3 text-right">{{ '{:,}'.format(t.cancelled) }}</td>
+                    <td class="px-4 py-3 text-right">Rs.{{ '{:,.2f}'.format(t.income) }}</td>
+                    <td></td>
+                    <td class="px-4 py-3 text-right">Rs.{{ '{:,.2f}'.format(t.discounts) }}</td>
+                    <td class="px-4 py-3 text-right">Rs.{{ '{:,.2f}'.format(t.commission) }}</td>
+                    <td class="px-4 py-3 text-right">Rs.{{ '{:,.2f}'.format(t.driver_earnings) }}</td>
+                    <td class="px-4 py-3 text-right">Rs.{{ '{:,.2f}'.format(t.cash) }}</td>
+                    <td class="px-4 py-3 text-right">Rs.{{ '{:,.2f}'.format(t.card_wallet) }}</td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+        </div>
+    </div>
+    <p class="text-[11px] text-gray-400">District boundaries © OpenStreetMap contributors (ODbL).</p>
+</div>
+{% endblock %}

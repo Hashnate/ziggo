@@ -256,6 +256,105 @@ async def overview(db: AsyncSession) -> dict:
     }
 
 
+
+# ---------------------------------------------------------------------------
+# District financial report (Phase 2, feature 04)
+# ---------------------------------------------------------------------------
+
+REPORT_SERVICES = ("all", "rides", "parcels", "food", "market")
+_LK = timezone(timedelta(hours=5, minutes=30))
+
+
+async def district_report(db: AsyncSession, start_day, end_day, service: str = "all",
+                          vehicle: str = "") -> dict:
+    """Money per district between two Sri Lanka calendar days (inclusive).
+
+    Same definitions as overview(): income is what customers paid on completed
+    jobs, Ziggo's commission is the booking's platform fee (or the platform's cut
+    of a delivery fee), driver earnings likewise. Trips count on the day they
+    finished, cancellations on the day they were cancelled. Rides vs parcels:
+    parcels are flash and courier bookings. A vehicle filter only covers trips.
+    """
+    start = datetime(start_day.year, start_day.month, start_day.day, tzinfo=_LK)
+    end = datetime(end_day.year, end_day.month, end_day.day, tzinfo=_LK) + timedelta(days=1)
+
+    def in_range(ts):
+        if ts is None:
+            return False
+        ts = ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
+        return start <= ts < end
+
+    rows: dict[str, dict] = {}
+
+    def row(district):
+        name = district or "Unknown"
+        if name not in rows:
+            rows[name] = {"district": name, "completed": 0, "cancelled": 0, "income": Decimal("0"),
+                          "discounts": Decimal("0"), "commission": Decimal("0"), "driver_earnings": Decimal("0"),
+                          "cash": Decimal("0"), "card_wallet": Decimal("0")}
+        return rows[name]
+
+    def add_completed(r, income, discounts, commission, driver, cash):
+        r["completed"] += 1
+        r["income"] += income
+        r["discounts"] += discounts
+        r["commission"] += commission
+        r["driver_earnings"] += driver
+        r["cash" if cash else "card_wallet"] += income
+
+    if service in ("all", "rides", "parcels"):
+        bq = select(Booking).where(Booking.status.in_([BookingStatus.COMPLETED, BookingStatus.CANCELLED]))
+        if vehicle:
+            bq = bq.where(Booking.service_type == vehicle)
+        for b in (await db.execute(bq)).scalars().all():
+            parcel = bool(b.is_flash or b.is_courier)
+            if (service == "rides" and parcel) or (service == "parcels" and not parcel):
+                continue
+            if b.status == BookingStatus.COMPLETED:
+                if in_range(b.completed_at or b.booked_at):
+                    add_completed(row(b.district), _dec(b.final_amount or b.fare_amount),
+                                  _dec(b.discount_amount) + _dec(b.redeem_discount), _dec(b.platform_fee),
+                                  _dec(b.driver_earnings), b.payment_method == "cash")
+            elif in_range(b.cancelled_at or b.booked_at):
+                row(b.district)["cancelled"] += 1
+
+    if not vehicle and service in ("all", "food"):
+        fq = select(FoodOrder).options(joinedload(FoodOrder.restaurant)).where(
+            FoodOrder.status.in_([FoodOrderStatus.DELIVERED, FoodOrderStatus.CANCELLED]))
+        for o in (await db.execute(fq)).scalars().all():
+            if o.status == FoodOrderStatus.DELIVERED:
+                if in_range(o.delivered_at or o.created_at):
+                    earn, cut = _food_split(o)
+                    add_completed(row(o.district), _dec(o.final_amount),
+                                  _dec(o.discount_amount) + _dec(o.redeem_discount), cut, earn,
+                                  o.payment_method == "cash")
+            elif in_range(o.created_at):
+                row(o.district)["cancelled"] += 1
+
+    if not vehicle and service in ("all", "market"):
+        mq = select(MarketOrder).options(joinedload(MarketOrder.vendor)).where(
+            MarketOrder.status.in_([MarketOrderStatus.DELIVERED, MarketOrderStatus.CANCELLED]))
+        for o in (await db.execute(mq)).scalars().all():
+            if o.status == MarketOrderStatus.DELIVERED:
+                if in_range(o.delivered_at or o.created_at):
+                    earn, cut = _market_split(o)
+                    add_completed(row(o.district), _dec(o.final_amount), _dec(o.redeem_discount), cut, earn,
+                                  o.payment_method == "cash")
+            elif in_range(o.created_at):
+                row(o.district)["cancelled"] += 1
+
+    money = ("income", "discounts", "commission", "driver_earnings", "cash", "card_wallet")
+    totals = {"district": "Total", "completed": 0, "cancelled": 0, **{k: Decimal("0") for k in money}}
+    for r in rows.values():
+        totals["completed"] += r["completed"]
+        totals["cancelled"] += r["cancelled"]
+        for k in money:
+            totals[k] += r[k]
+    ordered = sorted(rows.values(), key=lambda r: (r["district"] == "Unknown", -r["income"], r["district"]))
+    as_float = lambda r: {k: (float(v) if isinstance(v, Decimal) else v) for k, v in r.items()}
+    return {"rows": [as_float(r) for r in ordered], "totals": as_float(totals)}
+
+
 # ---------------------------------------------------------------------------
 # Driver financials
 # ---------------------------------------------------------------------------

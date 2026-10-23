@@ -6947,6 +6947,75 @@ def _zero_report_revenue(data: dict, report_type: str) -> dict:
     return data
 
 
+def _district_report_params(start: str, end: str, service: str):
+    from datetime import date
+    today = datetime.now(timezone(timedelta(hours=5, minutes=30))).date()
+
+    def day(raw, default):
+        try:
+            return date.fromisoformat(raw.strip()) if raw else default
+        except ValueError:
+            return default
+
+    s_day, e_day = day(start, today - timedelta(days=29)), day(end, today)
+    if e_day < s_day:
+        s_day, e_day = e_day, s_day
+    return s_day, e_day, (service if service in fin.REPORT_SERVICES else "all")
+
+
+@router.get("/reports/districts", response_class=HTMLResponse)
+async def admin_district_report(
+    request: Request,
+    start: str = "",
+    end: str = "",
+    service: str = "all",
+    vehicle: str = "",
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import FareSetting
+
+    s_day, e_day, service = _district_report_params(start, end, service)
+    data = await fin.district_report(db, s_day, e_day, service, vehicle)
+    vq = await db.execute(select(FareSetting.service_type).order_by(FareSetting.display_order, FareSetting.id))
+    return templates.TemplateResponse(
+        request, "district_report.html",
+        {"request": request, "active_page": "district-report", "data": data, "start": s_day.isoformat(),
+         "end": e_day.isoformat(), "service": service, "vehicle": vehicle,
+         "vehicles": [v for v in vq.scalars().all() if v != "courier"], "services": fin.REPORT_SERVICES},
+    )
+
+
+@router.get("/reports/districts.csv")
+async def admin_district_report_csv(
+    start: str = "",
+    end: str = "",
+    service: str = "all",
+    vehicle: str = "",
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    import csv
+    import io
+    from fastapi.responses import StreamingResponse
+
+    s_day, e_day, service = _district_report_params(start, end, service)
+    data = await fin.district_report(db, s_day, e_day, service, vehicle)
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow([f"Ziggo district report {s_day} to {e_day}", f"service: {service}", f"vehicle: {vehicle or 'all'}"])
+    cols = ["district", "completed", "cancelled", "income", "discounts", "commission", "driver_earnings", "cash", "card_wallet"]
+    w.writerow(["District", "Completed", "Cancelled", "Customers paid (Rs)", "Discounts (Rs)", "Ziggo commission (Rs)",
+                "Driver earnings (Rs)", "Paid in cash (Rs)", "Paid by card/wallet (Rs)"])
+    for r in data["rows"] + [data["totals"]]:
+        w.writerow([r[c] if c in ("district", "completed", "cancelled") else f"{r[c]:.2f}" for c in cols])
+    w.writerow([])
+    w.writerow(["District boundaries (c) OpenStreetMap contributors, ODbL"])
+    name = f"ziggo-districts-{s_day}-to-{e_day}-{service}{'-' + vehicle if vehicle else ''}.csv".replace(" ", "-")
+    return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
+                             headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
 @router.get("/reports", response_class=HTMLResponse)
 async def admin_reports(
     request: Request,
