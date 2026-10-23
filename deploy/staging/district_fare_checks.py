@@ -93,7 +93,7 @@ try:
     sql("delete from district_fares where not (district = 'Colombo' and service_type = 'tuk')")
     off_col, off_col_card = quote(BORELLA, NUGEGODA)
     off_gam, _ = quote(NEGOMBO, NEGOMBO_BEACH)
-    check("Colombo trip uses the national fare while the switch is off", "district" not in off_col_card)
+    check("Colombo trip uses the national fare while the switch is off", off_col_card.get("district") is None)
 
     print("\n3. Switch ON")
     st, page = admin_req("/admin/fare-settings/districts/switch", {"enabled": "on", "service": "tuk"})
@@ -109,7 +109,7 @@ try:
     check("vehicle card shows the same price", on_col_card and on_col_card["final_amount"] == on_col["final_amount"],
           f"card Rs.{on_col_card and on_col_card['final_amount']} / estimate Rs.{on_col['final_amount']}")
     check("Gampaha trip (no district fare) is unchanged", on_gam["final_amount"] == off_gam["final_amount"]
-          and "district" not in on_gam, f"Rs.{off_gam['final_amount']} -> Rs.{on_gam['final_amount']}")
+          and on_gam.get("district") is None, f"Rs.{off_gam['final_amount']} -> Rs.{on_gam['final_amount']}")
 
     print("\n4. A booked trip keeps the district price to the end")
     call("POST", "/driver/online", tuk, {"is_online": True})
@@ -137,7 +137,7 @@ try:
     admin_req("/admin/fare-settings/districts/save", {"service_type": "tuk", "base_Colombo": ""})
     cleared, _ = quote(BORELLA, NUGEGODA)
     cleared_card = quote(BORELLA, NUGEGODA)[1]
-    check("emptying the Colombo box removes the district fare", "district" not in cleared_card
+    check("emptying the Colombo box removes the district fare", cleared_card.get("district") is None
           and cleared["fare_amount"] == off_col["fare_amount"], f"Rs.{cleared['fare_amount']} vs Rs.{off_col['fare_amount']}")
 finally:
     sql(f"update system_settings set district_fares_enabled = {'true' if was_on else 'false'} where id = 1")
