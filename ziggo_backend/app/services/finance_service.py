@@ -46,6 +46,14 @@ def _dec(v) -> Decimal:
     return Decimal(str(v)) if v is not None else Decimal("0")
 
 
+def _delivery_cut(o, df: Decimal) -> Decimal:
+    """Ziggo's cut of a delivery fee; nothing for an order placed in a launch
+    location that waives it (Phase 2, feature 02)."""
+    if getattr(o, "waive_delivery_cut", False):
+        return Decimal("0.00")
+    return (df * _PLATFORM_DELIVERY_CUT).quantize(Decimal("0.01"))
+
+
 def _food_split(o) -> tuple[Decimal, Decimal]:
     # Returns (driver_earnings, platform_fee)
     df = _dec(o.delivery_fee)
@@ -53,7 +61,7 @@ def _food_split(o) -> tuple[Decimal, Decimal]:
     
     comm_pct = o.restaurant.commission_percentage if (o.restaurant and o.restaurant.commission_percentage is not None) else Decimal("20.00")
     
-    driver_app_usage_charge = (df * _PLATFORM_DELIVERY_CUT).quantize(Decimal("0.01"))
+    driver_app_usage_charge = _delivery_cut(o, df)
     driver_earn = df - driver_app_usage_charge
     
     restaurant_comm = (item_total * (comm_pct / Decimal("100"))).quantize(Decimal("0.01"))
@@ -69,7 +77,7 @@ def _market_split(o) -> tuple[Decimal, Decimal]:
     
     comm_pct = o.vendor.commission_percentage if (o.vendor and o.vendor.commission_percentage is not None) else Decimal("20.00")
     
-    driver_app_usage_charge = (df * _PLATFORM_DELIVERY_CUT).quantize(Decimal("0.01"))
+    driver_app_usage_charge = _delivery_cut(o, df)
     driver_earn = df - driver_app_usage_charge
     
     vendor_comm = (item_total * (comm_pct / Decimal("100"))).quantize(Decimal("0.01"))

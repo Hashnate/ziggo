@@ -130,6 +130,12 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("market_orders", "district", "VARCHAR(30)"),
     ("system_settings", "district_fares_enabled", "BOOLEAN NOT NULL DEFAULT FALSE"),
     ("bookings", "launch_location_id", "INTEGER"),
+    ("food_orders", "launch_location_id", "INTEGER"),
+    ("food_orders", "waive_delivery_cut", "BOOLEAN NOT NULL DEFAULT FALSE"),
+    ("food_orders", "waive_merchant_commission", "BOOLEAN NOT NULL DEFAULT FALSE"),
+    ("market_orders", "launch_location_id", "INTEGER"),
+    ("market_orders", "waive_delivery_cut", "BOOLEAN NOT NULL DEFAULT FALSE"),
+    ("market_orders", "waive_merchant_commission", "BOOLEAN NOT NULL DEFAULT FALSE"),
 )
 
 

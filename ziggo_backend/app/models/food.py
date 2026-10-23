@@ -114,6 +114,11 @@ class FoodOrder(Base):
     id = Column(Integer, primary_key=True, index=True)
     order_ref = Column(String(20), unique=True, index=True)
     district = Column(String(30), nullable=True)  # the restaurant's district
+    # Commission-free launch location this order was placed in (Phase 2, feature 02),
+    # with that location's waivers as they were then, so later edits don't change it.
+    launch_location_id = Column(Integer, nullable=True)
+    waive_delivery_cut = Column(Boolean, nullable=False, default=False)
+    waive_merchant_commission = Column(Boolean, nullable=False, default=False)
     customer_id = Column(Integer, ForeignKey("customers.id", ondelete="SET NULL"), nullable=True)
     restaurant_id = Column(Integer, ForeignKey("restaurants.id", ondelete="SET NULL"), nullable=True)
     driver_id = Column(Integer, ForeignKey("drivers.id", ondelete="SET NULL"), nullable=True)

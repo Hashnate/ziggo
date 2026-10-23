@@ -32,6 +32,7 @@ from ...schemas.market_schema import (
 )
 from ...services.auth_service import get_current_user, require_role
 from ...services.district_service import district_for
+from ...services.launch_service import launch_location_for
 from ...services.fare_service import haversine_km
 from ...services.matching_service import find_all_nearby_drivers
 from ...services import market_delivery_service as delivery
@@ -538,11 +539,15 @@ async def create_market_order(
             raise HTTPException(status_code=400, detail="Card not found")
 
     order_ref = "MK" + secrets.token_hex(4).upper()
+    launch = await launch_location_for(db, vendor.lat, vendor.lng, "market")
     order = MarketOrder(
         order_ref=order_ref,
         customer_id=customer.id,
         vendor_id=vendor.id,
         district=district_for(vendor.lat, vendor.lng),
+        launch_location_id=launch.id if launch else None,
+        waive_delivery_cut=bool(launch and launch.waive_delivery_cut),
+        waive_merchant_commission=bool(launch and launch.waive_merchant_commission),
         status=MarketOrderStatus.PENDING,
         total_amount=total,
         delivery_fee=delivery_fee,

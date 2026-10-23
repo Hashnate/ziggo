@@ -41,6 +41,7 @@ from ...schemas.food_schema import (
 )
 from ...services.auth_service import get_current_user, require_role
 from ...services.district_service import district_for
+from ...services.launch_service import launch_location_for
 from ...services.matching_service import find_all_nearby_drivers
 from ...services.ws_manager import manager
 from ...services import ipay_service
@@ -651,11 +652,15 @@ async def create_food_order(
             raise HTTPException(status_code=400, detail="Card not found")
 
     order_ref = "FO" + secrets.token_hex(4).upper()
+    launch = await launch_location_for(db, r.lat, r.lng, "food")
     order = FoodOrder(
         order_ref=order_ref,
         customer_id=customer.id,
         restaurant_id=r.id,
         district=district_for(r.lat, r.lng),
+        launch_location_id=launch.id if launch else None,
+        waive_delivery_cut=bool(launch and launch.waive_delivery_cut),
+        waive_merchant_commission=bool(launch and launch.waive_merchant_commission),
         status=FoodOrderStatus.PENDING,
         total_amount=total,
         delivery_fee=delivery_fee,

@@ -68,3 +68,26 @@ def test_first_matching_location_wins_and_missing_points():
     assert match([a, b], None, None, "rides", date(2026, 11, 10)) is None
     assert match([loc(kind="area", district=None, coordinates=KINNIYA_BOX[:2])], *KINNIYA, "rides",
                  date(2026, 11, 10)) is None
+
+
+def _order(**kw):
+    from decimal import Decimal
+    base = dict(delivery_fee=Decimal("200.00"), final_amount=Decimal("1200.00"), waive_delivery_cut=False,
+                waive_merchant_commission=False, restaurant=SimpleNamespace(commission_percentage=Decimal("20.00")),
+                vendor=SimpleNamespace(commission_percentage=Decimal("10.00")))
+    return SimpleNamespace(**{**base, **kw})
+
+
+def test_delivery_cut_waived_on_launch_location_orders():
+    from decimal import Decimal
+    from app.services.finance_service import _food_split, _market_split
+
+    # Normal: Ziggo keeps 20% of the Rs.200 delivery fee plus the merchant's commission on Rs.1,000 of items.
+    assert _food_split(_order()) == (Decimal("160.00"), Decimal("40.00") + Decimal("200.00"))
+    assert _food_split(_order(waive_delivery_cut=True)) == (Decimal("200.00"), Decimal("200.00"))
+    assert _market_split(_order()) [0] == Decimal("160.00")
+    assert _market_split(_order(waive_delivery_cut=True))[0] == Decimal("200.00")
+    # Orders from before launch locations existed have no flag at all.
+    old = _order()
+    del old.waive_delivery_cut
+    assert _food_split(old)[0] == Decimal("160.00")
