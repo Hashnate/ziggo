@@ -123,6 +123,7 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("system_settings", "app_play_store_url", "VARCHAR(255) NOT NULL DEFAULT 'https://play.google.com/store/apps/details?id=lk.ziggo.app'"),
     ("system_settings", "app_app_store_url", "VARCHAR(255) NOT NULL DEFAULT 'https://apps.apple.com/app/ziggo-app/id6778739956'"),
     ("bookings", "packages", "JSON"),
+    ("driver_payouts", "kind", "VARCHAR(30)"),
 )
 
 
@@ -262,7 +263,6 @@ async def ensure_schema(engine: AsyncEngine) -> None:
         await _seed_incentives(conn)
         await _seed_peak_hours(conn)
         await _seed_sample_jobs(conn)
-        await _cleanup_bad_payouts(conn)
         await _backfill_driver_vehicles(conn)
 
 
@@ -466,17 +466,6 @@ async def _seed_peak_hours(conn) -> None:
                     .values(start_time=new_st, end_time=new_et)
                 )
         print("[schema_sync] Backfilled start_time and end_time for existing peak hour settings")
-
-
-async def _cleanup_bad_payouts(conn) -> None:
-    from ..models import DriverPayout
-    # Clean up incorrect test payouts that are ledger entries rather than actual payments
-    res = await conn.execute(
-        DriverPayout.__table__.delete().where(
-            DriverPayout.description.ilike("%Commission settled (Cash balance offset)%")
-        )
-    )
-    print("[schema_sync] Cleaned up bad test commission payouts from DB")
 
 
 async def _seed_sample_jobs(conn) -> None:
