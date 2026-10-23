@@ -6,7 +6,7 @@ below, so each rule is written once and a vehicle card always shows the same
 price, pickup fee and loyalty points as booking that vehicle. The golden tests
 in tests/test_fare_golden.py check both.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from math import radians, sin, cos, asin, sqrt
 from typing import Optional
@@ -18,6 +18,7 @@ from shapely.geometry import Point, Polygon
 
 from ..models import FareSetting, FlashWeightTier, PromoCode, SurgeZone
 from ..api.v1.surge_zones import is_time_in_range
+from .district_service import district_for
 from .promo_service import usable_promo_query
 
 # Fallback fare table (used if DB has no row yet for a service type)
@@ -84,11 +85,13 @@ class _Rules:
     promo: Optional[PromoCode]
     flash_tiers: list
     system_surge: Optional[float]     # system surge multiplier while its window is open
+    district: Optional[str] = None    # pickup district, only looked up while district fares are on
+    district_base_fares: dict = field(default_factory=dict)  # service_type -> that district's base fare
 
 
 async def _load_rules(db: AsyncSession, service_types: list[str], promo: Optional[str],
-                      need_flash_tiers: bool) -> _Rules:
-    from ..models import PeakHourSetting, SystemSettings
+                      need_flash_tiers: bool, pickup: Optional[tuple] = None) -> _Rules:
+    from ..models import DistrictFare, PeakHourSetting, SystemSettings
     from datetime import datetime, timezone, timedelta
 
     ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
@@ -130,10 +133,20 @@ async def _load_rules(db: AsyncSession, service_types: list[str], promo: Optiona
     now_local = datetime.now()
     open_zones = [z for z in zone_q.scalars().all() if is_time_in_range(z.start_time, z.end_time, now_local)]
 
+    # District base fares (Phase 2, feature 04): the pickup's district decides.
+    district, district_base_fares = None, {}
+    if ss is not None and ss.district_fares_enabled and pickup is not None:
+        district = district_for(*pickup)
+        if district:
+            df_q = await db.execute(select(DistrictFare).where(
+                DistrictFare.district == district, DistrictFare.service_type.in_(service_types)))
+            district_base_fares = {r.service_type: float(r.base_fare) for r in df_q.scalars().all()}
+
     return _Rules(
         settings=ss, sys_commission=sys_commission, fare_settings=fare_settings,
         peaks=peak_q.scalars().all(), hhmm=now_colombo.strftime("%H:%M"), zones=open_zones,
         promo=promo_row, flash_tiers=flash_tiers, system_surge=system_surge,
+        district=district, district_base_fares=district_base_fares,
     )
 
 
@@ -280,6 +293,9 @@ def _standard_fare(rules: _Rules, service_type: str, setting, route, pickup_dist
         base, per_km, per_min, min_fare = d["base"], d["per_km"], d["per_min"], d["min"]
         surge = 1.0
         boost_val, passenger_deductible_pct, pickup_fee_pct = 0.0, 0.0, 0.0
+    district_base = rules.district_base_fares.get(service_type)
+    if district_base is not None:
+        base = district_base
     platform_pct = _platform_pct(setting, rules.sys_commission)
 
     # Pickup fee: a percentage of the per-km charge for the driver's distance to the pickup
@@ -371,7 +387,7 @@ def _standard_fare(rules: _Rules, service_type: str, setting, route, pickup_dist
     passenger_deductible_val_original = final_pre_deductible_original * (passenger_deductible_pct / 100.0)
     gross_total_original = final_pre_deductible_original + passenger_deductible_val_original
 
-    return {
+    result = {
         "distance_km": round(distance_km, 2),
         "pickup_distance_km": round(pickup_distance_km, 2),
         "duration_min": round(duration_min),
@@ -396,6 +412,10 @@ def _standard_fare(rules: _Rules, service_type: str, setting, route, pickup_dist
         "app_usage_charges": round(app_usage_charges, 2),
         "deductions": round(deductions, 2),
     }
+    if district_base is not None:
+        result["district"] = rules.district
+        result["district_base_fare"] = round(district_base, 2)
+    return result
 
 
 async def calculate_fare(
@@ -425,6 +445,7 @@ async def calculate_fare(
     rules = await _load_rules(
         db, [service_type, "courier"], promo,
         need_flash_tiers=(is_flash and parcel_weight_kg is not None) or is_courier,
+        pickup=(pickup_lat, pickup_lng),
     )
 
     if is_rental:
@@ -570,6 +591,7 @@ async def calculate_fares_bulk(
     rules = await _load_rules(
         db, list(set(service_types + (["courier"] if is_courier else []))), promo,
         need_flash_tiers=(is_flash and parcel_weight_kg is not None) or is_courier,
+        pickup=(pickup_lat, pickup_lng),
     )
 
     # Nearest free online driver of each vehicle type, found once for all cards.

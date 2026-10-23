@@ -8,6 +8,7 @@ from sqlalchemy import (
     ForeignKey,
     Text,
     JSON,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -133,6 +134,20 @@ class FareSetting(Base):
     )
 
 
+class DistrictFare(Base):
+    """A district's own base fare for one vehicle type (Phase 2, feature 04). Only
+    used while SystemSettings.district_fares_enabled is on, and only the base fare:
+    per-km, per-minute and minimum fares stay national."""
+    __tablename__ = "district_fares"
+    __table_args__ = (UniqueConstraint("district", "service_type", name="uq_district_fares_district_service"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    district = Column(String(30), nullable=False, index=True)
+    service_type = Column(String(20), nullable=False)
+    base_fare = Column(DECIMAL(10, 2), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class SystemSettings(Base):
     __tablename__ = "system_settings"
 
@@ -188,6 +203,8 @@ class SystemSettings(Base):
     multi_stop_excess_per_minute = Column(DECIMAL(10, 2), nullable=False, default=5)
     multi_stop_fee_per_stop = Column(DECIMAL(10, 2), nullable=False, default=50)
     max_settle_amount = Column(DECIMAL(10, 2), default=1000.00)
+    # District base fares (DistrictFare) apply only while this is on.
+    district_fares_enabled = Column(Boolean, nullable=False, default=False)
     # Peak Hours
     peak_start_hour = Column(Integer, default=17)
     peak_end_hour = Column(Integer, default=20)

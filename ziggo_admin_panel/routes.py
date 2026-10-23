@@ -3001,6 +3001,94 @@ async def admin_fare_settings_update(
     return RedirectResponse(url="/admin/fare-settings", status_code=303)
 
 
+
+# ---------- District base fares (Phase 2, feature 04) ----------
+@router.get("/fare-settings/districts", response_class=HTMLResponse)
+async def admin_district_fares(
+    request: Request,
+    service: str = "",
+    saved: int = 0,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    from app.models import DistrictFare, FareSetting
+    from app.services.district_service import DISTRICTS
+
+    # Courier is weight-priced island-wide, so it has no district base fare.
+    fq = await db.execute(
+        select(FareSetting).where(FareSetting.service_type != "courier")
+        .order_by(FareSetting.display_order, FareSetting.id)
+    )
+    services = fq.scalars().all()
+    current = next((f for f in services if f.service_type == service), services[0] if services else None)
+    overrides = {}
+    if current is not None:
+        oq = await db.execute(select(DistrictFare).where(DistrictFare.service_type == current.service_type))
+        overrides = {r.district: r for r in oq.scalars().all()}
+    counts = dict((await db.execute(
+        select(DistrictFare.service_type, func.count(DistrictFare.id)).group_by(DistrictFare.service_type)
+    )).all())
+    ss = await _get_or_create_settings(db)
+    return templates.TemplateResponse(
+        request, "district_fares.html",
+        {"request": request, "active_page": "fare-settings", "services": services, "current": current,
+         "districts": DISTRICTS, "overrides": overrides, "counts": counts,
+         "enabled": bool(ss.district_fares_enabled), "saved": bool(saved)},
+    )
+
+
+@router.post("/fare-settings/districts/save")
+async def admin_district_fares_save(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    """One form per vehicle type: a base fare box per district. Blank = national fare."""
+    from app.models import DistrictFare
+    from app.services.district_service import DISTRICTS
+    from decimal import Decimal, InvalidOperation
+
+    form = await request.form()
+    service_type = str(form.get("service_type") or "")
+    if not service_type:
+        raise HTTPException(status_code=400, detail="Vehicle type missing")
+    oq = await db.execute(select(DistrictFare).where(DistrictFare.service_type == service_type))
+    existing = {r.district: r for r in oq.scalars().all()}
+    for district in DISTRICTS:
+        raw = str(form.get(f"base_{district}") or "").strip()
+        row = existing.get(district)
+        if raw == "":
+            if row is not None:
+                await db.delete(row)
+            continue
+        try:
+            value = Decimal(raw)
+        except InvalidOperation:
+            raise HTTPException(status_code=400, detail=f"{district}: '{raw}' is not a number")
+        if value < 0:
+            raise HTTPException(status_code=400, detail=f"{district}: the base fare can't be negative")
+        if row is None:
+            db.add(DistrictFare(district=district, service_type=service_type, base_fare=value))
+        else:
+            row.base_fare = value
+    await db.commit()
+    return RedirectResponse(url=f"/admin/fare-settings/districts?service={urllib.parse.quote(service_type)}&saved=1",
+                            status_code=303)
+
+
+@router.post("/fare-settings/districts/switch")
+async def admin_district_fares_switch(
+    enabled: str = Form(...),
+    service: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    ss = await _get_or_create_settings(db)
+    ss.district_fares_enabled = enabled == "on"
+    await db.commit()
+    return RedirectResponse(url=f"/admin/fare-settings/districts?service={urllib.parse.quote(service)}", status_code=303)
+
+
 # ---------- System settings (admin → Settings) ----------
 async def _get_or_create_settings(db: AsyncSession):
     from app.models import SystemSettings
