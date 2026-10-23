@@ -40,6 +40,7 @@ from ...schemas.food_schema import (
     FoodOrderResponse,
 )
 from ...services.auth_service import get_current_user, require_role
+from ...services.district_service import district_for
 from ...services.matching_service import find_all_nearby_drivers
 from ...services.ws_manager import manager
 from ...services import ipay_service
@@ -654,6 +655,7 @@ async def create_food_order(
         order_ref=order_ref,
         customer_id=customer.id,
         restaurant_id=r.id,
+        district=district_for(r.lat, r.lng),
         status=FoodOrderStatus.PENDING,
         total_amount=total,
         delivery_fee=delivery_fee,

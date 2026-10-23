@@ -31,6 +31,7 @@ from ...schemas.market_schema import (
     MarketOrderResponse,
 )
 from ...services.auth_service import get_current_user, require_role
+from ...services.district_service import district_for
 from ...services.fare_service import haversine_km
 from ...services.matching_service import find_all_nearby_drivers
 from ...services import market_delivery_service as delivery
@@ -541,6 +542,7 @@ async def create_market_order(
         order_ref=order_ref,
         customer_id=customer.id,
         vendor_id=vendor.id,
+        district=district_for(vendor.lat, vendor.lng),
         status=MarketOrderStatus.PENDING,
         total_amount=total,
         delivery_fee=delivery_fee,

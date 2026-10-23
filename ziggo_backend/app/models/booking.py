@@ -114,6 +114,10 @@ class Booking(Base):
     # Courier packages as booked ([{"weight_kg": .., "type": ..}]), so re-pricing at
     # accept, completion and destination change keeps each package's weight charge.
     packages = Column(JSON, nullable=True)
+    # District of the pickup point (services/district_service), and the quote the
+    # trip's amounts came from, so reports never have to re-price old trips.
+    district = Column(String(30), nullable=True)
+    fare_breakdown = Column(JSON, nullable=True)
 
     # Rental / vehicle-hire fields. is_rental=True means the customer hires a
     # vehicle for `rental_hours` and the fare is hourly_rate * hours (no drop

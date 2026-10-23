@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from typing import Dict, List, Optional
@@ -40,6 +41,7 @@ from ...schemas import (
     BookingUpdateDestinationRequest,
 )
 from ...services.auth_service import get_current_user
+from ...services.district_service import district_for
 from ...services.finance_service import COMMISSION_BLOCK_MESSAGE, driver_blocked_for_commission
 from ...services.fare_service import calculate_fare, calculate_fares_bulk, to_decimal
 from ...services.matching_service import (
@@ -460,6 +462,11 @@ async def _get_customer(db: AsyncSession, user: User) -> Customer:
     return c
 
 
+def _fare_snapshot(fare: dict) -> dict:
+    """JSON-safe copy of the quote a booking's amounts come from."""
+    return json.loads(json.dumps(fare, default=str))
+
+
 async def _get_driver(db: AsyncSession, user: User) -> Driver:
     if user.role != UserRole.DRIVER:
         raise HTTPException(status_code=403, detail="Driver role required")
@@ -690,6 +697,8 @@ async def create_booking(
         is_courier=req.is_courier,
         courier_eta_days=fare.get("courier_eta_days") if req.is_courier else None,
         packages=[p.model_dump() for p in req.packages] or None,
+        district=district_for(req.pickup_lat, req.pickup_lng),
+        fare_breakdown=_fare_snapshot(fare),
         is_rental=req.is_rental,
         rental_hours=req.rental_hours,
         is_corporate=req.payment_method == "corporate",
@@ -1014,6 +1023,8 @@ async def scan_and_go_booking(
         is_courier=req.is_courier,
         courier_eta_days=fare.get("courier_eta_days") if req.is_courier else None,
         packages=[p.model_dump() for p in req.packages] or None,
+        district=district_for(req.pickup_lat, req.pickup_lng),
+        fare_breakdown=_fare_snapshot(fare),
         is_rental=req.is_rental,
         rental_hours=req.rental_hours,
         pickup_fee=to_decimal(fare.get("pickup_fee", 0)),
@@ -1464,6 +1475,7 @@ async def accept_booking(
     b.final_amount = to_decimal(fare["final_amount"])
     b.platform_fee = to_decimal(fare["platform_fee"])
     b.driver_earnings = to_decimal(fare["driver_earnings"])
+    b.fare_breakdown = _fare_snapshot(fare)
     b.pickup_distance_km = to_decimal(fare.get("pickup_distance_km", 0))
     b.pickup_fee = to_decimal(fare.get("pickup_fee", 0))
     b.boost = to_decimal(fare.get("boost", 0))
@@ -1872,6 +1884,7 @@ async def update_booking_status(
             b.final_amount = to_decimal(fare["final_amount"])
             b.platform_fee = to_decimal(fare["platform_fee"])
             b.driver_earnings = to_decimal(fare["driver_earnings"])
+            b.fare_breakdown = _fare_snapshot(fare)
             b.pickup_distance_km = to_decimal(fare.get("pickup_distance_km", 0))
             b.pickup_fee = to_decimal(fare.get("pickup_fee", 0))
             b.boost = to_decimal(fare.get("boost", 0))
@@ -2462,6 +2475,7 @@ async def update_booking_destination(
     b.final_amount = to_decimal(fare["final_amount"])
     b.platform_fee = to_decimal(fare["platform_fee"])
     b.driver_earnings = to_decimal(fare["driver_earnings"])
+    b.fare_breakdown = _fare_snapshot(fare)
     b.pickup_distance_km = to_decimal(fare.get("pickup_distance_km", 0))
     b.pickup_fee = to_decimal(fare.get("pickup_fee", 0))
     b.boost = to_decimal(fare.get("boost", 0))

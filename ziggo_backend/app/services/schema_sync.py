@@ -124,6 +124,10 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("system_settings", "app_app_store_url", "VARCHAR(255) NOT NULL DEFAULT 'https://apps.apple.com/app/ziggo-app/id6778739956'"),
     ("bookings", "packages", "JSON"),
     ("driver_payouts", "kind", "VARCHAR(30)"),
+    ("bookings", "district", "VARCHAR(30)"),
+    ("bookings", "fare_breakdown", "JSON"),
+    ("food_orders", "district", "VARCHAR(30)"),
+    ("market_orders", "district", "VARCHAR(30)"),
 )
 
 
@@ -264,6 +268,7 @@ async def ensure_schema(engine: AsyncEngine) -> None:
         await _seed_peak_hours(conn)
         await _seed_sample_jobs(conn)
         await _backfill_driver_vehicles(conn)
+        await _backfill_districts(conn)
 
 
 async def _seed_flash_tiers(conn) -> None:
@@ -649,3 +654,35 @@ async def _backfill_driver_vehicles(conn) -> None:
     except Exception as ex:
         print(f"[schema_sync] Error during _backfill_driver_vehicles: {ex}")
 
+
+
+async def _backfill_districts(conn) -> None:
+    """Fill in the district of trips and food/market orders saved without one (all of
+    them before districts existed). Points outside Sri Lanka stay empty."""
+    from ..models import Booking, FoodOrder, MarketOrder, MarketVendor, Restaurant
+    from .district_service import district_for
+
+    jobs = (
+        (Booking, select(Booking.id, Booking.pickup_lat, Booking.pickup_lng)
+         .where(Booking.district.is_(None), Booking.pickup_lat.isnot(None))),
+        (FoodOrder, select(FoodOrder.id, Restaurant.lat, Restaurant.lng)
+         .join(Restaurant, Restaurant.id == FoodOrder.restaurant_id)
+         .where(FoodOrder.district.is_(None), Restaurant.lat.isnot(None))),
+        (MarketOrder, select(MarketOrder.id, MarketVendor.lat, MarketVendor.lng)
+         .join(MarketVendor, MarketVendor.id == MarketOrder.vendor_id)
+         .where(MarketOrder.district.is_(None), MarketVendor.lat.isnot(None))),
+    )
+    filled = []
+    for model, stmt in jobs:
+        by_district: dict[str, list[int]] = {}
+        for row_id, lat, lng in (await conn.execute(stmt)).all():
+            d = district_for(lat, lng)
+            if d:
+                by_district.setdefault(d, []).append(row_id)
+        for d, ids in by_district.items():
+            await conn.execute(model.__table__.update().where(model.id.in_(ids)).values(district=d))
+        n = sum(len(ids) for ids in by_district.values())
+        if n:
+            filled.append(f"{n} {model.__tablename__}")
+    if filled:
+        print(f"[schema_sync] Filled in districts: {', '.join(filled)}")

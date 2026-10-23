@@ -113,6 +113,7 @@ class FoodOrder(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     order_ref = Column(String(20), unique=True, index=True)
+    district = Column(String(30), nullable=True)  # the restaurant's district
     customer_id = Column(Integer, ForeignKey("customers.id", ondelete="SET NULL"), nullable=True)
     restaurant_id = Column(Integer, ForeignKey("restaurants.id", ondelete="SET NULL"), nullable=True)
     driver_id = Column(Integer, ForeignKey("drivers.id", ondelete="SET NULL"), nullable=True)

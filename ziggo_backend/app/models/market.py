@@ -112,6 +112,7 @@ class MarketOrder(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     order_ref = Column(String(20), unique=True, index=True)
+    district = Column(String(30), nullable=True)  # the shop's district
     customer_id = Column(Integer, ForeignKey("customers.id"))
     vendor_id = Column(Integer, ForeignKey("market_vendors.id"))
     driver_id = Column(Integer, ForeignKey("drivers.id"), nullable=True)
