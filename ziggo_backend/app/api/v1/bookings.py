@@ -1583,9 +1583,22 @@ async def _reverse_geocode_coordinates(lat: float, lng: float) -> Optional[str]:
             )
             if resp.status_code == 200:
                 data = resp.json()
-                results = data.get("results", [])
+                # Google sometimes ranks an unrelated place first (points in
+                # Kinniya come back with a street in Hanoi), so only keep
+                # results within 10 km of the point.
+                from ...services.fare_service import haversine_km
 
-                plus_code_re = re.compile(r"^[A-Z0-9]{4,8}\+[A-Z0-9]{2,3}\b")
+                def near_point(r):
+                    loc = (r.get("geometry") or {}).get("location") or {}
+                    return (
+                        loc.get("lat") is not None
+                        and loc.get("lng") is not None
+                        and haversine_km(lat, lng, loc["lat"], loc["lng"]) <= 10
+                    )
+
+                results = [r for r in data.get("results", []) if near_point(r)]
+
+                plus_code_re = re.compile(r"^[A-Z0-9]{4,8}\+[A-Z0-9]{2,7}\b")
 
                 for r in results:
                     types = r.get("types", [])
