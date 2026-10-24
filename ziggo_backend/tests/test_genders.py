@@ -160,17 +160,18 @@ async def test_profiles_backfill_and_switch():
                 customer = await db.get(User, people[PHONES[4]])
                 await update_profile(UserUpdate(full_name="Amali"), db, customer)
                 assert customer.gender is None, "saving other fields doesn't set a gender"
-                await update_profile(UserUpdate(gender="Prefer not to say"), db, customer)
-                assert customer.gender is None, "'Prefer not to say' (older apps) leaves it empty and unlocked"
+                for older_app_value in ("Female", "Male", "Prefer not to say"):
+                    await update_profile(UserUpdate(gender=older_app_value), db, customer)
+                    assert customer.gender is None, \
+                        f"older apps' '{older_app_value}' is ignored: they don't warn that it locks"
                 await update_profile(UserUpdate(gender="female"), db, customer)
                 assert (customer.gender, customer.gender_source) == ("female", "self")
                 await update_profile(UserUpdate(gender="female", full_name="Amali P"), db, customer)
                 assert customer.gender == "female", "sending the same gender again is fine"
-                await update_profile(UserUpdate(gender="Female"), db, customer)
-                await update_profile(UserUpdate(gender="Prefer not to say"), db, customer)
-                await update_profile(UserUpdate(gender="Other"), db, customer)
+                for older_app_value in ("Male", "Female", "Other"):
+                    await update_profile(UserUpdate(gender=older_app_value), db, customer)
                 assert (customer.gender, customer.gender_source) == ("female", "self"), \
-                    "older apps' values: 'Female' is the same answer, the others change nothing"
+                    "older apps can't change it either, and get no error they can't show"
                 with pytest.raises(HTTPException) as e:
                     await update_profile(UserUpdate(gender="male"), db, customer)
                 assert e.value.status_code == 400 and "support" in e.value.detail

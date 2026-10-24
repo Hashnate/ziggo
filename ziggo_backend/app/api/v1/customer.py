@@ -42,7 +42,7 @@ async def update_profile(
     user: User = Depends(require_role("customer", "driver")),
 ):
     updates = body.model_dump(exclude_unset=True)
-    gender = (updates.get("gender") or "").strip().lower()
+    gender = updates.get("gender")
     if gender in GENDERS and gender != user.gender:
         if user.gender:
             raise HTTPException(status_code=400, detail=GENDER_LOCKED_MESSAGE)

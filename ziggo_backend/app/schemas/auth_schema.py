@@ -35,8 +35,9 @@ class UserUpdate(BaseModel):
     profile_photo: Optional[str] = None
     phone_number: Optional[str] = None
     referred_by_code: Optional[str] = None
-    # Set once by the customer; after that only an admin can change it. Older apps send
-    # "Male"/"Female"/"Other"/"Prefer not to say": only female/male are kept (any case).
+    # Set once by the customer; after that only an admin can change it. Only the exact
+    # values "female"/"male" count. Older apps send "Male"/"Female"/"Other"/"Prefer not
+    # to say" without warning the customer that it locks, so those are ignored, as before.
     gender: Optional[str] = Field(None, max_length=40)
 
 
