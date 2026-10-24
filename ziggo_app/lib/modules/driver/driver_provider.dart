@@ -780,6 +780,22 @@ class DriverProvider extends ChangeNotifier {
     }
   }
 
+  /// Lady drivers only: get ride requests from female customers only.
+  /// Returns an error message, or null when saved.
+  Future<String?> setFemalePassengersOnly(bool enabled) async {
+    try {
+      final resp = await ApiClient.instance.dio.post(
+        '/driver/female-passengers-only',
+        data: {'enabled': enabled},
+      );
+      _profile = Map<String, dynamic>.from(resp.data);
+      notifyListeners();
+      return null;
+    } on DioException catch (e) {
+      return e.response?.data?['detail']?.toString() ?? 'Could not save. Check your connection and try again.';
+    }
+  }
+
   Future<bool> rateBooking({required int bookingId, required int rating, String? feedback}) async {
     try {
       await ApiClient.instance.dio.post(

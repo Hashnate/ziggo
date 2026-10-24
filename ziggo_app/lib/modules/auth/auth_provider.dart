@@ -77,6 +77,8 @@ class AuthProvider extends ChangeNotifier {
   bool get isNewUser => _isNewUser;
   String? get birthday => _birthday;
   String? get gender => _gender;
+  // "female" / "male" / null — set once by the customer, then only by an admin.
+  bool get isFemale => _gender == 'female';
   String? get emergencyContact => _emergencyContact;
   String? get profilePhoto => _profilePhoto;
 
@@ -243,7 +245,7 @@ class AuthProvider extends ChangeNotifier {
       _email = resp.data['email'] as String? ?? _email;
       _phoneNumber = resp.data['phone_number'] as String? ?? _phoneNumber;
       _birthday = resp.data['birthday'] as String? ?? _birthday;
-      _gender = resp.data['gender'] as String? ?? _gender;
+      _gender = resp.data['gender'] as String?;
       _emergencyContact = resp.data['emergency_contact'] as String? ?? _emergencyContact;
       _profilePhoto = resp.data['profile_photo'] as String? ?? _profilePhoto;
       _referralCode = resp.data['referral_code'] as String? ?? _referralCode;
@@ -317,7 +319,7 @@ class AuthProvider extends ChangeNotifier {
     _fullName = resp.data['full_name'] as String? ?? fullName ?? _fullName;
     _email = resp.data['email'] as String? ?? email ?? _email;
     _birthday = resp.data['birthday'] as String? ?? birthday ?? _birthday;
-    _gender = resp.data['gender'] as String? ?? gender ?? _gender;
+    _gender = resp.data['gender'] as String?;
     _emergencyContact = resp.data['emergency_contact'] as String? ?? emergencyContact ?? _emergencyContact;
     _profilePhoto = resp.data['profile_photo'] as String? ?? profilePhoto ?? _profilePhoto;
     _phoneNumber = resp.data['phone_number'] as String? ?? phoneNumber ?? _phoneNumber;

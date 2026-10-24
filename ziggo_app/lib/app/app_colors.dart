@@ -38,6 +38,7 @@ class AppColors {
   static const Color truck = Color(0xFFE11D48);       // rose
   static const Color bike = Color(0xFFA855F7);        // violet
   static const Color events = Color(0xFFF59E0B);      // amber/gold
+  static const Color ladies = Color(0xFFDB2777);      // pink — lady driver option
 
   // Legacy aliases (kept to avoid widespread breakage)
   static const Color white = Colors.white;

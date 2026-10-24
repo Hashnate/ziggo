@@ -1052,8 +1052,10 @@ class _BottomCard extends StatelessWidget {
                                 ),
                               ),
                             ],
-                            if (active['status'] == 'searching')
+                            if (active['status'] == 'searching') ...[
                               const _SearchingIndicator(),
+                              const _LadyDriverSearchNote(),
+                            ],
                           ],
                         ),
                       ),
@@ -1103,8 +1105,10 @@ class _BottomCard extends StatelessWidget {
                       ),
                     ),
                   ],
-                  if (active['status'] == 'searching')
+                  if (active['status'] == 'searching') ...[
                     const _SearchingIndicator(),
+                    const _LadyDriverSearchNote(),
+                  ],
                 ],
                 AnimatedSize(
                   duration: const Duration(milliseconds: 220),
@@ -2124,6 +2128,72 @@ class _SearchingIndicator extends StatelessWidget {
             color: AppColors.primary,
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Shown while a lady-driver ride is searching. If no lady driver is free, the
+/// customer can switch the ride to any driver (Phase 2).
+class _LadyDriverSearchNote extends StatelessWidget {
+  const _LadyDriverSearchNote();
+
+  @override
+  Widget build(BuildContext context) {
+    final booking = context.watch<BookingProvider>();
+    final active = booking.activeBooking;
+    if (active == null || active['lady_driver_requested'] != true) return const SizedBox.shrink();
+    final message = booking.noLadyDriverMessage;
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.ladies.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.ladies.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.woman_rounded, color: AppColors.ladies, size: 18),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  message ?? 'Looking for a lady driver',
+                  style: const TextStyle(color: AppColors.ladies, fontWeight: FontWeight.w800, fontSize: 12.5),
+                ),
+              ),
+            ],
+          ),
+          if (message != null) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: booking.busy
+                    ? null
+                    : () async {
+                        final provider = context.read<BookingProvider>();
+                        final ok = await provider.switchToAnyDriver();
+                        if (!ok && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(provider.lastError ?? 'Could not switch to any driver.')),
+                          );
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.ladies,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Use any driver', style: TextStyle(fontWeight: FontWeight.w800)),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

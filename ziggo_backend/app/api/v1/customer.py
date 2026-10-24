@@ -19,7 +19,7 @@ from ...schemas import (
 )
 from ...services import ipay_service
 from ...services.auth_service import require_role
-from ...services.gender_service import GENDER_LOCKED_MESSAGE, SOURCE_SELF
+from ...services.gender_service import GENDER_LOCKED_MESSAGE, GENDERS, SOURCE_SELF
 
 router = APIRouter()
 
@@ -42,10 +42,11 @@ async def update_profile(
     user: User = Depends(require_role("customer", "driver")),
 ):
     updates = body.model_dump(exclude_unset=True)
-    if updates.get("gender") and updates["gender"] != user.gender:
+    gender = (updates.get("gender") or "").strip().lower()
+    if gender in GENDERS and gender != user.gender:
         if user.gender:
             raise HTTPException(status_code=400, detail=GENDER_LOCKED_MESSAGE)
-        user.gender = updates["gender"]
+        user.gender = gender
         user.gender_source = SOURCE_SELF
 
     if "phone_number" in updates and updates["phone_number"]:

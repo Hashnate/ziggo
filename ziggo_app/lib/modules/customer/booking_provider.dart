@@ -33,6 +33,18 @@ class BookingProvider extends ChangeNotifier {
   String? _lastError;
   String? get lastError => _lastError;
 
+  // A lady-driver ride with no lady driver free stays open, so the customer can
+  // switch it to any driver. The event can arrive before the booking response,
+  // so it is kept by booking id.
+  int? _noLadyDriverBookingId;
+  String? _noLadyDriverMessage;
+  String? get noLadyDriverMessage {
+    final b = _activeBooking;
+    if (b == null || b['id'] != _noLadyDriverBookingId) return null;
+    if (b['status'] != 'searching' || b['lady_driver_requested'] != true) return null;
+    return _noLadyDriverMessage;
+  }
+
   bool _busy = false;
   bool get busy => _busy;
 
@@ -77,7 +89,11 @@ class BookingProvider extends ChangeNotifier {
         loadActive();
       } else if (event == 'no_drivers_available') {
         final bid = data['booking_id'];
-        if (_activeBooking != null && (bid == null || _activeBooking!['id'] == bid)) {
+        if (data['lady_driver'] == true && bid != null) {
+          _noLadyDriverBookingId = bid as int?;
+          _noLadyDriverMessage = data['message']?.toString() ?? 'No lady driver is available nearby right now.';
+          notifyListeners();
+        } else if (_activeBooking != null && (bid == null || _activeBooking!['id'] == bid)) {
           _activeBooking = null;
           notifyListeners();
         }
@@ -194,6 +210,7 @@ class BookingProvider extends ChangeNotifier {
     int redeemPoints = 0,
     List<Map<String, dynamic>> stops = const [],
     List<Map<String, dynamic>> packages = const [],
+    bool ladyDriver = false,
   }) async {
     try {
       final resp = await ApiClient.instance.dio.post(
@@ -214,6 +231,7 @@ class BookingProvider extends ChangeNotifier {
           if (redeemPoints > 0) 'redeem_points': redeemPoints,
           if (stops.isNotEmpty) 'stops': stops,
           if (packages.isNotEmpty) 'packages': packages,
+          if (ladyDriver) 'lady_driver': true,
         },
       );
       if (resp.data is! Map) return null;
@@ -265,6 +283,8 @@ class BookingProvider extends ChangeNotifier {
     List<Map<String, dynamic>> stops = const [],
     List<Map<String, dynamic>> packages = const [],
     DateTime? scheduledTime,
+    // Phase 2: female customers, rides only
+    bool ladyDriver = false,
   }) async {
     _setBusy(true);
     _lastError = null;
@@ -300,6 +320,7 @@ class BookingProvider extends ChangeNotifier {
           if (redeemPoints > 0) 'redeem_points': redeemPoints,
           if (stops.isNotEmpty) 'stops': stops,
           if (scheduledTime != null) 'scheduled_time': scheduledTime.toIso8601String(),
+          if (ladyDriver) 'lady_driver': true,
           if (isFlash || isCourier) ...{
             if (isFlash) 'is_flash': true,
             if (isCourier) 'is_courier': true,
@@ -338,6 +359,25 @@ class BookingProvider extends ChangeNotifier {
       if (kDebugMode) debugPrint('createBooking error: $e\n$st');
       notifyListeners();
       return null;
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  /// No lady driver took the ride: offer it to every nearby driver instead.
+  Future<bool> switchToAnyDriver() async {
+    final id = _activeBooking?['id'];
+    if (id == null) return false;
+    _setBusy(true);
+    try {
+      final resp = await ApiClient.instance.dio.post('/bookings/$id/any-driver');
+      _activeBooking = Map<String, dynamic>.from(resp.data as Map);
+      _noLadyDriverMessage = null;
+      _noLadyDriverBookingId = null;
+      return true;
+    } on DioException catch (e) {
+      _lastError = e.response?.data?['detail']?.toString() ?? e.message ?? 'Network error';
+      return false;
     } finally {
       _setBusy(false);
     }

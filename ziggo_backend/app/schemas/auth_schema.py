@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import List, Literal, Optional
+from typing import List, Optional
 from ..models.user import UserRole
 
 
@@ -35,8 +35,9 @@ class UserUpdate(BaseModel):
     profile_photo: Optional[str] = None
     phone_number: Optional[str] = None
     referred_by_code: Optional[str] = None
-    # Set once by the customer; after that only an admin can change it.
-    gender: Optional[Literal["female", "male"]] = None
+    # Set once by the customer; after that only an admin can change it. Older apps send
+    # "Male"/"Female"/"Other"/"Prefer not to say": only female/male are kept (any case).
+    gender: Optional[str] = Field(None, max_length=40)
 
 
 class ProfileCompleteness(BaseModel):

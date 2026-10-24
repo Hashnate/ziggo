@@ -4257,6 +4257,29 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                   ),
                 ),
               ],
+              if (r['lady_driver_requested'] == true) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.ladies.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.ladies.withOpacity(0.35)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.woman_rounded, size: 18, color: AppColors.ladies),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Lady driver requested',
+                          style: TextStyle(color: AppColors.ladies, fontWeight: FontWeight.w800, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               // Customer + fare
               Row(

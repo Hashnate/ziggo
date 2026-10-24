@@ -258,6 +258,10 @@ class DriverProfileScreen extends StatelessWidget {
                       title: 'Show Scan & Go QR',
                       onTap: () => _showQrSheet(context, driverId, name, vehicleNumber, vehicleType),
                     ),
+                    if (profile['gender'] == 'female') ...[
+                      _divider(),
+                      const _FemalePassengersOnlyTile(),
+                    ],
                     _divider(),
                     _listTile(
                       icon: Icons.group_add_rounded,
@@ -995,6 +999,62 @@ class DriverProfileScreen extends StatelessWidget {
 }
 
 const Color _kGold = AppColors.accent;
+
+class _FemalePassengersOnlyTile extends StatefulWidget {
+  const _FemalePassengersOnlyTile();
+
+  @override
+  State<_FemalePassengersOnlyTile> createState() => _FemalePassengersOnlyTileState();
+}
+
+class _FemalePassengersOnlyTileState extends State<_FemalePassengersOnlyTile> {
+  bool _saving = false;
+
+  Future<void> _set(bool v) async {
+    setState(() => _saving = true);
+    final err = await context.read<DriverProvider>().setFemalePassengersOnly(v);
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (err != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final on = context.watch<DriverProvider>().profile?['female_passengers_only'] == true;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+      child: Row(
+        children: [
+          const Icon(Icons.woman_rounded, color: AppColors.ladies, size: 22),
+          const SizedBox(width: 14),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Female passengers only',
+                  style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w800, fontSize: 14),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Get ride requests from female customers only. Parcels are not affected.',
+                  style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: on,
+            activeColor: AppColors.ladies,
+            onChanged: _saving ? null : _set,
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _Header extends StatelessWidget {
   final String name;

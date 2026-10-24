@@ -8,6 +8,7 @@ import '../../../app/app_colors.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/widgets/motion.dart';
 import '../../auth/auth_provider.dart';
+import '../widgets/gender_choice.dart';
 import 'additional_settings_screen.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -148,34 +149,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _editGender() async {
-    final auth = context.read<AuthProvider>();
-    final gender = await showDialog<String>(
-      context: context,
-      builder: (ctx) => SimpleDialog(
-        title: const Text('Select Gender'),
-        children: [
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(ctx, 'Male'),
-            child: const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Male', style: TextStyle(fontSize: 16))),
-          ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(ctx, 'Female'),
-            child: const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Female', style: TextStyle(fontSize: 16))),
-          ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(ctx, 'Other'),
-            child: const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Other', style: TextStyle(fontSize: 16))),
-          ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(ctx, 'Prefer not to say'),
-            child: const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Prefer not to say', style: TextStyle(fontSize: 16))),
-          ),
-        ],
-      ),
-    );
-    if (gender != null && mounted) {
-      await auth.updateProfile(gender: gender);
-    }
+    await chooseGenderOnce(context);
   }
 
   Future<void> _editEmergencyContact() async {
@@ -392,7 +366,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _listTile(
             icon: Icons.transgender_outlined,
             title: 'Gender',
-            subtitle: auth.gender != null && auth.gender!.isNotEmpty ? auth.gender : 'Not provided',
+            subtitle: auth.gender == 'female'
+                ? 'Female'
+                : auth.gender == 'male'
+                    ? 'Male'
+                    : 'Not provided',
+            trailing: auth.gender == 'female' || auth.gender == 'male'
+                ? const Icon(Icons.lock_outline_rounded, color: AppColors.textTertiary, size: 18)
+                : null,
             onTap: _editGender,
           ),
           

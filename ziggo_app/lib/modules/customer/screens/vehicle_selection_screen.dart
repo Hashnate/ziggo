@@ -14,6 +14,7 @@ import '../../../core/map/maps_service.dart';
 import '../../../core/map/places.dart';
 import '../../../core/map/ziggo_map.dart';
 import '../../../core/network/api_client.dart';
+import '../../auth/auth_provider.dart';
 import '../../customer/booking_provider.dart';
 import '../../customer/payment_methods_provider.dart';
 import '../../customer/promos_provider.dart';
@@ -23,6 +24,7 @@ import 'promotions_selection_screen.dart';
 import 'ride_tracking_screen.dart';
 import 'customer_shell.dart';
 import 'confirm_pickup_screen.dart';
+import '../widgets/gender_choice.dart';
 
 class VehicleSelectionScreen extends StatefulWidget {
   final Place pickup;
@@ -64,6 +66,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
   final Map<String, Map<String, dynamic>> _estimates = {};
   bool _loadingEstimates = false;
   bool _usePoints = false;
+  bool _ladyDriver = false;
   bool _truckTermsAccepted = false;
   late final TapGestureRecognizer _termsRecognizer;
   DateTime? _scheduledTime;
@@ -322,6 +325,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
         'lng': s.location.longitude,
         'address': s.name,
       }).toList(),
+      ladyDriver: _ladyDriver,
     );
 
     if (bulkRes != null && mounted) {
@@ -412,6 +416,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
         'lng': s.location.longitude,
         'address': s.name,
       }).toList(),
+      ladyDriver: _ladyDriver,
     );
 
     if (bulkRes != null && mounted) {
@@ -473,8 +478,33 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     }
   }
 
+  int? get _ladyDriversNearby => (_estimates[_serviceType]?['lady_drivers_nearby'] as num?)?.toInt();
+
   Future<void> _confirmBooking() async {
     if (_serviceType == null) return;
+    if (_ladyDriver && _ladyDriversNearby == 0) {
+      final anyDriver = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          icon: const Icon(Icons.woman_rounded, color: AppColors.ladies, size: 36),
+          title: const Text('No lady drivers nearby', textAlign: TextAlign.center),
+          content: const Text(
+            'No lady driver is available nearby right now. Would you like to book with any driver instead?',
+            textAlign: TextAlign.center,
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Book with any driver', style: TextStyle(fontWeight: FontWeight.w800)),
+            ),
+          ],
+        ),
+      );
+      if (anyDriver != true || !mounted) return;
+      setState(() => _ladyDriver = false);
+    }
     
     final confirmedPlace = await Navigator.push<Place>(
       context,
@@ -513,6 +543,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
         receiverPhone: _secondaryPhone != null && _secondaryPhone!.isNotEmpty ? _secondaryPhone : null,
         parcelInstructions: _driverNote.isNotEmpty ? _driverNote : null,
         scheduledTime: _scheduledTime,
+        ladyDriver: _ladyDriver,
       );
     } catch (e) {
       caughtError = e.toString();
@@ -1124,6 +1155,8 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                       ),
                     ),
 
+                  if (!widget.isTruckMode) _ladyDriverRow(),
+
                   if (widget.isTruckMode)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1214,6 +1247,73 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
           ),
         ),
         ],
+      ),
+    );
+  }
+
+  Widget _ladyDriverRow() {
+    final gender = context.watch<AuthProvider>().gender;
+    if (gender == 'male') return const SizedBox.shrink();
+    final count = _ladyDriversNearby;
+    String hint;
+    Color hintColor = AppColors.textSecondary;
+    if (gender != 'female') {
+      hint = 'Set your gender to ask for a lady driver';
+    } else if (!_ladyDriver) {
+      hint = 'Ask for a woman driver, at no extra charge';
+    } else if (count == null) {
+      hint = 'Looking for lady drivers nearby…';
+    } else if (count == 0) {
+      hint = 'No lady drivers nearby right now';
+      hintColor = AppColors.error;
+    } else {
+      hint = count == 1 ? '1 lady driver nearby' : '$count lady drivers nearby';
+      hintColor = AppColors.ladies;
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+        decoration: BoxDecoration(
+          border: Border.all(color: _ladyDriver ? AppColors.ladies : AppColors.cardBorder),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.woman_rounded, color: AppColors.ladies, size: 22),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Lady driver', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                  const SizedBox(height: 2),
+                  Text(hint, style: TextStyle(color: hintColor, fontSize: 11.5, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+            if (gender == 'female')
+              Switch(
+                value: _ladyDriver,
+                activeColor: AppColors.ladies,
+                onChanged: (v) {
+                  setState(() => _ladyDriver = v);
+                  if (v) _recalculate();
+                },
+              )
+            else
+              TextButton(
+                onPressed: () async {
+                  final saved = await chooseGenderOnce(context);
+                  if (!saved || !mounted || !context.read<AuthProvider>().isFemale) return;
+                  setState(() => _ladyDriver = true);
+                  _recalculate();
+                },
+                child: const Text('Set', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.ladies)),
+              ),
+          ],
+        ),
       ),
     );
   }
