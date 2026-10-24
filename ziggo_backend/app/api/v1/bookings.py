@@ -39,6 +39,7 @@ from ...schemas import (
     BookingStatusUpdate,
     BookingRateRequest,
     BookingUpdateDestinationRequest,
+    PassengerLocationUpdate,
 )
 from ...services.auth_service import get_current_user
 from ...services.district_service import district_for
@@ -60,7 +61,7 @@ from ...services.matching_service import (
     can_driver_accept_ride,
 )
 from ...services.ws_manager import manager
-from ...services import ipay_service
+from ...services import ipay_service, passenger_location_service
 
 router = APIRouter()
 
@@ -229,6 +230,8 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
         waiting_charge=float(b.waiting_charge or 0.0),
         is_driver_completing_prior_trip=is_driver_completing_prior_trip,
         lady_driver_requested=bool(b.lady_driver_requested),
+        passenger_sharing=bool(b.passenger_sharing),
+        passenger_location=passenger_location_service.live_point(b),
         stops=[
             {
                 "order_index": s.order_index,
@@ -1257,6 +1260,7 @@ async def get_active_booking(
                     cancelled_by="system",
                     cancellation_reason=search_timeout_reason(b),
                     cancelled_at=now_utc,
+                    **passenger_location_service.CLEARED,
                 )
                 .execution_options(synchronize_session=False)
             )
@@ -1765,6 +1769,74 @@ async def switch_to_any_driver(
     return await _booking_to_response(db, b)
 
 
+async def _customer_booking(db: AsyncSession, user: User, booking_id: int) -> Booking:
+    customer = await _get_customer(db, user)
+    b = (await db.execute(
+        select(Booking).where(Booking.id == booking_id, Booking.customer_id == customer.id)
+    )).scalars().first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    return b
+
+
+async def _driver_user_id(db: AsyncSession, b: Booking) -> Optional[int]:
+    if not b.driver_id:
+        return None
+    return (await db.execute(select(Driver.user_id).where(Driver.id == b.driver_id))).scalar()
+
+
+@router.post("/{booking_id}/passenger-location")
+async def share_passenger_location(
+    booking_id: int,
+    body: PassengerLocationUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """The customer shares where she or he is while waiting for pickup (Phase 2, feature 01).
+    The app sends this only while the customer's "share my live location" switch is on."""
+    b = await _customer_booking(db, user, booking_id)
+    if not is_passenger_trip(b.is_flash, b.is_courier):
+        raise HTTPException(status_code=400, detail=passenger_location_service.RIDES_ONLY)
+    if b.status not in passenger_location_service.PRE_PICKUP:
+        raise HTTPException(status_code=409, detail=passenger_location_service.TRIP_UNDERWAY)
+    now = datetime.now(timezone.utc)
+    if passenger_location_service.too_soon(b, now):
+        return {"sharing": True, "at": b.passenger_location_at.isoformat()}
+
+    b.passenger_sharing = True
+    b.passenger_lat = Decimal(str(body.lat))
+    b.passenger_lng = Decimal(str(body.lng))
+    b.passenger_location_at = now
+    await db.commit()
+
+    point = {"booking_id": b.id, "lat": body.lat, "lng": body.lng, "at": now.isoformat()}
+    if b.status in passenger_location_service.DRIVER_SEES:
+        driver_user_id = await _driver_user_id(db, b)
+        if driver_user_id:
+            await manager.send(driver_user_id, "passenger_location_update", point)
+    await manager.publish(passenger_location_service.ADMIN_TOPIC, "customer_location_update", {
+        **point, "customer_id": b.customer_id, "status": b.status.value,
+    })
+    return {"sharing": True, "at": now.isoformat()}
+
+
+@router.delete("/{booking_id}/passenger-location")
+async def stop_passenger_location(
+    booking_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """The customer stops sharing; the point is deleted at once."""
+    b = await _customer_booking(db, user, booking_id)
+    if passenger_location_service.clear(b):
+        await db.commit()
+        driver_user_id = await _driver_user_id(db, b)
+        if driver_user_id:
+            await manager.send(driver_user_id, "passenger_location_stopped", {"booking_id": b.id})
+        await manager.publish(passenger_location_service.ADMIN_TOPIC, "customer_location_stopped", {"booking_id": b.id})
+    return {"sharing": False}
+
+
 @router.post("/{booking_id}/stops/{order_index}/arrive")
 async def driver_arrived_at_stop(
     booking_id: int,
@@ -1904,6 +1976,7 @@ async def update_booking_status(
 
     now = datetime.now(timezone.utc)
     b.status = new_status
+    passenger_stopped = new_status not in passenger_location_service.PRE_PICKUP and passenger_location_service.clear(b)
 
     if new_status == BookingStatus.ARRIVED:
         b.arrived_at = now
@@ -2322,6 +2395,8 @@ async def update_booking_status(
         })
     except Exception as e:
         print(f"[ws] booking_status_update publish error: {e}")
+    if passenger_stopped:
+        await manager.publish(passenger_location_service.ADMIN_TOPIC, "customer_location_stopped", {"booking_id": b.id})
 
     return await _booking_to_response(db, b)
 

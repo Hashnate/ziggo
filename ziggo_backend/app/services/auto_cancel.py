@@ -26,6 +26,7 @@ from ..models import (
 from .ws_manager import manager
 from .gender_service import no_driver_payload, search_timeout_reason
 from .loyalty_service import refund_redeemed_points
+from . import passenger_location_service
 
 # Customer-visible timeout. 5 minutes matches the locked design decision.
 STALE_AFTER_SECONDS = 300
@@ -64,6 +65,14 @@ async def _run_once() -> None:
             await _check_and_reset_daily_stats(db)
         except Exception as e:
             print(f"[auto_cancel] failed to check/reset daily stats: {e!r}")
+
+    async with AsyncSessionLocal() as db:
+        try:
+            forgotten = await passenger_location_service.forget_stale(db)
+            if forgotten:
+                print(f"[auto_cancel] deleted {forgotten} stale customer location(s)")
+        except Exception as e:
+            print(f"[auto_cancel] failed to delete stale customer locations: {e!r}")
 
     # 1. Sweep stale PENDING food orders
     cutoff = datetime.now(timezone.utc) - timedelta(seconds=STALE_AFTER_SECONDS)
@@ -175,6 +184,7 @@ async def _run_once() -> None:
                         cancelled_by="system",
                         cancellation_reason=search_timeout_reason(b),
                         cancelled_at=datetime.now(timezone.utc),
+                        **passenger_location_service.CLEARED,
                     )
                     .execution_options(synchronize_session=False)
                 )

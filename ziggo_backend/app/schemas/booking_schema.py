@@ -242,9 +242,17 @@ class BookingResponse(BaseModel):
     # Back-to-back indicator
     is_driver_completing_prior_trip: bool = False
     lady_driver_requested: bool = False
+    # Customer live location while waiting for pickup: {lat, lng, at}, only while fresh.
+    passenger_sharing: bool = False
+    passenger_location: Optional[dict] = None
 
     class Config:
         from_attributes = True
+
+
+class PassengerLocationUpdate(BaseModel):
+    lat: float = Field(..., ge=-90, le=90)
+    lng: float = Field(..., ge=-180, le=180)
 
 
 
