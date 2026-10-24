@@ -4,8 +4,8 @@
 
 The test customer (0771234567) chooses a gender once, admins correct customers on
 the Riders page and drivers on the driver edit form, and only a lady driver can
-ask for female passengers only. The Drivers page filters, counts and exports lady
-drivers. Test Driver 1 (0771000001, tuk) is a woman by her
+ask for female passengers only. A driver who re-submits a corrected NIC gets the
+gender it shows. The Drivers page filters, counts and exports lady drivers. Test Driver 1 (0771000001, tuk) is a woman by her
 generated NIC; Test Driver 2 (0771000002, bike) is a man. Everything touched is
 put back afterwards, even if a check fails.
 """
@@ -94,6 +94,13 @@ saved = sql(f"select json_object_agg(u.phone_number, json_build_object('gender',
             f"where u.phone_number in ('{CUSTOMER}', '{LADY}', '{MAN}')")
 customer_id = sql(f"select c.id from customers c join users u on u.id = c.user_id where u.phone_number = '{CUSTOMER}'")
 lady_id = sql(f"select d.id from drivers d join users u on u.id = d.user_id where u.phone_number = '{LADY}'")
+man_reg = json.loads(sql(
+    "select json_strip_nulls(json_build_object('full_name', u.full_name, 'email', u.email, 'nic_number', d.nic_number, "
+    "'license_number', d.license_number, 'vehicle_type', d.vehicle_type, 'driver_type', d.driver_type, "
+    "'vehicle_number', d.vehicle_number, 'vehicle_model', coalesce(d.vehicle_model, ''), 'vehicle_color', "
+    "coalesce(d.vehicle_color, ''), 'relative_name', d.relative_name, 'relative_contact', d.relative_contact, "
+    "'relative_relationship', d.relative_relationship)) "
+    f"from drivers d join users u on u.id = d.user_id where u.phone_number = '{MAN}'"))
 try:
     sql(f"update users set gender = null, gender_source = null where phone_number = '{CUSTOMER}'")
     customer, lady, man = login(CUSTOMER, "customer"), login(LADY, "driver"), login(MAN, "driver")
@@ -103,9 +110,10 @@ try:
     check("no gender yet", me.get("gender") is None, str(me.get("gender")))
     st, res = call("PATCH", "/customer/profile", customer, {"full_name": me.get("full_name")})
     check("saving the name doesn't set a gender", st == 200 and res.get("gender") is None, f"{st} {res}")
-    st, res = call("PATCH", "/customer/profile", customer, {"gender": "Prefer not to say"})
-    check("the current app's 'Prefer not to say' leaves it empty", st == 200 and gender_of(CUSTOMER) == "/",
-          f"{st} {gender_of(CUSTOMER)}")
+    for older_app_value in ("Female", "Male", "Prefer not to say"):
+        st, res = call("PATCH", "/customer/profile", customer, {"gender": older_app_value})
+        check(f"the current app's '{older_app_value}' is ignored (it doesn't warn that it locks)",
+              st == 200 and gender_of(CUSTOMER) == "/", f"{st} {gender_of(CUSTOMER)}")
     st, res = call("PATCH", "/customer/profile", customer, {"gender": "female"})
     check("chooses female", st == 200 and res.get("gender") == "female", f"{st} {res}")
     check("stored as her own choice", gender_of(CUSTOMER) == "female/self", gender_of(CUSTOMER))
@@ -113,12 +121,10 @@ try:
     check("can't change it herself", st == 400 and "support" in str(res), f"{st} {res}")
     st, res = call("PATCH", "/customer/profile", customer, {"gender": "female"})
     check("sending the same answer again is fine", st == 200, f"{st} {res}")
-    for older_app_value in ("Female", "Other", "Prefer not to say"):
+    for older_app_value in ("Male", "Female", "Other"):
         st, res = call("PATCH", "/customer/profile", customer, {"gender": older_app_value})
-        check(f"the current app's '{older_app_value}' is accepted without changing it", st == 200
-              and gender_of(CUSTOMER) == "female/self", f"{st} {gender_of(CUSTOMER)}")
-    st, res = call("PATCH", "/customer/profile", customer, {"gender": "Male"})
-    check("the current app's 'Male' is refused like 'male'", st == 400, f"{st}")
+        check(f"the current app's '{older_app_value}' changes nothing and gets no error", st == 200
+              and res.get("gender") == "female" and gender_of(CUSTOMER) == "female/self", f"{st} {gender_of(CUSTOMER)}")
     _, me = call("GET", "/auth/me", customer)
     check("/auth/me shows it", me.get("gender") == "female", str(me.get("gender")))
 
@@ -150,6 +156,18 @@ try:
     check("and off again", st == 200 and res.get("female_passengers_only") is False, f"{st}")
     st, res = call("POST", "/driver/female-passengers-only", man, {"enabled": True})
     check("a male driver can't switch it on", st == 400, f"{st} {res}")
+
+    print("A corrected NIC changes a driver's gender")
+    nic = man_reg["nic_number"]
+    check("Test Driver 2 has a new-format male NIC", len(nic) == 12 and nic.isdigit() and int(nic[4:7]) <= 366, nic)
+    female_nic = nic[:4] + f"{int(nic[4:7]) + 500:03d}" + nic[7:]
+    st, res = call("POST", "/driver/register", man, {**man_reg, "nic_number": female_nic})
+    check("re-submitting his details with a woman's NIC makes the driver female", st == 200
+          and res.get("gender") == "female" and gender_of(MAN) == "female/nic", f"{st} {gender_of(MAN)}")
+    check("and keeps the driver approved", sql(f"select status from drivers d join users u on u.id = d.user_id "
+                                               f"where u.phone_number = '{MAN}'") == "APPROVED")
+    st, res = call("POST", "/driver/register", man, man_reg)
+    check("his own NIC makes him male again", st == 200 and gender_of(MAN) == "male/nic", f"{st} {gender_of(MAN)}")
 
     print("Admin corrects a driver on the edit form")
     st, html = admin_req(f"/admin/drivers/{lady_id}/edit")
@@ -202,6 +220,8 @@ try:
     check("export honours the gender filter", st == 200 and len(list(csv.reader(io.StringIO(csv_text)))) == 1, f"{st}")
     call("POST", "/driver/female-passengers-only", lady, {"enabled": False})
 finally:
+    sql(f"update drivers set nic_number = '{man_reg['nic_number']}' "
+        f"where user_id = (select id from users where phone_number = '{MAN}')")
     for phone, v in json.loads(saved or "{}").items():
         g = "null" if v["gender"] is None else f"'{v['gender']}'"
         s = "null" if v["source"] is None else f"'{v['source']}'"

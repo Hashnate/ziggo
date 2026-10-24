@@ -109,6 +109,16 @@ def table_row(html, bid):
     return html.split(f'id="table-row-{bid}"', 1)[1].split("</tr>", 1)[0] if f'id="table-row-{bid}"' in html else ""
 
 
+def wait_for(predicate, seconds=45):
+    """The scheduled-ride and auto-cancel sweeps run every 30 s."""
+    end = time.time() + seconds
+    while time.time() < end:
+        if predicate():
+            return True
+        time.sleep(2)
+    return predicate()
+
+
 def set_gender(phone, gender, source):
     g = "null" if gender is None else f"'{gender}'"
     s = "null" if source is None else f"'{source}'"
@@ -219,6 +229,16 @@ try:
     check("not marked lady driver", b.get("lady_driver_requested") is False)
     cancel(customer, bid)
 
+    print("Lady driver rental")
+    s, b = ride(customer, lady_driver=True, is_rental=True, rental_hours=2)
+    bid = b.get("id") if s == 201 else None
+    created.append(bid)
+    time.sleep(1)
+    check("booked as a rental, marked lady driver", s == 201 and b.get("lady_driver_requested") is True
+          and sql(f"select is_rental from bookings where id = {bid}") == "t", f"{s} {str(b)[:120]}")
+    check("offered to the lady driver only", offered(bid) == {LADY}, str(offered(bid)))
+    cancel(customer, bid)
+
     print("No lady driver nearby")
     online(lady, False)
     _, est = call("POST", "/bookings/estimate", customer, {"service_type": "tuk", "lady_driver": True, **coords})
@@ -256,6 +276,17 @@ try:
     call("GET", "/bookings/active", customer)
     st = sql(f"select status || ' / ' || coalesce(cancellation_reason, '') from bookings where id = {bid}")
     check("cancelled, saying no lady driver", st == "CANCELLED / No lady driver available within search window", st)
+    s, b = ride(customer, lady_driver=True)
+    bid = b.get("id") if s == 201 else None
+    created.append(bid)
+    sql(f"update bookings set dispatch_started_at = now() - interval '3 minutes' where id = {bid}")
+    wait_for(lambda: sql(f"select status from bookings where id = {bid}") == "CANCELLED")
+    st = sql(f"select status || ' / ' || coalesce(cancellation_reason, '') from bookings where id = {bid}")
+    check("the background sweep cancels one too, saying no lady driver",
+          st == "CANCELLED / No lady driver available within search window", st)
+    note = sql(f"select body from notifications where type = 'ride_update' and data = '{{\"booking_id\":{bid}}}' "
+               f"order by id desc limit 1")
+    check("and the customer's notice offers any driver", "lady driver" in note and "any driver" in note, note)
 
     print("Scheduled lady driver ride")
     s, b = ride(customer, lady_driver=True, scheduled_time=(datetime.now(timezone.utc) + timedelta(hours=2)).isoformat())
@@ -264,6 +295,18 @@ try:
     s, r = call("POST", f"/bookings/{bid}/any-driver", customer)
     check("switching before its time only clears the request", s == 200 and r.get("lady_driver_requested") is False
           and offered(bid) == set(), f"{s} {offered(bid)}")
+    cancel(customer, bid)
+    online(lady, True)
+    s, b = ride(customer, lady_driver=True, scheduled_time=(datetime.now(timezone.utc) + timedelta(hours=2)).isoformat())
+    bid = b.get("id") if s == 201 else None
+    created.append(bid)
+    time.sleep(1)
+    check("nobody is offered it before its time", s == 201 and offered(bid) == set(), f"{s} {offered(bid)}")
+    sql(f"update bookings set scheduled_at = now() + interval '5 minutes' where id = {bid}")
+    sent = wait_for(lambda: sql(f"select scheduled_dispatch_sent from bookings where id = {bid}") == "t")
+    time.sleep(1)
+    check("when it comes due it is offered to the lady driver only", sent and offered(bid) == {LADY},
+          f"sent={sent} {offered(bid)}")
     cancel(customer, bid)
 
     print("Female passengers only")

@@ -185,11 +185,19 @@ A `Booking` row with `is_flash=True`. Same state machine, but requires `receiver
 
 | Event                  | To       | Payload key fields                                            |
 | ---------------------- | -------- | ------------------------------------------------------------- |
-| `new_ride_request`     | driver   | full booking summary + customer name/phone + 30s expiry       |
+| `new_ride_request`     | driver   | full booking summary + customer name/phone + 30s expiry + `lady_driver_requested` |
 | `booking_update`       | both     | `booking_id`, `status` (string)                               |
-| `no_drivers_available` | customer | `booking_id`, `booking_ref`                                   |
+| `no_drivers_available` | customer | `booking_id`, `booking_ref` (+ `lady_driver`, `message` when no lady driver was found) |
 
 Customer dispatch: when a booking is created, **every** available online, approved driver within the search radius gets `new_ride_request` at once (`find_all_nearby_drivers`). Rides go only to the booked vehicle type, flash and courier parcels to any type, and a driver about to finish a nearby trip can get a ride as a back-to-back request. The first to accept (`POST /bookings/{id}/accept`) wins, and the others get `ride_taken`.
+
+### Lady drivers and "female passengers only" (see [app/services/gender_service.py](ziggo_backend/app/services/gender_service.py))
+
+- `users.gender` is `female`, `male` or empty; `users.gender_source` says who set it. Drivers: read from the NIC (Sri Lankan NIC day-of-year + 500 = female) by `apply_nic_gender` wherever a NIC is saved. Customers: chosen once in the app (`PATCH /customer/profile` with exactly `female`/`male`; older apps' `Female`/`Male`/`Other` are ignored because they don't warn that it locks). An admin's choice (driver edit form, Riders page) is never overridden.
+- A female customer can book a ride with `lady_driver: true` (`bookings.lady_driver_requested`); a lady driver can switch on `drivers.female_passengers_only`. Both apply to rides only (rentals and return trips included, not flash/courier parcels) and never change the price.
+- **Every place that offers or hands a ride to a driver must apply the rule**: `matching_service.drivers_for_customer` / `gender_service.refusal_for_driver`. Today that is `create_booking`, `scheduled_dispatch.dispatch_booking`, the cancelled-ride notice to nearby drivers and accept (403). Scan-and-go is deliberately not filtered (the driver picks the passenger in person). A new dispatch path needs it too.
+- No lady driver: the customer gets `no_drivers_available` with `lady_driver` + `message`, and `POST /bookings/{id}/any-driver` re-dispatches to everyone and restarts the search clock.
+- Staging checks: `deploy/staging/gender_checks.py`, `deploy/staging/lady_driver_checks.py`.
 
 ### Database
 
