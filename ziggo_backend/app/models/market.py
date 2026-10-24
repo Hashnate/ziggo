@@ -130,6 +130,7 @@ class MarketOrder(Base):
     )
     total_amount = Column(DECIMAL(10, 2))
     delivery_fee = Column(DECIMAL(10, 2))
+    promo_code = Column(String(50))
     # BRD: RW-02 — loyalty redemption snapshot
     redeem_points = Column(Integer, nullable=False, default=0)
     redeem_discount = Column(DECIMAL(10, 2), nullable=False, default=0)

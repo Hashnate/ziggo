@@ -3,6 +3,21 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/network/api_client.dart';
 
+/// The admin's conditions on a promo, as short phrases for chips and summaries.
+List<String> promoRules(Map<String, dynamic> p) {
+  final rules = <String>[];
+  final min = p['min_order_amount'] as num?;
+  if (min != null && min > 0) rules.add('Min Rs.${min.toStringAsFixed(0)}');
+  final vehicles = (p['vehicle_types'] as List?)?.map((v) => v.toString()).toList() ?? const <String>[];
+  if (vehicles.isNotEmpty) rules.add('${vehicles.join(', ')} only');
+  final perCustomer = (p['per_customer_limit'] as num?)?.toInt();
+  if (perCustomer != null) {
+    rules.add(perCustomer == 1 ? 'Once per customer' : '$perCustomer uses per customer');
+  }
+  if (p['new_customers_only'] == true) rules.add('New customers only');
+  return rules;
+}
+
 /// Promo inbox + loyalty balance state (BRD: RW-01 + RW-04).
 class PromosProvider extends ChangeNotifier {
   List<Map<String, dynamic>> _items = const [];
@@ -54,6 +69,23 @@ class PromosProvider extends ChangeNotifier {
     } finally {
       _loading = false;
       notifyListeners();
+    }
+  }
+
+  /// Whether [code] applies to an order worth [amount] (before discounts) at a
+  /// checkout without a server quote: category is food | market | events.
+  /// The reply has `applies`, `discount_amount` and the server's `message`
+  /// when it doesn't apply; null if the check couldn't be made.
+  Future<Map<String, dynamic>?> check(String code, String category, double amount) async {
+    try {
+      final r = await ApiClient.instance.dio.post('/promos/check', data: {
+        'code': code,
+        'category': category,
+        'amount': amount,
+      });
+      return Map<String, dynamic>.from(r.data as Map);
+    } on DioException {
+      return null;
     }
   }
 

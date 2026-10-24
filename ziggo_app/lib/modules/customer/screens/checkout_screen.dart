@@ -14,8 +14,10 @@ import '../food_ui.dart';
 import '../promos_provider.dart';
 import '../wallet_provider.dart';
 import '../payment_methods_provider.dart';
+import '../widgets/promo_code_tile.dart';
 import 'food_tracking_screen.dart';
 import 'payment_methods_screen.dart';
+import 'promotions_selection_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -32,6 +34,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _busy = false;
   bool _usePoints = false;
   bool _isSelfPickup = false;
+  String _promo = '';
+  final _promoCheck = PromoCheck();
 
   @override
   void initState() {
@@ -73,6 +77,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (lat != null && lng != null) {
       await context.read<FoodProvider>().quoteDelivery(lat: lat, lng: lng);
     }
+  }
+
+  Future<void> _pickPromo() async {
+    final code = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => PromotionsSelectionScreen(currentPromo: _promo, category: 'food')),
+    );
+    if (code != null && mounted) setState(() => _promo = code.trim().toUpperCase());
   }
 
   Future<void> _pickPlace() async {
@@ -133,7 +145,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final int balance = promos.points;
 
       if (valPerPoint > 0) {
-        double subtotal = food.cartTotal + food.cartPackingCharge + (_isSelfPickup ? 0.0 : ((food.quote?['delivery_fee'] as num?)?.toDouble() ?? (food.activeRestaurant?['delivery_fee'] as num?)?.toDouble() ?? 0.0)) + appUsageCharge;
+        double subtotal = food.cartTotal + food.cartPackingCharge + (_isSelfPickup ? 0.0 : ((food.quote?['delivery_fee'] as num?)?.toDouble() ?? (food.activeRestaurant?['delivery_fee'] as num?)?.toDouble() ?? 0.0)) + appUsageCharge - _promoCheck.discount(_promo);
         double maxDiscount = subtotal * (maxPct / 100.0);
         int allowed = balance;
         double allowedVal = allowed * valPerPoint;
@@ -154,6 +166,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       paymentMethod: _payment,
       instructions: _instructionsCtrl.text.trim(),
       redeemPoints: pointsToRedeem,
+      promoCode: _promo.isEmpty ? null : _promo,
       isSelfPickup: _isSelfPickup,
       appUsageCharge: appUsageCharge,
     );
@@ -185,8 +198,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         (restaurant?['delivery_fee'] as num?)?.toDouble() ?? 0.0);
     final appUsagePct = _isSelfPickup ? ((promos.loyalty['self_pickup_app_usage_charge'] as num?)?.toDouble() ?? 5.0) : 0.0;
     final appUsageCharge = _isSelfPickup ? (food.cartTotal * (appUsagePct / 100.0)) : 0.0;
-    
-    double total = food.cartTotal + deliveryFee + appUsageCharge + food.cartPackingCharge;
+    _promoCheck.keepFresh(context, _promo, 'food', food.cartTotal, () {
+      if (mounted) setState(() {});
+    });
+    final promoDiscount = _promoCheck.discount(_promo);
+
+    double total = food.cartTotal + deliveryFee + appUsageCharge + food.cartPackingCharge - promoDiscount;
+    if (total < 0) total = 0;
     int maxRedeemablePoints = 0;
     double potentialDiscount = 0.0;
     double discount = 0.0;
@@ -591,6 +609,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ),
           ),
+          _Section(
+            title: 'PROMO CODE',
+            child: PromoCodeTile(
+              code: _promo,
+              check: _promoCheck,
+              onTap: _pickPromo,
+              onClear: () => setState(() => _promo = ''),
+            ),
+          ),
           if (promos.isLoyaltyActive && maxRedeemablePoints > 0)
             _Section(
               title: 'LOYALTY POINTS',
@@ -639,6 +666,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 if (!_isSelfPickup) _row('Delivery fee', formatRs(deliveryFee)),
                 if (_isSelfPickup && appUsageCharge > 0)
                   _row('App usage charge', formatRs(appUsageCharge)),
+                if (promoDiscount > 0)
+                  _row('Promo ($_promo)', '-${formatRs(promoDiscount)}', color: AppColors.success),
                 if (_usePoints && discount > 0)
                   _row('Points Discount', '-${formatRs(discount)}', color: AppColors.success),
                 const Divider(height: 16),

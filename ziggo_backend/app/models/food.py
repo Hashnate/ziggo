@@ -133,6 +133,7 @@ class FoodOrder(Base):
     delivery_fee = Column(DECIMAL(10, 2))
     tax_amount = Column(DECIMAL(10, 2), default=0)
     discount_amount = Column(DECIMAL(10, 2), default=0)
+    promo_code = Column(String(50))
     # BRD: RW-02 — loyalty redemption snapshot
     redeem_points = Column(Integer, nullable=False, default=0)
     redeem_discount = Column(DECIMAL(10, 2), nullable=False, default=0)

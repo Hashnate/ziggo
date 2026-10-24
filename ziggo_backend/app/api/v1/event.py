@@ -252,24 +252,14 @@ async def book_tickets(
 
     # Optional promo (events-eligible). Unknown / ineligible codes are ignored.
     discount = Decimal("0")
+    promo = None
     if body.promo_code:
-        from ...services.promo_service import usable_promo_query
+        from ...services.promo_service import promo_applies, promo_discount, usable_promo
 
-        p = (
-            await db.execute(usable_promo_query(body.promo_code.upper()))
-        ).scalars().first()
-        if (
-            p
-            and p.is_active
-            and p.category in ("all", "events")
-            and (p.usage_limit is None or p.used_count < p.usage_limit)
-        ):
-            if p.discount_type == "percentage":
-                discount = (subtotal * Decimal(str(p.discount_value)) / Decimal("100")).quantize(Decimal("0.01"))
-                if p.max_discount:
-                    discount = min(discount, Decimal(str(p.max_discount)))
-            else:
-                discount = Decimal(str(p.discount_value))
+        p = await usable_promo(db, body.promo_code, "events", cust.id)
+        if promo_applies(p, subtotal):
+            promo = p
+            discount = promo_discount(p, subtotal)
 
     discount = min(discount, subtotal)
     taxable = subtotal - discount
@@ -289,12 +279,15 @@ async def book_tickets(
         subtotal=subtotal,
         convenience_fee=convenience_fee,
         discount_amount=discount,
+        promo_code=promo.code if promo else None,
         total_amount=total,
         payment_method=body.payment_method,
         payment_status="paid" if body.payment_method == "wallet" else "pending",
     )
     order.items = order_items
     db.add(order)
+    if promo:
+        promo.used_count = (promo.used_count or 0) + 1
 
     if body.payment_method == "wallet":
         cust.wallet_balance = (cust.wallet_balance or Decimal(0)) - total

@@ -6,10 +6,13 @@ import '../promos_provider.dart';
 
 class PromotionsSelectionScreen extends StatefulWidget {
   final String currentPromo;
+  // rides | food | market | events: only list codes usable there. Null = all.
+  final String? category;
 
   const PromotionsSelectionScreen({
     super.key,
     required this.currentPromo,
+    this.category,
   });
 
   @override
@@ -37,6 +40,9 @@ class _PromotionsSelectionScreenState extends State<PromotionsSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     final promosProvider = context.watch<PromosProvider>();
+    final items = promosProvider.items
+        .where((p) => widget.category == null || p['category'] == null || p['category'] == 'all' || p['category'] == widget.category)
+        .toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F7),
@@ -157,12 +163,12 @@ class _PromotionsSelectionScreenState extends State<PromotionsSelectionScreen> {
             ),
 
             // Promo Lists
-            if (promosProvider.loading && promosProvider.items.isEmpty)
+            if (promosProvider.loading && items.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 40),
                 child: CircularProgressIndicator(),
               )
-            else if (promosProvider.items.isEmpty)
+            else if (items.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 40),
                 child: Column(
@@ -182,9 +188,10 @@ class _PromotionsSelectionScreenState extends State<PromotionsSelectionScreen> {
                 child: ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: promosProvider.items.length,
+                  itemCount: items.length,
                   itemBuilder: (context, index) {
-                    final promo = promosProvider.items[index];
+                    final promo = items[index];
+                    final rules = promoRules(promo);
                     final code = promo['code'] as String? ?? '';
                     final desc = promo['description'] as String? ?? '';
                     final bool isSelected = widget.currentPromo.toUpperCase() == code.toUpperCase();
@@ -255,14 +262,16 @@ class _PromotionsSelectionScreenState extends State<PromotionsSelectionScreen> {
                                 color: const Color(0xFFFFF3E0),
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: const Row(
+                              child: Row(
                                 children: [
-                                  Icon(Icons.info_outline, color: Colors.orange, size: 16),
-                                  SizedBox(width: 8),
+                                  const Icon(Icons.info_outline, color: Colors.orange, size: 16),
+                                  const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      'This promotion will be automatically applied if conditions met only.',
-                                      style: TextStyle(
+                                      rules.isEmpty
+                                          ? 'This promotion will be automatically applied if conditions met only.'
+                                          : rules.join(' · '),
+                                      style: const TextStyle(
                                         color: Colors.orange,
                                         fontSize: 11,
                                         fontWeight: FontWeight.w500,

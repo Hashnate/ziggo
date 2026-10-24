@@ -497,18 +497,10 @@ async def create_market_order(
     promo_discount = Decimal("0")
     promo_code_applied = None
     if body.promo_code:
-        from ...services.promo_service import usable_promo_query
-        p_q = await db.execute(usable_promo_query(body.promo_code.upper()))
-        p = p_q.scalars().first()
-        if p and p.is_active and p.category in ("all", "market") and (
-            p.usage_limit is None or p.used_count < p.usage_limit
-        ):
-            if p.discount_type == "percentage":
-                promo_discount = (total * Decimal(str(p.discount_value)) / Decimal("100")).quantize(Decimal("0.01"))
-                if p.max_discount:
-                    promo_discount = min(promo_discount, Decimal(str(p.max_discount)))
-            else:
-                promo_discount = Decimal(str(p.discount_value))
+        from ...services.promo_service import promo_applies, promo_discount as discount_for, usable_promo
+        p = await usable_promo(db, body.promo_code, "market", customer.id)
+        if promo_applies(p, total):
+            promo_discount = discount_for(p, total)
             promo_code_applied = p.code
 
     subtotal_before_points = max(Decimal("0.00"), total + delivery_fee + app_usage_charge - promo_discount)
@@ -550,6 +542,7 @@ async def create_market_order(
         status=MarketOrderStatus.PENDING,
         total_amount=total,
         delivery_fee=delivery_fee,
+        promo_code=promo_code_applied,
         app_usage_charge=app_usage_charge,
         redeem_points=redeem_pts,
         redeem_discount=redeem_value,

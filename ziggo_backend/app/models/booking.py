@@ -225,6 +225,15 @@ class PromoCode(Base):
     valid_from = Column(DateTime(timezone=True))
     valid_to = Column(DateTime(timezone=True))
     is_active = Column(Boolean, default=True)
+    # Empty = no per-customer limit.
+    per_customer_limit = Column(Integer)
+    # Only customers with nothing completed in this promo's category yet.
+    new_customers_only = Column(Boolean, nullable=False, default=False)
+    # Comma-separated FareSetting.service_type values; empty = every vehicle.
+    # Only restricts ride-side bookings.
+    vehicle_types = Column(String(255))
+    # Cancelled bookings/orders stop counting toward both limits.
+    return_use_on_cancel = Column(Boolean, nullable=False, default=False)
 
 class BookingMessage(Base):
     __tablename__ = "booking_messages"

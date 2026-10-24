@@ -484,10 +484,11 @@ async def estimate_fare(
     user: User = Depends(get_current_user),
 ):
     # Customer is only needed when the estimate also previews a points
-    # redemption. Avoid lazy-loading it through the User relationship —
-    # async SQLAlchemy refuses that and we don't need it for plain estimates.
+    # redemption or a promo code (per-customer promo rules). Avoid lazy-loading
+    # it through the User relationship — async SQLAlchemy refuses that and we
+    # don't need it for plain estimates.
     customer = None
-    if (req.redeem_points or 0) > 0:
+    if (req.redeem_points or 0) > 0 or (req.promo_code and user.role == UserRole.CUSTOMER):
         customer = await _get_customer(db, user)
     fare = await calculate_fare(
         db,
@@ -521,7 +522,7 @@ async def estimate_fare_bulk(
     user: User = Depends(get_current_user),
 ):
     customer = None
-    if (req.redeem_points or 0) > 0:
+    if (req.redeem_points or 0) > 0 or (req.promo_code and user.role == UserRole.CUSTOMER):
         customer = await _get_customer(db, user)
         
     service_types = list(req.service_types or [])
@@ -1469,6 +1470,7 @@ async def accept_booking(
         stops=stops_list,
         driver_accepted_lat=float(b.driver_accepted_lat) if b.driver_accepted_lat else None,
         driver_accepted_lng=float(b.driver_accepted_lng) if b.driver_accepted_lng else None,
+        promo_locked=True,
     )
     
     b.distance_km = to_decimal(fare["distance_km"])
@@ -1867,6 +1869,7 @@ async def update_booking_status(
                 stops=stops_list,
                 driver_accepted_lat=float(b.driver_accepted_lat) if b.driver_accepted_lat else None,
                 driver_accepted_lng=float(b.driver_accepted_lng) if b.driver_accepted_lng else None,
+                promo_locked=True,
             )
 
             if not b.requested_drop_address:
@@ -2467,6 +2470,7 @@ async def update_booking_destination(
         stops=[s.model_dump() for s in (body.stops or [])],
         driver_accepted_lat=float(b.driver_accepted_lat) if b.driver_accepted_lat else None,
         driver_accepted_lng=float(b.driver_accepted_lng) if b.driver_accepted_lng else None,
+        promo_locked=True,
     )
 
     b.drop_lat = Decimal(str(body.drop_lat))

@@ -91,6 +91,7 @@ class EventOrder(Base):
     subtotal = Column(DECIMAL(10, 2), nullable=False, default=0)
     convenience_fee = Column(DECIMAL(10, 2), nullable=False, default=0)
     discount_amount = Column(DECIMAL(10, 2), nullable=False, default=0)
+    promo_code = Column(String(50))
     total_amount = Column(DECIMAL(10, 2), nullable=False, default=0)
 
     payment_method = Column(String(20))               # wallet | cash
