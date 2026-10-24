@@ -25,6 +25,7 @@ from ...models import (
     JobApplication,
 )
 from ...services.fare_service import calculate_fare
+from ...services.gender_service import apply_nic_gender
 
 router = APIRouter()
 
@@ -554,6 +555,7 @@ async def verify_preregister(
         if user_role == UserRole.CUSTOMER:
             db.add(Customer(user_id=user.id))
         elif user_role == UserRole.DRIVER:
+            apply_nic_gender(user, req.nic)
             db.add(Driver(
                 user_id=user.id,
                 nic_number=req.nic.strip() if req.nic else None,
@@ -574,6 +576,7 @@ async def verify_preregister(
             )
             user = res.scalars().first()
             if not user.driver_profile:
+                apply_nic_gender(user, req.nic)
                 db.add(Driver(
                     user_id=user.id,
                     nic_number=req.nic.strip() if req.nic else None,

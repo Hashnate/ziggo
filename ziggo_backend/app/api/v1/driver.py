@@ -22,6 +22,7 @@ from ...schemas import (
 )
 from ...services.auth_service import get_current_user, require_role
 from ...services.fare_service import haversine_km
+from ...services.gender_service import FEMALE, apply_nic_gender
 from ...services.ws_manager import manager
 
 router = APIRouter()
@@ -130,6 +131,8 @@ def _to_response(user: User, d: Driver, paid_payouts: float = 0.0, pending_payou
         account_holder_name=d.account_holder_name,
         account_number=d.account_number,
         branch_name=d.branch_name,
+        gender=user.gender,
+        female_passengers_only=bool(d.female_passengers_only),
     )
 
 
@@ -367,6 +370,7 @@ async def register_driver(
             )
 
     d.nic_number = body.nic_number
+    apply_nic_gender(user, body.nic_number)
     d.license_number = body.license_number
     d.vehicle_type = body.vehicle_type
     d.vehicle_number = body.vehicle_number
@@ -876,6 +880,32 @@ async def update_bank_details(
     d.account_holder_name = body.account_holder_name.strip()
     d.account_number = body.account_number.strip()
     d.branch_name = body.branch_name.strip()
+    await db.commit()
+    await db.refresh(d)
+    await db.refresh(user)
+
+    from ...services.finance_service import get_driver_payout_stats
+    stats = await get_driver_payout_stats(db, d.id)
+    from ...models import PeakHourSetting
+    peaks_q = await db.execute(select(PeakHourSetting).order_by(PeakHourSetting.display_order, PeakHourSetting.id))
+    peaks = peaks_q.scalars().all()
+    return _to_response(user, d, paid_payouts=stats["paid"], pending_payout=stats["pending"], peaks=peaks)
+
+
+class FemalePassengersOnlyRequest(BaseModel):
+    enabled: bool
+
+
+@router.post("/female-passengers-only", response_model=DriverProfileResponse)
+async def set_female_passengers_only(
+    body: FemalePassengersOnlyRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("driver")),
+):
+    d = await _get_driver(db, user)
+    if body.enabled and user.gender != FEMALE:
+        raise HTTPException(status_code=400, detail="Only lady drivers can choose female passengers only.")
+    d.female_passengers_only = body.enabled
     await db.commit()
     await db.refresh(d)
     await db.refresh(user)

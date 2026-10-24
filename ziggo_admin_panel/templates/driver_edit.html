@@ -81,6 +81,18 @@
                     <input name="nic_number" required value="{{ driver.nic_number or '' }}"
                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                 </div>
+                <div>
+                    {% set nic_g = gender_from_nic(driver.nic_number) %}
+                    {% set admin_g = user.gender if (user and user.gender_source == 'admin') else '' %}
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Gender</label>
+                    <select name="gender"
+                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
+                        <option value="auto" {% if not admin_g %}selected{% endif %}>From NIC ({{ nic_g|title if nic_g else "can't read the NIC" }})</option>
+                        <option value="female" {% if admin_g == 'female' %}selected{% endif %}>Female (set by admin)</option>
+                        <option value="male" {% if admin_g == 'male' %}selected{% endif %}>Male (set by admin)</option>
+                    </select>
+                    <p class="text-[10px] text-gray-400 font-bold mt-1">Used for the lady-driver option. Only change it if the NIC gives the wrong answer.</p>
+                </div>
             </div>
         </div>
 

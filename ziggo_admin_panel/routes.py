@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 from app.config import settings
 from app.database import get_db
+from app.services.gender_service import apply_nic_gender, gender_from_nic, set_admin_gender
 from app.models import (
     User,
     UserRole,
@@ -99,6 +100,7 @@ def format_colombo_dt(dt: datetime | None, fmt: str = "%Y-%m-%d %H:%M") -> str:
 
 templates.env.filters["colombo_dt"] = format_colombo_dt
 templates.env.filters["to_colombo"] = to_colombo_dt
+templates.env.globals["gender_from_nic"] = gender_from_nic
 
 UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "drivers")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -1109,6 +1111,7 @@ async def admin_drivers_new_submit(
         profile_photo=photo_url,
         is_active=True,
     )
+    apply_nic_gender(user, nic_number)
     db.add(user)
     await db.flush()
 
@@ -1358,6 +1361,7 @@ async def admin_drivers_edit_submit(
     vehicle_color: str = Form(...),
     is_approved: str = Form(""),
     remove_photo: str = Form(""),
+    gender: str = Form("auto"),
     profile_photo: UploadFile | None = File(None),
     relative_name: str = Form(""),
     relative_contact: str = Form(""),
@@ -1444,6 +1448,7 @@ async def admin_drivers_edit_submit(
     user.email = email or None
 
     d.nic_number = nic_number
+    set_admin_gender(user, gender, nic_number)
     d.license_number = license_number
     d.vehicle_type = vehicle_type
     d.vehicle_number = vehicle_number
@@ -2055,6 +2060,26 @@ async def admin_rider_deactivate(
         c.user.is_active = False
         await db.commit()
     return RedirectResponse(url="/admin/riders", status_code=303)
+
+
+@router.post("/riders/{customer_id}/gender")
+async def admin_rider_gender(
+    customer_id: int,
+    gender: str = Form(...),
+    back: str = Form("/admin/riders"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    q = await db.execute(
+        select(Customer).options(selectinload(Customer.user).selectinload(User.driver_profile))
+        .where(Customer.id == customer_id)
+    )
+    c = q.scalars().first()
+    if c and c.user:
+        nic = c.user.driver_profile.nic_number if c.user.driver_profile else None
+        set_admin_gender(c.user, gender if gender in ("female", "male") else ("auto" if nic else "none"), nic)
+        await db.commit()
+    return RedirectResponse(url=back if back.startswith("/admin/riders") else "/admin/riders", status_code=303)
 
 
 @router.post("/riders/{customer_id}/activate")

@@ -327,6 +327,7 @@
                     <th class="px-5 py-3">Rider</th>
                     <th class="px-5 py-3">Email</th>
                     <th class="px-5 py-3">Phone</th>
+                    <th class="px-5 py-3">Gender</th>
                     <th class="px-5 py-3">Joined</th>
                     <th class="px-5 py-3 text-center">Rides</th>
                     <th class="px-5 py-3">Wallet</th>
@@ -355,6 +356,20 @@
                     </td>
                     <td class="px-5 py-3 text-sm text-gray-500">{{ c.user.email or '—' }}</td>
                     <td class="px-5 py-3 text-sm font-semibold text-gray-700">{{ c.user.phone_number or '—' }}</td>
+                    <td class="px-5 py-3">
+                        <form method="post" action="/admin/riders/{{ c.id }}/gender" class="flex items-center gap-1.5"
+                              onchange="if (confirm('Change this rider\'s gender?')) this.submit(); else this.reset();">
+                            <input type="hidden" name="back" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                            <select name="gender" class="text-xs font-bold border border-gray-200 rounded-lg px-2 py-1 bg-white">
+                                <option value="none" {% if not c.user.gender %}selected{% endif %}>Not set</option>
+                                <option value="female" {% if c.user.gender == 'female' %}selected{% endif %}>Female</option>
+                                <option value="male" {% if c.user.gender == 'male' %}selected{% endif %}>Male</option>
+                            </select>
+                            {% if c.user.gender_source %}
+                            <span class="text-[10px] text-gray-400 font-bold" title="Who set it">{{ {'self': 'by rider', 'admin': 'by admin', 'nic': 'from NIC'}[c.user.gender_source] or '' }}</span>
+                            {% endif %}
+                        </form>
+                    </td>
                     <td class="px-5 py-3 text-xs text-gray-400 whitespace-nowrap">
                         {{ c.user.created_at|colombo_dt("%b %d, %Y") if c.user.created_at else '—' }}
                     </td>
@@ -404,7 +419,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="8">
+                    <td colspan="9">
                         <div class="empty-state">
                             <div class="icon"><i class="fas fa-users"></i></div>
                             <p>No riders found{% if search or status != 'all' %} matching your filters{% endif %}.</p>

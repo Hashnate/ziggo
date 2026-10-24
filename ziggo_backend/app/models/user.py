@@ -70,6 +70,9 @@ class User(Base):
     referral_code = Column(String(16), unique=True, nullable=True, default=generate_referral_code)
     referred_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     is_preregistered = Column(Boolean, default=False)
+    # "female" / "male" / empty; gender_source = nic | self | admin (see gender_service)
+    gender = Column(String(10), nullable=True)
+    gender_source = Column(String(10), nullable=True)
 
     customer_profile = relationship("Customer", back_populates="user", uselist=False, cascade="all, delete-orphan")
     driver_profile = relationship("Driver", back_populates="user", uselist=False, cascade="all, delete-orphan")
@@ -153,6 +156,8 @@ class Driver(Base):
     account_holder_name = Column(String(100), nullable=True)
     account_number = Column(String(50), nullable=True)
     branch_name = Column(String(100), nullable=True)
+    # Lady drivers can choose to be offered female passengers only.
+    female_passengers_only = Column(Boolean, nullable=False, default=False)
 
 
     user = relationship("User", back_populates="driver_profile")

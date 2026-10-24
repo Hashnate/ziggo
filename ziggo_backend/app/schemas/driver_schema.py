@@ -76,6 +76,8 @@ class DriverProfileResponse(BaseModel):
     peak_end_hour: Optional[int] = None
     peak_extra_amount: Optional[float] = 0.0
     is_currently_peak: Optional[bool] = False
+    gender: Optional[str] = None
+    female_passengers_only: bool = False
 
     bank_name: Optional[str] = None
     account_holder_name: Optional[str] = None

@@ -143,6 +143,9 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("food_orders", "promo_code", "VARCHAR(50)"),
     ("market_orders", "promo_code", "VARCHAR(50)"),
     ("event_orders", "promo_code", "VARCHAR(50)"),
+    ("users", "gender", "VARCHAR(10)"),
+    ("users", "gender_source", "VARCHAR(10)"),
+    ("drivers", "female_passengers_only", "BOOLEAN NOT NULL DEFAULT FALSE"),
 )
 
 
@@ -284,6 +287,7 @@ async def ensure_schema(engine: AsyncEngine) -> None:
         await _seed_sample_jobs(conn)
         await _backfill_driver_vehicles(conn)
         await _backfill_districts(conn)
+        await _backfill_driver_genders(conn)
 
 
 async def _seed_flash_tiers(conn) -> None:
@@ -701,3 +705,24 @@ async def _backfill_districts(conn) -> None:
             filled.append(f"{n} {model.__tablename__}")
     if filled:
         print(f"[schema_sync] Filled in districts: {', '.join(filled)}")
+
+
+async def _backfill_driver_genders(conn) -> None:
+    """Drivers registered before genders existed get theirs from their NIC."""
+    from ..models import User
+    from .gender_service import SOURCE_NIC, gender_from_nic
+
+    rows = (await conn.execute(
+        select(User.id, Driver.nic_number)
+        .join(Driver, Driver.user_id == User.id)
+        .where(User.gender.is_(None), Driver.nic_number.isnot(None))
+    )).all()
+    by_gender: dict[str, list[int]] = {}
+    for user_id, nic in rows:
+        g = gender_from_nic(nic)
+        if g:
+            by_gender.setdefault(g, []).append(user_id)
+    for g, ids in by_gender.items():
+        await conn.execute(User.__table__.update().where(User.id.in_(ids)).values(gender=g, gender_source=SOURCE_NIC))
+    if by_gender:
+        print("[schema_sync] Driver genders from NIC: " + ", ".join(f"{len(v)} {k}" for k, v in sorted(by_gender.items())))

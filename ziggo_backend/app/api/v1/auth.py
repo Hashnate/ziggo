@@ -294,4 +294,5 @@ async def get_me(
         profile_completeness=compute_profile_completeness(user),
         has_driver_profile=has_driver,
         has_customer_profile=has_customer,
+        gender=user.gender,
     )

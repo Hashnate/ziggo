@@ -18,6 +18,7 @@ from ...models import (
 )
 from ...schemas import AdminDriverCreateRequest
 from ...services.auth_service import require_role
+from ...services.gender_service import apply_nic_gender
 
 router = APIRouter()
 
@@ -100,6 +101,7 @@ async def create_driver(
         email=body.email,
         is_active=True,
     )
+    apply_nic_gender(user, body.nic_number)
     db.add(user)
     await db.flush()
 
