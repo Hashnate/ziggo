@@ -1056,6 +1056,7 @@ class _BottomCard extends StatelessWidget {
                               const _SearchingIndicator(),
                               const _LadyDriverSearchNote(),
                             ],
+                            const _SharingLocationNote(),
                           ],
                         ),
                       ),
@@ -1170,6 +1171,7 @@ class _BottomCard extends StatelessWidget {
                                 ),
                               ),
                             ],
+                            const _ShareLocationTile(),
                             if ((active['stops'] as List?)?.isNotEmpty == true) ...[
                               Builder(builder: (context) {
                                 final activeStopsList = (active['stops'] as List? ?? []);
@@ -2128,6 +2130,106 @@ class _SearchingIndicator extends StatelessWidget {
             color: AppColors.primary,
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Phase 2 feature 01: the customer can show the driver where she or he is
+/// while waiting for pickup. Off by default, per ride, foreground only.
+class _ShareLocationTile extends StatelessWidget {
+  const _ShareLocationTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final booking = context.watch<BookingProvider>();
+    if (!booking.canShareLocation) return const SizedBox.shrink();
+    final on = booking.sharingLocation;
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+      decoration: BoxDecoration(
+        color: on ? AppColors.success.withOpacity(0.08) : AppColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: on ? AppColors.success.withOpacity(0.35) : AppColors.divider),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.share_location_rounded, color: on ? AppColors.success : AppColors.textSecondary, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Share my live location with driver',
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                const SizedBox(height: 2),
+                Text(
+                  on
+                      ? 'Your driver can see where you are. It stops when your trip starts.'
+                      : 'Helps your driver find you. Only while Ziggo is open, until your trip starts.',
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 11.5, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+          if (booking.shareToggling)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          else
+            Switch(
+              value: on,
+              activeColor: AppColors.success,
+              onChanged: (v) async {
+                final provider = context.read<BookingProvider>();
+                if (!v) {
+                  await provider.stopSharingLocation();
+                  return;
+                }
+                final problem = await provider.startSharingLocation();
+                if (problem == null || !context.mounted) return;
+                final fix = switch (problem) {
+                  BookingProvider.shareLocationOff => Geolocator.openLocationSettings,
+                  BookingProvider.shareNoPermission => Geolocator.openAppSettings,
+                  _ => null,
+                };
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(problem),
+                    behavior: SnackBarBehavior.floating,
+                    action: fix == null ? null : SnackBarAction(label: 'Settings', onPressed: fix),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Reminder on the collapsed sheet that the driver can see the customer.
+class _SharingLocationNote extends StatelessWidget {
+  const _SharingLocationNote();
+
+  @override
+  Widget build(BuildContext context) {
+    if (!context.watch<BookingProvider>().sharingLocation) return const SizedBox.shrink();
+    return const Padding(
+      padding: EdgeInsets.only(top: 6),
+      child: Row(
+        children: [
+          Icon(Icons.share_location_rounded, color: AppColors.success, size: 15),
+          SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              'Sharing your live location with your driver',
+              style: TextStyle(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
       ),
     );
   }

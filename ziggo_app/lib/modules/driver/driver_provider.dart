@@ -140,6 +140,18 @@ class DriverProvider extends ChangeNotifier {
     }
 
     if (data == null) return;
+
+    if (event == 'passenger_location_update') {
+      _takePassengerPoint(data['booking_id'], data);
+      return;
+    }
+    if (event == 'passenger_location_stopped') {
+      if (_passengerPoint != null && _passengerPoint!['booking_id'] == data['booking_id']) {
+        _clearPassengerPoint();
+        notifyListeners();
+      }
+      return;
+    }
     
     // Aggressive catch-all: If it looks like a request, show it!
     // Exclude cancellation events and broadcast notifications.
@@ -479,12 +491,14 @@ class DriverProvider extends ChangeNotifier {
 
   Future<void> loadActive() async {
     try {
+      final asked = DateTime.now();
       final resp = await ApiClient.instance.dio.get('/bookings/active');
       if (resp.data == null || (resp.data is String && resp.data == '')) {
         _activeRide = null;
       } else {
         _activeRide = Map<String, dynamic>.from(resp.data);
       }
+      _syncPassengerPoint(asked);
     } catch (_) {}
 
     try {
@@ -893,8 +907,89 @@ class DriverProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
+  // ---- Phase 2 feature 01 — the customer's live location ----------------
+  // Shown beside the pickup pin while the driver is on the way, and only while
+  // fresh. Its age is timed from when the point reached this phone, so a wrong
+  // phone clock can neither hide it nor keep it on screen.
+  static const _passengerLiveSeconds = 60;
+  Map<String, dynamic>? _passengerPoint;
+  Timer? _passengerTimer;
+  String? _passengerAge;
+
+  /// The customer's live point on the active ride, with a coarse age label.
+  ({LatLng point, String age})? get passengerLocation {
+    final p = _passengerPoint;
+    final ride = _activeRide;
+    if (p == null || ride == null || ride['id'] != p['booking_id']) return null;
+    if (ride['status'] != 'accepted' && ride['status'] != 'arrived') return null;
+    final age = _passengerAgeLabel(p);
+    if (age == null) return null;
+    return (point: LatLng(p['lat'] as double, p['lng'] as double), age: age);
+  }
+
+  static String? _passengerAgeLabel(Map<String, dynamic> p) {
+    final seconds = DateTime.now().difference(p['seen'] as DateTime).inSeconds;
+    if (seconds > _passengerLiveSeconds) return null;
+    return seconds < 10 ? 'updated just now' : 'updated ${seconds ~/ 10 * 10} s ago';
+  }
+
+  void _takePassengerPoint(dynamic bookingId, Map p, {bool reloaded = false}) {
+    final lat = (p['lat'] as num?)?.toDouble();
+    final lng = (p['lng'] as num?)?.toDouble();
+    if (bookingId == null || lat == null || lng == null) return;
+    final at = DateTime.tryParse(p['at']?.toString() ?? '');
+    final held = _passengerPoint;
+    if (held != null && held['booking_id'] == bookingId) {
+      final heldAt = held['at'] as DateTime?;
+      // A reload can return a point the live channel already delivered, or an
+      // older one if it raced a newer update.
+      if (heldAt != null && at != null && !at.isAfter(heldAt)) return;
+    }
+    var seen = DateTime.now();
+    // A reload can hand over a point that is already up to a minute old; use
+    // its server time when this phone's clock agrees with it.
+    if (reloaded && at != null) {
+      final age = seen.difference(at);
+      if (age > Duration.zero && age.inSeconds <= _passengerLiveSeconds) seen = at.toLocal();
+    }
+    _passengerPoint = {'booking_id': bookingId, 'lat': lat, 'lng': lng, 'at': at, 'seen': seen};
+    _passengerAge = _passengerAgeLabel(_passengerPoint!);
+    _passengerTimer ??= Timer.periodic(const Duration(seconds: 1), (_) {
+      final held = _passengerPoint;
+      final age = held == null ? null : _passengerAgeLabel(held);
+      if (age == null) {
+        _clearPassengerPoint();
+        notifyListeners();
+      } else if (age != _passengerAge) {
+        _passengerAge = age;
+        notifyListeners();
+      }
+    });
+    if (!reloaded) notifyListeners();
+  }
+
+  void _syncPassengerPoint(DateTime asked) {
+    final ride = _activeRide;
+    final held = _passengerPoint;
+    final sharing = ride != null && ride['passenger_sharing'] == true;
+    // Only a reply sent after the point arrived can say sharing has stopped.
+    if (held != null && !sharing && (held['seen'] as DateTime).isBefore(asked)) {
+      _clearPassengerPoint();
+    }
+    final p = ride?['passenger_location'];
+    if (sharing && p is Map) _takePassengerPoint(ride!['id'], p, reloaded: true);
+  }
+
+  void _clearPassengerPoint() {
+    _passengerPoint = null;
+    _passengerAge = null;
+    _passengerTimer?.cancel();
+    _passengerTimer = null;
+  }
+
   @override
   void dispose() {
+    _clearPassengerPoint();
     try {
       WakelockPlus.disable();
     } catch (_) {}

@@ -1096,6 +1096,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
     }
 
     final ride = driver.activeRide;
+    final passenger = driver.passengerLocation;
     final food = driver.activeFoodOrder;
     final market = driver.activeMarketOrder;
     final pending = driver.pendingRequest;
@@ -1313,6 +1314,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
                       size: 30,
                       label: 'Drop | ${ride['drop_address'] ?? ''}',
                     ),
+                    // The customer chose to share where she or he is (Phase 2, feature 01).
+                    if (passenger != null)
+                      pinMarker(
+                        point: passenger.point,
+                        icon: Icons.emoji_people_rounded,
+                        color: AppColors.success,
+                        size: 30,
+                        label: 'Customer | ${passenger.age}',
+                      ),
                   ],
                   if (ride == null && food != null) ...[
                     if (food['pickup_lat'] != null && food['pickup_lng'] != null)

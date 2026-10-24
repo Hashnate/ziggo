@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -10,7 +12,7 @@ import '../../core/network/ws_client.dart';
 import '../../core/notifications/fcm_service.dart';
 
 /// Drives the full ride lifecycle: estimate → create → track → rate.
-class BookingProvider extends ChangeNotifier {
+class BookingProvider extends ChangeNotifier with WidgetsBindingObserver {
   final WsClient _ws = WsClient();
   WsClient get ws => _ws;
 
@@ -429,6 +431,7 @@ class BookingProvider extends ChangeNotifier {
         }
       }
       notifyListeners();
+      unawaited(_resumeSharingIfOn());
     } catch (_) {}
 
     // Do not check pending rating automatically on loadActive to prevent unwanted popups on startup
@@ -551,6 +554,8 @@ class BookingProvider extends ChangeNotifier {
     _wsSub = null;
     _fcmSub = null;
     await _ws.disconnect();
+    _endSharing();
+    _shareStoppedBookingIds.clear();
     _activeBooking = null;
     _pendingRatingBooking = null;
     _lastError = null;
@@ -715,8 +720,261 @@ class BookingProvider extends ChangeNotifier {
     }
   }
 
+  // ---- Phase 2 feature 01 — share my live location with the driver ----
+  // Per booking and off until the customer turns it on. Points are sent only
+  // while the driver is on the way and the app is in the foreground; there is
+  // no background location. The backend keeps just the latest point and wipes
+  // it when the trip starts or ends.
+  static const _shareStatuses = {'accepted', 'arrived'};
+  static const _shareTick = Duration(seconds: 5);
+  static const _shareGapNearDriver = Duration(seconds: 15);
+  // Re-sent even when standing still, so the driver's map (which hides a point
+  // after 60 s) keeps showing the customer.
+  static const _shareHeartbeat = Duration(seconds: 20);
+  static const double _shareMinMoveMetres = 10;
+  static const double _nearDriverMetres = 20;
+  static const shareLocationOff = "Turn on your phone's location to share it with your driver.";
+  static const shareNoPermission = 'Allow Ziggo to use your location to share it with your driver.';
+
+  int? _sharingBookingId;
+  // Bookings the customer switched off here; a poll that raced the switch-off
+  // must not turn sharing back on.
+  final Set<int> _shareStoppedBookingIds = {};
+  bool _shareToggling = false;
+  Future<bool?>? _shareInFlight;
+  bool _observingLifecycle = false;
+  StreamSubscription<Position>? _sharePositionSub;
+  Timer? _shareTimer;
+  Position? _sharePosition;
+  Position? _shareSentPosition;
+  DateTime? _shareSentAt;
+
+  /// Rides (not parcels) whose driver is on the way to the pickup.
+  bool get canShareLocation {
+    final b = _activeBooking;
+    return b != null &&
+        b['is_flash'] != true &&
+        b['is_courier'] != true &&
+        _shareStatuses.contains(b['status']);
+  }
+
+  bool get sharingLocation =>
+      _sharingBookingId != null && _sharingBookingId == _activeBooking?['id'] && canShareLocation;
+
+  bool get shareToggling => _shareToggling;
+
+  /// Turns sharing on for the active ride. Returns null on success, else a
+  /// message for the customer.
+  Future<String?> startSharingLocation() async {
+    final b = _activeBooking;
+    if (b == null || !canShareLocation || sharingLocation || _shareToggling) return null;
+    final id = b['id'] as int;
+    _shareToggling = true;
+    notifyListeners();
+    try {
+      final problem = await _locationProblem(ask: true);
+      if (problem != null) return problem;
+      final p = await _freshPosition();
+      if (p == null) return 'Could not find your location. Please try again.';
+      final ok = await _postSharePoint(id, p);
+      if (ok == null) return 'Could not share your location. Check your connection.';
+      if (ok == false) return _lastError ?? 'Live location sharing is not available for this ride.';
+      _shareStoppedBookingIds.remove(id);
+      _sharePosition = p;
+      _shareSentPosition = p;
+      _shareSentAt = DateTime.now();
+      _runSharing(id);
+      return null;
+    } finally {
+      _shareToggling = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> stopSharingLocation() async {
+    final id = _sharingBookingId ?? _activeBooking?['id'] as int?;
+    final inFlight = _shareInFlight;
+    _endSharing();
+    if (id != null) _shareStoppedBookingIds.add(id);
+    notifyListeners();
+    if (id == null) return;
+    // A point already on its way must land before the stop, not after it.
+    if (inFlight != null) await inFlight;
+    try {
+      await ApiClient.instance.dio.delete('/bookings/$id/passenger-location');
+    } catch (_) {}
+  }
+
+  // The app was closed or restarted with sharing on for this ride: carry on,
+  // but never ask for permission without a tap.
+  Future<void> _resumeSharingIfOn() async {
+    final b = _activeBooking;
+    if (b == null || b['passenger_sharing'] != true || _sharingBookingId != null || _shareToggling) return;
+    final id = b['id'] as int;
+    if (!canShareLocation || _shareStoppedBookingIds.contains(id)) return;
+    _shareToggling = true;
+    final problem = await _locationProblem(ask: false);
+    _shareToggling = false;
+    if (_activeBooking?['id'] != id || !canShareLocation) return;
+    if (problem == null) {
+      _runSharing(id);
+      notifyListeners();
+    } else {
+      await stopSharingLocation();
+    }
+  }
+
+  Future<String?> _locationProblem({required bool ask}) async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) return shareLocationOff;
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied && ask) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm != LocationPermission.always && perm != LocationPermission.whileInUse) return shareNoPermission;
+      return null;
+    } catch (_) {
+      return 'Could not check location access on this phone.';
+    }
+  }
+
+  Future<Position?> _freshPosition() async {
+    try {
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+    } catch (_) {}
+    try {
+      final last = await Geolocator.getLastKnownPosition();
+      if (last != null && DateTime.now().difference(last.timestamp).inMinutes < 2) return last;
+    } catch (_) {}
+    return null;
+  }
+
+  /// true = sent, false = the server won't take points for this ride any
+  /// more (trip started, cancelled, …), null = network trouble, try again.
+  Future<bool?> _postSharePoint(int bookingId, Position p) async {
+    try {
+      await ApiClient.instance.dio.post(
+        '/bookings/$bookingId/passenger-location',
+        data: {'lat': p.latitude, 'lng': p.longitude},
+      );
+      return true;
+    } on DioException catch (e) {
+      final code = e.response?.statusCode;
+      if (code == null || code >= 500 || code == 429) return null;
+      final detail = e.response?.data;
+      _lastError = detail is Map ? detail['detail']?.toString() : null;
+      return false;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _runSharing(int bookingId) {
+    _sharingBookingId = bookingId;
+    if (!_observingLifecycle) {
+      WidgetsBinding.instance.addObserver(this);
+      _observingLifecycle = true;
+    }
+    final state = WidgetsBinding.instance.lifecycleState;
+    if (state == null || _isForeground(state)) _listenForShare();
+  }
+
+  static bool _isForeground(AppLifecycleState s) =>
+      s == AppLifecycleState.resumed || s == AppLifecycleState.inactive;
+
+  void _listenForShare() {
+    _sharePositionSub ??= Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 5,
+      ),
+    ).listen((p) => _sharePosition = p, onError: (_) {});
+    _shareTimer ??= Timer.periodic(_shareTick, (_) => _sendShareIfDue());
+  }
+
+  void _pauseShare() {
+    _sharePositionSub?.cancel();
+    _sharePositionSub = null;
+    _shareTimer?.cancel();
+    _shareTimer = null;
+    // Never send a pre-background fix as live after coming back.
+    _sharePosition = null;
+  }
+
+  void _endSharing() {
+    _sharingBookingId = null;
+    _pauseShare();
+    _shareSentPosition = null;
+    _shareSentAt = null;
+    if (_observingLifecycle) {
+      WidgetsBinding.instance.removeObserver(this);
+      _observingLifecycle = false;
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_sharingBookingId == null) return;
+    if (_isForeground(state)) {
+      _listenForShare();
+    } else {
+      _pauseShare();
+    }
+  }
+
+  Future<void> _sendShareIfDue() async {
+    final id = _sharingBookingId;
+    if (id == null) return;
+    if (!sharingLocation) {
+      // The ride ended, was cancelled or the trip started; the backend has
+      // already wiped the point.
+      _endSharing();
+      notifyListeners();
+      return;
+    }
+    final p = _sharePosition;
+    if (p == null || _shareInFlight != null) return;
+    final now = DateTime.now();
+    final last = _shareSentAt;
+    final sent = _shareSentPosition;
+    bool due;
+    if (last == null || sent == null || now.difference(last) >= _shareHeartbeat) {
+      due = true;
+    } else {
+      final moved = Geolocator.distanceBetween(sent.latitude, sent.longitude, p.latitude, p.longitude);
+      final gap = _driverIsNear(p) ? _shareGapNearDriver : _shareTick;
+      due = moved >= _shareMinMoveMetres && now.difference(last) >= gap;
+    }
+    if (!due) return;
+    final ok = await (_shareInFlight = _postSharePoint(id, p));
+    _shareInFlight = null;
+    if (_sharingBookingId != id) return;
+    if (ok == true) {
+      _shareSentAt = now;
+      _shareSentPosition = p;
+    } else if (ok == false) {
+      _endSharing();
+      notifyListeners();
+    }
+  }
+
+  bool _driverIsNear(Position p) {
+    final d = _activeBooking?['driver'];
+    if (d is! Map) return false;
+    final lat = d['current_lat'] as num?;
+    final lng = d['current_lng'] as num?;
+    if (lat == null || lng == null) return false;
+    return Geolocator.distanceBetween(p.latitude, p.longitude, lat.toDouble(), lng.toDouble()) <= _nearDriverMetres;
+  }
+
   @override
   void dispose() {
+    _endSharing();
     _wsSub?.cancel();
     _fcmSub?.cancel();
     _ws.dispose();
