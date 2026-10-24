@@ -15,7 +15,15 @@ from app.api.v1.driver import FemalePassengersOnlyRequest, set_female_passengers
 from app.database import AsyncSessionLocal, Base, engine
 from app.models import Customer, Driver, DriverStatus, User, UserRole
 from app.schemas import UserUpdate
-from app.services.gender_service import apply_nic_gender, gender_from_nic, set_admin_gender
+from app.services.gender_service import (
+    FEMALE_PASSENGERS_ONLY,
+    LADY_DRIVER_REQUESTED,
+    apply_nic_gender,
+    gender_from_nic,
+    refusal_for_driver,
+    set_admin_gender,
+)
+from app.services.matching_service import drivers_for_customer
 from app.services.schema_sync import _backfill_driver_genders
 
 PHONES = [f"07799900{i:02d}" for i in range(1, 7)]
@@ -45,6 +53,22 @@ PHONES = [f"07799900{i:02d}" for i in range(1, 7)]
 ])
 def test_gender_from_nic(nic, expected):
     assert gender_from_nic(nic) == expected
+
+
+@pytest.mark.parametrize("driver, fpo, customer, lady, expected", [
+    ("female", False, "female", True, None),
+    ("male", False, "female", True, LADY_DRIVER_REQUESTED),
+    (None, False, "female", True, LADY_DRIVER_REQUESTED),       # unknown gender is not a lady driver
+    ("male", False, "male", False, None),
+    ("female", True, "female", False, None),
+    ("female", True, "female", True, None),
+    ("female", True, "male", False, FEMALE_PASSENGERS_ONLY),
+    ("female", True, None, False, FEMALE_PASSENGERS_ONLY),       # customer who hasn't said is not female
+    ("male", True, "male", False, None),                        # the switch means nothing for a man
+    ("female", False, "male", False, None),
+])
+def test_who_may_take_a_ride(driver, fpo, customer, lady, expected):
+    assert refusal_for_driver(driver, fpo, customer, lady) == expected
 
 
 def _person(gender=None, source=None):
@@ -161,6 +185,24 @@ async def test_profiles_backfill_and_switch():
                 man = await db.get(User, people[PHONES[1]])
                 res = await set_female_passengers_only(FemalePassengersOnlyRequest(enabled=False), db, man)
                 assert res.female_passengers_only is False, "anyone can switch it off"
+
+                lady_d, man_d, ladmin_d = [
+                    (await db.execute(select(Driver).where(Driver.user_id == people[p]))).scalars().one()
+                    for p in (PHONES[0], PHONES[1], PHONES[2])
+                ]
+                lady_d.female_passengers_only = True
+                await db.commit()
+                pool = [lady_d, man_d, ladmin_d]  # ladmin: female NIC, but an admin made him male
+
+                async def offered(customer_gender, lady, passenger=True):
+                    return [d.id for d in await drivers_for_customer(db, pool, customer_gender, lady, passenger)]
+
+                assert await offered("female", True) == [lady_d.id], "lady driver ride: only the woman"
+                assert await offered("female", False) == [d.id for d in pool]
+                assert await offered("male", False) == [man_d.id, ladmin_d.id], "female-only lady skips a man"
+                assert await offered(None, False) == [man_d.id, ladmin_d.id], "and a customer with no gender"
+                assert await offered("male", False, passenger=False) == [d.id for d in pool], "parcels unchanged"
+                assert await drivers_for_customer(db, [], "female", True, True) == []
             finally:
                 await db.rollback()
                 await _clean(db)

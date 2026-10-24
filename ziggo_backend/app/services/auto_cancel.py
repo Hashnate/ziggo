@@ -24,6 +24,7 @@ from ..models import (
     SystemSettings,
 )
 from .ws_manager import manager
+from .gender_service import no_driver_payload, search_timeout_reason
 from .loyalty_service import refund_redeemed_points
 
 # Customer-visible timeout. 5 minutes matches the locked design decision.
@@ -172,7 +173,7 @@ async def _run_once() -> None:
                     .values(
                         status=BookingStatus.CANCELLED,
                         cancelled_by="system",
-                        cancellation_reason="No driver available within search window",
+                        cancellation_reason=search_timeout_reason(b),
                         cancelled_at=datetime.now(timezone.utc),
                     )
                     .execution_options(synchronize_session=False)
@@ -224,7 +225,7 @@ async def _run_once() -> None:
                     await manager.send(
                         c.user_id,
                         "no_drivers_available",
-                        {"booking_id": b.id, "booking_ref": b.booking_ref},
+                        no_driver_payload(b),
                     )
                     await manager.send(
                         c.user_id,
@@ -235,7 +236,9 @@ async def _run_once() -> None:
                         Notification(
                             user_id=c.user_id,
                             title="Ride search timed out",
-                            body="No nearby driver accepted the ride. Please try booking again.",
+                            body=("No lady driver accepted the ride. You can book again with any driver."
+                                  if b.lady_driver_requested
+                                  else "No nearby driver accepted the ride. Please try booking again."),
                             type="ride_update",
                             data=f'{{"booking_id":{b.id}}}',
                         )

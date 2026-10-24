@@ -44,7 +44,17 @@ from ...services.auth_service import get_current_user
 from ...services.district_service import district_for
 from ...services.finance_service import COMMISSION_BLOCK_MESSAGE, driver_blocked_for_commission
 from ...services.fare_service import calculate_fare, calculate_fares_bulk, to_decimal
+from ...services.gender_service import (
+    FEMALE,
+    LADY_DRIVER_FEMALE_ONLY,
+    LADY_DRIVER_RIDES_ONLY,
+    is_passenger_trip,
+    no_driver_payload,
+    refusal_for_driver,
+    search_timeout_reason,
+)
 from ...services.matching_service import (
+    drivers_for_customer,
     find_all_nearby_drivers,
     find_nearest_driver,
     can_driver_accept_ride,
@@ -82,6 +92,23 @@ async def get_search_radius_for_service(db: AsyncSession, service_type: Optional
         return ss.driver_search_radius_km
 
     return 15
+
+
+async def _lady_drivers_nearby(db: AsyncSession, lat: float, lng: float, service_type: str,
+                               is_rental: bool, customer_gender: Optional[str]) -> int:
+    """How many lady drivers a ride booked now would be offered to (same search as create_booking)."""
+    radius = await get_search_radius_for_service(db, service_type)
+    nearby = await find_all_nearby_drivers(db, lat, lng, service_type, max_distance_km=radius,
+                                           allow_back_to_back=not is_rental)
+    nearby = [d for d in nearby if getattr(d, "driver_type", "ride") == "ride"]
+    return len(await drivers_for_customer(db, nearby, customer_gender, True, True))
+
+
+async def _customer_gender(db: AsyncSession, customer_id: Optional[int]) -> Optional[str]:
+    if customer_id is None:
+        return None
+    q = await db.execute(select(User.gender).join(Customer, Customer.user_id == User.id).where(Customer.id == customer_id))
+    return q.scalar()
 
 
 async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingResponse:
@@ -201,6 +228,7 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
         driver_earnings=float(b.driver_earnings) if b.driver_earnings is not None else 0.0,
         waiting_charge=float(b.waiting_charge or 0.0),
         is_driver_completing_prior_trip=is_driver_completing_prior_trip,
+        lady_driver_requested=bool(b.lady_driver_requested),
         stops=[
             {
                 "order_index": s.order_index,
@@ -512,6 +540,9 @@ async def estimate_fare(
     # FareEstimateResponse doesn't carry rental_hours/hourly_rate; strip them.
     fare.pop("hourly_rate", None)
     fare.pop("rental_hours", None)
+    if req.lady_driver and is_passenger_trip(req.is_flash, req.is_courier):
+        fare["lady_drivers_nearby"] = await _lady_drivers_nearby(
+            db, req.pickup_lat, req.pickup_lng, req.service_type, req.is_rental, user.gender)
     return FareEstimateResponse(service_type=req.service_type, **fare)
 
 
@@ -548,6 +579,10 @@ async def estimate_fare_bulk(
         redeem_points=req.redeem_points or 0,
         stops=[s.model_dump() for s in (req.stops or [])],
     )
+    if req.lady_driver and is_passenger_trip(req.is_flash, req.is_courier):
+        for st, r in results.items():
+            r["lady_drivers_nearby"] = await _lady_drivers_nearby(
+                db, req.pickup_lat, req.pickup_lng, st, req.is_rental, user.gender)
     return results
 
 
@@ -578,6 +613,11 @@ async def create_booking(
             status_code=400,
             detail="Intermediate stops are not supported on flash, courier or rental bookings",
         )
+    if req.lady_driver:
+        if not is_passenger_trip(req.is_flash, req.is_courier):
+            raise HTTPException(status_code=400, detail=LADY_DRIVER_RIDES_ONLY)
+        if user.gender != FEMALE:
+            raise HTTPException(status_code=400, detail=LADY_DRIVER_FEMALE_ONLY)
 
     fare = await calculate_fare(
         db,
@@ -713,6 +753,7 @@ async def create_booking(
         deductions=to_decimal(fare.get("deductions", 0)),
         scheduled_at=req.scheduled_time,
         scheduled_dispatch_sent=False,
+        lady_driver_requested=bool(req.lady_driver),
     )
     db.add(booking)
     await db.flush()
@@ -793,6 +834,10 @@ async def create_booking(
                     continue
                 filtered.append(d)
             nearby = filtered
+        nearby = await drivers_for_customer(
+            db, nearby, user.gender, booking.lady_driver_requested,
+            is_passenger_trip(booking.is_flash, booking.is_courier),
+        )
     if booking.is_courier:
         n_title = "New courier delivery"
         n_body = (
@@ -849,6 +894,7 @@ async def create_booking(
         "rental_hours": booking.rental_hours,
         "is_courier": bool(booking.is_courier),
         "courier_eta_days": booking.courier_eta_days,
+        "lady_driver_requested": bool(booking.lady_driver_requested),
         # BRD: CD-19 — intermediate stops so the driver popup can render them
         "stop_count": booking.stop_count or 0,
         "stops": [
@@ -894,7 +940,7 @@ async def create_booking(
             await manager.send(
                 user.id,
                 "no_drivers_available",
-                {"booking_id": booking.id, "booking_ref": booking.booking_ref},
+                no_driver_payload(booking),
             )
 
     # Bump promo usage if applied
@@ -1209,7 +1255,7 @@ async def get_active_booking(
                 .values(
                     status=BookingStatus.CANCELLED,
                     cancelled_by="system",
-                    cancellation_reason="No driver available within search window",
+                    cancellation_reason=search_timeout_reason(b),
                     cancelled_at=now_utc,
                 )
                 .execution_options(synchronize_session=False)
@@ -1402,6 +1448,11 @@ async def accept_booking(
             status_code=409,
             detail="This ride has already been taken or cancelled",
         )
+    if is_passenger_trip(b.is_flash, b.is_courier) and (b.lady_driver_requested or driver.female_passengers_only):
+        refusal = refusal_for_driver(user.gender, driver.female_passengers_only,
+                                     await _customer_gender(db, b.customer_id), b.lady_driver_requested)
+        if refusal:
+            raise HTTPException(status_code=403, detail=refusal)
 
     # Dispatch already skips busy drivers, but a request can be in flight when
     # the driver picks up another job — support back-to-back rides if driver is mid-trip (STARTED).
@@ -1683,6 +1734,35 @@ async def _load_booking_for_driver(db: AsyncSession, user: User, booking_id: int
     if b.driver_id != d.id:
         raise HTTPException(status_code=403, detail="Not your booking")
     return b
+
+
+@router.post("/{booking_id}/any-driver", response_model=BookingResponse)
+async def switch_to_any_driver(
+    booking_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """No lady driver has taken the ride: offer it to every nearby driver instead,
+    restarting the search (Phase 2, feature 03)."""
+    customer = await _get_customer(db, user)
+    q = await db.execute(
+        select(Booking)
+        .options(selectinload(Booking.stops), selectinload(Booking.customer).selectinload(Customer.user))
+        .where(Booking.id == booking_id, Booking.customer_id == customer.id)
+    )
+    b = q.scalars().first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    if b.status != BookingStatus.SEARCHING:
+        raise HTTPException(status_code=409, detail="This ride is no longer looking for a driver")
+    if b.lady_driver_requested:
+        b.lady_driver_requested = False
+        if b.scheduled_at is not None and not b.scheduled_dispatch_sent:
+            await db.commit()
+        else:
+            from ...services.scheduled_dispatch import dispatch_booking
+            await dispatch_booking(db, b)
+    return await _booking_to_response(db, b)
 
 
 @router.post("/{booking_id}/stops/{order_index}/arrive")
@@ -2112,6 +2192,10 @@ async def update_booking_status(
             dispatch_vehicle,
             max_distance_km=max_radius,
             exclude_driver_id=None,
+        )
+        nearby = await drivers_for_customer(
+            db, nearby, await _customer_gender(db, b.customer_id), b.lady_driver_requested,
+            is_passenger_trip(b.is_flash, b.is_courier),
         )
         for nd in nearby:
             reason_msg = f" Reason: {b.cancellation_reason}" if b.cancellation_reason else ""

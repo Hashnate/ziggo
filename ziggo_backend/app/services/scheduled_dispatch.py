@@ -6,13 +6,16 @@ from sqlalchemy.orm import selectinload
 from ..database import AsyncSessionLocal
 from ..models import Booking, BookingStatus, Notification, Customer, Driver, User
 from .ws_manager import manager
-from .matching_service import find_all_nearby_drivers
+from .gender_service import is_passenger_trip, no_driver_payload
+from .matching_service import drivers_for_customer, find_all_nearby_drivers
 from ..api.v1.bookings import get_search_radius_for_service
 
 TICK_SECONDS = 30
 LEAD_TIME_MINUTES = 10
 
-async def _dispatch_booking(db, booking: Booking) -> None:
+async def dispatch_booking(db, booking: Booking) -> None:
+    """Offer a booking to every eligible nearby driver now. Used at a scheduled
+    ride's dispatch time, and when a customer switches a lady-driver ride to any driver."""
     # Mark as sent immediately so we don't duplicate dispatch on network delay.
     # dispatch_started_at is what the 120s search timeout is measured from —
     # booked_at is when the customer scheduled the ride, which may be days ago.
@@ -55,6 +58,10 @@ async def _dispatch_booking(db, booking: Booking) -> None:
                 continue
             filtered.append(d)
         nearby = filtered
+    nearby = await drivers_for_customer(
+        db, nearby, customer_user.gender if customer_user else None, booking.lady_driver_requested,
+        is_passenger_trip(booking.is_flash, booking.is_courier),
+    )
 
     if booking.is_courier:
         n_title = "New courier delivery"
@@ -112,6 +119,7 @@ async def _dispatch_booking(db, booking: Booking) -> None:
         "rental_hours": booking.rental_hours,
         "is_courier": bool(booking.is_courier),
         "courier_eta_days": booking.courier_eta_days,
+        "lady_driver_requested": bool(booking.lady_driver_requested),
         "stop_count": booking.stop_count or 0,
         "stops": [
             {
@@ -142,7 +150,7 @@ async def _dispatch_booking(db, booking: Booking) -> None:
             await manager.send(
                 customer_user.id,
                 "no_drivers_available",
-                {"booking_id": booking.id, "booking_ref": booking.booking_ref},
+                no_driver_payload(booking),
             )
 
     # Commit the driver notifications
@@ -176,7 +184,7 @@ async def _run_once() -> None:
         due_bookings = q.scalars().all()
         for b in due_bookings:
             try:
-                await _dispatch_booking(db, b)
+                await dispatch_booking(db, b)
             except Exception as e:
                 print(f"[scheduled_dispatch] Failed to dispatch {b.booking_ref}: {e!r}")
 

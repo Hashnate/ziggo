@@ -146,6 +146,7 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("users", "gender", "VARCHAR(10)"),
     ("users", "gender_source", "VARCHAR(10)"),
     ("drivers", "female_passengers_only", "BOOLEAN NOT NULL DEFAULT FALSE"),
+    ("bookings", "lady_driver_requested", "BOOLEAN NOT NULL DEFAULT FALSE"),
 )
 
 

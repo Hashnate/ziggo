@@ -121,6 +121,9 @@ class Booking(Base):
     # Commission-free launch location this trip was booked in (Phase 2, feature 02).
     # Re-pricing keeps the decision made at booking, even after the period ends.
     launch_location_id = Column(Integer, nullable=True)
+    # The customer asked for a lady driver (Phase 2, feature 03). Cleared if she
+    # switches to any driver while searching.
+    lady_driver_requested = Column(Boolean, nullable=False, default=False)
 
     # Rental / vehicle-hire fields. is_rental=True means the customer hires a
     # vehicle for `rental_hours` and the fare is hourly_rate * hours (no drop

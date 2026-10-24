@@ -39,6 +39,8 @@ class FareEstimateRequest(BaseModel):
     # BRD: CD-19 — up to N intermediate stops (server clamps to admin limit)
     stops: List[StopRequest] = Field(default_factory=list)
     packages: List[PackageRequest] = Field(default_factory=list)
+    # Phase 2, feature 03 — the reply then says how many lady drivers are nearby.
+    lady_driver: bool = False
 
 
 class BulkFareEstimateRequest(BaseModel):
@@ -57,6 +59,7 @@ class BulkFareEstimateRequest(BaseModel):
     redeem_points: int = 0
     stops: List[StopRequest] = Field(default_factory=list)
     packages: List[PackageRequest] = Field(default_factory=list)
+    lady_driver: bool = False
 
 
 class FareEstimateResponse(BaseModel):
@@ -98,6 +101,8 @@ class FareEstimateResponse(BaseModel):
     commission_free: Optional[str] = None
     launch_location_id: Optional[int] = None
     commission_waived: Optional[float] = None
+    # Phase 2, feature 03 — only when the estimate asked for a lady driver
+    lady_drivers_nearby: Optional[int] = None
 
 
 class BookingCreate(BaseModel):
@@ -130,6 +135,8 @@ class BookingCreate(BaseModel):
     # BRD: CD-19 — up to N intermediate stops (server clamps to admin limit)
     stops: List[StopRequest] = Field(default_factory=list)
     scheduled_time: Optional[datetime] = None
+    # Phase 2, feature 03 — female customers, rides only
+    lady_driver: bool = False
 
 
 class DriverMini(BaseModel):
@@ -234,6 +241,7 @@ class BookingResponse(BaseModel):
 
     # Back-to-back indicator
     is_driver_completing_prior_trip: bool = False
+    lady_driver_requested: bool = False
 
     class Config:
         from_attributes = True

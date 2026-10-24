@@ -1338,6 +1338,7 @@ async def get_pending_request(
             "customer_phone": cu.phone_number if cu else "",
             "expires_in_seconds": remaining,
             "is_flash": bool(b.is_flash),
+            "lady_driver_requested": bool(b.lady_driver_requested),
             "parcel_type": b.parcel_type,
             "parcel_weight_kg": float(b.parcel_weight_kg) if b.parcel_weight_kg else None,
             "receiver_name": b.receiver_name,
