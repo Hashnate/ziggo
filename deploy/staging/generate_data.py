@@ -195,7 +195,15 @@ async def add_user(db, phone, role, name, joined, admin_role=None, password=None
     return user
 
 
-async def add_driver(db, n: int, phone: str, name: str, vtype, status, driver_type="ride", home=None):
+def synthetic_nic(n: int, female: bool) -> str:
+    """A made-up NIC in the new 12-digit format: year, day of year (+500 for women), serial.
+    No randomness, so the rest of the generated data stays the same."""
+    day = 1 + (n * 37) % 365 + (500 if female else 0)
+    return f"{1975 + n % 30}{day:03d}{n:05d}"
+
+
+async def add_driver(db, n: int, phone: str, name: str, vtype, status, driver_type="ride", home=None,
+                     female=None):
     joined = joined_at()
     user = await add_user(db, phone, UserRole.DRIVER, name, joined)
     home = home or weighted(DISTRICT_WEIGHTS)
@@ -205,7 +213,7 @@ async def add_driver(db, n: int, phone: str, name: str, vtype, status, driver_ty
         _, lat, lng = town(home)
         driver.vehicle_type = vtype
         driver.vehicle_number = f"STG-{n:04d}"
-        driver.nic_number = f"STGNIC{n:05d}"
+        driver.nic_number = synthetic_nic(n, n % 4 == 0 if female is None else female)
         driver.license_number = f"STGLIC{n:05d}"
         driver.vehicle_model = rng.choice(MODELS.get(vtype, ["Generic"]))
         driver.vehicle_color = rng.choice(COLOURS)
@@ -271,7 +279,7 @@ async def main() -> None:
                 test_customer = cust
 
         # Drivers: approved fleet by vehicle mix, delivery riders, pending and suspended
-        # registrations, and six known test drivers.
+        # registrations, and six known test drivers. Every 4th driver and test driver 1 are women.
         ride_drivers, home_of, test_drivers = defaultdict(list), {}, {}
         n = 0
         for vtype, count in FLEET.items():
@@ -295,7 +303,7 @@ async def main() -> None:
         for k, vtype in enumerate([t for t in TEST_DRIVER_TYPES if t in active][:6], start=1):
             n += 1
             driver, home = await add_driver(db, n, f"077100000{k}", f"Test Driver {k} ({vtype})", vtype,
-                                            DriverStatus.APPROVED, home="Colombo")
+                                            DriverStatus.APPROVED, home="Colombo", female=k == 1)
             ride_drivers[vtype].append(driver)
             home_of[driver.id] = home
             test_drivers[vtype] = driver
