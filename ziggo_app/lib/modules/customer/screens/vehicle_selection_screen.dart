@@ -577,7 +577,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
     final selected = await Navigator.push<String>(
       context,
       MaterialPageRoute(
-        builder: (_) => PromotionsSelectionScreen(currentPromo: _promo),
+        builder: (_) => PromotionsSelectionScreen(currentPromo: _promo, category: 'rides'),
       ),
     );
     if (selected != null && mounted) {
@@ -775,6 +775,17 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
   }
 
   bool _hidePromoBanner = false;
+
+  // The fare estimate says, per vehicle, why the chosen code isn't applied.
+  String? get _promoMessage {
+    if (_promo.isEmpty || _serviceType == null) return null;
+    return _estimates[_serviceType]?['promo_message']?.toString();
+  }
+
+  Color get _promoColor {
+    if (_promo.isEmpty) return AppColors.primary;
+    return _promoMessage != null ? AppColors.error : AppColors.success;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1081,9 +1092,12 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.local_offer_rounded, color: _promo.isNotEmpty ? AppColors.success : AppColors.primary, size: 18),
+                                  Icon(Icons.local_offer_rounded, color: _promoColor, size: 18),
                                   const SizedBox(width: 8),
-                                  Text(_promo.isNotEmpty ? 'Applied' : 'Add Promo', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: _promo.isNotEmpty ? AppColors.success : AppColors.primary)),
+                                  Text(
+                                    _promo.isEmpty ? 'Add Promo' : (_promoMessage != null ? 'Not applied' : 'Applied'),
+                                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: _promoColor),
+                                  ),
                                 ],
                               ),
                             ),
@@ -1093,6 +1107,23 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                     ),
                   ),
                   
+                  if (_promoMessage != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline_rounded, color: AppColors.error, size: 16),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '$_promo: ${_promoMessage!}',
+                              style: const TextStyle(color: AppColors.error, fontSize: 12, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
                   if (widget.isTruckMode)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

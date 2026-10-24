@@ -139,11 +139,7 @@ class _PromoCard extends StatelessWidget {
   }
 
   List<Widget> _metaChips(Map<String, dynamic> p) {
-    final chips = <Widget>[];
-    final min = p['min_order_amount'] as num?;
-    if (min != null && min > 0) {
-      chips.add(_chip('Min Rs.${min.toStringAsFixed(0)}'));
-    }
+    final chips = <Widget>[for (final rule in promoRules(p)) _chip(rule)];
     final validTo = p['valid_to']?.toString();
     if (validTo != null && validTo.isNotEmpty) {
       try {

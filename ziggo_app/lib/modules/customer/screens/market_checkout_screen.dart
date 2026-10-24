@@ -13,8 +13,10 @@ import '../market_provider.dart';
 import '../promos_provider.dart';
 import '../wallet_provider.dart';
 import '../payment_methods_provider.dart';
+import '../widgets/promo_code_tile.dart';
 import 'market_tracking_screen.dart';
 import 'payment_methods_screen.dart';
+import 'promotions_selection_screen.dart';
 
 class MarketCheckoutScreen extends StatefulWidget {
   const MarketCheckoutScreen({super.key});
@@ -30,6 +32,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
   bool _busy = false;
   bool _usePoints = false;
   bool _isSelfPickup = false;
+  final _promoCheck = PromoCheck();
   final _instructionsCtrl = TextEditingController();
 
   @override
@@ -131,7 +134,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
       final int balance = promos.points;
 
       if (valPerPoint > 0) {
-        double subtotal = market.cartTotal + (_isSelfPickup ? 0.0 : ((market.quote?['delivery_fee'] as num?)?.toDouble() ?? 0.0)) + appUsageCharge;
+        double subtotal = market.cartTotal + (_isSelfPickup ? 0.0 : ((market.quote?['delivery_fee'] as num?)?.toDouble() ?? 0.0)) + appUsageCharge - _promoCheck.discount(market.pendingPromoCode ?? '');
         double maxDiscount = subtotal * (maxPct / 100.0);
         int allowed = balance;
         double allowedVal = allowed * valPerPoint;
@@ -189,8 +192,14 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
     final deliveryFee = _isSelfPickup ? 0.0 : ((quote?['delivery_fee'] as num?)?.toDouble() ?? 0.0);
     final appUsagePct = _isSelfPickup ? ((promos.loyalty['self_pickup_app_usage_charge'] as num?)?.toDouble() ?? 5.0) : 0.0;
     final appUsageCharge = _isSelfPickup ? (p.cartTotal * (appUsagePct / 100.0)) : 0.0;
+    final promoCode = p.pendingPromoCode ?? '';
+    _promoCheck.keepFresh(context, promoCode, 'market', p.cartTotal, () {
+      if (mounted) setState(() {});
+    });
+    final promoDiscount = _promoCheck.discount(promoCode);
 
-    double total = p.cartTotal + ((hasAddress && !_isSelfPickup) ? deliveryFee : 0.0) + appUsageCharge;
+    double total = p.cartTotal + ((hasAddress && !_isSelfPickup) ? deliveryFee : 0.0) + appUsageCharge - promoDiscount;
+    if (total < 0) total = 0;
     int maxRedeemablePoints = 0;
     double potentialDiscount = 0.0;
     double discount = 0.0;
@@ -559,6 +568,21 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
               ),
             ),
           ),
+          _section(
+            'PROMO CODE',
+            PromoCodeTile(
+              code: promoCode,
+              check: _promoCheck,
+              onTap: () async {
+                final code = await Navigator.push<String>(
+                  context,
+                  MaterialPageRoute(builder: (_) => PromotionsSelectionScreen(currentPromo: promoCode, category: 'market')),
+                );
+                if (code != null && mounted) p.setPromoCode(code.toUpperCase());
+              },
+              onClear: () => p.setPromoCode(null),
+            ),
+          ),
           if (promos.isLoyaltyActive && maxRedeemablePoints > 0)
             _section(
               'LOYALTY POINTS',
@@ -658,6 +682,8 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
                 ],
                 if (_isSelfPickup && appUsageCharge > 0)
                   _row('App usage charge', 'Rs.${appUsageCharge.toStringAsFixed(0)}'),
+                if (promoDiscount > 0)
+                  _row('Promo ($promoCode)', '-Rs.${promoDiscount.toStringAsFixed(0)}', color: AppColors.success),
                 if (_usePoints && discount > 0)
                   _row('Points Discount', '-Rs.${discount.toStringAsFixed(0)}', color: AppColors.success),
                 const Divider(height: 16),

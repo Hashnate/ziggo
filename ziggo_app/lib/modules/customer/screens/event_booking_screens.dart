@@ -10,6 +10,7 @@ import '../../../app/app_styles.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../../core/network/api_client.dart';
+import '../widgets/promo_code_tile.dart';
 
 
 String _money(num v) => 'LKR ${NumberFormat('#,##0').format(v)}';
@@ -430,6 +431,7 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
 
   String _paymentMethod = 'card'; // card | wallet
   String? _promoCode;
+  final _promoCheck = PromoCheck();
   bool _agreed = false;
   bool _busy = false;
 
@@ -467,9 +469,11 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
     return s;
   }
 
+  double get _promoDiscount => _promoCheck.discount(_promoCode ?? '');
+
   // Mirror the backend: 1% convenience fee on the (discounted) subtotal.
-  double get _convenienceFee => (_subtotal * 0.01);
-  double get _total => _subtotal + _convenienceFee;
+  double get _convenienceFee => ((_subtotal - _promoDiscount) * 0.01);
+  double get _total => _subtotal - _promoDiscount + _convenienceFee;
 
   String get _timerLabel {
     final m = (_remaining ~/ 60).toString().padLeft(2, '0');
@@ -528,6 +532,9 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
   Widget build(BuildContext context) {
     final ev = widget.event;
     final startsAt = DateTime.tryParse(ev['starts_at']?.toString() ?? '')?.toLocal();
+    _promoCheck.keepFresh(context, _promoCode ?? '', 'events', _subtotal, () {
+      if (mounted) setState(() {});
+    });
     return Scaffold(
       backgroundColor: const Color(0xFFF1F2F4),
       appBar: AppBar(
@@ -689,6 +696,10 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
                   ),
                 const SizedBox(height: 8),
                 _row('Subtotal', NumberFormat('#,##0.00').format(_subtotal)),
+                if (_promoDiscount > 0) ...[
+                  const SizedBox(height: 8),
+                  _row('Promo ($_promoCode)', '-${NumberFormat('#,##0.00').format(_promoDiscount)}'),
+                ],
                 const SizedBox(height: 8),
                 _row('Convenience Fee', '+${NumberFormat('#,##0.00').format(_convenienceFee)}', info: true),
               ],
@@ -833,13 +844,13 @@ class _EventSummaryScreenState extends State<EventSummaryScreen> {
                             Text(
                               _promoCode == null || _promoCode!.isEmpty
                                   ? '4 promotions available'
-                                  : 'Applied: $_promoCode',
+                                  : '$_promoCode · ${_promoCheck.status(_promoCode!)}',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
                                 color: _promoCode == null || _promoCode!.isEmpty
                                     ? const Color(0xFF22C55E)
-                                    : AppColors.textPrimary,
+                                    : _promoCheck.statusColor(_promoCode!),
                               ),
                             ),
                           ],
