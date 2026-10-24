@@ -139,7 +139,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 | `/api/v1/market`        | [app/api/v1/market.py](ziggo_backend/app/api/v1/market.py)     | vendors list, products, orders                     |
 | `/api/v1/admin`         | [app/api/v1/admin.py](ziggo_backend/app/api/v1/admin.py)       | stats, create/approve/suspend drivers (JSON)       |
 | `/api/v1` (misc)        | [app/api/v1/misc.py](ziggo_backend/app/api/v1/misc.py)         | promos, complaints, gold subscription              |
-| `/ws`                   | [app/api/v1/ws.py](ziggo_backend/app/api/v1/ws.py)             | JWT-authed WebSocket (`?token=<jwt>`)              |
+| `/ws`                   | [app/api/v1/ws.py](ziggo_backend/app/api/v1/ws.py)             | JWT-authed WebSocket (`?token=<jwt>`); admin cookie channels `/ws/admin` (Live Tracking) and `/ws/admin/customers` (Customer Map, superadmin/admin only) |
 | `/admin/*`              | [ziggo_admin_panel/routes.py](ziggo_admin_panel/routes.py) | Jinja2 admin UI (cookie session via itsdangerous)  |
 
 ### Auth model
@@ -188,6 +188,10 @@ A `Booking` row with `is_flash=True`. Same state machine, but requires `receiver
 | `new_ride_request`     | driver   | full booking summary + customer name/phone + 30s expiry + `lady_driver_requested` |
 | `booking_update`       | both     | `booking_id`, `status` (string)                               |
 | `no_drivers_available` | customer | `booking_id`, `booking_ref` (+ `lady_driver`, `message` when no lady driver was found) |
+| `passenger_location_update` | driver | `booking_id`, `lat`, `lng`, `at` — the customer's shared point while the driver is on the way |
+| `passenger_location_stopped` | driver | `booking_id` — the customer switched sharing off |
+| `customer_location_update` | admins on `/ws/admin/customers` | `booking_id`, `lat`, `lng`, `at`, `customer_id`, `status` (no name or phone) |
+| `customer_location_stopped` | admins on `/ws/admin/customers` | `booking_id` |
 
 Customer dispatch: when a booking is created, **every** available online, approved driver within the search radius gets `new_ride_request` at once (`find_all_nearby_drivers`). Rides go only to the booked vehicle type, flash and courier parcels to any type, and a driver about to finish a nearby trip can get a ride as a back-to-back request. The first to accept (`POST /bookings/{id}/accept`) wins, and the others get `ride_taken`.
 
@@ -198,6 +202,15 @@ Customer dispatch: when a booking is created, **every** available online, approv
 - **Every place that offers or hands a ride to a driver must apply the rule**: `matching_service.drivers_for_customer` / `gender_service.refusal_for_driver`. Today that is `create_booking`, `scheduled_dispatch.dispatch_booking`, the cancelled-ride notice to nearby drivers and accept (403). Scan-and-go is deliberately not filtered (the driver picks the passenger in person). A new dispatch path needs it too.
 - No lady driver: the customer gets `no_drivers_available` with `lady_driver` + `message`, and `POST /bookings/{id}/any-driver` re-dispatches to everyone and restarts the search clock.
 - Staging checks: `deploy/staging/gender_checks.py`, `deploy/staging/lady_driver_checks.py`.
+
+### Customer live location and the Customer Map (see [app/services/passenger_location_service.py](ziggo_backend/app/services/passenger_location_service.py))
+
+- On a ride (not a parcel) waiting for pickup, the customer can switch on "Share my live location with driver". It is per booking and off by default. The app sends points only while it is in the foreground (`BookingProvider` sharing section: every 5 s when moved 10 m, a 20 s heartbeat) to `POST /bookings/{id}/passenger-location`; `DELETE` stops it. 400 for parcels, 409 once the trip has started.
+- Only the latest point is kept, on the booking (`bookings.passenger_sharing`, `passenger_lat`/`_lng`, `passenger_location_at`); there is no trail. It goes to the accepting driver (`passenger_location_update`) and to the admin Customer Map channel. `BookingResponse.passenger_location` carries it only while fresh (`LIVE_SECONDS` = 60).
+- **The point is wiped** when the trip starts or ends (`update_booking_status`), on a search timeout (poll and `auto_cancel`), on `DELETE`, and by the `auto_cancel` sweep (`forget_stale`, every 30 s) for anything no longer waiting or not updated for 10 minutes. A new path that ends a booking should call `passenger_location_service.clear` too; the sweep only catches it later.
+- The driver app shows it as a green "Customer | updated N s ago" marker beside the pickup (`DriverProvider.passengerLocation`), hidden after 60 s.
+- **Admin Customer Map** (`/admin/customer-map`, [customer_map_service.py](ziggo_backend/app/services/customer_map_service.py)), superadmin and admin only (data entry is refused, and so is its WebSocket). Active trips are drawn at the fresh shared point, else the pickup, or the driver once under way. Every other customer who has booked sits at the pickup of the latest booking, coloured by a 0-100 score of how recently the last ride (not parcel) was completed: 100 today, 0 at `SCORE_DAYS` (60) days or never. The feed has no phones; `POST /admin/customer-map/customers/{id}/phone` returns one and writes `admin_phone_reveals` (who, which customer, booking, when), which super admins see on the page.
+- Staging checks: `deploy/staging/customer_location_checks.py`, `deploy/staging/customer_map_checks.py`.
 
 ### Database
 
@@ -318,7 +331,7 @@ Material 3, royal-blue brand seed in [app_colors.dart](ziggo_app/lib/app/app_col
 - **`Booking.is_flash` index split**: `/admin/bookings` filters `is_flash == False`, `/admin/flash` filters `is_flash == True`. Anything booking-listing-related on the admin side has to honor this split.
 - **Schemas mismatch with model fields**: some response models (e.g. `FoodOrderResponse`) don't include `items` even though the model has them. Re-check the schema before assuming a field is round-tripped.
 - **Places**: the backend stores lat/lng plus free-form address strings everywhere; the app's place search uses Google Places (`core/map/maps_service.dart`) plus the static POIs in `core/map/places.dart`.
-- **Tests**: the backend's only automated tests are the fare golden tests in `ziggo_backend/tests/`, run with `deploy/staging/run-backend-tests.sh`. `ziggo_app/test/` is still the default Flutter scaffold. Verify anything else by running it on staging (test.ziggo.lk) and exercising the endpoint.
+- **Tests**: the backend tests in `ziggo_backend/tests/` (fare golden, districts, launch locations, genders, customer location, Customer Map) run with `deploy/staging/run-backend-tests.sh`; `deploy/staging/*_checks.py` exercise staging end to end. `ziggo_app/test/` is still the default Flutter scaffold, so app changes are only compiled by the staging APK build; try them on a phone.
 
 ---
 
