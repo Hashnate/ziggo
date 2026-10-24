@@ -124,6 +124,13 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("system_settings", "app_app_store_url", "VARCHAR(255) NOT NULL DEFAULT 'https://apps.apple.com/app/ziggo-app/id6778739956'"),
     ("bookings", "packages", "JSON"),
     ("driver_payouts", "kind", "VARCHAR(30)"),
+    ("promo_codes", "per_customer_limit", "INTEGER"),
+    ("promo_codes", "new_customers_only", "BOOLEAN NOT NULL DEFAULT FALSE"),
+    ("promo_codes", "vehicle_types", "VARCHAR(255)"),
+    ("promo_codes", "return_use_on_cancel", "BOOLEAN NOT NULL DEFAULT FALSE"),
+    ("food_orders", "promo_code", "VARCHAR(50)"),
+    ("market_orders", "promo_code", "VARCHAR(50)"),
+    ("event_orders", "promo_code", "VARCHAR(50)"),
 )
 
 

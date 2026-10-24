@@ -147,17 +147,19 @@ async def list_active_promos(
 ):
     """Promotions inbox.
 
-    Shows every redeemable promo (active, in-date, under-limit). When the
-    caller is a customer, each row carries a `claimed_at` so the app can
-    badge saved ones. `category` filters by surface (rides/food/market/all)
+    Shows every promo this caller can redeem right now (active, in-date,
+    under its limits, and new-customers-only ones only to new customers).
+    When the caller is a customer, each row carries a `claimed_at` so the app
+    can badge saved ones. `category` filters by surface (rides/food/market/all)
     and `only_claimed=true` restricts to promos the customer has saved.
     """
+    from ...services.promo_service import usable_promo
+
     now = datetime.now(timezone.utc)
     where_clauses = [
         PromoCode.is_active == True,  # noqa: E712
         (PromoCode.valid_from == None) | (PromoCode.valid_from <= now),  # noqa: E711
         (PromoCode.valid_to == None) | (PromoCode.valid_to >= now),  # noqa: E711
-        (PromoCode.usage_limit == None) | (PromoCode.used_count < PromoCode.usage_limit),  # noqa: E711
     ]
     if category and category != "all":
         where_clauses.append(PromoCode.category.in_(["all", category]))
@@ -167,6 +169,7 @@ async def list_active_promos(
 
     # Attach claimed_at for the requesting customer (if any).
     claimed_map: dict[int, datetime] = {}
+    customer = None
     if user.role == UserRole.CUSTOMER:
         customer = await _customer_or_none(db, user)
         if customer:
@@ -179,6 +182,8 @@ async def list_active_promos(
     out = []
     for p in promos:
         if only_claimed and p.id not in claimed_map:
+            continue
+        if not await usable_promo(db, p.code, p.category or "all", customer.id if customer else None):
             continue
         out.append(PromoCodeResponse(
             id=p.id, code=p.code, description=p.description,

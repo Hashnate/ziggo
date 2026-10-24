@@ -477,10 +477,11 @@ async def estimate_fare(
     user: User = Depends(get_current_user),
 ):
     # Customer is only needed when the estimate also previews a points
-    # redemption. Avoid lazy-loading it through the User relationship —
-    # async SQLAlchemy refuses that and we don't need it for plain estimates.
+    # redemption or a promo code (per-customer promo rules). Avoid lazy-loading
+    # it through the User relationship — async SQLAlchemy refuses that and we
+    # don't need it for plain estimates.
     customer = None
-    if (req.redeem_points or 0) > 0:
+    if (req.redeem_points or 0) > 0 or (req.promo_code and user.role == UserRole.CUSTOMER):
         customer = await _get_customer(db, user)
     fare = await calculate_fare(
         db,
@@ -514,7 +515,7 @@ async def estimate_fare_bulk(
     user: User = Depends(get_current_user),
 ):
     customer = None
-    if (req.redeem_points or 0) > 0:
+    if (req.redeem_points or 0) > 0 or (req.promo_code and user.role == UserRole.CUSTOMER):
         customer = await _get_customer(db, user)
         
     service_types = list(req.service_types or [])

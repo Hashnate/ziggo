@@ -603,10 +603,9 @@ async def create_food_order(
     promo_discount = Decimal("0")
     promo_code_applied = None
     if body.promo_code:
-        from ...services.promo_service import promo_applies, usable_promo_query
-        p_q = await db.execute(usable_promo_query(body.promo_code.upper()))
-        p = p_q.scalars().first()
-        if p and p.category in ("all", "food") and promo_applies(p, total):
+        from ...services.promo_service import promo_applies, usable_promo
+        p = await usable_promo(db, body.promo_code, "food", customer.id)
+        if promo_applies(p, total):
             if p.discount_type == "percentage":
                 promo_discount = (total * Decimal(str(p.discount_value)) / Decimal("100")).quantize(Decimal("0.01"))
                 if p.max_discount:
@@ -659,6 +658,7 @@ async def create_food_order(
         packing_charge=packing_charge_total,
         tax_amount=Decimal("0"),
         discount_amount=promo_discount,
+        promo_code=promo_code_applied,
         redeem_points=redeem_pts,
         redeem_discount=redeem_value,
         gold_discount=gold_discount,

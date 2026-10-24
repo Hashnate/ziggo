@@ -37,7 +37,18 @@
                             {% if p.discount_type == 'percentage' %}{{ "%.2f"|format(p.discount_value or 0) }}%{% else %}Rs.{{ "%.2f"|format(p.discount_value or 0) }}{% endif %}
                         </td>
                         <td class="px-6 py-4 text-sm text-ziggo-muted">{{ p.valid_to|colombo_dt("%d %b %Y") if p.valid_to else '—' }}</td>
-                        <td class="px-6 py-4 text-sm text-ziggo-ink">{{ p.used_count or 0 }} / {{ p.usage_limit if p.usage_limit else '∞' }}</td>
+                        <td class="px-6 py-4 text-sm text-ziggo-ink">
+                            {{ uses[p.id] }} / {{ p.usage_limit if p.usage_limit else '∞' }}
+                            {% set vehicles = promo_vehicle_names[p.id] %}
+                            {% if p.per_customer_limit is not none or p.new_customers_only or vehicles or p.return_use_on_cancel %}
+                            <div class="mt-1 space-y-0.5 text-[11px] font-bold text-ziggo-muted">
+                                {% if p.per_customer_limit is not none %}<div>{{ p.per_customer_limit }} per customer</div>{% endif %}
+                                {% if p.new_customers_only %}<div>New customers only</div>{% endif %}
+                                {% if vehicles %}<div>{{ vehicles|join(', ') }}</div>{% endif %}
+                                {% if p.return_use_on_cancel %}<div>Cancels don't count</div>{% endif %}
+                            </div>
+                            {% endif %}
+                        </td>
                         <td class="px-6 py-4">
                             {% if p.is_active %}
                             <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600">Active</span>
@@ -58,8 +69,12 @@
                                         "min_order_amount": (p.min_order_amount|float) if p.min_order_amount is not none else 0,
                                         "max_discount": (p.max_discount|float) if p.max_discount is not none else "",
                                         "usage_limit": p.usage_limit if p.usage_limit is not none else "",
-                                        "valid_from": p.valid_from.strftime("%Y-%m-%d") if p.valid_from else "",
-                                        "valid_to": p.valid_to.strftime("%Y-%m-%d") if p.valid_to else "",
+                                        "per_customer_limit": p.per_customer_limit if p.per_customer_limit is not none else "",
+                                        "new_customers_only": p.new_customers_only,
+                                        "vehicle_types": (p.vehicle_types or "").split(","),
+                                        "return_use_on_cancel": p.return_use_on_cancel,
+                                        "valid_from": p.valid_from|colombo_dt("%Y-%m-%d"),
+                                        "valid_to": p.valid_to|colombo_dt("%Y-%m-%d"),
                                         "is_active": p.is_active,
                                     }|tojson }})'
                                     class="px-3 py-1.5 bg-blue-50 text-ziggo border border-blue-100 rounded-lg text-xs font-bold hover:bg-blue-100 transition flex items-center gap-1.5">
@@ -194,8 +209,37 @@
                 <div>
                     <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Usage limit</label>
                     <input type="number" min="0" name="usage_limit" id="pmLimit" placeholder="leave empty for unlimited" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    <p class="text-[10px] text-ziggo-faint font-bold mt-1">Total uses, all customers together.</p>
                 </div>
-                <div></div>
+                <div>
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Uses per customer</label>
+                    <input type="number" min="0" name="per_customer_limit" id="pmPerCustomer" placeholder="leave empty for no limit" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    <p class="text-[10px] text-ziggo-faint font-bold mt-1">1 = each customer can use it once.</p>
+                </div>
+                <div class="col-span-2 space-y-2">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="new_customers_only" id="pmNewOnly" class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
+                        <span class="text-sm font-black text-ziggo-ink">New customers only</span>
+                    </label>
+                    <p class="text-[10px] text-ziggo-faint font-bold -mt-1 ml-7">Only customers with no completed ride/order in this category yet. For a one-time first-ride offer, also set Uses per customer to 1.</p>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="return_use_on_cancel" id="pmReturnUse" class="w-5 h-5 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
+                        <span class="text-sm font-black text-ziggo-ink">Cancelled bookings don't count</span>
+                    </label>
+                    <p class="text-[10px] text-ziggo-faint font-bold -mt-1 ml-7">When ticked, a cancelled booking/order gives its use back to the usage limit and to the customer.</p>
+                </div>
+                <div class="col-span-2">
+                    <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Vehicle types</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        {% for value, label in vehicle_options %}
+                        <label class="flex items-center gap-2 cursor-pointer text-sm font-bold text-ziggo-ink">
+                            <input type="checkbox" name="vehicle_types" value="{{ value }}" class="pm-vehicle w-4 h-4 rounded border-ziggo-line text-ziggo focus:ring-ziggo">
+                            {{ label }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                    <p class="text-[10px] text-ziggo-faint font-bold mt-1">Rides only. None ticked = every vehicle.</p>
+                </div>
                 <div>
                     <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Valid from</label>
                     <input type="date" name="valid_from" id="pmFrom" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
@@ -203,6 +247,7 @@
                 <div>
                     <label class="block text-xs font-black text-ziggo-muted mb-1 uppercase tracking-wider">Valid until</label>
                     <input type="date" name="valid_to" id="pmTo" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                    <p class="text-[10px] text-ziggo-faint font-bold mt-1">Works until 11:59 PM on this day (Sri Lanka time).</p>
                 </div>
             </div>
             <div class="pt-2 flex justify-end gap-3">
@@ -229,6 +274,10 @@ function openCreateModal() {
     document.getElementById('pmMin').value = 0;
     document.getElementById('pmMax').value = '';
     document.getElementById('pmLimit').value = '';
+    document.getElementById('pmPerCustomer').value = '';
+    document.getElementById('pmNewOnly').checked = false;
+    document.getElementById('pmReturnUse').checked = false;
+    document.querySelectorAll('.pm-vehicle').forEach(cb => { cb.checked = false; });
     document.getElementById('pmFrom').value = '';
     document.getElementById('pmTo').value = '';
     document.getElementById('pmActive').checked = true;
@@ -248,6 +297,10 @@ function openEditModal(p) {
     document.getElementById('pmMin').value = p.min_order_amount || 0;
     document.getElementById('pmMax').value = p.max_discount === '' ? '' : p.max_discount;
     document.getElementById('pmLimit').value = p.usage_limit === '' ? '' : p.usage_limit;
+    document.getElementById('pmPerCustomer').value = p.per_customer_limit === '' ? '' : p.per_customer_limit;
+    document.getElementById('pmNewOnly').checked = !!p.new_customers_only;
+    document.getElementById('pmReturnUse').checked = !!p.return_use_on_cancel;
+    document.querySelectorAll('.pm-vehicle').forEach(cb => { cb.checked = p.vehicle_types.includes(cb.value); });
     document.getElementById('pmFrom').value = p.valid_from || '';
     document.getElementById('pmTo').value = p.valid_to || '';
     document.getElementById('pmActive').checked = !!p.is_active;

@@ -6934,6 +6934,13 @@ async def admin_promotions(
         .limit(limit)
     )
     promos = q.scalars().all()
+    from app.models import FareSetting
+    from app.services.promo_service import counted_uses, promo_vehicles
+
+    uses = {p.id: await counted_uses(db, p) for p in promos}
+    vq = await db.execute(select(FareSetting).order_by(FareSetting.display_order, FareSetting.id))
+    vehicle_options = [(f.service_type, f.display_name or f.service_type) for f in vq.scalars().all()]
+    vehicle_names = dict(vehicle_options)
 
     start_idx = (page - 1) * limit + 1 if total > 0 else 0
     end_idx = min(page * limit, total)
@@ -6945,6 +6952,9 @@ async def admin_promotions(
             "request": request,
             "active_page": "promotions",
             "promos": promos,
+            "uses": uses,
+            "vehicle_options": vehicle_options,
+            "promo_vehicle_names": {p.id: [vehicle_names.get(v, v) for v in promo_vehicles(p)] for p in promos},
             "page": page,
             "total_pages": total_pages,
             "total_promos": total,
@@ -6956,15 +6966,30 @@ async def admin_promotions(
 
 
 
-def _parse_admin_date(s: str):
+def _parse_admin_date(s: str, end_of_day: bool = False):
+    """A YYYY-MM-DD from a date input, as the start (or end) of that day in Sri Lanka, in UTC."""
     s = (s or "").strip()
     if not s:
         return None
-    # Form input type="date" sends YYYY-MM-DD
     try:
-        return datetime.strptime(s, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        d = datetime.strptime(s, "%Y-%m-%d").replace(tzinfo=COLOMBO_TZ)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid date '{s}', expected YYYY-MM-DD")
+    if end_of_day:
+        d = d.replace(hour=23, minute=59, second=59, microsecond=999999)
+    return d.astimezone(timezone.utc)
+
+
+def _promo_limits(per_customer_limit: str, new_customers_only: str, vehicle_types: list[str],
+                  return_use_on_cancel: str) -> dict:
+    """The per-customer / vehicle / cancellation controls from the promo form."""
+    per_customer = per_customer_limit.strip()
+    return {
+        "per_customer_limit": int(per_customer) if per_customer.isdigit() else None,
+        "new_customers_only": new_customers_only == "on",
+        "vehicle_types": ",".join(v.strip() for v in vehicle_types if v.strip()) or None,
+        "return_use_on_cancel": return_use_on_cancel == "on",
+    }
 
 
 @router.post("/promotions/new")
@@ -6980,6 +7005,10 @@ async def admin_promotions_new(
     valid_from: str = Form(""),
     valid_to: str = Form(""),
     is_active: str = Form("on"),
+    per_customer_limit: str = Form(""),
+    new_customers_only: str = Form(""),
+    vehicle_types: list[str] = Form([]),
+    return_use_on_cancel: str = Form(""),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -7011,8 +7040,9 @@ async def admin_promotions_new(
         usage_limit=int(usage_limit) if usage_limit.strip().isdigit() else None,
         used_count=0,
         valid_from=_parse_admin_date(valid_from),
-        valid_to=_parse_admin_date(valid_to),
+        valid_to=_parse_admin_date(valid_to, end_of_day=True),
         is_active=(is_active == "on"),
+        **_promo_limits(per_customer_limit, new_customers_only, vehicle_types, return_use_on_cancel),
     ))
     await db.commit()
     return RedirectResponse(url="/admin/promotions", status_code=303)
@@ -7031,6 +7061,10 @@ async def admin_promotions_edit(
     valid_from: str = Form(""),
     valid_to: str = Form(""),
     is_active: str = Form(""),
+    per_customer_limit: str = Form(""),
+    new_customers_only: str = Form(""),
+    vehicle_types: list[str] = Form([]),
+    return_use_on_cancel: str = Form(""),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -7056,8 +7090,11 @@ async def admin_promotions_edit(
     p.max_discount = Decimal(str(max_discount)) if max_discount.strip() else None
     p.usage_limit = int(usage_limit) if usage_limit.strip().isdigit() else None
     p.valid_from = _parse_admin_date(valid_from)
-    p.valid_to = _parse_admin_date(valid_to)
+    p.valid_to = _parse_admin_date(valid_to, end_of_day=True)
     p.is_active = (is_active == "on")
+    for field, value in _promo_limits(per_customer_limit, new_customers_only, vehicle_types,
+                                      return_use_on_cancel).items():
+        setattr(p, field, value)
     await db.commit()
     return RedirectResponse(url="/admin/promotions", status_code=303)
 

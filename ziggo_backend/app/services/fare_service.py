@@ -10,7 +10,7 @@ from shapely.geometry import Point, Polygon
 
 from ..models import FareSetting, FlashWeightTier, SurgeZone
 from ..api.v1.surge_zones import is_time_in_range
-from .promo_service import booking_promo_query, promo_applies, usable_promo_query
+from .promo_service import promo_applies, usable_promo
 
 # Fallback fare table (used if DB has no row yet for a service type)
 DEFAULTS = {
@@ -138,9 +138,8 @@ async def calculate_fare(
         discount = 0.0
         promo_applied = None
         if promo:
-            promo_q = await db.execute(booking_promo_query(promo.upper(), promo_locked))
-            p = promo_q.scalars().first()
-            if promo_applies(p, fare, promo_locked):
+            p = await usable_promo(db, promo, "rides", getattr(customer, "id", None), promo_locked)
+            if promo_applies(p, fare, promo_locked, service_type):
                 if p.discount_type == "percentage":
                     discount = fare * (float(p.discount_value) / 100.0)
                     if p.max_discount:
@@ -196,9 +195,8 @@ async def calculate_fare(
         discount = 0.0
         promo_applied = None
         if promo:
-            promo_q = await db.execute(booking_promo_query(promo.upper(), promo_locked))
-            p = promo_q.scalars().first()
-            if promo_applies(p, fare, promo_locked):
+            p = await usable_promo(db, promo, "rides", getattr(customer, "id", None), promo_locked)
+            if promo_applies(p, fare, promo_locked, service_type):
                 if p.discount_type == "percentage":
                     discount = fare * (float(p.discount_value) / 100.0)
                     if p.max_discount:
@@ -395,9 +393,8 @@ async def calculate_fare(
     discount_original = 0.0
     promo_applied = None
     if promo:
-        promo_q = await db.execute(booking_promo_query(promo.upper(), promo_locked))
-        p = promo_q.scalars().first()
-        if promo_applies(p, fare_val, promo_locked):
+        p = await usable_promo(db, promo, "rides", getattr(customer, "id", None), promo_locked)
+        if promo_applies(p, fare_val, promo_locked, service_type):
             if p.discount_type == "percentage":
                 discount = fare_val * (float(p.discount_value) / 100.0)
                 discount_original = fare_val_original * (float(p.discount_value) / 100.0)
@@ -561,10 +558,7 @@ async def calculate_fares_bulk(
     active_zones = zone_q.scalars().all()
 
     # 5. Query PromoCode if provided
-    promo_code_obj = None
-    if promo:
-        promo_q = await db.execute(usable_promo_query(promo.upper()))
-        promo_code_obj = promo_q.scalars().first()
+    promo_code_obj = await usable_promo(db, promo, "rides", getattr(customer, "id", None))
 
     # 6. Query Flash tiers if needed
     flash_tiers = []
@@ -690,7 +684,7 @@ async def calculate_fares_bulk(
                 fare = hourly * hours
                 discount = 0.0
                 promo_applied = None
-                if promo_applies(promo_code_obj, fare):
+                if promo_applies(promo_code_obj, fare, vehicle=service_type):
                     if promo_code_obj.discount_type == "percentage":
                         discount = fare * (float(promo_code_obj.discount_value) / 100.0)
                         if promo_code_obj.max_discount:
@@ -755,7 +749,7 @@ async def calculate_fares_bulk(
 
                 discount = 0.0
                 promo_applied = None
-                if promo_applies(promo_code_obj, fare):
+                if promo_applies(promo_code_obj, fare, vehicle=service_type):
                     if promo_code_obj.discount_type == "percentage":
                         discount = fare * (float(promo_code_obj.discount_value) / 100.0)
                         if promo_code_obj.max_discount:
@@ -894,7 +888,7 @@ async def calculate_fares_bulk(
             discount = 0.0
             discount_original = 0.0
             promo_applied = None
-            if promo_applies(promo_code_obj, fare_val):
+            if promo_applies(promo_code_obj, fare_val, vehicle=service_type):
                 if promo_code_obj.discount_type == "percentage":
                     discount = fare_val * (float(promo_code_obj.discount_value) / 100.0)
                     discount_original = fare_val_original * (float(promo_code_obj.discount_value) / 100.0)
