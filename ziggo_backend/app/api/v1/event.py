@@ -253,16 +253,15 @@ async def book_tickets(
     # Optional promo (events-eligible). Unknown / ineligible codes are ignored.
     discount = Decimal("0")
     if body.promo_code:
-        from ...services.promo_service import usable_promo_query
+        from ...services.promo_service import promo_applies, usable_promo_query
 
         p = (
             await db.execute(usable_promo_query(body.promo_code.upper()))
         ).scalars().first()
         if (
             p
-            and p.is_active
             and p.category in ("all", "events")
-            and (p.usage_limit is None or p.used_count < p.usage_limit)
+            and promo_applies(p, subtotal)
         ):
             if p.discount_type == "percentage":
                 discount = (subtotal * Decimal(str(p.discount_value)) / Decimal("100")).quantize(Decimal("0.01"))

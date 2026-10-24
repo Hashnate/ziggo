@@ -1455,6 +1455,7 @@ async def accept_booking(
         stops=stops_list,
         driver_accepted_lat=float(b.driver_accepted_lat) if b.driver_accepted_lat else None,
         driver_accepted_lng=float(b.driver_accepted_lng) if b.driver_accepted_lng else None,
+        promo_locked=True,
     )
     
     b.distance_km = to_decimal(fare["distance_km"])
@@ -1851,6 +1852,7 @@ async def update_booking_status(
                 stops=stops_list,
                 driver_accepted_lat=float(b.driver_accepted_lat) if b.driver_accepted_lat else None,
                 driver_accepted_lng=float(b.driver_accepted_lng) if b.driver_accepted_lng else None,
+                promo_locked=True,
             )
 
             if not b.requested_drop_address:
@@ -2449,6 +2451,7 @@ async def update_booking_destination(
         stops=[s.model_dump() for s in (body.stops or [])],
         driver_accepted_lat=float(b.driver_accepted_lat) if b.driver_accepted_lat else None,
         driver_accepted_lng=float(b.driver_accepted_lng) if b.driver_accepted_lng else None,
+        promo_locked=True,
     )
 
     b.drop_lat = Decimal(str(body.drop_lat))
