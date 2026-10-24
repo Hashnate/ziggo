@@ -10,7 +10,7 @@ from shapely.geometry import Point, Polygon
 
 from ..models import FareSetting, FlashWeightTier, SurgeZone
 from ..api.v1.surge_zones import is_time_in_range
-from .promo_service import promo_applies, usable_promo
+from .promo_service import check_promo
 
 # Fallback fare table (used if DB has no row yet for a service type)
 DEFAULTS = {
@@ -137,9 +137,12 @@ async def calculate_fare(
 
         discount = 0.0
         promo_applied = None
+        promo_message = None
         if promo:
-            p = await usable_promo(db, promo, "rides", getattr(customer, "id", None), promo_locked)
-            if promo_applies(p, fare, promo_locked, service_type):
+            check = await check_promo(db, promo, "rides", getattr(customer, "id", None), promo_locked)
+            p = check.promo
+            promo_message = check.refusal(fare, service_type)
+            if promo_message is None:
                 if p.discount_type == "percentage":
                     discount = fare * (float(p.discount_value) / 100.0)
                     if p.max_discount:
@@ -168,6 +171,8 @@ async def calculate_fare(
             "hourly_rate": hourly,
             "rental_hours": hours,
         }
+        if promo_message:
+            rental_dict["promo_message"] = promo_message
         return await _enrich_with_loyalty(db, rental_dict, customer, redeem_points)
 
     if is_courier:
@@ -194,9 +199,12 @@ async def calculate_fare(
 
         discount = 0.0
         promo_applied = None
+        promo_message = None
         if promo:
-            p = await usable_promo(db, promo, "rides", getattr(customer, "id", None), promo_locked)
-            if promo_applies(p, fare, promo_locked, service_type):
+            check = await check_promo(db, promo, "rides", getattr(customer, "id", None), promo_locked)
+            p = check.promo
+            promo_message = check.refusal(fare, service_type)
+            if promo_message is None:
                 if p.discount_type == "percentage":
                     discount = fare * (float(p.discount_value) / 100.0)
                     if p.max_discount:
@@ -224,6 +232,8 @@ async def calculate_fare(
             "flash_surcharge": round(weight_surcharge, 2),
             "courier_eta_days": eta_days,
         }
+        if promo_message:
+            courier_dict["promo_message"] = promo_message
         return await _enrich_with_loyalty(db, courier_dict, customer, redeem_points)
 
     # BRD: CD-19 — sum of leg distances when intermediate stops are present.
@@ -392,9 +402,12 @@ async def calculate_fare(
     discount = 0.0
     discount_original = 0.0
     promo_applied = None
+    promo_message = None
     if promo:
-        p = await usable_promo(db, promo, "rides", getattr(customer, "id", None), promo_locked)
-        if promo_applies(p, fare_val, promo_locked, service_type):
+        check = await check_promo(db, promo, "rides", getattr(customer, "id", None), promo_locked)
+        p = check.promo
+        promo_message = check.refusal(fare_val, service_type)
+        if promo_message is None:
             if p.discount_type == "percentage":
                 discount = fare_val * (float(p.discount_value) / 100.0)
                 discount_original = fare_val_original * (float(p.discount_value) / 100.0)
@@ -446,6 +459,8 @@ async def calculate_fare(
         "app_usage_charges": round(app_usage_charges, 2),
         "deductions": round(deductions, 2),
     }
+    if promo_message:
+        fare_dict["promo_message"] = promo_message
     return await _enrich_with_loyalty(db, fare_dict, customer, redeem_points)
 
 def to_decimal(x: float) -> Decimal:
@@ -558,7 +573,8 @@ async def calculate_fares_bulk(
     active_zones = zone_q.scalars().all()
 
     # 5. Query PromoCode if provided
-    promo_code_obj = await usable_promo(db, promo, "rides", getattr(customer, "id", None))
+    promo_check = await check_promo(db, promo, "rides", getattr(customer, "id", None)) if promo else None
+    promo_code_obj = promo_check.promo if promo_check else None
 
     # 6. Query Flash tiers if needed
     flash_tiers = []
@@ -684,7 +700,8 @@ async def calculate_fares_bulk(
                 fare = hourly * hours
                 discount = 0.0
                 promo_applied = None
-                if promo_applies(promo_code_obj, fare, vehicle=service_type):
+                promo_message = promo_check.refusal(fare, service_type) if promo_check else None
+                if promo_check and promo_message is None:
                     if promo_code_obj.discount_type == "percentage":
                         discount = fare * (float(promo_code_obj.discount_value) / 100.0)
                         if promo_code_obj.max_discount:
@@ -726,6 +743,8 @@ async def calculate_fares_bulk(
                     "redeem_discount": 0.0,
                     "redeem_reason": None,
                 }
+                if promo_message:
+                    rental_dict["promo_message"] = promo_message
                 results[service_type] = rental_dict
                 continue
 
@@ -749,7 +768,8 @@ async def calculate_fares_bulk(
 
                 discount = 0.0
                 promo_applied = None
-                if promo_applies(promo_code_obj, fare, vehicle=service_type):
+                promo_message = promo_check.refusal(fare, service_type) if promo_check else None
+                if promo_check and promo_message is None:
                     if promo_code_obj.discount_type == "percentage":
                         discount = fare * (float(promo_code_obj.discount_value) / 100.0)
                         if promo_code_obj.max_discount:
@@ -792,6 +812,8 @@ async def calculate_fares_bulk(
                     "redeem_discount": 0.0,
                     "redeem_reason": None,
                 }
+                if promo_message:
+                    courier_dict["promo_message"] = promo_message
                 results[service_type] = courier_dict
                 continue
 
@@ -888,7 +910,8 @@ async def calculate_fares_bulk(
             discount = 0.0
             discount_original = 0.0
             promo_applied = None
-            if promo_applies(promo_code_obj, fare_val, vehicle=service_type):
+            promo_message = promo_check.refusal(fare_val, service_type) if promo_check else None
+            if promo_check and promo_message is None:
                 if promo_code_obj.discount_type == "percentage":
                     discount = fare_val * (float(promo_code_obj.discount_value) / 100.0)
                     discount_original = fare_val_original * (float(promo_code_obj.discount_value) / 100.0)
@@ -948,6 +971,8 @@ async def calculate_fares_bulk(
             if customer is not None and (redeem_points or 0) > 0:
                 fare_dict = await _enrich_with_loyalty(db, fare_dict, customer, redeem_points)
 
+            if promo_message:
+                fare_dict["promo_message"] = promo_message
             results[service_type] = fare_dict
         except Exception as e:
             import logging

@@ -70,6 +70,8 @@ class FareEstimateResponse(BaseModel):
     platform_fee: float
     driver_earnings: float
     promo_code: Optional[str] = None
+    # Why a promo code that was sent isn't applied (shown to the customer as is).
+    promo_message: Optional[str] = None
     surge_multiplier: float
     flash_surcharge: float = 0
     # Courier SLA (days) — only populated on courier estimates.

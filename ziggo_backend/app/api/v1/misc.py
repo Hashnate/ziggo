@@ -11,6 +11,7 @@ from sqlalchemy import select
 
 from ...database import get_db
 from ...models import (
+    FareSetting,
     PromoCode,
     Complaint,
     ComplaintMessage,
@@ -25,6 +26,8 @@ from ...models import (
     SystemSettings,
 )
 from ...schemas import (
+    PromoCheckRequest,
+    PromoCheckResponse,
     PromoCodeResponse,
     ComplaintCreate,
     ComplaintResponse,
@@ -153,7 +156,7 @@ async def list_active_promos(
     can badge saved ones. `category` filters by surface (rides/food/market/all)
     and `only_claimed=true` restricts to promos the customer has saved.
     """
-    from ...services.promo_service import usable_promo
+    from ...services.promo_service import promo_vehicles, usable_promo
 
     now = datetime.now(timezone.utc)
     where_clauses = [
@@ -179,6 +182,7 @@ async def list_active_promos(
             for cp in cq.scalars().all():
                 claimed_map[cp.promo_code_id] = cp.claimed_at
 
+    vehicle_names = dict((await db.execute(select(FareSetting.service_type, FareSetting.display_name))).all())
     out = []
     for p in promos:
         if only_claimed and p.id not in claimed_map:
@@ -193,8 +197,43 @@ async def list_active_promos(
             max_discount=float(p.max_discount) if p.max_discount is not None else None,
             valid_to=p.valid_to,
             claimed_at=claimed_map.get(p.id),
+            vehicle_types=[vehicle_names.get(v) or v for v in promo_vehicles(p)],
+            per_customer_limit=p.per_customer_limit,
+            new_customers_only=bool(p.new_customers_only),
         ))
     return out
+
+
+@router.post("/promos/check", response_model=PromoCheckResponse)
+async def check_promo_code(
+    body: PromoCheckRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("customer")),
+):
+    """Preview a code for checkouts that have no server quote (food, market, events).
+
+    Placing the order checks the code again, so this is only what the customer
+    sees before ordering. Rides get the same message from the fare estimate.
+    """
+    from ...services.promo_service import check_promo, promo_discount
+
+    if body.category not in ("rides", "food", "market", "events"):
+        raise HTTPException(status_code=400, detail="category must be rides/food/market/events")
+    customer = await _customer_or_none(db, user)
+    check = await check_promo(db, body.code, body.category, customer.id if customer else None)
+    amount = Decimal(str(body.amount))
+    message = check.refusal(amount, body.vehicle)
+    discount = Decimal("0")
+    if message is None:
+        discount = promo_discount(check.promo, amount)
+        if body.category == "events":
+            discount = min(discount, amount)
+    return PromoCheckResponse(
+        code=(body.code or "").strip().upper(),
+        applies=message is None,
+        discount_amount=float(discount),
+        message=message,
+    )
 
 
 @router.post("/promos/{promo_id}/claim", status_code=201)

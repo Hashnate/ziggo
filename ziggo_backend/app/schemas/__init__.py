@@ -40,6 +40,8 @@ from .driver_schema import (
 )
 from .misc_schema import (
     PromoCodeResponse,
+    PromoCheckRequest,
+    PromoCheckResponse,
     ComplaintCreate,
     ComplaintResponse,
     ComplaintMessageCreate,
@@ -118,6 +120,8 @@ __all__ = [
     "DriverVehicleResponse",
     "DriverVehicleSelectRequest",
     "PromoCodeResponse",
+    "PromoCheckRequest",
+    "PromoCheckResponse",
     "ComplaintCreate",
     "ComplaintResponse",
     "ComplaintMessageCreate",

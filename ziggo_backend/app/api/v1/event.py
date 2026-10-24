@@ -254,17 +254,12 @@ async def book_tickets(
     discount = Decimal("0")
     promo = None
     if body.promo_code:
-        from ...services.promo_service import promo_applies, usable_promo
+        from ...services.promo_service import promo_applies, promo_discount, usable_promo
 
         p = await usable_promo(db, body.promo_code, "events", cust.id)
         if promo_applies(p, subtotal):
             promo = p
-            if p.discount_type == "percentage":
-                discount = (subtotal * Decimal(str(p.discount_value)) / Decimal("100")).quantize(Decimal("0.01"))
-                if p.max_discount:
-                    discount = min(discount, Decimal(str(p.max_discount)))
-            else:
-                discount = Decimal(str(p.discount_value))
+            discount = promo_discount(p, subtotal)
 
     discount = min(discount, subtotal)
     taxable = subtotal - discount

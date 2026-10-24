@@ -16,9 +16,29 @@ class PromoCodeResponse(BaseModel):
     valid_to: Optional[datetime] = None
     # BRD: RW-04 — populated when the customer has claimed this promo
     claimed_at: Optional[datetime] = None
+    # Admin rules, so the app can show them. vehicle_types holds display names
+    # (empty = every vehicle); per_customer_limit None = no limit.
+    vehicle_types: List[str] = []
+    per_customer_limit: Optional[int] = None
+    new_customers_only: bool = False
 
     class Config:
         from_attributes = True
+
+
+class PromoCheckRequest(BaseModel):
+    code: str
+    category: str                  # rides | food | market | events
+    amount: float                  # order value before any discount
+    vehicle: Optional[str] = None  # rides: the service type
+
+
+class PromoCheckResponse(BaseModel):
+    code: str
+    applies: bool
+    discount_amount: float = 0
+    # Why the code doesn't apply, shown to the customer as is.
+    message: Optional[str] = None
 
 
 class LoyaltyBalanceResponse(BaseModel):
