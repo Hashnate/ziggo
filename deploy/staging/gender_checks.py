@@ -95,6 +95,9 @@ try:
     check("no gender yet", me.get("gender") is None, str(me.get("gender")))
     st, res = call("PATCH", "/customer/profile", customer, {"full_name": me.get("full_name")})
     check("saving the name doesn't set a gender", st == 200 and res.get("gender") is None, f"{st} {res}")
+    st, res = call("PATCH", "/customer/profile", customer, {"gender": "Prefer not to say"})
+    check("the current app's 'Prefer not to say' leaves it empty", st == 200 and gender_of(CUSTOMER) == "/",
+          f"{st} {gender_of(CUSTOMER)}")
     st, res = call("PATCH", "/customer/profile", customer, {"gender": "female"})
     check("chooses female", st == 200 and res.get("gender") == "female", f"{st} {res}")
     check("stored as her own choice", gender_of(CUSTOMER) == "female/self", gender_of(CUSTOMER))
@@ -102,8 +105,12 @@ try:
     check("can't change it herself", st == 400 and "support" in str(res), f"{st} {res}")
     st, res = call("PATCH", "/customer/profile", customer, {"gender": "female"})
     check("sending the same answer again is fine", st == 200, f"{st} {res}")
-    st, res = call("PATCH", "/customer/profile", customer, {"gender": "other"})
-    check("only female or male", st == 422, f"{st}")
+    for older_app_value in ("Female", "Other", "Prefer not to say"):
+        st, res = call("PATCH", "/customer/profile", customer, {"gender": older_app_value})
+        check(f"the current app's '{older_app_value}' is accepted without changing it", st == 200
+              and gender_of(CUSTOMER) == "female/self", f"{st} {gender_of(CUSTOMER)}")
+    st, res = call("PATCH", "/customer/profile", customer, {"gender": "Male"})
+    check("the current app's 'Male' is refused like 'male'", st == 400, f"{st}")
     _, me = call("GET", "/auth/me", customer)
     check("/auth/me shows it", me.get("gender") == "female", str(me.get("gender")))
 
