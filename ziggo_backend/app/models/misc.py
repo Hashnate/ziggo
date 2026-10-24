@@ -342,6 +342,21 @@ class CustomerPromoClaim(Base):
     claimed_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class AdminPhoneReveal(Base):
+    """Each time an admin reveals a customer's phone on the Customer Map (Phase 2,
+    feature 01). Names are copied in so the log still reads after an account goes.
+    """
+    __tablename__ = "admin_phone_reveals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    admin_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    admin_name = Column(String(100))
+    customer_id = Column(Integer, ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
+    customer_name = Column(String(100))
+    booking_id = Column(Integer, ForeignKey("bookings.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
 class FlashWeightTier(Base):
     """Admin-configurable weight tier for Flash parcel deliveries.
 

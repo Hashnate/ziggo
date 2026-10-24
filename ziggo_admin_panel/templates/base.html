@@ -463,6 +463,11 @@
             <a href="/admin/live-tracking" class="sidebar-item {% if active_page == 'live-tracking' %}active{% endif %}">
                 <i class="fas fa-location-arrow"></i><span>Live Tracking</span>
             </a>
+            {% if not request.state.admin or (request.state.admin.admin_role or 'admin') in ('superadmin', 'admin') %}
+            <a href="/admin/customer-map" class="sidebar-item {% if active_page == 'customer-map' %}active{% endif %}">
+                <i class="fas fa-map-marked-alt"></i><span>Customer Map</span>
+            </a>
+            {% endif %}
             <a href="/admin/courier" class="sidebar-item {% if active_page == 'courier' %}active{% endif %}">
                 <i class="fas fa-box"></i><span>Courier</span>
             </a>

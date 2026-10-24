@@ -1,0 +1,622 @@
+{% extends "base.html" %}
+
+{% block title %}Customer Map | Ziggo Admin{% endblock %}
+{% block page_title %}Customer Map{% endblock %}
+
+{% block head %}
+<style>
+    .pulse-dot {
+        width: 10px; height: 10px; border-radius: 50%;
+        background: #10B981; box-shadow: 0 0 0 0 rgba(16,185,129,0.7);
+        animation: pulseRing 1.5s ease-out infinite;
+    }
+    @keyframes pulseRing {
+        0%   { box-shadow: 0 0 0 0 rgba(16,185,129,0.7); }
+        70%  { box-shadow: 0 0 0 10px rgba(16,185,129,0); }
+        100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+    }
+    .layer-toggle {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 14px -4px rgba(15,23,42,0.18);
+        padding: 4px;
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 2px;
+    }
+    .layer-toggle button {
+        padding: 6px 12px;
+        font-weight: 800;
+        font-size: 12px;
+        border-radius: 9px;
+        color: #475569;
+    }
+    .layer-toggle button.active { background: #f1f5f9; color: #0f172a; }
+    .map-fab {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 14px -4px rgba(15,23,42,0.18);
+        width: 40px; height: 40px;
+        display: flex; align-items: center; justify-content: center;
+        color: #0f172a;
+        cursor: pointer;
+    }
+    .score-bar { height: 8px; border-radius: 99px; background: linear-gradient(90deg, #DC2626, #F59E0B, #16A34A); }
+    .trip-icon {
+        width: 22px; height: 22px; border-radius: 50%; background: #059669; color: white;
+        display: inline-flex; align-items: center; justify-content: center; font-size: 10px;
+        border: 2.5px solid white; box-shadow: 0 1px 4px rgba(15,23,42,0.35);
+    }
+    .trip-icon.live { border-color: #2563EB; }
+    #customerMap:fullscreen { background: white; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <div class="flex justify-end items-center gap-3">
+        <span class="pulse-dot" id="liveDot"></span>
+        <span class="text-xs font-black text-emerald-600 uppercase tracking-wider" id="liveLabel">Connecting…</span>
+        <span class="text-xs text-ziggo-muted font-bold">· Updated <span id="liveUpdated">--:--:--</span></span>
+    </div>
+
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-3">
+            <p class="text-xl font-black text-ziggo-ink leading-none" id="statActive">–</p>
+            <p class="text-[11px] font-black text-ziggo-muted uppercase tracking-wider mt-1.5">Active trips</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-3">
+            <p class="text-xl font-black leading-none" style="color:#16A34A" id="statRecent">–</p>
+            <p class="text-[11px] font-black text-ziggo-muted uppercase tracking-wider mt-1.5">Score 67–100</p>
+            <p class="text-[10px] text-ziggo-faint font-bold">rode in the last ~3 weeks</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-3">
+            <p class="text-xl font-black leading-none" style="color:#D97706" id="statLapsing">–</p>
+            <p class="text-[11px] font-black text-ziggo-muted uppercase tracking-wider mt-1.5">Score 34–66</p>
+            <p class="text-[10px] text-ziggo-faint font-bold">last ride ~3 to 6 weeks ago</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-3">
+            <p class="text-xl font-black leading-none" style="color:#DC2626" id="statInactive">–</p>
+            <p class="text-[11px] font-black text-ziggo-muted uppercase tracking-wider mt-1.5">Score 0–33</p>
+            <p class="text-[10px] text-ziggo-faint font-bold">6+ weeks ago, or no ride yet</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-3">
+            <p class="text-xl font-black text-ziggo-muted leading-none" id="statNever">–</p>
+            <p class="text-[11px] font-black text-ziggo-muted uppercase tracking-wider mt-1.5">Never booked</p>
+            <p class="text-[10px] text-ziggo-faint font-bold">no location, not on the map</p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div class="relative">
+            <div id="customerMap" style="height: 620px; min-height: 480px;"></div>
+
+            <div class="absolute top-3 left-3 z-[400] flex flex-col gap-2 items-start">
+                <div class="layer-toggle">
+                    <button id="layerMap" class="active" type="button">Map</button>
+                    <button id="layerSat" type="button">Satellite</button>
+                </div>
+                <div class="layer-toggle" id="bandFilter">
+                    <button data-band="all" class="active" type="button">All</button>
+                    <button data-band="active" type="button">Active trips</button>
+                    <button data-band="recent" type="button">67–100</button>
+                    <button data-band="lapsing" type="button">34–66</button>
+                    <button data-band="inactive" type="button">0–33</button>
+                </div>
+            </div>
+
+            <div class="absolute top-3 right-3 z-[400] flex flex-col gap-2">
+                <button id="fitAllBtn" type="button" class="map-fab" title="Fit everything shown">
+                    <i class="fas fa-expand-arrows-alt"></i>
+                </button>
+                <button id="fullscreenBtn" type="button" class="map-fab" title="Toggle fullscreen">
+                    <i class="fas fa-expand"></i>
+                </button>
+            </div>
+
+            <div class="absolute bottom-6 left-3 z-[400] bg-white rounded-2xl shadow-soft-sm border border-ziggo-line p-3 w-72 text-[11px] font-bold text-ziggo-muted space-y-2">
+                <p class="text-ziggo-ink font-black text-xs">Customer activity score (0–100)</p>
+                <div class="score-bar"></div>
+                <div class="flex justify-between text-[10px]"><span>0</span><span>50</span><span>100</span></div>
+                <p class="text-[10px] leading-snug">How recently the customer last completed a ride: 100 = today, 50 = about a month ago, 0 = {{ score_days }}+ days ago or never. Each dot is the pickup of the customer's latest booking. Grouped circles show how many customers are there, coloured by their average score.</p>
+                <div class="pt-1 border-t border-ziggo-line space-y-1.5">
+                    <p class="flex items-center gap-2"><span class="trip-icon"><i class="fas fa-map-marker-alt"></i></span> Active trip, waiting at the pickup</p>
+                    <p class="flex items-center gap-2"><span class="trip-icon live"><i class="fas fa-walking"></i></span> Waiting, sharing live location</p>
+                    <p class="flex items-center gap-2"><span class="trip-icon"><i class="fas fa-car"></i></span> On the trip (driver's position)</p>
+                    <p class="flex items-center gap-2"><span class="trip-icon"><i class="fas fa-box"></i></span> Parcel</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-ziggo-line flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                <i class="fas fa-route"></i>
+            </div>
+            <div>
+                <h3 class="text-base font-black text-ziggo-ink">Active trips</h3>
+                <p class="text-[11px] text-ziggo-muted font-bold">Click a row to find it on the map. Phones are shown only when you ask, and each one is logged.</p>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-[11px] uppercase tracking-wider text-ziggo-muted">
+                    <tr>
+                        <th class="text-left px-6 py-3 font-black">Customer</th>
+                        <th class="text-left px-6 py-3 font-black">Booking</th>
+                        <th class="text-left px-6 py-3 font-black">Status</th>
+                        <th class="text-left px-6 py-3 font-black">Shown at</th>
+                    </tr>
+                </thead>
+                <tbody id="tripsBody"></tbody>
+            </table>
+            <p id="tripsEmpty" class="p-10 text-center text-ziggo-muted font-bold hidden">No active trips right now.</p>
+        </div>
+    </div>
+
+    {% if is_superadmin %}
+    <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-ziggo-line flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
+                <i class="fas fa-user-shield"></i>
+            </div>
+            <div>
+                <h3 class="text-base font-black text-ziggo-ink">Phone reveal log</h3>
+                <p class="text-[11px] text-ziggo-muted font-bold">Every customer phone shown on this page, latest first (last 50). Only super admins see this.</p>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-[11px] uppercase tracking-wider text-ziggo-muted">
+                    <tr>
+                        <th class="text-left px-6 py-3 font-black">When</th>
+                        <th class="text-left px-6 py-3 font-black">Admin</th>
+                        <th class="text-left px-6 py-3 font-black">Customer</th>
+                        <th class="text-left px-6 py-3 font-black">Booking</th>
+                    </tr>
+                </thead>
+                <tbody id="revealBody">
+                    {% for r in reveals %}
+                    <tr class="border-t border-ziggo-line">
+                        <td class="px-6 py-3 font-bold text-ziggo-muted whitespace-nowrap">{{ r.at | colombo_dt }}</td>
+                        <td class="px-6 py-3 font-black text-ziggo-ink">{{ r.admin }}</td>
+                        <td class="px-6 py-3 font-bold">{{ r.customer }}</td>
+                        <td class="px-6 py-3 font-bold text-ziggo-muted">{{ r.booking_ref or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <p id="revealEmpty" class="p-8 text-center text-ziggo-muted font-bold {% if reveals %}hidden{% endif %}">No phones revealed yet.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    const SCORE_DAYS = {{ score_days }};
+    const IS_SUPERADMIN = {{ 'true' if is_superadmin else 'false' }};
+    const ME = {{ ((request.state.admin.full_name or request.state.admin.phone_number) if request.state.admin else 'Admin') | tojson }};
+    const STATUS_LABEL = { searching: 'Finding a driver', accepted: 'Driver on the way', arrived: 'Driver arrived', started: 'On the trip' };
+    const FA = { pickup: '', live: '', driver: '', parcel: '' };
+
+    let map, info, clusterer;
+    let customerMarkers = [];
+    const trips = new Map();          // booking_id -> trip
+    const tripMarkers = new Map();    // booking_id -> google.maps.Marker
+    let activeCustomerIds = new Set();
+    let band = 'all';
+    let fittedOnce = false;
+
+    function escapeHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    // Red at 0, amber at 50, green at 100.
+    function scoreColor(score) {
+        const stops = [[220, 38, 38], [245, 158, 11], [22, 163, 74]];
+        const t = Math.max(0, Math.min(100, score)) / 50;
+        const i = Math.min(1, Math.floor(t));
+        const f = t - i;
+        const rgb = stops[i].map((c, k) => Math.round(c + (stops[i + 1][k] - c) * f));
+        return '#' + rgb.map(c => c.toString(16).padStart(2, '0')).join('');
+    }
+
+    function bandOf(score) {
+        return score >= 67 ? 'recent' : score >= 34 ? 'lapsing' : 'inactive';
+    }
+
+    function colomboDay(iso) {
+        return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Colombo' });
+    }
+
+    function formatDate(iso) {
+        if (!iso) return '—';
+        return new Date(iso).toLocaleDateString('en-GB', { timeZone: 'Asia/Colombo', day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    function daysAgo(iso) {
+        const a = colomboDay(iso), b = colomboDay(new Date().toISOString());
+        const days = Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
+        return days <= 0 ? 'today' : days === 1 ? 'yesterday' : days + ' days ago';
+    }
+
+    function secondsAgo(iso) {
+        if (!iso) return '';
+        const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+        return s < 60 ? s + ' s ago' : Math.round(s / 60) + ' min ago';
+    }
+
+    function formatTime(iso) {
+        try {
+            return new Date(iso || Date.now()).toLocaleTimeString('en-GB', { timeZone: 'Asia/Colombo', hour12: false });
+        } catch (_) {
+            return '--:--:--';
+        }
+    }
+
+    function tripKind(t) {
+        if (t.source === 'live') return 'live';
+        if (t.is_parcel) return 'parcel';
+        return t.source === 'driver' ? 'driver' : 'pickup';
+    }
+
+    function tripWhere(t) {
+        if (t.source === 'live') return "Shared live from the customer's phone · " + secondsAgo(t.at);
+        if (t.source === 'driver') return "Driver's position (trip under way)";
+        return 'Pickup: ' + (t.pickup_address || 'pickup point');
+    }
+
+    function phoneBlock(customerId, bookingId) {
+        return `<div data-phone-for="${customerId}" style="margin-top:8px;">
+            <button type="button" onclick="revealPhone(${customerId}, ${bookingId ?? 'null'}, this)"
+                style="background:#0f172a;color:white;font-weight:800;font-size:11px;padding:6px 12px;border-radius:9px;">
+                <i class="fas fa-phone"></i> Show phone
+            </button>
+            <p style="font-size:10px;color:#94a3b8;margin:4px 0 0;">Each phone shown is logged.</p>
+        </div>`;
+    }
+
+    function customerPopup(c) {
+        const lastRide = c.last_ride_at
+            ? `${formatDate(c.last_ride_at)} (${daysAgo(c.last_ride_at)})`
+            : 'No completed ride yet';
+        return `<div style="font-family:inherit;min-width:220px;">
+            <p style="font-weight:900;color:#0f172a;margin:0 0 4px;">${escapeHtml(c.name)}</p>
+            <p style="font-size:11px;margin:0;font-weight:800;color:${scoreColor(c.score)};">Score ${c.score} / 100</p>
+            <p style="font-size:11px;color:#475569;margin:4px 0 0;">Last completed ride: ${lastRide}</p>
+            <p style="font-size:11px;color:#64748b;margin:4px 0 0;">Shown at the pickup of ${escapeHtml(c.booking_ref)} · ${formatDate(c.booked_at)} · ${escapeHtml(c.booking_status)}</p>
+            ${phoneBlock(c.id, null)}
+        </div>`;
+    }
+
+    function tripPopup(t) {
+        return `<div style="font-family:inherit;min-width:220px;">
+            <p style="font-weight:900;color:#0f172a;margin:0 0 4px;">${escapeHtml(t.name)}</p>
+            <p style="font-size:11px;margin:0;font-weight:800;color:#059669;">${STATUS_LABEL[t.status] || escapeHtml(t.status)}</p>
+            <p style="font-size:11px;color:#475569;margin:4px 0 0;">${escapeHtml(t.booking_ref)} · ${t.is_parcel ? 'Parcel' : 'Ride'} · ${escapeHtml(t.service_type || '')}</p>
+            <p style="font-size:11px;color:#64748b;margin:4px 0 0;">${escapeHtml(tripWhere(t))}</p>
+            ${phoneBlock(t.customer_id, t.booking_id)}
+        </div>`;
+    }
+
+    async function revealPhone(customerId, bookingId, btn) {
+        btn.disabled = true;
+        const qs = bookingId ? `?booking_id=${bookingId}` : '';
+        try {
+            const r = await fetch(`/admin/customer-map/customers/${customerId}/phone${qs}`, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json' },
+            });
+            if (!r.ok) throw new Error(r.status);
+            const j = await r.json();
+            btn.parentElement.innerHTML = `<a href="tel:${encodeURIComponent(j.phone)}" style="font-weight:900;color:#2563EB;font-size:13px;">
+                <i class="fas fa-phone"></i> ${escapeHtml(j.phone)}</a>`;
+            if (IS_SUPERADMIN) addRevealRow(j.name, bookingId ? (trips.get(bookingId) || {}).booking_ref : null);
+        } catch (e) {
+            btn.disabled = false;
+            btn.textContent = 'Could not load the phone. Try again';
+        }
+    }
+
+    function addRevealRow(customer, bookingRef) {
+        const body = document.getElementById('revealBody');
+        if (!body) return;
+        const now = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Colombo' }).slice(0, 16);
+        const tr = document.createElement('tr');
+        tr.className = 'border-t border-ziggo-line';
+        tr.innerHTML = `<td class="px-6 py-3 font-bold text-ziggo-muted whitespace-nowrap">${now}</td>
+            <td class="px-6 py-3 font-black text-ziggo-ink">${escapeHtml(ME)}</td>
+            <td class="px-6 py-3 font-bold">${escapeHtml(customer)}</td>
+            <td class="px-6 py-3 font-bold text-ziggo-muted">${escapeHtml(bookingRef || '—')}</td>`;
+        body.prepend(tr);
+        document.getElementById('revealEmpty').classList.add('hidden');
+    }
+
+    function openPopup(html, position) {
+        info.setContent(html);
+        info.setPosition(position);
+        info.open(map);
+    }
+
+    function dotIcon(score) {
+        return {
+            path: google.maps.SymbolPath.CIRCLE, scale: 6,
+            fillColor: scoreColor(score), fillOpacity: 0.95,
+            strokeColor: '#ffffff', strokeWeight: 1.5,
+        };
+    }
+
+    function tripIcon(t) {
+        return {
+            path: google.maps.SymbolPath.CIRCLE, scale: 12,
+            fillColor: '#059669', fillOpacity: 1,
+            strokeColor: t.source === 'live' ? '#2563EB' : '#ffffff', strokeWeight: 3,
+        };
+    }
+
+    function tripLabel(t) {
+        return { text: FA[tripKind(t)], fontFamily: '"Font Awesome 6 Free"', fontWeight: '900', fontSize: '11px', color: '#ffffff' };
+    }
+
+    // Grouped customers: size grows with the count, colour is their average score.
+    const clusterRenderer = {
+        render({ count, position, markers }) {
+            const avg = markers.reduce((sum, m) => sum + (m.dot ? m.dot.score : 0), 0) / Math.max(1, markers.length);
+            return new google.maps.Marker({
+                position,
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE, scale: Math.min(26, 13 + Math.log10(count) * 6),
+                    fillColor: scoreColor(avg), fillOpacity: 0.85, strokeColor: '#ffffff', strokeWeight: 2,
+                },
+                label: { text: String(count), color: '#ffffff', fontSize: '11px', fontWeight: '800' },
+                title: `${count} customers · average score ${Math.round(avg)}`,
+                zIndex: 1000 + count,
+            });
+        },
+    };
+
+    function shownCustomerMarkers() {
+        if (band === 'active') return [];
+        return customerMarkers.filter(m => !activeCustomerIds.has(m.dot.id) && (band === 'all' || bandOf(m.dot.score) === band));
+    }
+
+    function applyFilter() {
+        clusterer.clearMarkers();
+        clusterer.addMarkers(shownCustomerMarkers());
+        const showTrips = band === 'all' || band === 'active';
+        for (const m of tripMarkers.values()) m.setMap(showTrips ? map : null);
+    }
+
+    function setCustomers(list) {
+        clusterer.clearMarkers();
+        customerMarkers = list.map(c => {
+            const m = new google.maps.Marker({
+                position: { lat: c.lat, lng: c.lng },
+                icon: dotIcon(c.score),
+                title: `${c.name} · score ${c.score}`,
+            });
+            m.dot = c;
+            m.addListener('click', () => openPopup(customerPopup(c), m.getPosition()));
+            return m;
+        });
+    }
+
+    function upsertTrip(t) {
+        trips.set(t.booking_id, t);
+        const pos = { lat: t.lat, lng: t.lng };
+        let m = tripMarkers.get(t.booking_id);
+        if (!m) {
+            m = new google.maps.Marker({ zIndex: 5000 });
+            m.addListener('click', () => openPopup(tripPopup(trips.get(t.booking_id)), m.getPosition()));
+            tripMarkers.set(t.booking_id, m);
+            m.setMap(band === 'all' || band === 'active' ? map : null);
+        }
+        m.setPosition(pos);
+        m.setIcon(tripIcon(t));
+        m.setLabel(tripLabel(t));
+        m.setTitle(`${t.name} · ${STATUS_LABEL[t.status] || t.status}`);
+    }
+
+    function setTrips(list) {
+        const seen = new Set();
+        list.forEach(t => { upsertTrip(t); seen.add(t.booking_id); });
+        for (const [id, m] of tripMarkers.entries()) {
+            if (!seen.has(id)) {
+                m.setMap(null);
+                tripMarkers.delete(id);
+                trips.delete(id);
+            }
+        }
+        const ids = new Set(list.map(t => t.customer_id));
+        const changed = ids.size !== activeCustomerIds.size || [...ids].some(id => !activeCustomerIds.has(id));
+        activeCustomerIds = ids;
+        if (changed) applyFilter();
+        document.getElementById('statActive').textContent = list.length;
+        renderTrips();
+    }
+
+    function renderTrips() {
+        const body = document.getElementById('tripsBody');
+        const list = [...trips.values()];
+        document.getElementById('tripsEmpty').classList.toggle('hidden', list.length > 0);
+        body.innerHTML = list.map(t => `
+            <tr class="border-t border-ziggo-line hover:bg-gray-50 cursor-pointer" onclick="focusTrip(${t.booking_id})">
+                <td class="px-6 py-3 font-black text-ziggo-ink">${escapeHtml(t.name)}</td>
+                <td class="px-6 py-3 font-bold text-ziggo-muted">${escapeHtml(t.booking_ref)} · ${t.is_parcel ? 'Parcel' : 'Ride'}</td>
+                <td class="px-6 py-3"><span class="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full text-[11px] font-black">${STATUS_LABEL[t.status] || escapeHtml(t.status)}</span></td>
+                <td class="px-6 py-3 text-[12px] font-bold ${t.source === 'live' ? 'text-blue-600' : 'text-ziggo-muted'}">${escapeHtml(tripWhere(t))}</td>
+            </tr>`).join('');
+    }
+
+    function focusTrip(id) {
+        const t = trips.get(id), m = tripMarkers.get(id);
+        if (!t || !m) return;
+        if (band !== 'all' && band !== 'active') setBand('all');
+        map.panTo(m.getPosition());
+        map.setZoom(16);
+        openPopup(tripPopup(t), m.getPosition());
+        document.getElementById('customerMap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function setBand(value) {
+        band = value;
+        document.querySelectorAll('[data-band]').forEach(b => b.classList.toggle('active', b.dataset.band === value));
+        applyFilter();
+    }
+
+    function fitShown() {
+        const bounds = new google.maps.LatLngBounds();
+        let n = 0;
+        for (const m of shownCustomerMarkers()) { bounds.extend(m.getPosition()); n++; }
+        if (band === 'all' || band === 'active') {
+            for (const m of tripMarkers.values()) { bounds.extend(m.getPosition()); n++; }
+        }
+        if (n > 0) map.fitBounds(bounds);
+    }
+
+    function markUpdated(iso) {
+        document.getElementById('liveUpdated').textContent = formatTime(iso);
+    }
+
+    async function getFeed(part) {
+        const r = await fetch('/admin/customer-map/feed' + (part ? '?part=' + part : ''), { headers: { 'Accept': 'application/json' } });
+        if (!r.ok) throw new Error(r.status);
+        return r.json();
+    }
+
+    async function loadAll() {
+        try {
+            const j = await getFeed();
+            setCustomers(j.customers);
+            activeCustomerIds = new Set();
+            setTrips(j.active);
+            applyFilter();
+            document.getElementById('statRecent').textContent = j.totals.recent;
+            document.getElementById('statLapsing').textContent = j.totals.lapsing;
+            document.getElementById('statInactive').textContent = j.totals.inactive;
+            document.getElementById('statNever').textContent = j.totals.never_booked;
+            markUpdated(j.server_time);
+            if (!fittedOnce && (customerMarkers.length || tripMarkers.size)) {
+                fitShown();
+                fittedOnce = true;
+            }
+        } catch (e) {
+            console.error('customer map load failed', e);
+        }
+    }
+
+    async function loadActive() {
+        try {
+            const j = await getFeed('active');
+            setTrips(j.active);
+            markUpdated(j.server_time);
+        } catch (e) {
+            console.error('active trips load failed', e);
+        }
+    }
+
+    function setLive(state) {
+        const dot = document.getElementById('liveDot'), label = document.getElementById('liveLabel');
+        const live = state === 'live';
+        dot.style.background = live ? '#10B981' : '#F59E0B';
+        dot.style.animation = live ? 'pulseRing 1.5s ease-out infinite' : 'none';
+        label.textContent = live ? 'Live Feed Active' : 'Reconnecting…';
+        label.classList.toggle('text-emerald-600', live);
+        label.classList.toggle('text-amber-600', !live);
+    }
+
+    let ws = null;
+    let reconnectDelay = 1000;
+
+    function openWs() {
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${proto}//${location.host}/ws/admin/customers`);
+        ws.addEventListener('open', () => {
+            setLive('live');
+            reconnectDelay = 1000;
+            ws._ping = setInterval(() => { try { ws.send('ping'); } catch (_) {} }, 30000);
+        });
+        ws.addEventListener('message', (ev) => {
+            let msg;
+            try { msg = JSON.parse(ev.data); } catch (_) { return; }
+            if (!msg || !msg.event) return;
+            const d = msg.data || {};
+            if (msg.event === 'customer_location_update') {
+                const t = trips.get(d.booking_id);
+                if (t) {
+                    upsertTrip({ ...t, lat: d.lat, lng: d.lng, source: 'live', at: d.at, status: d.status || t.status });
+                    renderTrips();
+                    markUpdated(d.at);
+                } else {
+                    loadActive();
+                }
+            } else if (msg.event === 'customer_location_stopped') {
+                loadActive();
+            }
+        });
+        ws.addEventListener('close', () => {
+            if (ws && ws._ping) clearInterval(ws._ping);
+            setLive('reconnecting');
+            const delay = reconnectDelay;
+            reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+            setTimeout(openWs, delay);
+        });
+        ws.addEventListener('error', () => {});
+    }
+
+    window.gm_authFailure = function () {
+        const el = document.getElementById('customerMap');
+        if (el) {
+            el.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;color:#6b7280;">' +
+                '<p style="font-weight:700;font-size:14px;margin:0;">Map unavailable</p>' +
+                '<p style="font-size:12px;margin:0;text-align:center;max-width:260px;">The Google Maps API key is missing or invalid. Configure <strong>GOOGLE_MAPS_API_KEY</strong> in the .env file.</p>' +
+                '</div>';
+        }
+    };
+
+    function initMap() {
+        map = new google.maps.Map(document.getElementById('customerMap'), {
+            center: { lat: 6.9271, lng: 79.8612 },
+            zoom: 12,
+            mapTypeControl: false,
+            streetViewControl: false,
+        });
+        info = new google.maps.InfoWindow();
+        clusterer = new markerClusterer.MarkerClusterer({ map, markers: [], renderer: clusterRenderer });
+
+        const layerMapBtn = document.getElementById('layerMap');
+        const layerSatBtn = document.getElementById('layerSat');
+        layerMapBtn.addEventListener('click', () => {
+            map.setMapTypeId(google.maps.MapTypeId.ROADMAP);
+            layerMapBtn.classList.add('active'); layerSatBtn.classList.remove('active');
+        });
+        layerSatBtn.addEventListener('click', () => {
+            map.setMapTypeId(google.maps.MapTypeId.SATELLITE);
+            layerSatBtn.classList.add('active'); layerMapBtn.classList.remove('active');
+        });
+        document.querySelectorAll('[data-band]').forEach(b => b.addEventListener('click', () => setBand(b.dataset.band)));
+        document.getElementById('fitAllBtn').addEventListener('click', fitShown);
+        document.getElementById('fullscreenBtn').addEventListener('click', () => {
+            const el = document.getElementById('customerMap');
+            if (!document.fullscreenElement) el.requestFullscreen?.(); else document.exitFullscreen?.();
+        });
+
+        loadAll().then(openWs);
+        // Trips change status and drivers move; a live point that stops
+        // updating drops back to the pickup on the next poll.
+        setInterval(loadActive, 15000);
+        setInterval(loadAll, 300000);
+        setInterval(renderTrips, 5000);
+    }
+</script>
+{% if google_maps_api_key %}
+<script src="https://unpkg.com/@googlemaps/markerclusterer@2.5.3/dist/index.min.js"></script>
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&v=weekly&callback=initMap&loading=async" async defer></script>
+{% else %}
+<script>
+    window.addEventListener('DOMContentLoaded', function () { window.gm_authFailure(); });
+</script>
+{% endif %}
+{% endblock %}

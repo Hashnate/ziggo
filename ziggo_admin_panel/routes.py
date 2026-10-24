@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 from app.config import settings
 from app.database import get_db
+from app.services import customer_map_service
 from app.services.gender_service import apply_nic_gender, gender_from_nic, gender_label, set_admin_gender
 from app.models import (
     User,
@@ -7501,6 +7502,58 @@ async def admin_live_tracking_feed(
         },
         "server_time": datetime.now(timezone.utc).isoformat(),
     }
+
+
+# ---------- Customer Map (Phase 2, feature 01) ----------
+# Superadmin and admin only: it shows customers' names and where they are, and
+# lets them reveal a phone (each reveal is logged). Data entry can't open it.
+@router.get("/customer-map", response_class=HTMLResponse)
+async def admin_customer_map(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_superadmin_or_admin),
+):
+    is_superadmin = (admin.admin_role or "admin") == "superadmin"
+    return templates.TemplateResponse(
+        request,
+        "customer_map.html",
+        {
+            "request": request,
+            "active_page": "customer-map",
+            "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY or "",
+            "score_days": customer_map_service.SCORE_DAYS,
+            "is_superadmin": is_superadmin,
+            "reveals": await customer_map_service.recent_reveals(db) if is_superadmin else [],
+        },
+    )
+
+
+@router.get("/customer-map/feed")
+async def admin_customer_map_feed(
+    part: str = "all",
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin_or_admin),
+):
+    """Active trips, and with part=all every other customer who has booked. No phones."""
+    now = datetime.now(timezone.utc)
+    active = await customer_map_service.active_trips(db, now)
+    out = {"active": active, "server_time": now.isoformat()}
+    if part != "active":
+        out.update(await customer_map_service.customer_dots(db, now))
+    return out
+
+
+@router.post("/customer-map/customers/{customer_id}/phone")
+async def admin_customer_map_phone(
+    customer_id: int,
+    booking_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_superadmin_or_admin),
+):
+    revealed = await customer_map_service.reveal_phone(db, admin, customer_id, booking_id)
+    if revealed is None:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return revealed
 
 
 # ---------- Help & Support Center ----------
