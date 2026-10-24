@@ -197,9 +197,9 @@ try:
     s, _, raw = admin_req("POST", f"/admin/customer-map/customers/{customer_id}/phone?booking_id={bid}",
                           cookies["admin"], json_reply=True)
     check("admin reveals the phone", s == 200 and json.loads(raw)["phone"] == CUSTOMER, s)
-    row = sql("select a.admin_user_id = u.id, r.customer_id, r.booking_id, r.customer_name is not null "
+    row = sql("select r.admin_user_id = u.id, r.customer_id, r.booking_id, r.customer_name is not null "
               "from admin_phone_reveals r join users u on u.phone_number = '0700000001' "
-              f"left join users a on a.id = r.admin_user_id where r.id > {first_reveal} order by r.id desc limit 1")
+              f"where r.id > {first_reveal} order by r.id desc limit 1")
     check("the reveal is logged: who, which customer, which booking", row == f"t|{customer_id}|{bid}|t", row)
     s, _, _ = admin_req("POST", "/admin/customer-map/customers/999999999/phone", cookies["superadmin"], json_reply=True)
     check("an unknown customer is a 404", s == 404, s)
