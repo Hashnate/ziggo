@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 from app.config import settings
 from app.database import get_db
-from app.services.gender_service import apply_nic_gender, gender_from_nic, set_admin_gender
+from app.services.gender_service import apply_nic_gender, gender_from_nic, gender_label, set_admin_gender
 from app.models import (
     User,
     UserRole,
@@ -630,6 +630,18 @@ async def admin_dashboard(
     )
 
 
+DRIVER_GENDER_FILTERS = ("female", "male", "unknown")
+
+
+def _driver_gender_clause(gender: str):
+    """Drivers-page gender filter; "unknown" finds drivers whose NIC couldn't be read."""
+    if gender == "unknown":
+        return User.gender.is_(None)
+    if gender in DRIVER_GENDER_FILTERS:
+        return User.gender == gender
+    return None
+
+
 @router.get("/drivers", response_class=HTMLResponse)
 async def admin_drivers(
     request: Request,
@@ -637,6 +649,7 @@ async def admin_drivers(
     status: str = "all",
     search: str = "",
     view: str = "drivers",
+    gender: str = "all",
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -645,6 +658,8 @@ async def admin_drivers(
 
     limit = 50
     offset = (page - 1) * limit
+    if gender not in DRIVER_GENDER_FILTERS:
+        gender = "all"
 
     is_submitted_driver = and_(Driver.vehicle_number.isnot(None), Driver.vehicle_number != "")
 
@@ -686,6 +701,19 @@ async def admin_drivers(
     )
     avg_rating = float(avg_rating_q.scalar() or 0)
 
+    is_online_now = and_(Driver.is_online == True, Driver.is_approved == True)  # noqa: E712
+    ladies, ladies_online, ladies_fpo = (
+        await db.execute(
+            select(
+                func.count(Driver.id),
+                func.count(Driver.id).filter(is_online_now),
+                func.count(Driver.id).filter(Driver.female_passengers_only == True),  # noqa: E712
+            )
+            .join(User, Driver.user_id == User.id)
+            .where(is_submitted_driver, User.gender == "female")
+        )
+    ).one()
+
     stats = {
         "total": total_all,
         "online": online,
@@ -695,6 +723,9 @@ async def admin_drivers(
         "avg_rating": avg_rating,
         "total_apps": total_apps,
         "unread_apps": unread_apps,
+        "ladies": ladies or 0,
+        "ladies_online": ladies_online or 0,
+        "ladies_fpo": ladies_fpo or 0,
     }
 
     if view == "applications":
@@ -771,6 +802,9 @@ async def admin_drivers(
                     Driver.vehicle_model.ilike(search_term),
                 )
             )
+        gender_clause = _driver_gender_clause(gender)
+        if gender_clause is not None:
+            where_clauses.append(gender_clause)
 
         stmt = select(Driver).join(User, Driver.user_id == User.id)
         if where_clauses:
@@ -814,6 +848,7 @@ async def admin_drivers(
             "status": status,
             "search": search,
             "view": view,
+            "gender": gender,
         },
     )
 
@@ -824,6 +859,7 @@ async def admin_drivers_export(
     status: str = "all",
     search: str = "",
     scope: Optional[str] = None,
+    gender: str = "all",
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -883,6 +919,9 @@ async def admin_drivers_export(
                 Driver.vehicle_model.ilike(search_term),
             )
         )
+    gender_clause = _driver_gender_clause(gender)
+    if gender_clause is not None:
+        where_clauses.append(gender_clause)
 
     if where_clauses:
         stmt = stmt.where(*where_clauses)
@@ -905,7 +944,7 @@ async def admin_drivers_export(
     w.writerow([
         "ID", "Name", "Phone", "Email", "NIC", "License", "Vehicle Type", "Vehicle No",
         "Model", "Color", "Year", "Status", "Online", "Rating", "Total Rides",
-        "Total Earnings (Rs.)", "Joined Date",
+        "Total Earnings (Rs.)", "Joined Date", "Gender", "Female Passengers Only",
     ])
     for d in drivers:
         u = d.user
@@ -944,6 +983,8 @@ async def admin_drivers_export(
             (u.total_rides if u and u.total_rides is not None else 0),
             float(d.total_earnings or 0),
             joined_str,
+            gender_label(u) if u else "Not set",
+            "Yes" if d.female_passengers_only and u and u.gender == "female" else "No",
         ])
 
     return Response(
@@ -2135,12 +2176,14 @@ async def admin_bookings(
     start: str = "",
     end: str = "",
     status: str = "all",
+    lady: str = "",
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
     from sqlalchemy import and_
 
     limit = 50
+    lady = "1" if lady == "1" else ""
     offset = (page - 1) * limit
 
     # Build query base. Rides exclude both parcel services (flash + courier),
@@ -2164,6 +2207,8 @@ async def admin_bookings(
             base_where.append(Booking.booked_at <= end_dt)
         except ValueError:
             pass
+    if lady:
+        base_where.append(Booking.lady_driver_requested == True)  # noqa: E712
 
     # Active bookings (not paginated, needed for live map tracking)
     active_statuses = [
@@ -2196,10 +2241,11 @@ async def admin_bookings(
             func.coalesce(func.sum(Booking.final_amount).filter(Booking.status == BookingStatus.COMPLETED), 0),
             func.count(Booking.id).filter(Booking.customer_rating.is_not(None)),
             func.coalesce(func.avg(Booking.customer_rating).filter(Booking.customer_rating.is_not(None)), 0),
+            func.count(Booking.id).filter(Booking.lady_driver_requested == True),  # noqa: E712
         )
         .where(and_(*base_where))
     )
-    stat_total, stat_completed, stat_cancelled, stat_revenue, stat_rated, stat_avg_rating = stats_q.one()
+    stat_total, stat_completed, stat_cancelled, stat_revenue, stat_rated, stat_avg_rating, stat_lady = stats_q.one()
 
     # Table query conditions (base + optional status filter)
     table_where = list(base_where)
@@ -2262,6 +2308,7 @@ async def admin_bookings(
             "fare": float(b.final_amount or 0),
             "distance_km": float(b.distance_km or 0),
             "duration_min": int(b.duration_min or 0),
+            "lady_driver_requested": bool(b.lady_driver_requested),
             "booked_at": b.booked_at.isoformat() if b.booked_at else "",
         }
 
@@ -2289,6 +2336,8 @@ async def admin_bookings(
             "start_date": start,
             "end_date": end,
             "status": status,
+            "lady": lady,
+            "stat_lady": stat_lady or 0,
             "stat_total": stat_total,
             "stat_completed": stat_completed,
             "stat_cancelled": stat_cancelled,
@@ -2379,6 +2428,7 @@ async def admin_bookings_feed(
             "customer_rating": float(b.customer_rating) if b.customer_rating is not None else None,
             "customer_feedback": b.customer_feedback or "",
             "promo_code": b.promo_code or "",
+            "lady_driver_requested": bool(b.lady_driver_requested),
             "booked_at": b.booked_at.strftime("%Y-%m-%d %H:%M") if b.booked_at else "",
         }
 

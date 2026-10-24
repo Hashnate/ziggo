@@ -67,7 +67,7 @@
 
 <!-- Driver Stats Bar -->
 {% if view != 'applications' %}
-<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+<div class="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
     <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
         <div class="flex items-center justify-between mb-4">
             <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
@@ -106,6 +106,19 @@
         <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Platform Rating</p>
         <p class="text-2xl font-black text-ziggo">{{ "{:.2f}".format(stats.avg_rating) }}</p>
     </div>
+    <a href="/admin/drivers?gender=female" class="block bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:border-pink-200 transition" title="Show lady drivers">
+        <div class="flex items-center justify-between mb-4">
+            <div class="w-10 h-10 bg-pink-50 text-pink-600 rounded-2xl flex items-center justify-center">
+                <i class="fas fa-person-dress"></i>
+            </div>
+            <span class="text-xs font-black text-pink-600">{{ stats.ladies_online }} online</span>
+        </div>
+        <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Lady Drivers</p>
+        <p class="text-2xl font-black text-ziggo">{{ stats.ladies }}</p>
+        {% if stats.ladies_fpo %}
+        <p class="text-[11px] text-pink-700 font-bold mt-1">{{ stats.ladies_fpo }} female passengers only</p>
+        {% endif %}
+    </a>
 </div>
 {% else %}
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -157,6 +170,15 @@
                     <option value="incomplete" {% if status == 'incomplete' %}selected{% endif %}>⚪ Incomplete / Draft</option>
                 </select>
             </div>
+            <div>
+                <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Gender</label>
+                <select name="gender" onchange="this.form.submit()" class="bg-white border border-gray-200 rounded-lg px-4 py-2 text-sm font-semibold outline-none shadow-soft-sm cursor-pointer hover:border-ziggo transition-all min-w-[140px]">
+                    <option value="all" {% if gender == 'all' %}selected{% endif %}>All</option>
+                    <option value="female" {% if gender == 'female' %}selected{% endif %}>Lady drivers</option>
+                    <option value="male" {% if gender == 'male' %}selected{% endif %}>Male</option>
+                    <option value="unknown" {% if gender == 'unknown' %}selected{% endif %}>Not known (check NIC)</option>
+                </select>
+            </div>
             {% endif %}
             <div class="flex-1 min-w-[260px] max-w-sm">
                 <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Quick Search</label>
@@ -165,7 +187,7 @@
             <button type="submit" class="px-4 py-2 bg-ziggo text-white rounded-lg font-black text-xs shadow-brand hover:bg-ziggo-light transition flex items-center gap-1.5 h-[38px] items-center">
                 <i class="fas fa-search"></i> Search
             </button>
-            {% if status != 'all' or search %}
+            {% if status != 'all' or search or (gender and gender != 'all') %}
             <a href="/admin/drivers?view={{ view }}" class="px-4 py-2 bg-slate-100 border border-gray-200 text-gray-700 rounded-lg font-black text-xs hover:bg-slate-200 transition flex items-center gap-1.5 h-[38px] items-center">
                 Clear Filter
             </a>
@@ -227,7 +249,7 @@
                     {% if status and status != 'all' and status != 'incomplete' and status != 'all_with_draft' %}
                     <div class="border-t border-gray-100 my-1"></div>
                     <!-- Option 4: Current Filtered View -->
-                    <a href="/admin/drivers/export?status={{ status }}{% if search %}&search={{ search }}{% endif %}" class="flex items-start gap-3 px-4 py-2.5 hover:bg-purple-50/70 transition group text-left">
+                    <a href="/admin/drivers/export?status={{ status }}{% if search %}&search={{ search }}{% endif %}{% if gender and gender != 'all' %}&gender={{ gender }}{% endif %}" class="flex items-start gap-3 px-4 py-2.5 hover:bg-purple-50/70 transition group text-left">
                         <div class="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-purple-600 group-hover:text-white transition">
                             <i class="fas fa-filter text-xs"></i>
                         </div>
@@ -335,6 +357,14 @@
                             <div class="min-w-0 flex-1">
                                 <p class="text-sm font-bold text-ziggo truncate" title="{{ driver.user.full_name or 'N/A' }}">{{ driver.user.full_name or 'N/A' }}</p>
                                 <p class="text-xs text-gray-400 truncate">{{ driver.user.phone_number }}</p>
+                                {% if driver.user.gender == 'female' %}
+                                <div class="flex flex-wrap gap-1 mt-1">
+                                    <span class="px-1.5 py-0.5 rounded bg-pink-50 text-pink-700 text-[10px] font-black uppercase tracking-wide">Lady</span>
+                                    {% if driver.female_passengers_only %}
+                                    <span class="px-1.5 py-0.5 rounded bg-pink-50 text-pink-700 text-[10px] font-black uppercase tracking-wide">Female passengers only</span>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
                     </td>
@@ -437,7 +467,7 @@
         </p>
         <div class="flex items-center gap-1.5">
             {% if page > 1 %}
-                <a href="/admin/drivers?page={{ page - 1 }}&status={{ status }}&search={{ search }}&view={{ view }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
+                <a href="/admin/drivers?page={{ page - 1 }}&status={{ status }}&search={{ search }}&view={{ view }}&gender={{ gender }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
             {% else %}
                 <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Previous</span>
             {% endif %}
@@ -446,12 +476,12 @@
                 {% if p == page %}
                     <span class="px-3 py-1.5 rounded-lg bg-ziggo text-white text-xs font-black">{{ p }}</span>
                 {% else %}
-                    <a href="/admin/drivers?page={{ p }}&status={{ status }}&search={{ search }}&view={{ view }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
+                    <a href="/admin/drivers?page={{ p }}&status={{ status }}&search={{ search }}&view={{ view }}&gender={{ gender }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
                 {% endif %}
             {% endfor %}
 
             {% if page < total_pages %}
-                <a href="/admin/drivers?page={{ page + 1 }}&status={{ status }}&search={{ search }}&view={{ view }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
+                <a href="/admin/drivers?page={{ page + 1 }}&status={{ status }}&search={{ search }}&view={{ view }}&gender={{ gender }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
             {% else %}
                 <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Next</span>
             {% endif %}
