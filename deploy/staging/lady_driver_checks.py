@@ -6,17 +6,23 @@ Two tuk drivers go online next to a Colombo pickup: Test Driver 1 (0771000001, a
 her NIC) and a generated male tuk driver. The test customer (0771234567) books through
 the app's API. Who was offered a ride is read from the per-driver request notifications,
 and the live messages are read with a WebSocket listener inside the staging backend.
+The admin Bookings page is checked for the Lady driver label, filter and count.
 Genders, the switch and the drivers' online state are put back afterwards.
 """
+import http.cookiejar
 import json
+import re
 import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
-BASE = "https://test.ziggo.lk/api/v1"
+ROOT = "https://test.ziggo.lk"
+BASE = ROOT + "/api/v1"
+ADMIN_PW = next(l.split()[-1] for l in open("/root/ziggo-staging-admin-logins.txt") if l.startswith("0700000000"))
 DB = ["docker", "exec", "-i", "ziggo_postgres_staging", "psql", "-U", "ziggo_staging", "-d", "ziggo_staging",
       "-At", "-v", "ON_ERROR_STOP=1", "-c"]
 BORELLA, NUGEGODA = (6.9147, 79.8778), (6.8649, 79.8997)
@@ -85,6 +91,22 @@ def offered(bid):
                f"where n.type in {REQUEST_TYPES} and (n.data = '{{\"booking_id\":{bid}}}' "
                f"or n.data like '{{\"booking_id\":{bid},%') order by 1")
     return set(rows.split()) if rows else set()
+
+
+admin = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+
+
+def admin_req(path, fields=None):
+    data = None if fields is None else urllib.parse.urlencode(fields).encode()
+    try:
+        with admin.open(ROOT + path, data=data, timeout=30) as r:
+            return r.status, r.read().decode(errors="replace")
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode(errors="replace")
+
+
+def table_row(html, bid):
+    return html.split(f'id="table-row-{bid}"', 1)[1].split("</tr>", 1)[0] if f'id="table-row-{bid}"' in html else ""
 
 
 def set_gender(phone, gender, source):
@@ -168,7 +190,7 @@ try:
     print("Lady driver ride")
     lw, mw, cw = Listener(lady), Listener(man), Listener(customer)
     s, b = ride(customer, lady_driver=True)
-    bid = b.get("id") if s == 201 else None
+    bid = lady_bid = b.get("id") if s == 201 else None
     created.append(bid)
     check("booked", s == 201 and b.get("lady_driver_requested") is True, f"{s} {str(b)[:120]}")
     time.sleep(1)
@@ -190,7 +212,7 @@ try:
 
     print("Normal ride")
     s, b = ride(customer)
-    bid = b.get("id") if s == 201 else None
+    bid = plain_bid = b.get("id") if s == 201 else None
     created.append(bid)
     time.sleep(1)
     check("offered to both drivers", {LADY, man_phone} <= offered(bid), str(offered(bid)))
@@ -279,6 +301,35 @@ try:
     created.append(bid)
     time.sleep(1)
     check("parcels are unchanged: offered to her too", s == 201 and LADY in offered(bid), f"{s} {offered(bid)}")
+    cancel(customer, bid)
+
+    print("Admin Bookings page")
+    set_gender(CUSTOMER, "female", "self")
+    s, b = ride(customer, lady_driver=True)
+    bid = b.get("id") if s == 201 else None
+    created.append(bid)
+    st, html = admin_req("/admin/login", {"phone_number": "0700000000", "password": ADMIN_PW})
+    check("admin logs in", st == 200 and "logout" in html.lower(), f"{st}")
+    lady_count = sql("select count(*) from bookings where not is_flash and not is_courier and lady_driver_requested")
+    st, html = admin_req("/admin/bookings")
+    check("the table labels the lady driver ride, not the normal one", "Lady driver" in table_row(html, lady_bid)
+          and table_row(html, plain_bid) and "Lady driver" not in table_row(html, plain_bid), f"{st}")
+    card = html.split(f'id="ride-card-{bid}"', 1)[-1].split("fa-user", 1)[0] if f'id="ride-card-{bid}"' in html else ""
+    check("the live sidebar labels the searching lady driver ride", "Lady driver" in card)
+    check("the Total card counts lady driver requests", f"{lady_count} asked for a lady driver" in html, lady_count)
+    st, html = admin_req("/admin/bookings?lady=1")
+    total = re.search(r'id="kpiStatTotal">(\d+)<', html)
+    check("the Lady driver filter lists only lady driver rides", st == 200 and table_row(html, lady_bid)
+          and not table_row(html, plain_bid), f"{st}")
+    check("and its Total is the lady driver count", total and total.group(1) == lady_count,
+          f"{total and total.group(1)} / {lady_count}")
+    check("a filtered page keeps its own KPI numbers", "var kpiFiltered = true;" in html
+          and "var kpiFiltered = false;" in admin_req("/admin/bookings")[1])
+    st, feed = admin_req("/admin/bookings/feed")
+    flags = {x["id"]: x.get("lady_driver_requested") for x in json.loads(feed)["recent_bookings"]}
+    check("the live feed carries the flag", flags.get(lady_bid) is True and flags.get(plain_bid) is False
+          and any(x["id"] == bid and x.get("lady_driver_requested") for x in json.loads(feed)["active_bookings"]),
+          f"{flags.get(lady_bid)} {flags.get(plain_bid)}")
     cancel(customer, bid)
 finally:
     for bid in created:

@@ -4,12 +4,16 @@
 
 The test customer (0771234567) chooses a gender once, admins correct customers on
 the Riders page and drivers on the driver edit form, and only a lady driver can
-ask for female passengers only. Test Driver 1 (0771000001, tuk) is a woman by her
+ask for female passengers only. The Drivers page filters, counts and exports lady
+drivers. Test Driver 1 (0771000001, tuk) is a woman by her
 generated NIC; Test Driver 2 (0771000002, bike) is a man. Everything touched is
 put back afterwards, even if a check fails.
 """
+import csv
 import http.cookiejar
+import io
 import json
+import re
 import subprocess
 import sys
 import urllib.error
@@ -67,6 +71,10 @@ def check(label, ok, detail=""):
 
 def gender_of(phone):
     return sql(f"select coalesce(gender, '') || '/' || coalesce(gender_source, '') from users where phone_number = '{phone}'")
+
+
+def listed(html, phone):
+    return f'truncate">{phone}</p>' in html
 
 
 def driver_form(driver_id, gender):
@@ -158,6 +166,41 @@ try:
           f"{st} {gender_of(LADY)}")
     check("saving the form left her approved", sql(f"select status from drivers where id = {lady_id}") == "APPROVED",
           sql(f"select status from drivers where id = {lady_id}"))
+
+    print("Admin driver list")
+    submitted_ladies = ("from drivers d join users u on u.id = d.user_id "
+                        "where coalesce(d.vehicle_number, '') <> '' and u.gender = 'female'")
+    call("POST", "/driver/online", lady, {"is_online": True})
+    st, html = admin_req("/admin/drivers")
+    card = re.search(r'(\d+) online</span>\s*</div>\s*<p[^>]*>Lady Drivers</p>\s*<p[^>]*>(\d+)</p>', html)
+    want = (sql(f"select count(*) filter (where d.is_online and d.is_approved) {submitted_ladies}"),
+            sql(f"select count(*) {submitted_ladies}"))
+    check("Lady Drivers card counts them and how many are online", card and card.groups() == want,
+          f"{card and card.groups()} / {want}")
+    call("POST", "/driver/online", lady, {"is_online": False})
+    st, html = admin_req(f"/admin/drivers?gender=female&search={LADY}")
+    check("lady filter lists Test Driver 1 with a Lady badge", st == 200 and listed(html, LADY) and ">Lady</span>" in html
+          and ">Female passengers only</span>" not in html and "Clear Filter" in html, f"{st}")
+    for gender, phone in (("male", LADY), ("female", MAN), ("unknown", LADY)):
+        st, html = admin_req(f"/admin/drivers?gender={gender}&search={phone}")
+        check(f"'{gender}' filter leaves out {phone}", st == 200 and not listed(html, phone), f"{st}")
+    st, html = admin_req(f"/admin/drivers?gender=male&search={MAN}")
+    check("'male' filter lists Test Driver 2, no Lady badge", listed(html, MAN) and ">Lady</span>" not in html)
+    sql(f"update users set gender = null, gender_source = null where phone_number = '{MAN}'")
+    st, html = admin_req(f"/admin/drivers?gender=unknown&search={MAN}")
+    check("'not known' filter finds a driver with no gender", st == 200 and listed(html, MAN), f"{st}")
+    st, html = admin_req(f"/admin/drivers?gender=nonsense&search={LADY}")
+    check("an unknown filter value is ignored", st == 200 and listed(html, LADY), f"{st}")
+    call("POST", "/driver/female-passengers-only", lady, {"enabled": True})
+    st, html = admin_req(f"/admin/drivers?gender=female&search={LADY}")
+    check("her row says Female passengers only", ">Female passengers only</span>" in html)
+    st, csv_text = admin_req(f"/admin/drivers/export?gender=female&search={LADY}")
+    rows = list(csv.reader(io.StringIO(csv_text)))
+    check("export has Gender columns and her row", st == 200 and rows[0][-2:] == ["Gender", "Female Passengers Only"]
+          and len(rows) == 2 and rows[1][2] == LADY and rows[1][-2:] == ["Female", "Yes"], f"{st} {rows[:1]} {rows[1:2]}")
+    st, csv_text = admin_req(f"/admin/drivers/export?gender=male&search={LADY}")
+    check("export honours the gender filter", st == 200 and len(list(csv.reader(io.StringIO(csv_text)))) == 1, f"{st}")
+    call("POST", "/driver/female-passengers-only", lady, {"enabled": False})
 finally:
     for phone, v in json.loads(saved or "{}").items():
         g = "null" if v["gender"] is None else f"'{v['gender']}'"
