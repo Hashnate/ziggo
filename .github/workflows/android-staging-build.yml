@@ -1,0 +1,83 @@
+name: Android Staging Build (test.ziggo.lk)
+
+# Builds an APK that talks to the STAGING backend (https://test.ziggo.lk), for
+# internal testers only. Nothing is uploaded to a store. It is signed with a
+# throwaway key generated in each run, never the upload keystore, so Play would
+# reject it. Testers uninstall the store app (and any older staging build, whose
+# key differs) before installing it.
+#
+# Run it by pushing a tag that starts with "staging-app-" on the commit to build:
+#   git tag staging-app-2026-10-22.1 origin/dev && git push origin staging-app-2026-10-22.1
+# The production workflows only run on pushes to main, so tags never trigger them.
+# workflow_dispatch only becomes usable once this file is also on the default branch.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'staging-app-*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build staging APK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ziggo_app
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Configure Maps key and Firebase config
+        env:
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          echo "MAPS_API_KEY=$MAPS_API_KEY" > android/local.properties
+          echo "GOOGLE_MAPS_API_KEY=$MAPS_API_KEY" > .env
+          echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 -di > android/app/google-services.json
+
+      - name: Create a throwaway signing key
+        run: |
+          keytool -genkeypair -noprompt -keystore android/app/staging-keystore.jks \
+            -storepass ziggo-staging -keypass ziggo-staging -alias staging \
+            -keyalg RSA -keysize 2048 -validity 3650 -dname "CN=Ziggo Staging"
+          printf 'storePassword=ziggo-staging\nkeyPassword=ziggo-staging\nkeyAlias=staging\nstoreFile=staging-keystore.jks\n' > android/key.properties
+
+      - name: Build APK against staging
+        run: |
+          set -o pipefail
+          flutter build apk --release --dart-define=API_HOST=https://test.ziggo.lk 2>&1 | tee build.log || {
+            # Job logs need a GitHub login; an annotation shows on the public run page.
+            msg=$(grep -E "error|Error|FAILURE|What went wrong|Exception" build.log | tail -25 | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error title=flutter build apk failed::$msg"
+            exit 1
+          }
+
+      - name: Upload staging APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ziggo-staging-apk
+          path: ziggo_app/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
