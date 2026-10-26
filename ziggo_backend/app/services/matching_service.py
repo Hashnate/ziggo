@@ -16,7 +16,7 @@ from ..models import (
     User,
 )
 from .fare_service import haversine_km
-from .gender_service import refusal_for_driver
+from .gender_service import female_passengers_only, refusal_for_driver
 
 
 _ACTIVE_RIDE = (BookingStatus.ACCEPTED, BookingStatus.ARRIVED, BookingStatus.STARTED)
@@ -328,17 +328,17 @@ async def drivers_for_customer(
     passenger_trip: bool,
 ) -> List[Driver]:
     """Drop the drivers this ride may not be offered to: men when a lady driver was
-    asked for, and lady drivers on "female passengers only" when the customer isn't
-    female (Phase 2, feature 03). Parcels pass through unchanged."""
+    asked for, and lady Scooter drivers on "female passengers only" when the customer
+    isn't female (Phase 2, feature 03). Parcels pass through unchanged."""
     if not passenger_trip or not drivers:
         return list(drivers)
-    if not lady_driver and not any(d.female_passengers_only for d in drivers):
+    if not lady_driver and not any(female_passengers_only(d) for d in drivers):
         return list(drivers)
     q = await db.execute(select(User.id, User.gender).where(User.id.in_({d.user_id for d in drivers})))
     genders = dict(q.all())
     kept = [
         d for d in drivers
-        if refusal_for_driver(genders.get(d.user_id), d.female_passengers_only, customer_gender, lady_driver) is None
+        if refusal_for_driver(genders.get(d.user_id), female_passengers_only(d), customer_gender, lady_driver) is None
     ]
     print(f"[match-gender] lady_driver={lady_driver} customer={customer_gender} kept {len(kept)} of {len(drivers)}")
     return kept

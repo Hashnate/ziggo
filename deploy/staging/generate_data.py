@@ -279,7 +279,7 @@ async def main() -> None:
                 test_customer = cust
 
         # Drivers: approved fleet by vehicle mix, delivery riders, pending and suspended
-        # registrations, and six known test drivers. Every 4th driver and test driver 1 are women.
+        # registrations, and six known test drivers. Every 4th driver and test driver 6 (scooter) are women.
         ride_drivers, home_of, test_drivers = defaultdict(list), {}, {}
         n = 0
         for vtype, count in FLEET.items():
@@ -303,7 +303,7 @@ async def main() -> None:
         for k, vtype in enumerate([t for t in TEST_DRIVER_TYPES if t in active][:6], start=1):
             n += 1
             driver, home = await add_driver(db, n, f"077100000{k}", f"Test Driver {k} ({vtype})", vtype,
-                                            DriverStatus.APPROVED, home="Colombo", female=k == 1)
+                                            DriverStatus.APPROVED, home="Colombo", female=k == 6)
             ride_drivers[vtype].append(driver)
             home_of[driver.id] = home
             test_drivers[vtype] = driver

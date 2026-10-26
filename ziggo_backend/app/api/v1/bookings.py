@@ -49,6 +49,9 @@ from ...services.gender_service import (
     FEMALE,
     LADY_DRIVER_FEMALE_ONLY,
     LADY_DRIVER_RIDES_ONLY,
+    LADY_DRIVER_SCOOTER_ONLY,
+    female_passengers_only,
+    is_lady_driver_service,
     is_passenger_trip,
     no_driver_payload,
     refusal_for_driver,
@@ -543,7 +546,7 @@ async def estimate_fare(
     # FareEstimateResponse doesn't carry rental_hours/hourly_rate; strip them.
     fare.pop("hourly_rate", None)
     fare.pop("rental_hours", None)
-    if req.lady_driver and is_passenger_trip(req.is_flash, req.is_courier):
+    if req.lady_driver and is_passenger_trip(req.is_flash, req.is_courier) and is_lady_driver_service(req.service_type):
         fare["lady_drivers_nearby"] = await _lady_drivers_nearby(
             db, req.pickup_lat, req.pickup_lng, req.service_type, req.is_rental, user.gender)
     return FareEstimateResponse(service_type=req.service_type, **fare)
@@ -584,6 +587,8 @@ async def estimate_fare_bulk(
     )
     if req.lady_driver and is_passenger_trip(req.is_flash, req.is_courier):
         for st, r in results.items():
+            if not is_lady_driver_service(st):
+                continue
             r["lady_drivers_nearby"] = await _lady_drivers_nearby(
                 db, req.pickup_lat, req.pickup_lng, st, req.is_rental, user.gender)
     return results
@@ -619,6 +624,8 @@ async def create_booking(
     if req.lady_driver:
         if not is_passenger_trip(req.is_flash, req.is_courier):
             raise HTTPException(status_code=400, detail=LADY_DRIVER_RIDES_ONLY)
+        if not is_lady_driver_service(req.service_type):
+            raise HTTPException(status_code=400, detail=LADY_DRIVER_SCOOTER_ONLY)
         if user.gender != FEMALE:
             raise HTTPException(status_code=400, detail=LADY_DRIVER_FEMALE_ONLY)
 
@@ -1452,8 +1459,8 @@ async def accept_booking(
             status_code=409,
             detail="This ride has already been taken or cancelled",
         )
-    if is_passenger_trip(b.is_flash, b.is_courier) and (b.lady_driver_requested or driver.female_passengers_only):
-        refusal = refusal_for_driver(user.gender, driver.female_passengers_only,
+    if is_passenger_trip(b.is_flash, b.is_courier) and (b.lady_driver_requested or female_passengers_only(driver)):
+        refusal = refusal_for_driver(user.gender, female_passengers_only(driver),
                                      await _customer_gender(db, b.customer_id), b.lady_driver_requested)
         if refusal:
             raise HTTPException(status_code=403, detail=refusal)

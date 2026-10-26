@@ -258,7 +258,7 @@ class DriverProfileScreen extends StatelessWidget {
                       title: 'Show Scan & Go QR',
                       onTap: () => _showQrSheet(context, driverId, name, vehicleNumber, vehicleType),
                     ),
-                    if (profile['gender'] == 'female') ...[
+                    if (profile['gender'] == 'female' && vehicleType.trim().toLowerCase() == 'moto scooter') ...[
                       _divider(),
                       const _FemalePassengersOnlyTile(),
                     ],

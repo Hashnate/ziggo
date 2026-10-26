@@ -22,7 +22,13 @@ from ...schemas import (
 )
 from ...services.auth_service import get_current_user, require_role
 from ...services.fare_service import haversine_km
-from ...services.gender_service import FEMALE, apply_nic_gender
+from ...services.gender_service import (
+    FEMALE,
+    FEMALE_PASSENGERS_SCOOTER_ONLY,
+    apply_nic_gender,
+    female_passengers_only,
+    is_lady_driver_service,
+)
 from ...services.ws_manager import manager
 
 router = APIRouter()
@@ -132,7 +138,7 @@ def _to_response(user: User, d: Driver, paid_payouts: float = 0.0, pending_payou
         account_number=d.account_number,
         branch_name=d.branch_name,
         gender=user.gender,
-        female_passengers_only=bool(d.female_passengers_only),
+        female_passengers_only=female_passengers_only(d),
     )
 
 
@@ -903,8 +909,8 @@ async def set_female_passengers_only(
     user: User = Depends(require_role("driver")),
 ):
     d = await _get_driver(db, user)
-    if body.enabled and user.gender != FEMALE:
-        raise HTTPException(status_code=400, detail="Only lady drivers can choose female passengers only.")
+    if body.enabled and (user.gender != FEMALE or not is_lady_driver_service(d.vehicle_type)):
+        raise HTTPException(status_code=400, detail=FEMALE_PASSENGERS_SCOOTER_ONLY)
     d.female_passengers_only = body.enabled
     await db.commit()
     await db.refresh(d)

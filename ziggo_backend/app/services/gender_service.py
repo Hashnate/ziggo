@@ -69,10 +69,14 @@ def gender_label(user) -> str:
 
 
 # ── Who may be offered a trip (stage B) ──────────────────────────────────────
-# Both rules apply to rides only (incl. rentals and return trips); parcels and
-# couriers carry no passenger and are dispatched as before.
+# Both rules apply to Scooter rides only (incl. rentals and return trips): lady
+# drivers ride scooters. Other vehicles, parcels and couriers are dispatched as before.
+
+LADY_DRIVER_SERVICE = "moto scooter"
 
 LADY_DRIVER_RIDES_ONLY = "A lady driver can only be requested for rides."
+LADY_DRIVER_SCOOTER_ONLY = "A lady driver can only be requested for Scooter rides."
+FEMALE_PASSENGERS_SCOOTER_ONLY = "Only lady Scooter drivers can choose female passengers only."
 LADY_DRIVER_FEMALE_ONLY = "Only customers whose profile says female can ask for a lady driver."
 NO_LADY_DRIVER_MESSAGE = "No lady driver is available nearby right now. You can book with any driver instead."
 LADY_DRIVER_REQUESTED = "This customer asked for a lady driver."
@@ -81,6 +85,16 @@ FEMALE_PASSENGERS_ONLY = "You chose female passengers only."
 
 def is_passenger_trip(is_flash, is_courier) -> bool:
     return not (is_flash or is_courier)
+
+
+def is_lady_driver_service(service_type) -> bool:
+    return (service_type or "").strip().lower() == LADY_DRIVER_SERVICE
+
+
+def female_passengers_only(driver) -> bool:
+    """The driver's "female passengers only" choice, which counts only while she rides a
+    Scooter; a driver moved to another vehicle keeps the stored choice for if she comes back."""
+    return bool(driver.female_passengers_only) and is_lady_driver_service(driver.vehicle_type)
 
 
 def refusal_for_driver(driver_gender, female_passengers_only, customer_gender, lady_driver_requested) -> str | None:

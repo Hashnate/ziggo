@@ -480,9 +480,15 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
 
   int? get _ladyDriversNearby => (_estimates[_serviceType]?['lady_drivers_nearby'] as num?)?.toInt();
 
+  // Lady drivers ride scooters only; the switch keeps its state if the customer
+  // looks at another vehicle and comes back.
+  bool get _ladyDriverOffered => _serviceType?.trim().toLowerCase() == 'moto scooter';
+
+  bool get _wantsLadyDriver => _ladyDriver && _ladyDriverOffered;
+
   Future<void> _confirmBooking() async {
     if (_serviceType == null) return;
-    if (_ladyDriver && _ladyDriversNearby == 0) {
+    if (_wantsLadyDriver && _ladyDriversNearby == 0) {
       final anyDriver = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -543,7 +549,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
         receiverPhone: _secondaryPhone != null && _secondaryPhone!.isNotEmpty ? _secondaryPhone : null,
         parcelInstructions: _driverNote.isNotEmpty ? _driverNote : null,
         scheduledTime: _scheduledTime,
-        ladyDriver: _ladyDriver,
+        ladyDriver: _wantsLadyDriver,
       );
     } catch (e) {
       caughtError = e.toString();
@@ -1155,7 +1161,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                       ),
                     ),
 
-                  if (!widget.isTruckMode) _ladyDriverRow(),
+                  if (!widget.isTruckMode && _ladyDriverOffered) _ladyDriverRow(),
 
                   if (widget.isTruckMode)
                     Padding(

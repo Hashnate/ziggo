@@ -2,9 +2,9 @@
 
     python3 deploy/staging/lady_driver_checks.py
 
-Two tuk drivers go online next to a Colombo pickup: Test Driver 1 (0771000001, a woman by
-her NIC) and a generated male tuk driver. The test customer (0771234567) books through
-the app's API. Who was offered a ride is read from the per-driver request notifications,
+Lady drivers ride scooters, so two Scooter drivers go online next to a Colombo pickup:
+Test Driver 6 (0771000006, a woman by her NIC) and a generated male Scooter driver. The
+test customer (0771234567) books through the app's API. Who was offered a ride is read from the per-driver request notifications,
 and the live messages are read with a WebSocket listener inside the staging backend.
 The admin Bookings page is checked for the Lady driver label, filter and count.
 Genders, the switch and the drivers' online state are put back afterwards.
@@ -125,8 +125,11 @@ def set_gender(phone, gender, source):
     sql(f"update users set gender = {g}, gender_source = {s} where phone_number = '{phone}'")
 
 
+SCOOTER = "moto scooter"
+
+
 def ride(token, **extra):
-    body = {"service_type": "tuk", "pickup_lat": BORELLA[0], "pickup_lng": BORELLA[1], "drop_lat": NUGEGODA[0],
+    body = {"service_type": SCOOTER, "pickup_lat": BORELLA[0], "pickup_lng": BORELLA[1], "drop_lat": NUGEGODA[0],
             "drop_lng": NUGEGODA[1], "pickup_address": "Staging lady test pickup",
             "drop_address": "Staging lady test drop", "payment_method": "cash", **extra}
     return call("POST", "/bookings", token, body)
@@ -144,7 +147,7 @@ def online(token, on, km=0.3):
     return s, r
 
 
-CUSTOMER, LADY = "0771234567", "0771000001"
+CUSTOMER, LADY = "0771234567", "0771000006"
 TEST_DRIVERS = [f"077100000{k}" for k in range(1, 7)]
 saved = sql("select json_object_agg(u.phone_number, json_build_object('gender', u.gender, 'source', u.gender_source, "
             "'fpo', d.female_passengers_only)) from users u left join drivers d on d.user_id = u.id "
@@ -155,7 +158,7 @@ for tok in test_tokens:
     call("POST", "/driver/online", tok, {"is_online": False})
 
 man_phone, man = None, None
-for phone in sql("select u.phone_number from drivers d join users u on u.id = d.user_id where d.vehicle_type = 'tuk' "
+for phone in sql("select u.phone_number from drivers d join users u on u.id = d.user_id where d.vehicle_type = 'moto scooter' "
                  "and d.status = 'APPROVED' and d.driver_type = 'ride' and u.gender = 'male' and not d.is_online "
                  "and u.phone_number like '0001%' order by d.id limit 8").split():
     tok = login(phone, "driver")
@@ -165,8 +168,8 @@ for phone in sql("select u.phone_number from drivers d join users u on u.id = d.
 created = []
 try:
     print("Setup")
-    check("a generated male tuk driver is online 500 m away", man is not None, man_phone or "none could go online")
-    check("Test Driver 1 (female by NIC) is online 300 m away", online(lady, True)[0] == 200)
+    check("a generated male Scooter driver is online 500 m away", man is not None, man_phone or "none could go online")
+    check("Test Driver 6 (female by NIC) is online 300 m away", online(lady, True)[0] == 200)
     sql(f"update drivers set female_passengers_only = false where user_id = (select id from users where phone_number = '{LADY}')")
     if man is None:
         raise SystemExit(1)
@@ -184,15 +187,23 @@ try:
         "drop_lng": NUGEGODA[1], "pickup_address": "x", "drop_address": "y", "is_flash": True,
         "parcel_weight_kg": 1, "receiver_phone": "0000000001", "lady_driver": True})
     check("not for parcels", s == 400 and "rides" in str(r), f"{s} {r}")
+    for vehicle in ("tuk", "bike", "car"):
+        s, r = ride(customer, lady_driver=True, service_type=vehicle)
+        check(f"not for a {vehicle}: lady drivers ride scooters", s == 400 and "Scooter" in str(r), f"{s} {r}")
 
     print("Estimate")
     coords = {"pickup_lat": BORELLA[0], "pickup_lng": BORELLA[1], "drop_lat": NUGEGODA[0], "drop_lng": NUGEGODA[1]}
-    _, plain = call("POST", "/bookings/estimate", customer, {"service_type": "tuk", **coords})
-    _, est = call("POST", "/bookings/estimate", customer, {"service_type": "tuk", "lady_driver": True, **coords})
-    _, cards = call("POST", "/bookings/estimate/bulk", customer, {"service_types": ["tuk", "car"], "lady_driver": True, **coords})
-    check("estimate counts 1 lady tuk driver nearby", est.get("lady_drivers_nearby") == 1, str(est.get("lady_drivers_nearby")))
-    check("vehicle cards count per type (tuk 1, car 0)", cards["tuk"].get("lady_drivers_nearby") == 1
-          and cards["car"].get("lady_drivers_nearby") == 0, f"{cards['tuk'].get('lady_drivers_nearby')} / {cards['car'].get('lady_drivers_nearby')}")
+    _, plain = call("POST", "/bookings/estimate", customer, {"service_type": SCOOTER, **coords})
+    _, est = call("POST", "/bookings/estimate", customer, {"service_type": SCOOTER, "lady_driver": True, **coords})
+    _, tuk_est = call("POST", "/bookings/estimate", customer, {"service_type": "tuk", "lady_driver": True, **coords})
+    _, cards = call("POST", "/bookings/estimate/bulk", customer,
+                    {"service_types": [SCOOTER, "tuk", "car"], "lady_driver": True, **coords})
+    check("estimate counts 1 lady Scooter driver nearby", est.get("lady_drivers_nearby") == 1, str(est.get("lady_drivers_nearby")))
+    check("a tuk estimate doesn't count lady drivers", tuk_est.get("lady_drivers_nearby") is None,
+          str(tuk_est.get("lady_drivers_nearby")))
+    check("vehicle cards count on the Scooter card only", cards[SCOOTER].get("lady_drivers_nearby") == 1
+          and cards["tuk"].get("lady_drivers_nearby") is None and cards["car"].get("lady_drivers_nearby") is None,
+          " / ".join(str(cards[v].get("lady_drivers_nearby")) for v in (SCOOTER, "tuk", "car")))
     check("no extra charge: same price as a normal estimate", est["final_amount"] == plain["final_amount"],
           f"Rs.{plain['final_amount']} / Rs.{est['final_amount']}")
     check("a normal estimate doesn't count", plain.get("lady_drivers_nearby") is None)
@@ -241,7 +252,7 @@ try:
 
     print("No lady driver nearby")
     online(lady, False)
-    _, est = call("POST", "/bookings/estimate", customer, {"service_type": "tuk", "lady_driver": True, **coords})
+    _, est = call("POST", "/bookings/estimate", customer, {"service_type": SCOOTER, "lady_driver": True, **coords})
     check("estimate says 0 lady drivers", est.get("lady_drivers_nearby") == 0, str(est.get("lady_drivers_nearby")))
     cw = Listener(customer)
     s, b = ride(customer, lady_driver=True)

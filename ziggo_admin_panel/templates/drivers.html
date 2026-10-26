@@ -106,14 +106,14 @@
         <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Platform Rating</p>
         <p class="text-2xl font-black text-ziggo">{{ "{:.2f}".format(stats.avg_rating) }}</p>
     </div>
-    <a href="/admin/drivers?gender=female" class="block bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:border-pink-200 transition" title="Show lady drivers">
+    <a href="/admin/drivers?gender=lady" class="block bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:border-pink-200 transition" title="Show lady drivers: women on a Scooter">
         <div class="flex items-center justify-between mb-4">
             <div class="w-10 h-10 bg-pink-50 text-pink-600 rounded-2xl flex items-center justify-center">
                 <i class="fas fa-person-dress"></i>
             </div>
             <span class="text-xs font-black text-pink-600">{{ stats.ladies_online }} online</span>
         </div>
-        <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Lady Drivers</p>
+        <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Lady Drivers (Scooter)</p>
         <p class="text-2xl font-black text-ziggo">{{ stats.ladies }}</p>
         {% if stats.ladies_fpo %}
         <p class="text-[11px] text-pink-700 font-bold mt-1">{{ stats.ladies_fpo }} female passengers only</p>
@@ -174,7 +174,8 @@
                 <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Gender</label>
                 <select name="gender" onchange="this.form.submit()" class="bg-white border border-gray-200 rounded-lg px-4 py-2 text-sm font-semibold outline-none shadow-soft-sm cursor-pointer hover:border-ziggo transition-all min-w-[140px]">
                     <option value="all" {% if gender == 'all' %}selected{% endif %}>All</option>
-                    <option value="female" {% if gender == 'female' %}selected{% endif %}>Lady drivers</option>
+                    <option value="lady" {% if gender == 'lady' %}selected{% endif %}>Lady drivers (Scooter)</option>
+                    <option value="female" {% if gender == 'female' %}selected{% endif %}>Female</option>
                     <option value="male" {% if gender == 'male' %}selected{% endif %}>Male</option>
                     <option value="unknown" {% if gender == 'unknown' %}selected{% endif %}>Not known (check NIC)</option>
                 </select>
@@ -358,9 +359,14 @@
                                 <p class="text-sm font-bold text-ziggo truncate" title="{{ driver.user.full_name or 'N/A' }}">{{ driver.user.full_name or 'N/A' }}</p>
                                 <p class="text-xs text-gray-400 truncate">{{ driver.user.phone_number }}</p>
                                 {% if driver.user.gender == 'female' %}
+                                {% set on_scooter = (driver.vehicle_type or '')|trim|lower == 'moto scooter' %}
                                 <div class="flex flex-wrap gap-1 mt-1">
+                                    {% if on_scooter %}
                                     <span class="px-1.5 py-0.5 rounded bg-pink-50 text-pink-700 text-[10px] font-black uppercase tracking-wide">Lady</span>
-                                    {% if driver.female_passengers_only %}
+                                    {% else %}
+                                    <span class="px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 text-[10px] font-black uppercase tracking-wide" title="Lady-driver rides are for Scooter drivers only">Female</span>
+                                    {% endif %}
+                                    {% if on_scooter and driver.female_passengers_only %}
                                     <span class="px-1.5 py-0.5 rounded bg-pink-50 text-pink-700 text-[10px] font-black uppercase tracking-wide">Female passengers only</span>
                                     {% endif %}
                                 </div>

@@ -21,7 +21,14 @@ logger = logging.getLogger(__name__)
 from app.config import settings
 from app.database import get_db
 from app.services import customer_map_service
-from app.services.gender_service import apply_nic_gender, gender_from_nic, gender_label, set_admin_gender
+from app.services.gender_service import (
+    LADY_DRIVER_SERVICE,
+    apply_nic_gender,
+    female_passengers_only,
+    gender_from_nic,
+    gender_label,
+    set_admin_gender,
+)
 from app.models import (
     User,
     UserRole,
@@ -631,11 +638,15 @@ async def admin_dashboard(
     )
 
 
-DRIVER_GENDER_FILTERS = ("female", "male", "unknown")
+DRIVER_GENDER_FILTERS = ("lady", "female", "male", "unknown")
+_on_scooter = func.lower(func.trim(Driver.vehicle_type)) == LADY_DRIVER_SERVICE
 
 
 def _driver_gender_clause(gender: str):
-    """Drivers-page gender filter; "unknown" finds drivers whose NIC couldn't be read."""
+    """Drivers-page gender filter; "unknown" finds drivers whose NIC couldn't be read and
+    "lady" the women on a Scooter, who are the ones offered lady-driver rides."""
+    if gender == "lady":
+        return and_(User.gender == "female", _on_scooter)
     if gender == "unknown":
         return User.gender.is_(None)
     if gender in DRIVER_GENDER_FILTERS:
@@ -711,7 +722,7 @@ async def admin_drivers(
                 func.count(Driver.id).filter(Driver.female_passengers_only == True),  # noqa: E712
             )
             .join(User, Driver.user_id == User.id)
-            .where(is_submitted_driver, User.gender == "female")
+            .where(is_submitted_driver, User.gender == "female", _on_scooter)
         )
     ).one()
 
@@ -985,7 +996,7 @@ async def admin_drivers_export(
             float(d.total_earnings or 0),
             joined_str,
             gender_label(u) if u else "Not set",
-            "Yes" if d.female_passengers_only and u and u.gender == "female" else "No",
+            "Yes" if female_passengers_only(d) and u and u.gender == "female" else "No",
         ])
 
     return Response(
