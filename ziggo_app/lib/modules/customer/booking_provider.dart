@@ -287,6 +287,7 @@ class BookingProvider extends ChangeNotifier with WidgetsBindingObserver {
     DateTime? scheduledTime,
     // Phase 2: female customers, rides only
     bool ladyDriver = false,
+    bool includeBikes = false,
   }) async {
     _setBusy(true);
     _lastError = null;
@@ -323,6 +324,7 @@ class BookingProvider extends ChangeNotifier with WidgetsBindingObserver {
           if (stops.isNotEmpty) 'stops': stops,
           if (scheduledTime != null) 'scheduled_time': scheduledTime.toIso8601String(),
           if (ladyDriver) 'lady_driver': true,
+          if (includeBikes) 'include_bikes': true,
           if (isFlash || isCourier) ...{
             if (isFlash) 'is_flash': true,
             if (isCourier) 'is_courier': true,

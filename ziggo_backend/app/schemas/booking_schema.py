@@ -139,6 +139,8 @@ class BookingCreate(BaseModel):
     scheduled_time: Optional[datetime] = None
     # Phase 2, feature 03 — female customers, rides only
     lady_driver: bool = False
+    # No lady driver: book this Scooter ride with any Scooter or Bike driver
+    include_bikes: bool = False
 
 
 class DriverMini(BaseModel):
@@ -244,6 +246,7 @@ class BookingResponse(BaseModel):
     # Back-to-back indicator
     is_driver_completing_prior_trip: bool = False
     lady_driver_requested: bool = False
+    include_bikes: bool = False
     # Customer live location while waiting for pickup: {lat, lng, at}, only while fresh.
     passenger_sharing: bool = False
     passenger_location: Optional[dict] = None

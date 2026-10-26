@@ -16,7 +16,7 @@ from ..models import (
     User,
 )
 from .fare_service import haversine_km
-from .gender_service import female_passengers_only, refusal_for_driver
+from .gender_service import FALLBACK_BIKE, female_passengers_only, refusal_for_driver
 
 
 _ACTIVE_RIDE = (BookingStatus.ACCEPTED, BookingStatus.ARRIVED, BookingStatus.STARTED)
@@ -223,13 +223,14 @@ async def find_all_nearby_drivers(
     db: AsyncSession,
     pickup_lat: float,
     pickup_lng: float,
-    vehicle_type: Optional[str] = None,
+    vehicle_type=None,
     max_distance_km: float = 10.0,
     exclude_driver_id: Optional[int] = None,
     allow_back_to_back: bool = False,
 ) -> List[Driver]:
     """Return every online + approved driver within `max_distance_km` of the
-    pickup, sorted nearest-first. If `vehicle_type` is set, also filter by it.
+    pickup, sorted nearest-first. If `vehicle_type` is set (one type, or a list
+    from `dispatch_vehicles`), also filter by it.
 
     Used for broadcast dispatch: every driver in range is pinged simultaneously
     and the first to tap Accept wins the ride.
@@ -240,7 +241,9 @@ async def find_all_nearby_drivers(
         Driver.is_online == True,  # noqa: E712
         Driver.status == DriverStatus.APPROVED,
     )
-    if vehicle_type:
+    if isinstance(vehicle_type, (list, tuple)):
+        stmt = stmt.where(Driver.vehicle_type.in_(vehicle_type))
+    elif vehicle_type:
         stmt = stmt.where(Driver.vehicle_type == vehicle_type)
     q = await db.execute(stmt)
     candidates = q.scalars().all()
@@ -318,6 +321,17 @@ async def find_all_nearby_drivers(
         f"too_far(>{max_distance_km}km)={too_far} → broadcasting to {len(in_range)} driver(s)"
     )
     return [d for _, d in in_range]
+
+
+def dispatch_vehicles(booking) -> Optional[List[str]]:
+    """Vehicle types a booking is offered to: any for parcels, otherwise its own,
+    plus bikes for a Scooter ride that fell back from a lady driver to any driver."""
+    if booking.is_flash or booking.is_courier:
+        return None
+    types = [booking.service_type]
+    if getattr(booking, "include_bikes", False):
+        types.append(FALLBACK_BIKE)
+    return types
 
 
 async def drivers_for_customer(

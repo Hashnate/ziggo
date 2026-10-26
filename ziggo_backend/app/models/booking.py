@@ -124,6 +124,9 @@ class Booking(Base):
     # The customer asked for a lady driver (Phase 2, feature 03). Cleared if she
     # switches to any driver while searching.
     lady_driver_requested = Column(Boolean, nullable=False, default=False)
+    # A Scooter ride that fell back from a lady driver to any driver is also offered
+    # to Bike drivers, at the Scooter price (Phase 2, feature 03).
+    include_bikes = Column(Boolean, nullable=False, default=False)
     # The customer's live location while waiting for pickup (Phase 2, feature 01).
     # Only the latest point, only while she or he shares it; see passenger_location_service.
     passenger_sharing = Column(Boolean, nullable=False, default=False)

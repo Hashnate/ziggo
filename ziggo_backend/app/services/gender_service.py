@@ -73,12 +73,16 @@ def gender_label(user) -> str:
 # drivers ride scooters. Other vehicles, parcels and couriers are dispatched as before.
 
 LADY_DRIVER_SERVICE = "moto scooter"
+# When no lady driver takes a Scooter ride and the customer chooses any driver,
+# Bike drivers are offered it too (Booking.include_bikes).
+FALLBACK_BIKE = "bike"
 
 LADY_DRIVER_RIDES_ONLY = "A lady driver can only be requested for rides."
 LADY_DRIVER_SCOOTER_ONLY = "A lady driver can only be requested for Scooter rides."
 FEMALE_PASSENGERS_SCOOTER_ONLY = "Only lady Scooter drivers can choose female passengers only."
 LADY_DRIVER_FEMALE_ONLY = "Only customers whose profile says female can ask for a lady driver."
-NO_LADY_DRIVER_MESSAGE = "No lady driver is available nearby right now. You can book with any driver instead."
+NO_LADY_DRIVER_MESSAGE = ("No lady driver is available nearby right now. "
+                          "You can book with any Scooter or Bike driver instead.")
 LADY_DRIVER_REQUESTED = "This customer asked for a lady driver."
 FEMALE_PASSENGERS_ONLY = "You chose female passengers only."
 

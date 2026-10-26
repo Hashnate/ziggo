@@ -67,6 +67,8 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
   bool _loadingEstimates = false;
   bool _usePoints = false;
   bool _ladyDriver = false;
+  // No lady driver and the customer chose any driver: Bike drivers get the ride too.
+  bool _includeBikes = false;
   bool _truckTermsAccepted = false;
   late final TapGestureRecognizer _termsRecognizer;
   DateTime? _scheduledTime;
@@ -496,7 +498,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
           icon: const Icon(Icons.woman_rounded, color: AppColors.ladies, size: 36),
           title: const Text('No lady drivers nearby', textAlign: TextAlign.center),
           content: const Text(
-            'No lady driver is available nearby right now. Would you like to book with any driver instead?',
+            'No lady driver is available nearby right now. Would you like to book with any Scooter or Bike driver instead?',
             textAlign: TextAlign.center,
           ),
           actions: [
@@ -509,7 +511,10 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
         ),
       );
       if (anyDriver != true || !mounted) return;
-      setState(() => _ladyDriver = false);
+      setState(() {
+        _ladyDriver = false;
+        _includeBikes = true;
+      });
     }
     
     final confirmedPlace = await Navigator.push<Place>(
@@ -550,6 +555,7 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
         parcelInstructions: _driverNote.isNotEmpty ? _driverNote : null,
         scheduledTime: _scheduledTime,
         ladyDriver: _wantsLadyDriver,
+        includeBikes: _includeBikes && _ladyDriverOffered && !_wantsLadyDriver,
       );
     } catch (e) {
       caughtError = e.toString();
@@ -1304,7 +1310,10 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                 value: _ladyDriver,
                 activeColor: AppColors.ladies,
                 onChanged: (v) {
-                  setState(() => _ladyDriver = v);
+                  setState(() {
+                    _ladyDriver = v;
+                    _includeBikes = false;
+                  });
                   if (v) _recalculate();
                 },
               )

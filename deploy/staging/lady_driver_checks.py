@@ -266,7 +266,8 @@ try:
     old_start = sql(f"select coalesce(dispatch_started_at, booked_at) from bookings where id = {bid}")
     mw = Listener(man)
     s, r = call("POST", f"/bookings/{bid}/any-driver", customer)
-    check("switch to any driver", s == 200 and r.get("lady_driver_requested") is False and r.get("status") == "searching",
+    check("switch to any driver, Bike drivers included", s == 200 and r.get("lady_driver_requested") is False
+          and r.get("include_bikes") is True and r.get("status") == "searching",
           f"{s} {str(r)[:120]}")
     time.sleep(1)
     check("now offered to the male driver", man_phone in offered(bid), str(offered(bid)))

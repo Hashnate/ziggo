@@ -7,7 +7,7 @@ from ..database import AsyncSessionLocal
 from ..models import Booking, BookingStatus, Notification, Customer, Driver, User
 from .ws_manager import manager
 from .gender_service import is_passenger_trip, no_driver_payload
-from .matching_service import drivers_for_customer, find_all_nearby_drivers
+from .matching_service import dispatch_vehicles, drivers_for_customer, find_all_nearby_drivers
 from ..api.v1.bookings import get_search_radius_for_service
 
 TICK_SECONDS = 30
@@ -39,7 +39,7 @@ async def dispatch_booking(db, booking: Booking) -> None:
     max_radius = await get_search_radius_for_service(db, dispatch_vehicle)
 
     nearby = await find_all_nearby_drivers(
-        db, booking.pickup_lat, booking.pickup_lng, dispatch_vehicle, max_distance_km=max_radius
+        db, booking.pickup_lat, booking.pickup_lng, dispatch_vehicles(booking), max_distance_km=max_radius
     )
     # Only ride-type drivers receive scheduled ride-hailing/parcel booking dispatches
     nearby = [d for d in nearby if getattr(d, 'driver_type', 'ride') == 'ride']

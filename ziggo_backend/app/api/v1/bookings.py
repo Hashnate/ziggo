@@ -58,6 +58,7 @@ from ...services.gender_service import (
     search_timeout_reason,
 )
 from ...services.matching_service import (
+    dispatch_vehicles,
     drivers_for_customer,
     find_all_nearby_drivers,
     find_nearest_driver,
@@ -233,6 +234,7 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
         waiting_charge=float(b.waiting_charge or 0.0),
         is_driver_completing_prior_trip=is_driver_completing_prior_trip,
         lady_driver_requested=bool(b.lady_driver_requested),
+        include_bikes=bool(b.include_bikes),
         passenger_sharing=bool(b.passenger_sharing),
         passenger_location=passenger_location_service.live_point(b),
         stops=[
@@ -775,6 +777,8 @@ async def create_booking(
         scheduled_at=req.scheduled_time,
         scheduled_dispatch_sent=False,
         lady_driver_requested=bool(req.lady_driver),
+        include_bikes=bool(req.include_bikes and not req.lady_driver and is_lady_driver_service(req.service_type)
+                           and is_passenger_trip(req.is_flash, req.is_courier)),
     )
     db.add(booking)
     await db.flush()
@@ -834,7 +838,7 @@ async def create_booking(
             db,
             req.pickup_lat,
             req.pickup_lng,
-            dispatch_vehicle,
+            dispatch_vehicles(booking),
             max_distance_km=max_radius,
             allow_back_to_back=not (booking.is_flash or booking.is_courier or booking.is_rental),
         )
@@ -1576,7 +1580,7 @@ async def accept_booking(
         db,
         float(b.pickup_lat),
         float(b.pickup_lng),
-        dispatch_vehicle,
+        dispatch_vehicles(b),
         max_distance_km=max_radius,
         exclude_driver_id=driver.id,
     )
@@ -1780,6 +1784,7 @@ async def switch_to_any_driver(
         raise HTTPException(status_code=409, detail="This ride is no longer looking for a driver")
     if b.lady_driver_requested:
         b.lady_driver_requested = False
+        b.include_bikes = is_lady_driver_service(b.service_type)
         if b.scheduled_at is not None and not b.scheduled_dispatch_sent:
             await db.commit()
         else:
@@ -2282,7 +2287,7 @@ async def update_booking_status(
             db,
             float(b.pickup_lat),
             float(b.pickup_lng),
-            dispatch_vehicle,
+            dispatch_vehicles(b),
             max_distance_km=max_radius,
             exclude_driver_id=None,
         )
@@ -2391,7 +2396,7 @@ async def update_booking_status(
             db,
             float(b.pickup_lat),
             float(b.pickup_lng),
-            dispatch_vehicle,
+            dispatch_vehicles(b),
             max_distance_km=max_radius,
             exclude_driver_id=None,
         )
