@@ -201,6 +201,7 @@
                     <span id="trackedDistance"><i class="fas fa-route text-blue-500 mr-1"></i> Road: -- km</span>
                     <span id="trackedDuration"><i class="fas fa-clock text-amber-500 mr-1"></i> Est: -- min</span>
                 </div>
+                <div id="trackedGps" class="hidden mt-1.5 text-[11px] font-bold"></div>
             </div>
 
             <!-- Map Legend -->
@@ -504,6 +505,7 @@
                           (data.recent_bookings || []).find(function(b) { return b.id === currentTrackedBookingId; });
             if (tracked) {
                 updateTrackedRideCard(tracked);
+                setTrackedGps(tracked);
                 if (tracked.driver_lat && tracked.driver_lng) {
                     if (vehicleOverlays.has(tracked.id)) {
                         vehicleOverlays.get(tracked.id).update(tracked.driver_lat, tracked.driver_lng, tracked.driver_heading);
@@ -672,6 +674,38 @@
         }
     }
 
+    // When the tracked ride's driver last sent a GPS fix (ms). Shows whether a still
+    // vehicle is parked or the driver's phone has stopped reporting.
+    var trackedGpsAt = null;
+    var trackedDriverId = null;
+
+    function setTrackedGps(b) {
+        var live = ['accepted', 'arrived', 'started'].indexOf(b.status) !== -1;
+        trackedDriverId = live ? b.driver_id : null;
+        trackedGpsAt = (live && b.driver_location_at) ? Date.parse(b.driver_location_at) : null;
+        renderTrackedGps();
+    }
+
+    function renderTrackedGps() {
+        var el = document.getElementById('trackedGps');
+        if (!el) return;
+        if (!currentTrackedBookingId || !trackedGpsAt) {
+            el.classList.add('hidden');
+            return;
+        }
+        var secs = Math.max(0, Math.round((Date.now() - trackedGpsAt) / 1000));
+        var ago = secs < 60 ? secs + ' s' : Math.round(secs / 60) + ' min';
+        if (secs <= 60) {
+            el.className = 'mt-1.5 text-[11px] font-bold text-emerald-600';
+            el.innerHTML = '<i class="fas fa-satellite-dish mr-1"></i> Driver GPS updated ' + ago + ' ago';
+        } else {
+            el.className = 'mt-1.5 text-[11px] font-bold text-amber-600';
+            el.innerHTML = '<i class="fas fa-exclamation-triangle mr-1"></i> No GPS from the driver\'s phone for ' + ago;
+        }
+    }
+
+    setInterval(renderTrackedGps, 1000);
+
     // Start real-time sync immediately
     startRealtimeSync();
 
@@ -701,23 +735,28 @@
     }
 
     // Pickup & Drop marker pin SVGs (matching mobile app visual hierarchy)
-    var pickSymbol = {
-        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
-            '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 34 34">' +
-            '<circle cx="17" cy="17" r="15.5" fill="#16A34A" stroke="#ffffff" stroke-width="2.5"/>' +
-            '<path transform="translate(17 17) scale(0.033) translate(-224 -256)" fill="#ffffff" d="M224 256A128 128 0 1 0 224 0a128 128 0 1 0 0 256zm-45.7 48C79.8 304 0 383.8 0 482.3C0 498.7 13.3 512 29.7 512l388.6 0c16.4 0 29.7-13.3 29.7-29.7C448 383.8 368.2 304 269.7 304l-91.4 0z"/></svg>'),
-        scaledSize: new google.maps.Size(36, 36),
-        anchor: new google.maps.Point(18, 18)
-    };
+    var PICK_PIN_SVG =
+        '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 34 34">' +
+        '<circle cx="17" cy="17" r="15.5" fill="#16A34A" stroke="#ffffff" stroke-width="2.5"/>' +
+        '<path transform="translate(17 17) scale(0.033) translate(-224 -256)" fill="#ffffff" d="M224 256A128 128 0 1 0 224 0a128 128 0 1 0 0 256zm-45.7 48C79.8 304 0 383.8 0 482.3C0 498.7 13.3 512 29.7 512l388.6 0c16.4 0 29.7-13.3 29.7-29.7C448 383.8 368.2 304 269.7 304l-91.4 0z"/></svg>';
 
-    var dropSymbol = {
-        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
-            '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 34 34">' +
-            '<circle cx="17" cy="17" r="15.5" fill="#EF4444" stroke="#ffffff" stroke-width="2.5"/>' +
-            '<path transform="translate(17 17) scale(0.030) translate(-224 -256)" fill="#ffffff" d="M64 32C64 14.3 49.7 0 32 0S0 14.3 0 32L0 64 0 368 0 480c0 17.7 14.3 32 32 32s32-14.3 32-32l0-128 64.3-16.1c41.1-10.3 84.6-5.5 122.5 13.4c44.2 22.1 95.5 24.8 141.7 7.4l34.7-13c12.5-4.7 20.8-16.6 20.8-30l0-247.7c0-23-24.2-38-44.8-27.7l-9.6 4.8c-46.3 23.2-100.8 23.2-147.1 0c-35.1-17.6-75.4-22-113.5-12.5L64 48l0-16z"/></svg>'),
-        scaledSize: new google.maps.Size(36, 36),
-        anchor: new google.maps.Point(18, 18)
-    };
+    var DROP_PIN_SVG =
+        '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 34 34">' +
+        '<circle cx="17" cy="17" r="15.5" fill="#EF4444" stroke="#ffffff" stroke-width="2.5"/>' +
+        '<path transform="translate(17 17) scale(0.030) translate(-224 -256)" fill="#ffffff" d="M64 32C64 14.3 49.7 0 32 0S0 14.3 0 32L0 64 0 368 0 480c0 17.7 14.3 32 32 32s32-14.3 32-32l0-128 64.3-16.1c41.1-10.3 84.6-5.5 122.5 13.4c44.2 22.1 95.5 24.8 141.7 7.4l34.7-13c12.5-4.7 20.8-16.6 20.8-30l0-247.7c0-23-24.2-38-44.8-27.7l-9.6 4.8c-46.3 23.2-100.8 23.2-147.1 0c-35.1-17.6-75.4-22-113.5-12.5L64 48l0-16z"/></svg>';
+
+    // Built in initMap: google.maps doesn't exist until the async Maps script loads, and
+    // touching it here threw, which stopped the rest of this script (default red pins,
+    // dead ride-card clicks, no live-event listener).
+    var pickSymbol, dropSymbol;
+
+    function pinIcon(svg) {
+        return {
+            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+            scaledSize: new google.maps.Size(36, 36),
+            anchor: new google.maps.Point(18, 18)
+        };
+    }
 
     var VehicleTopOverlay;
 
@@ -734,6 +773,8 @@
 
     function initMap() {
         directionsService = new google.maps.DirectionsService();
+        pickSymbol = pinIcon(PICK_PIN_SVG);
+        dropSymbol = pinIcon(DROP_PIN_SVG);
 
         // Custom Vehicle Top Overlay Class
         VehicleTopOverlay = class extends google.maps.OverlayView {
@@ -821,25 +862,39 @@
             }
 
             update(lat, lng, heading) {
-                var newPos = new google.maps.LatLng(lat, lng);
+                var moved = this.lat !== lat || this.lng !== lng;
                 if (heading === undefined || heading === null || isNaN(heading) || heading === 0) {
-                    if (this.lat !== lat || this.lng !== lng) {
-                        heading = computeBearing(this.lat, this.lng, lat, lng);
-                    } else {
-                        heading = this.heading;
-                    }
+                    heading = moved ? computeBearing(this.lat, this.lng, lat, lng) : this.heading;
                 }
                 this.lat = lat;
                 this.lng = lng;
-                this.position = newPos;
                 this.heading = heading;
                 if (this.img) {
                     this.img.style.transform = 'rotate(' + this.heading + 'deg)';
                 }
-                this.draw();
+                if (moved) this.glideTo(lat, lng);
+            }
+
+            // Fixes arrive about every 10 s; sliding there keeps the move visible at city zoom.
+            glideTo(lat, lng) {
+                if (this.anim) cancelAnimationFrame(this.anim);
+                var self = this;
+                var fromLat = this.position.lat();
+                var fromLng = this.position.lng();
+                var start = null;
+                function step(ts) {
+                    if (start === null) start = ts;
+                    var t = Math.min(1, (ts - start) / 1500);
+                    self.position = new google.maps.LatLng(fromLat + (lat - fromLat) * t, fromLng + (lng - fromLng) * t);
+                    self.draw();
+                    self.anim = t < 1 ? requestAnimationFrame(step) : null;
+                }
+                this.anim = requestAnimationFrame(step);
             }
 
             onRemove() {
+                if (this.anim) cancelAnimationFrame(this.anim);
+                this.anim = null;
                 if (this.div && this.div.parentNode) {
                     this.div.parentNode.removeChild(this.div);
                     this.div = null;
@@ -1208,6 +1263,7 @@
             document.getElementById('trackedDriver').textContent = (b.driver_name || 'Unassigned') + (b.vehicle_number ? ' • ' + b.vehicle_number : ' • ' + b.vehicle_type.toUpperCase());
             document.getElementById('trackedDistance').innerHTML = '<i class="fas fa-route text-blue-500 mr-1"></i> ' + (b.distance_km ? b.distance_km + ' km' : 'Calculating…');
             document.getElementById('trackedDuration').innerHTML = '<i class="fas fa-clock text-amber-500 mr-1"></i> ' + (b.duration_min ? b.duration_min + ' min' : '--');
+            setTrackedGps(b);
             card.classList.remove('hidden');
         }
         if (resetBtn) resetBtn.classList.remove('hidden');
@@ -1238,6 +1294,9 @@
     // Reset tracking and return to overview
     function resetRideTracking() {
         currentTrackedBookingId = null;
+        trackedGpsAt = null;
+        trackedDriverId = null;
+        renderTrackedGps();
         try {
             sessionStorage.removeItem('zi_tracked_booking_id');
         } catch (_) {}
@@ -1284,6 +1343,7 @@
     // Update real-time GPS position & bearing of drivers in active rides
     function handleDriverLocationUpdate(d) {
         if (!d) return;
+        if (trackedDriverId != null && d.id === trackedDriverId) trackedGpsAt = Date.now();
         // Update tracked or active booking's vehicle overlay
         vehicleOverlays.forEach(function(v) {
             if (v.driverId === d.id) {
