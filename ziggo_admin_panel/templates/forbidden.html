@@ -28,7 +28,7 @@
                 </div>
                 <div class="min-w-0">
                     <p class="text-sm font-black text-slate-700 truncate">{{ request.state.admin.full_name if request.state.admin else 'Administrator' }}</p>
-                    <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">{{ request.state.admin.admin_role or 'admin' }}</p>
+                    <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">{{ (request.state.admin.admin_role if request.state.admin else None) or 'admin' }}</p>
                 </div>
             </div>
         </div>

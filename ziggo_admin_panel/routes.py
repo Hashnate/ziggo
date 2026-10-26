@@ -10152,7 +10152,7 @@ async def admin_incentives_delete(
 
 
 @router.get("/forbidden", response_class=HTMLResponse)
-async def admin_forbidden(request: Request):
+async def admin_forbidden(request: Request, _: User = Depends(current_admin)):
     return templates.TemplateResponse(request, "forbidden.html", {"request": request})
 
 
