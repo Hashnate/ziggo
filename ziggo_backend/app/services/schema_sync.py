@@ -126,6 +126,7 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("driver_payouts", "kind", "VARCHAR(30)"),
     ("bookings", "district", "VARCHAR(30)"),
     ("bookings", "fare_breakdown", "JSON"),
+    ("driver_wallet_grants", "filters", "JSON"),
     ("food_orders", "district", "VARCHAR(30)"),
     ("market_orders", "district", "VARCHAR(30)"),
     ("system_settings", "district_fares_enabled", "BOOLEAN NOT NULL DEFAULT FALSE"),

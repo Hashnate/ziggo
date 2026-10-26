@@ -138,6 +138,41 @@ def credit(note):
     return float(used), float(amount), expires
 
 
+ALL_JOBS = [("job_types", t) for t in ("rides", "parcels", "food", "market")]
+LK_DAY = "(x at time zone 'Asia/Colombo')::date"
+
+
+def found(page):
+    """The '2. N drivers found' count on the admin page, or None."""
+    import re
+    m = re.search(r"2\. (\d+) drivers? found", page)
+    return int(m.group(1)) if m else None
+
+
+def jobs_sql(kinds, start=None, end=None):
+    """SQL for each approved driver's completed jobs of these kinds (Sri Lanka days)."""
+    def window(col):
+        w = ""
+        if start:
+            w += f" and {LK_DAY.replace('x', col)} >= '{start}'"
+        if end:
+            w += f" and {LK_DAY.replace('x', col)} <= '{end}'"
+        return w
+    parts = []
+    parcel = "(coalesce(b.is_flash, false) or coalesce(b.is_courier, false))"
+    if "rides" in kinds or "parcels" in kinds:
+        which = "" if {"rides", "parcels"} <= set(kinds) else (f" and not {parcel}" if "rides" in kinds else f" and {parcel}")
+        parts.append(f"(select count(*) from bookings b where b.driver_id = d.id and b.status = 'COMPLETED'{which}"
+                     f"{window('b.completed_at')})")
+    if "food" in kinds:
+        parts.append(f"(select count(*) from food_orders o where o.driver_id = d.id and o.status = 'DELIVERED'"
+                     f"{window('o.delivered_at')})")
+    if "market" in kinds:
+        parts.append(f"(select count(*) from market_orders o where o.driver_id = d.id and o.status = 'DELIVERED'"
+                     f"{window('o.delivered_at')})")
+    return " + ".join(parts) or "0"
+
+
 def cash_ride():
     """A real cash car ride, Borella -> Nugegoda, through the API."""
     call("POST", "/driver/online", car, {"is_online": True})
@@ -183,15 +218,15 @@ try:
     print("\n1. Admin page")
     check("wallet tables created at startup", sql("select count(*) from driver_wallet_grants") == "0")
     st, page = superadmin.get("/admin/driver-wallet")
-    check("superadmin opens Driver Bonus Wallet", st == 200 and "Give a bonus" in page, f"HTTP {st}")
-    check("form counts the approved drivers", f"All approved drivers <span class=\"text-gray-400\">({approved})" in page)
+    check("superadmin opens Driver Bonus Wallet", st == 200 and "Give a bonus to these" in page, f"HTTP {st}")
+    check("with no filter, every approved driver is listed", found(page) == approved, f"{found(page)} / {approved}")
     check("sidebar has the link", 'href="/admin/driver-wallet"' in page)
     st, page = admin.get("/admin/driver-wallet")
     check("admin role opens it too", st == 200 and "Give a bonus" in page, f"HTTP {st}")
     st, page = data_entry.get("/admin/driver-wallet")
     check("data entry can't open it", "Give a bonus" not in page, f"HTTP {st}")
     data_entry.post("/admin/driver-wallet/give", {"amount": 500, "expires_on": (today + timedelta(days=7)).isoformat(),
-                                                   "note": "Data entry try", "audience": "all"})
+                                                   "note": "Data entry try", "expected_count": approved})
     check("data entry can't give a bonus", sql("select count(*) from driver_wallet_grants") == "0")
 
     print("\n2. Wrong input is refused")
@@ -206,10 +241,14 @@ try:
     set_balance(-300)
     check("car driver owes Rs.300", near(summary()["outstanding_commission"], 300))
     note1 = "Wallet check bonus"
-    _, page = admin.post("/admin/driver-wallet/give", {
-        "amount": 500, "expires_on": (today + timedelta(days=7)).isoformat(), "note": note1,
-        "audience": "vehicle", "vehicle_type": "car"})
+    give_cars = [("f", "1"), ("vehicle_type", "car"), *ALL_JOBS, ("amount", 500), ("note", note1),
+                 ("expires_on", (today + timedelta(days=7)).isoformat())]
+    _, page = admin.post("/admin/driver-wallet/give", give_cars + [("expected_count", approved_cars + 1)])
+    check("refused if the list changed since the admin looked", "changed" in page
+          and sql("select count(*) from driver_wallet_grants") == "0", f"{approved_cars} now")
+    _, page = admin.post("/admin/driver-wallet/give", give_cars + [("expected_count", approved_cars)])
     check("admin sees the result", f"bonus given to {approved_cars} drivers" in page, f"{approved_cars} car drivers")
+    check("the page keeps the car filter", found(page) == approved_cars)
     check("one credit per approved car driver",
           sql(f"select count(*) from driver_wallet_credits where grant_id = {grant_id(note1)}") == str(approved_cars))
     check("other vehicle types got nothing", sql(
@@ -299,14 +338,57 @@ try:
           and w["credits"][0]["status"] == "cancelled", f"left Rs.{w['available']}")
     check("commission already paid stays paid", w["commission_due"] == 0)
 
-    print("\n7. Other pages")
+    print("\n7. Filters match the database")
+    kinds_all = ("rides", "parcels", "food", "market")
+    # Staging has no driver-delivered food or Mart orders; hand a few to the car driver in this copy.
+    sql(f"update food_orders set status = 'DELIVERED', driver_id = {CAR}, delivered_at = now() "
+        "where id in (select id from food_orders order by id limit 2)")
+    sql(f"update market_orders set status = 'DELIVERED', driver_id = {CAR}, delivered_at = now() "
+        "where id in (select id from market_orders order by id limit 1)")
+    cases = [
+        ("drivers with 1+ completed rides (not parcels)", [("min_jobs", 1), ("job_types", "rides")],
+         f"({jobs_sql(['rides'])}) >= 1"),
+        ("drivers with no completed job yet", [("max_jobs", 0), *ALL_JOBS], f"({jobs_sql(kinds_all)}) = 0"),
+        ("drivers with 1 to 5 food or Mart deliveries", [("min_jobs", 1), ("max_jobs", 5), ("job_types", "food"),
+                                                          ("job_types", "market")],
+         f"({jobs_sql(['food', 'market'])}) between 1 and 5"),
+        ("drivers with 3+ jobs in the last 30 days",
+         [("min_jobs", 3), *ALL_JOBS, ("jobs_from", (today - timedelta(days=29)).isoformat()), ("jobs_to", today.isoformat())],
+         f"({jobs_sql(kinds_all, today - timedelta(days=29), today)}) >= 3"),
+        ("tuk drivers who signed up in the last 150 days", [("vehicle_type", "tuk"), ("new_days", 150), ("new_by", "joined"), *ALL_JOBS],
+         "d.vehicle_type = 'tuk' and u.created_at >= now() - interval '150 days'"),
+        ("drivers approved in the last 150 days with 2+ parcels",
+         [("new_days", 150), ("new_by", "approved"), ("min_jobs", 2), ("job_types", "parcels")],
+         f"d.approved_at >= now() - interval '150 days' and ({jobs_sql(['parcels'])}) >= 2"),
+    ]
+    for label, params, where in cases:
+        _, page = superadmin.get("/admin/driver-wallet?" + urllib.parse.urlencode([("f", "1"), *params]))
+        want = int(sql(f"select count(*) from drivers d join users u on u.id = d.user_id where d.is_approved and {where}"))
+        check(f"{label}: {want}", found(page) == want and want > 0, f"page shows {found(page)}")
+    _, page = superadmin.get("/admin/driver-wallet?f=1&min_jobs=5&max_jobs=2&job_types=rides")
+    check("'at least' above 'at most' is explained, nothing listed", "be more than" in page and found(page) is None)
+    _, page = superadmin.get("/admin/driver-wallet?f=1&min_jobs=1")
+    check("counting jobs with no kind ticked is explained", "Tick at least one kind of job" in page)
+    fewest = int(sql(f"select min({jobs_sql(kinds_all)}) from drivers d where d.is_approved and d.vehicle_type = 'car'"))
+    newbies = [("f", "1"), ("vehicle_type", "car"), ("max_jobs", fewest), *ALL_JOBS]
+    _, page = superadmin.get("/admin/driver-wallet?" + urllib.parse.urlencode(newbies))
+    n = found(page)
+    _, page = superadmin.post("/admin/driver-wallet/give", newbies + [
+        ("amount", 75), ("note", "First trips bonus"), ("expires_on", today.isoformat()), ("expected_count", n)])
+    check(f"bonus to the {n} car drivers with at most {fewest} jobs", n and f"bonus given to {n} driver" in page, f"{n} drivers")
+    _, page = superadmin.get("/admin/driver-wallet")
+    check("the bonus list says who it was for", f"Car drivers · at most {fewest} completed jobs" in page)
+    check("the filter is stored with the bonus", sql("select filters->>'max_jobs' from driver_wallet_grants "
+                                                     "where note = 'First trips bonus'") == str(fewest))
+
+    print("\n8. Other pages")
     st, page = superadmin.get("/admin/driver-wallet")
-    check("bonus list shows all four bonuses", all(n in page for n in (note1, note2, "Unblock", note3)), f"HTTP {st}")
+    check("bonus list shows all the bonuses", all(x in page for x in (note1, note2, "Unblock", note3)), f"HTTP {st}")
     st, page = superadmin.get("/admin/withdrawals")
     check("wallet payments are not listed as payouts", st == 200 and "Commission paid from bonus wallet" not in page,
           f"HTTP {st}")
 
-    print("\n8. Restart keeps every record")
+    print("\n9. Restart keeps every record")
     before = sql("select count(*), sum(used_amount) from driver_wallet_credits")
     start()
     check("nothing lost at restart", sql("select count(*), sum(used_amount) from driver_wallet_credits") == before, before)

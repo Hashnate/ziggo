@@ -8694,6 +8694,70 @@ def _wallet_date(value: str):
         return None
 
 
+def _wallet_filter(params):
+    """The admin's driver filter from the query string or form. Returns (filter, error)."""
+    from app.services.driver_wallet_service import JOB_TYPES, DriverFilter
+
+    errors: list[str] = []
+
+    def number(key: str, label: str):
+        raw = (params.get(key) or "").strip()
+        if not raw:
+            return None
+        if not raw.isdigit():
+            errors.append(f"{label} must be a whole number.")
+            return None
+        return int(raw)
+
+    def day(key: str, label: str):
+        raw = (params.get(key) or "").strip()
+        if not raw:
+            return None
+        d = _wallet_date(raw)
+        if d is None:
+            errors.append(f"{label} is not a valid date.")
+        return d
+
+    submitted = bool(params.get("f"))
+    f = DriverFilter(
+        vehicle_type=(params.get("vehicle_type") or "").strip(),
+        new_days=number("new_days", "Days"),
+        new_by="joined" if params.get("new_by") == "joined" else "approved",
+        min_jobs=number("min_jobs", "At least"),
+        max_jobs=number("max_jobs", "At most"),
+        job_types=tuple(t for t in JOB_TYPES if t in params.getlist("job_types")) if submitted else JOB_TYPES,
+        jobs_from=day("jobs_from", "From"),
+        jobs_to=day("jobs_to", "To"),
+    )
+    if f.new_days == 0:
+        errors.append("New drivers: enter at least 1 day.")
+    if f.min_jobs is not None and f.max_jobs is not None and f.min_jobs > f.max_jobs:
+        errors.append("'At least' can't be more than 'at most'.")
+    if f.jobs_from and f.jobs_to and f.jobs_from > f.jobs_to:
+        errors.append("The job period ends before it starts.")
+    if not f.job_types and (f.min_jobs is not None or f.max_jobs is not None):
+        errors.append("Tick at least one kind of job to count.")
+    return f, " ".join(errors)
+
+
+def _wallet_filter_pairs(f) -> list[tuple[str, str]]:
+    pairs = [("f", "1")]
+    if f.vehicle_type:
+        pairs.append(("vehicle_type", f.vehicle_type))
+    if f.new_days is not None:
+        pairs += [("new_days", str(f.new_days)), ("new_by", f.new_by)]
+    if f.min_jobs is not None:
+        pairs.append(("min_jobs", str(f.min_jobs)))
+    if f.max_jobs is not None:
+        pairs.append(("max_jobs", str(f.max_jobs)))
+    pairs += [("job_types", t) for t in f.job_types]
+    if f.jobs_from:
+        pairs.append(("jobs_from", f.jobs_from.isoformat()))
+    if f.jobs_to:
+        pairs.append(("jobs_to", f.jobs_to.isoformat()))
+    return pairs
+
+
 @router.get("/driver-wallet", response_class=HTMLResponse)
 async def admin_driver_wallet(
     request: Request,
@@ -8702,31 +8766,28 @@ async def admin_driver_wallet(
 ):
     from app.services import driver_wallet_service as wallet
 
+    f, error = _wallet_filter(request.query_params)
     overview = await wallet.grants_overview(db)
     for r in overview["rows"]:
-        r["audience"] = await wallet.describe_audience(db, r["grant"].audience)
-    drivers = await wallet.eligible_drivers(db)
+        r["audience"] = await wallet.describe_audience(db, r["grant"])
     by_vehicle: dict[str, int] = {}
-    for d in drivers:
+    for d in await wallet.eligible_drivers(db):
         if d.vehicle_type:
             by_vehicle[d.vehicle_type] = by_vehicle.get(d.vehicle_type, 0) + 1
+    matches = [] if error else await wallet.find_drivers(db, f)
     return templates.TemplateResponse(
         request, "driver_wallet.html",
         {"request": request, "active_page": "driver_wallet", "overview": overview,
-         "eligible_count": len(drivers), "by_vehicle": sorted(by_vehicle.items()),
+         "by_vehicle": sorted(by_vehicle.items()), "filter": f, "filter_error": error,
+         "filter_pairs": _wallet_filter_pairs(f), "matches": matches,
+         "job_types": wallet.JOB_TYPES, "job_names": wallet.JOB_NAMES,
          "today": overview["today"].isoformat(), "msg": request.query_params.get("msg", "")},
     )
 
 
 @router.post("/driver-wallet/give")
 async def admin_driver_wallet_give(
-    amount: str = Form(...),
-    expires_on: str = Form(...),
-    note: str = Form(...),
-    audience: str = Form("all"),
-    vehicle_type: str = Form(""),
-    driver_id: int = Form(0),
-    back: str = Form("/admin/driver-wallet"),
+    request: Request,
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_superadmin_or_admin),
 ):
@@ -8734,34 +8795,47 @@ async def admin_driver_wallet_give(
     from app.models import Driver
     from app.services import driver_wallet_service as wallet
 
+    form = await request.form()
+    single = form.get("audience") == "driver"
+    if single:
+        back = form.get("back") or "/admin/driver-wallet"
+    else:
+        f, error = _wallet_filter(form)
+        back = "/admin/driver-wallet?" + urllib.parse.urlencode(_wallet_filter_pairs(f))
+        if error:
+            return _wallet_redirect(back, error)
+
     try:
-        amt = Decimal(str(amount).strip()).quantize(Decimal("0.01"))
+        amt = Decimal(str(form.get("amount") or "").strip()).quantize(Decimal("0.01"))
     except (InvalidOperation, ValueError):
         return _wallet_redirect(back, "Enter the bonus amount in rupees.")
     if amt <= 0 or amt > _WALLET_MAX_PER_DRIVER:
         return _wallet_redirect(back, f"The bonus must be between Rs.0.01 and Rs.{_WALLET_MAX_PER_DRIVER:,.0f} per driver.")
-    expiry = _wallet_date(expires_on)
+    expiry = _wallet_date(form.get("expires_on") or "")
     if expiry is None or expiry < wallet.today_lk():
         return _wallet_redirect(back, "Choose an expiry date from today onwards.")
-    note = (note or "").strip()[:150]
+    note = (form.get("note") or "").strip()[:150]
     if not note:
         return _wallet_redirect(back, "Add a short note, e.g. Avurudu bonus.")
 
-    if audience == "driver":
+    if single:
+        driver_id = int(form.get("driver_id") or 0) if str(form.get("driver_id") or "").isdigit() else 0
         d = (await db.execute(select(Driver).where(Driver.id == driver_id))).scalars().first()
         if d is None:
             return _wallet_redirect(back, "Driver not found.")
-        drivers, tag = [d], f"driver:{d.id}"
-    elif audience == "vehicle":
-        if not vehicle_type:
-            return _wallet_redirect(back, "Choose a vehicle type.")
-        drivers, tag = await wallet.eligible_drivers(db, vehicle_type), f"vehicle:{vehicle_type}"
+        drivers, audience, filters = [d], f"driver:{d.id}", None
     else:
-        drivers, tag = await wallet.eligible_drivers(db), "all"
+        drivers = [r["driver"] for r in await wallet.find_drivers(db, f)]
+        expected = str(form.get("expected_count") or "")
+        if not expected.isdigit() or int(expected) != len(drivers):
+            return _wallet_redirect(back, f"The drivers matching these filters changed ({len(drivers)} now). "
+                                          "Check the list and give the bonus again.")
+        audience, filters = ("all", None) if f.is_everyone() else ("filtered", f)
     if not drivers:
         return _wallet_redirect(back, "No approved drivers match, so no bonus was given.")
 
-    await wallet.give(db, drivers=drivers, amount=amt, expires_on=expiry, note=note, audience=tag, admin_id=admin.id)
+    await wallet.give(db, drivers=drivers, amount=amt, expires_on=expiry, note=note, audience=audience,
+                      filters=filters, admin_id=admin.id)
     who = "1 driver" if len(drivers) == 1 else f"{len(drivers)} drivers"
     return _wallet_redirect(back, f"Rs.{amt:,.2f} bonus given to {who} (Rs.{amt * len(drivers):,.2f} in total), usable until {expiry:%d %b %Y}.")
 

@@ -413,7 +413,8 @@ class DriverWalletGrant(Base):
     note = Column(String(150), nullable=False)
     amount = Column(DECIMAL(10, 2), nullable=False)           # per driver
     expires_on = Column(Date, nullable=False)                 # last usable Sri Lanka day
-    audience = Column(String(60), nullable=False)             # all | vehicle:<type> | driver:<id>
+    audience = Column(String(60), nullable=False)             # all | filtered | driver:<id>
+    filters = Column(JSON, nullable=True)                     # DriverFilter.to_json() when filtered
     drivers_count = Column(Integer, nullable=False, default=0)
     created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

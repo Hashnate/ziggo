@@ -10,15 +10,19 @@ A payment is a driver_payouts row of kind "wallet_payment", which lifts the
 driver's running balance (see finance_service) but never above zero, so bonus
 money can't turn into a pending payout.
 """
-from datetime import date, datetime, timezone
+from dataclasses import asdict, dataclass, fields
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from typing import Iterable, Optional
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from ..models import Driver, DriverPayout, DriverWalletCredit, DriverWalletGrant, Notification, User
+from ..models import (
+    Booking, BookingStatus, Driver, DriverPayout, DriverWalletCredit, DriverWalletGrant, FoodOrder,
+    FoodOrderStatus, MarketOrder, MarketOrderStatus, Notification, User,
+)
 from .finance_service import WALLET_PAYMENT, get_driver_outstanding_commission
 from .launch_service import today_lk
 
@@ -122,13 +126,140 @@ async def settle(db: AsyncSession, driver_ids: Iterable[int]) -> Decimal:
 # ---------------------------------------------------------------------------
 
 
+JOB_TYPES = ("rides", "parcels", "food", "market")
+JOB_NAMES = {"rides": "rides", "parcels": "parcels", "food": "food deliveries", "market": "Mart deliveries"}
+_LK = timezone(timedelta(hours=5, minutes=30))
+
+
+@dataclass
+class DriverFilter:
+    """Which approved drivers get a bonus. Every part is optional and chosen by
+    the admin; empty means "any"."""
+    vehicle_type: str = ""
+    new_days: Optional[int] = None          # approved / signed up in the last N days
+    new_by: str = "approved"                # approved | joined
+    min_jobs: Optional[int] = None
+    max_jobs: Optional[int] = None
+    job_types: tuple = JOB_TYPES            # which completed jobs count
+    jobs_from: Optional[date] = None        # Sri Lanka days, inclusive; None = no limit
+    jobs_to: Optional[date] = None
+
+    def is_everyone(self) -> bool:
+        return not self.vehicle_type and self.new_days is None and self.min_jobs is None and self.max_jobs is None
+
+    def to_json(self) -> dict:
+        d = asdict(self)
+        d["job_types"] = list(self.job_types)
+        d["jobs_from"] = self.jobs_from.isoformat() if self.jobs_from else None
+        d["jobs_to"] = self.jobs_to.isoformat() if self.jobs_to else None
+        return d
+
+    @classmethod
+    def from_json(cls, d: dict) -> "DriverFilter":
+        d = {k: v for k, v in (d or {}).items() if k in {f.name for f in fields(cls)}}
+        d["job_types"] = tuple(d.get("job_types") or ())
+        for k in ("jobs_from", "jobs_to"):
+            d[k] = date.fromisoformat(d[k]) if d.get(k) else None
+        return cls(**d)
+
+    def jobs_text(self) -> str:
+        kinds = [JOB_NAMES[t] for t in JOB_TYPES if t in self.job_types]
+        what = "jobs" if len(kinds) == len(JOB_TYPES) else (
+            kinds[0] if len(kinds) == 1 else ", ".join(kinds[:-1]) + " and " + kinds[-1])
+        when = ""
+        if self.jobs_from and self.jobs_to:
+            when = f" from {self.jobs_from:%d %b %Y} to {self.jobs_to:%d %b %Y}"
+        elif self.jobs_from:
+            when = f" since {self.jobs_from:%d %b %Y}"
+        elif self.jobs_to:
+            when = f" up to {self.jobs_to:%d %b %Y}"
+        return what + when
+
+    def describe(self) -> str:
+        parts = [f"{self.vehicle_type.capitalize()} drivers" if self.vehicle_type else "All drivers"]
+        if self.new_days is not None:
+            verb = "approved" if self.new_by == "approved" else "signed up"
+            parts.append(f"{verb} in the last {self.new_days} day{'s' if self.new_days != 1 else ''}")
+        if self.min_jobs is not None or self.max_jobs is not None:
+            if self.min_jobs is not None and self.max_jobs is not None:
+                n = f"{self.min_jobs} to {self.max_jobs}" if self.min_jobs != self.max_jobs else str(self.min_jobs)
+            elif self.min_jobs is not None:
+                n = f"at least {self.min_jobs}"
+            else:
+                n = f"at most {self.max_jobs}"
+            parts.append(f"{n} completed {self.jobs_text()}")
+        return " · ".join(parts)
+
+
+async def job_counts(
+    db: AsyncSession, driver_ids: list[int], job_types: Iterable[str] = JOB_TYPES,
+    start: Optional[date] = None, end: Optional[date] = None,
+) -> dict[int, int]:
+    """Completed jobs per driver: rides (incl. rentals), parcels (flash + courier),
+    food and Mart deliveries, optionally between two Sri Lanka days."""
+    counts: dict[int, int] = {i: 0 for i in driver_ids}
+    if not driver_ids:
+        return counts
+    types = set(job_types)
+    lo = datetime.combine(start, time.min, _LK) if start else None
+    hi = datetime.combine(end + timedelta(days=1), time.min, _LK) if end else None
+
+    def window(q, col):
+        if lo is not None:
+            q = q.where(col >= lo)
+        if hi is not None:
+            q = q.where(col < hi)
+        return q
+
+    queries = []
+    if types & {"rides", "parcels"}:
+        q = select(Booking.driver_id, func.count()).where(
+            Booking.driver_id.in_(driver_ids), Booking.status == BookingStatus.COMPLETED)
+        parcel = or_(func.coalesce(Booking.is_flash, False) == True,  # noqa: E712
+                     func.coalesce(Booking.is_courier, False) == True)  # noqa: E712
+        if "parcels" not in types:
+            q = q.where(~parcel)
+        elif "rides" not in types:
+            q = q.where(parcel)
+        queries.append(window(q, Booking.completed_at).group_by(Booking.driver_id))
+    if "food" in types:
+        q = select(FoodOrder.driver_id, func.count()).where(
+            FoodOrder.driver_id.in_(driver_ids), FoodOrder.status == FoodOrderStatus.DELIVERED)
+        queries.append(window(q, FoodOrder.delivered_at).group_by(FoodOrder.driver_id))
+    if "market" in types:
+        q = select(MarketOrder.driver_id, func.count()).where(
+            MarketOrder.driver_id.in_(driver_ids), MarketOrder.status == MarketOrderStatus.DELIVERED)
+        queries.append(window(q, MarketOrder.delivered_at).group_by(MarketOrder.driver_id))
+    for q in queries:
+        for driver_id, n in (await db.execute(q)).all():
+            counts[driver_id] += n
+    return counts
+
+
+async def find_drivers(db: AsyncSession, f: DriverFilter) -> list[dict]:
+    """Approved drivers matching the filter, including those blocked for unpaid
+    commission (they keep their approval); never pending, rejected or
+    admin-suspended ones. Each row carries the job count the filter uses."""
+    q = select(Driver, User).join(User, User.id == Driver.user_id).where(Driver.is_approved == True)  # noqa: E712
+    if f.vehicle_type:
+        q = q.where(Driver.vehicle_type == f.vehicle_type)
+    if f.new_days is not None:
+        since = datetime.now(timezone.utc) - timedelta(days=f.new_days)
+        q = q.where((Driver.approved_at if f.new_by == "approved" else User.created_at) >= since)
+    pairs = (await db.execute(q.order_by(Driver.id))).all()
+    counts = await job_counts(db, [d.id for d, _ in pairs], f.job_types, f.jobs_from, f.jobs_to)
+    rows = []
+    for d, u in pairs:
+        n = counts[d.id]
+        if (f.min_jobs is not None and n < f.min_jobs) or (f.max_jobs is not None and n > f.max_jobs):
+            continue
+        rows.append({"driver": d, "name": u.full_name, "phone": u.phone_number, "vehicle_type": d.vehicle_type,
+                     "approved_at": d.approved_at, "joined_at": u.created_at, "jobs": n})
+    return rows
+
+
 async def eligible_drivers(db: AsyncSession, vehicle_type: str = "") -> list[Driver]:
-    """Approved drivers, including those blocked for unpaid commission (they
-    keep their approval); not pending, rejected or admin-suspended ones."""
-    q = select(Driver).where(Driver.is_approved == True)  # noqa: E712
-    if vehicle_type:
-        q = q.where(Driver.vehicle_type == vehicle_type)
-    return list((await db.execute(q.order_by(Driver.id))).scalars().all())
+    return [r["driver"] for r in await find_drivers(db, DriverFilter(vehicle_type=vehicle_type))]
 
 
 async def give(
@@ -139,6 +270,7 @@ async def give(
     expires_on: date,
     note: str,
     audience: str,
+    filters: Optional[DriverFilter] = None,
     admin_id: Optional[int] = None,
 ) -> DriverWalletGrant:
     grant = DriverWalletGrant(
@@ -146,6 +278,7 @@ async def give(
         amount=amount,
         expires_on=expires_on,
         audience=audience,
+        filters=filters.to_json() if filters else None,
         drivers_count=len(drivers),
         created_by_id=admin_id,
     )
@@ -282,7 +415,10 @@ async def grants_overview(db: AsyncSession) -> dict:
     return {"rows": rows, "totals": _totals(all_credits, on), "today": on}
 
 
-async def describe_audience(db: AsyncSession, audience: str) -> str:
+async def describe_audience(db: AsyncSession, grant: DriverWalletGrant) -> str:
+    audience = grant.audience
+    if grant.filters:
+        return DriverFilter.from_json(grant.filters).describe()
     if audience == "all":
         return "All drivers"
     if audience.startswith("vehicle:"):

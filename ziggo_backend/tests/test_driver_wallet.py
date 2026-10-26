@@ -164,3 +164,101 @@ async def _run(today, D):
             assert not [h for h in history if h.kind == "wallet_payment"], "wallet payments aren't payouts"
         finally:
             await _clean(db)
+
+
+FILTER_PHONES = ["0779990411", "0779990412", "0779990413", "0779990414", "0779990415"]
+
+
+async def _clean_filter_drivers(db):
+    users = select(User.id).where(User.phone_number.in_(FILTER_PHONES))
+    drivers = select(Driver.id).where(Driver.user_id.in_(users))
+    await db.execute(delete(Booking).where(Booking.driver_id.in_(drivers)))
+    await db.execute(delete(Driver).where(Driver.user_id.in_(users)))
+    await db.execute(delete(Customer).where(Customer.user_id.in_(users)))
+    await db.execute(delete(User).where(User.phone_number.in_(FILTER_PHONES)))
+    await db.commit()
+
+
+async def test_driver_filters():
+    """Admin-chosen filters: vehicle, new (approved / signed up in the last N days),
+    at least / at most N completed jobs of the ticked kinds, in a date range."""
+    from datetime import datetime, timezone
+
+    from app.services.driver_wallet_service import DriverFilter, find_drivers
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    now = datetime.now(timezone.utc)
+    try:
+        async with AsyncSessionLocal() as db:
+            await _clean_filter_drivers(db)
+            try:
+                users = [User(phone_number=p, role=UserRole.DRIVER if i else UserRole.CUSTOMER, full_name=f"F{i}")
+                         for i, p in enumerate(FILTER_PHONES)]
+                db.add_all(users)
+                await db.flush()
+                users[1].created_at = now - timedelta(days=400)      # old driver, recently re-approved
+                users[2].created_at = now - timedelta(days=5)
+                users[3].created_at = now - timedelta(days=200)
+                users[4].created_at = now - timedelta(days=2)
+                customer = Customer(user_id=users[0].id)
+                veteran = Driver(user_id=users[1].id, status=DriverStatus.APPROVED, is_approved=True,
+                                 vehicle_type="tuk", approved_at=now - timedelta(days=3))
+                newbie = Driver(user_id=users[2].id, status=DriverStatus.APPROVED, is_approved=True,
+                                vehicle_type="tuk", approved_at=now - timedelta(days=4))
+                car = Driver(user_id=users[3].id, status=DriverStatus.SUSPENDED, is_approved=True,
+                             vehicle_type="car", approved_at=now - timedelta(days=190))
+                pending = Driver(user_id=users[4].id, status=DriverStatus.PENDING, is_approved=False, vehicle_type="tuk")
+                db.add_all([customer, veteran, newbie, car, pending])
+                await db.flush()
+
+                refs = iter(range(1, 100))
+
+                def job(driver, days_ago, **kw):
+                    return Booking(booking_ref=f"ZGFILTER{next(refs):02d}",
+                                   customer_id=customer.id, driver_id=driver.id, service_type=driver.vehicle_type,
+                                   status=BookingStatus.COMPLETED, payment_method="cash", pickup_lat=6.9,
+                                   pickup_lng=79.8, drop_lat=6.8, drop_lng=79.9,
+                                   completed_at=now - timedelta(days=days_ago), **kw)
+                db.add_all([job(veteran, d) for d in (1, 2, 3, 40, 41)]
+                           + [job(veteran, 5, is_flash=True), job(veteran, 6, is_courier=True)]
+                           + [job(newbie, 1)]
+                           + [job(car, d) for d in (10, 11)])
+                await db.commit()
+                ours = {veteran.id: "veteran", newbie.id: "newbie", car.id: "car", pending.id: "pending"}
+
+                async def who(**kw):
+                    rows = await find_drivers(db, DriverFilter(**kw))
+                    return sorted(ours[r["driver"].id] for r in rows if r["driver"].id in ours)
+
+                async def jobs(**kw):
+                    rows = await find_drivers(db, DriverFilter(**kw))
+                    return {ours[r["driver"].id]: r["jobs"] for r in rows if r["driver"].id in ours}
+
+                assert await who() == ["car", "newbie", "veteran"], "approved only (incl. blocked for commission)"
+                assert await who(vehicle_type="tuk") == ["newbie", "veteran"]
+                assert await who(new_days=7) == ["newbie", "veteran"], "approved in the last 7 days"
+                assert await who(new_days=7, new_by="joined") == ["newbie"], "signed up in the last 7 days"
+                assert await jobs() == {"veteran": 7, "newbie": 1, "car": 2}
+                assert await jobs(job_types=("rides",)) == {"veteran": 5, "newbie": 1, "car": 2}
+                assert await jobs(job_types=("parcels",)) == {"veteran": 2, "newbie": 0, "car": 0}
+                assert await jobs(job_types=("food", "market")) == {"veteran": 0, "newbie": 0, "car": 0}
+                today = today_lk()
+                week = {"jobs_from": today - timedelta(days=7), "jobs_to": today}
+                assert await jobs(job_types=("rides",), **week) == {"veteran": 3, "newbie": 1, "car": 0}
+                assert await who(min_jobs=2, job_types=("rides",), **week) == ["veteran"]
+                assert await who(max_jobs=0, job_types=("rides",), **week) == ["car"], "no ride this week"
+                assert await who(min_jobs=1, max_jobs=2) == ["car", "newbie"]
+                assert await who(vehicle_type="tuk", new_days=30, new_by="joined", max_jobs=0) == []
+
+                f = DriverFilter(vehicle_type="tuk", new_days=30, min_jobs=10, job_types=("rides", "parcels"),
+                                 jobs_from=today - timedelta(days=7), jobs_to=today)
+                assert f.describe() == (f"Tuk drivers · approved in the last 30 days · at least 10 completed rides and "
+                                        f"parcels from {week['jobs_from']:%d %b %Y} to {today:%d %b %Y}")
+                assert DriverFilter.from_json(f.to_json()) == f
+                assert DriverFilter().describe() == "All drivers" and DriverFilter().is_everyone()
+                assert DriverFilter(max_jobs=0).describe() == "All drivers · at most 0 completed jobs"
+            finally:
+                await _clean_filter_drivers(db)
+    finally:
+        await engine.dispose()

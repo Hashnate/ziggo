@@ -36,29 +36,126 @@
         </div>
     </div>
 
-    <form method="POST" action="/admin/driver-wallet/give" onsubmit="return confirmGive()" class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div class="p-6 border-b border-gray-100 bg-gray-50/50">
-            <h3 class="text-lg font-black text-ziggo">Give a bonus</h3>
+    {% set f = filter %}
+    <!-- 1. Choose drivers -->
+    <form method="GET" action="/admin/driver-wallet" class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <input type="hidden" name="f" value="1">
+        <div class="p-6 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between gap-4 flex-wrap">
+            <div>
+                <h3 class="text-lg font-black text-ziggo">1. Choose drivers</h3>
+                <p class="text-xs text-gray-400 font-bold mt-0.5">Leave a box empty for "any". Only approved drivers are included; that covers drivers blocked for unpaid commission (the bonus pays it), not pending, rejected or suspended-by-admin ones.</p>
+            </div>
+            <a href="/admin/driver-wallet" class="text-xs font-bold text-gray-500 hover:text-ziggo"><i class="fas fa-undo mr-1"></i> Clear filters</a>
         </div>
-        <div class="p-6 grid md:grid-cols-2 gap-6">
+        <div class="p-6 grid md:grid-cols-3 gap-6 text-sm">
             <div class="space-y-4">
                 <div>
-                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Who gets it</label>
-                    <div class="space-y-2 text-sm font-bold">
-                        <label class="block"><input type="radio" name="audience" value="all" checked onchange="audienceChanged()">
-                            All approved drivers <span class="text-gray-400">({{ eligible_count }})</span></label>
-                        <label class="block"><input type="radio" name="audience" value="vehicle" onchange="audienceChanged()"> Drivers of one vehicle type</label>
-                    </div>
-                    <select name="vehicle_type" id="vehicleType" class="mt-2 w-full p-2.5 border border-gray-200 rounded-xl hidden" onchange="updateTotal()">
-                        {% for vt, n in by_vehicle %}<option value="{{ vt }}" data-count="{{ n }}">{{ vt|capitalize }} ({{ n }} driver{{ 's' if n != 1 }})</option>{% endfor %}
+                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Vehicle</label>
+                    <select name="vehicle_type" class="w-full p-2.5 border border-gray-200 rounded-xl">
+                        <option value="">Any vehicle</option>
+                        {% for vt, n in by_vehicle %}<option value="{{ vt }}" {% if f.vehicle_type == vt %}selected{% endif %}>{{ vt|capitalize }} ({{ n }} driver{{ 's' if n != 1 }})</option>{% endfor %}
                     </select>
-                    <p class="text-[11px] text-gray-400 mt-1">Includes drivers blocked for unpaid commission (the bonus pays it). Pending, rejected and suspended-by-admin drivers are left out.</p>
                 </div>
                 <div>
-                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Note (drivers see it)</label>
-                    <input type="text" name="note" maxlength="150" required placeholder="e.g. Avurudu bonus" class="w-full p-2.5 border border-gray-200 rounded-xl">
+                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">New drivers only</label>
+                    <div class="flex items-center gap-2 flex-wrap font-bold text-gray-600">
+                        <select name="new_by" class="p-2 border border-gray-200 rounded-xl">
+                            <option value="approved" {% if f.new_by == 'approved' %}selected{% endif %}>Approved</option>
+                            <option value="joined" {% if f.new_by == 'joined' %}selected{% endif %}>Signed up</option>
+                        </select>
+                        <span>in the last</span>
+                        <input type="number" name="new_days" min="1" value="{{ f.new_days if f.new_days is not none else '' }}" placeholder="any" class="w-20 p-2 border border-gray-200 rounded-xl">
+                        <span>days</span>
+                    </div>
+                    <p class="text-[11px] text-gray-400 mt-1">"Approved" restarts if an admin suspends and re-approves a driver; "signed up" never changes.</p>
                 </div>
             </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Completed jobs</label>
+                    <div class="flex items-center gap-2 flex-wrap font-bold text-gray-600">
+                        <span>at least</span>
+                        <input type="number" name="min_jobs" min="0" value="{{ f.min_jobs if f.min_jobs is not none else '' }}" placeholder="any" class="w-20 p-2 border border-gray-200 rounded-xl">
+                        <span>and at most</span>
+                        <input type="number" name="max_jobs" min="0" value="{{ f.max_jobs if f.max_jobs is not none else '' }}" placeholder="any" class="w-20 p-2 border border-gray-200 rounded-xl">
+                    </div>
+                    <p class="text-[11px] text-gray-400 mt-1">e.g. at most 0 = drivers with no completed job yet.</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Jobs that count</label>
+                    <div class="grid grid-cols-2 gap-1 font-bold">
+                        {% for t in job_types %}
+                        <label><input type="checkbox" name="job_types" value="{{ t }}" {% if t in f.job_types %}checked{% endif %}> {{ job_names[t]|capitalize }}</label>
+                        {% endfor %}
+                    </div>
+                    <p class="text-[11px] text-gray-400 mt-1">Rides include rentals; parcels are Flash and courier.</p>
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Jobs done between</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="date" name="jobs_from" value="{{ f.jobs_from.isoformat() if f.jobs_from else '' }}" class="w-full p-2 border border-gray-200 rounded-xl">
+                        <input type="date" name="jobs_to" value="{{ f.jobs_to.isoformat() if f.jobs_to else '' }}" class="w-full p-2 border border-gray-200 rounded-xl">
+                    </div>
+                    <p class="text-[11px] text-gray-400 mt-1">Both days included. Leave empty to count all jobs ever.</p>
+                </div>
+                <button type="submit" class="w-full px-6 py-2.5 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light shadow-sm text-sm"><i class="fas fa-search mr-1"></i> Find drivers</button>
+            </div>
+        </div>
+    </form>
+
+    {% if filter_error %}
+    <div class="p-4 rounded-xl bg-rose-50 border border-rose-100 text-rose-700 text-sm font-bold"><i class="fas fa-exclamation-triangle mr-1"></i> {{ filter_error }}</div>
+    {% else %}
+    {% set n = matches|length %}
+    <!-- 2. Drivers found -->
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-gray-100">
+            <h3 class="text-lg font-black text-ziggo">2. {{ n }} driver{{ 's' if n != 1 }} found</h3>
+            <p class="text-xs text-gray-500 font-bold mt-0.5">{{ f.describe() }}</p>
+        </div>
+        {% if matches %}
+        <div class="overflow-auto max-h-96">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-xs font-black uppercase text-gray-500 tracking-wider sticky top-0">
+                <tr>
+                    <th class="px-4 py-3 text-left">Driver</th>
+                    <th class="px-4 py-3 text-left">Phone</th>
+                    <th class="px-4 py-3 text-left">Vehicle</th>
+                    <th class="px-4 py-3 text-left">Approved</th>
+                    <th class="px-4 py-3 text-left">Signed up</th>
+                    <th class="px-4 py-3 text-right">Completed {{ f.jobs_text() if f.job_types else 'jobs' }}</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for m in matches %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2"><a href="/admin/finance/drivers/{{ m.driver.id }}" class="font-bold text-ziggo hover:underline">{{ m.name or ('Driver #' ~ m.driver.id) }}</a></td>
+                    <td class="px-4 py-2 text-xs">{{ m.phone or '—' }}</td>
+                    <td class="px-4 py-2 text-xs capitalize">{{ m.vehicle_type or '—' }}</td>
+                    <td class="px-4 py-2 text-xs text-gray-500">{{ m.approved_at|colombo_dt("%Y-%m-%d") if m.approved_at else '—' }}</td>
+                    <td class="px-4 py-2 text-xs text-gray-500">{{ m.joined_at|colombo_dt("%Y-%m-%d") if m.joined_at else '—' }}</td>
+                    <td class="px-4 py-2 text-right font-black">{{ m.jobs }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p class="p-8 text-center text-gray-400 text-sm font-bold">No approved drivers match these filters.</p>
+        {% endif %}
+    </div>
+
+    {% if matches %}
+    <!-- 3. Give the bonus -->
+    <form method="POST" action="/admin/driver-wallet/give" onsubmit="return confirmGive()" class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        {% for k, v in filter_pairs %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+        <input type="hidden" name="expected_count" value="{{ n }}">
+        <div class="p-6 border-b border-gray-100 bg-gray-50/50">
+            <h3 class="text-lg font-black text-ziggo">3. Give a bonus to these {{ n }} driver{{ 's' if n != 1 }}</h3>
+        </div>
+        <div class="p-6 grid md:grid-cols-2 gap-6">
             <div class="space-y-4">
                 <div class="grid grid-cols-2 gap-4">
                     <div>
@@ -70,17 +167,23 @@
                         <input type="date" name="expires_on" min="{{ today }}" required class="w-full p-2.5 border border-gray-200 rounded-xl">
                     </div>
                 </div>
-                <div class="p-4 rounded-xl bg-violet-50 border border-violet-100">
-                    <p class="text-xs font-black text-violet-700 uppercase tracking-wider">Total</p>
-                    <p class="text-2xl font-black text-violet-700" id="total">Rs.0.00</p>
-                    <p class="text-xs text-violet-600 font-bold" id="totalNote">{{ eligible_count }} drivers</p>
+                <div>
+                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Note (drivers see it)</label>
+                    <input type="text" name="note" maxlength="150" required placeholder="e.g. Avurudu bonus" class="w-full p-2.5 border border-gray-200 rounded-xl">
                 </div>
+            </div>
+            <div class="p-4 rounded-xl bg-violet-50 border border-violet-100 self-start">
+                <p class="text-xs font-black text-violet-700 uppercase tracking-wider">Total</p>
+                <p class="text-2xl font-black text-violet-700" id="total">Rs.0.00</p>
+                <p class="text-xs text-violet-600 font-bold" id="totalNote">{{ n }} driver{{ 's' if n != 1 }}</p>
             </div>
         </div>
         <div class="p-5 border-t border-gray-100 flex justify-end">
             <button type="submit" class="px-6 py-2.5 bg-violet-600 text-white rounded-xl font-bold hover:bg-violet-500 shadow-sm text-sm"><i class="fas fa-wallet mr-1"></i> Give bonus</button>
         </div>
     </form>
+    {% endif %}
+    {% endif %}
 
     <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div class="p-6 border-b border-gray-100">
@@ -147,19 +250,7 @@
 </div>
 
 <script>
-const ALL_DRIVERS = {{ eligible_count }};
-
-function audienceChanged() {
-    const byVehicle = document.querySelector('input[name="audience"]:checked').value === 'vehicle';
-    document.getElementById('vehicleType').classList.toggle('hidden', !byVehicle);
-    updateTotal();
-}
-
-function driverCount() {
-    if (document.querySelector('input[name="audience"]:checked').value !== 'vehicle') return ALL_DRIVERS;
-    const opt = document.getElementById('vehicleType').selectedOptions[0];
-    return opt ? parseInt(opt.dataset.count, 10) : 0;
-}
+const DRIVERS = {{ (matches|length) if not filter_error else 0 }};
 
 function rupees(n) {
     return 'Rs.' + n.toLocaleString('en-LK', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -167,16 +258,13 @@ function rupees(n) {
 
 function updateTotal() {
     const amount = parseFloat(document.getElementById('amount').value) || 0;
-    const n = driverCount();
-    document.getElementById('total').textContent = rupees(amount * n);
-    document.getElementById('totalNote').textContent = n + ' driver' + (n === 1 ? '' : 's') + ' × ' + rupees(amount);
+    document.getElementById('total').textContent = rupees(amount * DRIVERS);
+    document.getElementById('totalNote').textContent = DRIVERS + ' driver' + (DRIVERS === 1 ? '' : 's') + ' × ' + rupees(amount);
 }
 
 function confirmGive() {
     const amount = parseFloat(document.getElementById('amount').value) || 0;
-    const n = driverCount();
-    if (n === 0) { alert('No approved drivers match.'); return false; }
-    return confirm('Give ' + rupees(amount) + ' to ' + n + ' driver' + (n === 1 ? '' : 's') + ' (' + rupees(amount * n) + ' in total)?\n\nDrivers are notified, and any commission they owe now is paid from it straight away.');
+    return confirm('Give ' + rupees(amount) + ' to ' + DRIVERS + ' driver' + (DRIVERS === 1 ? '' : 's') + ' (' + rupees(amount * DRIVERS) + ' in total)?\n\nDrivers are notified, and any commission they owe now is paid from it straight away.');
 }
 </script>
 {% endblock %}
