@@ -207,6 +207,7 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
         completed_at=b.completed_at,
         cancelled_at=b.cancelled_at,
         cancellation_reason=b.cancellation_reason,
+        cancelled_by=b.cancelled_by,
         customer_rating=b.customer_rating,
         customer_feedback=b.customer_feedback,
         driver_rating=b.driver_rating,
@@ -2266,12 +2267,28 @@ async def update_booking_status(
         cust_q = await db.execute(select(Customer).where(Customer.id == b.customer_id))
         c = cust_q.scalars().first()
         if c:
-            await manager.send(
-                c.user_id,
-                "booking_update",
-                {"booking_id": b.id, "status": b.status.value, "otp": b.otp},
-            )
-            if not (b.status == BookingStatus.CANCELLED and b.cancelled_by == "customer"):
+            customer_payload = {"booking_id": b.id, "status": b.status.value, "otp": b.otp}
+            if b.status == BookingStatus.CANCELLED:
+                customer_payload.update(
+                    booking_ref=b.booking_ref,
+                    reason=b.cancellation_reason,
+                    cancelled_by=b.cancelled_by,
+                )
+            await manager.send(c.user_id, "booking_update", customer_payload)
+            if b.status == BookingStatus.CANCELLED:
+                if b.cancelled_by != "customer":
+                    by_driver = b.cancelled_by == "driver"
+                    reason_msg = f" Reason: {b.cancellation_reason}" if b.cancellation_reason else ""
+                    db.add(
+                        Notification(
+                            user_id=c.user_id,
+                            title="Ride Cancelled by Driver" if by_driver else "Ride Cancelled",
+                            body=f"Booking {b.booking_ref} was cancelled by "
+                                 f"{'your driver' if by_driver else 'Ziggo'}.{reason_msg}",
+                            type="ride_update",
+                        )
+                    )
+            else:
                 db.add(
                     Notification(
                         user_id=c.user_id,
@@ -2378,13 +2395,15 @@ async def update_booking_status(
                                 type="ride_update",
                             )
                         )
-            if b.status == BookingStatus.CANCELLED and b.cancelled_by == "customer":
+            if b.status == BookingStatus.CANCELLED and b.cancelled_by != "driver":
+                by_customer = b.cancelled_by == "customer"
                 reason_msg = f" Reason: {b.cancellation_reason}" if b.cancellation_reason else ""
                 db.add(
                     Notification(
                         user_id=drv.user_id,
-                        title="Ride Cancelled by Customer",
-                        body=f"Booking {b.booking_ref} was cancelled by customer.{reason_msg}",
+                        title="Ride Cancelled by Customer" if by_customer else "Ride Cancelled",
+                        body=f"Booking {b.booking_ref} was cancelled by "
+                             f"{'customer' if by_customer else 'Ziggo'}.{reason_msg}",
                         type="ride_cancelled",
                         data=f'{{"booking_id":{b.id},"booking_ref":"{b.booking_ref}"}}',
                     )

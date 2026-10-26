@@ -31,13 +31,14 @@ class RideTrackingScreen extends StatefulWidget {
 class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTickerProviderStateMixin {
   final ZiggoMapController _mapController = ZiggoMapController();
   bool _navigatedToRating = false;
-  bool _driverCancelled = false;
+  // The last copy of the booking while it was live. A ride cancelled after
+  // accept leaves activeBooking, and the screen stays open drawing this copy.
+  Map<String, dynamic>? _lastActive;
   // The first /bookings/active round-trip hasn't landed yet. Until it does a
   // null activeBooking means "not loaded", not "no ride" — popping on it would
   // eject the user the moment they arrive from a flow that didn't prime the
   // provider (e.g. Scan & Go).
   bool _initialLoadDone = false;
-  bool _userCancelled = false;
   List<LatLng> _routePoints = const [];
   List<DirectionStep> _routeSteps = const [];
   String? _routeKey;
@@ -385,12 +386,16 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
   @override
   Widget build(BuildContext context) {
     final booking = context.watch<BookingProvider>();
-    final active = booking.activeBooking;
+    final live = booking.activeBooking;
+    final cancelled = booking.cancelledRide;
+    if (live != null) _lastActive = live;
+    final last = _lastActive;
+    final active = live ??
+        (cancelled != null && last != null && cancelled['id'] == last['id']
+            ? {...last, 'status': 'cancelled'}
+            : null);
 
     if (active == null) {
-      if (_driverCancelled) {
-        return const Scaffold(body: SizedBox.shrink());
-      }
       if (!_initialLoadDone) {
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       }
@@ -414,11 +419,13 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
     final driverLat = driver?['current_lat'] as num?;
     final driverLng = driver?['current_lng'] as num?;
     final status = active['status'] as String?;
-    final driverLatLng = (status == 'started' && _customerLatLng != null)
-        ? _customerLatLng
-        : ((driverLat != null && driverLng != null)
-            ? LatLng(driverLat.toDouble(), driverLng.toDouble())
-            : null);
+    final driverLatLng = status == 'cancelled'
+        ? null
+        : (status == 'started' && _customerLatLng != null)
+            ? _customerLatLng
+            : ((driverLat != null && driverLng != null)
+                ? LatLng(driverLat.toDouble(), driverLng.toDouble())
+                : null);
 
     final double targetHeading = (status == 'started' && _customerHeading != null)
         ? _customerHeading!
@@ -447,14 +454,6 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
         _otpDialogShown = true;
         // Don't show popup dialog anymore, show inline in the sheet instead
       }
-      if (status == 'cancelled') {
-        if (!_userCancelled) {
-          _driverCancelled = true;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _showDriverCancelledDialog();
-          });
-        }
-      }
       _lastStatus = status;
     }
 
@@ -468,7 +467,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
       routeTo = drop;
     }
 
-    _ensureRoute(routeFrom, routeTo);
+    if (status != 'cancelled') _ensureRoute(routeFrom, routeTo);
     _updateMapCamera(status, pickup, drop, driverLatLng);
 
     // Show wandering driver pins only while we're still hunting for a driver.
@@ -548,11 +547,12 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
                   ),
               ],
               polylines: [
-                ZiggoPolyline(
-                  points: activeRoutePoints,
-                  strokeWidth: 4,
-                  color: Colors.black,
-                ),
+                if (status != 'cancelled')
+                  ZiggoPolyline(
+                    points: activeRoutePoints,
+                    strokeWidth: 4,
+                    color: Colors.black,
+                  ),
               ],
             ),
           ),
@@ -664,103 +664,31 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
               left: 12, right: 12,
               child: _NextStepStrip(step: _routeSteps.first),
             ),
-          _BottomCard(
-            active: active,
-            meta: meta,
-            driver: driver,
-            expanded: _sheetExpanded,
-            onToggle: () {
-              setState(() {
-                _sheetExpanded = !_sheetExpanded;
-              });
-            },
-            onVerticalDragEnd: (d) {
-              final v = d.primaryVelocity ?? 0;
-              if (v > 80 && _sheetExpanded) {
-                setState(() => _sheetExpanded = false);
-              } else if (v < -80 && !_sheetExpanded) {
-                setState(() => _sheetExpanded = true);
-              }
-            },
-            onCancel: () {
-              setState(() {
-                _userCancelled = true;
-              });
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showDriverCancelledDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline_rounded, color: AppColors.error, size: 32),
-            SizedBox(width: 10),
-            Text(
-              'Ride Cancelled',
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
-                color: AppColors.error,
-                fontSize: 20,
-              ),
-            ),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Unfortunately, the driver has cancelled your ride. Please try booking another ride.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                height: 1.4,
-              ),
-            ),
-          ],
-        ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                if (mounted) {
-                  context.read<BookingProvider>().clearActiveBookingLocally();
-                  Navigator.popUntil(context, (r) => r.isFirst);
+          if (status == 'cancelled' && cancelled != null)
+            _CancelledCard(
+              cancelled: cancelled,
+              onDone: () => Navigator.of(context).popUntil((r) => r.isFirst),
+            )
+          else
+            _BottomCard(
+              active: active,
+              meta: meta,
+              driver: driver,
+              expanded: _sheetExpanded,
+              onToggle: () {
+                setState(() {
+                  _sheetExpanded = !_sheetExpanded;
+                });
+              },
+              onVerticalDragEnd: (d) {
+                final v = d.primaryVelocity ?? 0;
+                if (v > 80 && _sheetExpanded) {
+                  setState(() => _sheetExpanded = false);
+                } else if (v < -80 && !_sheetExpanded) {
+                  setState(() => _sheetExpanded = true);
                 }
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.error,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              child: const Text(
-                'GO HOME',
-                style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 14,
-                  letterSpacing: 1.2,
-                ),
-              ),
             ),
-          ),
         ],
       ),
     );
@@ -966,6 +894,135 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
   }
 }
 
+class _CancelledCard extends StatelessWidget {
+  final Map<String, dynamic> cancelled;
+  final VoidCallback onDone;
+
+  const _CancelledCard({required this.cancelled, required this.onDone});
+
+  @override
+  Widget build(BuildContext context) {
+    final by = cancelled['cancelled_by']?.toString();
+    final reason = (cancelled['reason'] ?? '').toString().trim();
+    final ref = cancelled['booking_ref']?.toString();
+    final title = switch (by) {
+      'customer' => 'You cancelled this ride',
+      'driver' => 'Your driver cancelled this ride',
+      _ => 'This ride was cancelled',
+    };
+
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          boxShadow: AppStyles.shadowLg,
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.cancel_rounded, color: AppColors.error, size: 28),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          if (ref != null && ref.isNotEmpty)
+                            Text(
+                              'Booking $ref',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (reason.isNotEmpty) ...[
+                  const SizedBox(height: 18),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(AppStyles.radiusSm),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'REASON',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.2,
+                            color: AppColors.error,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          reason,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (by != 'customer') ...[
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Sorry about that. You can book another ride from the home screen.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 20),
+                PrimaryButton(label: 'Back to home', gold: true, onPressed: onDone),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _BottomCard extends StatelessWidget {
   final Map<String, dynamic> active;
   final ({String label, String hint, Color color, IconData icon}) meta;
@@ -973,7 +1030,6 @@ class _BottomCard extends StatelessWidget {
   final bool expanded;
   final VoidCallback onToggle;
   final Function(DragEndDetails) onVerticalDragEnd;
-  final VoidCallback? onCancel;
 
   const _BottomCard({
     required this.active,
@@ -982,7 +1038,6 @@ class _BottomCard extends StatelessWidget {
     required this.expanded,
     required this.onToggle,
     required this.onVerticalDragEnd,
-    this.onCancel,
   });
 
   @override
@@ -1538,10 +1593,7 @@ class _BottomCard extends StatelessWidget {
                                ),
                              ],
                              const SizedBox(height: 16),
-                             _ActionRow(
-                               active: active,
-                               onCancel: onCancel,
-                             ),
+                             _ActionRow(active: active),
                           ],
                         )
                       : const SizedBox(width: double.infinity),
@@ -1904,8 +1956,7 @@ class _DriverCard extends StatelessWidget {
 
 class _ActionRow extends StatelessWidget {
   final Map<String, dynamic> active;
-  final VoidCallback? onCancel;
-  const _ActionRow({required this.active, this.onCancel});
+  const _ActionRow({required this.active});
 
   void _showCancelDialog(BuildContext context) {
     showModalBottomSheet(
@@ -1946,9 +1997,22 @@ class _ActionRow extends StatelessWidget {
                   onTap: () async {
                     final provider = context.read<BookingProvider>();
                     final navigator = Navigator.of(context);
+                    final messenger = ScaffoldMessenger.of(context);
                     Navigator.pop(ctx);
-                    onCancel?.call();
-                    
+
+                    // A driver is already on the way: stay on this screen,
+                    // which shows the cancellation once the server agrees.
+                    if (active['status'] != 'searching') {
+                      if (!await provider.cancelAcceptedRide(r)) {
+                        messenger.showSnackBar(SnackBar(
+                          content: Text(provider.lastError ?? 'Could not cancel the ride. Please try again.'),
+                          backgroundColor: AppColors.error,
+                          behavior: SnackBarBehavior.floating,
+                        ));
+                      }
+                      return;
+                    }
+
                     final bookingId = provider.activeBooking?['id'] as int?;
                     provider.clearActiveBookingLocally();
                     navigator.popUntil((r) => r.isFirst);

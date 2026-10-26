@@ -198,6 +198,7 @@ class BookingResponse(BaseModel):
     completed_at: Optional[datetime] = None
     cancelled_at: Optional[datetime] = None
     cancellation_reason: Optional[str] = None
+    cancelled_by: Optional[str] = None
     scheduled_at: Optional[datetime] = None
 
 

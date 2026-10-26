@@ -1107,6 +1107,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
     final pending = driver.pendingRequest;
     final loc = driver.currentLocation ?? kColomboCenter;
 
+    final cancelNotice = driver.rideCancelNotice;
+    if (cancelNotice != null) {
+      driver.clearRideCancelNotice();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showRideCancelledNotice(cancelNotice);
+      });
+    }
+
     double? mapNavLat;
     double? mapNavLng;
     if (ride != null) {
@@ -3109,13 +3117,85 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
 
     if (confirmed != true) return;
 
-    await driver.updateRideStatus('cancelled', reason: reason);
+    final ok = await driver.updateRideStatus('cancelled', reason: reason);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+      SnackBar(
         backgroundColor: AppColors.error,
-        content: Text('Ride cancelled.'),
+        content: Text(ok
+            ? 'Ride cancelled. The customer has been told why.'
+            : 'Could not cancel the ride. Please try again.'),
         behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showRideCancelledNotice(Map<String, dynamic> notice) {
+    final reason = (notice['reason'] ?? '').toString().trim();
+    final ref = notice['booking_ref']?.toString();
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: AppColors.error.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.cancel_rounded, color: AppColors.error, size: 32),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                notice['cancelled_by'] == 'customer' ? 'Ride cancelled by customer' : 'Ride cancelled',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+              ),
+              if (ref != null && ref.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Booking $ref',
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                ),
+              ],
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  reason.isNotEmpty ? 'Reason: $reason' : 'No reason was given.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('OK', style: TextStyle(fontWeight: FontWeight.w900)),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

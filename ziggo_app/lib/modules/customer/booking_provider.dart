@@ -32,6 +32,14 @@ class BookingProvider extends ChangeNotifier with WidgetsBindingObserver {
   Map<String, dynamic>? _pendingRatingBooking;
   Map<String, dynamic>? get pendingRatingBooking => _pendingRatingBooking;
 
+  // A ride cancelled after a driver accepted it: {id, booking_ref, reason,
+  // cancelled_by}. activeBooking is cleared as usual; the ride screen matches
+  // this by id so it can stay open and say who cancelled and why.
+  Map<String, dynamic>? _cancelledRide;
+  Map<String, dynamic>? get cancelledRide => _cancelledRide;
+
+  static const _acceptedStatuses = {'accepted', 'arrived', 'started'};
+
   String? _lastError;
   String? get lastError => _lastError;
 
@@ -71,6 +79,14 @@ class BookingProvider extends ChangeNotifier with WidgetsBindingObserver {
         final newStatus = data['status'];
         if (_activeBooking != null && _activeBooking!['id'] == bid) {
           if (newStatus == 'cancelled') {
+            if (_acceptedStatuses.contains(_activeBooking!['status'])) {
+              _cancelledRide = {
+                'id': bid,
+                'booking_ref': data['booking_ref'] ?? _activeBooking!['booking_ref'],
+                'reason': data['reason'],
+                'cancelled_by': data['cancelled_by'],
+              };
+            }
             _activeBooking = null;
           } else {
             _activeBooking = {
@@ -118,14 +134,13 @@ class BookingProvider extends ChangeNotifier with WidgetsBindingObserver {
     _fcmSub = FcmService.instance.onForegroundEvent.listen((data) {
       if (data['event'] == 'booking_update') {
         final s = data['status']?.toString();
-        // Skip loadActive() for terminal statuses — the WS handler already
-        // updated _activeBooking inline. Calling loadActive() here could
-        // race with the API and restore a stale completed booking.
-        if (s != 'cancelled' && s != 'completed') {
+        // Skip loadActive() for 'completed' — the WS handler already updated
+        // _activeBooking inline, and a reload could race with the API and
+        // restore a stale completed booking. A cancel does reload: push data
+        // is all strings (a missing reason arrives as "None"), so loadActive
+        // asks the server who cancelled and why.
+        if (s != 'completed') {
           loadActive();
-        } else if (s == 'cancelled') {
-          _activeBooking = null;
-          notifyListeners();
         }
       }
     });
@@ -388,6 +403,7 @@ class BookingProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> loadActive() async {
+    final before = _activeBooking;
     try {
       final resp = await ApiClient.instance.dio.get('/bookings/active');
       if (resp.data == null || (resp.data is String && resp.data == '')) {
@@ -432,6 +448,11 @@ class BookingProvider extends ChangeNotifier with WidgetsBindingObserver {
           _activeBooking = data;
         }
       }
+      if (_activeBooking == null &&
+          before != null &&
+          _acceptedStatuses.contains(before['status'])) {
+        await _noteIfCancelled(before);
+      }
       notifyListeners();
       unawaited(_resumeSharingIfOn());
     } catch (_) {}
@@ -456,6 +477,48 @@ class BookingProvider extends ChangeNotifier with WidgetsBindingObserver {
       _lastError = e.response?.data?['detail']?.toString() ?? e.message;
       return null;
     }
+  }
+
+  // The ride vanished from /bookings/active without its cancel event (socket
+  // down, or only the push arrived). Ask for the booking before anything
+  // redraws, or the ride screen would close without saying why.
+  Future<void> _noteIfCancelled(Map<String, dynamic> ride) async {
+    final id = ride['id'] as int?;
+    if (id == null || _cancelledRide?['id'] == id) return;
+    final b = await fetchBooking(id);
+    if (b == null || b['status'] != 'cancelled') return;
+    _cancelledRide = {
+      'id': id,
+      'booking_ref': b['booking_ref'],
+      'reason': b['cancellation_reason'],
+      'cancelled_by': b['cancelled_by'],
+    };
+  }
+
+  /// Cancels a ride a driver has already accepted. Unlike
+  /// [cancelActiveSilently] this waits for the server, because the ride screen
+  /// stays open to show the cancellation.
+  Future<bool> cancelAcceptedRide(String reason) async {
+    final b = _activeBooking;
+    if (b == null) return false;
+    try {
+      await ApiClient.instance.dio.patch(
+        '/bookings/${b['id']}/status',
+        data: {'status': 'cancelled', 'reason': reason},
+      );
+    } on DioException catch (e) {
+      _lastError = e.response?.data?['detail']?.toString() ?? e.message ?? 'Network error';
+      return false;
+    }
+    _cancelledRide = {
+      'id': b['id'],
+      'booking_ref': b['booking_ref'],
+      'reason': reason,
+      'cancelled_by': 'customer',
+    };
+    _activeBooking = null;
+    notifyListeners();
+    return true;
   }
 
   Future<void> cancelActive({String reason = 'Cancelled by user'}) async {

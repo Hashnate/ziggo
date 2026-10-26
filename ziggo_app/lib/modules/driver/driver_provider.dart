@@ -40,6 +40,18 @@ class DriverProvider extends ChangeNotifier {
   Map<String, dynamic>? _pendingRequest;
   Map<String, dynamic>? get pendingRequest => _pendingRequest;
 
+  // A ride of this driver's that the customer (or Ziggo) cancelled after it
+  // was accepted: {booking_id, booking_ref, reason, cancelled_by}. The home
+  // screen shows it once and clears it.
+  Map<String, dynamic>? _rideCancelNotice;
+  Map<String, dynamic>? get rideCancelNotice => _rideCancelNotice;
+  // Both the socket event and the loadActive fallback can report one cancel.
+  int? _lastCancelNoticeId;
+
+  void clearRideCancelNotice() => _rideCancelNotice = null;
+
+  static const _acceptedStatuses = {'accepted', 'arrived', 'started'};
+
   LatLng? _currentLocation;
   LatLng? get currentLocation => _currentLocation;
 
@@ -215,13 +227,25 @@ class DriverProvider extends ChangeNotifier {
             notifyListeners();
           }
         }
-        final reason = data['reason']?.toString();
-        if (SchedulerBinding.instance.lifecycleState != AppLifecycleState.resumed && reason != null && reason.isNotEmpty) {
-          unawaited(FcmService.instance.showChatNotification(
-            'Ride Cancelled by Customer',
-            'Reason: $reason',
-            data: data,
-          ));
+        final dataBid = data['booking_id']?.toString();
+        final wasMine = [_activeRide, _queuedRide].any((r) => r != null && r['id'].toString() == dataBid);
+        if (data['cancelled_by'] != 'driver') {
+          if (wasMine) {
+            _noteRideCancelled(
+              data['booking_id'] as int?,
+              bookingRef: data['booking_ref'],
+              reason: data['reason'],
+              cancelledBy: data['cancelled_by'],
+            );
+          }
+          final reason = data['reason']?.toString();
+          if (SchedulerBinding.instance.lifecycleState != AppLifecycleState.resumed && reason != null && reason.isNotEmpty) {
+            unawaited(FcmService.instance.showChatNotification(
+              data['cancelled_by'] == 'customer' ? 'Ride Cancelled by Customer' : 'Ride Cancelled',
+              'Reason: $reason',
+              data: data,
+            ));
+          }
         }
       }
     } else if (event == 'booking_cancelled') {
@@ -490,6 +514,7 @@ class DriverProvider extends ChangeNotifier {
   }
 
   Future<void> loadActive() async {
+    final before = _activeRide;
     try {
       final asked = DateTime.now();
       final resp = await ApiClient.instance.dio.get('/bookings/active');
@@ -511,6 +536,40 @@ class DriverProvider extends ChangeNotifier {
     } catch (_) {
       _queuedRide = null;
     }
+    if (before != null &&
+        _activeRide?['id'] != before['id'] &&
+        _acceptedStatuses.contains(before['status'])) {
+      await _noteIfCancelled(before['id'] as int?);
+    }
+    notifyListeners();
+  }
+
+  // The ride left /bookings/active without its cancel event reaching us
+  // (socket down). Ask for the booking so the driver still hears why.
+  Future<void> _noteIfCancelled(int? bookingId) async {
+    if (bookingId == null || bookingId == _lastCancelNoticeId) return;
+    try {
+      final resp = await ApiClient.instance.dio.get('/bookings/$bookingId');
+      final b = Map<String, dynamic>.from(resp.data as Map);
+      if (b['status'] != 'cancelled' || b['cancelled_by'] == 'driver') return;
+      _noteRideCancelled(
+        bookingId,
+        bookingRef: b['booking_ref'],
+        reason: b['cancellation_reason'],
+        cancelledBy: b['cancelled_by'],
+      );
+    } catch (_) {}
+  }
+
+  void _noteRideCancelled(int? bookingId, {dynamic bookingRef, dynamic reason, dynamic cancelledBy}) {
+    if (bookingId == null || bookingId == _lastCancelNoticeId) return;
+    _lastCancelNoticeId = bookingId;
+    _rideCancelNotice = {
+      'booking_id': bookingId,
+      'booking_ref': bookingRef?.toString(),
+      'reason': reason?.toString(),
+      'cancelled_by': cancelledBy?.toString(),
+    };
     notifyListeners();
   }
 
