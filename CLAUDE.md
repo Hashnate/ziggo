@@ -177,6 +177,8 @@ Prices must not change by accident: `ziggo_backend/tests/test_fare_golden.py` ho
 
 Rates come from `FareSetting` rows (admin-editable at `/admin/fare-settings`); falls back to `DEFAULTS` constant if a row is missing.
 
+**Trip distance** is a straight line (`haversine_km`) unless `SystemSettings.road_distance_enabled` is on (switch on `/admin/fare-settings`, off by default). Then rides and flash parcels use Google's driving route via [road_distance_service.py](ziggo_backend/app/services/road_distance_service.py) (Directions API, backend `GOOGLE_MAPS_API_KEY`; that key needs the Directions API enabled). Stops are passed through in order; the result is never shorter than the straight line; the 25 km/h time estimate follows it; answers are cached 30 min per route (points rounded to ~11 m). Google failing falls back to the straight line, and quotes then say `distance_source: "straight"` (`"road"` otherwise; no key while the switch is off). At COMPLETE TRIP the route is measured to where the driver tapped it. The pickup fee (driver → pickup), courier, rental and food/Mart delivery fees still use straight lines.
+
 ### Flash (parcel) deliveries
 
 A `Booking` row with `is_flash=True`. Same state machine, but requires `receiver_phone`, and `booking_ref` is prefixed `FL` instead of `ZG`. The admin panel splits them: `/admin/bookings` shows rides (where `is_flash=False`) and `/admin/flash` shows parcels.

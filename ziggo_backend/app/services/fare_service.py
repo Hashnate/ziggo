@@ -19,6 +19,7 @@ from shapely.geometry import Point, Polygon
 
 from ..models import FareSetting, FlashWeightTier, PromoCode, SurgeZone
 from ..api.v1.surge_zones import is_time_in_range
+from . import road_distance_service
 from .district_service import district_for
 from .launch_service import launch_location_for, service_of_booking
 from .promo_service import check_promo
@@ -91,6 +92,7 @@ class _Rules:
     district_base_fares: dict = field(default_factory=dict)  # service_type -> that district's base fare
     launch_location: object = None    # commission-free launch location this job falls in, if any
     promo_check: object = None        # promo_service.PromoCheck for the code sent, if any
+    road_distance: bool = False       # measure the road route instead of a straight line
 
 
 async def _load_rules(db: AsyncSession, service_types: list[str], promo: Optional[str],
@@ -163,7 +165,7 @@ async def _load_rules(db: AsyncSession, service_types: list[str], promo: Optiona
         peaks=peak_q.scalars().all(), hhmm=now_colombo.strftime("%H:%M"), zones=open_zones,
         promo=promo_row, flash_tiers=flash_tiers, system_surge=system_surge,
         district=district, district_base_fares=district_base_fares, launch_location=launch_location,
-        promo_check=promo_check,
+        promo_check=promo_check, road_distance=bool(ss is not None and ss.road_distance_enabled),
     )
 
 
@@ -254,6 +256,22 @@ def _route(pickup_lat, pickup_lng, drop_lat, drop_lng, stops) -> tuple[list, flo
     for (a_lat, a_lng), (b_lat, b_lng) in zip(waypoints, waypoints[1:]):
         distance_km += haversine_km(a_lat, a_lng, b_lat, b_lng)
     return clean_stops, distance_km, estimate_duration_min(distance_km)
+
+
+async def _trip_route(rules: _Rules, pickup_lat, pickup_lng, drop_lat, drop_lng, stops) -> tuple[tuple, dict]:
+    """`_route`, measured along the roads while road distance is on, plus the quote key
+    saying which was used. Never shorter than the straight line: Google snaps points to
+    the nearest road, which can shave a few metres off."""
+    route = _route(pickup_lat, pickup_lng, drop_lat, drop_lng, stops)
+    if not rules.road_distance:
+        return route, {}
+    clean_stops, straight_km, _ = route
+    points = [(pickup_lat, pickup_lng), *[(s["lat"], s["lng"]) for s in clean_stops], (drop_lat, drop_lng)]
+    km = await road_distance_service.road_km(points)
+    if km is None:
+        return route, {"distance_source": "straight"}
+    km = max(km, straight_km)
+    return (clean_stops, km, estimate_duration_min(km)), {"distance_source": "road"}
 
 
 def _zone_surcharge(rules: _Rules, pickup_lat: float, pickup_lng: float) -> float:
@@ -548,10 +566,12 @@ async def calculate_fare(
         if nearest and nearest.current_lat is not None and nearest.current_lng is not None:
             pickup_distance_km = haversine_km(float(nearest.current_lat), float(nearest.current_lng), pickup_lat, pickup_lng)
 
-    fare_dict = _standard_fare(
-        rules, service_type, setting, _route(pickup_lat, pickup_lng, drop_lat, drop_lng, stops),
-        pickup_distance_km, _zone_surcharge(rules, pickup_lat, pickup_lng), is_flash, parcel_weight_kg, trip_type,
-    )
+    route, route_keys = await _trip_route(rules, pickup_lat, pickup_lng, drop_lat, drop_lng, stops)
+    fare_dict = {
+        **_standard_fare(rules, service_type, setting, route, pickup_distance_km,
+                         _zone_surcharge(rules, pickup_lat, pickup_lng), is_flash, parcel_weight_kg, trip_type),
+        **route_keys,
+    }
     return await _enrich_with_loyalty(db, fare_dict, customer, redeem_points)
 
 
@@ -665,7 +685,11 @@ async def calculate_fares_bulk(
         if d.vehicle_type not in nearest_dist_by_type or dist < nearest_dist_by_type[d.vehicle_type]:
             nearest_dist_by_type[d.vehicle_type] = dist
 
-    route = _route(pickup_lat, pickup_lng, drop_lat, drop_lng, stops)
+    # Rentals and couriers don't use it, so only rides and flash parcels pay for a road lookup.
+    if is_rental or is_courier:
+        route, route_keys = _route(pickup_lat, pickup_lng, drop_lat, drop_lng, stops), {}
+    else:
+        route, route_keys = await _trip_route(rules, pickup_lat, pickup_lng, drop_lat, drop_lng, stops)
     zone_surcharge = _zone_surcharge(rules, pickup_lat, pickup_lng)
 
     def flat_estimate(service_type: str, fields: dict, platform_fee: float, passenger_pays: float) -> dict:
@@ -737,6 +761,7 @@ async def calculate_fares_bulk(
                     "service_type": service_type,
                     **_standard_fare(rules, service_type, setting, route, pickup_distance_km,
                                      zone_surcharge, is_flash, parcel_weight_kg, trip_type),
+                    **route_keys,
                 }
 
             # Same loyalty points and redemption as booking this vehicle.

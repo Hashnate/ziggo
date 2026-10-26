@@ -231,6 +231,8 @@ class SystemSettings(Base):
     max_settle_amount = Column(DECIMAL(10, 2), default=1000.00)
     # District base fares (DistrictFare) apply only while this is on.
     district_fares_enabled = Column(Boolean, nullable=False, default=False)
+    # Ride and flash fares measure the road route (Google) instead of a straight line.
+    road_distance_enabled = Column(Boolean, nullable=False, default=False)
     # Peak Hours
     peak_start_hour = Column(Integer, default=17)
     peak_end_hour = Column(Integer, default=20)

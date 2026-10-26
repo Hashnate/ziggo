@@ -15,6 +15,23 @@
                 <i class="fas fa-map-marked-alt mr-1"></i> District base fares
             </a>
         </div>
+        <div class="mt-6 p-4 rounded-xl border {% if road_distance %}border-emerald-200 bg-emerald-50/60{% else %}border-gray-200 bg-white{% endif %} flex items-center justify-between gap-4 flex-wrap">
+            <div>
+                <p class="text-sm font-black text-ziggo"><i class="fas fa-route mr-1"></i> Trip distance:
+                    {% if road_distance %}<span class="text-emerald-600">road route</span>{% else %}<span class="text-gray-500">straight line</span>{% endif %}</p>
+                <p class="text-xs text-gray-500 font-bold mt-1">
+                    {% if road_distance %}Ride and Flash parcel fares use the driving distance from Google Maps, at booking and when the driver completes the trip. If Google can't be reached, that price uses the straight line.
+                    {% else %}Ride and Flash parcel fares use the straight-line distance, which is shorter than the road. Switching to the road route raises fares at the same per-km rates.{% endif %}
+                </p>
+            </div>
+            <form method="POST" action="/admin/fare-settings/road-distance"
+                  onsubmit="return confirm('{% if road_distance %}Go back to straight-line distance? New prices will be lower.{% else %}Use the road route for fares? New prices will use the driving distance and be higher.{% endif %}')">
+                <input type="hidden" name="enabled" value="{% if road_distance %}off{% else %}on{% endif %}">
+                <button type="submit" class="px-4 py-2 rounded-xl font-bold text-sm shadow-sm {% if road_distance %}bg-white border border-gray-200 text-gray-600 hover:bg-gray-50{% else %}bg-emerald-600 text-white hover:bg-emerald-500{% endif %}">
+                    {% if road_distance %}Use straight line{% else %}Use road route{% endif %}
+                </button>
+            </form>
+        </div>
     </div>
     <div class="overflow-x-auto">
         <table class="w-full text-left">

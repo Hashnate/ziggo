@@ -94,6 +94,8 @@ class FareEstimateResponse(BaseModel):
     passenger_deductible: float = 0
     app_usage_charges: float = 0
     deductions: float = 0
+    # "road" or "straight" (Google failed), set only while road distance is switched on
+    distance_source: Optional[str] = None
     # Phase 2, feature 04 — set only when a district base fare was used
     district: Optional[str] = None
     district_base_fare: Optional[float] = None

@@ -3048,10 +3048,24 @@ async def admin_fare_settings(
     from app.models import FareSetting
 
     q = await db.execute(select(FareSetting).order_by(FareSetting.display_order, FareSetting.id))
+    ss = await _get_or_create_settings(db)
     return templates.TemplateResponse(
         request, "settings.html",
-        {"request": request, "active_page": "fare-settings", "fares": q.scalars().all()},
+        {"request": request, "active_page": "fare-settings", "fares": q.scalars().all(),
+         "road_distance": bool(ss.road_distance_enabled)},
     )
+
+
+@router.post("/fare-settings/road-distance")
+async def admin_road_distance_switch(
+    enabled: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    ss = await _get_or_create_settings(db)
+    ss.road_distance_enabled = enabled == "on"
+    await db.commit()
+    return RedirectResponse(url="/admin/fare-settings", status_code=303)
 
 
 @router.post("/fare-settings/update")
