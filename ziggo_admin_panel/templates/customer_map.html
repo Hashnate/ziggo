@@ -408,7 +408,9 @@
         const pos = { lat: t.lat, lng: t.lng };
         let m = tripMarkers.get(t.booking_id);
         if (!m) {
-            m = new google.maps.Marker({ zIndex: 5000 });
+            // Not optimized: the label is then page text, which the browser redraws once the
+            // icon font arrives; an optimized marker keeps the empty box it first drew.
+            m = new google.maps.Marker({ zIndex: 5000, optimized: false });
             m.addListener('click', () => openPopup(tripPopup(trips.get(t.booking_id)), m.getPosition()));
             tripMarkers.set(t.booking_id, m);
             m.setMap(band === 'all' || band === 'active' ? map : null);
@@ -603,6 +605,9 @@
             if (!document.fullscreenElement) el.requestFullscreen?.(); else document.exitFullscreen?.();
         });
 
+        document.fonts?.load('900 11px "Font Awesome 6 Free"').then(() => {
+            tripMarkers.forEach((m, id) => { if (trips.has(id)) m.setLabel(tripLabel(trips.get(id))); });
+        }).catch(() => {});
         loadAll().then(openWs);
         // Trips change status and drivers move; a live point that stops
         // updating drops back to the pickup on the next poll.
