@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -1158,6 +1158,7 @@ async def get_withdrawals_data(db: AsyncSession, page: int = 1, page_size: int =
     hist_q = await db.execute(
         select(DriverPayout)
         .options(selectinload(DriverPayout.user))
+        .where(or_(DriverPayout.kind == None, DriverPayout.kind != WALLET_PAYMENT))  # noqa: E711
         .order_by(DriverPayout.created_at.desc())
         .limit(50)
     )
@@ -1237,7 +1238,8 @@ COMMISSION_PAYMENT = "commission_payment"  # driver paid Ziggo commission   -> b
 BONUS = "bonus"                            # incentive earned, not yet paid -> balance up
 INCENTIVE_PAID = "incentive_paid"          # incentive given and paid at once
 OFFSET = "offset"                          # old manual offsets; netting is automatic now
-_LEDGER_SIGN = {PAYOUT: -1, COMMISSION_PAYMENT: 1, BONUS: 1, INCENTIVE_PAID: 0, OFFSET: 0}
+WALLET_PAYMENT = "wallet_payment"          # commission paid from the bonus wallet -> balance up (never above 0)
+_LEDGER_SIGN = {PAYOUT: -1, COMMISSION_PAYMENT: 1, BONUS: 1, INCENTIVE_PAID: 0, OFFSET: 0, WALLET_PAYMENT: 1}
 
 
 def ledger_kind(p) -> str:
@@ -1387,12 +1389,14 @@ async def check_and_deactivate_driver(db: AsyncSession, driver_id: int) -> bool:
     Otherwise, if they were SUSPENDED and are now below the limit, restore status to APPROVED.
     """
     from app.models import Driver, DriverStatus, SystemSettings
-    
+    from app.services.driver_wallet_service import pay_commission
+
     dq = await db.execute(select(Driver).where(Driver.id == driver_id))
     drv = dq.scalars().first()
     if not drv:
         return False
-        
+
+    await pay_commission(db, driver_id)
     outstanding = await get_driver_outstanding_commission(db, driver_id)
     max_limit = await _driver_commission_limit(db)
 
@@ -1424,6 +1428,7 @@ async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
     """Lifetime money split for a single driver, for the in-app Earnings page.
     Modified to return current outstanding commission under 'commission'."""
     from app.models import DriverPayout
+    from app.services.driver_wallet_service import available as wallet_available
 
     bq = await db.execute(
         select(Booking).where(
@@ -1500,6 +1505,7 @@ async def get_driver_earnings_summary(db: AsyncSession, driver_id: int) -> dict:
         "rides": ride_count,
         "deliveries": delivery_count,
         "max_settle_amount": float(await _driver_commission_limit(db)),
+        "wallet_available": float(await wallet_available(db, driver_id)),
     }
 
 

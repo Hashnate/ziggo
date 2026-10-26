@@ -12,6 +12,7 @@ import 'driver_documents_screen.dart';
 import 'driver_earnings_screen.dart';
 import 'driver_history_screen.dart';
 import 'driver_profile_screen.dart';
+import 'driver_wallet_screen.dart';
 
 class DriverNotificationsScreen extends StatefulWidget {
   const DriverNotificationsScreen({super.key});
@@ -576,6 +577,11 @@ class _DriverNotificationsScreenState extends State<DriverNotificationsScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const DriverHistoryScreen()),
+      );
+    } else if (type == 'wallet') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const DriverWalletScreen()),
       );
     } else if (type == 'payment' ||
         type == 'earnings' ||

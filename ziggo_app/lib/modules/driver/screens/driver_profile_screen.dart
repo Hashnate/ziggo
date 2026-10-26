@@ -15,6 +15,7 @@ import 'driver_documents_screen.dart';
 import 'driver_history_screen.dart';
 import 'driver_notifications_screen.dart';
 import 'driver_vehicles_screen.dart';
+import 'driver_wallet_screen.dart';
 import '../../customer/notifications_provider.dart';
 import '../../customer/screens/earn_with_ziggo_screen.dart';
 
@@ -262,6 +263,16 @@ class DriverProfileScreen extends StatelessWidget {
                       _divider(),
                       const _FemalePassengersOnlyTile(),
                     ],
+                    _divider(),
+                    _listTile(
+                      icon: Icons.account_balance_wallet_rounded,
+                      title: 'Bonus wallet',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const DriverWalletScreen()),
+                      ),
+                    ),
                     _divider(),
                     _listTile(
                       icon: Icons.group_add_rounded,

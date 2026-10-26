@@ -404,6 +404,42 @@ class DriverPayout(Base):
     user = relationship("User", foreign_keys=[user_id])
 
 
+class DriverWalletGrant(Base):
+    """One "give bonus" action by an admin, to one driver or many. Each driver
+    gets a DriverWalletCredit. See services/driver_wallet_service.py."""
+    __tablename__ = "driver_wallet_grants"
+
+    id = Column(Integer, primary_key=True, index=True)
+    note = Column(String(150), nullable=False)
+    amount = Column(DECIMAL(10, 2), nullable=False)           # per driver
+    expires_on = Column(Date, nullable=False)                 # last usable Sri Lanka day
+    audience = Column(String(60), nullable=False)             # all | vehicle:<type> | driver:<id>
+    drivers_count = Column(Integer, nullable=False, default=0)
+    created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    created_by = relationship("User", foreign_keys=[created_by_id])
+    credits = relationship("DriverWalletCredit", back_populates="grant")
+
+
+class DriverWalletCredit(Base):
+    """Bonus money in a driver's wallet. It can only pay Ziggo commission (never
+    withdrawn), until the end of expires_on. Whatever is unused then is lost."""
+    __tablename__ = "driver_wallet_credits"
+
+    id = Column(Integer, primary_key=True, index=True)
+    grant_id = Column(Integer, ForeignKey("driver_wallet_grants.id", ondelete="CASCADE"), nullable=False, index=True)
+    driver_id = Column(Integer, ForeignKey("drivers.id", ondelete="CASCADE"), nullable=False, index=True)
+    amount = Column(DECIMAL(10, 2), nullable=False)
+    used_amount = Column(DECIMAL(10, 2), nullable=False, default=0)
+    expires_on = Column(Date, nullable=False)
+    cancelled_at = Column(DateTime(timezone=True), nullable=True)   # admin removed what was left
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    grant = relationship("DriverWalletGrant", back_populates="credits")
+    driver = relationship("Driver", foreign_keys=[driver_id])
+
+
 class DriverIncentive(Base):
     __tablename__ = "driver_incentives"
 

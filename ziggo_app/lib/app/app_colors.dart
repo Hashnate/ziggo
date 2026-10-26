@@ -39,6 +39,7 @@ class AppColors {
   static const Color bike = Color(0xFFA855F7);        // violet
   static const Color events = Color(0xFFF59E0B);      // amber/gold
   static const Color ladies = Color(0xFFDB2777);      // pink — lady driver option
+  static const Color bonus = Color(0xFF7C3AED);       // violet — driver bonus wallet
 
   // Legacy aliases (kept to avoid widespread breakage)
   static const Color white = Colors.white;

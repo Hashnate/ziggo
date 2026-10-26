@@ -2,11 +2,16 @@
 {% block title %}Driver finance | Ziggo Admin{% endblock %}
 {% block page_title %}{{ data.driver.name or 'Driver' }}{% endblock %}
 {% block content %}
-{% set d = data.driver %}{% set t = data.totals %}
+{% set d = data.driver %}{% set t = data.totals %}{% set w = wallet %}
+{% set can_wallet = request.state.admin and (request.state.admin.admin_role or 'admin') in ('superadmin', 'admin') %}
 <div class="space-y-6 max-w-6xl mx-auto">
     <a href="/admin/finance/drivers" class="inline-flex items-center text-sm font-bold text-gray-500 hover:text-ziggo">
         <i class="fas fa-arrow-left mr-2"></i> Back to driver earnings
     </a>
+
+    {% if msg %}
+    <div class="p-4 rounded-xl bg-blue-50 border border-blue-100 text-blue-800 text-sm font-bold"><i class="fas fa-info-circle mr-1"></i> {{ msg }}</div>
+    {% endif %}
 
     <!-- Driver summary -->
     <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-wrap items-center gap-6">
@@ -30,7 +35,7 @@
     </div>
 
     <!-- Totals -->
-    <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
         <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <p class="text-[10px] uppercase font-black text-gray-400 tracking-widest">Lifetime earnings</p>
             <p class="text-xl font-black text-ziggo mt-1">Rs.{{ "{:,.0f}".format(t.lifetime_earnings) }}</p>
@@ -48,6 +53,11 @@
             <p class="text-xl font-black {% if (d.pending_payout or 0) > 0 %}text-emerald-600{% else %}text-gray-400{% endif %} mt-1">Rs.{{ "{:,.0f}".format(d.pending_payout or 0) }}</p>
         </div>
         <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p class="text-[10px] uppercase font-black text-gray-400 tracking-widest">Bonus wallet</p>
+            <p class="text-xl font-black {% if w.available > 0 %}text-violet-600{% else %}text-gray-400{% endif %} mt-1">Rs.{{ "{:,.0f}".format(w.available) }}</p>
+            {% if w.next_expiry %}<p class="text-[10px] text-gray-400 font-bold">Rs.{{ "{:,.0f}".format(w.next_expiry.amount) }} ends {{ w.next_expiry.date }}</p>{% endif %}
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <p class="text-[10px] uppercase font-black text-gray-400 tracking-widest">Rides / Flash</p>
             <p class="text-xl font-black mt-1">{{ t.rides }} <span class="text-xs text-gray-400">+ {{ t.flash }}</span></p>
         </div>
@@ -55,6 +65,76 @@
             <p class="text-[10px] uppercase font-black text-gray-400 tracking-widest">Food / Market</p>
             <p class="text-xl font-black mt-1">{{ t.food }} <span class="text-xs text-gray-400">+ {{ t.market }}</span></p>
         </div>
+    </div>
+
+    <!-- Bonus wallet -->
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-gray-100 flex items-center justify-between gap-4 flex-wrap">
+            <div>
+                <h3 class="font-black text-ziggo">Bonus wallet</h3>
+                <p class="text-xs text-gray-400 mt-0.5">Pays this driver's commission automatically until each bonus expires. It can't be withdrawn.
+                    Used so far: <span class="font-black text-gray-600">Rs.{{ "{:,.2f}".format(w.totals.used) }}</span> in {{ w.payments|length }} payment{{ 's' if w.payments|length != 1 }}.</p>
+            </div>
+            {% if can_wallet %}
+            <button onclick="openModal('walletModal')" class="px-3.5 py-1.5 text-xs bg-violet-600 text-white rounded-lg font-bold shadow-sm hover:bg-violet-500 transition flex items-center gap-1.5">
+                <i class="fas fa-wallet"></i> Give Bonus
+            </button>
+            {% endif %}
+        </div>
+        {% if w.credits %}
+        <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-xs font-black uppercase text-gray-500 tracking-wider">
+                <tr>
+                    <th class="px-4 py-3 text-left">Bonus</th>
+                    <th class="px-4 py-3 text-left">Given</th>
+                    <th class="px-4 py-3 text-right">Amount</th>
+                    <th class="px-4 py-3 text-right">Used</th>
+                    <th class="px-4 py-3 text-right">Left</th>
+                    <th class="px-4 py-3 text-left">Expires after</th>
+                    <th class="px-4 py-3 text-left">Status</th>
+                    {% if can_wallet %}<th class="px-4 py-3"></th>{% endif %}
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for c in w.credits %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 font-bold">{{ c.note }}</td>
+                    <td class="px-4 py-3 text-xs text-gray-500">{{ c.given_at[:10] if c.given_at else '—' }}</td>
+                    <td class="px-4 py-3 text-right">Rs.{{ "{:,.2f}".format(c.amount) }}</td>
+                    <td class="px-4 py-3 text-right text-amber-600 font-bold">Rs.{{ "{:,.2f}".format(c.used) }}</td>
+                    <td class="px-4 py-3 text-right font-black {% if c.status == 'active' %}text-violet-600{% else %}text-gray-400 line-through{% endif %}">Rs.{{ "{:,.2f}".format(c.remaining) }}</td>
+                    <td class="px-4 py-3 text-xs">
+                        {% if can_wallet and c.status in ('active', 'expired') %}
+                        <form method="POST" action="/admin/driver-wallet/credits/{{ c.id }}/expiry" class="flex items-center gap-1">
+                            <input type="date" name="expires_on" value="{{ c.expires_on }}" required class="p-1 border border-gray-200 rounded-lg text-xs">
+                            <button class="text-xs font-bold text-ziggo">Save</button>
+                        </form>
+                        {% else %}{{ c.expires_on }}{% endif %}
+                    </td>
+                    <td class="px-4 py-3">
+                        {% if c.status == 'active' %}<span class="px-2 py-0.5 rounded-full text-xs font-black bg-violet-50 text-violet-700">Active · {{ c.days_left + 1 }} day{{ 's' if c.days_left != 0 }} left</span>
+                        {% elif c.status == 'used' %}<span class="px-2 py-0.5 rounded-full text-xs font-black bg-emerald-50 text-emerald-700">Used up</span>
+                        {% elif c.status == 'expired' %}<span class="px-2 py-0.5 rounded-full text-xs font-black bg-gray-100 text-gray-500">Expired</span>
+                        {% else %}<span class="px-2 py-0.5 rounded-full text-xs font-black bg-rose-50 text-rose-600">Removed</span>{% endif %}
+                    </td>
+                    {% if can_wallet %}
+                    <td class="px-4 py-3 text-right whitespace-nowrap">
+                        {% if c.status in ('active', 'expired') %}
+                        <form method="POST" action="/admin/driver-wallet/credits/{{ c.id }}/cancel" class="inline" onsubmit="return confirm('Remove the Rs.{{ '%.2f' % c.remaining }} left of this bonus? Commission already paid with it stays paid.')">
+                            <button class="text-xs font-bold text-rose-600">Remove rest</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p class="p-8 text-center text-gray-400 text-sm font-bold">No bonus given to this driver yet.</p>
+        {% endif %}
     </div>
 
     <!-- Transactions -->
@@ -159,6 +239,43 @@
     </div>
 </div>
 
+{% if can_wallet %}
+<!-- Give Bonus Modal -->
+<div id="walletModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col">
+        <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50 flex-shrink-0">
+            <h3 class="text-lg font-black text-ziggo">Give Bonus to {{ d.name or 'this driver' }}</h3>
+            <button onclick="closeModal('walletModal')" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form method="POST" action="/admin/driver-wallet/give" class="p-5 space-y-4">
+            <input type="hidden" name="audience" value="driver">
+            <input type="hidden" name="driver_id" value="{{ d.id }}">
+            <input type="hidden" name="back" value="/admin/finance/drivers/{{ d.id }}">
+            <p class="text-xs text-gray-500">The money goes into the driver's bonus wallet. It pays their commission automatically
+                (any commission due now is paid straight away) and can't be withdrawn.</p>
+            <div>
+                <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Amount (LKR)</label>
+                <input type="number" step="0.01" min="0.01" max="100000" name="amount" required placeholder="e.g. 500" class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+            </div>
+            <div>
+                <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Usable until (inclusive)</label>
+                <input type="date" name="expires_on" min="{{ today }}" required class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+            </div>
+            <div>
+                <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Note (the driver sees it)</label>
+                <input type="text" name="note" maxlength="150" required placeholder="e.g. Avurudu bonus" class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+            </div>
+            <div class="pt-3 flex justify-end gap-2">
+                <button type="button" onclick="closeModal('walletModal')" class="px-4 py-2 border border-gray-200 rounded-xl font-bold text-gray-500 hover:bg-gray-50 text-sm">Cancel</button>
+                <button type="submit" class="px-5 py-2 bg-violet-600 text-white rounded-xl font-bold hover:bg-violet-500 shadow-sm text-sm">Give Bonus</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
 <!-- Commission Payment Modal -->
 <div id="commissionModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col">
@@ -216,8 +333,9 @@ function closeModal(id) {
 function openIncentiveModal() { openModal('incentiveModal'); }
 function closeIncentiveModal() { closeModal('incentiveModal'); }
 
-['incentiveModal', 'commissionModal'].forEach(function(id) {
-    document.getElementById(id).addEventListener('click', function(e) {
+['incentiveModal', 'commissionModal', 'walletModal'].forEach(function(id) {
+    const m = document.getElementById(id);
+    if (m) m.addEventListener('click', function(e) {
         if (e.target === this) closeModal(id);
     });
 });

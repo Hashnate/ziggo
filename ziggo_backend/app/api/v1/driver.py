@@ -243,6 +243,19 @@ async def get_my_earnings_summary(
     return await get_driver_earnings_summary(db, d.id)
 
 
+@router.get("/wallet")
+async def get_my_wallet(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_role("driver")),
+):
+    """Bonus wallet: money Ziggo gave the driver that pays their commission
+    automatically until it expires. It can't be withdrawn."""
+    d = await _get_driver(db, user)
+    from ...services.driver_wallet_service import driver_wallet, settle
+    await settle(db, [d.id])
+    return await driver_wallet(db, d.id)
+
+
 @router.get("/fare-card")
 async def get_my_fare_card(
     db: AsyncSession = Depends(get_db),

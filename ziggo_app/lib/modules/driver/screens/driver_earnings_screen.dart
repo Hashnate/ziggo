@@ -9,6 +9,7 @@ import '../../customer/screens/payment_methods_screen.dart';
 import '../driver_provider.dart';
 import '../driver_theme.dart';
 import 'driver_history_screen.dart';
+import 'driver_wallet_screen.dart';
 
 /// Driver earnings page — payout summary plus a transparent "how your fare is
 /// calculated" rate card (live from the admin fare settings) with a worked
@@ -420,6 +421,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
     final paid = _summary != null ? _d(_summary!, 'paid') : ((profile['paid_payouts'] as num?)?.toDouble() ?? 0);
     final pending = _summary != null ? _d(_summary!, 'pending') : ((profile['pending_payout'] as num?)?.toDouble() ?? 0);
     final outstanding = _summary != null ? _d(_summary!, 'outstanding_commission') : 0.0;
+    final bonus = _summary != null ? _d(_summary!, 'wallet_available') : 0.0;
 
     return Scaffold(
       backgroundColor: kDriverBg,
@@ -525,6 +527,73 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                       AppColors.warning),
                 ),
               ],
+            ),
+            const SizedBox(height: 10),
+            GestureDetector(
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const DriverWalletScreen()),
+                );
+                _load();
+              },
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: kDriverCard,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.divider),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.bonus.withOpacity(0.16),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.account_balance_wallet_rounded,
+                          color: AppColors.bonus, size: 16),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Bonus wallet',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          Text(
+                            'Pays your commission automatically',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      'Rs.${bonus.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        color: AppColors.bonus,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded,
+                        color: AppColors.textTertiary),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 24),
             const Text(

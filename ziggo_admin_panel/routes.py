@@ -8625,12 +8625,16 @@ async def admin_finance_driver_detail(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
+    from app.services import driver_wallet_service as wallet
+
     data = await fin.driver_finance_detail(db, driver_id)
     if data is None:
         raise HTTPException(status_code=404, detail="Driver not found")
     return templates.TemplateResponse(
         request, "finance_driver_detail.html",
-        {"request": request, "active_page": "finance", "data": data},
+        {"request": request, "active_page": "finance", "data": data,
+         "wallet": await wallet.driver_wallet(db, driver_id),
+         "today": wallet.today_lk().isoformat(), "msg": request.query_params.get("msg", "")},
     )
 
 
@@ -8666,6 +8670,178 @@ async def admin_finance_driver_commission_payment(
         payment_method=payment_method, reference_id=reference_id, note=note,
     )
     return RedirectResponse(url=f"/admin/finance/drivers/{driver_id}", status_code=303)
+
+
+# ---------- Driver bonus wallet ----------
+# Bonus money that only pays a driver's commission, automatically, until it
+# expires (see app/services/driver_wallet_service.py).
+
+_WALLET_MAX_PER_DRIVER = Decimal("100000")
+
+
+def _wallet_redirect(back: str, msg: str) -> RedirectResponse:
+    if not back.startswith("/admin/"):
+        back = "/admin/driver-wallet"
+    sep = "&" if "?" in back else "?"
+    return RedirectResponse(url=f"{back}{sep}msg={urllib.parse.quote(msg)}", status_code=303)
+
+
+def _wallet_date(value: str):
+    from datetime import date
+    try:
+        return date.fromisoformat((value or "").strip())
+    except ValueError:
+        return None
+
+
+@router.get("/driver-wallet", response_class=HTMLResponse)
+async def admin_driver_wallet(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin_or_admin),
+):
+    from app.services import driver_wallet_service as wallet
+
+    overview = await wallet.grants_overview(db)
+    for r in overview["rows"]:
+        r["audience"] = await wallet.describe_audience(db, r["grant"].audience)
+    drivers = await wallet.eligible_drivers(db)
+    by_vehicle: dict[str, int] = {}
+    for d in drivers:
+        if d.vehicle_type:
+            by_vehicle[d.vehicle_type] = by_vehicle.get(d.vehicle_type, 0) + 1
+    return templates.TemplateResponse(
+        request, "driver_wallet.html",
+        {"request": request, "active_page": "driver_wallet", "overview": overview,
+         "eligible_count": len(drivers), "by_vehicle": sorted(by_vehicle.items()),
+         "today": overview["today"].isoformat(), "msg": request.query_params.get("msg", "")},
+    )
+
+
+@router.post("/driver-wallet/give")
+async def admin_driver_wallet_give(
+    amount: str = Form(...),
+    expires_on: str = Form(...),
+    note: str = Form(...),
+    audience: str = Form("all"),
+    vehicle_type: str = Form(""),
+    driver_id: int = Form(0),
+    back: str = Form("/admin/driver-wallet"),
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_superadmin_or_admin),
+):
+    from decimal import InvalidOperation
+    from app.models import Driver
+    from app.services import driver_wallet_service as wallet
+
+    try:
+        amt = Decimal(str(amount).strip()).quantize(Decimal("0.01"))
+    except (InvalidOperation, ValueError):
+        return _wallet_redirect(back, "Enter the bonus amount in rupees.")
+    if amt <= 0 or amt > _WALLET_MAX_PER_DRIVER:
+        return _wallet_redirect(back, f"The bonus must be between Rs.0.01 and Rs.{_WALLET_MAX_PER_DRIVER:,.0f} per driver.")
+    expiry = _wallet_date(expires_on)
+    if expiry is None or expiry < wallet.today_lk():
+        return _wallet_redirect(back, "Choose an expiry date from today onwards.")
+    note = (note or "").strip()[:150]
+    if not note:
+        return _wallet_redirect(back, "Add a short note, e.g. Avurudu bonus.")
+
+    if audience == "driver":
+        d = (await db.execute(select(Driver).where(Driver.id == driver_id))).scalars().first()
+        if d is None:
+            return _wallet_redirect(back, "Driver not found.")
+        drivers, tag = [d], f"driver:{d.id}"
+    elif audience == "vehicle":
+        if not vehicle_type:
+            return _wallet_redirect(back, "Choose a vehicle type.")
+        drivers, tag = await wallet.eligible_drivers(db, vehicle_type), f"vehicle:{vehicle_type}"
+    else:
+        drivers, tag = await wallet.eligible_drivers(db), "all"
+    if not drivers:
+        return _wallet_redirect(back, "No approved drivers match, so no bonus was given.")
+
+    await wallet.give(db, drivers=drivers, amount=amt, expires_on=expiry, note=note, audience=tag, admin_id=admin.id)
+    who = "1 driver" if len(drivers) == 1 else f"{len(drivers)} drivers"
+    return _wallet_redirect(back, f"Rs.{amt:,.2f} bonus given to {who} (Rs.{amt * len(drivers):,.2f} in total), usable until {expiry:%d %b %Y}.")
+
+
+async def _wallet_credits(db: AsyncSession, grant_id: int = 0, credit_id: int = 0):
+    from app.models import DriverWalletCredit
+    q = select(DriverWalletCredit)
+    q = q.where(DriverWalletCredit.grant_id == grant_id) if grant_id else q.where(DriverWalletCredit.id == credit_id)
+    return list((await db.execute(q)).scalars().all())
+
+
+@router.post("/driver-wallet/grants/{grant_id}/expiry")
+async def admin_driver_wallet_grant_expiry(
+    grant_id: int,
+    expires_on: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin_or_admin),
+):
+    from app.models import DriverWalletGrant
+    from app.services import driver_wallet_service as wallet
+
+    expiry = _wallet_date(expires_on)
+    if expiry is None:
+        return _wallet_redirect("/admin/driver-wallet", "Choose a valid date.")
+    grant = (await db.execute(select(DriverWalletGrant).where(DriverWalletGrant.id == grant_id))).scalars().first()
+    if grant is None:
+        raise HTTPException(status_code=404, detail="Bonus not found")
+    grant.expires_on = expiry
+    await wallet.change_expiry(db, await _wallet_credits(db, grant_id=grant_id), expiry)
+    return _wallet_redirect("/admin/driver-wallet", f"\"{grant.note}\" now expires after {expiry:%d %b %Y}.")
+
+
+@router.post("/driver-wallet/grants/{grant_id}/cancel")
+async def admin_driver_wallet_grant_cancel(
+    grant_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin_or_admin),
+):
+    from app.services import driver_wallet_service as wallet
+
+    credits = await _wallet_credits(db, grant_id=grant_id)
+    if not credits:
+        raise HTTPException(status_code=404, detail="Bonus not found")
+    removed = await wallet.cancel(db, credits)
+    return _wallet_redirect("/admin/driver-wallet", f"Removed Rs.{removed:,.2f} that drivers had not used yet.")
+
+
+@router.post("/driver-wallet/credits/{credit_id}/expiry")
+async def admin_driver_wallet_credit_expiry(
+    credit_id: int,
+    expires_on: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin_or_admin),
+):
+    from app.services import driver_wallet_service as wallet
+
+    credits = await _wallet_credits(db, credit_id=credit_id)
+    if not credits:
+        raise HTTPException(status_code=404, detail="Bonus not found")
+    back = f"/admin/finance/drivers/{credits[0].driver_id}"
+    expiry = _wallet_date(expires_on)
+    if expiry is None:
+        return _wallet_redirect(back, "Choose a valid date.")
+    await wallet.change_expiry(db, credits, expiry)
+    return _wallet_redirect(back, f"Bonus now expires after {expiry:%d %b %Y}.")
+
+
+@router.post("/driver-wallet/credits/{credit_id}/cancel")
+async def admin_driver_wallet_credit_cancel(
+    credit_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin_or_admin),
+):
+    from app.services import driver_wallet_service as wallet
+
+    credits = await _wallet_credits(db, credit_id=credit_id)
+    if not credits:
+        raise HTTPException(status_code=404, detail="Bonus not found")
+    removed = await wallet.cancel(db, credits)
+    return _wallet_redirect(f"/admin/finance/drivers/{credits[0].driver_id}", f"Removed Rs.{removed:,.2f} from this driver's wallet.")
 
 
 

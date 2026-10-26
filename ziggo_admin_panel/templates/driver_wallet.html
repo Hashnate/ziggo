@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}Driver Bonus Wallet | Ziggo Admin{% endblock %}
+{% block page_title %}Driver Bonus Wallet{% endblock %}
+
+{% block content %}
+{% set tot = overview.totals %}
+<div class="space-y-6">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <h3 class="text-lg font-black text-ziggo">Bonus money for drivers</h3>
+        <p class="text-sm text-gray-500 font-bold mt-1 max-w-3xl">Each bonus goes into the driver's wallet in the app. It pays the commission they owe Ziggo
+            automatically, as soon as they owe some, until its expiry date. Drivers can't withdraw it. Whatever is left after the expiry date is lost.
+            To give a bonus to one driver, open their page in <a href="/admin/finance/drivers" class="text-ziggo underline">Driver earnings</a>.</p>
+    </div>
+
+    {% if msg %}
+    <div class="p-4 rounded-xl bg-blue-50 border border-blue-100 text-blue-800 text-sm font-bold"><i class="fas fa-info-circle mr-1"></i> {{ msg }}</div>
+    {% endif %}
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p class="text-[10px] uppercase font-black text-gray-400 tracking-widest">Given</p>
+            <p class="text-xl font-black text-ziggo mt-1">Rs.{{ "{:,.2f}".format(tot.given) }}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p class="text-[10px] uppercase font-black text-gray-400 tracking-widest">Paid commission</p>
+            <p class="text-xl font-black text-amber-600 mt-1">Rs.{{ "{:,.2f}".format(tot.used) }}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p class="text-[10px] uppercase font-black text-gray-400 tracking-widest">Still in wallets</p>
+            <p class="text-xl font-black text-violet-600 mt-1">Rs.{{ "{:,.2f}".format(tot.available) }}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p class="text-[10px] uppercase font-black text-gray-400 tracking-widest">Expired or removed</p>
+            <p class="text-xl font-black text-gray-400 mt-1">Rs.{{ "{:,.2f}".format(tot.lost) }}</p>
+        </div>
+    </div>
+
+    <form method="POST" action="/admin/driver-wallet/give" onsubmit="return confirmGive()" class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-gray-100 bg-gray-50/50">
+            <h3 class="text-lg font-black text-ziggo">Give a bonus</h3>
+        </div>
+        <div class="p-6 grid md:grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Who gets it</label>
+                    <div class="space-y-2 text-sm font-bold">
+                        <label class="block"><input type="radio" name="audience" value="all" checked onchange="audienceChanged()">
+                            All approved drivers <span class="text-gray-400">({{ eligible_count }})</span></label>
+                        <label class="block"><input type="radio" name="audience" value="vehicle" onchange="audienceChanged()"> Drivers of one vehicle type</label>
+                    </div>
+                    <select name="vehicle_type" id="vehicleType" class="mt-2 w-full p-2.5 border border-gray-200 rounded-xl hidden" onchange="updateTotal()">
+                        {% for vt, n in by_vehicle %}<option value="{{ vt }}" data-count="{{ n }}">{{ vt|capitalize }} ({{ n }} driver{{ 's' if n != 1 }})</option>{% endfor %}
+                    </select>
+                    <p class="text-[11px] text-gray-400 mt-1">Includes drivers blocked for unpaid commission (the bonus pays it). Pending, rejected and suspended-by-admin drivers are left out.</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Note (drivers see it)</label>
+                    <input type="text" name="note" maxlength="150" required placeholder="e.g. Avurudu bonus" class="w-full p-2.5 border border-gray-200 rounded-xl">
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Amount per driver (LKR)</label>
+                        <input type="number" step="0.01" min="0.01" max="100000" name="amount" id="amount" required placeholder="e.g. 500" oninput="updateTotal()" class="w-full p-2.5 border border-gray-200 rounded-xl">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Usable until (inclusive)</label>
+                        <input type="date" name="expires_on" min="{{ today }}" required class="w-full p-2.5 border border-gray-200 rounded-xl">
+                    </div>
+                </div>
+                <div class="p-4 rounded-xl bg-violet-50 border border-violet-100">
+                    <p class="text-xs font-black text-violet-700 uppercase tracking-wider">Total</p>
+                    <p class="text-2xl font-black text-violet-700" id="total">Rs.0.00</p>
+                    <p class="text-xs text-violet-600 font-bold" id="totalNote">{{ eligible_count }} drivers</p>
+                </div>
+            </div>
+        </div>
+        <div class="p-5 border-t border-gray-100 flex justify-end">
+            <button type="submit" class="px-6 py-2.5 bg-violet-600 text-white rounded-xl font-bold hover:bg-violet-500 shadow-sm text-sm"><i class="fas fa-wallet mr-1"></i> Give bonus</button>
+        </div>
+    </form>
+
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-gray-100">
+            <h3 class="font-black text-ziggo">Bonuses given</h3>
+        </div>
+        <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-xs font-black uppercase text-gray-500 tracking-wider">
+                <tr>
+                    <th class="px-4 py-3 text-left">Note</th>
+                    <th class="px-4 py-3 text-left">To</th>
+                    <th class="px-4 py-3 text-left">Given</th>
+                    <th class="px-4 py-3 text-right">Per driver</th>
+                    <th class="px-4 py-3 text-right">Total</th>
+                    <th class="px-4 py-3 text-right">Paid commission</th>
+                    <th class="px-4 py-3 text-right">Still in wallets</th>
+                    <th class="px-4 py-3 text-left">Expires after</th>
+                    <th class="px-4 py-3"></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for r in overview.rows %}{% set g = r.grant %}{% set m = r.totals %}
+                <tr class="hover:bg-gray-50 align-top">
+                    <td class="px-4 py-3 font-bold text-ziggo">{{ g.note }}</td>
+                    <td class="px-4 py-3">
+                        {% if g.audience.startswith('driver:') %}<a href="/admin/finance/drivers/{{ g.audience[7:] }}" class="font-bold text-ziggo hover:underline">{{ r.audience }}</a>{% else %}{{ r.audience }}{% endif %}
+                        <div class="text-[10px] text-gray-400">{{ g.drivers_count }} driver{{ 's' if g.drivers_count != 1 }}{% if r.active_drivers %} · {{ r.active_drivers }} still have some{% endif %}</div>
+                    </td>
+                    <td class="px-4 py-3 text-xs text-gray-500">{{ g.created_at|colombo_dt("%Y-%m-%d %H:%M") }}{% if r.by %}<div>by {{ r.by }}</div>{% endif %}</td>
+                    <td class="px-4 py-3 text-right">Rs.{{ "{:,.2f}".format(g.amount|float) }}</td>
+                    <td class="px-4 py-3 text-right">Rs.{{ "{:,.2f}".format(m.given) }}</td>
+                    <td class="px-4 py-3 text-right text-amber-600 font-bold">Rs.{{ "{:,.2f}".format(m.used) }}</td>
+                    <td class="px-4 py-3 text-right font-black text-violet-600">Rs.{{ "{:,.2f}".format(m.available) }}
+                        {% if m.lost > 0 %}<div class="text-[10px] text-gray-400 font-bold">Rs.{{ "{:,.2f}".format(m.lost) }} expired/removed</div>{% endif %}</td>
+                    <td class="px-4 py-3 text-xs">
+                        {% if r.cancelled %}<span class="px-2 py-0.5 rounded-full text-xs font-black bg-rose-50 text-rose-600">Removed</span>
+                        {% else %}
+                        <form method="POST" action="/admin/driver-wallet/grants/{{ g.id }}/expiry" class="flex items-center gap-1">
+                            <input type="date" name="expires_on" value="{{ g.expires_on.isoformat() }}" required class="p-1 border border-gray-200 rounded-lg text-xs">
+                            <button class="text-xs font-bold text-ziggo">Save</button>
+                        </form>
+                        <div class="mt-1">
+                            {% if r.expired %}<span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-gray-100 text-gray-500">Expired</span>
+                            {% else %}<span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-violet-50 text-violet-700">{{ r.days_left + 1 }} day{{ 's' if r.days_left != 0 }} left</span>{% endif %}
+                            {% if r.own_expiry %}<span class="text-[10px] text-gray-400 font-bold">{{ r.own_expiry }} with their own date</span>{% endif %}
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-right whitespace-nowrap">
+                        {% if not r.cancelled and m.available > 0 %}
+                        <form method="POST" action="/admin/driver-wallet/grants/{{ g.id }}/cancel" class="inline" onsubmit="return confirm('Remove the Rs.{{ '%.2f' % m.available }} that drivers have not used yet from this bonus? Commission already paid with it stays paid.')">
+                            <button class="text-xs font-bold text-rose-600">Remove rest</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="9" class="p-10 text-center text-gray-400 text-sm font-bold">No bonuses given yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+
+<script>
+const ALL_DRIVERS = {{ eligible_count }};
+
+function audienceChanged() {
+    const byVehicle = document.querySelector('input[name="audience"]:checked').value === 'vehicle';
+    document.getElementById('vehicleType').classList.toggle('hidden', !byVehicle);
+    updateTotal();
+}
+
+function driverCount() {
+    if (document.querySelector('input[name="audience"]:checked').value !== 'vehicle') return ALL_DRIVERS;
+    const opt = document.getElementById('vehicleType').selectedOptions[0];
+    return opt ? parseInt(opt.dataset.count, 10) : 0;
+}
+
+function rupees(n) {
+    return 'Rs.' + n.toLocaleString('en-LK', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function updateTotal() {
+    const amount = parseFloat(document.getElementById('amount').value) || 0;
+    const n = driverCount();
+    document.getElementById('total').textContent = rupees(amount * n);
+    document.getElementById('totalNote').textContent = n + ' driver' + (n === 1 ? '' : 's') + ' × ' + rupees(amount);
+}
+
+function confirmGive() {
+    const amount = parseFloat(document.getElementById('amount').value) || 0;
+    const n = driverCount();
+    if (n === 0) { alert('No approved drivers match.'); return false; }
+    return confirm('Give ' + rupees(amount) + ' to ' + n + ' driver' + (n === 1 ? '' : 's') + ' (' + rupees(amount * n) + ' in total)?\n\nDrivers are notified, and any commission they owe now is paid from it straight away.');
+}
+</script>
+{% endblock %}
