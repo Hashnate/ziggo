@@ -86,6 +86,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
   String? _lastRideStatus;
   LatLng? _lastRideDriverLatLng;
   List<LatLng> _rideRoutePoints = [];
+  LatLng? _lastFollowLatLng;
 
   void _foodMarketRoutePointsCleaned() {
     _lastRouteOrderId = null;
@@ -363,11 +364,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
       final market = driver.activeMarketOrder;
       final currentLoc = LatLng(p.latitude, p.longitude);
       
-      final lastLoc = driver.currentLocation;
-      final bool movedSignificantly = lastLoc == null || 
+      // Not driver.currentLocation: geolocator hands DriverProvider this same
+      // stream, and when it subscribed first it has already stored this fix,
+      // so the distance would always be ~0 and the camera would never follow.
+      final lastLoc = _lastFollowLatLng;
+      final bool movedSignificantly = lastLoc == null ||
           Geolocator.distanceBetween(lastLoc.latitude, lastLoc.longitude, currentLoc.latitude, currentLoc.longitude) >= 10;
-      
+
       if (movedSignificantly) {
+        _lastFollowLatLng = currentLoc;
         driver.updateCurrentLocation(currentLoc);
 
         if (driver.activeRide != null || food != null || market != null) {
