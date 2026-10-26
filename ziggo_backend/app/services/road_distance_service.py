@@ -1,8 +1,8 @@
 """Road distance for fares, from Google's Directions API (used by fare_service._trip_route
 while SystemSettings.road_distance_enabled is on).
 
-A straight line undercharges: roads wind, and around Kinniya's lagoon a 1.1 km hop is
-3.6 km by road. Answers are kept for CACHE_SECONDS per route (points rounded to about
+A straight line undercharges: roads wind, and one Kinniya trip measured 1.1 km straight
+but 3.6 km by road. Answers are kept for CACHE_SECONDS per route (points rounded to about
 11 m), so the vehicle cards, the booking and the re-price at accept share one lookup.
 Any failure returns None and the fare falls back to the straight line, so a booking
 never fails because Google is slow or the key is wrong.
