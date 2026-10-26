@@ -13,7 +13,7 @@ from math import radians, sin, cos, asin, sqrt
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from shapely.geometry import Point, Polygon
 
@@ -21,7 +21,7 @@ from ..models import FareSetting, FlashWeightTier, PromoCode, SurgeZone
 from ..api.v1.surge_zones import is_time_in_range
 from . import road_distance_service
 from .district_service import district_for
-from .launch_service import launch_location_for, service_of_booking
+from .launch_service import launch_location_for, service_of_booking, today_lk
 from .promo_service import check_promo
 
 # Fallback fare table (used if DB has no row yet for a service type)
@@ -88,7 +88,7 @@ class _Rules:
     promo: Optional[PromoCode]
     flash_tiers: list
     system_surge: Optional[float]     # system surge multiplier while its window is open
-    district: Optional[str] = None    # pickup district, only looked up while district fares are on
+    district: Optional[str] = None    # pickup district, set when one of its district fares applies
     district_base_fares: dict = field(default_factory=dict)  # service_type -> that district's base fare
     launch_location: object = None    # commission-free launch location this job falls in, if any
     promo_check: object = None        # promo_service.PromoCheck for the code sent, if any
@@ -98,7 +98,8 @@ class _Rules:
 async def _load_rules(db: AsyncSession, service_types: list[str], promo: Optional[str],
                       need_flash_tiers: bool, pickup: Optional[tuple] = None,
                       launch_service: Optional[str] = None, launch_location_id: Optional[int] = None,
-                      customer_id: Optional[int] = None, promo_locked: bool = False) -> _Rules:
+                      customer_id: Optional[int] = None, promo_locked: bool = False,
+                      district_fare: Optional[tuple] = None) -> _Rules:
     from ..models import DistrictFare, LaunchLocation, PeakHourSetting, SystemSettings
     from datetime import datetime, timezone, timedelta
 
@@ -140,14 +141,28 @@ async def _load_rules(db: AsyncSession, service_types: list[str], promo: Optiona
     now_local = datetime.now()
     open_zones = [z for z in zone_q.scalars().all() if is_time_in_range(z.start_time, z.end_time, now_local)]
 
-    # District base fares (Phase 2, feature 04): the pickup's district decides.
+    # District base fares (Phase 2, feature 04): the pickup's district decides, using its
+    # switched-on fare whose period covers today. district_fare comes from a booking being
+    # re-priced: (district, base fare) it was booked with, or () for none; that stands
+    # even if the period has since ended or been switched off.
     district, district_base_fares = None, {}
-    if ss is not None and ss.district_fares_enabled and pickup is not None:
-        district = district_for(*pickup)
-        if district:
+    if district_fare is not None:
+        if district_fare:
+            district, district_base_fares = district_fare[0], {st: float(district_fare[1]) for st in service_types}
+    elif pickup is not None:
+        found = district_for(*pickup)
+        if found:
+            day = today_lk()
             df_q = await db.execute(select(DistrictFare).where(
-                DistrictFare.district == district, DistrictFare.service_type.in_(service_types)))
-            district_base_fares = {r.service_type: float(r.base_fare) for r in df_q.scalars().all()}
+                DistrictFare.district == found, DistrictFare.service_type.in_(service_types),
+                DistrictFare.is_active == True,  # noqa: E712
+                or_(DistrictFare.start_date == None, DistrictFare.start_date <= day),  # noqa: E711
+                or_(DistrictFare.end_date == None, DistrictFare.end_date >= day),  # noqa: E711
+            ).order_by(DistrictFare.start_date.desc().nullslast(), DistrictFare.id.desc()))
+            for r in df_q.scalars().all():
+                district_base_fares.setdefault(r.service_type, float(r.base_fare))
+            if district_base_fares:
+                district = found
 
     # Commission-free launch locations (Phase 2, feature 02). launch_location_id comes
     # from a booking being re-priced: its own decision stands (0 = not free) even if
@@ -504,13 +519,15 @@ async def calculate_fare(
     launch_location_id: Optional[int] = None,
     # True when re-pricing a booking that already took `promo`.
     promo_locked: bool = False,
+    # Re-pricing a booking: the district base fare it was booked with, see _load_rules.
+    district_fare: Optional[tuple] = None,
 ) -> dict:
     rules = await _load_rules(
         db, [service_type, "courier"], promo,
         need_flash_tiers=(is_flash and parcel_weight_kg is not None) or is_courier,
         pickup=(pickup_lat, pickup_lng),
         launch_service=service_of_booking(is_flash, is_courier), launch_location_id=launch_location_id,
-        customer_id=getattr(customer, "id", None), promo_locked=promo_locked,
+        customer_id=getattr(customer, "id", None), promo_locked=promo_locked, district_fare=district_fare,
     )
 
     if is_rental:

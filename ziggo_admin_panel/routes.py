@@ -3106,16 +3106,47 @@ async def admin_fare_settings_update(
 
 
 # ---------- District base fares (Phase 2, feature 04) ----------
+def _district_fare_status(f, today):
+    """upcoming | active | ended | off, as for launch locations; a missing date is no limit."""
+    if not f.is_active:
+        return "off"
+    if f.start_date and today < f.start_date:
+        return "upcoming"
+    if f.end_date and today > f.end_date:
+        return "ended"
+    return "active"
+
+
+async def _district_fare_clash(db: AsyncSession, f) -> Optional[str]:
+    """Another switched-on period of the same district and vehicle that overlaps f, described."""
+    from datetime import date as _date
+    from app.models import DistrictFare
+
+    if not f.is_active:
+        return None
+    lo, hi = f.start_date or _date.min, f.end_date or _date.max
+    q = await db.execute(select(DistrictFare).where(
+        DistrictFare.district == f.district, DistrictFare.service_type == f.service_type,
+        DistrictFare.is_active == True, DistrictFare.id != (f.id or 0)))  # noqa: E712
+    for o in q.scalars().all():
+        if (o.start_date or _date.min) <= hi and (o.end_date or _date.max) >= lo:
+            return (f"{o.district} already has a base fare of Rs.{o.base_fare:,.2f} for this vehicle from "
+                    f"{o.start_date or 'the start'} to {o.end_date or 'no end date'}. Switched-on periods can't overlap: "
+                    f"change the dates or switch that one off first.")
+    return None
+
+
 @router.get("/fare-settings/districts", response_class=HTMLResponse)
 async def admin_district_fares(
     request: Request,
-    service: str = "",
-    saved: int = 0,
+    edit: int = 0,
+    error: str = "",
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_superadmin),
 ):
     from app.models import DistrictFare, FareSetting
     from app.services.district_service import DISTRICTS
+    from app.services.launch_service import today_lk
 
     # Courier is weight-priced island-wide, so it has no district base fare.
     fq = await db.execute(
@@ -3123,20 +3154,21 @@ async def admin_district_fares(
         .order_by(FareSetting.display_order, FareSetting.id)
     )
     services = fq.scalars().all()
-    current = next((f for f in services if f.service_type == service), services[0] if services else None)
-    overrides = {}
-    if current is not None:
-        oq = await db.execute(select(DistrictFare).where(DistrictFare.service_type == current.service_type))
-        overrides = {r.district: r for r in oq.scalars().all()}
-    counts = dict((await db.execute(
-        select(DistrictFare.service_type, func.count(DistrictFare.id)).group_by(DistrictFare.service_type)
-    )).all())
-    ss = await _get_or_create_settings(db)
+    national = {f.service_type: float(f.base_fare or 0) for f in services}
+    names = {f.service_type: f.display_name or f.service_type for f in services}
+    fares = (await db.execute(select(DistrictFare).order_by(
+        DistrictFare.district, DistrictFare.service_type, desc(DistrictFare.start_date), desc(DistrictFare.id)))).scalars().all()
+    today = today_lk()
+    rows = [{"fare": f, "status": _district_fare_status(f, today),
+             "days_left": (f.end_date - today).days + 1 if f.end_date else None,
+             "starts_in": (f.start_date - today).days if f.start_date else None,
+             "national": national.get(f.service_type), "vehicle": names.get(f.service_type, f.service_type)}
+            for f in fares]
+    current = next((f for f in fares if f.id == edit), None)
     return templates.TemplateResponse(
         request, "district_fares.html",
-        {"request": request, "active_page": "fare-settings", "services": services, "current": current,
-         "districts": DISTRICTS, "overrides": overrides, "counts": counts,
-         "enabled": bool(ss.district_fares_enabled), "saved": bool(saved)},
+        {"request": request, "active_page": "services", "services": services, "national": national,
+         "districts": DISTRICTS, "rows": rows, "current": current, "today": today.isoformat(), "error": error},
     )
 
 
@@ -3146,50 +3178,90 @@ async def admin_district_fares_save(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_superadmin),
 ):
-    """One form per vehicle type: a base fare box per district. Blank = national fare."""
-    from app.models import DistrictFare
-    from app.services.district_service import DISTRICTS
+    from datetime import date
     from decimal import Decimal, InvalidOperation
+    from app.models import DistrictFare, FareSetting
+    from app.services.district_service import DISTRICTS
 
     form = await request.form()
+    fare_id = int(form.get("id") or 0)
+    back = f"/admin/fare-settings/districts?edit={fare_id or -1}"
+
+    def fail(msg):
+        return RedirectResponse(url=back + "&error=" + urllib.parse.quote(msg), status_code=303)
+
+    district = str(form.get("district") or "")
     service_type = str(form.get("service_type") or "")
-    if not service_type:
-        raise HTTPException(status_code=400, detail="Vehicle type missing")
-    oq = await db.execute(select(DistrictFare).where(DistrictFare.service_type == service_type))
-    existing = {r.district: r for r in oq.scalars().all()}
-    for district in DISTRICTS:
-        raw = str(form.get(f"base_{district}") or "").strip()
-        row = existing.get(district)
-        if raw == "":
-            if row is not None:
-                await db.delete(row)
-            continue
-        try:
-            value = Decimal(raw)
-        except InvalidOperation:
-            raise HTTPException(status_code=400, detail=f"{district}: '{raw}' is not a number")
-        if value < 0:
-            raise HTTPException(status_code=400, detail=f"{district}: the base fare can't be negative")
-        if row is None:
-            db.add(DistrictFare(district=district, service_type=service_type, base_fare=value))
-        else:
-            row.base_fare = value
+    if district not in DISTRICTS:
+        return fail("Please choose a district.")
+    known = (await db.execute(select(FareSetting.service_type).where(
+        FareSetting.service_type == service_type, FareSetting.service_type != "courier"))).scalar()
+    if not known:
+        return fail("Please choose a vehicle type.")
+    try:
+        base = Decimal(str(form.get("base_fare") or "").strip())
+    except InvalidOperation:
+        return fail("Please give the base fare as a number.")
+    if base < 0:
+        return fail("The base fare can't be negative.")
+    try:
+        start = date.fromisoformat(str(form.get("start_date")))
+        end = date.fromisoformat(str(form.get("end_date")))
+    except ValueError:
+        return fail("Please give a start and end date.")
+    if end < start:
+        return fail("The end date can't be before the start date.")
+
+    f = None
+    if fare_id:
+        f = (await db.execute(select(DistrictFare).where(DistrictFare.id == fare_id))).scalars().first()
+    if f is None:
+        f = DistrictFare()
+    f.district, f.service_type, f.base_fare = district, service_type, base
+    f.start_date, f.end_date, f.is_active = start, end, form.get("is_active") == "on"
+    clash = await _district_fare_clash(db, f)
+    if clash:
+        return fail(clash)
+    if f.id is None:
+        db.add(f)
     await db.commit()
-    return RedirectResponse(url=f"/admin/fare-settings/districts?service={urllib.parse.quote(service_type)}&saved=1",
-                            status_code=303)
+    return RedirectResponse(url="/admin/fare-settings/districts", status_code=303)
 
 
-@router.post("/fare-settings/districts/switch")
-async def admin_district_fares_switch(
+@router.post("/fare-settings/districts/{fare_id}/switch")
+async def admin_district_fare_switch(
+    fare_id: int,
     enabled: str = Form(...),
-    service: str = Form(""),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_superadmin),
 ):
-    ss = await _get_or_create_settings(db)
-    ss.district_fares_enabled = enabled == "on"
-    await db.commit()
-    return RedirectResponse(url=f"/admin/fare-settings/districts?service={urllib.parse.quote(service)}", status_code=303)
+    from app.models import DistrictFare
+
+    f = (await db.execute(select(DistrictFare).where(DistrictFare.id == fare_id))).scalars().first()
+    if f is not None:
+        f.is_active = enabled == "on"
+        clash = await _district_fare_clash(db, f)
+        if clash:
+            await db.rollback()
+            return RedirectResponse(url="/admin/fare-settings/districts?error=" + urllib.parse.quote(clash),
+                                    status_code=303)
+        await db.commit()
+    return RedirectResponse(url="/admin/fare-settings/districts", status_code=303)
+
+
+@router.post("/fare-settings/districts/{fare_id}/delete")
+async def admin_district_fare_delete(
+    fare_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    from app.models import DistrictFare
+
+    f = (await db.execute(select(DistrictFare).where(DistrictFare.id == fare_id))).scalars().first()
+    if f is not None:
+        await db.delete(f)
+        await db.commit()
+    return RedirectResponse(url="/admin/fare-settings/districts", status_code=303)
 
 
 # ---------- System settings (admin → Settings) ----------

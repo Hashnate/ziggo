@@ -501,6 +501,17 @@ def _fare_snapshot(fare: dict) -> dict:
     return json.loads(json.dumps(fare, default=str))
 
 
+def _booked_district_fare(b: Booking) -> Optional[tuple]:
+    """The district base fare a booking was priced with, so re-pricing keeps it:
+    (district, base fare), () for none, None if the booking has no saved quote."""
+    fb = b.fare_breakdown if isinstance(b.fare_breakdown, dict) else None
+    if fb is None:
+        return None
+    if fb.get("district_base_fare") is None:
+        return ()
+    return fb.get("district"), float(fb["district_base_fare"])
+
+
 async def _get_driver(db: AsyncSession, user: User) -> Driver:
     if user.role != UserRole.DRIVER:
         raise HTTPException(status_code=403, detail="Driver role required")
@@ -1527,6 +1538,7 @@ async def accept_booking(
         is_courier=b.is_courier,
         packages=b.packages,
         launch_location_id=b.launch_location_id or 0,
+        district_fare=_booked_district_fare(b),
         customer=None, # Not modifying loyalty here
         redeem_points=int(b.redeem_points) if b.redeem_points else 0,
         stops=stops_list,
@@ -2024,6 +2036,7 @@ async def update_booking_status(
                 is_courier=b.is_courier,
                 packages=b.packages,
                 launch_location_id=b.launch_location_id or 0,
+                district_fare=_booked_district_fare(b),
                 customer=customer,
                 redeem_points=int(b.redeem_points) if b.redeem_points else 0,
                 stops=stops_list,
@@ -2631,6 +2644,7 @@ async def update_booking_destination(
         is_courier=b.is_courier,
         packages=b.packages,
         launch_location_id=b.launch_location_id or 0,
+        district_fare=_booked_district_fare(b),
         customer=c,
         redeem_points=int(b.redeem_points) if b.redeem_points else 0,
         stops=[s.model_dump() for s in (body.stops or [])],

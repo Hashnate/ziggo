@@ -130,6 +130,10 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("market_orders", "district", "VARCHAR(30)"),
     ("system_settings", "district_fares_enabled", "BOOLEAN NOT NULL DEFAULT FALSE"),
     ("system_settings", "road_distance_enabled", "BOOLEAN NOT NULL DEFAULT FALSE"),
+    ("district_fares", "start_date", "DATE"),
+    ("district_fares", "end_date", "DATE"),
+    ("district_fares", "is_active", "BOOLEAN NOT NULL DEFAULT TRUE"),
+    ("district_fares", "created_at", "TIMESTAMP WITH TIME ZONE DEFAULT now()"),
     ("bookings", "launch_location_id", "INTEGER"),
     ("food_orders", "launch_location_id", "INTEGER"),
     ("food_orders", "waive_delivery_cut", "BOOLEAN NOT NULL DEFAULT FALSE"),
@@ -282,6 +286,11 @@ async def ensure_schema(engine: AsyncEngine) -> None:
         added = await conn.run_sync(_alter)
         if added:
             print(f"[schema_sync] Added columns: {', '.join(added)}")
+        if conn.dialect.name == "postgresql":
+            # District fares were one row per district and vehicle; now each row is a
+            # dated period, so a district and vehicle can have several.
+            await conn.execute(text(
+                "ALTER TABLE district_fares DROP CONSTRAINT IF EXISTS uq_district_fares_district_service"))
 
         await _seed_flash_tiers(conn)
         await _seed_sample_events(conn)

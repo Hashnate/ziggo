@@ -2,10 +2,12 @@
 
     python3 deploy/staging/district_fare_checks.py
 
-Uses the admin page to set a Colombo tuk base fare and the switch, then prices
-and books trips through the app's API. The switch and the district fares are put
-back exactly as they were afterwards, even if a check fails.
+Uses the admin page to add a Colombo tuk base fare for a period and to switch it on
+and off, then prices and books trips through the app's API. The district fares are
+put back exactly as they were afterwards, even if a check fails. It books a trip with
+the test customer and Test Driver 1, so don't run it while testers use those accounts.
 """
+from datetime import date, timedelta
 import http.cookiejar
 import json
 import subprocess
@@ -74,36 +76,45 @@ def quote(pickup, drop):
 
 
 customer, tuk = login("0771234567", "customer"), login("0771000001", "driver")
-was_on = sql("select district_fares_enabled from system_settings where id = 1") == "t"
-saved_rows = sql("select coalesce(json_agg(row_to_json(d)), '[]') from (select district, service_type, base_fare "
-                 "from district_fares) d")
+saved_rows = sql("select coalesce(json_agg(row_to_json(d)), '[]') from (select district, service_type, base_fare, "
+                 "start_date, end_date, is_active from district_fares) d")
 national = float(sql("select base_fare from fare_settings where service_type = 'tuk'"))
+today = date.fromisoformat(sql("select (now() at time zone 'Asia/Colombo')::date"))
+
+
+def colombo_tuk_id():
+    return sql("select id from district_fares where district = 'Colombo' and service_type = 'tuk' order by id desc limit 1")
+
+
 try:
+    sql("delete from district_fares")
     admin_req("/admin/login", {"phone_number": "0700000000", "password": ADMIN_PW})
     print("\n1. Admin page")
-    st, page = admin_req("/admin/fare-settings/districts?service=tuk")
-    check("District base fares page loads with all 25 districts", st == 200 and page.count('name="base_') == 25, f"HTTP {st}")
-    admin_req("/admin/fare-settings/districts/switch", {"enabled": "off", "service": "tuk"})
-    st, _ = admin_req("/admin/fare-settings/districts/save", {"service_type": "tuk", "base_Colombo": f"{national + EXTRA:.2f}"})
-    stored = sql("select base_fare from district_fares where district = 'Colombo' and service_type = 'tuk'")
-    check("saving a Colombo tuk base fare stores it", st == 200 and stored and float(stored) == national + EXTRA,
-          f"national Rs.{national:.2f}, Colombo Rs.{stored}")
-
-    print("\n2. Switch OFF: nothing changes")
-    sql("delete from district_fares where not (district = 'Colombo' and service_type = 'tuk')")
+    st, page = admin_req("/admin/fare-settings/districts")
+    check("District base fares page loads, empty", st == 200 and "No district fares yet" in page, f"HTTP {st}")
     off_col, off_col_card = quote(BORELLA, NUGEGODA)
     off_gam, _ = quote(NEGOMBO, NEGOMBO_BEACH)
-    check("Colombo trip uses the national fare while the switch is off", off_col_card.get("district") is None)
+    check("with no district fares a Colombo trip is national", off_col_card.get("district") is None)
+    st, page = admin_req("/admin/fare-settings/districts/save", {
+        "district": "Colombo", "service_type": "tuk", "base_fare": f"{national + EXTRA:.2f}",
+        "start_date": today.isoformat(), "end_date": (today + timedelta(days=2)).isoformat(), "is_active": "on"})
+    stored = sql("select base_fare || '|' || start_date || '|' || end_date || '|' || is_active from district_fares "
+                 "where district = 'Colombo' and service_type = 'tuk'")
+    check("adding a Colombo tuk fare for 3 days stores it", st == 200 and stored.startswith(f"{national + EXTRA:.2f}|{today}"),
+          stored)
+    check("the list shows it as active", "Active · 3 days left" in page)
+    st, page = admin_req("/admin/fare-settings/districts/save", {
+        "district": "Colombo", "service_type": "tuk", "base_fare": "1.00",
+        "start_date": (today + timedelta(days=1)).isoformat(), "end_date": (today + timedelta(days=5)).isoformat(),
+        "is_active": "on"})
+    check("an overlapping switched-on period is refused", ("can&#39;t overlap" in page or "can't overlap" in page)
+          and sql("select count(*) from district_fares") == "1", sql("select count(*) from district_fares"))
 
-    print("\n3. Switch ON")
-    st, page = admin_req("/admin/fare-settings/districts/switch", {"enabled": "on", "service": "tuk"})
-    check("switch turned on from the admin page", st == 200 and "district_fares_enabled" not in page
-          and sql("select district_fares_enabled from system_settings where id = 1") == "t")
+    print("\n2. Switched on, inside its period")
     on_col, on_col_card = quote(BORELLA, NUGEGODA)
     on_gam, _ = quote(NEGOMBO, NEGOMBO_BEACH)
     surge = float(on_col.get("surge_multiplier") or 1)
     diff = round(on_col["fare_amount"] - off_col["fare_amount"], 2)
-    # The estimate reply has a fixed list of fields; the vehicle card carries the district label.
     check("Colombo trip uses Colombo's base fare", on_col_card.get("district") == "Colombo"
           and abs(diff - EXTRA * surge) < 0.02, f"+Rs.{diff} (expected +{EXTRA * surge:.2f})")
     check("vehicle card shows the same price", on_col_card and on_col_card["final_amount"] == on_col["final_amount"],
@@ -111,7 +122,15 @@ try:
     check("Gampaha trip (no district fare) is unchanged", on_gam["final_amount"] == off_gam["final_amount"]
           and on_gam.get("district") is None, f"Rs.{off_gam['final_amount']} -> Rs.{on_gam['final_amount']}")
 
-    print("\n4. A booked trip keeps the district price to the end")
+    print("\n3. Its own switch")
+    admin_req(f"/admin/fare-settings/districts/{colombo_tuk_id()}/switch", {"enabled": "off"})
+    switched_off, _ = quote(BORELLA, NUGEGODA)
+    check("switched off: national fare", quote(BORELLA, NUGEGODA)[1].get("district") is None
+          and switched_off["fare_amount"] == off_col["fare_amount"], f"Rs.{switched_off['fare_amount']}")
+    admin_req(f"/admin/fare-settings/districts/{colombo_tuk_id()}/switch", {"enabled": "on"})
+    check("switched on again: Colombo fare", quote(BORELLA, NUGEGODA)[1].get("district") == "Colombo")
+
+    print("\n4. A booked trip keeps the district price to the end, even if the fare is switched off")
     call("POST", "/driver/online", tuk, {"is_online": True})
     call("POST", "/driver/location", tuk, {"lat": BORELLA[0] + 0.0027, "lng": BORELLA[1]})
     priced, _ = quote(BORELLA, NUGEGODA)   # with the driver online, as the app would see it
@@ -122,30 +141,39 @@ try:
           f"HTTP {s}, Rs.{b.get('final_amount') if isinstance(b, dict) else b}")
     bid = b["id"]
     call("POST", f"/bookings/{bid}/accept", tuk)
+    admin_req(f"/admin/fare-settings/districts/{colombo_tuk_id()}/switch", {"enabled": "off"})
     call("PATCH", f"/bookings/{bid}/status", tuk, {"status": "arrived"})
     otp = call("GET", f"/bookings/{bid}", customer)[1].get("otp")
     call("PATCH", f"/bookings/{bid}/status", tuk, {"status": "started", "otp": otp})
     s, done = call("PATCH", f"/bookings/{bid}/status", tuk, {"status": "completed", "lat": NUGEGODA[0], "lng": NUGEGODA[1]})
-    check("trip completed at the district price", s == 200 and done["final_amount"] == priced["final_amount"],
+    check("trip completed at the district price after the fare was switched off",
+          s == 200 and done["final_amount"] == priced["final_amount"],
           f"HTTP {s}, Rs.{done.get('final_amount') if isinstance(done, dict) else done}")
     row = sql(f"select district || '|' || (fare_breakdown->>'district_base_fare') from bookings where id = {bid}")
     check("trip record shows Colombo and the district base fare", row == f"Colombo|{national + EXTRA:.1f}"
           or row == f"Colombo|{national + EXTRA}", row)
     call("POST", "/driver/online", tuk, {"is_online": False})
 
-    print("\n5. Clearing a box goes back to the national fare")
-    admin_req("/admin/fare-settings/districts/save", {"service_type": "tuk", "base_Colombo": ""})
-    cleared, _ = quote(BORELLA, NUGEGODA)
-    cleared_card = quote(BORELLA, NUGEGODA)[1]
-    check("emptying the Colombo box removes the district fare", cleared_card.get("district") is None
-          and cleared["fare_amount"] == off_col["fare_amount"], f"Rs.{cleared['fare_amount']} vs Rs.{off_col['fare_amount']}")
+    print("\n5. After its period, and deleted")
+    fid = colombo_tuk_id()
+    admin_req("/admin/fare-settings/districts/save", {
+        "id": fid, "district": "Colombo", "service_type": "tuk", "base_fare": f"{national + EXTRA:.2f}",
+        "start_date": (today - timedelta(days=5)).isoformat(), "end_date": (today - timedelta(days=1)).isoformat(),
+        "is_active": "on"})
+    ended, ended_card = quote(BORELLA, NUGEGODA)
+    st, page = admin_req("/admin/fare-settings/districts")
+    check("a period that ended yesterday: national fare again", ended_card.get("district") is None
+          and ended["fare_amount"] == off_col["fare_amount"] and "Ended · national fare again" in page,
+          f"Rs.{ended['fare_amount']} vs Rs.{off_col['fare_amount']}")
+    admin_req(f"/admin/fare-settings/districts/{fid}/delete", {})
+    check("delete removes it", sql("select count(*) from district_fares") == "0")
 finally:
-    sql(f"update system_settings set district_fares_enabled = {'true' if was_on else 'false'} where id = 1")
     sql("delete from district_fares")
     for r in json.loads(saved_rows):
-        sql(f"insert into district_fares (district, service_type, base_fare) values "
-            f"('{r['district']}', '{r['service_type']}', {r['base_fare']})")
-    print(f"\nRestored: switch {'on' if was_on else 'off'}, {len(json.loads(saved_rows))} district fare(s).")
+        dates = ", ".join("null" if r[k] is None else f"'{r[k]}'" for k in ("start_date", "end_date"))
+        sql(f"insert into district_fares (district, service_type, base_fare, start_date, end_date, is_active) values "
+            f"('{r['district']}', '{r['service_type']}', {r['base_fare']}, {dates}, {str(r['is_active']).lower()})")
+    print(f"\nRestored {len(json.loads(saved_rows))} district fare(s).")
 
 fails = [r for r in results if not r[1]]
 print(f"\n{len(results) - len(fails)}/{len(results)} checks passed")
