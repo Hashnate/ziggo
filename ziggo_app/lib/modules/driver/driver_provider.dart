@@ -70,8 +70,18 @@ class DriverProvider extends ChangeNotifier {
       );
 
   StreamSubscription<Position>? _locationSub;
+  int _locationGen = 0;
   DateTime? _lastLocationPush;
   Timer? _profileTimer;
+
+  /// Every GPS fix, for the home screen. Screens must listen here instead of
+  /// calling Geolocator.getPositionStream: geolocator hands every caller the
+  /// stream the first caller opened, with that caller's settings. A screen
+  /// stream opened before going online left the whole online session without
+  /// the background settings, so location stopped reaching the server (admin
+  /// and customer maps froze) once the driver switched to Google Maps.
+  final _positions = StreamController<Position>.broadcast();
+  Stream<Position> get positions => _positions.stream;
 
   DriverProvider() {
     _initLocation();
@@ -122,9 +132,7 @@ class DriverProvider extends ChangeNotifier {
     ]);
     _startProfileTimer();
 
-    if (_isOnline) {
-      await _startLocationStream();
-    }
+    await _startLocationStream(online: _isOnline);
   }
 
   void _startProfileTimer() {
@@ -617,10 +625,8 @@ class DriverProvider extends ChangeNotifier {
       _isOnline = resp.data['is_online'] == true;
       notifyListeners();
 
-      if (_isOnline) {
-        await _startLocationStream();
-      } else {
-        _stopLocationStream();
+      await _startLocationStream(online: _isOnline);
+      if (!_isOnline) {
         unawaited(FloatingOverlayService.hideFloatingWidget());
       }
       return true;
@@ -640,25 +646,35 @@ class DriverProvider extends ChangeNotifier {
   /// or a location foreground service (Android) the OS lets the process keep
   /// running, so the WebSocket stays connected, location keeps reaching
   /// dispatch, and a ride request lands in the app the instant it's sent.
-  Future<void> _startLocationStream() async {
+  ///
+  /// Offline, a plain stream only feeds the map ([positions]); nothing is sent.
+  Future<void> _startLocationStream({bool online = true}) async {
     _stopLocationStream();
+    final gen = _locationGen;
 
     LocationPermission perm = await Geolocator.checkPermission();
-    if (perm == LocationPermission.denied) {
+    if (perm == LocationPermission.denied && online) {
       perm = await Geolocator.requestPermission();
     }
     if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
       return;
     }
 
-    await _pushLocationOnce();
+    if (online) await _pushLocationOnce();
+    // A later start or stop won the race; subscribing now would leave two
+    // listeners and pin the shared stream to this call's settings.
+    if (gen != _locationGen) return;
 
     final LocationSettings settings;
-    if (Platform.isAndroid) {
+    if (!online) {
+      settings = const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 5);
+    } else if (Platform.isAndroid) {
       settings = AndroidSettings(
         accuracy: LocationAccuracy.high,
         distanceFilter: 10,
-        intervalDuration: const Duration(seconds: 10),
+        // Fixes every 5 s so the 10 s server push below never skips a beat
+        // (at exactly 10 s, jitter dropped every other fix).
+        intervalDuration: const Duration(seconds: 5),
         // The foreground service is what stops Android killing the process
         // while the driver is online. Its notification is mandatory and is
         // the "You're online" card the driver sees.
@@ -690,6 +706,8 @@ class DriverProvider extends ChangeNotifier {
         _currentLocation = LatLng(pos.latitude, pos.longitude);
         _saveCachedLocation(_currentLocation!);
         notifyListeners();
+        _positions.add(pos);
+        if (!online) return;
         // Every fix keeps the process alive; only some need to reach the server.
         final now = DateTime.now();
         if (_lastLocationPush == null ||
@@ -705,6 +723,7 @@ class DriverProvider extends ChangeNotifier {
   }
 
   void _stopLocationStream() {
+    _locationGen++;
     _locationSub?.cancel();
     _locationSub = null;
     _lastLocationPush = null;
@@ -1053,6 +1072,7 @@ class DriverProvider extends ChangeNotifier {
       WakelockPlus.disable();
     } catch (_) {}
     _stopLocationStream();
+    _positions.close();
     _profileTimer?.cancel();
     _ws.dispose();
     super.dispose();

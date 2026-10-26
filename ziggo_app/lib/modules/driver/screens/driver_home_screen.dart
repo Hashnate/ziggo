@@ -339,11 +339,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
     context.read<NotificationsProvider>().refresh();
 
     // BRD: live speed read-out — subscribe once, convert m/s → km/h.
-    _speedSub ??= Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high, distanceFilter: 5,
-      ),
-    ).listen((p) {
+    // DriverProvider owns the only GPS stream; see DriverProvider.positions.
+    _speedSub ??= driver.positions.listen((p) {
       final driver = context.read<DriverProvider>();
       if (!driver.profileComplete) return;
 
@@ -364,9 +361,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
       final market = driver.activeMarketOrder;
       final currentLoc = LatLng(p.latitude, p.longitude);
       
-      // Not driver.currentLocation: geolocator hands DriverProvider this same
-      // stream, and when it subscribed first it has already stored this fix,
-      // so the distance would always be ~0 and the camera would never follow.
+      // Not driver.currentLocation: DriverProvider stores each fix before
+      // passing it on, so the distance would always be ~0 and the camera
+      // would never follow.
       final lastLoc = _lastFollowLatLng;
       final bool movedSignificantly = lastLoc == null ||
           Geolocator.distanceBetween(lastLoc.latitude, lastLoc.longitude, currentLoc.latitude, currentLoc.longitude) >= 10;
