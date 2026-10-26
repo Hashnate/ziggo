@@ -3059,13 +3059,15 @@ async def admin_fare_settings(
 @router.post("/fare-settings/road-distance")
 async def admin_road_distance_switch(
     enabled: str = Form(...),
+    back: str = Form("/admin/fare-settings"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_superadmin),
 ):
     ss = await _get_or_create_settings(db)
     ss.road_distance_enabled = enabled == "on"
     await db.commit()
-    return RedirectResponse(url="/admin/fare-settings", status_code=303)
+    return RedirectResponse(url=back if back in ("/admin/fare-settings", "/admin/services") else "/admin/fare-settings",
+                            status_code=303)
 
 
 @router.post("/fare-settings/update")
@@ -3857,6 +3859,7 @@ async def admin_services(
         select(Driver.vehicle_type, func.count(Driver.id)).group_by(Driver.vehicle_type)
     )
     driver_counts = {vt: n for vt, n in counts_q.all()}
+    ss = await _get_or_create_settings(db)
     return templates.TemplateResponse(
         request,
         "services.html",
@@ -3864,6 +3867,7 @@ async def admin_services(
             "request": request,
             "active_page": "services",
             "categories": categories,
+            "road_distance": bool(ss.road_distance_enabled),
             "driver_counts": driver_counts,
         },
     )

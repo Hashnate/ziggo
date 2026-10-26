@@ -7,7 +7,22 @@
 <div class="space-y-6">
 
     <!-- Header Controls -->
-    <div class="flex justify-end">
+    <div class="flex justify-end items-center gap-2 flex-wrap">
+        {% if request.state.admin and request.state.admin.admin_role == 'superadmin' %}
+        <form method="POST" action="/admin/fare-settings/road-distance" class="flex items-center gap-2 px-3 py-1.5 rounded-xl border {% if road_distance %}border-emerald-200 bg-emerald-50{% else %}border-ziggo-line bg-white{% endif %}"
+              onsubmit="return confirm('{% if road_distance %}Go back to straight-line distance? New prices will be lower.{% else %}Use the road route for fares? New prices will use the driving distance and be higher.{% endif %}')"
+              title="Ride and Flash parcel fares measure the trip {% if road_distance %}along the roads (Google Maps){% else %}as a straight line{% endif %}">
+            <input type="hidden" name="enabled" value="{% if road_distance %}off{% else %}on{% endif %}">
+            <input type="hidden" name="back" value="/admin/services">
+            <span class="text-xs font-bold text-ziggo-muted"><i class="fas fa-route mr-1"></i>Trip distance:
+                {% if road_distance %}<span class="text-emerald-700">road route</span>{% else %}straight line{% endif %}</span>
+            <button type="submit" class="text-xs font-black underline {% if road_distance %}text-gray-500{% else %}text-emerald-700{% endif %}">
+                {% if road_distance %}use straight line{% else %}use road route{% endif %}</button>
+        </form>
+        <a href="/admin/fare-settings/districts" class="px-3.5 py-2 text-sm bg-white border border-ziggo-line rounded-xl font-bold text-ziggo hover:bg-gray-50 shadow-soft-sm flex items-center gap-2">
+            <i class="fas fa-map-marked-alt text-xs"></i> District base fares
+        </a>
+        {% endif %}
         <button onclick="openCreateModal()" class="px-3.5 py-2 text-sm bg-ziggo text-white rounded-xl font-bold shadow-brand hover:bg-ziggo-light transition flex items-center gap-2">
             <i class="fas fa-plus text-xs"></i> Add Service
         </button>
