@@ -9,6 +9,7 @@ import '../booking_provider.dart';
 import 'ride_tracking_screen.dart';
 import 'payment_selection_screen.dart';
 import 'promotions_selection_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 class RentalConfirmBookingScreen extends StatefulWidget {
   final Place pickup;
@@ -418,7 +419,7 @@ class _RentalConfirmBookingScreenState extends State<RentalConfirmBookingScreen>
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text('Total Amount', style: TextStyle(fontSize: 15, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-                            Text('LKR ${totalAmount.toStringAsFixed(2)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+                            Text('LKR ${formatAmount(totalAmount, 2)}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
                           ],
                         ),
                       ],

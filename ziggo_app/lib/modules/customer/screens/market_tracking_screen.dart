@@ -11,6 +11,7 @@ import 'market_home_screen.dart';
 import 'market_rating_screen.dart';
 import '../../../core/network/ws_client.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/utils/amount_format.dart';
 
 // ─────────────────────────────────────────────
 //  Market-order green color tokens
@@ -455,7 +456,7 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
                       borderRadius: BorderRadius.circular(100),
                     ),
                     child: Text(
-                      'Rs.${amount.toStringAsFixed(0)}',
+                      'Rs.${formatAmount(amount)}',
                       style: const TextStyle(
                         color: Color(0xFFB91C1C),
                         fontWeight: FontWeight.w900,
@@ -556,7 +557,7 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
               Expanded(
                 child: Text(
                   refunded
-                      ? 'Rs.${amount.toStringAsFixed(0)} has been refunded to your wallet.'
+                      ? 'Rs.${formatAmount(amount)} has been refunded to your wallet.'
                       : paymentMethod == 'CASH'
                           ? 'No payment was taken — nothing to refund.'
                           : 'If you were charged, the refund will appear in your wallet shortly.',
@@ -709,7 +710,7 @@ class _MarketTrackingScreenState extends State<MarketTrackingScreen> {
 
 // Helper formatting function
 String _formatRs(num? value) {
-  return 'Rs.${(value ?? 0).toStringAsFixed(0)}';
+  return 'Rs.${formatAmount((value ?? 0))}';
 }
 
 // ─────────────────────────────────────────────

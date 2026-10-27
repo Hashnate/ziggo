@@ -7,6 +7,7 @@ import '../../../app/app_styles.dart';
 import '../../../core/widgets/motion.dart';
 import '../restaurant_provider.dart';
 import 'restaurant_order_detail_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 class RestaurantDailyReportScreen extends StatefulWidget {
   final String date;
@@ -169,7 +170,7 @@ class _RestaurantDailyReportScreenState
             children: [
               _buildMetricItem('Completed', '$delivered', Colors.greenAccent),
               _buildMetricItem('Cancelled', '$cancelled', Colors.redAccent),
-              _buildMetricItem('Avg Order', 'Rs.${aov.round()}', Colors.white),
+              _buildMetricItem('Avg Order', 'Rs.${formatAmount(aov)}', Colors.white),
             ],
           ),
         ],

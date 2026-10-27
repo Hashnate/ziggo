@@ -6,6 +6,7 @@ import '../../../app/app_colors.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/widgets/motion.dart';
 import '../wallet_provider.dart';
+import '../../../core/utils/amount_format.dart';
 
 class SubscriptionScreen extends StatefulWidget {
   const SubscriptionScreen({super.key});
@@ -199,7 +200,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         ),
                         if (_payment == 'wallet')
                           Text(
-                            'Balance: Rs.${wallet.balance.toStringAsFixed(0)}',
+                            'Balance: Rs.${formatAmount(wallet.balance)}',
                             style: const TextStyle(color: Colors.white60, fontSize: 12),
                           ),
                       ],
@@ -229,8 +230,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               ),
               child: _busy
                   ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 3))
-                  : Text(active ? 'EXTEND ($_months month${_months > 1 ? 's' : ''}) • Rs.$total'
-                      : 'GO GOLD • Rs.$total',
+                  : Text(active ? 'EXTEND ($_months month${_months > 1 ? 's' : ''}) • Rs.${formatAmount(total)}'
+                      : 'GO GOLD • Rs.${formatAmount(total)}',
                       style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
             ),
           ),
@@ -296,7 +297,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 ListTile(
                   leading: const Icon(Icons.account_balance_wallet_rounded, color: AppColors.accent),
                   title: const Text('Ziggo Wallet', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('Balance: Rs.${walletProvider.balance.toStringAsFixed(2)}'),
+                  subtitle: Text('Balance: Rs.${formatAmount(walletProvider.balance, 2)}'),
                   trailing: _payment == 'wallet' ? const Icon(Icons.check_circle_rounded, color: AppColors.accent) : null,
                   onTap: () {
                     setState(() => _payment = 'wallet');

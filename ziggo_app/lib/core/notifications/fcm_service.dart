@@ -37,6 +37,7 @@ import 'package:audioplayers/audioplayers.dart';
 
 import '../network/api_client.dart';
 import 'notification_router.dart';
+import '../utils/amount_format.dart';
 
 // Must match the channel_id the backend sends in FCM payloads
 // (see fcm_service.py `channel_id="ziggo_ride_alarm_v16"`). Bumping this id
@@ -153,7 +154,7 @@ Future<void> showCallkitIncomingForRide(Map<String, dynamic> data) async {
       callerName = 'New Market Order';
     }
 
-    final fare = data['fare'] != null ? 'Rs. ${data['fare']}' : '';
+    final fare = data['fare'] != null ? 'Rs. ${formatAmount(data['fare'])}' : '';
     final pickup = (data['pickup_address'] ??
             data['restaurant_name'] ??
             data['vendor_name'] ??

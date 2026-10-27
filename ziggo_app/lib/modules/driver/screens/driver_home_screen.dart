@@ -38,6 +38,7 @@ import 'driver_notifications_screen.dart';
 import '../../customer/notifications_provider.dart';
 import '../../customer/screens/food_order_details_screen.dart';
 import '../../customer/screens/market_order_details_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 // Ziggo light driver UI tokens — clean light brand surfaces + gold accent.
 const Color _kPanel = AppColors.surface;       // clean white (matching surface)
@@ -1561,7 +1562,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
                             ),
                           ),
                           Text(
-                            earnings.toStringAsFixed(2),
+                            formatAmount(earnings, 2),
                             style: const TextStyle(
                               color: AppColors.textPrimary,
                               fontWeight: FontWeight.w900,
@@ -1730,7 +1731,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
                         ),
                       ),
                       Text(
-                        'Earn an extra Rs. ${peakExtraAmount.toStringAsFixed(2)} per ride',
+                        'Earn an extra Rs. ${formatAmount(peakExtraAmount, 2)} per ride',
                         style: const TextStyle(
                           color: Colors.white70,
                           fontWeight: FontWeight.w700,
@@ -2355,7 +2356,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
               Expanded(
                 child: _statBlock(
                   'Today',
-                  'Rs.${(driver.profile?['today_earnings'] ?? 0).toString()}',
+                  'Rs.${formatAmount(driver.profile?['today_earnings'], 2)}',
                   Colors.white,
                   Icons.payments_rounded,
                 ),
@@ -2513,7 +2514,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  'Rs.${driver.queuedRide!['final_amount'] ?? 0}',
+                  'Rs.${formatAmount(driver.queuedRide!['final_amount'])}',
                   style: const TextStyle(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w900,
@@ -2557,7 +2558,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
               ),
               const Spacer(),
               Text(
-                'Rs.${ride['final_amount'] ?? 0}',
+                'Rs.${formatAmount(ride['final_amount'])}',
                 style: const TextStyle(
                   fontWeight: FontWeight.w900,
                   fontSize: 18,
@@ -3382,28 +3383,28 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
               const Icon(Icons.payments_rounded, color: AppColors.success, size: 48),
               const SizedBox(height: 16),
               const Text('Please collect', style: TextStyle(color: AppColors.textSecondary)),
-              Text('Rs.${amount.toStringAsFixed(0)}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900)),
+              Text('Rs.${formatAmount(amount)}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900)),
               const Text('from the customer.', style: TextStyle(color: AppColors.textSecondary)),
               const SizedBox(height: 16),
               const Divider(height: 1),
               const SizedBox(height: 8),
-              buildItemizedRow('Trip Fare', tripFare.toStringAsFixed(2)),
+              buildItemizedRow('Trip Fare', formatAmount(tripFare, 2)),
               if (pickupFee > 0)
-                buildItemizedRow('Pickup Fee (included)', pickupFee.toStringAsFixed(2)),
+                buildItemizedRow('Pickup Fee (included)', formatAmount(pickupFee, 2)),
               if (passDeductible > 0)
-                buildItemizedRow('Passenger Deductibles', passDeductible.toStringAsFixed(2)),
-              buildItemizedRow('Gross Total', grossTotal.toStringAsFixed(2), isBold: true),
+                buildItemizedRow('Passenger Deductibles', formatAmount(passDeductible, 2)),
+              buildItemizedRow('Gross Total', formatAmount(grossTotal, 2), isBold: true),
               const Divider(height: 8),
-              buildItemizedRow('App Usage Charges', appUsage.toStringAsFixed(2), isNegative: true),
+              buildItemizedRow('App Usage Charges', formatAmount(appUsage, 2), isNegative: true),
               if (passDeductible > 0)
-                buildItemizedRow('Passenger Deductibles', passDeductible.toStringAsFixed(2), isNegative: true),
-              buildItemizedRow('Deduction', totalDeductions.toStringAsFixed(2), isNegative: true, isBold: true),
+                buildItemizedRow('Passenger Deductibles', formatAmount(passDeductible, 2), isNegative: true),
+              buildItemizedRow('Deduction', formatAmount(totalDeductions, 2), isNegative: true, isBold: true),
               const Divider(height: 1),
               const SizedBox(height: 8),
-              buildItemizedRow('Your Earnings', driverEarnings.toStringAsFixed(2), isBold: true, customColor: AppColors.primary),
+              buildItemizedRow('Your Earnings', formatAmount(driverEarnings, 2), isBold: true, customColor: AppColors.primary),
               if (driverEarnings > grossTotal) ...[
                 const SizedBox(height: 6),
-                buildItemizedRow('Ziggo Subsidy (Added to Payout)', (driverEarnings - grossTotal).toStringAsFixed(2), customColor: AppColors.success, isBold: true),
+                buildItemizedRow('Ziggo Subsidy (Added to Payout)', formatAmount((driverEarnings - grossTotal), 2), customColor: AppColors.success, isBold: true),
               ],
             ],
           ),
@@ -3434,25 +3435,25 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
               const Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary, size: 48),
               const SizedBox(height: 16),
               const Text('Payment of', style: TextStyle(color: AppColors.textSecondary)),
-              Text('Rs.${amount.toStringAsFixed(0)}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: AppColors.primary)),
+              Text('Rs.${formatAmount(amount)}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: AppColors.primary)),
               const Text('was successfully deducted from customer.', style: TextStyle(color: AppColors.textSecondary), textAlign: TextAlign.center),
               const SizedBox(height: 16),
               const Divider(height: 1),
               const SizedBox(height: 8),
-              buildItemizedRow('Trip Fare', tripFare.toStringAsFixed(2)),
+              buildItemizedRow('Trip Fare', formatAmount(tripFare, 2)),
               if (pickupFee > 0)
-                buildItemizedRow('Pickup Fee (included)', pickupFee.toStringAsFixed(2)),
+                buildItemizedRow('Pickup Fee (included)', formatAmount(pickupFee, 2)),
               if (passDeductible > 0)
-                buildItemizedRow('Passenger Deductibles', passDeductible.toStringAsFixed(2)),
-              buildItemizedRow('Gross Total', grossTotal.toStringAsFixed(2), isBold: true),
+                buildItemizedRow('Passenger Deductibles', formatAmount(passDeductible, 2)),
+              buildItemizedRow('Gross Total', formatAmount(grossTotal, 2), isBold: true),
               const Divider(height: 8),
-              buildItemizedRow('App Usage Charges', appUsage.toStringAsFixed(2), isNegative: true),
+              buildItemizedRow('App Usage Charges', formatAmount(appUsage, 2), isNegative: true),
               if (passDeductible > 0)
-                buildItemizedRow('Passenger Deductibles', passDeductible.toStringAsFixed(2), isNegative: true),
-              buildItemizedRow('Deduction', totalDeductions.toStringAsFixed(2), isNegative: true, isBold: true),
+                buildItemizedRow('Passenger Deductibles', formatAmount(passDeductible, 2), isNegative: true),
+              buildItemizedRow('Deduction', formatAmount(totalDeductions, 2), isNegative: true, isBold: true),
               const Divider(height: 1),
               const SizedBox(height: 8),
-              buildItemizedRow('Your Earnings', driverEarnings.toStringAsFixed(2), isBold: true, customColor: AppColors.primary),
+              buildItemizedRow('Your Earnings', formatAmount(driverEarnings, 2), isBold: true, customColor: AppColors.primary),
             ],
           ),
           actionsAlignment: MainAxisAlignment.center,
@@ -3673,7 +3674,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
             ),
             const Spacer(),
             Text(
-              'Rs.${amount.toStringAsFixed(0)}',
+              'Rs.${formatAmount(amount)}',
               style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
             ),
           ],
@@ -4422,7 +4423,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        'Rs.${fare.toStringAsFixed(0)}',
+                        'Rs.${formatAmount(fare)}',
                         style: const TextStyle(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w900,
@@ -4431,7 +4432,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                         ),
                       ),
                       Text(
-                        'You earn Rs.${earnings.toStringAsFixed(0)}',
+                        'You earn Rs.${formatAmount(earnings)}',
                         style: const TextStyle(
                           color: AppColors.textSecondary,
                           fontWeight: FontWeight.w700,
@@ -4442,7 +4443,7 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
                         Padding(
                           padding: const EdgeInsets.only(top: 2),
                           child: Text(
-                            '+ Rs.${zoneSurcharge.toStringAsFixed(0)} Zone Surge',
+                            '+ Rs.${formatAmount(zoneSurcharge)} Zone Surge',
                             style: const TextStyle(
                               color: Color(0xFFFF8C00),
                               fontWeight: FontWeight.w900,
@@ -5550,7 +5551,7 @@ class _StopWaitingTimerWidgetState extends State<_StopWaitingTimerWidget> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                '+Rs.${charge.toStringAsFixed(2)}',
+                '+Rs.${formatAmount(charge, 2)}',
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w900,

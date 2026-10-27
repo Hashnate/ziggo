@@ -7,6 +7,7 @@ import '../../../app/app_styles.dart';
 import '../../../core/network/api_client.dart';
 import '../market_provider.dart';
 import 'market_checkout_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 class MarketVendorScreen extends StatefulWidget {
   final Map<String, dynamic> vendor;
@@ -740,7 +741,7 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
                 ),
                 const Spacer(),
                 Text(
-                  'Rs.${mp.cartTotal.toStringAsFixed(0)}',
+                  'Rs.${formatAmount(mp.cartTotal)}',
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w900,
@@ -987,7 +988,7 @@ class _AddControl extends StatelessWidget {
 // ====================================================================
 //  Price + discount badge helpers
 // ====================================================================
-String _money(num v) => 'LKR ${v.toStringAsFixed(2)}';
+String _money(num v) => 'LKR ${formatAmount(v, 2)}';
 
 int _discountPct(Map<String, dynamic> p) {
   final orig = (p['original_price'] as num?)?.toDouble() ?? 0;

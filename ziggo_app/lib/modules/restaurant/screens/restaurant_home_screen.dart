@@ -16,6 +16,7 @@ import 'restaurant_earnings_screen.dart';
 import 'restaurant_menu_screen.dart';
 import 'restaurant_order_detail_screen.dart';
 import 'restaurant_profile_edit_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 class RestaurantHomeScreen extends StatefulWidget {
   const RestaurantHomeScreen({super.key});
@@ -797,7 +798,7 @@ class _OrderCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'Rs.${(order['final_amount'] as num? ?? 0).toStringAsFixed(0)}',
+                    'Rs.${formatAmount((order['final_amount'] as num? ?? 0))}',
                     style: const TextStyle(
                       fontWeight: FontWeight.w900,
                       fontSize: 16,
@@ -858,7 +859,7 @@ class _TodayStatsCard extends StatelessWidget {
           Expanded(
             child: _StatTile(
               label: 'TODAY',
-              value: 'Rs.${revenue.toStringAsFixed(0)}',
+              value: 'Rs.${formatAmount(revenue)}',
               subtitle: '$delivered delivered',
               color: AppColors.success,
               icon: Icons.attach_money_rounded,

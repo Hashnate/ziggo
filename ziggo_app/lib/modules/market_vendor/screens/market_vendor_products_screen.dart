@@ -8,6 +8,7 @@ import '../../../app/app_styles.dart';
 import '../../../core/widgets/motion.dart';
 import '../../restaurant/widgets/image_picker_tile.dart';
 import '../market_vendor_provider.dart';
+import '../../../core/utils/amount_format.dart';
 
 class MarketVendorProductsScreen extends StatefulWidget {
   const MarketVendorProductsScreen({super.key});
@@ -603,7 +604,7 @@ class _ProductRow extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                          'Rs.${(item['price'] as num? ?? 0).toStringAsFixed(0)}',
+                          'Rs.${formatAmount((item['price'] as num? ?? 0))}',
                           style: const TextStyle(
                             fontWeight: FontWeight.w900,
                             fontSize: 14,

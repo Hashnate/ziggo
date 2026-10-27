@@ -2,12 +2,13 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../core/network/api_client.dart';
+import '../../core/utils/amount_format.dart';
 
 /// The admin's conditions on a promo, as short phrases for chips and summaries.
 List<String> promoRules(Map<String, dynamic> p) {
   final rules = <String>[];
   final min = p['min_order_amount'] as num?;
-  if (min != null && min > 0) rules.add('Min Rs.${min.toStringAsFixed(0)}');
+  if (min != null && min > 0) rules.add('Min Rs.${formatAmount(min)}');
   final vehicles = (p['vehicle_types'] as List?)?.map((v) => v.toString()).toList() ?? const <String>[];
   if (vehicles.isNotEmpty) rules.add('${vehicles.join(', ')} only');
   final perCustomer = (p['per_customer_limit'] as num?)?.toInt();

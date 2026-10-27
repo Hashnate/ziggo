@@ -6,6 +6,7 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/widgets/motion.dart';
 import '../promos_provider.dart';
+import '../../../core/utils/amount_format.dart';
 
 class PromotionsScreen extends StatefulWidget {
   const PromotionsScreen({super.key});
@@ -27,7 +28,7 @@ class _PromotionsScreenState extends State<PromotionsScreen> {
     final t = p['discount_type']?.toString();
     final v = (p['discount_value'] as num?)?.toDouble() ?? 0;
     if (t == 'percentage') return '${v.toStringAsFixed(0)}%';
-    return 'Rs.${v.toStringAsFixed(0)}';
+    return 'Rs.${formatAmount(v)}';
   }
 
   @override
@@ -387,9 +388,9 @@ class _LoyaltyCard extends StatelessWidget {
                 const Text('Your points',
                     style: TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.3)),
                 const SizedBox(height: 2),
-                Text('$pts pts',
+                Text('${formatAmount(pts)} pts',
                     style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
-                Text('≈ Rs.${value.toStringAsFixed(0)} · Redeem from $min pts',
+                Text('≈ Rs.${formatAmount(value)} · Redeem from $min pts',
                     style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600)),
               ],
             ),

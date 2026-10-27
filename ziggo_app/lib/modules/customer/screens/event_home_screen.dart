@@ -9,6 +9,7 @@ import '../../../app/app_styles.dart';
 import '../../../core/network/api_client.dart';
 import 'event_booking_screens.dart';
 import 'my_tickets_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 /// Events / ticketing — browse concerts, shows, festivals. Purchase pipeline
 /// is not wired yet; tapping Buy on a tier surfaces a "contact organizer" CTA.
@@ -489,7 +490,7 @@ class _EventCard extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              from != null ? 'LKR ${from.toStringAsFixed(0)}' : 'TBD',
+                              from != null ? 'LKR ${formatAmount(from)}' : 'TBD',
                               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.textPrimary),
                             ),
                             const Text('upwards', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey)),
@@ -662,7 +663,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                         if (fromPrice != null) ...[
                           const SizedBox(height: 8),
                           Text(
-                            'LKR ${fromPrice.toStringAsFixed(0)} upwards',
+                            'LKR ${formatAmount(fromPrice)} upwards',
                             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.primary),
                           ),
                         ],

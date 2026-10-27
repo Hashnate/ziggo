@@ -16,6 +16,7 @@ import '../../../core/widgets/pulse_dot.dart';
 import '../booking_provider.dart';
 import 'rating_screen.dart';
 import '../../common/screens/ride_chat_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 /// Parcel-delivery tracker. Same status state-machine as a ride but labelled
 /// for couriers — the customer sees "Courier collecting parcel" / "Parcel in
@@ -820,7 +821,7 @@ class _FlashTrackingScreenState extends State<FlashTrackingScreen> with SingleTi
                                       ),
                                       const Spacer(),
                                       Text(
-                                        'Rs.${(active['final_amount'] ?? 0).toString()}',
+                                        'Rs.${formatAmount(active['final_amount'])}',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w900,
                                           fontSize: 18,

@@ -8,6 +8,7 @@ import '../../../app/app_styles.dart';
 import '../../../core/widgets/motion.dart';
 import '../restaurant_provider.dart';
 import '../widgets/image_picker_tile.dart';
+import '../../../core/utils/amount_format.dart';
 
 class RestaurantMenuScreen extends StatefulWidget {
   const RestaurantMenuScreen({super.key});
@@ -954,7 +955,7 @@ class _ItemRow extends StatelessWidget {
                       ),
                     const SizedBox(height: 4),
                     Text(
-                      'Rs.${(item['price'] as num? ?? 0).toStringAsFixed(0)}',
+                      'Rs.${formatAmount((item['price'] as num? ?? 0))}',
                       style: const TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 14,

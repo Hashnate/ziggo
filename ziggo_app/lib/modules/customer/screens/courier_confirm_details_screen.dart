@@ -9,6 +9,7 @@ import '../wallet_provider.dart';
 import 'flash_tracking_screen.dart';
 import 'payment_methods_screen.dart';
 import 'promotions_selection_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 class CourierConfirmDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> pickupDetails;
@@ -111,7 +112,7 @@ class _CourierConfirmDetailsScreenState extends State<CourierConfirmDetailsScree
                 ListTile(
                   leading: const Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary),
                   title: const Text('Ziggo Wallet', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('Balance: Rs.${walletProvider.balance.toStringAsFixed(2)}'),
+                  subtitle: Text('Balance: Rs.${formatAmount(walletProvider.balance, 2)}'),
                   trailing: _payment == 'wallet' ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
                   onTap: () {
                     setState(() => _payment = 'wallet');
@@ -485,7 +486,7 @@ class _CourierConfirmDetailsScreenState extends State<CourierConfirmDetailsScree
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 const Text('Total base fare', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
-                                Text('LKR ${(_estimate!['original_amount'] ?? _estimate!['final_amount'] ?? 0).toStringAsFixed(2)}', style: const TextStyle(fontSize: 14)),
+                                Text('LKR ${formatAmount((_estimate!['original_amount'] ?? _estimate!['final_amount'] ?? 0), 2)}', style: const TextStyle(fontSize: 14)),
                               ],
                             ),
                             const SizedBox(height: 12),
@@ -493,7 +494,7 @@ class _CourierConfirmDetailsScreenState extends State<CourierConfirmDetailsScree
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 const Text('Discount', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
-                                Text('LKR ${(_estimate!['discount'] ?? 0).toStringAsFixed(2)}', style: const TextStyle(fontSize: 14)),
+                                Text('LKR ${formatAmount((_estimate!['discount'] ?? 0), 2)}', style: const TextStyle(fontSize: 14)),
                               ],
                             ),
                             const SizedBox(height: 16),
@@ -508,7 +509,7 @@ class _CourierConfirmDetailsScreenState extends State<CourierConfirmDetailsScree
                                   ],
                                 ),
                                 Text(
-                                  'LKR ${(_estimate!['final_amount'] ?? 0).toStringAsFixed(2)}',
+                                  'LKR ${formatAmount((_estimate!['final_amount'] ?? 0), 2)}',
                                   style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
                                 ),
                               ],

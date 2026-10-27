@@ -18,6 +18,7 @@ import '../widgets/promo_code_tile.dart';
 import 'food_tracking_screen.dart';
 import 'payment_methods_screen.dart';
 import 'promotions_selection_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -589,7 +590,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         _payment == 'cash'
                             ? 'Cash'
                             : _payment == 'wallet'
-                                ? 'Ziggo Wallet (Rs.${context.read<WalletProvider>().balance.toStringAsFixed(0)})'
+                                ? 'Ziggo Wallet (Rs.${formatAmount(context.read<WalletProvider>().balance)})'
                                 : _payment == 'corporate'
                                     ? 'Corporate (${context.read<PaymentMethodsProvider>().corporateProfile?['company_name'] ?? 'Business'})'
                                     : _getSelectedCardLabel(),
@@ -639,11 +640,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Use $maxRedeemablePoints Points',
+                          'Use ${formatAmount(maxRedeemablePoints)} Points',
                           style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
                         ),
                         Text(
-                          '-Rs.${potentialDiscount.toStringAsFixed(2)} discount',
+                          '-Rs.${formatAmount(potentialDiscount, 2)} discount',
                           style: const TextStyle(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.w700),
                         ),
                       ],
@@ -754,7 +755,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ListTile(
                   leading: const Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary),
                   title: const Text('Ziggo Wallet', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('Balance: Rs.${walletProvider.balance.toStringAsFixed(2)}'),
+                  subtitle: Text('Balance: Rs.${formatAmount(walletProvider.balance, 2)}'),
                   trailing: _payment == 'wallet' ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
                   onTap: () {
                     setState(() => _payment = 'wallet');

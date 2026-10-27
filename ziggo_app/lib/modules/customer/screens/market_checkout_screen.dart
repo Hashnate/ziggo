@@ -17,6 +17,7 @@ import '../widgets/promo_code_tile.dart';
 import 'market_tracking_screen.dart';
 import 'payment_methods_screen.dart';
 import 'promotions_selection_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 class MarketCheckoutScreen extends StatefulWidget {
   const MarketCheckoutScreen({super.key});
@@ -347,7 +348,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
                       const SizedBox(width: 10),
                       Expanded(child: Text(pr['name'].toString())),
                       Text(
-                        'Rs.${((pr['price'] as num) * qty).toStringAsFixed(0)}',
+                        'Rs.${formatAmount(((pr['price'] as num) * qty))}',
                         style: const TextStyle(fontWeight: FontWeight.w900),
                       ),
                     ],
@@ -548,7 +549,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
                         _payment == 'cash'
                             ? 'Cash'
                             : _payment == 'wallet'
-                                ? 'Ziggo Wallet (Rs.${context.read<WalletProvider>().balance.toStringAsFixed(0)})'
+                                ? 'Ziggo Wallet (Rs.${formatAmount(context.read<WalletProvider>().balance)})'
                                 : _payment == 'corporate'
                                     ? 'Corporate (${context.read<PaymentMethodsProvider>().corporateProfile?['company_name'] ?? 'Business'})'
                                     : _getSelectedCardLabel(),
@@ -604,11 +605,11 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Use $maxRedeemablePoints Points',
+                          'Use ${formatAmount(maxRedeemablePoints)} Points',
                           style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
                         ),
                         Text(
-                          '-Rs.${potentialDiscount.toStringAsFixed(2)} discount',
+                          '-Rs.${formatAmount(potentialDiscount, 2)} discount',
                           style: const TextStyle(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.w700),
                         ),
                       ],
@@ -652,7 +653,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
             'BILL SUMMARY',
             Column(
               children: [
-                _row('Items', 'Rs.${p.cartTotal.toStringAsFixed(0)}'),
+                _row('Items', 'Rs.${formatAmount(p.cartTotal)}'),
                 if (!_isSelfPickup) ...[
                   _row(
                     'Delivery',
@@ -660,7 +661,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
                         ? 'Pick address'
                         : quote == null
                             ? 'Calculating…'
-                            : 'Rs.${deliveryFee.toStringAsFixed(0)}',
+                            : 'Rs.${formatAmount(deliveryFee)}',
                   ),
                   if (quote != null && hasAddress)
                     Padding(
@@ -681,13 +682,13 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
                     ),
                 ],
                 if (_isSelfPickup && appUsageCharge > 0)
-                  _row('App usage charge', 'Rs.${appUsageCharge.toStringAsFixed(0)}'),
+                  _row('App usage charge', 'Rs.${formatAmount(appUsageCharge)}'),
                 if (promoDiscount > 0)
-                  _row('Promo ($promoCode)', '-Rs.${promoDiscount.toStringAsFixed(0)}', color: AppColors.success),
+                  _row('Promo ($promoCode)', '-Rs.${formatAmount(promoDiscount)}', color: AppColors.success),
                 if (_usePoints && discount > 0)
-                  _row('Points Discount', '-Rs.${discount.toStringAsFixed(0)}', color: AppColors.success),
+                  _row('Points Discount', '-Rs.${formatAmount(discount)}', color: AppColors.success),
                 const Divider(height: 16),
-                _row('Total', 'Rs.${total.toStringAsFixed(0)}', bold: true),
+                _row('Total', 'Rs.${formatAmount(total)}', bold: true),
               ],
             ),
           ),
@@ -700,7 +701,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
           child: PrimaryButton(
             label: outOfRange
                 ? 'OUT OF DELIVERY RANGE'
-                : 'PLACE ORDER • Rs.${total.toStringAsFixed(0)}',
+                : 'PLACE ORDER • Rs.${formatAmount(total)}',
             icon: outOfRange ? Icons.location_off_rounded : Icons.check_rounded,
             busy: _busy,
             onPressed: outOfRange ? null : _placeOrder,
@@ -800,7 +801,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
                 ListTile(
                   leading: const Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary),
                   title: const Text('Ziggo Wallet', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('Balance: Rs.${walletProvider.balance.toStringAsFixed(2)}'),
+                  subtitle: Text('Balance: Rs.${formatAmount(walletProvider.balance, 2)}'),
                   trailing: _payment == 'wallet' ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
                   onTap: () {
                     setState(() => _payment = 'wallet');

@@ -12,6 +12,7 @@ import '../../auth/auth_provider.dart';
 import '../payment_methods_provider.dart';
 import '../wallet_provider.dart';
 import 'wallet_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 class PaymentMethodsScreen extends StatefulWidget {
   const PaymentMethodsScreen({super.key});
@@ -300,7 +301,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'Balance: Rs.${wallet.balance.toStringAsFixed(2)}',
+                                  'Balance: Rs.${formatAmount(wallet.balance, 2)}',
                                   style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
                                 ),
                               ],

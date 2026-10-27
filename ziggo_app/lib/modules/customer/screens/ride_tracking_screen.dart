@@ -20,6 +20,7 @@ import '../../../core/notifications/fcm_service.dart';
 import '../../common/screens/ride_chat_screen.dart';
 import '../booking_provider.dart';
 import 'rating_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 class RideTrackingScreen extends StatefulWidget {
   const RideTrackingScreen({super.key});
@@ -1042,7 +1043,7 @@ class _BottomCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final amount = (active['final_amount'] ?? 0).toString();
+    final amount = formatAmount(active['final_amount']);
 
     return Align(
       alignment: Alignment.bottomCenter,
@@ -2042,7 +2043,7 @@ class _ActionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = active['status'] as String?;
     final canCancel = status == 'searching' || status == 'accepted';
-    final amount = (active['final_amount'] ?? 0).toString();
+    final amount = formatAmount(active['final_amount']);
 
     return Row(
       children: [
@@ -2525,7 +2526,7 @@ class _CustomerStopWaitingTimerWidgetState extends State<_CustomerStopWaitingTim
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Exceeded by ${_formatSeconds(excessSec)} (Rs. ${widget.excessRatePerMinute.toStringAsFixed(0)}/min)',
+                    'Exceeded by ${_formatSeconds(excessSec)} (Rs. ${formatAmount(widget.excessRatePerMinute)}/min)',
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -2542,7 +2543,7 @@ class _CustomerStopWaitingTimerWidgetState extends State<_CustomerStopWaitingTim
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                '+Rs.${charge.toStringAsFixed(2)}',
+                '+Rs.${formatAmount(charge, 2)}',
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w900,

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../app/app_colors.dart';
 import '../../../core/network/api_client.dart';
 import '../driver_theme.dart';
+import '../../../core/utils/amount_format.dart';
 
 /// Bonus wallet: money Ziggo gave the driver. It pays their commission
 /// automatically until each bonus expires and can't be withdrawn.
@@ -47,7 +48,7 @@ class _DriverWalletScreenState extends State<DriverWalletScreen> {
 
   double _d(Map m, String k) => (m[k] as num?)?.toDouble() ?? 0;
 
-  String _rs(double v) => 'Rs.${v.toStringAsFixed(2)}';
+  String _rs(double v) => 'Rs.${formatAmount(v, 2)}';
 
   String _day(String? iso) {
     final d = DateTime.tryParse(iso ?? '');

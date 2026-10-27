@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
 import '../promos_provider.dart';
+import '../../../core/utils/amount_format.dart';
 
 /// Keeps a chosen promo code checked with the server (POST /promos/check) for
 /// checkouts that have no server quote: food, market and events. The order
@@ -26,7 +27,7 @@ class PromoCheck {
     if (code.isEmpty) return 'Tap to add a promo code';
     if (checking || !isFor(code)) return 'Checking…';
     if (result == null) return "Couldn't check this code right now";
-    if (result!['applies'] == true) return 'Applied: -Rs.${discount(code).toStringAsFixed(0)}';
+    if (result!['applies'] == true) return 'Applied: -Rs.${formatAmount(discount(code))}';
     return 'Not applied: ${result!['message'] ?? "this code can't be used here"}';
   }
 

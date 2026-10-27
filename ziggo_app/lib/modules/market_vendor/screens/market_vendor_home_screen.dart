@@ -16,6 +16,7 @@ import 'market_vendor_products_screen.dart';
 import 'market_vendor_profile_edit_screen.dart';
 import 'market_vendor_ads_screen.dart';
 import 'market_vendor_commission_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 class MarketVendorHomeScreen extends StatefulWidget {
   /// When true, the back/close arrow is shown (used when this screen is
@@ -632,7 +633,7 @@ class _TodayStatsCard extends StatelessWidget {
           Expanded(
             child: _StatTile(
               label: 'TODAY',
-              value: 'Rs.${revenue.toStringAsFixed(0)}',
+              value: 'Rs.${formatAmount(revenue)}',
               subtitle: '$delivered delivered',
               color: AppColors.success,
               icon: Icons.attach_money_rounded,
@@ -854,7 +855,7 @@ class _OrderCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'Rs.${(order['final_amount'] as num? ?? 0).toStringAsFixed(0)}',
+                    'Rs.${formatAmount((order['final_amount'] as num? ?? 0))}',
                     style: const TextStyle(
                       fontWeight: FontWeight.w900,
                       fontSize: 16,

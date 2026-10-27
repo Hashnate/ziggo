@@ -20,6 +20,7 @@ import 'market_favourites_screen.dart';
 import 'market_orders_screen.dart';
 import 'market_group_screen.dart';
 import 'market_vendor_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 class MarketHomeScreen extends StatefulWidget {
   const MarketHomeScreen({super.key});
@@ -1410,7 +1411,7 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
                 ),
                 const Spacer(),
                 Text(
-                  'Rs.${p.cartTotal.toStringAsFixed(0)}',
+                  'Rs.${formatAmount(p.cartTotal)}',
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w900,
@@ -1719,7 +1720,7 @@ class MarketOutletCard extends StatelessWidget {
                         const SizedBox(width: 3),
                         Flexible(
                           child: Text(
-                            'Rs.${fee.toStringAsFixed(0)}',
+                            'Rs.${formatAmount(fee)}',
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w800,

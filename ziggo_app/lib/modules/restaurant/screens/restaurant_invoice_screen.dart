@@ -10,6 +10,7 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/widgets/motion.dart';
 import '../restaurant_provider.dart';
+import '../../../core/utils/amount_format.dart';
 
 class RestaurantOrderDetailScreen extends StatefulWidget {
   final Map<String, dynamic> order;
@@ -467,28 +468,28 @@ class _RestaurantOrderDetailScreenState
               children: [
                 _kv(
                   'Order Value',
-                  'Rs.${(_order['final_amount'] as num? ?? 0).toStringAsFixed(0)}',
+                  'Rs.${formatAmount((_order['final_amount'] as num? ?? 0))}',
                 ),
                 _kv(
                   'Delivery Fee',
-                  '-Rs.${(_order['delivery_fee'] as num? ?? 0).toStringAsFixed(0)}',
+                  '-Rs.${formatAmount((_order['delivery_fee'] as num? ?? 0))}',
                 ),
                 _kv(
                   'Packing Charge',
-                  'Rs.${(_order['packing_charge'] as num? ?? 0).toStringAsFixed(0)}',
+                  'Rs.${formatAmount((_order['packing_charge'] as num? ?? 0))}',
                 ),
                 _kv(
                   'Items total',
-                  'Rs.${((_order['final_amount'] as num? ?? 0) - (_order['delivery_fee'] as num? ?? 0) - (_order['packing_charge'] as num? ?? 0)).toStringAsFixed(0)}',
+                  'Rs.${formatAmount(((_order['final_amount'] as num? ?? 0) - (_order['delivery_fee'] as num? ?? 0) - (_order['packing_charge'] as num? ?? 0)))}',
                 ),
                 _kv(
                   'App usage charge',
-                  '-Rs.${(((_order['final_amount'] as num? ?? 0) - (_order['delivery_fee'] as num? ?? 0) - (_order['packing_charge'] as num? ?? 0)) * ((_order['commission_percentage'] as num? ?? 20) / 100)).toStringAsFixed(0)}',
+                  '-Rs.${formatAmount((((_order['final_amount'] as num? ?? 0) - (_order['delivery_fee'] as num? ?? 0) - (_order['packing_charge'] as num? ?? 0)) * ((_order['commission_percentage'] as num? ?? 20) / 100)))}',
                 ),
                 const Divider(height: 18),
                 _kv(
                   'Net Earnings',
-                  'Rs.${(((_order['final_amount'] as num? ?? 0) - (_order['delivery_fee'] as num? ?? 0) - (_order['packing_charge'] as num? ?? 0)) * (1 - ((_order['commission_percentage'] as num? ?? 20) / 100)) + (_order['packing_charge'] as num? ?? 0)).toStringAsFixed(0)}',
+                  'Rs.${formatAmount((((_order['final_amount'] as num? ?? 0) - (_order['delivery_fee'] as num? ?? 0) - (_order['packing_charge'] as num? ?? 0)) * (1 - ((_order['commission_percentage'] as num? ?? 20) / 100)) + (_order['packing_charge'] as num? ?? 0)))}',
                   bold: true,
                 ),
                 const SizedBox(height: 6),
@@ -1100,7 +1101,7 @@ class _LineItemRow extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Text(
-            'Rs.${(line['line_total'] as num? ?? 0).toStringAsFixed(0)}',
+            'Rs.${formatAmount((line['line_total'] as num? ?? 0))}',
             style: const TextStyle(
               fontWeight: FontWeight.w900,
               fontSize: 14,

@@ -10,6 +10,7 @@ import '../../../core/widgets/glass_card.dart';
 import '../../../core/widgets/motion.dart';
 import '../wallet_provider.dart';
 import 'qr_pay_scan_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 
 class WalletScreen extends StatefulWidget {
@@ -36,7 +37,7 @@ class _WalletScreenState extends State<WalletScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(err ?? 'Top-up request of Rs.${amount.toStringAsFixed(0)} sent for admin approval'),
+        content: Text(err ?? 'Top-up request of Rs.${formatAmount(amount)} sent for admin approval'),
         backgroundColor: err == null ? AppColors.success : AppColors.error,
         behavior: SnackBarBehavior.floating,
       ),
@@ -312,7 +313,7 @@ class _WalletScreenState extends State<WalletScreen> {
                             border: Border.all(color: AppColors.cardBorder),
                           ),
                           child: Text(
-                            'Rs.$amt',
+                            'Rs.${formatAmount(amt)}',
                             style: const TextStyle(fontWeight: FontWeight.w900),
                           ),
                         ),

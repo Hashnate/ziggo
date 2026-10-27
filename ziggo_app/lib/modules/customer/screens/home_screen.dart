@@ -39,6 +39,7 @@ import 'subscription_screen.dart';
 import 'support_screen.dart';
 import 'wallet_screen.dart';
 import 'scan_and_go_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onMenu;
@@ -1753,7 +1754,7 @@ class CustomerDrawer extends StatelessWidget {
                   _item(Icons.bookmark_rounded, 'Saved Places', () { Navigator.pop(context); onPlaces(); }),
                   _item(Icons.local_offer_rounded, 'Promos & Offers', () { Navigator.pop(context); onPromos(); }),
                   _item(Icons.account_balance_wallet_rounded,
-                      'Wallet (Rs.${wallet.balance.toStringAsFixed(0)})',
+                      'Wallet (Rs.${formatAmount(wallet.balance)})',
                       () { Navigator.pop(context); onWallet(); }),
                   _item(Icons.person_rounded, 'Profile', () { Navigator.pop(context); onProfile(); }),
                   _item(Icons.notifications_rounded, 'Notifications',

@@ -6,6 +6,7 @@ import '../payment_methods_provider.dart';
 import '../wallet_provider.dart';
 import '../promos_provider.dart';
 import 'payment_methods_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 class PaymentSelectionScreen extends StatefulWidget {
   final String currentPayment;
@@ -118,7 +119,7 @@ class _PaymentSelectionScreenState extends State<PaymentSelectionScreen> {
             // Points Option
             _buildPaymentTile(
               value: 'points',
-              title: 'Points ${promosProvider.points}',
+              title: 'Points ${formatAmount(promosProvider.points)}',
               icon: const Icon(Icons.stars_rounded, color: Colors.amber, size: 24),
               trailing: const Icon(Icons.chevron_right, color: Colors.grey),
               onTap: () {
@@ -131,7 +132,7 @@ class _PaymentSelectionScreenState extends State<PaymentSelectionScreen> {
             // Wallet Option
             _buildPaymentTile(
               value: 'wallet',
-              title: 'Ziggo Wallet (Rs. ${walletProvider.balance.toStringAsFixed(2)})',
+              title: 'Ziggo Wallet (Rs. ${formatAmount(walletProvider.balance, 2)})',
               icon: const Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary, size: 24),
               onTap: () => _selectPayment('wallet'),
             ),

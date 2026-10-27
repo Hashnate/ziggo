@@ -25,6 +25,7 @@ import 'ride_tracking_screen.dart';
 import 'customer_shell.dart';
 import 'confirm_pickup_screen.dart';
 import '../widgets/gender_choice.dart';
+import '../../../core/utils/amount_format.dart';
 
 class VehicleSelectionScreen extends StatefulWidget {
   final Place pickup;
@@ -1448,13 +1449,13 @@ class _VehicleSelectionScreenState extends State<VehicleSelectionScreen> {
                 children: [
                   if (est != null && est['final_amount'] != null) ...[
                     Text(
-                      'LKR ${(est['final_amount'] as num).toStringAsFixed(2)}',
+                      'LKR ${formatAmount((est['final_amount'] as num), 2)}',
                       style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
                     ),
                     if (est['original_amount'] != null &&
                         (est['original_amount'] as num) > (est['final_amount'] as num))
                       Text(
-                        'LKR ${(est['original_amount'] as num).toStringAsFixed(2)}',
+                        'LKR ${formatAmount((est['original_amount'] as num), 2)}',
                         style: const TextStyle(
                           fontWeight: FontWeight.normal,
                           fontSize: 10,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/amount_format.dart';
 
 /// A number that smoothly counts up/down when its value changes.
 class AnimatedCounter extends StatelessWidget {
@@ -26,7 +27,7 @@ class AnimatedCounter extends StatelessWidget {
       duration: duration,
       curve: Curves.easeOutCubic,
       builder: (_, v, __) => Text(
-        '$prefix${v.toStringAsFixed(decimals)}$suffix',
+        '$prefix${formatAmount(v, decimals)}$suffix',
         style: style,
       ),
     );

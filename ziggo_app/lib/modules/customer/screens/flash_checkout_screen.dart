@@ -12,6 +12,7 @@ import '../payment_methods_provider.dart';
 import '../wallet_provider.dart';
 import 'flash_tracking_screen.dart';
 import 'payment_methods_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 class FlashCheckoutScreen extends StatefulWidget {
   final Place pickup;
@@ -442,7 +443,7 @@ class _FlashCheckoutScreenState extends State<FlashCheckoutScreen> {
                         Text(
                           _estimate == null
                               ? '--'
-                              : 'Rs.${(_estimate!['final_amount'] as num).toStringAsFixed(0)}',
+                              : 'Rs.${formatAmount((_estimate!['final_amount'] as num))}',
                           style: const TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.w900,
@@ -666,7 +667,7 @@ class _FlashCheckoutScreenState extends State<FlashCheckoutScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      surcharge == 0 ? 'Free' : '+Rs.${surcharge.toStringAsFixed(0)}',
+                      surcharge == 0 ? 'Free' : '+Rs.${formatAmount(surcharge)}',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
@@ -747,7 +748,7 @@ class _FlashCheckoutScreenState extends State<FlashCheckoutScreen> {
                 ListTile(
                   leading: const Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary),
                   title: const Text('Ziggo Wallet', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('Balance: Rs.${walletProvider.balance.toStringAsFixed(2)}'),
+                  subtitle: Text('Balance: Rs.${formatAmount(walletProvider.balance, 2)}'),
                   trailing: _payment == 'wallet' ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
                   onTap: () {
                     setState(() => _payment = 'wallet');
@@ -851,7 +852,7 @@ class _FlashCheckoutScreenState extends State<FlashCheckoutScreen> {
                   _payment == 'cash'
                       ? 'Cash'
                       : _payment == 'wallet'
-                          ? 'Ziggo Wallet (Rs.${context.read<WalletProvider>().balance.toStringAsFixed(0)})'
+                          ? 'Ziggo Wallet (Rs.${formatAmount(context.read<WalletProvider>().balance)})'
                           : _payment == 'corporate'
                               ? 'Corporate Profile (${context.read<PaymentMethodsProvider>().corporateProfile?['company_name'] ?? 'Business'})'
                               : _getSelectedCardLabel(),

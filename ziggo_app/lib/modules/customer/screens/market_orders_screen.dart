@@ -10,6 +10,7 @@ import 'market_tracking_screen.dart';
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../market_provider.dart';
+import '../../../core/utils/amount_format.dart';
 
 /// "My Orders" screen displaying live/past market orders. 
 /// Opened from the receipt icon in the market header.
@@ -202,7 +203,7 @@ class _OrderCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  'Rs.${amount.toStringAsFixed(0)}',
+                  'Rs.${formatAmount(amount)}',
                   style: const TextStyle(
                     fontWeight: FontWeight.w900,
                     fontSize: 16,

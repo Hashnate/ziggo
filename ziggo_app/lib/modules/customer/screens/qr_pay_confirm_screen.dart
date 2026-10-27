@@ -5,6 +5,7 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../wallet_provider.dart';
 import 'qr_pay_success_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 class QrPayConfirmScreen extends StatefulWidget {
   final Map<String, dynamic> merchantInfo;
@@ -253,7 +254,7 @@ class _QrPayConfirmScreenState extends State<QrPayConfirmScreen> {
                                   ),
                                 ),
                                 Text(
-                                  'Rs.${balance.toStringAsFixed(2)}',
+                                  'Rs.${formatAmount(balance, 2)}',
                                   style: TextStyle(
                                     fontWeight: FontWeight.w900,
                                     color: isInsufficient ? AppColors.error : Colors.black,

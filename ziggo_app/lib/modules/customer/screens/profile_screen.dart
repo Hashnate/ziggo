@@ -19,6 +19,7 @@ import 'wallet_screen.dart';
 import 'payment_methods_screen.dart';
 import 'edit_profile_screen.dart';
 import 'earn_with_ziggo_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -413,7 +414,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('$points',
+                    Text(formatAmount(points),
                         style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w900,
@@ -441,7 +442,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               color: AppColors.surfaceMuted,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Text('≈ Rs.${value.toStringAsFixed(0)}',
+            child: Text('≈ Rs.${formatAmount(value)}',
                 style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w900,
@@ -497,7 +498,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Rs.${balance.toStringAsFixed(2)}',
+                    'Rs.${formatAmount(balance, 2)}',
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w900,

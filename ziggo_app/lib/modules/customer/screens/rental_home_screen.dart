@@ -11,6 +11,7 @@ import 'ride_tracking_screen.dart';
 import 'rental_pickup_map_screen.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'rental_confirm_booking_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 class RentalHomeScreen extends StatefulWidget {
   const RentalHomeScreen({super.key});
@@ -456,7 +457,7 @@ class _RentalHomeScreenState extends State<RentalHomeScreen> {
                   Text(v.$2, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: sel ? AppColors.primary : AppColors.textPrimary)),
                   const SizedBox(height: 4),
                   Text(
-                    'Rs.${totalPrice.toInt()}',
+                    'Rs.${formatAmount(totalPrice)}',
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: sel ? AppColors.primary.withOpacity(0.8) : AppColors.textSecondary),
                   ),
                 ],

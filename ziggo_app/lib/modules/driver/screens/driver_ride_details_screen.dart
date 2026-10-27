@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../../app/app_colors.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/widgets/download_invoice_button.dart';
+import '../../../core/utils/amount_format.dart';
 
 class DriverRideDetailsScreen extends StatelessWidget {
   final Map<String, dynamic> rideData;
@@ -627,7 +628,7 @@ class DriverRideDetailsScreen extends StatelessWidget {
                               ],
                             ),
                             Text(
-                              '+Rs.${fmt.format(driverEarnings - ((rideData['final_amount'] as num?)?.toDouble() ?? 0.0))}',
+                              '+Rs.${formatAmount(driverEarnings - ((rideData['final_amount'] as num?)?.toDouble() ?? 0.0), 2)}',
                               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
                             ),
                           ],

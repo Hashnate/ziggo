@@ -10,6 +10,7 @@ import '../driver_provider.dart';
 import '../driver_theme.dart';
 import 'driver_history_screen.dart';
 import 'driver_wallet_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 /// Driver earnings page — payout summary plus a transparent "how your fare is
 /// calculated" rate card (live from the admin fare settings) with a worked
@@ -100,7 +101,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Amount due: Rs.${commissionAmount.toStringAsFixed(2)}',
+                    'Amount due: Rs.${formatAmount(commissionAmount, 2)}',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -222,7 +223,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
             const Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary, size: 48),
             const SizedBox(height: 16),
             Text(
-              'Confirm payment of Rs.${amountToPay.toStringAsFixed(2)} from your card ending in ${selectedCard['card_no'].toString().substring(selectedCard['card_no'].toString().length - 4)}?',
+              'Confirm payment of Rs.${formatAmount(amountToPay, 2)} from your card ending in ${selectedCard['card_no'].toString().substring(selectedCard['card_no'].toString().length - 4)}?',
               textAlign: TextAlign.center,
               style: const TextStyle(color: AppColors.textSecondary),
             ),
@@ -259,7 +260,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Commission of Rs.${amountToPay.toStringAsFixed(2)} settled successfully.'),
+          content: Text('Commission of Rs.${formatAmount(amountToPay, 2)} settled successfully.'),
           backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,
         ),
@@ -459,7 +460,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Rs.${total.toStringAsFixed(2)}',
+                          'Rs.${formatAmount(total, 2)}',
                           style: const TextStyle(
                             color: Color(0xFF4ADE80),
                             fontSize: 20,
@@ -485,7 +486,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Rs.${outstanding.toStringAsFixed(2)}',
+                          'Rs.${formatAmount(outstanding, 2)}',
                           style: const TextStyle(
                             color: Color(0xFFFF9B9B),
                             fontSize: 20,
@@ -501,7 +502,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
             Row(
               children: [
                 Expanded(
-                  child: _tile('Today', 'Rs.${today.toStringAsFixed(0)}',
+                  child: _tile('Today', 'Rs.${formatAmount(today)}',
                       Icons.today_rounded, AppColors.success),
                 ),
                 const SizedBox(width: 10),
@@ -515,14 +516,14 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
             Row(
               children: [
                 Expanded(
-                  child: _tile('Paid out', 'Rs.${paid.toStringAsFixed(0)}',
+                  child: _tile('Paid out', 'Rs.${formatAmount(paid)}',
                       Icons.payments_rounded, kDriverGold),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _tile(
                       'Pending payout',
-                      'Rs.${pending.toStringAsFixed(0)}',
+                      'Rs.${formatAmount(pending)}',
                       Icons.hourglass_empty_rounded,
                       AppColors.warning),
                 ),
@@ -582,7 +583,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                       ),
                     ),
                     Text(
-                      'Rs.${bonus.toStringAsFixed(0)}',
+                      'Rs.${formatAmount(bonus)}',
                       style: const TextStyle(
                         color: AppColors.bonus,
                         fontWeight: FontWeight.w900,
@@ -740,7 +741,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Rs.${collected.toStringAsFixed(2)}',
+                    'Rs.${formatAmount(collected, 2)}',
                     style: const TextStyle(
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.w900,
@@ -762,13 +763,13 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
             ],
           ),
           const Divider(height: 24, color: AppColors.divider),
-          _rateRow('Admin commission', 'Rs.${commission.toStringAsFixed(2)}',
+          _rateRow('Admin commission', 'Rs.${formatAmount(commission, 2)}',
               negative: true),
-          _rateRow('Driver earnings', 'Rs.${earnings.toStringAsFixed(2)}',
+          _rateRow('Driver earnings', 'Rs.${formatAmount(earnings, 2)}',
               highlight: true),
           const Divider(height: 24, color: AppColors.divider),
-          _rateRow('Paid out', 'Rs.${paid.toStringAsFixed(2)}'),
-          _rateRow('Pending payout', 'Rs.${pending.toStringAsFixed(2)}'),
+          _rateRow('Paid out', 'Rs.${formatAmount(paid, 2)}'),
+          _rateRow('Pending payout', 'Rs.${formatAmount(pending, 2)}'),
           const SizedBox(height: 14),
           Row(
             children: [
@@ -797,7 +798,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                           const SizedBox(width: 4),
                           Flexible(
                             child: Text(
-                              'Settle (-Rs.${outstanding.toStringAsFixed(0)})',
+                              'Settle (-Rs.${formatAmount(outstanding)})',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w900,
@@ -835,7 +836,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                         const SizedBox(width: 4),
                         Flexible(
                           child: Text(
-                            'Pending (+Rs.${pending.toStringAsFixed(0)})',
+                            'Pending (+Rs.${formatAmount(pending)})',
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w900,
@@ -868,7 +869,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
-                    'Maximum settle commission amount is Rs.${maxSettle.toStringAsFixed(2)}',
+                    'Maximum settle commission amount is Rs.${formatAmount(maxSettle, 2)}',
                     style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 11,
@@ -950,20 +951,20 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
             ],
           ),
           const SizedBox(height: 6),
-          _rateRow('Base fare', 'Rs.${_d(c, 'base_fare').toStringAsFixed(2)}'),
+          _rateRow('Base fare', 'Rs.${formatAmount(_d(c, 'base_fare'), 2)}'),
           _rateRow('Per kilometre',
-              'Rs.${_d(c, 'per_km_rate').toStringAsFixed(2)}'),
+              'Rs.${formatAmount(_d(c, 'per_km_rate'), 2)}'),
           _rateRow('Per minute',
-              'Rs.${_d(c, 'per_minute_rate').toStringAsFixed(2)}'),
+              'Rs.${formatAmount(_d(c, 'per_minute_rate'), 2)}'),
           _rateRow('Minimum fare',
-              'Rs.${_d(c, 'min_fare').toStringAsFixed(2)}'),
+              'Rs.${formatAmount(_d(c, 'min_fare'), 2)}'),
           if (pickup > 0)
-            _rateRow('Pickup fee', 'Rs.${pickup.toStringAsFixed(2)}'),
+            _rateRow('Pickup fee', 'Rs.${formatAmount(pickup, 2)}'),
           if (boost > 0)
-            _rateRow('Boost (100% yours)', 'Rs.${boost.toStringAsFixed(2)}'),
+            _rateRow('Boost (100% yours)', 'Rs.${formatAmount(boost, 2)}'),
           if (passDeduct > 0)
             _rateRow('Passenger deductible',
-                'Rs.${passDeduct.toStringAsFixed(2)}'),
+                'Rs.${formatAmount(passDeduct, 2)}'),
           if (surge != 1.0)
             _rateRow('Surge multiplier', '×${surge.toStringAsFixed(2)}'),
           const Divider(height: 22, color: AppColors.divider),

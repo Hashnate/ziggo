@@ -12,6 +12,7 @@ import '../../../core/network/api_client.dart';
 import '../booking_provider.dart';
 import 'ride_tracking_screen.dart';
 import 'qr_pay_scan_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 class ScanAndGoScreen extends StatefulWidget {
   const ScanAndGoScreen({super.key});
@@ -277,7 +278,7 @@ class _ScanAndGoScreenState extends State<ScanAndGoScreen> {
                         style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.textSecondary),
                       ),
                       Text(
-                        'Rs.${finalAmount.toStringAsFixed(0)}',
+                        'Rs.${formatAmount(finalAmount)}',
                         style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: AppColors.textPrimary),
                       ),
                     ],

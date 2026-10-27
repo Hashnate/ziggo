@@ -7,6 +7,7 @@ import '../../../app/app_styles.dart';
 import '../../../core/services/referral_tracker.dart';
 import '../../auth/auth_provider.dart';
 import '../referrals_provider.dart';
+import '../../../core/utils/amount_format.dart';
 
 class EarnWithZiggoScreen extends StatefulWidget {
   const EarnWithZiggoScreen({super.key});
@@ -51,7 +52,7 @@ class _EarnWithZiggoScreenState extends State<EarnWithZiggoScreen> {
   }
 
   Future<void> _shareCode(BuildContext context, String code, double amount) async {
-    final formattedAmt = amount.toStringAsFixed(2);
+    final formattedAmt = formatAmount(amount, 2);
     final playStoreUrl = "https://play.google.com/store/apps/details?id=lk.ziggo.app&referrer=ref%3D$code";
     final message = "Sign up for Ziggo using my referral code $code and get Rs.$formattedAmt wallet credit on your first completed trip!\n\n"
         "Download the app now:\n"
@@ -166,7 +167,7 @@ class _EarnWithZiggoScreenState extends State<EarnWithZiggoScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Enter your invite code to get Rs.${r.referralAmount.toStringAsFixed(2)} wallet credit on your first completed trip.',
+                            'Enter your invite code to get Rs.${formatAmount(r.referralAmount, 2)} wallet credit on your first completed trip.',
                             style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                           ),
                           const SizedBox(height: 12),
@@ -223,9 +224,9 @@ class _EarnWithZiggoScreenState extends State<EarnWithZiggoScreen> {
                     children: [
                       Expanded(child: _statCard('Total Referred', r.totalReferred.toString(), Icons.people_rounded, AppColors.info)),
                       const SizedBox(width: 12),
-                      Expanded(child: _statCard('Earned (Rs)', r.earnedAmount.toStringAsFixed(0), Icons.payments_rounded, AppColors.success)),
+                      Expanded(child: _statCard('Earned (Rs)', formatAmount(r.earnedAmount), Icons.payments_rounded, AppColors.success)),
                       const SizedBox(width: 12),
-                      Expanded(child: _statCard('Pending (Rs)', r.pendingAmount.toStringAsFixed(0), Icons.hourglass_top_rounded, AppColors.warning)),
+                      Expanded(child: _statCard('Pending (Rs)', formatAmount(r.pendingAmount), Icons.hourglass_top_rounded, AppColors.warning)),
                     ],
                   ),
                   const SizedBox(height: 32),
@@ -258,7 +259,7 @@ class _EarnWithZiggoScreenState extends State<EarnWithZiggoScreen> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Text('Rs. ${(friend['amount'] as num?)?.toStringAsFixed(2) ?? '0.00'}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.success)),
+                            Text('Rs. ${formatAmount(friend['amount'], 2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.success)),
                             const SizedBox(height: 4),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

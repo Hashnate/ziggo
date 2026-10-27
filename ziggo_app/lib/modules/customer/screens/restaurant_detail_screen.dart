@@ -7,6 +7,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../food_provider.dart';
 import '../food_ui.dart';
 import 'checkout_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 class RestaurantDetailScreen extends StatefulWidget {
   final int restaurantId;
@@ -534,7 +535,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
               const SizedBox(width: 12),
               const Text('View cart', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
               const Spacer(),
-              Text('Rs.${food.cartTotal.toStringAsFixed(0)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+              Text('Rs.${formatAmount(food.cartTotal)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
             ],
           ),
         ),
