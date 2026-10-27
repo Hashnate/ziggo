@@ -139,7 +139,7 @@
     const rowsPerPage = 50;
     let currentRows = [];
 
-    function fmtMoney(n) { return Math.round(n).toLocaleString(); }
+    function fmtMoney(n) { return fmtNum(n); }
 
     function getActiveType() {
         return document.getElementById('rptType').value;

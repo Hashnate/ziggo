@@ -11,7 +11,7 @@
             <i class="fas fa-box"></i>
         </div>
         <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Total Deliveries</p>
-        <p class="text-2xl font-black text-ziggo">{{ stats.total }}</p>
+        <p class="text-2xl font-black text-ziggo">{{ stats.total|num }}</p>
     </div>
     <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
         <div class="w-10 h-10 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center mb-3">
@@ -38,7 +38,7 @@
 
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
     <div class="p-6 border-b border-gray-100 flex justify-between items-center">
-        <h3 class="font-bold text-ziggo">All courier deliveries ({{ stats.total }})</h3>
+        <h3 class="font-bold text-ziggo">All courier deliveries ({{ stats.total|num }})</h3>
         <div class="flex gap-2">
             <a href="/admin/flash-pricing" class="px-3 py-1.5 bg-orange-50 text-orange-600 border border-orange-100 rounded-lg text-xs font-bold hover:bg-orange-100 transition flex items-center gap-1.5">
                 <i class="fas fa-weight-hanging"></i> Weight Tiers
@@ -131,7 +131,7 @@
         <p class="text-sm text-gray-500">
             Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to
             <span class="font-bold text-ziggo">{{ end_idx }}</span> of
-            <span class="font-bold text-ziggo">{{ stats.total }}</span> deliveries
+            <span class="font-bold text-ziggo">{{ stats.total|num }}</span> deliveries
         </p>
         <div class="flex items-center gap-1.5">
             {% if page > 1 %}
@@ -189,7 +189,7 @@
             <div class="bg-blue-50 rounded-xl p-4 text-xs text-blue-700 space-y-1">
                 <p class="font-black uppercase tracking-wide mb-1">How commission works</p>
                 <p>Fare = Base Fare + Weight Surcharge + (Distance × Per KM Rate)</p>
-                <p>Admin earns = Fare × <strong>{{ courier_commission }}%</strong></p>
+                <p>Admin earns = Fare × <strong>{{ courier_commission|num }}%</strong></p>
                 <p>Driver earns = Fare − Admin commission</p>
             </div>
             <div class="pt-2 flex justify-end gap-3">

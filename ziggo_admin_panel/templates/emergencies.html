@@ -13,7 +13,7 @@
             </div>
             <div>
                 <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Open</p>
-                <p class="text-2xl font-black text-rose-600 leading-none mt-1">{{ open_count }}</p>
+                <p class="text-2xl font-black text-rose-600 leading-none mt-1">{{ open_count|num }}</p>
             </div>
         </div>
         <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-3.5 flex items-center gap-3">
@@ -22,7 +22,7 @@
             </div>
             <div>
                 <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Acknowledged</p>
-                <p class="text-2xl font-black text-amber-600 leading-none mt-1">{{ acknowledged_count }}</p>
+                <p class="text-2xl font-black text-amber-600 leading-none mt-1">{{ acknowledged_count|num }}</p>
             </div>
         </div>
         <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-3.5 flex items-center gap-3">
@@ -31,7 +31,7 @@
             </div>
             <div>
                 <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Closed</p>
-                <p class="text-2xl font-black text-emerald-600 leading-none mt-1">{{ resolved_count }}</p>
+                <p class="text-2xl font-black text-emerald-600 leading-none mt-1">{{ resolved_count|num }}</p>
             </div>
         </div>
         <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-3.5 flex items-center gap-3">
@@ -40,7 +40,7 @@
             </div>
             <div>
                 <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">All-time</p>
-                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1">{{ total_count }}</p>
+                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1">{{ total_count|num }}</p>
             </div>
         </div>
     </div>
@@ -138,7 +138,7 @@
             <p class="text-sm text-gray-500">
                 Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
                 <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
-                <span class="font-bold text-ziggo">{{ total_emergencies }}</span> alerts
+                <span class="font-bold text-ziggo">{{ total_emergencies|num }}</span> alerts
             </p>
             <div class="flex items-center gap-1.5">
                 {% if page > 1 %}

@@ -24,7 +24,7 @@
         <form method="get" action="/admin/jobs/applications" class="flex flex-col sm:flex-row gap-3 items-center">
             <label class="text-xs font-bold text-ziggo-muted uppercase tracking-wider whitespace-nowrap">Filter by Position:</label>
             <select name="job_id" onchange="this.form.submit()" class="w-full sm:w-96 px-3 py-2 rounded-xl border border-ziggo-line text-sm outline-none focus:border-ziggo bg-white">
-                <option value="">All Job Roles ({{ applications|length }} total)</option>
+                <option value="">All Job Roles ({{ (applications|length)|num }} total)</option>
                 {% for j in all_jobs %}
                 <option value="{{ j.id }}" {% if selected_job_id == j.id %}selected{% endif %}>{{ j.title }} ({{ j.department }})</option>
                 {% endfor %}

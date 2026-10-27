@@ -237,7 +237,7 @@
                                 </table>
                             </div>
                             <div class="px-6 py-3.5 border-t border-ziggo-line bg-gray-50/50 flex items-center justify-between text-xs text-ziggo-muted">
-                                <span class="font-medium">Total <strong class="text-ziggo-ink">{{ peaks|length }}</strong> peak hour slot{{ 's' if peaks|length != 1 else '' }}</span>
+                                <span class="font-medium">Total <strong class="text-ziggo-ink">{{ (peaks|length)|num }}</strong> peak hour slot{{ 's' if peaks|length != 1 else '' }}</span>
                                 <span class="text-[11px] font-semibold text-gray-400"><i class="fas fa-grip-vertical mr-1"></i>Drag rows to reorder</span>
                             </div>
                         </div>
@@ -391,8 +391,8 @@
                                         <td class="px-6 py-4 text-sm text-ziggo-ink font-normal">
                                             {{ inc.limit_days }} {% if inc.limit_days == 1 %}Day{% else %}Days{% endif %}
                                         </td>
-                                        <td class="px-6 py-4 text-sm text-ziggo-ink font-normal">{{ inc.trips_required }}</td>
-                                        <td class="px-6 py-4 text-sm text-ziggo-ink font-semibold text-emerald-600">LKR {{ "%.2f"|format(inc.reward_amount or 0) }}</td>
+                                        <td class="px-6 py-4 text-sm text-ziggo-ink font-normal">{{ inc.trips_required|num }}</td>
+                                        <td class="px-6 py-4 text-sm text-ziggo-ink font-semibold text-emerald-600">LKR {{ "{:,.2f}".format(inc.reward_amount or 0) }}</td>
                                         <td class="px-6 py-4">
                                             {% if inc.is_active %}
                                             <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600">Active</span>

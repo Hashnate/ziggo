@@ -12,7 +12,7 @@
                 <h3 class="font-black text-ziggo">Driver earnings & payouts</h3>
                 <p class="text-xs text-gray-400 mt-1">Sum of driver_earnings on completed rides + 80% of delivery fees on food/market.</p>
             </div>
-            <p class="text-sm font-bold text-gray-500">{{ total_drivers }} drivers</p>
+            <p class="text-sm font-bold text-gray-500">{{ total_drivers|num }} drivers</p>
         </div>
         <div class="overflow-x-auto">
         <table class="w-full text-sm">
@@ -52,7 +52,7 @@
                     <td class="px-4 py-3 text-right">Rs.{{ "{:,.0f}".format(r.this_month) }}</td>
                     <td class="px-4 py-3 text-right">Rs.{{ "{:,.0f}".format(r.this_week) }}</td>
                     <td class="px-4 py-3 text-right">Rs.{{ "{:,.0f}".format(r.today) }}</td>
-                    <td class="px-4 py-3 text-right">{{ r.rides }}</td>
+                    <td class="px-4 py-3 text-right">{{ r.rides|num }}</td>
                     <td class="px-4 py-3 text-right">{{ r.food_deliveries }}</td>
                     <td class="px-4 py-3 text-right">{{ r.market_deliveries }}</td>
                 </tr>
@@ -70,7 +70,7 @@
             <p class="text-sm text-gray-500">
                 Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
                 <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
-                <span class="font-bold text-ziggo">{{ total_drivers }}</span> drivers
+                <span class="font-bold text-ziggo">{{ total_drivers|num }}</span> drivers
             </p>
             <div class="flex items-center gap-1.5">
                 {% if page > 1 %}

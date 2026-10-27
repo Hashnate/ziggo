@@ -14,7 +14,7 @@
             </div>
             <div>
                 <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Total Vehicles</p>
-                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1">{{ total_vehicles }}</p>
+                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1">{{ total_vehicles|num }}</p>
             </div>
         </div>
         <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
@@ -23,7 +23,7 @@
             </div>
             <div>
                 <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Pending Verification</p>
-                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1">{{ pending_count }}</p>
+                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1">{{ pending_count|num }}</p>
             </div>
         </div>
         <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
@@ -32,7 +32,7 @@
             </div>
             <div>
                 <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Verified Vehicles</p>
-                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1">{{ verified_count }}</p>
+                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1">{{ verified_count|num }}</p>
             </div>
         </div>
         <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
@@ -41,7 +41,7 @@
             </div>
             <div>
                 <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Categories</p>
-                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1">{{ category_count }}</p>
+                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1">{{ category_count|num }}</p>
             </div>
         </div>
     </div>
@@ -248,7 +248,7 @@
             <p class="text-sm text-gray-500">
                 Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
                 <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
-                <span class="font-bold text-ziggo">{{ total_filtered }}</span> vehicles
+                <span class="font-bold text-ziggo">{{ total_filtered|num }}</span> vehicles
             </p>
             <div class="flex items-center gap-1.5">
                 {% if page > 1 %}

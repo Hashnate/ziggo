@@ -40,7 +40,7 @@
 
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
     <div class="p-5 border-b border-gray-100 flex items-center justify-between">
-        <h3 class="font-black text-ziggo-ink">Payments ({{ total_payments }})</h3>
+        <h3 class="font-black text-ziggo-ink">Payments ({{ total_payments|num }})</h3>
         <a href="/admin/finance" class="text-xs font-bold text-ziggo hover:underline">
             Detailed finance reports <i class="fas fa-arrow-right ml-1"></i>
         </a>
@@ -109,7 +109,7 @@
         <p class="text-sm text-gray-500">
             Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
             <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
-            <span class="font-bold text-ziggo">{{ total_payments }}</span> payments
+            <span class="font-bold text-ziggo">{{ total_payments|num }}</span> payments
         </p>
         <div class="flex items-center gap-1.5">
             {% if page > 1 %}

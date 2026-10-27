@@ -11,7 +11,7 @@
             <div class="stat-icon bg-purple-100 text-purple-600"><i class="fas fa-building"></i></div>
             <div>
                 <p class="text-[10px] text-ziggo-faint uppercase font-bold">Total accounts</p>
-                <p class="text-2xl font-black text-purple-600">{{ accounts|length }}</p>
+                <p class="text-2xl font-black text-purple-600">{{ (accounts|length)|num }}</p>
             </div>
         </div>
     </div>
@@ -55,7 +55,7 @@
 
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
     <div class="p-5 border-b border-gray-100 flex items-center justify-between">
-        <h3 class="font-black text-ziggo-ink">Corporate Accounts ({{ accounts|length }})</h3>
+        <h3 class="font-black text-ziggo-ink">Corporate Accounts ({{ (accounts|length)|num }})</h3>
         <input type="text" id="corpSearch" placeholder="Search company…"
                class="px-3 py-2 rounded-xl border border-gray-200 text-sm w-72 focus:outline-none focus:border-ziggo">
     </div>
@@ -81,7 +81,7 @@
                     <td class="px-6 py-3 text-xs text-gray-500">{{ a.billing_email or '—' }}</td>
                     <td class="px-6 py-3 text-right text-sm font-normal text-emerald-600">Rs.{{ "{:,.2f}".format(a.balance|float) }}</td>
                     <td class="px-6 py-3 text-center">
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-700">{{ item.member_count }}</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-700">{{ item.member_count|num }}</span>
                     </td>
                     <td class="px-6 py-3 text-xs text-gray-500">{{ a.created_at|colombo_dt("%Y-%m-%d") }}</td>
                     <td class="px-6 py-3 text-center">

@@ -140,7 +140,7 @@
 <!-- View Tabs -->
 <div class="flex border-b border-gray-200 mb-6 gap-6">
     <span class="pb-3 text-sm font-black border-b-2 border-ziggo text-ziggo">
-        Registered Riders ({{ stats.total_riders }})
+        Registered Riders ({{ stats.total_riders|num }})
     </span>
 </div>
 
@@ -151,7 +151,7 @@
     <div class="rider-stat-card rsc-blue">
         <div class="rsc-icon blue"><i class="fas fa-users"></i></div>
         <div>
-            <div class="rsc-val">{{ total_riders }}</div>
+            <div class="rsc-val">{{ total_riders|num }}</div>
             <div class="rsc-lbl">Total Riders</div>
         </div>
     </div>
@@ -159,7 +159,7 @@
     <div class="rider-stat-card rsc-green">
         <div class="rsc-icon green"><i class="fas fa-user-check"></i></div>
         <div>
-            <div class="rsc-val">{{ active_riders }}</div>
+            <div class="rsc-val">{{ active_riders|num }}</div>
             <div class="rsc-lbl">Active</div>
         </div>
     </div>
@@ -167,7 +167,7 @@
     <div class="rider-stat-card rsc-red">
         <div class="rsc-icon red"><i class="fas fa-user-slash"></i></div>
         <div>
-            <div class="rsc-val">{{ inactive_riders }}</div>
+            <div class="rsc-val">{{ inactive_riders|num }}</div>
             <div class="rsc-lbl">Inactive</div>
         </div>
     </div>
@@ -186,7 +186,7 @@
     <div class="rider-stat-card rsc-blue">
         <div class="rsc-icon blue"><i class="fas fa-user-tag"></i></div>
         <div>
-            <div class="rsc-val">{{ stats.total_preregs }}</div>
+            <div class="rsc-val">{{ stats.total_preregs|num }}</div>
             <div class="rsc-lbl">Total Preregistrations</div>
         </div>
     </div>
@@ -202,7 +202,7 @@
     <div class="rider-stat-card rsc-green">
         <div class="rsc-icon green"><i class="fas fa-check-double"></i></div>
         <div>
-            <div class="rsc-val">{{ stats.total_preregs - stats.unread_preregs }}</div>
+            <div class="rsc-val">{{ (stats.total_preregs - stats.unread_preregs)|num }}</div>
             <div class="rsc-lbl">Processed</div>
         </div>
     </div>
@@ -374,7 +374,7 @@
                         {{ c.user.created_at|colombo_dt("%b %d, %Y") if c.user.created_at else '—' }}
                     </td>
                     <td class="px-5 py-3 text-sm font-bold text-gray-700 text-center">
-                        {{ c.user.total_rides or 0 }}
+                        {{ (c.user.total_rides or 0)|num }}
                     </td>
                     <td class="px-5 py-3 text-sm font-bold text-gray-700">
                         Rs.{{ "{:,.2f}".format(c.wallet_balance or 0) }}
@@ -440,7 +440,7 @@
     <div class="px-5 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50/40">
         <p class="text-xs text-gray-400 font-medium">
             Showing <strong class="text-ziggo">{{ start_idx }}–{{ end_idx }}</strong> of
-            <strong class="text-ziggo">{{ total_riders }}</strong> {% if view == 'preregistrations' %}preregistrations{% else %}riders{% endif %}
+            <strong class="text-ziggo">{{ total_riders|num }}</strong> {% if view == 'preregistrations' %}preregistrations{% else %}riders{% endif %}
         </p>
         <div class="flex items-center gap-1">
             {% if page > 1 %}
@@ -479,9 +479,9 @@
     <div class="px-5 py-3 border-t border-gray-100">
         <p class="text-xs text-gray-400">
             {% if view == 'preregistrations' %}
-                {{ preregistrations | length }} preregistration{{ '' if preregistrations|length == 1 else 's' }} shown
+                {{ (preregistrations | length)|num }} preregistration{{ '' if preregistrations|length == 1 else 's' }} shown
             {% else %}
-                {{ riders | length }} rider{{ '' if riders|length == 1 else 's' }} shown
+                {{ (riders | length)|num }} rider{{ '' if riders|length == 1 else 's' }} shown
             {% endif %}
         </p>
     </div>

@@ -6,7 +6,7 @@
 {% block content %}
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
     <div class="p-6 border-b border-gray-100">
-        <h3 class="font-bold text-ziggo">Complaints ({{ total_complaints }})</h3>
+        <h3 class="font-bold text-ziggo">Complaints ({{ total_complaints|num }})</h3>
     </div>
     <div class="overflow-x-auto">
         <table class="w-full text-left">
@@ -46,7 +46,7 @@
         <p class="text-sm text-gray-500">
             Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
             <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
-            <span class="font-bold text-ziggo">{{ total_complaints }}</span> complaints
+            <span class="font-bold text-ziggo">{{ total_complaints|num }}</span> complaints
         </p>
         <div class="flex items-center gap-1.5">
             {% if page > 1 %}

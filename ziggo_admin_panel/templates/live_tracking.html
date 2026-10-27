@@ -62,7 +62,7 @@
         <span class="pulse-dot"></span>
         <span class="text-xs font-black text-emerald-600 uppercase tracking-wider">Live Feed Active</span>
         <span class="text-xs text-ziggo-muted font-bold">
-            · <span id="liveOnlineLabel">{{ online_drivers }}</span> Online ·
+            · <span id="liveOnlineLabel">{{ online_drivers|num }}</span> Online ·
             Updated <span id="liveUpdated">--:--:--</span>
         </span>
     </div>
@@ -70,17 +70,17 @@
     <!-- Stat cards -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-3 flex items-center gap-2.5">
-            <span class="text-xl font-black text-ziggo-ink leading-none" id="statOnline">{{ online_drivers }}</span>
+            <span class="text-xl font-black text-ziggo-ink leading-none" id="statOnline">{{ online_drivers|num }}</span>
             <span class="pulse-dot"></span>
             <span class="text-[11px] font-black text-ziggo-muted uppercase tracking-wider">Drivers Online</span>
         </div>
         <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-3 flex items-center gap-2.5">
-            <span class="text-xl font-black text-ziggo-ink leading-none" id="statOffline">{{ offline_drivers }}</span>
+            <span class="text-xl font-black text-ziggo-ink leading-none" id="statOffline">{{ offline_drivers|num }}</span>
             <span class="w-2.5 h-2.5 rounded-full bg-gray-300"></span>
             <span class="text-[11px] font-black text-ziggo-muted uppercase tracking-wider">Drivers Offline</span>
         </div>
         <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-3 flex items-center gap-2.5">
-            <span class="text-xl font-black text-ziggo-ink leading-none" id="statTotal">{{ total_drivers }}</span>
+            <span class="text-xl font-black text-ziggo-ink leading-none" id="statTotal">{{ total_drivers|num }}</span>
             <i class="fas fa-car text-ziggo"></i>
             <span class="text-[11px] font-black text-ziggo-muted uppercase tracking-wider">Total Drivers</span>
         </div>
@@ -443,9 +443,9 @@
         let online = 0;
         for (const d of driversState.values()) if (d.is_online) online++;
         const total = driversState.size;
-        document.getElementById('statOnline').textContent = online;
-        document.getElementById('statOffline').textContent = total - online;
-        document.getElementById('statTotal').textContent = total;
+        document.getElementById('statOnline').textContent = fmtNum(online);
+        document.getElementById('statOffline').textContent = fmtNum(total - online);
+        document.getElementById('statTotal').textContent = fmtNum(total);
         document.getElementById('liveOnlineLabel').textContent = online;
     }
 
@@ -472,9 +472,9 @@
                 }
             }
 
-            document.getElementById('statOnline').textContent = j.totals.online;
-            document.getElementById('statOffline').textContent = j.totals.offline;
-            document.getElementById('statTotal').textContent = j.totals.total;
+            document.getElementById('statOnline').textContent = fmtNum(j.totals.online);
+            document.getElementById('statOffline').textContent = fmtNum(j.totals.offline);
+            document.getElementById('statTotal').textContent = fmtNum(j.totals.total);
             document.getElementById('liveOnlineLabel').textContent = j.totals.online;
             markUpdated(j.server_time);
 

@@ -44,7 +44,7 @@
             </div>
             <div>
                 <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Total Referrals</p>
-                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1">{{ stat_total }}</p>
+                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1">{{ stat_total|num }}</p>
             </div>
         </div>
         <div class="bg-white rounded-2xl p-5 border border-ziggo-line shadow-soft-sm flex items-center gap-4">
@@ -62,7 +62,7 @@
             </div>
             <div>
                 <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Pending</p>
-                <p class="text-2xl font-black text-amber-600 leading-none mt-1">{{ stat_pending }}</p>
+                <p class="text-2xl font-black text-amber-600 leading-none mt-1">{{ stat_pending|num }}</p>
             </div>
         </div>
         <div class="bg-white rounded-2xl p-5 border border-ziggo-line shadow-soft-sm flex items-center gap-4">
@@ -152,7 +152,7 @@
                             <p class="text-xs text-ziggo-muted font-mono">{{ b.referred.phone_number if b.referred and b.referred.phone_number else 'N/A' }}</p>
                         </td>
                         <td class="px-6 py-4 text-right font-black text-emerald-600">
-                            Rs. {{ "%.2f"|format(b.referrer_amount) }}
+                            Rs. {{ "{:,.2f}".format(b.referrer_amount) }}
                         </td>
                         <td class="px-6 py-4">
                             {% if b.status.value == 'completed' %}
@@ -194,7 +194,7 @@
             <p class="text-sm text-ziggo-muted">
                 Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to
                 <span class="font-bold text-ziggo">{{ end_idx }}</span> of
-                <span class="font-bold text-ziggo">{{ total_count }}</span> referrals
+                <span class="font-bold text-ziggo">{{ total_count|num }}</span> referrals
             </p>
             <div class="flex items-center gap-1.5">
                 {% if page > 1 %}
@@ -221,7 +221,7 @@
         {% elif total_count > 0 %}
         <div class="px-6 py-4 border-t border-ziggo-line bg-ziggo-canvas/30">
             <p class="text-xs text-ziggo-muted">
-                Showing <span class="font-bold text-ziggo">{{ total_count }}</span> referrals
+                Showing <span class="font-bold text-ziggo">{{ total_count|num }}</span> referrals
             </p>
         </div>
         {% endif %}

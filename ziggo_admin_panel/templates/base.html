@@ -52,6 +52,10 @@
             }
         }
     </script>
+    <script>
+        // 200000 -> "200,000"; fmtNum(x, 2) keeps two decimals (same as the |num filter).
+        window.fmtNum = function (v, d) { d = d || 0; return Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }); };
+    </script>
     <style>
         /* Force Plus Jakarta Sans globally across all text elements (excluding FontAwesome icons) */
         html, body, input, select, textarea, button, a, p, span, h1, h2, h3, h4, h5, h6, label, div:not(.fa):not(.fas):not(.far):not(.fab):not(.fal):not(.fad) {
@@ -1224,7 +1228,7 @@
             showToast({
               type: 'booking-create',
               title: 'New Hire Created',
-              message: 'Booking ' + (data.booking_ref || '') + ' (' + (data.service_type || 'ride') + ') • Rs.' + (data.fare ? Math.round(data.fare).toLocaleString() : '0'),
+              message: 'Booking ' + (data.booking_ref || '') + ' (' + (data.service_type || 'ride') + ') • Rs.' + (data.fare ? fmtNum(data.fare) : '0'),
               url: '/admin/bookings',
               icon: 'fa-route'
             });
@@ -1238,7 +1242,7 @@
               showToast({
                 type: 'booking-complete',
                 title: 'Hire Completed',
-                message: 'Booking ' + (data.booking_ref || '') + ' completed • Rs.' + (data.amount ? Math.round(data.amount).toLocaleString() : '0'),
+                message: 'Booking ' + (data.booking_ref || '') + ' completed • Rs.' + (data.amount ? fmtNum(data.amount) : '0'),
                 url: '/admin/bookings',
                 icon: 'fa-circle-check'
               });

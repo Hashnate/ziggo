@@ -74,7 +74,7 @@
                 <i class="fas fa-motorcycle"></i>
             </div>
             <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Drivers</p>
-            <p class="text-xl font-black mt-1">{{ rs.counts.drivers }}</p>
+            <p class="text-xl font-black mt-1">{{ rs.counts.drivers|num }}</p>
             <p class="text-xs text-gray-500 mt-1 font-bold">Per-driver earnings →</p>
         </a>
         <a href="/admin/finance/customers" class="block bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
@@ -82,7 +82,7 @@
                 <i class="fas fa-users"></i>
             </div>
             <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Customers</p>
-            <p class="text-xl font-black mt-1">{{ rs.counts.customers }}</p>
+            <p class="text-xl font-black mt-1">{{ rs.counts.customers|num }}</p>
             <p class="text-xs text-gray-500 mt-1 font-bold">Per-customer spend →</p>
         </a>
         <a href="/admin/finance/restaurants" class="block bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
@@ -90,7 +90,7 @@
                 <i class="fas fa-utensils"></i>
             </div>
             <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Restaurants</p>
-            <p class="text-xl font-black mt-1">{{ rs.counts.restaurants }}</p>
+            <p class="text-xl font-black mt-1">{{ rs.counts.restaurants|num }}</p>
             <p class="text-xs text-gray-500 mt-1 font-bold">Per-restaurant revenue →</p>
         </a>
         <a href="/admin/finance/market" class="block bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
@@ -98,7 +98,7 @@
                 <i class="fas fa-store"></i>
             </div>
             <p class="text-xs uppercase font-black text-gray-400 tracking-widest">Market vendors</p>
-            <p class="text-xl font-black mt-1">{{ rs.counts.vendors }}</p>
+            <p class="text-xl font-black mt-1">{{ rs.counts.vendors|num }}</p>
             <p class="text-xs text-gray-500 mt-1 font-bold">Per-vendor revenue →</p>
         </a>
     </div>

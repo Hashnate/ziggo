@@ -30,7 +30,7 @@
             <i class="fas {{ icon }} text-amber-500"></i>
             <div>
                 <p class="text-[10px] text-ziggo-muted uppercase font-black tracking-wider">{{ k }}</p>
-                <p class="text-xl font-black text-ziggo-ink leading-none">{{ counts.get(k, 0) }}</p>
+                <p class="text-xl font-black text-ziggo-ink leading-none">{{ (counts.get(k, 0))|num }}</p>
             </div>
         </div>
         {% endfor %}
@@ -108,7 +108,7 @@
             <p class="text-sm text-gray-500">
                 Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
                 <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
-                <span class="font-bold text-ziggo">{{ total_incidents }}</span> incidents
+                <span class="font-bold text-ziggo">{{ total_incidents|num }}</span> incidents
             </p>
             <div class="flex items-center gap-1.5">
                 {% if page > 1 %}

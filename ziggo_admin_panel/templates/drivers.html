@@ -45,7 +45,7 @@
     {% if status == 'incomplete' %}
     <a href="/admin/drivers?status=all" class="pb-3 text-sm font-bold text-gray-400 hover:text-ziggo transition flex items-center gap-1.5">
         <span>Registered Drivers</span>
-        <span class="px-2 py-0.5 rounded-full text-xs font-black bg-gray-100 text-gray-600">{{ stats.total }}</span>
+        <span class="px-2 py-0.5 rounded-full text-xs font-black bg-gray-100 text-gray-600">{{ stats.total|num }}</span>
     </a>
     <a href="/admin/drivers?status=incomplete" class="pb-3 text-sm font-black border-b-2 border-ziggo text-ziggo flex items-center gap-1.5">
         <span>Incomplete Signups</span>
@@ -54,7 +54,7 @@
     {% else %}
     <a href="/admin/drivers?status=all" class="pb-3 text-sm font-black border-b-2 border-ziggo text-ziggo flex items-center gap-1.5">
         <span>Registered Drivers</span>
-        <span class="px-2 py-0.5 rounded-full text-xs font-black bg-blue-100 text-blue-700">{{ stats.total }}</span>
+        <span class="px-2 py-0.5 rounded-full text-xs font-black bg-blue-100 text-blue-700">{{ stats.total|num }}</span>
     </a>
     {% if stats.incomplete and stats.incomplete > 0 %}
     <a href="/admin/drivers?status=incomplete" class="pb-3 text-sm font-bold text-gray-400 hover:text-amber-600 transition flex items-center gap-1.5">
@@ -75,27 +75,27 @@
             </div>
         </div>
         <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Registered Drivers</p>
-        <p class="text-2xl font-black text-ziggo">{{ stats.total }}</p>
+        <p class="text-2xl font-black text-ziggo">{{ stats.total|num }}</p>
     </div>
     <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
         <div class="flex items-center justify-between mb-4">
             <div class="w-10 h-10 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center">
                 <i class="fas fa-signal"></i>
             </div>
-            <span class="text-xs font-black text-ziggo">{{ stats.online_pct }}%</span>
+            <span class="text-xs font-black text-ziggo">{{ stats.online_pct|num }}%</span>
         </div>
         <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Online Now</p>
-        <p class="text-2xl font-black text-ziggo">{{ stats.online }}</p>
+        <p class="text-2xl font-black text-ziggo">{{ stats.online|num }}</p>
     </div>
     <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
         <div class="flex items-center justify-between mb-4">
             <div class="w-10 h-10 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center">
                 <i class="fas fa-clock"></i>
             </div>
-            <span class="text-xs font-black text-orange-500">{{ stats.pending }} Pending</span>
+            <span class="text-xs font-black text-orange-500">{{ stats.pending|num }} Pending</span>
         </div>
         <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Pending Review</p>
-        <p class="text-2xl font-black text-ziggo">{{ stats.pending }}</p>
+        <p class="text-2xl font-black text-ziggo">{{ stats.pending|num }}</p>
     </div>
     <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
         <div class="flex items-center justify-between mb-4">
@@ -111,7 +111,7 @@
             <div class="w-10 h-10 bg-pink-50 text-pink-600 rounded-2xl flex items-center justify-center">
                 <i class="fas fa-person-dress"></i>
             </div>
-            <span class="text-xs font-black text-pink-600">{{ stats.ladies_online }} online</span>
+            <span class="text-xs font-black text-pink-600">{{ stats.ladies_online|num }} online</span>
         </div>
         <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Lady Drivers (Scooter)</p>
         <p class="text-2xl font-black text-ziggo">{{ stats.ladies }}</p>
@@ -129,7 +129,7 @@
             </div>
         </div>
         <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Total Applications</p>
-        <p class="text-2xl font-black text-ziggo">{{ stats.total_apps }}</p>
+        <p class="text-2xl font-black text-ziggo">{{ stats.total_apps|num }}</p>
     </div>
     <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
         <div class="flex items-center justify-between mb-4">
@@ -138,7 +138,7 @@
             </div>
         </div>
         <p class="text-xs font-black text-gray-400 uppercase tracking-widest">New / Unread</p>
-        <p class="text-2xl font-black text-blue-600">{{ stats.unread_apps }}</p>
+        <p class="text-2xl font-black text-blue-600">{{ stats.unread_apps|num }}</p>
     </div>
     <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
         <div class="flex items-center justify-between mb-4">
@@ -147,7 +147,7 @@
             </div>
         </div>
         <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Processed</p>
-        <p class="text-2xl font-black text-ziggo">{{ stats.total_apps - stats.unread_apps }}</p>
+        <p class="text-2xl font-black text-ziggo">{{ (stats.total_apps - stats.unread_apps)|num }}</p>
     </div>
 </div>
 {% endif %}
@@ -221,7 +221,7 @@
                         </div>
                         <div>
                             <div class="text-sm font-bold text-gray-800 group-hover:text-ziggo">All Drivers (Inc. Drafts)</div>
-                            <div class="text-xs text-gray-500">All {{ (stats.total or 0) + (stats.incomplete or 0) }} registered & draft signups</div>
+                            <div class="text-xs text-gray-500">All {{ ((stats.total or 0) + (stats.incomplete or 0))|num }} registered & draft signups</div>
                         </div>
                     </a>
 
@@ -243,7 +243,7 @@
                         </div>
                         <div>
                             <div class="text-sm font-bold text-gray-800 group-hover:text-emerald-700">Registered Drivers Only</div>
-                            <div class="text-xs text-gray-500">{{ stats.total or 0 }} completed vehicle registrations</div>
+                            <div class="text-xs text-gray-500">{{ (stats.total or 0)|num }} completed vehicle registrations</div>
                         </div>
                     </a>
 
@@ -469,7 +469,7 @@
         <p class="text-sm text-gray-500">
             Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
             <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
-            <span class="font-bold text-ziggo">{{ total_drivers }}</span> {% if view == 'applications' %}applications{% else %}drivers{% endif %}
+            <span class="font-bold text-ziggo">{{ total_drivers|num }}</span> {% if view == 'applications' %}applications{% else %}drivers{% endif %}
         </p>
         <div class="flex items-center gap-1.5">
             {% if page > 1 %}
@@ -497,9 +497,9 @@
     <div class="p-6 border-t border-gray-100">
         <p class="text-sm text-gray-500">
             {% if view == 'applications' %}
-                {{ applications | length }} application{{ '' if applications|length == 1 else 's' }} shown
+                {{ (applications | length)|num }} application{{ '' if applications|length == 1 else 's' }} shown
             {% else %}
-                {{ drivers | length }} driver{{ '' if drivers|length == 1 else 's' }} shown
+                {{ (drivers | length)|num }} driver{{ '' if drivers|length == 1 else 's' }} shown
             {% endif %}
         </p>
     </div>

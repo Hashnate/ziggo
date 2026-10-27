@@ -12,7 +12,7 @@
                 <h3 class="font-black text-ziggo">Market vendor revenue & platform commission</h3>
                 <p class="text-xs text-gray-400 mt-1">Same split as food: vendor keeps the items total, 20% of delivery fee goes to Ziggo.</p>
             </div>
-            <p class="text-sm font-bold text-gray-500">{{ total_vendors }} vendors</p>
+            <p class="text-sm font-bold text-gray-500">{{ total_vendors|num }} vendors</p>
         </div>
         <div class="overflow-x-auto">
         <table class="w-full text-sm">
@@ -50,7 +50,7 @@
                     <td class="px-4 py-3 text-right font-black text-green-600">Rs.{{ "{:,.0f}".format(r.platform_commission) }}</td>
                     <td class="px-4 py-3 text-right">{{ r.delivered }}</td>
                     <td class="px-4 py-3 text-right text-red-500">{{ r.cancelled }}</td>
-                    <td class="px-4 py-3 text-right text-amber-600">{{ r.pending_or_active }}</td>
+                    <td class="px-4 py-3 text-right text-amber-600">{{ r.pending_or_active|num }}</td>
                 </tr>
                 {% endfor %}
                 {% if not rows %}
@@ -66,7 +66,7 @@
             <p class="text-sm text-gray-500">
                 Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
                 <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
-                <span class="font-bold text-ziggo">{{ total_vendors }}</span> vendors
+                <span class="font-bold text-ziggo">{{ total_vendors|num }}</span> vendors
             </p>
             <div class="flex items-center gap-1.5">
                 {% if page > 1 %}

@@ -34,7 +34,7 @@
                         <td class="px-6 py-4 font-bold text-ziggo">{{ p.code }}</td>
                         <td class="px-6 py-4 text-xs font-black uppercase tracking-wider text-ziggo-faint">{{ (p.category or 'all')|upper }}</td>
                         <td class="px-6 py-4 text-sm font-bold text-ziggo-ink">
-                            {% if p.discount_type == 'percentage' %}{{ "%.2f"|format(p.discount_value or 0) }}%{% else %}Rs.{{ "%.2f"|format(p.discount_value or 0) }}{% endif %}
+                            {% if p.discount_type == 'percentage' %}{{ "{:,.2f}".format(p.discount_value or 0) }}%{% else %}Rs.{{ "{:,.2f}".format(p.discount_value or 0) }}{% endif %}
                         </td>
                         <td class="px-6 py-4 text-sm text-ziggo-muted">{{ p.valid_to|colombo_dt("%d %b %Y") if p.valid_to else '—' }}</td>
                         <td class="px-6 py-4 text-sm text-ziggo-ink">
@@ -115,7 +115,7 @@
             <p class="text-sm text-gray-500">
                 Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
                 <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
-                <span class="font-bold text-ziggo">{{ total_promos }}</span> promotions
+                <span class="font-bold text-ziggo">{{ total_promos|num }}</span> promotions
             </p>
             <div class="flex items-center gap-1.5">
                 {% if page > 1 %}

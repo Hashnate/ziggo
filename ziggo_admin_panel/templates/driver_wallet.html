@@ -136,7 +136,7 @@
                     <td class="px-4 py-2 text-xs capitalize">{{ m.vehicle_type or '—' }}</td>
                     <td class="px-4 py-2 text-xs text-gray-500">{{ m.approved_at|colombo_dt("%Y-%m-%d") if m.approved_at else '—' }}</td>
                     <td class="px-4 py-2 text-xs text-gray-500">{{ m.joined_at|colombo_dt("%Y-%m-%d") if m.joined_at else '—' }}</td>
-                    <td class="px-4 py-2 text-right font-black">{{ m.jobs }}</td>
+                    <td class="px-4 py-2 text-right font-black">{{ m.jobs|num }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -210,7 +210,7 @@
                     <td class="px-4 py-3 font-bold text-ziggo">{{ g.note }}</td>
                     <td class="px-4 py-3">
                         {% if g.audience.startswith('driver:') %}<a href="/admin/finance/drivers/{{ g.audience[7:] }}" class="font-bold text-ziggo hover:underline">{{ r.audience }}</a>{% else %}{{ r.audience }}{% endif %}
-                        <div class="text-[10px] text-gray-400">{{ g.drivers_count }} driver{{ 's' if g.drivers_count != 1 }}{% if r.active_drivers %} · {{ r.active_drivers }} still have some{% endif %}</div>
+                        <div class="text-[10px] text-gray-400">{{ g.drivers_count|num }} driver{{ 's' if g.drivers_count != 1 }}{% if r.active_drivers %} · {{ r.active_drivers|num }} still have some{% endif %}</div>
                     </td>
                     <td class="px-4 py-3 text-xs text-gray-500">{{ g.created_at|colombo_dt("%Y-%m-%d %H:%M") }}{% if r.by %}<div>by {{ r.by }}</div>{% endif %}</td>
                     <td class="px-4 py-3 text-right">Rs.{{ "{:,.2f}".format(g.amount|float) }}</td>
@@ -234,7 +234,7 @@
                     </td>
                     <td class="px-4 py-3 text-right whitespace-nowrap">
                         {% if not r.cancelled and m.available > 0 %}
-                        <form method="POST" action="/admin/driver-wallet/grants/{{ g.id }}/cancel" class="inline" onsubmit="return confirm('Remove the Rs.{{ '%.2f' % m.available }} that drivers have not used yet from this bonus? Commission already paid with it stays paid.')">
+                        <form method="POST" action="/admin/driver-wallet/grants/{{ g.id }}/cancel" class="inline" onsubmit="return confirm('Remove the Rs.{{ "{:,.2f}".format(m.available) }} that drivers have not used yet from this bonus? Commission already paid with it stays paid.')">
                             <button class="text-xs font-bold text-rose-600">Remove rest</button>
                         </form>
                         {% endif %}

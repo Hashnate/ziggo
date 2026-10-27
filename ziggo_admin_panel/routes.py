@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 import os
 import urllib.parse
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Request, Form, Depends, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -106,7 +106,31 @@ def format_colombo_dt(dt: datetime | None, fmt: str = "%Y-%m-%d %H:%M") -> str:
     return str(dt)
 
 
+def format_number(value, decimals: Optional[int] = None):
+    """Comma every three digits: 200000 -> "200,000". Without `decimals` a number keeps
+    the decimals it has (Decimal("1500.00") -> "1,500.00", 3 -> "3"). None counts as 0;
+    anything that isn't a number is shown unchanged."""
+    if value is None or value == "":
+        value = 0
+    if isinstance(value, str):
+        try:
+            value = Decimal(value)
+        except InvalidOperation:
+            return value
+    if isinstance(value, bool) or not isinstance(value, (int, float, Decimal)):
+        return value
+    if decimals is None:
+        if isinstance(value, Decimal):
+            decimals = max(0, -value.as_tuple().exponent) if value.is_finite() else 0
+        elif isinstance(value, float):
+            decimals = 0 if value.is_integer() else 2
+        else:
+            decimals = 0
+    return f"{value:,.{decimals}f}"
+
+
 templates.env.filters["colombo_dt"] = format_colombo_dt
+templates.env.filters["num"] = format_number
 templates.env.filters["to_colombo"] = to_colombo_dt
 templates.env.globals["gender_from_nic"] = gender_from_nic
 

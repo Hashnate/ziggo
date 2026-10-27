@@ -19,7 +19,7 @@
             <div class="stat-icon bg-emerald-100 text-emerald-600"><i class="fas fa-check"></i></div>
             <div>
                 <p class="text-[10px] text-ziggo-faint uppercase font-bold">Drivers w/ earnings</p>
-                <p class="text-2xl font-black text-ziggo-ink">{{ rows | length }}</p>
+                <p class="text-2xl font-black text-ziggo-ink">{{ (rows | length)|num }}</p>
             </div>
         </div>
     </div>
@@ -28,7 +28,7 @@
             <div class="stat-icon bg-blue-100 text-ziggo"><i class="fas fa-history"></i></div>
             <div>
                 <p class="text-[10px] text-ziggo-faint uppercase font-bold">Past payouts</p>
-                <p class="text-2xl font-black text-ziggo">{{ history | length }}</p>
+                <p class="text-2xl font-black text-ziggo">{{ (history | length)|num }}</p>
             </div>
         </div>
     </div>
@@ -104,7 +104,7 @@
         <p class="text-sm text-gray-500">
             Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
             <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
-            <span class="font-bold text-ziggo">{{ total_drivers }}</span> drivers
+            <span class="font-bold text-ziggo">{{ total_drivers|num }}</span> drivers
         </p>
         <div class="flex items-center gap-1.5">
             {% if page > 1 %}
@@ -137,7 +137,7 @@
             <h3 class="font-black text-ziggo-ink">Payout & Transfer History</h3>
             <p class="text-xs text-gray-400 mt-0.5">Audit log of all payouts issued to drivers.</p>
         </div>
-        <span class="text-xs font-bold text-gray-400 bg-gray-50 px-2.5 py-1 rounded-lg">{{ history | length }} records</span>
+        <span class="text-xs font-bold text-gray-400 bg-gray-50 px-2.5 py-1 rounded-lg">{{ (history | length)|num }} records</span>
     </div>
     <div class="overflow-x-auto">
         <table class="w-full text-left">
@@ -284,7 +284,7 @@ function handleOpenPayout(btn) {
     document.getElementById('modalDriverType').textContent = `${d.vehicle ? (d.vehicle.charAt(0).toUpperCase() + d.vehicle.slice(1)) : 'Vehicle'} Driver`;
     
     const pendingVal = parseFloat(d.pending) || 0;
-    document.getElementById('modalDriverPending').textContent = `Rs. ${pendingVal.toFixed(2)}`;
+    document.getElementById('modalDriverPending').textContent = `Rs. ${fmtNum(pendingVal, 2)}`;
     
     const amountInput = document.getElementById('modalAmountInput');
     amountInput.value = pendingVal.toFixed(2);

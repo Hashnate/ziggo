@@ -103,7 +103,7 @@
     <!-- History -->
     <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div class="p-5 border-b border-gray-100 flex items-center justify-between">
-            <h3 class="font-black text-ziggo-ink">Sent Broadcasts ({{ total_messages }})</h3>
+            <h3 class="font-black text-ziggo-ink">Sent Broadcasts ({{ total_messages|num }})</h3>
         </div>
         <div class="divide-y divide-gray-100">
             {% for b in batches %}
@@ -133,7 +133,7 @@
                             {{ b.audience }}
                         </span>
                         <span class="px-2 py-1 rounded-full text-[10px] font-bold bg-ziggo-canvas text-ziggo-ink">
-                            {{ b.count }} recipient{{ '' if b.count == 1 else 's' }}
+                            {{ b.count|num }} recipient{{ '' if b.count == 1 else 's' }}
                         </span>
                     </div>
                 </div>
@@ -150,7 +150,7 @@
             <p class="text-sm text-gray-500">
                 Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
                 <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
-                <span class="font-bold text-ziggo">{{ total_messages }}</span> broadcasts
+                <span class="font-bold text-ziggo">{{ total_messages|num }}</span> broadcasts
             </p>
             <div class="flex items-center gap-1.5">
                 {% if page > 1 %}

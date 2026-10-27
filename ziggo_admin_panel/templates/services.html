@@ -64,10 +64,10 @@
                             </div>
                         </td>
                         <td class="px-6 py-4 font-black text-ziggo-ink">{{ c.display_name or c.service_type|title }}</td>
-                        <td class="px-6 py-4 text-ziggo font-normal">Rs.{{ "%.2f"|format(c.base_fare or 0) }}</td>
-                        <td class="px-6 py-4 text-ziggo-ink font-normal">Rs.{{ "%.2f"|format(c.per_km_rate or 0) }}</td>
-                        <td class="px-6 py-4 text-ziggo-ink font-normal">Rs.{{ "%.2f"|format(c.per_minute_rate or 0) }}</td>
-                        <td class="px-6 py-4 text-ziggo-ink font-normal">Rs.{{ "%.2f"|format(c.min_fare or 0) }}</td>
+                        <td class="px-6 py-4 text-ziggo font-normal">Rs.{{ "{:,.2f}".format(c.base_fare or 0) }}</td>
+                        <td class="px-6 py-4 text-ziggo-ink font-normal">Rs.{{ "{:,.2f}".format(c.per_km_rate or 0) }}</td>
+                        <td class="px-6 py-4 text-ziggo-ink font-normal">Rs.{{ "{:,.2f}".format(c.per_minute_rate or 0) }}</td>
+                        <td class="px-6 py-4 text-ziggo-ink font-normal">Rs.{{ "{:,.2f}".format(c.min_fare or 0) }}</td>
                         <td class="px-6 py-4">
                             <form method="POST" action="/admin/services/{{ c.id }}/toggle" class="inline">
                                 {% if c.is_active %}

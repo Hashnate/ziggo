@@ -82,7 +82,7 @@
 
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
     <div class="p-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-4">
-        <h3 class="font-bold text-ziggo">Restaurants ({{ total_restaurants }})</h3>
+        <h3 class="font-bold text-ziggo">Restaurants ({{ total_restaurants|num }})</h3>
         
         <form method="GET" action="/admin/restaurants" class="flex flex-wrap items-center gap-3 ml-auto">
             <div>
@@ -201,7 +201,7 @@
         <p class="text-sm text-gray-500">
             Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
             <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
-            <span class="font-bold text-ziggo">{{ total_restaurants }}</span> restaurants
+            <span class="font-bold text-ziggo">{{ total_restaurants|num }}</span> restaurants
         </p>
         <div class="flex items-center gap-1.5">
             {% if page > 1 %}

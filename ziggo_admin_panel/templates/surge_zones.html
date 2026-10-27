@@ -39,7 +39,7 @@
                                     <span class="text-gray-400">Always</span>
                                 {% endif %}
                             </td>
-                            <td class="px-4 py-3 font-medium text-ziggo-light">Rs. {{ "%.2f"|format(z.flat_extra_charge) }}</td>
+                            <td class="px-4 py-3 font-medium text-ziggo-light">Rs. {{ "{:,.2f}".format(z.flat_extra_charge) }}</td>
                             <td class="px-4 py-3">
                                 {% if z.is_active %}
                                     <span class="px-2 py-1 rounded-md text-xs font-bold bg-green-100 text-green-800">Active</span>
@@ -142,7 +142,7 @@
                     <label class="inline-flex items-center gap-1.5 cursor-pointer select-none text-xs text-gray-700 bg-gray-100 hover:bg-gray-200 px-2.5 py-1 rounded-md border border-gray-200 transition-colors">
                         <input type="checkbox" id="toggleExistingZones" class="rounded text-ziggo-light w-3.5 h-3.5" checked onchange="toggleReferenceZones(this.checked)">
                         <span>Show existing zones</span>
-                        <span class="bg-white px-1.5 py-0.2 rounded text-[11px] font-bold text-gray-600 border border-gray-200">{{ zones|length }}</span>
+                        <span class="bg-white px-1.5 py-0.2 rounded text-[11px] font-bold text-gray-600 border border-gray-200">{{ (zones|length)|num }}</span>
                     </label>
                 </div>
             </div>

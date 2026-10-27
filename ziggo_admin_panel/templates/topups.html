@@ -26,7 +26,7 @@
         <div class="tu-ic blue"><i class="fas fa-receipt"></i></div>
         <div class="relative">
             <p class="tu-lbl">Top-up transactions</p>
-            <p class="tu-val">{{ count }}</p>
+            <p class="tu-val">{{ count|num }}</p>
         </div>
     </div>
 </div>
@@ -125,7 +125,7 @@
         <p class="text-sm text-gray-500">
             Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
             <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
-            <span class="font-bold text-ziggo">{{ count }}</span> transactions
+            <span class="font-bold text-ziggo">{{ count|num }}</span> transactions
         </p>
         <div class="flex items-center gap-1.5">
             {% if page > 1 %}

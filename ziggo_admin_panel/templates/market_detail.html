@@ -22,7 +22,7 @@
             </p>
             <div class="mt-2 flex flex-wrap gap-4 text-xs text-gray-600 font-bold">
                 <span><i class="fas fa-star text-yellow-400"></i> {{ "{:.1f}".format((vendor.rating or 0)|float) }}</span>
-                <span><i class="fas fa-box"></i> {{ products | length }} product{{ '' if products|length == 1 else 's' }}</span>
+                <span><i class="fas fa-box"></i> {{ (products | length)|num }} product{{ '' if products|length == 1 else 's' }}</span>
                 <span class="px-2 py-0.5 rounded-full {% if vendor.is_active %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-500{% endif %}">{{ 'Active' if vendor.is_active else 'Suspended' }}</span>
                 {% if owner %}
                 <span><i class="fas fa-user-tie"></i> {{ owner.full_name or 'Owner #' ~ owner.id }}</span>
@@ -89,7 +89,7 @@
         <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div class="p-6 border-b border-gray-100">
                 <h3 class="font-black text-ziggo">Products</h3>
-                <p class="text-xs text-gray-400">{{ products | length }} product{{ '' if products|length == 1 else 's' }}</p>
+                <p class="text-xs text-gray-400">{{ (products | length)|num }} product{{ '' if products|length == 1 else 's' }}</p>
             </div>
             {% if products %}
             <div class="divide-y divide-gray-100">

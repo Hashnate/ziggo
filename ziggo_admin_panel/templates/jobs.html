@@ -29,7 +29,7 @@
         <div class="flex items-center gap-3">
             <a href="/admin/jobs/applications"
                class="px-4 py-2.5 rounded-xl border border-ziggo-line bg-white text-ziggo-ink font-bold text-sm hover:bg-ziggo-canvas transition inline-flex items-center gap-2">
-                <i class="fas fa-users-viewfinder text-ziggo"></i> Applications ({{ total_apps }})
+                <i class="fas fa-users-viewfinder text-ziggo"></i> Applications ({{ total_apps|num }})
             </a>
             <a href="/admin/jobs/new"
                class="px-5 py-2.5 rounded-xl bg-ziggo text-white font-bold text-sm hover:bg-ziggo-light transition inline-flex items-center gap-2 shadow-sm">
@@ -46,7 +46,7 @@
             </div>
             <div>
                 <p class="text-xs font-bold text-ziggo-muted uppercase tracking-wider">Total Job Roles</p>
-                <p class="text-2xl font-black text-ziggo-ink">{{ total_jobs }}</p>
+                <p class="text-2xl font-black text-ziggo-ink">{{ total_jobs|num }}</p>
             </div>
         </div>
         <div class="bg-white p-5 rounded-2xl border border-ziggo-line shadow-sm flex items-center gap-4">
@@ -55,7 +55,7 @@
             </div>
             <div>
                 <p class="text-xs font-bold text-ziggo-muted uppercase tracking-wider">Active Openings</p>
-                <p class="text-2xl font-black text-emerald-600">{{ active_jobs }}</p>
+                <p class="text-2xl font-black text-emerald-600">{{ active_jobs|num }}</p>
             </div>
         </div>
         <div class="bg-white p-5 rounded-2xl border border-ziggo-line shadow-sm flex items-center gap-4">
@@ -64,7 +64,7 @@
             </div>
             <div>
                 <p class="text-xs font-bold text-ziggo-muted uppercase tracking-wider">Total Applications</p>
-                <p class="text-2xl font-black text-indigo-600">{{ total_apps }}</p>
+                <p class="text-2xl font-black text-indigo-600">{{ total_apps|num }}</p>
             </div>
         </div>
     </div>
@@ -142,7 +142,7 @@
                         <td class="px-6 py-4 text-sm">
                             <a href="/admin/jobs/applications?job_id={{ job.id }}" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-xs hover:bg-indigo-100 transition">
                                 <i class="fas fa-user-tie text-[11px]"></i>
-                                {{ job.applications|length }} candidates
+                                {{ (job.applications|length)|num }} candidates
                             </a>
                         </td>
                         <td class="px-6 py-4">

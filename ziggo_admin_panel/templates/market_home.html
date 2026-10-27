@@ -18,7 +18,7 @@
         <div class="p-5 border-b border-ziggo-line flex items-center justify-between">
             <div>
                 <h3 class="text-lg font-black text-ziggo">Marketplace Ads &amp; Banners</h3>
-                <p class="text-xs text-ziggo-muted">{{ ads|length }} total — geofenced carousel banners with redirect routing</p>
+                <p class="text-xs text-ziggo-muted">{{ (ads|length)|num }} total — geofenced carousel banners with redirect routing</p>
             </div>
         </div>
 
@@ -174,7 +174,7 @@
     <section class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
         <div class="p-5 border-b border-ziggo-line">
             <h3 class="text-lg font-black text-ziggo">Marketplace Categories</h3>
-            <p class="text-xs text-ziggo-muted">{{ categories|length }} total — popular categories dynamic grid on customer home</p>
+            <p class="text-xs text-ziggo-muted">{{ (categories|length)|num }} total — popular categories dynamic grid on customer home</p>
         </div>
 
         <div class="divide-y divide-ziggo-line">
@@ -318,7 +318,7 @@
     <section class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
         <div class="p-5 border-b border-ziggo-line">
             <h3 class="text-lg font-black text-ziggo">Deals &amp; Offers</h3>
-            <p class="text-xs text-ziggo-muted">{{ deals|length }} total — promo-linked deal cards with redirect routing</p>
+            <p class="text-xs text-ziggo-muted">{{ (deals|length)|num }} total — promo-linked deal cards with redirect routing</p>
         </div>
 
         <div class="divide-y divide-ziggo-line">

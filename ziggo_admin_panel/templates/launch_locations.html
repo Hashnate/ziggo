@@ -119,7 +119,7 @@
                         {% if 'food' in l.services or 'market' in l.services %}<div class="text-gray-400">{{ 'delivery cut waived' if l.waive_delivery_cut else 'delivery cut charged' }}</div>{% endif %}
                     </td>
                     {% set m = r.summary %}
-                    <td class="px-4 py-3 text-right">{{ m.jobs }}<div class="text-[10px] text-gray-400">{{ m.trips }} trips · {{ m.orders }} orders</div></td>
+                    <td class="px-4 py-3 text-right">{{ m.jobs|num }}<div class="text-[10px] text-gray-400">{{ m.trips|num }} trips · {{ m.orders|num }} orders</div></td>
                     <td class="px-4 py-3 text-right">Rs.{{ "{:,.2f}".format(m.income) }}</td>
                     <td class="px-4 py-3 text-right text-green-700">Rs.{{ "{:,.2f}".format(m.driver_earnings) }}</td>
                     <td class="px-4 py-3 text-right font-black text-amber-600">Rs.{{ "{:,.2f}".format(m.waived) }}</td>

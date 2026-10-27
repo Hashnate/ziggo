@@ -10,7 +10,7 @@
             <div class="stat-icon bg-blue-100 text-ziggo text-base"><i class="fas fa-bell"></i></div>
             <div>
                 <p class="text-[10px] text-ziggo-faint uppercase font-bold">Total</p>
-                <p class="text-xl font-black text-ziggo-ink">{{ total_notifications }}</p>
+                <p class="text-xl font-black text-ziggo-ink">{{ total_notifications|num }}</p>
             </div>
         </div>
     </div>
@@ -19,7 +19,7 @@
             <div class="stat-icon bg-rose-100 text-rose-600 text-base"><i class="fas fa-envelope-open-text"></i></div>
             <div>
                 <p class="text-[10px] text-ziggo-faint uppercase font-bold">Unread</p>
-                <p class="text-xl font-black text-rose-600">{{ unread_count }}</p>
+                <p class="text-xl font-black text-rose-600">{{ unread_count|num }}</p>
             </div>
         </div>
     </div>
@@ -27,7 +27,7 @@
     <div class="zi-stat">
         <div>
             <p class="text-[10px] text-ziggo-faint uppercase font-bold truncate">{{ label }}</p>
-            <p class="text-xl font-black text-ziggo-ink">{{ count }}</p>
+            <p class="text-xl font-black text-ziggo-ink">{{ count|num }}</p>
         </div>
     </div>
     {% endfor %}
@@ -35,7 +35,7 @@
 
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
     <div class="p-5 border-b border-gray-100 flex items-center justify-between">
-        <h3 class="font-black text-ziggo-ink">Latest notifications <span class="text-xs font-bold text-gray-400 bg-gray-50 px-2.5 py-1 rounded-lg ml-2">Showing {{ start_idx }}-{{ end_idx }} of {{ total_notifications }}</span></h3>
+        <h3 class="font-black text-ziggo-ink">Latest notifications <span class="text-xs font-bold text-gray-400 bg-gray-50 px-2.5 py-1 rounded-lg ml-2">Showing {{ start_idx }}-{{ end_idx }} of {{ total_notifications|num }}</span></h3>
         <select id="typeFilter" class="px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-ziggo">
             <option value="">All types</option>
             {% for label in by_type.keys() %}
@@ -98,7 +98,7 @@
         <p class="text-sm text-gray-500">
             Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
             <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
-            <span class="font-bold text-ziggo">{{ total_notifications }}</span> notifications
+            <span class="font-bold text-ziggo">{{ total_notifications|num }}</span> notifications
         </p>
         <div class="flex items-center gap-1.5">
             {% if page > 1 %}

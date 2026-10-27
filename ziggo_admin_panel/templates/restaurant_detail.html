@@ -54,7 +54,7 @@
             <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div class="p-6 border-b border-gray-100">
                     <h3 class="font-black text-ziggo">Menu</h3>
-                    <p class="text-xs text-gray-400">{{ items | length }} item{{ '' if items|length == 1 else 's' }} across {{ categories | length }} categor{{ 'y' if categories|length == 1 else 'ies' }}</p>
+                    <p class="text-xs text-gray-400">{{ (items | length)|num }} item{{ '' if items|length == 1 else 's' }} across {{ (categories | length)|num }} categor{{ 'y' if categories|length == 1 else 'ies' }}</p>
                 </div>
                 <div class="divide-y divide-gray-100">
                     {% for cat in categories %}

@@ -14,7 +14,7 @@
             </div>
             <div>
                 <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Total Categories</p>
-                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1">{{ categories|length }}</p>
+                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1">{{ (categories|length)|num }}</p>
             </div>
         </div>
         <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
@@ -116,10 +116,10 @@
                                 {% endif %}
                             </div>
                         </td>
-                        <td class="px-6 py-4 text-sm text-ziggo-ink font-normal">Rs.{{ "%.2f"|format(c.base_fare or 0) }}</td>
-                        <td class="px-6 py-4 text-sm text-ziggo-ink font-normal">Rs.{{ "%.2f"|format(c.per_km_rate or 0) }}</td>
-                        <td class="px-6 py-4 text-sm text-ziggo-ink font-normal">Rs.{{ "%.2f"|format(c.per_minute_rate or 0) }}</td>
-                        <td class="px-6 py-4 text-sm text-ziggo-ink font-normal">Rs.{{ "%.2f"|format(c.min_fare or 0) }}</td>
+                        <td class="px-6 py-4 text-sm text-ziggo-ink font-normal">Rs.{{ "{:,.2f}".format(c.base_fare or 0) }}</td>
+                        <td class="px-6 py-4 text-sm text-ziggo-ink font-normal">Rs.{{ "{:,.2f}".format(c.per_km_rate or 0) }}</td>
+                        <td class="px-6 py-4 text-sm text-ziggo-ink font-normal">Rs.{{ "{:,.2f}".format(c.per_minute_rate or 0) }}</td>
+                        <td class="px-6 py-4 text-sm text-ziggo-ink font-normal">Rs.{{ "{:,.2f}".format(c.min_fare or 0) }}</td>
                         <td class="px-6 py-4 text-sm text-ziggo-muted">{{ c.capacity or 0 }}</td>
                         <td class="px-6 py-4 text-sm text-ziggo-muted">
                             {% if c.search_radius_km %}
@@ -187,7 +187,7 @@
             </table>
         </div>
         <div class="px-6 py-3.5 border-t border-ziggo-line bg-gray-50/50 flex items-center justify-between text-xs text-ziggo-muted">
-            <span class="font-medium">Total <strong class="text-ziggo-ink">{{ categories|length }}</strong> categories</span>
+            <span class="font-medium">Total <strong class="text-ziggo-ink">{{ (categories|length)|num }}</strong> categories</span>
             <span class="text-[11px] font-semibold text-gray-400">Drag rows to reorder</span>
         </div>
     </div>

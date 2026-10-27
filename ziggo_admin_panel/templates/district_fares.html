@@ -71,7 +71,7 @@
         function showNational() {
             const st = document.getElementById('dfService').value;
             document.getElementById('dfNational').textContent =
-                st in NATIONAL ? 'National base fare: Rs.' + NATIONAL[st].toFixed(2) : '';
+                st in NATIONAL ? 'National base fare: Rs.' + fmtNum(NATIONAL[st], 2) : '';
         }
         showNational();
     </script>
@@ -113,7 +113,7 @@
                     </td>
                     <td class="px-4 py-3">
                         <form method="POST" action="/admin/fare-settings/districts/{{ f.id }}/switch"
-                              onsubmit="return confirm('{% if f.is_active %}Switch off {{ f.district }} {{ r.vehicle }} Rs.{{ '%.2f' % f.base_fare }}? New trips there use the national base fare.{% else %}Switch on {{ f.district }} {{ r.vehicle }} Rs.{{ '%.2f' % f.base_fare }} for its period?{% endif %}')">
+                              onsubmit="return confirm('{% if f.is_active %}Switch off {{ f.district }} {{ r.vehicle }} Rs.{{ "{:,.2f}".format(f.base_fare) }}? New trips there use the national base fare.{% else %}Switch on {{ f.district }} {{ r.vehicle }} Rs.{{ "{:,.2f}".format(f.base_fare) }} for its period?{% endif %}')">
                             <input type="hidden" name="enabled" value="{{ 'off' if f.is_active else 'on' }}">
                             <button type="submit" class="relative inline-flex h-6 w-11 items-center rounded-full transition {{ 'bg-emerald-500' if f.is_active else 'bg-gray-300' }}" title="{{ 'Switch off' if f.is_active else 'Switch on' }}">
                                 <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition {{ 'translate-x-5' if f.is_active else 'translate-x-0.5' }}"></span>

@@ -495,10 +495,10 @@
             activeCustomerIds = new Set();
             setTrips(j.active);
             applyFilter();
-            document.getElementById('statRecent').textContent = j.totals.recent;
-            document.getElementById('statLapsing').textContent = j.totals.lapsing;
-            document.getElementById('statInactive').textContent = j.totals.inactive;
-            document.getElementById('statNever').textContent = j.totals.never_booked;
+            document.getElementById('statRecent').textContent = fmtNum(j.totals.recent);
+            document.getElementById('statLapsing').textContent = fmtNum(j.totals.lapsing);
+            document.getElementById('statInactive').textContent = fmtNum(j.totals.inactive);
+            document.getElementById('statNever').textContent = fmtNum(j.totals.never_booked);
             markUpdated(j.server_time);
             if (!fittedOnce && (customerMarkers.length || tripMarkers.size)) {
                 fitShown();

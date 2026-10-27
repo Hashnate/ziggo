@@ -6,7 +6,7 @@
 {% block content %}
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
     <div class="p-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-4">
-        <h3 class="text-lg font-bold text-ziggo">Customers ({{ total_customers }})</h3>
+        <h3 class="text-lg font-bold text-ziggo">Customers ({{ total_customers|num }})</h3>
     </div>
     <div class="overflow-x-auto">
         <table class="w-full text-left">
@@ -36,7 +36,7 @@
                     </td>
                     <td class="px-6 py-3 text-sm">{{ c.user.phone_number }}</td>
                     <td class="px-6 py-3 text-sm font-bold">Rs.{{ "{:,.2f}".format(c.wallet_balance or 0) }}</td>
-                    <td class="px-6 py-3 text-sm text-center">{{ c.user.total_rides or 0 }}</td>
+                    <td class="px-6 py-3 text-sm text-center">{{ (c.user.total_rides or 0)|num }}</td>
                     <td class="px-6 py-3 text-sm">
                         {% if c.gold_member %}
                             <span class="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 text-xs font-bold">Gold</span>
@@ -59,7 +59,7 @@
         <p class="text-sm text-gray-500">
             Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
             <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
-            <span class="font-bold text-ziggo">{{ total_customers }}</span> customers
+            <span class="font-bold text-ziggo">{{ total_customers|num }}</span> customers
         </p>
         <div class="flex items-center gap-1.5">
             {% if page > 1 %}

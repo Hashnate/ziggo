@@ -59,7 +59,7 @@
         </div>
         <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <p class="text-[10px] uppercase font-black text-gray-400 tracking-widest">Rides / Flash</p>
-            <p class="text-xl font-black mt-1">{{ t.rides }} <span class="text-xs text-gray-400">+ {{ t.flash }}</span></p>
+            <p class="text-xl font-black mt-1">{{ t.rides|num }} <span class="text-xs text-gray-400">+ {{ t.flash }}</span></p>
         </div>
         <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <p class="text-[10px] uppercase font-black text-gray-400 tracking-widest">Food / Market</p>
@@ -73,7 +73,7 @@
             <div>
                 <h3 class="font-black text-ziggo">Bonus wallet</h3>
                 <p class="text-xs text-gray-400 mt-0.5">Pays this driver's commission automatically until each bonus expires. It can't be withdrawn.
-                    Used so far: <span class="font-black text-gray-600">Rs.{{ "{:,.2f}".format(w.totals.used) }}</span> in {{ w.payments|length }} payment{{ 's' if w.payments|length != 1 }}.</p>
+                    Used so far: <span class="font-black text-gray-600">Rs.{{ "{:,.2f}".format(w.totals.used) }}</span> in {{ (w.payments|length)|num }} payment{{ 's' if w.payments|length != 1 }}.</p>
             </div>
             {% if can_wallet %}
             <button onclick="openModal('walletModal')" class="px-3.5 py-1.5 text-xs bg-violet-600 text-white rounded-lg font-bold shadow-sm hover:bg-violet-500 transition flex items-center gap-1.5">
@@ -121,7 +121,7 @@
                     {% if can_wallet %}
                     <td class="px-4 py-3 text-right whitespace-nowrap">
                         {% if c.status in ('active', 'expired') %}
-                        <form method="POST" action="/admin/driver-wallet/credits/{{ c.id }}/cancel" class="inline" onsubmit="return confirm('Remove the Rs.{{ '%.2f' % c.remaining }} left of this bonus? Commission already paid with it stays paid.')">
+                        <form method="POST" action="/admin/driver-wallet/credits/{{ c.id }}/cancel" class="inline" onsubmit="return confirm('Remove the Rs.{{ "{:,.2f}".format(c.remaining) }} left of this bonus? Commission already paid with it stays paid.')">
                             <button class="text-xs font-bold text-rose-600">Remove rest</button>
                         </form>
                         {% endif %}
@@ -142,7 +142,7 @@
         <div class="p-6 border-b border-gray-100 flex items-center justify-between">
             <div class="flex items-baseline gap-4">
                 <h3 class="font-black text-ziggo">Transaction history</h3>
-                <p class="text-xs text-gray-400">{{ data.transactions | length }} latest</p>
+                <p class="text-xs text-gray-400">{{ (data.transactions | length)|num }} latest</p>
             </div>
             <div class="flex items-center gap-2">
                 <button onclick="openModal('commissionModal')" class="px-3.5 py-1.5 text-xs bg-rose-600 text-white rounded-lg font-bold shadow-sm hover:bg-rose-500 transition flex items-center gap-1.5">
