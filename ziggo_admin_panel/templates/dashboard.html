@@ -22,7 +22,7 @@
 </div>
 
 <!-- Stats grid -->
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+<div id="dashboardStatsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
     <a href="/admin/customers" class="zi-stat block group">
         <div class="flex items-start justify-between gap-2">
             <div class="min-w-0">
@@ -112,7 +112,7 @@
             <h3 class="text-lg font-black text-ziggo-ink">Today's activity</h3>
             <span class="zi-chip" style="background: #DCFCE7; color: #15803D;">Live</span>
         </div>
-        <div class="space-y-2">
+        <div id="dashboardActivityStream" class="space-y-2">
             <div class="flex items-center gap-3 p-2.5 rounded-xl bg-green-50/60">
                 <div class="w-10 h-10 rounded-xl flex items-center justify-center text-green-600 bg-white shadow-soft-sm">
                     <i class="fas fa-check"></i>
@@ -151,7 +151,7 @@
             </div>
         </div>
 
-        <div class="mt-4 p-4 rounded-2xl relative overflow-hidden border border-blue-100"
+        <div id="dashboardAvgSurge" class="mt-4 p-4 rounded-2xl relative overflow-hidden border border-blue-100"
              style="background: linear-gradient(135deg, #F5F8FF 0%, #EAF1FF 100%);">
             <p class="text-[10px] font-black uppercase tracking-[0.16em] text-ziggo-faint mb-1 relative">Average surge (live)</p>
             <div class="flex items-end justify-between relative">
@@ -166,7 +166,7 @@
 </div>
 
 <!-- Quick links -->
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+<div id="dashboardQuickLinks" class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
     <a href="/admin/restaurants" class="zi-card zi-card-hover p-5 flex items-center gap-4">
         <div class="w-12 h-12 rounded-2xl flex items-center justify-center bg-ziggo-soft text-ziggo">
             <i class="fas fa-utensils text-lg"></i>
@@ -234,53 +234,57 @@
         grad.addColorStop(0, 'rgba(37, 99, 235, 0.22)');
         grad.addColorStop(1, 'rgba(37, 99, 235, 0.00)');
 
-        const drawChart = () => new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Revenue (Rs.)',
-                    data: revenueData,
-                    borderColor: '#1E40AF',
-                    backgroundColor: grad,
-                    fill: true,
-                    tension: 0.4,
-                    borderWidth: 2.5,
-                    pointBackgroundColor: '#fff',
-                    pointBorderColor: '#1E40AF',
-                    pointBorderWidth: 2,
-                    pointRadius: 3,
-                    pointHoverRadius: 6,
-                    pointHoverBackgroundColor: '#1E40AF',
-                    pointHoverBorderColor: '#fff'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        backgroundColor: '#0F172A',
-                        padding: 12,
-                        cornerRadius: 12,
-                        titleFont: { family: 'Sora', weight: '700' },
-                        bodyFont: { family: 'Sora', weight: '500' },
-                    }
+        let chartInstance = null;
+        const drawChart = () => {
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Revenue (Rs.)',
+                        data: revenueData,
+                        borderColor: '#1E40AF',
+                        backgroundColor: grad,
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 2.5,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#1E40AF',
+                        pointBorderWidth: 2,
+                        pointRadius: 3,
+                        pointHoverRadius: 6,
+                        pointHoverBackgroundColor: '#1E40AF',
+                        pointHoverBorderColor: '#fff'
+                    }]
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: { color: 'rgba(15, 23, 42, 0.04)', drawBorder: false },
-                        ticks: { font: { family: 'Sora', weight: '500', size: 11 }, color: '#94A3B8' }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#0F172A',
+                            padding: 12,
+                            cornerRadius: 12,
+                            titleFont: { family: 'Sora', weight: '700' },
+                            bodyFont: { family: 'Sora', weight: '500' },
+                        }
                     },
-                    x: {
-                        grid: { display: false, drawBorder: false },
-                        ticks: { font: { family: 'Sora', weight: '500', size: 11 }, color: '#94A3B8', maxRotation: 0, autoSkip: true, maxTicksLimit: 12 }
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(15, 23, 42, 0.04)', drawBorder: false },
+                            ticks: { font: { family: 'Sora', weight: '500', size: 11 }, color: '#94A3B8' }
+                        },
+                        x: {
+                            grid: { display: false, drawBorder: false },
+                            ticks: { font: { family: 'Sora', weight: '500', size: 11 }, color: '#94A3B8', maxRotation: 0, autoSkip: true, maxTicksLimit: 12 }
+                        }
                     }
                 }
-            }
-        });
+            });
+            return chartInstance;
+        };
 
         // If there's no revenue in this period, show a clean empty state instead of a flat 0 line
         if (!revenueData.some(function (v) { return v > 0; })) {
@@ -294,6 +298,57 @@
         } else {
             drawChart();
         }
+
+        // Silent in-place DOM updater hook for background auto-sync
+        window.ziUpdatePageContent = function(newDoc) {
+            var curContent = document.getElementById('mainContent');
+            var newContent = newDoc.getElementById('mainContent');
+            if (!curContent || !newContent) return false;
+
+            // 1. Update stats grid
+            var curStats = curContent.querySelector('#dashboardStatsGrid');
+            var newStats = newContent.querySelector('#dashboardStatsGrid');
+            if (curStats && newStats) {
+                curStats.innerHTML = newStats.innerHTML;
+            }
+
+            // 2. Update activity stream
+            var curActivity = curContent.querySelector('#dashboardActivityStream');
+            var newActivity = newContent.querySelector('#dashboardActivityStream');
+            if (curActivity && newActivity) {
+                curActivity.innerHTML = newActivity.innerHTML;
+            }
+
+            // 3. Update live surge card
+            var curSurge = curContent.querySelector('#dashboardAvgSurge');
+            var newSurge = newContent.querySelector('#dashboardAvgSurge');
+            if (curSurge && newSurge) {
+                curSurge.innerHTML = newSurge.innerHTML;
+            }
+
+            // 4. Update quick links counts
+            var curQuick = curContent.querySelector('#dashboardQuickLinks');
+            var newQuick = newContent.querySelector('#dashboardQuickLinks');
+            if (curQuick && newQuick) {
+                curQuick.innerHTML = newQuick.innerHTML;
+            }
+
+            // 5. Update revenue chart data smoothly without restarting the canvas
+            var newDataEl = newDoc.getElementById('revenueChartData');
+            if (newDataEl && chartInstance) {
+                try {
+                    var newLabels = JSON.parse(newDataEl.getAttribute('data-labels') || '[]');
+                    var newRev = JSON.parse(newDataEl.getAttribute('data-revenue') || '[]');
+                    chartInstance.data.labels = newLabels;
+                    chartInstance.data.datasets[0].data = newRev;
+                    chartInstance.update();
+                } catch (e) {
+                    console.warn('[dashboard] chart update error:', e);
+                }
+            }
+
+            return true;
+        };
     })();
 </script>
 {% endblock %}

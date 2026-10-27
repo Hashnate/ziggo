@@ -1055,23 +1055,31 @@
         }
 
         var lastKeystrokeTime = 0;
+        var isSilentRefreshing = false;
         document.addEventListener('input', function () { lastKeystrokeTime = Date.now(); }, true);
         document.addEventListener('keydown', function () { lastKeystrokeTime = Date.now(); }, true);
 
-        // Check if user is actively typing or inside a modal
+        // Check if user is actively typing or inside an open modal
         function isUserBusy() {
           if (Date.now() - lastKeystrokeTime < 4000) {
             return true;
           }
-          if (document.querySelector('.modal.open, .zi-modal-open')) {
+          if (document.querySelector('.modal.open, .zi-modal-open, .modal:not(.hidden), [id$="Modal"]:not(.hidden)')) {
+            return true;
+          }
+          var active = document.activeElement;
+          if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) {
             return true;
           }
           return false;
         }
 
-        // Trigger page refresh with scroll preservation and safety checks
+        // Trigger page refresh silently in the background without reloading the page
         function triggerPageRefresh(force) {
           if (!force && !autoSyncEnabled) return;
+
+          // Never auto-reload an edit/new form: it discards unsaved input and loses the scroll position
+          if (!force && /\/(edit|new)\/?$/.test(window.location.pathname)) return;
 
           if (!force && isUserBusy()) {
             var active = document.activeElement;
@@ -1085,23 +1093,93 @@
             return;
           }
 
+          if (isSilentRefreshing) return;
+
+          // Delegate to page-specific real-time handler if available (e.g. bookings live feed)
+          if (typeof window.ziCustomPageRefresh === 'function') {
+            try { window.ziCustomPageRefresh(); return; } catch (e) {}
+          }
+          if (typeof window.fetchBookingsFeed === 'function') {
+            try { window.fetchBookingsFeed(); return; } catch (e) {}
+          }
+
+          var path = window.location.pathname;
+          // Pages that maintain their own live feeds or maps via WebSockets
+          if (path.indexOf('/admin/bookings') === 0 ||
+              path.indexOf('/admin/live-tracking') === 0 ||
+              path.indexOf('/admin/customer-map') === 0) {
+            return;
+          }
+
           if (refreshIcon) {
             refreshIcon.classList.add('fa-spin');
           }
 
-          // Save current scroll position
-          try {
-            var sc = document.getElementById('mainContent') || window;
-            var pos = (sc === window) ? window.scrollY : sc.scrollTop;
-            if (pos > 0) {
-              sessionStorage.setItem('ziggo_admin_scroll_' + window.location.pathname, String(pos));
-            }
-          } catch (e) {}
+          isSilentRefreshing = true;
+          var fetchUrl = window.location.href;
 
-          // Gentle reload
-          setTimeout(function () {
-            window.location.reload();
-          }, 350);
+          fetch(fetchUrl, {
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest',
+              'Cache-Control': 'no-cache'
+            }
+          })
+          .then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            if (res.redirected && res.url.indexOf('/login') !== -1) {
+              window.location.href = res.url;
+              return null;
+            }
+            return res.text();
+          })
+          .then(function (html) {
+            if (!html) return;
+            if (window.location.href !== fetchUrl) return;
+            if (!force && isUserBusy()) return;
+
+            var parser = new DOMParser();
+            var newDoc = parser.parseFromString(html, 'text/html');
+
+            // Allow page-specific silent update hook if provided (e.g. Dashboard)
+            if (typeof window.ziUpdatePageContent === 'function') {
+              try {
+                var handled = window.ziUpdatePageContent(newDoc);
+                if (handled) return;
+              } catch (e) {
+                console.warn('[auto-sync] custom updater failed:', e);
+              }
+            }
+
+            var newContent = newDoc.getElementById('mainContent');
+            var curContent = document.getElementById('mainContent');
+            if (!newContent || !curContent) return;
+
+            // Safety check: do not overwrite content while a modal is open
+            if (curContent.querySelector('.modal:not(.hidden), [id$="Modal"]:not(.hidden), .zi-modal-open')) {
+              return;
+            }
+
+            var scrollPos = curContent.scrollTop;
+            curContent.innerHTML = newContent.innerHTML;
+            curContent.scrollTop = scrollPos;
+
+            // Notify page listeners that content updated in background
+            window.dispatchEvent(new CustomEvent('zi:content_refreshed', { detail: { newDoc: newDoc } }));
+          })
+          .catch(function (err) {
+            console.warn('[auto-sync] background refresh failed:', err);
+            if (force) {
+              window.location.reload();
+            }
+          })
+          .finally(function () {
+            isSilentRefreshing = false;
+            if (refreshIcon) {
+              setTimeout(function () {
+                refreshIcon.classList.remove('fa-spin');
+              }, 400);
+            }
+          });
         }
 
         // Debounced refresh scheduler
