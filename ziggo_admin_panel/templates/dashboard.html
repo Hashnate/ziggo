@@ -118,7 +118,7 @@
                     <i class="fas fa-check"></i>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <p class="text-sm font-black text-ziggo-ink">{{ stats.completed_today }} completed rides</p>
+                    <p class="text-sm font-black text-ziggo-ink">{{ stats.completed_today|num }} completed rides</p>
                     <p class="text-[11px] text-ziggo-faint font-bold uppercase tracking-wider">Today</p>
                 </div>
             </div>
@@ -127,7 +127,7 @@
                     <i class="fas fa-times"></i>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <p class="text-sm font-black text-ziggo-ink">{{ stats.cancelled_today }} cancelled rides</p>
+                    <p class="text-sm font-black text-ziggo-ink">{{ stats.cancelled_today|num }} cancelled rides</p>
                     <p class="text-[11px] text-ziggo-faint font-bold uppercase tracking-wider">Today</p>
                 </div>
             </div>
@@ -204,7 +204,7 @@
         <div>
             <p class="text-xs font-black uppercase text-ziggo-faint tracking-widest">Support</p>
             <p class="text-sm font-black text-ziggo-ink mt-0.5">Complaints</p>
-            <span class="text-[11px] text-ziggo-muted font-bold block mt-1">{{ stats.open_complaints }} open</span>
+            <span class="text-[11px] text-ziggo-muted font-bold block mt-1">{{ stats.open_complaints|num }} open</span>
         </div>
     </a>
 </div>

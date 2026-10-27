@@ -101,7 +101,7 @@
                     <div class="flex-1 min-w-0">
                         <p class="font-bold text-sm text-ziggo">{{ p.name }}</p>
                         {% if p.description %}<p class="text-xs text-gray-500 truncate">{{ p.description }}</p>{% endif %}
-                        <p class="text-xs text-gray-400">Stock: {{ p.stock_quantity }} {{ p.unit or '' }}</p>
+                        <p class="text-xs text-gray-400">Stock: {{ p.stock_quantity|num }} {{ p.unit or '' }}</p>
                     </div>
                     <span class="font-black text-sm">Rs.{{ "{:,.0f}".format(p.price) }}</span>
                 </div>

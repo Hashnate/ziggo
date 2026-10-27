@@ -18,14 +18,14 @@
             <i class="fas fa-truck"></i>
         </div>
         <p class="text-xs font-black text-gray-400 uppercase tracking-widest">In Progress</p>
-        <p class="text-2xl font-black text-ziggo">{{ stats.active }}</p>
+        <p class="text-2xl font-black text-ziggo">{{ stats.active|num }}</p>
     </div>
     <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
         <div class="w-10 h-10 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center mb-3">
             <i class="fas fa-check-double"></i>
         </div>
         <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Delivered Today</p>
-        <p class="text-2xl font-black text-ziggo">{{ stats.delivered_today }}</p>
+        <p class="text-2xl font-black text-ziggo">{{ stats.delivered_today|num }}</p>
     </div>
     <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
         <div class="w-10 h-10 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mb-3">

@@ -753,7 +753,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
               ),
               const Spacer(),
               Text(
-                '$trips trips',
+                '${formatAmount(trips)} trips',
                 style: const TextStyle(
                   color: AppColors.textSecondary,
                   fontWeight: FontWeight.w800,

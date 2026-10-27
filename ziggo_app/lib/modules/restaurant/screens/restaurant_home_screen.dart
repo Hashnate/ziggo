@@ -869,7 +869,7 @@ class _TodayStatsCard extends StatelessWidget {
           Expanded(
             child: _StatTile(
               label: 'ORDERS',
-              value: '$orders',
+              value: formatAmount(orders),
               subtitle: '$inFlight in progress',
               color: AppColors.primary,
               icon: Icons.receipt_long_rounded,

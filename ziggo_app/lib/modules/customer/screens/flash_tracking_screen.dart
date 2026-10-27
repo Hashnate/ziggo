@@ -1160,7 +1160,7 @@ class _DriverCard extends StatelessWidget {
           if (trips >= 0) ...[
             const SizedBox(height: 2),
             Text(
-              '$trips trips',
+              '${formatAmount(trips)} trips',
               style: const TextStyle(
                 color: AppColors.textSecondary,
                 fontWeight: FontWeight.w600,

@@ -63,7 +63,7 @@
                 <p class="text-2xl font-black text-ziggo-ink leading-none mt-1.5" id="kpiStatTotal">{{ stat_total|num }}</p>
                 {% if stat_lady and not lady %}
                 <a href="/admin/bookings?lady=1&start={{ start_date }}&end={{ end_date }}" class="text-[10px] text-pink-700 font-bold mt-1 flex items-center gap-1 hover:underline">
-                    <i class="fas fa-person-dress"></i> {{ stat_lady }} asked for a lady driver
+                    <i class="fas fa-person-dress"></i> {{ stat_lady|num }} asked for a lady driver
                 </a>
                 {% endif %}
             </div>
@@ -74,10 +74,10 @@
             </div>
             <div>
                 <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Completed</p>
-                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1.5" id="kpiStatCompleted">{{ stat_completed }}</p>
+                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1.5" id="kpiStatCompleted">{{ stat_completed|num }}</p>
                 {% if stat_rated is defined and stat_rated > 0 %}
                 <p class="text-[10px] text-green-700 font-bold mt-1 flex items-center gap-1">
-                    <i class="fas fa-star text-amber-400"></i> {{ stat_rated }} rated {% if stat_avg_rating > 0 %}({{ "{:.1f}".format(stat_avg_rating) }}){% endif %}
+                    <i class="fas fa-star text-amber-400"></i> {{ stat_rated|num }} rated {% if stat_avg_rating > 0 %}({{ "{:.1f}".format(stat_avg_rating) }}){% endif %}
                 </p>
                 {% endif %}
             </div>
@@ -88,7 +88,7 @@
             </div>
             <div>
                 <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Cancelled</p>
-                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1.5" id="kpiStatCancelled">{{ stat_cancelled }}</p>
+                <p class="text-2xl font-black text-ziggo-ink leading-none mt-1.5" id="kpiStatCancelled">{{ stat_cancelled|num }}</p>
             </div>
         </div>
         <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">

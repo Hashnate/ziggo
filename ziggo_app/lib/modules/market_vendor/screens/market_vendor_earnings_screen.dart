@@ -7,6 +7,7 @@ import '../../../app/app_styles.dart';
 import '../../../core/widgets/motion.dart';
 import '../market_vendor_provider.dart';
 import 'market_vendor_daily_report_screen.dart';
+import '../../../core/utils/amount_format.dart';
 
 
 class MarketVendorEarningsScreen extends StatefulWidget {
@@ -187,7 +188,7 @@ class _HeaderCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '$delivered delivered • $orders orders • avg Rs.${NumberFormat('#,##0').format(aov.round())}',
+            '${formatAmount(delivered)} delivered • ${formatAmount(orders)} orders • avg Rs.${NumberFormat('#,##0').format(aov.round())}',
             style: TextStyle(
               color: Colors.white.withOpacity(0.85),
               fontSize: 13,
@@ -485,7 +486,7 @@ class _DailyRow extends StatelessWidget {
                       style: const TextStyle(
                           fontWeight: FontWeight.w900, fontSize: 14)),
                   Text(
-                    '$delivered delivered • $orders total',
+                    '${formatAmount(delivered)} delivered • ${formatAmount(orders)} total',
                     style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontWeight: FontWeight.w600,

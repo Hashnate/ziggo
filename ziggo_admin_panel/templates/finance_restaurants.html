@@ -48,8 +48,8 @@
                     <td class="px-4 py-3 text-right font-black text-ziggo">Rs.{{ "{:,.0f}".format(r.items_revenue) }}</td>
                     <td class="px-4 py-3 text-right">Rs.{{ "{:,.0f}".format(r.delivery_fees_collected) }}</td>
                     <td class="px-4 py-3 text-right font-black text-green-600">Rs.{{ "{:,.0f}".format(r.platform_commission) }}</td>
-                    <td class="px-4 py-3 text-right">{{ r.delivered }}</td>
-                    <td class="px-4 py-3 text-right text-red-500">{{ r.cancelled }}</td>
+                    <td class="px-4 py-3 text-right">{{ r.delivered|num }}</td>
+                    <td class="px-4 py-3 text-right text-red-500">{{ r.cancelled|num }}</td>
                     <td class="px-4 py-3 text-right text-amber-600">{{ r.pending_or_active|num }}</td>
                 </tr>
                 {% endfor %}
