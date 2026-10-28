@@ -57,7 +57,38 @@ class MarketGroupScreen extends StatelessWidget {
       return trendingList.isNotEmpty ? trendingList : list;
     }
 
-    return list;
+    final q = groupName.trim().toLowerCase();
+    if (q.isEmpty) return list;
+
+    String baseQ = q;
+    if (q == 'groceries') {
+      baseQ = 'grocer';
+    } else if (q == 'pharmaceutical' || q == 'pharmacy') {
+      baseQ = 'pharma';
+    } else if (q == 'fresh produce' || q == 'fresh fruits') {
+      baseQ = 'produce';
+    } else if (q == 'poultry and meat') {
+      baseQ = 'meat';
+    } else if (q == 'fresh flowers') {
+      baseQ = 'flower';
+    } else if (q.endsWith('ies')) {
+      baseQ = q.substring(0, q.length - 3);
+    } else if (q.endsWith('s') && q.length > 3) {
+      baseQ = q.substring(0, q.length - 1);
+    }
+
+    final categoryFiltered = list.where((v) {
+      final name = (v['name']?.toString() ?? '').toLowerCase();
+      final cat = (v['category']?.toString() ?? '').toLowerCase();
+
+      if (name.contains(q) || cat.contains(q)) return true;
+      if (name.contains(baseQ) || cat.contains(baseQ)) return true;
+      if (cat.isNotEmpty && cat.length >= 3 && q.contains(cat)) return true;
+
+      return false;
+    }).toList();
+
+    return categoryFiltered;
   }
 
   String _getSubtitle() {
@@ -70,6 +101,20 @@ class MarketGroupScreen extends StatelessWidget {
         return 'Handpicked premium stores for you';
       case 'Trending':
         return 'Most ordered and popular right now';
+      case 'Groceries':
+        return 'Fresh daily essentials delivered to your door';
+      case 'Pharmaceutical':
+      case 'Pharmacy':
+        return 'Medicines & health supplies near you';
+      case 'Fresh Produce':
+      case 'Fresh Fruits':
+        return 'Farm-fresh fruits, vegetables and more';
+      case 'Household':
+        return 'Daily home care and household essentials';
+      case 'Dairy':
+        return 'Fresh milk, butter, cheese and dairy';
+      case 'Baby Care':
+        return 'Baby food, diapers and gentle care';
       default:
         return 'Handpicked stores for you';
     }

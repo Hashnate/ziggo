@@ -17,6 +17,7 @@ import '../widgets/promo_code_tile.dart';
 import 'market_tracking_screen.dart';
 import 'payment_methods_screen.dart';
 import 'promotions_selection_screen.dart';
+import 'set_location_map_screen.dart';
 import '../../../core/utils/amount_format.dart';
 
 class MarketCheckoutScreen extends StatefulWidget {
@@ -79,11 +80,39 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
   }
 
   Future<void> _pickPlace() async {
-    final p = await showPlaceSearch(context, title: 'Delivery address', allowCurrentLocation: true);
-    if (p != null) {
-      setState(() { _picked = p; _saved = null; });
-      _refreshQuote();
+    final p = await showPlaceSearch(
+      context,
+      title: 'Delivery address',
+      allowCurrentLocation: true,
+      allowSetOnMap: true,
+    );
+    if (p == null || !mounted) return;
+    if (p.name == '__SET_ON_MAP__') {
+      final pickedOnMap = await Navigator.push<Place>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SetLocationMapScreen(
+            initialLocation: _picked,
+            title: 'Set delivery address',
+            confirmButtonText: 'CONFIRM ADDRESS',
+            badgeText: 'Delivery',
+          ),
+        ),
+      );
+      if (pickedOnMap != null && mounted) {
+        setState(() {
+          _picked = pickedOnMap;
+          _saved = null;
+        });
+        _refreshQuote();
+      }
+      return;
     }
+    setState(() {
+      _picked = p;
+      _saved = null;
+    });
+    _refreshQuote();
   }
 
   Future<void> _placeOrder() async {

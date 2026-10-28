@@ -55,43 +55,32 @@
 {% endblock %}
 
 {% block content %}
-    <!-- Top Navigation & Live Header Controls -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <!-- View Toggle Pills -->
-        <div class="inline-flex p-1 bg-slate-100 rounded-2xl border border-ziggo-line shadow-soft-sm">
-            <a href="/admin/live-tracking" class="px-4 py-2 rounded-xl text-xs font-black bg-white text-ziggo shadow-sm flex items-center gap-2 transition">
-                <i class="fas fa-car"></i> <span>Drivers Live Tracking</span>
-            </a>
-            <a href="/admin/user-live-tracking" class="px-4 py-2 rounded-xl text-xs font-black text-slate-600 hover:text-ziggo flex items-center gap-2 transition">
-                <i class="fas fa-user-friends"></i> <span>Users Live Tracking</span>
-            </a>
-        </div>
+<div class="space-y-6">
 
-        <!-- Live Feed Indicator -->
-        <div class="flex items-center gap-3 bg-white px-4 py-2 rounded-2xl border border-ziggo-line shadow-soft-sm">
-            <span class="pulse-dot"></span>
-            <span class="text-xs font-black text-emerald-600 uppercase tracking-wider">Live Feed Active</span>
-            <span class="text-xs text-ziggo-muted font-bold">
-                · <span id="liveOnlineLabel">{{ online_drivers }}</span> Online ·
-                Updated <span id="liveUpdated">--:--:--</span>
-            </span>
-        </div>
+    <!-- Header Controls -->
+    <div class="flex justify-end items-center gap-3">
+        <span class="pulse-dot"></span>
+        <span class="text-xs font-black text-emerald-600 uppercase tracking-wider">Live Feed Active</span>
+        <span class="text-xs text-ziggo-muted font-bold">
+            · <span id="liveOnlineLabel">{{ online_drivers|num }}</span> Online ·
+            Updated <span id="liveUpdated">--:--:--</span>
+        </span>
     </div>
 
     <!-- Stat cards -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-3 flex items-center gap-2.5">
-            <span class="text-xl font-black text-ziggo-ink leading-none" id="statOnline">{{ online_drivers }}</span>
+            <span class="text-xl font-black text-ziggo-ink leading-none" id="statOnline">{{ online_drivers|num }}</span>
             <span class="pulse-dot"></span>
             <span class="text-[11px] font-black text-ziggo-muted uppercase tracking-wider">Drivers Online</span>
         </div>
         <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-3 flex items-center gap-2.5">
-            <span class="text-xl font-black text-ziggo-ink leading-none" id="statOffline">{{ offline_drivers }}</span>
+            <span class="text-xl font-black text-ziggo-ink leading-none" id="statOffline">{{ offline_drivers|num }}</span>
             <span class="w-2.5 h-2.5 rounded-full bg-gray-300"></span>
             <span class="text-[11px] font-black text-ziggo-muted uppercase tracking-wider">Drivers Offline</span>
         </div>
         <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-3 flex items-center gap-2.5">
-            <span class="text-xl font-black text-ziggo-ink leading-none" id="statTotal">{{ total_drivers }}</span>
+            <span class="text-xl font-black text-ziggo-ink leading-none" id="statTotal">{{ total_drivers|num }}</span>
             <i class="fas fa-car text-ziggo"></i>
             <span class="text-[11px] font-black text-ziggo-muted uppercase tracking-wider">Total Drivers</span>
         </div>
@@ -296,11 +285,41 @@
         return '/static/img/top_car.png';
     }
 
+    function haversineMeters(lat1, lon1, lat2, lon2) {
+        if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return 0;
+        var R = 6371000.0;
+        var toRad = Math.PI / 180;
+        var phi1 = lat1 * toRad;
+        var phi2 = lat2 * toRad;
+        var dphi = (lat2 - lat1) * toRad;
+        var dlam = (lon2 - lon1) * toRad;
+        var a = Math.sin(dphi/2) * Math.sin(dphi/2) +
+                Math.cos(phi1) * Math.cos(phi2) * Math.sin(dlam/2) * Math.sin(dlam/2);
+        return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function computeBearing(fromLat, fromLng, toLat, toLng) {
+        if (fromLat == null || fromLng == null || toLat == null || toLng == null) return 0;
+        var toRad = Math.PI / 180;
+        var toDeg = 180 / Math.PI;
+        var lat1 = fromLat * toRad;
+        var lon1 = fromLng * toRad;
+        var lat2 = toLat * toRad;
+        var lon2 = toLng * toRad;
+        var dLon = lon2 - lon1;
+        var y = Math.sin(dLon) * Math.cos(lat2);
+        var x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+        var brng = Math.atan2(y, x) * toDeg;
+        return (brng + 360) % 360;
+    }
+
+    const driverAngles = new Map(); // driverId -> cumulative continuous unrolled angle
+
     function getMarkerHtml(d) {
         if (d.is_online) {
-            const heading = d.heading || 0;
+            const curAngle = driverAngles.get(d.id) || 0;
             return `<div style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
-                <img src="${getVehicleTopAsset(d.vehicle_type)}" style="width: 38px; height: 38px; object-fit: contain; transform: rotate(${heading}deg); filter: drop-shadow(0 4px 8px rgba(0,0,0,0.45)); transition: transform 0.4s ease-out;" alt="${d.vehicle_type}">
+                <img src="${getVehicleTopAsset(d.vehicle_type)}" style="width: 38px; height: 38px; object-fit: contain; transform: rotate(${curAngle}deg); filter: drop-shadow(0 4px 8px rgba(0,0,0,0.45)); transition: transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);" alt="${d.vehicle_type}">
                 <span style="position: absolute; bottom: 2px; right: 2px; width: 8px; height: 8px; border-radius: 50%; background: #10B981; border: 1.5px solid white; box-shadow: 0 0 6px rgba(16,185,129,0.9);"></span>
             </div>`;
         }
@@ -308,6 +327,7 @@
     }
 
     function upsertMarker(d) {
+        const prev = driversState.get(d.id);
         driversState.set(d.id, d);
         if (d.lat == null || d.lng == null) {
             if (markers.has(d.id)) {
@@ -316,6 +336,28 @@
             }
             return;
         }
+
+        // Heading & rotation resolution with deadband filter (stops stationary spinning)
+        let curAngle = driverAngles.get(d.id) || 0;
+        let targetHeading = curAngle % 360;
+        let moved = false;
+
+        if (prev && prev.lat != null && prev.lng != null) {
+            const dist = haversineMeters(prev.lat, prev.lng, d.lat, d.lng);
+            moved = dist >= 1.2;
+            if (d.heading !== undefined && d.heading !== null && !isNaN(d.heading) && d.heading > 0) {
+                targetHeading = d.heading;
+            } else if (moved && dist >= 3.2) {
+                targetHeading = computeBearing(prev.lat, prev.lng, d.lat, d.lng);
+            }
+        } else if (d.heading !== undefined && d.heading !== null && !isNaN(d.heading)) {
+            targetHeading = d.heading;
+        }
+
+        const angleDiff = (targetHeading - (curAngle % 360) + 540) % 360 - 180;
+        curAngle += angleDiff;
+        driverAngles.set(d.id, curAngle);
+
         const gLatLng = new google.maps.LatLng(d.lat, d.lng);
         const htmlContent = getMarkerHtml(d);
 
@@ -454,9 +496,9 @@
         let online = 0;
         for (const d of driversState.values()) if (d.is_online) online++;
         const total = driversState.size;
-        document.getElementById('statOnline').textContent = online;
-        document.getElementById('statOffline').textContent = total - online;
-        document.getElementById('statTotal').textContent = total;
+        document.getElementById('statOnline').textContent = fmtNum(online);
+        document.getElementById('statOffline').textContent = fmtNum(total - online);
+        document.getElementById('statTotal').textContent = fmtNum(total);
         document.getElementById('liveOnlineLabel').textContent = online;
     }
 
@@ -483,9 +525,9 @@
                 }
             }
 
-            document.getElementById('statOnline').textContent = j.totals.online;
-            document.getElementById('statOffline').textContent = j.totals.offline;
-            document.getElementById('statTotal').textContent = j.totals.total;
+            document.getElementById('statOnline').textContent = fmtNum(j.totals.online);
+            document.getElementById('statOffline').textContent = fmtNum(j.totals.offline);
+            document.getElementById('statTotal').textContent = fmtNum(j.totals.total);
             document.getElementById('liveOnlineLabel').textContent = j.totals.online;
             markUpdated(j.server_time);
 

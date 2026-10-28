@@ -8,6 +8,7 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/map/maps_service.dart';
 import '../../../core/map/place_search_sheet.dart';
+import '../../../core/map/places.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/widgets/motion.dart';
 import '../addresses_provider.dart';
@@ -17,6 +18,7 @@ import 'category_restaurants_screen.dart';
 import 'food_favourites_screen.dart';
 import 'food_orders_screen.dart';
 import 'restaurant_detail_screen.dart';
+import 'set_location_map_screen.dart';
 
 /// Resolve an image path that may be remote (http) or a backend-relative
 /// /static path into a fully-qualified URL.
@@ -295,6 +297,12 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
               onTap: () => Navigator.pop(context, {'__current__': true}),
             ),
             ListTile(
+              leading: const Icon(Icons.pin_drop_rounded, color: AppColors.primary),
+              title: const Text('Set on map',
+                  style: TextStyle(fontWeight: FontWeight.w800)),
+              onTap: () => Navigator.pop(context, {'__map__': true}),
+            ),
+            ListTile(
               leading: const Icon(Icons.search_rounded, color: AppColors.primary),
               title: const Text('Search a new address',
                   style: TextStyle(fontWeight: FontWeight.w800)),
@@ -307,8 +315,17 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
     );
     if (selected == null || !mounted) return;
     final food = context.read<FoodProvider>();
-    if (selected['__search__'] == true) {
-      final place = await showPlaceSearch(context, title: 'Delivery location', allowCurrentLocation: true);
+    if (selected['__map__'] == true) {
+      final place = await Navigator.push<Place>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const SetLocationMapScreen(
+            title: 'Set delivery location',
+            confirmButtonText: 'CONFIRM LOCATION',
+            badgeText: 'Delivery',
+          ),
+        ),
+      );
       if (place != null && mounted) {
         food.setDeliveryLocation(
           label: place.name,
@@ -317,6 +334,41 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
           lng: place.location.longitude,
         );
       }
+    } else if (selected['__search__'] == true) {
+      final place = await showPlaceSearch(
+        context,
+        title: 'Delivery location',
+        allowCurrentLocation: true,
+        allowSetOnMap: true,
+      );
+      if (place == null || !mounted) return;
+      if (place.name == '__SET_ON_MAP__') {
+        final onMap = await Navigator.push<Place>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const SetLocationMapScreen(
+              title: 'Set delivery location',
+              confirmButtonText: 'CONFIRM LOCATION',
+              badgeText: 'Delivery',
+            ),
+          ),
+        );
+        if (onMap != null && mounted) {
+          food.setDeliveryLocation(
+            label: onMap.name,
+            subtitle: onMap.fullAddress,
+            lat: onMap.location.latitude,
+            lng: onMap.location.longitude,
+          );
+        }
+        return;
+      }
+      food.setDeliveryLocation(
+        label: place.name,
+        subtitle: place.fullAddress,
+        lat: place.location.latitude,
+        lng: place.location.longitude,
+      );
     } else if (selected['__current__'] == true) {
       final place = await MapsService.instance.currentLocationAsPlace();
       if (place != null && mounted) {

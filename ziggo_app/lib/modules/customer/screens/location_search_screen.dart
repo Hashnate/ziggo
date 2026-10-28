@@ -7,6 +7,7 @@ import 'package:flutter_contacts/flutter_contacts.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
+import '../../../core/map/location_permission_helper.dart';
 import '../../../core/map/maps_service.dart';
 import '../../../core/map/place_search_sheet.dart';
 import '../../../core/map/places.dart';
@@ -144,6 +145,13 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
   }
 
   Future<void> _selectCurrentLocation() async {
+    final granted = await LocationPermissionHelper.ensureLocationAccess(
+      context: context,
+      customMessage:
+          'Location access is disabled. Open app settings to use your current location as pickup.',
+    );
+    if (!granted) return;
+
     setState(() => _resolving = true);
     final here = await MapsService.instance.currentLocationAsPlace();
     if (!mounted) return;
@@ -151,8 +159,12 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
     
     if (here == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not get current location — check GPS / permission'),
+        SnackBar(
+          content: const Text('Could not get current location — please check your location settings'),
+          action: SnackBarAction(
+            label: 'Settings',
+            onPressed: () => LocationPermissionHelper.openSettings(),
+          ),
         ),
       );
       return;

@@ -40,6 +40,27 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
 
   GlobalKey _keyFor(String id) => _sectionKeys.putIfAbsent(id, () => GlobalKey());
 
+  Widget _topBackButton({VoidCallback? onTap}) {
+    return Positioned(
+      top: MediaQuery.of(context).padding.top + 10,
+      left: 16,
+      child: GestureDetector(
+        onTap: onTap ?? () => Navigator.pop(context),
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            boxShadow: AppStyles.shadowSm,
+            border: Border.all(color: AppColors.divider.withOpacity(0.6)),
+          ),
+          child: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary, size: 20),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final food = context.watch<FoodProvider>();
@@ -49,12 +70,73 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
         future: _detailFuture,
         builder: (_, snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+            return Stack(
+              children: [
+                _topBackButton(),
+                const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+              ],
+            );
           }
           final r = snap.data;
           if (r == null) {
-            return const Center(
-              child: Text('Restaurant not found', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w700)),
+            return Stack(
+              children: [
+                _topBackButton(),
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: const BoxDecoration(
+                            color: AppColors.surfaceMuted,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.restaurant_rounded,
+                            size: 40,
+                            color: AppColors.textTertiary,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Restaurant not found',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            if (Navigator.of(context).canPop()) {
+                              Navigator.of(context).popUntil((route) => route.isFirst);
+                            }
+                          },
+                          icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                          label: const Text(
+                            'Return to Home',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                            elevation: 0,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             );
           }
 

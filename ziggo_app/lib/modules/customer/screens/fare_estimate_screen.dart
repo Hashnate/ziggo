@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
+import '../../../core/map/location_permission_helper.dart';
 import '../../../core/map/maps_service.dart';
 import '../../../core/map/places.dart';
 import '../../../core/map/ziggo_map.dart';
@@ -26,7 +28,7 @@ class FareEstimateScreen extends StatefulWidget {
   State<FareEstimateScreen> createState() => _FareEstimateScreenState();
 }
 
-class _FareEstimateScreenState extends State<FareEstimateScreen> {
+class _FareEstimateScreenState extends State<FareEstimateScreen> with WidgetsBindingObserver {
   final ZiggoMapController _mapController = ZiggoMapController();
   Place? _currentLocation;
   List<Map<String, dynamic>> _nearbyDrivers = const [];
@@ -40,27 +42,126 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
   LatLng? _deviceLocation;
   Timer? _debounceTimer;
 
+  bool _locationPermissionDenied = false;
+  bool _locationServiceDisabled = false;
+  bool _isShowingDialog = false;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initLocation();
+      _checkLocationAndInit(promptUser: true);
     });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _nearbyTimer?.cancel();
     _debounceTimer?.cancel();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkLocationAndInit(promptUser: false, fromResume: true);
+    }
+  }
+
+  Future<void> _checkLocationAndInit({
+    bool promptUser = true,
+    bool fromResume = false,
+  }) async {
+    if (!mounted) return;
+
+    final status = await LocationPermissionHelper.checkStatus();
+    if (!mounted) return;
+
+    if (status == LocationAccessStatus.serviceDisabled) {
+      setState(() {
+        _locationServiceDisabled = true;
+        _locationPermissionDenied = false;
+      });
+      if (promptUser && !_isShowingDialog) {
+        _isShowingDialog = true;
+        final open = await LocationPermissionHelper.showLocationDialog(
+          context: context,
+          title: 'Turn on location',
+          message:
+              'Ziggo needs your location to find nearby rides and set your pickup point. Please turn on Location services in Settings.',
+          actionLabel: 'Open settings',
+        );
+        _isShowingDialog = false;
+        if (open == true) {
+          await LocationPermissionHelper.openSettings(isService: true);
+        }
+      }
+      return;
+    }
+
+    if (status == LocationAccessStatus.permissionDenied) {
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied && promptUser && !fromResume) {
+        perm = await Geolocator.requestPermission();
+      }
+
+      if (perm != LocationPermission.always && perm != LocationPermission.whileInUse) {
+        setState(() {
+          _locationPermissionDenied = true;
+          _locationServiceDisabled = false;
+        });
+        if (promptUser && !_isShowingDialog) {
+          _isShowingDialog = true;
+          final open = await LocationPermissionHelper.showLocationDialog(
+            context: context,
+            title: 'Location permission needed',
+            message:
+                'Location access is disabled. Open app settings to allow Ziggo to find nearby rides and set your pickup location.',
+            actionLabel: 'Open app settings',
+          );
+          _isShowingDialog = false;
+          if (open == true) {
+            await LocationPermissionHelper.openSettings(isService: false);
+          }
+        }
+        return;
+      }
+    }
+
+    // Permission granted
+    final wasRestricted = _locationPermissionDenied || _locationServiceDisabled;
+    if (mounted) {
+      setState(() {
+        _locationPermissionDenied = false;
+        _locationServiceDisabled = false;
+      });
+    }
+
+    if (wasRestricted || _currentLocation == null || fromResume) {
+      await _initLocation();
+    }
+  }
+
   Future<void> _initLocation() async {
     final here = await MapsService.instance.currentLocationAsPlace();
-    if (!mounted || here == null) return;
+    if (!mounted) return;
+    if (here == null) {
+      final status = await LocationPermissionHelper.checkStatus();
+      if (status != LocationAccessStatus.granted && mounted) {
+        setState(() {
+          _locationServiceDisabled = status == LocationAccessStatus.serviceDisabled;
+          _locationPermissionDenied = status == LocationAccessStatus.permissionDenied;
+        });
+      }
+      return;
+    }
     setState(() {
       _currentLocation = here;
       _deviceLocation = here.location;
+      _locationPermissionDenied = false;
+      _locationServiceDisabled = false;
     });
     _mapController.moveTo(here.location, zoom: 16);
     _startNearbyDriverPolling();
@@ -117,9 +218,27 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
   }
 
   Future<void> _moveToCurrentLocation() async {
+    final granted = await LocationPermissionHelper.ensureLocationAccess(
+      context: context,
+      customMessage:
+          'Location access is disabled. Open app settings to center on your current position.',
+    );
+    if (!granted) {
+      final status = await LocationPermissionHelper.checkStatus();
+      if (mounted) {
+        setState(() {
+          _locationServiceDisabled = status == LocationAccessStatus.serviceDisabled;
+          _locationPermissionDenied = status == LocationAccessStatus.permissionDenied;
+        });
+      }
+      return;
+    }
+
     final here = await MapsService.instance.currentLocationAsPlace();
     if (!mounted || here == null) return;
     setState(() {
+      _locationPermissionDenied = false;
+      _locationServiceDisabled = false;
       _currentLocation = here;
       _deviceLocation = here.location;
     });
@@ -311,7 +430,7 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
               controller: _mapController,
               center: _currentLocation?.location ?? kColomboCenter,
               zoom: 16,
-              showMyLocation: true,
+              showMyLocation: !_locationPermissionDenied && !_locationServiceDisabled,
               onPositionChanged: _onMapPositionChanged,
             ),
           ),
@@ -404,6 +523,18 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> {
               ),
             ),
           ),
+          if (_locationPermissionDenied || _locationServiceDisabled)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 64,
+              left: 0,
+              right: 0,
+              child: LocationPermissionBanner(
+                isServiceDisabled: _locationServiceDisabled,
+                onOpenSettings: () => LocationPermissionHelper.openSettings(
+                  isService: _locationServiceDisabled,
+                ),
+              ),
+            ),
           SafeArea(
             bottom: true,
             top: false,

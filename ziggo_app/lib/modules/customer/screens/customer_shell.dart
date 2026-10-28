@@ -121,6 +121,10 @@ class CustomerShellState extends State<CustomerShell> {
         actionsAlignment: MainAxisAlignment.center,
         actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Not now', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: ElevatedButton.styleFrom(

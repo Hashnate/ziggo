@@ -3,17 +3,24 @@ import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
+import '../../../core/map/location_permission_helper.dart';
 import '../../../core/map/maps_service.dart';
 import '../../../core/map/place_search_sheet.dart';
 import '../../../core/map/places.dart';
 import '../../../core/map/recent_places.dart';
 import '../addresses_provider.dart';
 import 'saved_addresses_screen.dart';
+import 'set_location_map_screen.dart';
 
 /// Full-screen delivery-location chooser. Pops a [Place] when the user picks
 /// a location (current GPS, search, set-on-map, a saved address or a recent).
 class ChooseLocationScreen extends StatefulWidget {
-  const ChooseLocationScreen({super.key});
+  final Place? initialPlace;
+
+  const ChooseLocationScreen({
+    super.key,
+    this.initialPlace,
+  });
 
   @override
   State<ChooseLocationScreen> createState() => _ChooseLocationScreenState();
@@ -40,11 +47,45 @@ class _ChooseLocationScreenState extends State<ChooseLocationScreen> {
   }
 
   Future<void> _search() async {
-    final p = await showPlaceSearch(context, title: 'Search location');
-    if (p != null) _return(p);
+    final p = await showPlaceSearch(
+      context,
+      title: 'Search location',
+      allowSetOnMap: true,
+      allowCurrentLocation: true,
+    );
+    if (p == null || !mounted) return;
+    if (p.name == '__SET_ON_MAP__') {
+      _openSetOnMap();
+      return;
+    }
+    _return(p);
+  }
+
+  Future<void> _openSetOnMap() async {
+    final Place? picked = await Navigator.push<Place>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SetLocationMapScreen(
+          initialLocation: widget.initialPlace,
+          title: 'Set delivery location',
+          confirmButtonText: 'CONFIRM LOCATION',
+          badgeText: 'Delivery',
+        ),
+      ),
+    );
+    if (picked != null && mounted) {
+      _return(picked);
+    }
   }
 
   Future<void> _useCurrent() async {
+    final granted = await LocationPermissionHelper.ensureLocationAccess(
+      context: context,
+      customMessage:
+          'Location access is disabled. Open app settings to use your current location.',
+    );
+    if (!granted) return;
+
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _locating = true);
     final here = await MapsService.instance.currentLocationAsPlace();
@@ -186,7 +227,7 @@ class _ChooseLocationScreenState extends State<ChooseLocationScreen> {
           label: 'Set on map',
           trailing: const Icon(Icons.chevron_right_rounded,
               color: AppColors.textTertiary),
-          onTap: _search,
+          onTap: _openSetOnMap,
         ),
         const Divider(height: 1, color: AppColors.divider),
         _actionRow(

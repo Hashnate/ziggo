@@ -71,6 +71,11 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
   }
 
   void _handleBack() {
+    if (_query.trim().isNotEmpty) {
+      _searchCtrl.clear();
+      setState(() => _query = '');
+      return;
+    }
     if (Navigator.of(context).canPop()) {
       Navigator.pop(context);
       return;
@@ -90,14 +95,18 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
   }
 
   void _selectCategory(String label) {
-    _searchCtrl.text = label;
-    setState(() => _query = label);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MarketGroupScreen(groupName: label),
+      ),
+    );
   }
 
   Future<void> _openChooseLocation() async {
     final picked = await Navigator.push<Place>(
       context,
-      MaterialPageRoute(builder: (_) => const ChooseLocationScreen()),
+      MaterialPageRoute(builder: (_) => ChooseLocationScreen(initialPlace: _selectedPlace)),
     );
     if (picked != null && mounted) {
       setState(() => _selectedPlace = picked);
@@ -322,8 +331,15 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        bottom: false,
+      body: PopScope(
+        canPop: _query.trim().isEmpty,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          if (_query.trim().isNotEmpty) {
+            _searchCtrl.clear();
+            setState(() => _query = '');
+          }
+        },
         child: RefreshIndicator(
           onRefresh: () async {
             final lat = _selectedPlace?.location.latitude;
@@ -335,8 +351,7 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
           },
           child: CustomScrollView(
             slivers: [
-              SliverToBoxAdapter(child: _header()),
-              SliverToBoxAdapter(child: _locationBar()),
+              _buildAppBar(),
               SliverToBoxAdapter(child: _search()),
               if (!searching) ...[
                 SliverToBoxAdapter(child: _bannerCarousel()),
@@ -374,37 +389,42 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
     );
   }
 
-  // ---------------------------------------------------------------- header
-  Widget _header() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: Row(
-        children: [
-          _headerIcon(Icons.arrow_back_rounded, _handleBack),
-          const SizedBox(width: 12),
-          const Text(
-            'Market',
-            style: TextStyle(
-              fontSize: 23,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.4,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const Spacer(),
-          _headerIcon(Icons.favorite_border_rounded, _openFavourites),
-          const SizedBox(width: 18),
-          _headerIcon(Icons.receipt_long_rounded, _openOrders),
-        ],
+  // ---------------------------------------------------------------- app bar
+  Widget _buildAppBar() {
+    return SliverAppBar(
+      backgroundColor: AppColors.background,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      pinned: true,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
+        onPressed: _handleBack,
       ),
-    );
-  }
-
-  Widget _headerIcon(IconData icon, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Icon(icon, size: 26, color: AppColors.textPrimary),
+      title: const Text(
+        'Market',
+        style: TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.w900,
+          letterSpacing: -0.4,
+          color: AppColors.textPrimary,
+        ),
+      ),
+      centerTitle: false,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.favorite_border_rounded, color: AppColors.textPrimary),
+          onPressed: _openFavourites,
+        ),
+        IconButton(
+          icon: const Icon(Icons.receipt_long_rounded, color: AppColors.textPrimary),
+          onPressed: _openOrders,
+        ),
+        const SizedBox(width: 4),
+      ],
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(52),
+        child: _locationBar(),
+      ),
     );
   }
 
@@ -431,7 +451,7 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: InkWell(
         onTap: _openChooseLocation,
         borderRadius: BorderRadius.circular(14),

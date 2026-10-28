@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
+import '../../../core/map/location_permission_helper.dart';
 import '../../../core/map/maps_service.dart';
 import '../../../core/map/places.dart';
 import '../../../core/map/ziggo_map.dart';
@@ -126,6 +127,13 @@ class _MapLocationSelectionScreenState extends State<MapLocationSelectionScreen>
   }
 
   void _moveToCurrentLocation() async {
+    final granted = await LocationPermissionHelper.ensureLocationAccess(
+      context: context,
+      customMessage:
+          'Location access is disabled. Open app settings to center on your current position.',
+    );
+    if (!granted) return;
+
     final here = await MapsService.instance.currentLocationAsPlace();
     if (here != null && mounted) {
       _mapController.moveTo(here.location, zoom: 16);

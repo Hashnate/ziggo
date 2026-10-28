@@ -414,8 +414,10 @@
     var directionsService;
     var activeMarkers = [];
     var activeRoutePolylines = [];
+    var activeRoutePath = [];
     var vehicleOverlays = new Map(); // bookingId -> VehicleTopOverlay
     var currentTrackedBookingId = null;
+    var currentTrackedBooking = null;
 
     // Injected Data from Backend
     var rawActiveBookings = [];
@@ -504,11 +506,26 @@
             var tracked = rawActiveBookings.find(function(b) { return b.id === currentTrackedBookingId; }) ||
                           (data.recent_bookings || []).find(function(b) { return b.id === currentTrackedBookingId; });
             if (tracked) {
+                currentTrackedBooking = tracked;
                 updateTrackedRideCard(tracked);
                 setTrackedGps(tracked);
-                if (tracked.driver_lat && tracked.driver_lng) {
-                    if (vehicleOverlays.has(tracked.id)) {
-                        vehicleOverlays.get(tracked.id).update(tracked.driver_lat, tracked.driver_lng, tracked.driver_heading);
+                var normSt = String(tracked.status || '').toLowerCase();
+                if (normSt !== 'completed' && normSt !== 'cancelled' && tracked.driver_lat && tracked.driver_lng) {
+                    if (!isDefaultPlaceholderCoord(tracked.driver_lat, tracked.driver_lng)) {
+                        if (vehicleOverlays.has(tracked.id)) {
+                            var lat = tracked.driver_lat;
+                            var lng = tracked.driver_lng;
+                            var snapBearing = null;
+                            if (activeRoutePath && activeRoutePath.length > 1) {
+                                var snap = snapToPolyline(lat, lng, activeRoutePath, 80);
+                                if (snap.snapped) {
+                                    lat = snap.lat;
+                                    lng = snap.lng;
+                                    snapBearing = snap.bearing;
+                                }
+                            }
+                            vehicleOverlays.get(tracked.id).update(lat, lng, tracked.driver_heading, snapBearing);
+                        }
                     }
                 }
             }
@@ -719,8 +736,23 @@
         return '/static/img/top_car.png';
     }
 
+    // Helper: Exact Haversine distance in meters
+    function haversineMeters(lat1, lon1, lat2, lon2) {
+        if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return 0;
+        var R = 6371000.0;
+        var toRad = Math.PI / 180;
+        var phi1 = lat1 * toRad;
+        var phi2 = lat2 * toRad;
+        var dphi = (lat2 - lat1) * toRad;
+        var dlam = (lon2 - lon1) * toRad;
+        var a = Math.sin(dphi/2) * Math.sin(dphi/2) +
+                Math.cos(phi1) * Math.cos(phi2) * Math.sin(dlam/2) * Math.sin(dlam/2);
+        return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
     // Helper: Compute forward azimuth heading between two lat/lngs (degrees 0-360)
     function computeBearing(fromLat, fromLng, toLat, toLng) {
+        if (fromLat == null || fromLng == null || toLat == null || toLng == null) return 0;
         var toRad = Math.PI / 180;
         var toDeg = 180 / Math.PI;
         var lat1 = fromLat * toRad;
@@ -734,6 +766,64 @@
         return (brng + 360) % 360;
     }
 
+    // Helper: Project a point onto a road segment and calculate distance + segment bearing
+    function projectPointToSegment(lat, lng, lat1, lng1, lat2, lng2) {
+        var toRad = Math.PI / 180;
+        var cosLat = Math.cos(((lat1 + lat2) / 2) * toRad);
+        var dx = (lng2 - lng1) * cosLat;
+        var dy = lat2 - lat1;
+        var px = (lng - lng1) * cosLat;
+        var py = lat - lat1;
+        var lenSq = dx * dx + dy * dy;
+        var t = 0.0;
+        if (lenSq > 0) {
+            t = Math.max(0.0, Math.min(1.0, (px * dx + py * dy) / lenSq));
+        }
+        var projLat = lat1 + t * (lat2 - lat1);
+        var projLng = lng1 + t * (lng2 - lng1);
+        var dist = haversineMeters(lat, lng, projLat, projLng);
+        var bearing = computeBearing(lat1, lng1, lat2, lng2);
+        return { lat: projLat, lng: projLng, dist: dist, bearing: bearing };
+    }
+
+    // Helper: Snap coordinates to the active route polyline within maxSnapMeters
+    function snapToPolyline(lat, lng, path, maxSnapMeters) {
+        if (!path || path.length < 2 || lat == null || lng == null) {
+            return { lat: lat, lng: lng, bearing: null, snapped: false };
+        }
+        var maxDist = maxSnapMeters || 75;
+        var bestProj = null;
+        var bestDist = Infinity;
+        var bestBearing = 0;
+
+        for (var i = 0; i < path.length - 1; i++) {
+            var p1 = path[i];
+            var p2 = path[i + 1];
+            var p1Lat = typeof p1.lat === 'function' ? p1.lat() : p1.lat;
+            var p1Lng = typeof p1.lng === 'function' ? p1.lng() : p1.lng;
+            var p2Lat = typeof p2.lat === 'function' ? p2.lat() : p2.lat;
+            var p2Lng = typeof p2.lng === 'function' ? p2.lng() : p2.lng;
+
+            var res = projectPointToSegment(lat, lng, p1Lat, p1Lng, p2Lat, p2Lng);
+            if (res.dist < bestDist) {
+                bestDist = res.dist;
+                bestProj = res;
+                bestBearing = res.bearing;
+            }
+        }
+
+        if (bestProj && bestDist <= maxDist) {
+            return { lat: bestProj.lat, lng: bestProj.lng, bearing: bestBearing, snapped: true };
+        }
+        return { lat: lat, lng: lng, bearing: null, snapped: false };
+    }
+
+    // Helper: Check if coordinates are the Colombo Fort default placeholder (6.9271, 79.8612)
+    function isDefaultPlaceholderCoord(lat, lng) {
+        if (lat == null || lng == null) return true;
+        return (Math.abs(lat - 6.9271) < 0.0008 && Math.abs(lng - 79.8612) < 0.0008);
+    }
+
     // Pickup & Drop marker pin SVGs (matching mobile app visual hierarchy)
     var PICK_PIN_SVG =
         '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 34 34">' +
@@ -745,9 +835,6 @@
         '<circle cx="17" cy="17" r="15.5" fill="#EF4444" stroke="#ffffff" stroke-width="2.5"/>' +
         '<path transform="translate(17 17) scale(0.030) translate(-224 -256)" fill="#ffffff" d="M64 32C64 14.3 49.7 0 32 0S0 14.3 0 32L0 64 0 368 0 480c0 17.7 14.3 32 32 32s32-14.3 32-32l0-128 64.3-16.1c41.1-10.3 84.6-5.5 122.5 13.4c44.2 22.1 95.5 24.8 141.7 7.4l34.7-13c12.5-4.7 20.8-16.6 20.8-30l0-247.7c0-23-24.2-38-44.8-27.7l-9.6 4.8c-46.3 23.2-100.8 23.2-147.1 0c-35.1-17.6-75.4-22-113.5-12.5L64 48l0-16z"/></svg>';
 
-    // Built in initMap: google.maps doesn't exist until the async Maps script loads, and
-    // touching it here threw, which stopped the rest of this script (default red pins,
-    // dead ride-card clicks, no live-event listener).
     var pickSymbol, dropSymbol;
 
     function pinIcon(svg) {
@@ -776,7 +863,7 @@
         pickSymbol = pinIcon(PICK_PIN_SVG);
         dropSymbol = pinIcon(DROP_PIN_SVG);
 
-        // Custom Vehicle Top Overlay Class
+        // Custom Vehicle Top Overlay Class with smooth bearing interpolation & route snapping
         VehicleTopOverlay = class extends google.maps.OverlayView {
             constructor(opts) {
                 super();
@@ -784,6 +871,7 @@
                 this.lng = opts.lng;
                 this.position = new google.maps.LatLng(opts.lat, opts.lng);
                 this.heading = opts.heading || 0;
+                this.currentAngle = this.heading; // Cumulative unrolled angle to prevent reverse 360-degree spins
                 this.vehicleType = opts.vehicleType || 'car';
                 this.driverName = opts.driverName || 'Driver';
                 this.vehicleNumber = opts.vehicleNumber || '';
@@ -793,6 +881,7 @@
                 this.div = null;
                 this.img = null;
                 this.tip = null;
+                this.anim = null;
                 this.setMap(opts.map);
             }
 
@@ -815,7 +904,7 @@
                                 '<div style="font-size:9px;color:#94a3b8;font-weight:600;">' + (this.vehicleNumber || this.vehicleType.toUpperCase()) + (this.statusText ? ' • ' + this.statusText : '') + '</div>';
                 this.tip = tip;
 
-                // Vehicle top view image
+                // Vehicle top view image with smooth cubic-bezier turning
                 var img = document.createElement('img');
                 img.src = getVehicleTopAsset(this.vehicleType);
                 img.style.width = '40px';
@@ -823,7 +912,8 @@
                 img.style.objectFit = 'contain';
                 img.style.display = 'block';
                 img.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.45))';
-                img.style.transform = 'rotate(' + this.heading + 'deg)';
+                img.style.transition = 'transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1)';
+                img.style.transform = 'rotate(' + this.currentAngle + 'deg)';
                 this.img = img;
 
                 div.appendChild(tip);
@@ -861,33 +951,61 @@
                 }
             }
 
-            update(lat, lng, heading) {
-                var moved = this.lat !== lat || this.lng !== lng;
-                if (heading === undefined || heading === null || isNaN(heading) || heading === 0) {
-                    heading = moved ? computeBearing(this.lat, this.lng, lat, lng) : this.heading;
+            update(targetLat, targetLng, heading, snapBearing) {
+                if (targetLat == null || targetLng == null) return;
+                var fromLat = this.lat;
+                var fromLng = this.lng;
+                var dist = haversineMeters(fromLat, fromLng, targetLat, targetLng);
+                var moved = dist >= 1.2;
+
+                // Target heading resolution with deadband filter to eliminate automatic random rotations
+                var targetHeading = this.heading;
+                if (snapBearing !== undefined && snapBearing !== null && moved) {
+                    // Aligned with road direction
+                    targetHeading = snapBearing;
+                } else if (heading !== undefined && heading !== null && !isNaN(heading) && heading > 0) {
+                    // Valid compass heading from phone
+                    targetHeading = heading;
+                } else if (moved && dist >= 3.2) {
+                    // Only compute azimuth when vehicle moved >= 3.2 meters (stops stationary GPS spinning)
+                    targetHeading = computeBearing(fromLat, fromLng, targetLat, targetLng);
                 }
-                this.lat = lat;
-                this.lng = lng;
-                this.heading = heading;
+
+                // Continuous shortest-path angle unrolling (prevents 340-degree backward turns)
+                var angleDiff = (targetHeading - (this.currentAngle % 360) + 540) % 360 - 180;
+                this.currentAngle += angleDiff;
+                this.heading = (targetHeading + 360) % 360;
+
                 if (this.img) {
-                    this.img.style.transform = 'rotate(' + this.heading + 'deg)';
+                    this.img.style.transform = 'rotate(' + this.currentAngle + 'deg)';
                 }
-                if (moved) this.glideTo(lat, lng);
+
+                if (moved) {
+                    this.lat = targetLat;
+                    this.lng = targetLng;
+                    this.glideTo(targetLat, targetLng);
+                }
             }
 
-            // Fixes arrive about every 10 s; sliding there keeps the move visible at city zoom.
-            glideTo(lat, lng) {
+            glideTo(targetLat, targetLng) {
                 if (this.anim) cancelAnimationFrame(this.anim);
                 var self = this;
                 var fromLat = this.position.lat();
                 var fromLng = this.position.lng();
                 var start = null;
+                var duration = 1200;
                 function step(ts) {
                     if (start === null) start = ts;
-                    var t = Math.min(1, (ts - start) / 1500);
-                    self.position = new google.maps.LatLng(fromLat + (lat - fromLat) * t, fromLng + (lng - fromLng) * t);
+                    var progress = Math.min(1, (ts - start) / duration);
+                    // Ease out cubic
+                    var t = 1 - Math.pow(1 - progress, 3);
+                    self.position = new google.maps.LatLng(fromLat + (targetLat - fromLat) * t, fromLng + (targetLng - fromLng) * t);
                     self.draw();
-                    self.anim = t < 1 ? requestAnimationFrame(step) : null;
+                    if (progress < 1) {
+                        self.anim = requestAnimationFrame(step);
+                    } else {
+                        self.anim = null;
+                    }
                 }
                 this.anim = requestAnimationFrame(step);
             }
@@ -948,6 +1066,7 @@
             activeRoutePolylines[i].setMap(null);
         }
         activeRoutePolylines = [];
+        activeRoutePath = [];
     }
 
     function clearTrackedRideMarkers() {
@@ -962,88 +1081,156 @@
         clearActiveRoutes();
     }
 
-    // Draw the real road route using DirectionsService (like in mobile app)
+    // Helper: Render high-contrast casing and colored road line
+    function renderPolyline(path, color, weight, zIndex, showArrows, isDashed) {
+        if (!path || path.length < 2) return null;
+
+        var casing = new google.maps.Polyline({
+            path: path,
+            strokeColor: '#0F172A',
+            strokeOpacity: 0.22,
+            strokeWeight: weight + 3.5,
+            zIndex: zIndex - 1,
+            map: map
+        });
+        activeRoutePolylines.push(casing);
+
+        var polyOptions = {
+            path: path,
+            strokeColor: color,
+            strokeOpacity: isDashed ? 0 : 0.95,
+            strokeWeight: weight,
+            zIndex: zIndex,
+            map: map
+        };
+
+        if (isDashed) {
+            polyOptions.icons = [{
+                icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.9, scale: 2 },
+                offset: '0',
+                repeat: '10px'
+            }];
+        } else if (showArrows) {
+            polyOptions.icons = [{
+                icon: {
+                    path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                    scale: 2.2,
+                    strokeColor: '#FFFFFF',
+                    fillColor: color,
+                    fillOpacity: 1,
+                    strokeWeight: 1
+                },
+                offset: '30px',
+                repeat: '120px'
+            }];
+        }
+
+        var mainLine = new google.maps.Polyline(polyOptions);
+        activeRoutePolylines.push(mainLine);
+        return mainLine;
+    }
+
+    // Draw the real road route using DirectionsService with state-aware approach & trip legs
     function drawRoadRoute(pickupLoc, dropLoc, driverLoc, status, onRouteReady) {
         clearActiveRoutes();
         if (!pickupLoc || !dropLoc) return;
 
+        var normStatus = String(status || '').toLowerCase();
+
+        // 1. Driver accepted / arrived: show live Approach route (Driver -> Pickup) + Planned route (Pickup -> Dropoff)
+        if (driverLoc && (normStatus === 'accepted' || normStatus === 'arrived')) {
+            directionsService.route({
+                origin: driverLoc,
+                destination: pickupLoc,
+                travelMode: google.maps.TravelMode.DRIVING
+            }, function(appRes, appStatus) {
+                var appPath = (appStatus === google.maps.DirectionsStatus.OK)
+                    ? appRes.routes[0].overview_path
+                    : [driverLoc, pickupLoc];
+
+                renderPolyline(appPath, '#0284C7', 5.5, 12, true, false);
+                activeRoutePath = appPath;
+
+                // Also draw planned route from Pickup to Dropoff (dashed line)
+                directionsService.route({
+                    origin: pickupLoc,
+                    destination: dropLoc,
+                    travelMode: google.maps.TravelMode.DRIVING
+                }, function(tripRes, tripStatus) {
+                    var tripPath = (tripStatus === google.maps.DirectionsStatus.OK)
+                        ? tripRes.routes[0].overview_path
+                        : [pickupLoc, dropLoc];
+
+                    renderPolyline(tripPath, '#64748B', 3.5, 8, false, true);
+
+                    if (onRouteReady && appRes && appRes.routes[0] && appRes.routes[0].legs[0]) {
+                        var leg = appRes.routes[0].legs[0];
+                        onRouteReady({
+                            distanceText: leg.distance ? leg.distance.text : '',
+                            durationText: leg.duration ? leg.duration.text : '',
+                            path: appPath,
+                            status: normStatus
+                        });
+                    }
+                });
+            });
+            return;
+        }
+
+        // 2. Ride Started: show live Trip route (Driver -> Dropoff) + Covered trail (Pickup -> Driver)
+        if (normStatus === 'started') {
+            var originLoc = driverLoc || pickupLoc;
+            directionsService.route({
+                origin: originLoc,
+                destination: dropLoc,
+                travelMode: google.maps.TravelMode.DRIVING
+            }, function(tripRes, tripStatus) {
+                var tripPath = (tripStatus === google.maps.DirectionsStatus.OK)
+                    ? tripRes.routes[0].overview_path
+                    : [originLoc, dropLoc];
+
+                renderPolyline(tripPath, '#2563EB', 5.5, 12, true, false);
+                activeRoutePath = tripPath;
+
+                // If driver has moved ahead from pickup, show covered trail
+                if (driverLoc && haversineMeters(pickupLoc.lat, pickupLoc.lng, driverLoc.lat, driverLoc.lng) > 80) {
+                    renderPolyline([pickupLoc, driverLoc], '#94A3B8', 3, 7, false, true);
+                }
+
+                if (onRouteReady && tripRes && tripRes.routes[0] && tripRes.routes[0].legs[0]) {
+                    var leg = tripRes.routes[0].legs[0];
+                    onRouteReady({
+                        distanceText: leg.distance ? leg.distance.text : '',
+                        durationText: leg.duration ? leg.duration.text : '',
+                        path: tripPath,
+                        status: normStatus
+                    });
+                }
+            });
+            return;
+        }
+
+        // 3. Completed, Searching, Cancelled, or overview: direct Pickup -> Dropoff route
         directionsService.route({
             origin: pickupLoc,
             destination: dropLoc,
             travelMode: google.maps.TravelMode.DRIVING
         }, function(result, dirStatus) {
-            if (dirStatus === google.maps.DirectionsStatus.OK) {
-                var path = result.routes[0].overview_path;
+            var path = (dirStatus === google.maps.DirectionsStatus.OK)
+                ? result.routes[0].overview_path
+                : [pickupLoc, dropLoc];
 
-                // Outer casing line for high contrast
-                var casingPolyline = new google.maps.Polyline({
+            renderPolyline(path, '#2563EB', 5, 11, false, false);
+            activeRoutePath = path;
+
+            if (onRouteReady && result && result.routes[0] && result.routes[0].legs[0]) {
+                var leg = result.routes[0].legs[0];
+                onRouteReady({
+                    distanceText: leg.distance ? leg.distance.text : '',
+                    durationText: leg.duration ? leg.duration.text : '',
                     path: path,
-                    strokeColor: '#0F172A',
-                    strokeOpacity: 0.25,
-                    strokeWeight: 8,
-                    zIndex: 10,
-                    map: map
+                    status: normStatus
                 });
-                activeRoutePolylines.push(casingPolyline);
-
-                // Vibrant road route line
-                var routePolyline = new google.maps.Polyline({
-                    path: path,
-                    strokeColor: '#2563EB',
-                    strokeOpacity: 0.95,
-                    strokeWeight: 5,
-                    zIndex: 11,
-                    map: map
-                });
-                activeRoutePolylines.push(routePolyline);
-
-                if (result.routes[0].legs && result.routes[0].legs[0]) {
-                    var leg = result.routes[0].legs[0];
-                    if (onRouteReady) {
-                        onRouteReady({
-                            distanceText: leg.distance ? leg.distance.text : '',
-                            durationText: leg.duration ? leg.duration.text : '',
-                            path: path
-                        });
-                    }
-                }
-
-                // If driver is accepted / arrived and en route to pickup
-                if (driverLoc && (status === 'accepted' || status === 'arrived')) {
-                    directionsService.route({
-                        origin: driverLoc,
-                        destination: pickupLoc,
-                        travelMode: google.maps.TravelMode.DRIVING
-                    }, function(driverRes, driverDirStatus) {
-                        if (driverDirStatus === google.maps.DirectionsStatus.OK) {
-                            var dPath = driverRes.routes[0].overview_path;
-                            var driverApproachLine = new google.maps.Polyline({
-                                path: dPath,
-                                strokeColor: '#0EA5E9',
-                                strokeOpacity: 0.9,
-                                strokeWeight: 4.5,
-                                zIndex: 12,
-                                icons: [{
-                                    icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 2 },
-                                    offset: '0',
-                                    repeat: '12px'
-                                }],
-                                map: map
-                            });
-                            activeRoutePolylines.push(driverApproachLine);
-                        }
-                    });
-                }
-            } else {
-                // Fallback straight line if directions quota exceeded or route unresolvable
-                var fallbackLine = new google.maps.Polyline({
-                    path: [pickupLoc, dropLoc],
-                    strokeColor: '#2563EB',
-                    strokeOpacity: 0.85,
-                    strokeWeight: 4,
-                    map: map
-                });
-                activeRoutePolylines.push(fallbackLine);
             }
         });
     }
@@ -1059,7 +1246,8 @@
         rawActiveBookings.forEach(function(b) {
             var pickupLoc = (b.pickup_lat != null && b.pickup_lng != null) ? { lat: b.pickup_lat, lng: b.pickup_lng } : null;
             var dropLoc = (b.drop_lat != null && b.drop_lng != null) ? { lat: b.drop_lat, lng: b.drop_lng } : null;
-            var driverLoc = (b.driver_lat != null && b.driver_lng != null) ? { lat: b.driver_lat, lng: b.driver_lng } : null;
+            var driverLoc = (b.driver_lat != null && b.driver_lng != null && !isDefaultPlaceholderCoord(b.driver_lat, b.driver_lng))
+                ? { lat: b.driver_lat, lng: b.driver_lng } : null;
 
             if (pickupLoc) {
                 var pickMarker = new google.maps.Marker({
@@ -1112,11 +1300,8 @@
                 count++;
             }
 
-            // Draw road route for the primary active booking
-            if (rawActiveBookings.length === 1 && pickupLoc && dropLoc) {
-                drawRoadRoute(pickupLoc, dropLoc, driverLoc, b.status);
-            } else if (pickupLoc && dropLoc) {
-                // For multiple rides draw quick road line
+            // Draw road route for active bookings
+            if (pickupLoc && dropLoc) {
                 drawRoadRoute(pickupLoc, dropLoc, driverLoc, b.status);
             }
         });
@@ -1130,19 +1315,52 @@
     function trackBooking(b) {
         if (!b || !map) return;
         currentTrackedBookingId = b.id;
+        currentTrackedBooking = b;
         try {
             sessionStorage.setItem('zi_tracked_booking_id', String(b.id));
         } catch (_) {}
 
         clearTrackedRideMarkers();
 
+        var normStatus = String(b.status || '').toLowerCase();
         var pickupLoc = (b.pickup_lat != null && b.pickup_lng != null) ? { lat: b.pickup_lat, lng: b.pickup_lng } : null;
         var dropLoc = (b.drop_lat != null && b.drop_lng != null) ? { lat: b.drop_lat, lng: b.drop_lng } : null;
-        var driverLoc = (b.driver_lat != null && b.driver_lng != null) ? { lat: b.driver_lat, lng: b.driver_lng } : null;
 
         if (!pickupLoc || !dropLoc) {
             alert("This booking does not have valid coordinates to map.");
             return;
+        }
+
+        // Determine sensible driver coordinates (resolves displacement bug):
+        var rawDriverLoc = (b.driver_lat != null && b.driver_lng != null) ? { lat: b.driver_lat, lng: b.driver_lng } : null;
+        var driverLoc = null;
+
+        if (normStatus === 'completed') {
+            // For a COMPLETED booking, the vehicle finished at destination (dropLoc)!
+            // Never displace to the driver's current coordinates hours/days later in Fort!
+            driverLoc = { lat: dropLoc.lat, lng: dropLoc.lng };
+        } else if (normStatus === 'searching') {
+            // Searching: no driver vehicle assigned yet!
+            driverLoc = null;
+        } else if (normStatus === 'accepted' || normStatus === 'arrived') {
+            if (rawDriverLoc && !isDefaultPlaceholderCoord(rawDriverLoc.lat, rawDriverLoc.lng)) {
+                driverLoc = rawDriverLoc;
+            } else if (b.driver_accepted_lat && b.driver_accepted_lng && !isDefaultPlaceholderCoord(b.driver_accepted_lat, b.driver_accepted_lng)) {
+                driverLoc = { lat: b.driver_accepted_lat, lng: b.driver_accepted_lng };
+            } else {
+                // If no real GPS fix yet, place slightly offset near pickup
+                driverLoc = { lat: pickupLoc.lat + 0.0015, lng: pickupLoc.lng + 0.0015 };
+            }
+        } else if (normStatus === 'started') {
+            if (rawDriverLoc && !isDefaultPlaceholderCoord(rawDriverLoc.lat, rawDriverLoc.lng)) {
+                driverLoc = rawDriverLoc;
+            } else {
+                driverLoc = { lat: pickupLoc.lat, lng: pickupLoc.lng };
+            }
+        } else {
+            if (rawDriverLoc && !isDefaultPlaceholderCoord(rawDriverLoc.lat, rawDriverLoc.lng)) {
+                driverLoc = rawDriverLoc;
+            }
         }
 
         var bounds = new google.maps.LatLngBounds();
@@ -1186,19 +1404,19 @@
         dropMarker.addListener('click', function() { dropInfo.open(map, dropMarker); });
         activeMarkers.push(dropMarker);
 
-        // Vehicle Top View Marker
-        var vehiclePlaced = false;
-        if (driverLoc) {
+        // Vehicle Top View Marker (only when driver assigned)
+        if (driverLoc && normStatus !== 'searching') {
             var heading = b.driver_heading || 0;
             if (!heading) {
-                heading = computeBearing(driverLoc.lat, driverLoc.lng, dropLoc.lat, dropLoc.lng);
+                var targetPt = (normStatus === 'accepted' || normStatus === 'arrived') ? pickupLoc : dropLoc;
+                heading = computeBearing(driverLoc.lat, driverLoc.lng, targetPt.lat, targetPt.lng);
             }
             var vOverlay = new VehicleTopOverlay({
                 lat: driverLoc.lat,
                 lng: driverLoc.lng,
                 heading: heading,
                 vehicleType: b.vehicle_type,
-                driverName: b.driver_name,
+                driverName: b.driver_name || 'Driver',
                 vehicleNumber: b.vehicle_number,
                 statusText: b.status,
                 driverId: b.driver_id,
@@ -1206,7 +1424,7 @@
                 onClick: function() {
                     var win = new google.maps.InfoWindow({
                         content: '<div style="font-family:inherit;padding:2px;">' +
-                                 '<p style="font-weight:900;color:#0f172a;margin:0 0 2px;">' + b.driver_name + '</p>' +
+                                 '<p style="font-weight:900;color:#0f172a;margin:0 0 2px;">' + (b.driver_name || 'Driver') + '</p>' +
                                  '<p style="font-size:11px;color:#64748b;margin:0;">' + (b.vehicle_number || '') + ' (' + b.vehicle_type + ')</p>' +
                                  '<p style="font-size:10px;color:#2563eb;font-weight:800;margin:4px 0 0;text-transform:uppercase;">Status: ' + b.status + '</p>' +
                                  '</div>'
@@ -1216,33 +1434,22 @@
                 }
             });
             vehicleOverlays.set(b.id, vOverlay);
-            vehiclePlaced = true;
         }
 
         // Fetch & Draw Road Route
         drawRoadRoute(pickupLoc, dropLoc, driverLoc, b.status, function(legData) {
             var distEl = document.getElementById('trackedDistance');
             var durEl = document.getElementById('trackedDuration');
-            if (distEl) distEl.innerHTML = '<i class="fas fa-route text-blue-500 mr-1"></i> Road: ' + legData.distanceText;
-            if (durEl) durEl.innerHTML = '<i class="fas fa-clock text-amber-500 mr-1"></i> Est: ' + legData.durationText;
+            if (distEl) distEl.innerHTML = '<i class="fas fa-route text-blue-500 mr-1"></i> Road: ' + (legData.distanceText || (b.distance_km ? b.distance_km + ' km' : '--'));
+            if (durEl) durEl.innerHTML = '<i class="fas fa-clock text-amber-500 mr-1"></i> Est: ' + (legData.durationText || (b.duration_min ? b.duration_min + ' min' : '--'));
 
-            // If driver wasn't already positioned, place vehicle top view at start of route or pickup
-            if (!vehiclePlaced && legData.path && legData.path.length > 1) {
-                var pt1 = legData.path[0];
-                var pt2 = legData.path[1];
-                var computedH = computeBearing(pt1.lat(), pt1.lng(), pt2.lat(), pt2.lng());
-                var fallbackOverlay = new VehicleTopOverlay({
-                    lat: pt1.lat(),
-                    lng: pt1.lng(),
-                    heading: computedH,
-                    vehicleType: b.vehicle_type,
-                    driverName: b.driver_name || 'Vehicle',
-                    vehicleNumber: b.vehicle_number,
-                    statusText: b.status,
-                    driverId: b.driver_id,
-                    map: map
-                });
-                vehicleOverlays.set(b.id, fallbackOverlay);
+            // Snap vehicle to road route polyline
+            if (vehicleOverlays.has(b.id) && legData.path && legData.path.length > 1) {
+                var overlay = vehicleOverlays.get(b.id);
+                var snap = snapToPolyline(overlay.lat, overlay.lng, legData.path, 80);
+                if (snap.snapped) {
+                    overlay.update(snap.lat, snap.lng, overlay.heading, snap.bearing);
+                }
             }
         });
 
@@ -1294,6 +1501,8 @@
     // Reset tracking and return to overview
     function resetRideTracking() {
         currentTrackedBookingId = null;
+        currentTrackedBooking = null;
+        activeRoutePath = [];
         trackedGpsAt = null;
         trackedDriverId = null;
         renderTrackedGps();
@@ -1340,11 +1549,39 @@
         }
     }
 
-    // Update real-time GPS position & bearing of drivers in active rides
+    // Update real-time GPS position & bearing of drivers in active rides with snapping and deadband
     function handleDriverLocationUpdate(d) {
-        if (!d) return;
+        if (!d || d.lat == null || d.lng == null) return;
         if (trackedDriverId != null && d.id === trackedDriverId) trackedGpsAt = Date.now();
-        // Update tracked or active booking's vehicle overlay
+
+        // 1. If currently tracking a booking for this driver
+        if (currentTrackedBooking && currentTrackedBooking.driver_id === d.id) {
+            var normStatus = String(currentTrackedBooking.status || '').toLowerCase();
+            // Completed or cancelled trips do not displace vehicle
+            if (normStatus === 'completed' || normStatus === 'cancelled') return;
+
+            var lat = d.lat;
+            var lng = d.lng;
+            var heading = d.heading;
+            var snapBearing = null;
+
+            // Snap to active route line if within 80m
+            if (activeRoutePath && activeRoutePath.length > 1) {
+                var snap = snapToPolyline(lat, lng, activeRoutePath, 80);
+                if (snap.snapped) {
+                    lat = snap.lat;
+                    lng = snap.lng;
+                    snapBearing = snap.bearing;
+                }
+            }
+
+            if (vehicleOverlays.has(currentTrackedBooking.id)) {
+                vehicleOverlays.get(currentTrackedBooking.id).update(lat, lng, heading, snapBearing);
+            }
+            return;
+        }
+
+        // 2. Overview map: update vehicle overlay
         vehicleOverlays.forEach(function(v) {
             if (v.driverId === d.id) {
                 v.update(d.lat, d.lng, d.heading);
