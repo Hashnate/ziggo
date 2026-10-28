@@ -37,6 +37,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
 
   String _vehicleType = 'car';
   String _driverType = 'ride';
+  String? _gender;
   bool _busy = false;
   String? _error;
   String? _uploadStatus;
@@ -122,6 +123,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
       await prefs.setString('driver_reg_ref', _referralCode.text);
       await prefs.setString('driver_reg_vtype', _vehicleType);
       await prefs.setString('driver_reg_dtype', _driverType);
+      if (_gender != null) await prefs.setString('driver_reg_gender', _gender!);
     } catch (_) {}
   }
 
@@ -195,6 +197,9 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
 
       final draftDtype = prefs.getString('driver_reg_dtype') ?? (prof['driver_type']?.toString() ?? 'ride');
       _driverType = draftDtype;
+
+      final draftGender = prefs.getString('driver_reg_gender') ?? prof['gender']?.toString();
+      if (draftGender == 'female' || draftGender == 'male') _gender = draftGender;
 
       final existingPhoto = auth.profilePhoto ?? prof['profile_photo']?.toString();
       if (existingPhoto != null && existingPhoto.isNotEmpty) {
@@ -349,6 +354,10 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_gender == null) {
+      setState(() => _error = 'Please choose your gender');
+      return;
+    }
 
     final hasPhoto = _profilePhoto != null || (_profilePhotoUrl != null && _profilePhotoUrl!.isNotEmpty);
     if (!hasPhoto) {
@@ -421,6 +430,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
             relativeContact: _relativeContact.text.trim(),
             relativeRelationship: _relativeRelationship.text.trim(),
             referralCode: _referralCode.text.trim(),
+            gender: _gender,
           );
 
       if (err != null) {
@@ -741,6 +751,8 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                           const SizedBox(height: 10),
                           _field(_nic, 'NIC Number', Icons.badge_rounded,
                               hint: '199012345678'),
+                          const SizedBox(height: 12),
+                          _genderRow(),
                           const SizedBox(height: 10),
                           _field(_license, 'Driving License Number', Icons.credit_card_rounded),
                           const SizedBox(height: 10),
@@ -956,6 +968,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
   Widget _vehicleTypeRow() {
     const types = [
       ('bike', Icons.motorcycle_rounded, 'Bike'),
+      ('moto scooter', Icons.electric_moped_rounded, 'Scooter'),
       ('tuk', Icons.electric_rickshaw_rounded, 'Tuk'),
       ('car', Icons.directions_car_filled_rounded, 'Car'),
       ('van', Icons.airport_shuttle_rounded, 'Van'),
@@ -1141,6 +1154,69 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                   color: isUploaded ? AppColors.success : AppColors.primary,
                 )),
           ),
+      ],
+    );
+  }
+
+  Widget _genderRow() {
+    const genders = [
+      ('female', Icons.woman_rounded, 'Female'),
+      ('male', Icons.man_rounded, 'Male'),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'GENDER',
+          style: TextStyle(
+            fontSize: 10,
+            color: AppColors.textTertiary,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.4,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: genders.map((g) {
+            final sel = _gender == g.$1;
+            return GestureDetector(
+              onTap: () {
+                setState(() => _gender = g.$1);
+                _saveDraft();
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: sel ? AppColors.primary : AppColors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(g.$2, color: sel ? Colors.white : AppColors.textSecondary, size: 16),
+                    const SizedBox(width: 6),
+                    Text(
+                      g.$3,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        color: sel ? Colors.white : AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Must match your NIC. Lady-driver rides go to women who drive a Scooter.',
+          style: TextStyle(fontSize: 11, color: AppColors.textTertiary, fontWeight: FontWeight.w600),
+        ),
       ],
     );
   }

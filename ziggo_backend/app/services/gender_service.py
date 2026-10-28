@@ -46,6 +46,27 @@ def apply_nic_gender(user, nic: str | None) -> None:
         user.gender_source = SOURCE_NIC
 
 
+NIC_GENDER_MISMATCH = "Your NIC number shows {nic_gender}. Please check the NIC number or the gender you chose."
+
+
+def apply_driver_gender(user, nic: str | None, chosen: str | None) -> str | None:
+    """Driver sign-up: the NIC decides when it can be read, and the gender the driver
+    chose must agree with it; otherwise the driver's choice is kept. An admin's choice
+    is never overridden. Returns why the sign-up is refused, or None."""
+    chosen = (chosen or "").strip().lower()
+    chosen = chosen if chosen in GENDERS else None
+    if user is None or user.gender_source == SOURCE_ADMIN:
+        return None
+    from_nic = gender_from_nic(nic)
+    if from_nic:
+        if chosen and chosen != from_nic:
+            return NIC_GENDER_MISMATCH.format(nic_gender=from_nic)
+        apply_nic_gender(user, nic)
+    elif chosen:
+        user.gender, user.gender_source = chosen, SOURCE_SELF
+    return None
+
+
 def set_admin_gender(user, choice: str, nic: str | None = None) -> None:
     """Admin correction. ``choice`` is "female"/"male" (fixed by the admin), "auto"
     (drivers: follow the NIC again) or "none" (customers: empty, so they can choose again)."""
