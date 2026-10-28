@@ -623,14 +623,20 @@ async def check_mobile(
     db: AsyncSession = Depends(get_db),
 ):
     phone = mobile.strip().replace(" ", "").replace("-", "")
-    if len(phone) > 10:
+    if phone.startswith("+94"):
+        phone = "0" + phone[3:]
+    elif phone.startswith("94") and len(phone) == 11:
+        phone = "0" + phone[2:]
+    elif len(phone) == 9 and not phone.startswith("0"):
+        phone = "0" + phone
+    elif len(phone) > 10:
         phone = phone[-10:]
 
-    result = await db.execute(select(User).where(User.phone_number == phone))
+    result = await db.execute(select(User).where(User.phone_number.in_([mobile, phone])))
     user = result.scalars().first()
 
     if user and not getattr(user, "is_preregistered", False):
-        return {"registered": True, "message": "This number is already registered."}
+        return {"registered": True, "message": "This number is already registered. Please sign in."}
 
     return {"registered": False}
 

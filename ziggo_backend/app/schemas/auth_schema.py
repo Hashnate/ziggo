@@ -73,6 +73,7 @@ class UserResponse(UserBase):
 
 class OTPRequest(BaseModel):
     phone_number: str = Field(..., pattern=r"^\d{10}$", description="10-digit phone number")
+    purpose: Optional[str] = Field(None, description="Optional purpose: 'login' or 'register'")
 
 
 class OTPVerify(BaseModel):

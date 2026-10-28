@@ -9,16 +9,23 @@ import 'otp_verification_screen.dart';
 
 class PhoneLoginScreen extends StatefulWidget {
   final String role;
-  const PhoneLoginScreen({super.key, required this.role});
+  final String? initialPhone;
+  const PhoneLoginScreen({super.key, required this.role, this.initialPhone});
 
   @override
   State<PhoneLoginScreen> createState() => _PhoneLoginScreenState();
 }
 
 class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
-  final TextEditingController _phoneController = TextEditingController();
+  late final TextEditingController _phoneController;
   bool _busy = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _phoneController = TextEditingController(text: widget.initialPhone ?? '');
+  }
 
   String get _normalizedPhone {
     final raw = _phoneController.text.replaceAll(RegExp(r'\D'), '');

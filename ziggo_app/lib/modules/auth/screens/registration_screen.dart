@@ -8,6 +8,7 @@ import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/motion.dart';
 import '../auth_provider.dart';
 import 'otp_verification_screen.dart';
+import 'phone_login_screen.dart';
 
 /// New-user registration screen — alternative entry to the implicit signup
 /// that happens via the role cards. Captures full_name up-front so the
@@ -38,6 +39,80 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     return raw.length > 10 ? raw.substring(0, 10) : raw;
   }
 
+  void _navigateToSignIn(String phone, String role) {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PhoneLoginScreen(
+          role: role,
+          initialPhone: phone,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showAlreadyRegisteredDialog(String phone, String role) async {
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.info_outline_rounded, color: AppColors.accent, size: 24),
+            SizedBox(width: 10),
+            Text(
+              'Already Registered',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'The phone number $phone is already registered. Please sign in to your existing account.',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.85),
+            fontSize: 14,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Change Number',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.6),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _navigateToSignIn(phone, role);
+            },
+            child: const Text(
+              'Sign In',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _register() async {
     setState(() => _error = null);
     final role = _role;
@@ -57,11 +132,29 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     setState(() => _busy = true);
     final auth = context.read<AuthProvider>();
-    final ok = await auth.sendOTP(phone);
+
+    // 1. Check if the phone is already registered before dispatching OTP
+    final alreadyRegistered = await auth.checkPhoneRegistered(phone);
+    if (!mounted) return;
+    if (alreadyRegistered) {
+      setState(() {
+        _busy = false;
+        _error = 'This phone number is already registered. Please sign in.';
+      });
+      _showAlreadyRegisteredDialog(phone, role);
+      return;
+    }
+
+    // 2. Request OTP with purpose="register" so backend also validates registration uniqueness
+    final ok = await auth.sendOTP(phone, purpose: 'register');
     if (!mounted) return;
     setState(() => _busy = false);
     if (!ok) {
-      setState(() => _error = auth.lastError ?? 'Failed to send OTP');
+      final err = auth.lastError ?? 'Failed to send OTP';
+      setState(() => _error = err);
+      if (err.toLowerCase().contains('already registered')) {
+        _showAlreadyRegisteredDialog(phone, role);
+      }
       return;
     }
     if (auth.status == AuthStatus.authenticated) {
@@ -201,6 +294,27 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                               ),
                             ),
                           ),
+                          if (_error!.toLowerCase().contains('already registered') && _role != null) ...[
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () => _navigateToSignIn(_normalizedPhone, _role!),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text(
+                                  'Sign In',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),

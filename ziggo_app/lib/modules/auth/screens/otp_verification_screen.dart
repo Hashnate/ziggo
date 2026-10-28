@@ -138,6 +138,47 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       );
       return;
     }
+
+    // If an already-registered user arrives via registration (fullName != null),
+    // inform them that their account already exists before proceeding to home.
+    if (widget.fullName != null && !auth.isNewUser) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.info_outline_rounded, color: AppColors.primary),
+              SizedBox(width: 10),
+              Text(
+                'Already Registered',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+              ),
+            ],
+          ),
+          content: Text(
+            'The phone number ${widget.phoneNumber} is already registered. You have been signed in to your existing account.',
+            style: const TextStyle(fontSize: 14, color: AppColors.textSecondary, height: 1.4),
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text(
+                'Continue to Home',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+    }
+
     Navigator.popUntil(context, (r) => r.isFirst);
   }
 

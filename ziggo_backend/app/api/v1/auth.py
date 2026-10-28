@@ -19,12 +19,52 @@ from ...services.auth_service import (
 router = APIRouter()
 
 
-@router.post("/send-otp", response_model=OTPResponse)
-async def send_otp(request: OTPRequest, db: AsyncSession = Depends(get_db)):
+def _normalize_phone(raw: str) -> str:
+    cleaned = raw.strip().replace(" ", "").replace("-", "")
+    if cleaned.startswith("+94"):
+        cleaned = "0" + cleaned[3:]
+    elif cleaned.startswith("94") and len(cleaned) == 11:
+        cleaned = "0" + cleaned[2:]
+    elif len(cleaned) == 9 and not cleaned.startswith("0"):
+        cleaned = "0" + cleaned
+    elif len(cleaned) > 10:
+        cleaned = cleaned[-10:]
+    return cleaned
+
+
+@router.get("/check-phone")
+async def check_phone(phone_number: str, db: AsyncSession = Depends(get_db)):
+    clean_phone = _normalize_phone(phone_number)
+
     result = await db.execute(
-        select(User).where(User.phone_number == request.phone_number)
+        select(User).where(User.phone_number.in_([phone_number, clean_phone]))
     )
     user = result.scalars().first()
+
+    if user and not getattr(user, "is_preregistered", False):
+        return {
+            "registered": True,
+            "role": user.role.value if hasattr(user.role, "value") else str(user.role),
+            "message": "This phone number is already registered. Please sign in.",
+        }
+
+    return {"registered": False}
+
+
+@router.post("/send-otp", response_model=OTPResponse)
+async def send_otp(request: OTPRequest, db: AsyncSession = Depends(get_db)):
+    clean_phone = _normalize_phone(request.phone_number)
+    result = await db.execute(
+        select(User).where(User.phone_number.in_([request.phone_number, clean_phone]))
+    )
+    user = result.scalars().first()
+
+    if request.purpose == "register" and user and not getattr(user, "is_preregistered", False):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This phone number is already registered. Please sign in.",
+        )
+
     if user and getattr(user, "is_preregistered", False):
         user.is_preregistered = False
         await db.commit()

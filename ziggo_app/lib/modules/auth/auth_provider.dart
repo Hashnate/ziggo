@@ -157,12 +157,40 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> sendOTP(String phoneNumber) async {
+  Future<bool> checkPhoneRegistered(String phoneNumber) async {
+    try {
+      final resp = await ApiClient.instance.dio.get(
+        '/auth/check-phone',
+        queryParameters: {'phone_number': phoneNumber},
+      );
+      if (resp.data is Map && resp.data['registered'] == true) {
+        return true;
+      }
+      return false;
+    } catch (_) {
+      try {
+        final resp = await ApiClient.instance.dio.get(
+          '/public/check-mobile',
+          queryParameters: {'mobile': phoneNumber},
+        );
+        if (resp.data is Map && resp.data['registered'] == true) {
+          return true;
+        }
+      } catch (_) {}
+      return false;
+    }
+  }
+
+  Future<bool> sendOTP(String phoneNumber, {String? purpose}) async {
     _lastError = null;
     try {
+      final data = <String, dynamic>{'phone_number': phoneNumber};
+      if (purpose != null) {
+        data['purpose'] = purpose;
+      }
       final resp = await ApiClient.instance.dio.post(
         '/auth/send-otp',
-        data: {'phone_number': phoneNumber},
+        data: data,
       );
       _devOtp = resp.data is Map ? resp.data['dev_otp'] as String? : null;
       _phoneNumber = phoneNumber;
