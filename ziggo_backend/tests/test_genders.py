@@ -19,6 +19,7 @@ from app.schemas import UserUpdate
 from app.services.gender_service import (
     FEMALE_PASSENGERS_ONLY,
     LADY_DRIVER_REQUESTED,
+    apply_driver_gender,
     apply_nic_gender,
     gender_from_nic,
     is_lady_driver_service,
@@ -82,6 +83,26 @@ def test_lady_drivers_ride_scooters(service, expected):
 
 def _person(gender=None, source=None):
     return SimpleNamespace(gender=gender, gender_source=source)
+
+
+@pytest.mark.parametrize("nic, chosen, before, expected, refused", [
+    ("858202937V", "female", (None, None), ("female", "nic"), False),       # NIC agrees
+    ("858202937V", None, (None, None), ("female", "nic"), False),           # older app: NIC alone, as before
+    ("858202937V", "male", (None, None), (None, None), True),               # NIC says female
+    ("199032002937", "female", (None, None), (None, None), True),           # NIC says male
+    ("2000245065403", "female", (None, None), ("female", "self"), False),   # 13 digits: NIC unreadable, choice kept
+    ("garbage", "Male", ("female", "self"), ("male", "self"), False),       # re-submitted with another choice
+    ("garbage", None, ("female", "self"), ("female", "self"), False),       # nothing to go on: unchanged
+    ("garbage", "other", (None, None), (None, None), False),                # only female/male count
+    ("858202937V", "male", ("male", "admin"), ("male", "admin"), False),    # the admin's say stands
+])
+def test_driver_signup_gender(nic, chosen, before, expected, refused):
+    user = SimpleNamespace(gender=before[0], gender_source=before[1])
+    refusal = apply_driver_gender(user, nic, chosen)
+    assert (refusal is not None) == refused
+    if refused:
+        assert "NIC" in refusal and (user.gender, user.gender_source) == before
+    assert (user.gender, user.gender_source) == expected
 
 
 def test_nic_follows_unless_admin_set_it():

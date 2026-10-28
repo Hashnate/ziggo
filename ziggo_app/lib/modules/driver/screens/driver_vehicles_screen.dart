@@ -592,7 +592,8 @@ class _AddVehicleSheetState extends State<_AddVehicleSheet> {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 ),
                 items: const [
-                  DropdownMenuItem(value: 'bike', child: Text('🛵 Motorbike')),
+                  DropdownMenuItem(value: 'bike', child: Text('🏍️ Motorbike')),
+                  DropdownMenuItem(value: 'moto scooter', child: Text('🛵 Scooter')),
                   DropdownMenuItem(value: 'tuk', child: Text('🛺 Three-Wheeler (Tuk-Tuk)')),
                   DropdownMenuItem(value: 'car', child: Text('🚗 Car')),
                   DropdownMenuItem(value: 'van', child: Text('🚐 Van')),

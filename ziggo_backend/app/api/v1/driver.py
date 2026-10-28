@@ -25,7 +25,7 @@ from ...services.fare_service import haversine_km
 from ...services.gender_service import (
     FEMALE,
     FEMALE_PASSENGERS_SCOOTER_ONLY,
-    apply_nic_gender,
+    apply_driver_gender,
     female_passengers_only,
     is_lady_driver_service,
 )
@@ -338,6 +338,9 @@ async def register_driver(
             status_code=400,
             detail="Invalid vehicle_type",
         )
+    refusal = apply_driver_gender(user, body.nic_number, body.gender)
+    if refusal:
+        raise HTTPException(status_code=400, detail=refusal)
 
     d = await _get_driver(db, user)
 
@@ -389,7 +392,6 @@ async def register_driver(
             )
 
     d.nic_number = body.nic_number
-    apply_nic_gender(user, body.nic_number)
     d.license_number = body.license_number
     d.vehicle_type = body.vehicle_type
     d.vehicle_number = body.vehicle_number

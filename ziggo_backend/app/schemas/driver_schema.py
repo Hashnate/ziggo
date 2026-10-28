@@ -18,7 +18,7 @@ class DriverRegisterRequest(BaseModel):
     email: Optional[EmailStr] = None
     nic_number: str
     license_number: str
-    vehicle_type: str  # bike | tuk | car | van | truck
+    vehicle_type: str  # bike | moto scooter | tuk | car | van | truck
     driver_type: Optional[str] = "ride"
     vehicle_number: str
     vehicle_model: str
@@ -27,6 +27,8 @@ class DriverRegisterRequest(BaseModel):
     relative_contact: Optional[str] = None
     relative_relationship: Optional[str] = None
     referral_code: Optional[str] = None
+    # "female" | "male"; must match the NIC when it can be read (older apps don't send it)
+    gender: Optional[str] = None
 
 
 class AdminDriverCreateRequest(BaseModel):
