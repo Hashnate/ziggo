@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/app_colors.dart';
@@ -24,6 +25,13 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
   late String _currentTab;
   int _selectedFilterIndex = 0;
 
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _dpoContactKey = GlobalKey();
+  final GlobalKey _termsContactKey = GlobalKey();
+
+  bool _highlightDpoEmail = false;
+  bool _highlightTermsEmail = false;
+
   final List<String> _privacyFilters = [
     'All',
     'Collection',
@@ -41,20 +49,96 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
     _currentTab = widget.initialTab == 'terms' ? 'terms' : 'privacy';
   }
 
-  Future<void> _launchEmail(String email, String subject) async {
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  /// Points directly to the email section by scrolling and pulsing the target email card,
+  /// copies the address to the system clipboard, and launches the native email client.
+  Future<void> _pointToEmailAndLaunch({
+    required String email,
+    required String subject,
+    required bool isTerms,
+  }) async {
+    // 1. Copy email address to system clipboard & haptic feedback
+    await Clipboard.setData(ClipboardData(text: email));
+    HapticFeedback.selectionClick();
+
+    // 2. Ensure the correct tab and filter are active so the section is mounted
+    if (isTerms && _currentTab != 'terms') {
+      setState(() => _currentTab = 'terms');
+    } else if (!isTerms && _currentTab != 'privacy') {
+      setState(() {
+        _currentTab = 'privacy';
+        _selectedFilterIndex = 0;
+      });
+    } else if (!isTerms && _selectedFilterIndex != 0 && _selectedFilterIndex != 7) {
+      // If a specific filter is hiding Section 8, reset to 'All'
+      setState(() => _selectedFilterIndex = 0);
+    }
+
+    // Wait for the next frame so widget tree layout is stabilized
+    await WidgetsBinding.instance.endOfFrame;
+
+    // 3. Smoothly scroll directly to the contact section
+    final targetKey = isTerms ? _termsContactKey : _dpoContactKey;
+    if (targetKey.currentContext != null) {
+      Scrollable.ensureVisible(
+        targetKey.currentContext!,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOutCubic,
+        alignment: 0.15,
+      );
+    }
+
+    // 4. Trigger pulse highlight on the target email card
+    setState(() {
+      if (isTerms) {
+        _highlightTermsEmail = true;
+      } else {
+        _highlightDpoEmail = true;
+      }
+    });
+
+    Future.delayed(const Duration(milliseconds: 3000), () {
+      if (mounted) {
+        setState(() {
+          _highlightDpoEmail = false;
+          _highlightTermsEmail = false;
+        });
+      }
+    });
+
+    // 5. Build RFC-compliant mailto URI
     final uri = Uri(
       scheme: 'mailto',
       path: email,
       queryParameters: {'subject': subject},
     );
+
+    // 6. Attempt direct launch with externalApplication mode
+    bool launched = false;
     try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
-      } else {
-        _showCopySnackBar('Email address: $email');
-      }
+      launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
     } catch (_) {
-      _showCopySnackBar('Email address: $email');
+      launched = false;
+    }
+
+    if (!mounted) return;
+
+    if (launched) {
+      _showFeedbackSnackBar(
+        'Opening email app for $email (address copied to clipboard)',
+        isSuccess: true,
+      );
+    } else {
+      // If launch was blocked or no email app exists, show fallback sheet
+      _showFallbackEmailSheet(email: email, subject: subject);
     }
   }
 
@@ -64,20 +148,141 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
-        _showCopySnackBar('Visit: $url');
+        _showFeedbackSnackBar('Visit: $url');
       }
     } catch (_) {
-      _showCopySnackBar('Visit: $url');
+      _showFeedbackSnackBar('Visit: $url');
     }
   }
 
-  void _showCopySnackBar(String msg) {
+  void _showFeedbackSnackBar(String msg, {bool isSuccess = false}) {
     if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg),
-        backgroundColor: AppColors.primaryDark,
+        content: Row(
+          children: [
+            Icon(
+              isSuccess ? Icons.check_circle_outline_rounded : Icons.info_outline_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                msg,
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: isSuccess ? AppColors.success : AppColors.primaryDark,
         behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  void _showFallbackEmailSheet({required String email, required String subject}) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.cardBorder,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.mark_email_read_rounded, color: AppColors.primary, size: 26),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Contact Email',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+                        ),
+                        Text(
+                          email,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.copy_rounded, color: AppColors.primary, size: 20),
+                ),
+                title: const Text('Copy Email Address', style: TextStyle(fontWeight: FontWeight.w800)),
+                subtitle: Text('Copied: $email'),
+                tileColor: AppColors.surfaceMuted,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Clipboard.setData(ClipboardData(text: email));
+                  _showFeedbackSnackBar('Copied $email to clipboard', isSuccess: true);
+                },
+              ),
+              const SizedBox(height: 10),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.language_rounded, color: AppColors.secondary, size: 20),
+                ),
+                title: const Text('Open Online Privacy Portal', style: TextStyle(fontWeight: FontWeight.w800)),
+                subtitle: const Text('https://ziggo.lk/pages/privacy'),
+                tileColor: AppColors.surfaceMuted,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _launchWeb('https://ziggo.lk/pages/privacy');
+                },
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -116,6 +321,7 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
         ],
       ),
       body: ListView(
+        controller: _scrollController,
         padding: const EdgeInsets.fromLTRB(18, 6, 18, 36),
         children: [
           // ── Hero Banner ──────────────────────────────────────────────────
@@ -148,7 +354,7 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
           // ── Contact / Action Card ─────────────────────────────────────────
           EntranceSlide(
             delay: const Duration(milliseconds: 200),
-            child: _buildContactCard(),
+            child: _buildBottomActionCard(),
           ),
           const SizedBox(height: 20),
 
@@ -461,14 +667,81 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
           badgeColor: AppColors.accent,
           title: '4. Your Rights & Account Controls',
           icon: Icons.admin_panel_settings_rounded,
-          content: [
-            'Under Sri Lanka’s data privacy framework and global standards, you retain comprehensive control:',
-            '• In-App Access: Review personal data, trip histories, and payment methods directly via your Profile.\n'
-            '• Data Rectification: Update your name, emergency contacts, or phone number in Edit Profile.\n'
-            '• Account Deletion: Request permanent account and credential deletion at any time via Profile > Additional Settings > Delete my account.\n'
-            '• Machine-Readable Export: Request a copy of your personal data archive by contacting privacy@ziggo.lk.\n'
-            '• Marketing Opt-Out: Disable promotional alerts anytime while retaining transactional receipts.',
-          ],
+          customWidget: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Under Sri Lanka’s data privacy framework and global standards, you retain comprehensive control over your personal data:',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.55,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '• In-App Access: Review personal data, trip histories, and payment methods directly via your Profile.\n'
+                '• Data Rectification: Update your name, emergency contacts, or phone number in Edit Profile.\n'
+                '• Account Deletion: Request permanent account and credential deletion at any time via Profile > Additional Settings > Delete my account.\n'
+                '• Marketing Opt-Out: Disable promotional alerts anytime while retaining transactional receipts.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.55,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.file_download_outlined, color: AppColors.primary, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Data Archive & Export Request',
+                            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Need a copy of your records? Email our DPO desk:',
+                            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                          ),
+                          const SizedBox(height: 4),
+                          GestureDetector(
+                            onTap: () => _pointToEmailAndLaunch(
+                              email: 'privacy@ziggo.lk',
+                              subject: 'Data Subject Access Request (DSAR) - Ziggo App',
+                              isTerms: false,
+                            ),
+                            child: const Text(
+                              'privacy@ziggo.lk',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.primary,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
 
       if (showAll || _selectedFilterIndex == 5)
@@ -511,16 +784,87 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
 
       if (showAll || _selectedFilterIndex == 7)
         _buildSectionCard(
+          key: _dpoContactKey,
           badge: 'SECTION 8',
           badgeColor: AppColors.primary,
           title: '8. Data Protection Officer & Contact',
           icon: Icons.contact_support_rounded,
-          content: [
-            'For data privacy inquiries, formal requests, or regulatory filings, reach out directly to our Data Protection Officer (DPO):',
-            '• Email: privacy@ziggo.lk\n'
-            '• Security Desk: security@ziggo.lk\n'
-            '• Postal Address: Ziggo Lanka (Pvt) Ltd, #75/30, Abdul Hameed Street, Colombo - 12, Sri Lanka.',
-          ],
+          customWidget: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'For data privacy inquiries, formal requests, or regulatory filings, reach out directly to our Data Protection Officer (DPO):',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.55,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Interactive DPO Email Card
+              _buildInteractiveEmailCard(
+                label: 'DATA PROTECTION OFFICER (DPO)',
+                email: 'privacy@ziggo.lk',
+                description: 'Official desk for user privacy, consent & rights',
+                isHighlighted: _highlightDpoEmail,
+                onTap: () => _pointToEmailAndLaunch(
+                  email: 'privacy@ziggo.lk',
+                  subject: 'Privacy Policy Inquiry - Ziggo App',
+                  isTerms: false,
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              // Interactive Security Desk Email Card
+              _buildInteractiveEmailCard(
+                label: 'SECURITY & FRAUD RESPONSE',
+                email: 'security@ziggo.lk',
+                description: 'Account safety, breach alerts & security reports',
+                isHighlighted: false,
+                onTap: () => _pointToEmailAndLaunch(
+                  email: 'security@ziggo.lk',
+                  subject: 'Security & Safety Inquiry - Ziggo App',
+                  isTerms: false,
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.location_on_outlined, color: AppColors.textSecondary, size: 20),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Registered Head Office',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Ziggo Lanka (Pvt) Ltd, #75/30, Abdul Hameed Street, Colombo - 12, Sri Lanka.',
+                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
     ];
   }
@@ -555,10 +899,27 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
         badgeColor: AppColors.warning,
         title: '2. Account Responsibilities',
         icon: Icons.key_rounded,
-        content: [
-          '• You are responsible for safeguarding your OTP credentials and all activities occurring on your account.\n'
-          '• Notify security@ziggo.lk immediately if you suspect unauthorized access or device loss.',
-        ],
+        customWidget: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '• You are responsible for safeguarding your OTP credentials and all activities occurring on your account.',
+              style: TextStyle(fontSize: 13, height: 1.5, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 8),
+            _buildInteractiveEmailCard(
+              label: 'REPORT COMPROMISED ACCOUNT',
+              email: 'security@ziggo.lk',
+              description: 'Notify immediately if you suspect unauthorized access',
+              isHighlighted: false,
+              onTap: () => _pointToEmailAndLaunch(
+                email: 'security@ziggo.lk',
+                subject: 'URGENT: Compromised Account Alert',
+                isTerms: true,
+              ),
+            ),
+          ],
+        ),
       ),
       _buildSectionCard(
         badge: 'SECTION 3',
@@ -584,28 +945,152 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
         ],
       ),
       _buildSectionCard(
+        key: _termsContactKey,
         badge: 'SECTION 5',
         badgeColor: AppColors.primaryDark,
-        title: '5. Governing Law & Dispute Resolution',
+        title: '5. Governing Law & Legal Contact',
         icon: Icons.account_balance_rounded,
-        content: [
-          'These Terms are governed by and construed in accordance with the laws of the Democratic Socialist Republic of Sri Lanka. '
-          'Disputes arising out of or in connection with these terms shall be subject to the exclusive jurisdiction of the competent courts of Colombo.',
-        ],
+        customWidget: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'These Terms are governed by and construed in accordance with the laws of the Democratic Socialist Republic of Sri Lanka. '
+              'Disputes arising out of or in connection with these terms shall be subject to the exclusive jurisdiction of the competent courts of Colombo.',
+              style: TextStyle(fontSize: 13, height: 1.5, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 12),
+            _buildInteractiveEmailCard(
+              label: 'LEGAL & REGULATORY COUNSEL',
+              email: 'legal@ziggo.lk',
+              description: 'Official inquiries regarding Terms of Service and contracts',
+              isHighlighted: _highlightTermsEmail,
+              onTap: () => _pointToEmailAndLaunch(
+                email: 'legal@ziggo.lk',
+                subject: 'Terms of Service Inquiry - Ziggo App',
+                isTerms: true,
+              ),
+            ),
+          ],
+        ),
       ),
     ];
   }
 
+  // ── Interactive Email Card Component ──────────────────────────────────────
+  Widget _buildInteractiveEmailCard({
+    required String label,
+    required String email,
+    required String description,
+    required bool isHighlighted,
+    required VoidCallback onTap,
+  }) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 350),
+      decoration: BoxDecoration(
+        color: isHighlighted ? AppColors.primary.withOpacity(0.08) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isHighlighted ? AppColors.primary : AppColors.cardBorder,
+          width: isHighlighted ? 2.0 : 1.0,
+        ),
+        boxShadow: isHighlighted
+            ? [
+                BoxShadow(
+                  color: AppColors.primary.withOpacity(0.25),
+                  blurRadius: 16,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : AppStyles.shadowSm,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: isHighlighted ? AppColors.primary : AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.email_rounded,
+                    color: isHighlighted ? Colors.white : AppColors.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.8,
+                          color: isHighlighted ? AppColors.primary : AppColors.textTertiary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        email,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        description,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  tooltip: 'Copy $email',
+                  icon: const Icon(Icons.copy_rounded, size: 18, color: AppColors.textSecondary),
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: email));
+                    _showFeedbackSnackBar('Copied $email to clipboard', isSuccess: true);
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── Section Card Widget ───────────────────────────────────────────────────
   Widget _buildSectionCard({
+    Key? key,
     required String badge,
     required Color badgeColor,
     required String title,
     required IconData icon,
     List<String>? content,
     List<_SubItem>? subsections,
+    Widget? customWidget,
   }) {
     return Container(
+      key: key,
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -708,13 +1193,18 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
                     ],
                   ),
                 )),
+          if (customWidget != null) customWidget,
         ],
       ),
     );
   }
 
   // ── Contact / Action Card ─────────────────────────────────────────────────
-  Widget _buildContactCard() {
+  Widget _buildBottomActionCard() {
+    final isPrivacy = _currentTab == 'privacy';
+    final targetEmail = isPrivacy ? 'privacy@ziggo.lk' : 'legal@ziggo.lk';
+    final btnLabel = isPrivacy ? 'Email DPO' : 'Email Legal Team';
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -737,22 +1227,24 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
                 child: const Icon(Icons.mark_email_read_rounded, color: AppColors.primary, size: 24),
               ),
               const SizedBox(width: 14),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Have a Privacy Question?',
-                      style: TextStyle(
+                      isPrivacy ? 'Have a Privacy Question?' : 'Questions About Our Terms?',
+                      style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w900,
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
-                      'Our Data Protection Officer is ready to assist',
-                      style: TextStyle(
+                      isPrivacy
+                          ? 'Our Data Protection Officer is ready to assist'
+                          : 'Our Legal Counsel will address your inquiry',
+                      style: const TextStyle(
                         fontSize: 11.5,
                         color: AppColors.textSecondary,
                         fontWeight: FontWeight.w500,
@@ -768,14 +1260,17 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () => _launchEmail(
-                    _currentTab == 'privacy' ? 'privacy@ziggo.lk' : 'legal@ziggo.lk',
-                    'Privacy Policy Inquiry - Ziggo App',
+                  onPressed: () => _pointToEmailAndLaunch(
+                    email: targetEmail,
+                    subject: isPrivacy
+                        ? 'Privacy Policy Inquiry - Ziggo App'
+                        : 'Terms of Service Inquiry - Ziggo App',
+                    isTerms: !isPrivacy,
                   ),
                   icon: const Icon(Icons.email_outlined, size: 16),
-                  label: const Text(
-                    'Email DPO',
-                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800),
+                  label: Text(
+                    btnLabel,
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
@@ -790,7 +1285,7 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () => _launchWeb(
-                    _currentTab == 'privacy'
+                    isPrivacy
                         ? 'https://ziggo.lk/pages/privacy'
                         : 'https://ziggo.lk/pages/terms',
                   ),

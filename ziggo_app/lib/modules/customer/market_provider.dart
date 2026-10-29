@@ -94,7 +94,7 @@ class MarketProvider extends ChangeNotifier {
   }
 
   void setActiveVendor(Map<String, dynamic> vendor) {
-    final vendorId = vendor['id'] as int;
+    final vendorId = (vendor['id'] as num).toInt();
     if (_activeVendorId != null && _activeVendorId != vendorId) {
       _cart.clear();
       _pendingPromoCode = null;
@@ -104,7 +104,7 @@ class MarketProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void addToCart(int vendorId, Map<String, dynamic> product) {
+  void addToCart(int vendorId, Map<String, dynamic> product, {Map<String, dynamic>? vendor}) {
     if (_activeVendorId != null && _activeVendorId != vendorId) {
       _cart.clear();
       _pendingPromoCode = null;
@@ -112,12 +112,44 @@ class MarketProvider extends ChangeNotifier {
       _quote = null;
     }
     _activeVendorId = vendorId;
+    if (vendor != null) {
+      _activeVendor = vendor;
+    }
     final pid = (product['id'] as num).toInt();
     final existing = _cart[pid];
     _cart[pid] = {
       'product': product,
       'quantity': (existing?['quantity'] as int? ?? 0) + 1,
     };
+    notifyListeners();
+  }
+
+  void setProductQty(int vendorId, Map<String, dynamic> product, int quantity, {Map<String, dynamic>? vendor}) {
+    if (_activeVendorId != null && _activeVendorId != vendorId) {
+      _cart.clear();
+      _pendingPromoCode = null;
+      _activeVendor = null;
+      _quote = null;
+    }
+    _activeVendorId = vendorId;
+    if (vendor != null) {
+      _activeVendor = vendor;
+    }
+    final pid = (product['id'] as num).toInt();
+    if (quantity <= 0) {
+      _cart.remove(pid);
+      if (_cart.isEmpty) {
+        _activeVendorId = null;
+        _activeVendor = null;
+        _pendingPromoCode = null;
+        _quote = null;
+      }
+    } else {
+      _cart[pid] = {
+        'product': product,
+        'quantity': quantity,
+      };
+    }
     notifyListeners();
   }
 
