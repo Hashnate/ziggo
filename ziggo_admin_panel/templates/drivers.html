@@ -418,7 +418,8 @@
                     <td class="px-6 py-4 text-sm font-normal {% if (driver.settlement_amount or 0) > 0 %}text-amber-600 font-bold{% else %}text-gray-400{% endif %}">Rs.{{ "{:,.0f}".format(driver.settlement_amount or 0) }}</td>
                     <td class="px-6 py-4">
                         <div class="flex items-center gap-2">
-                            <a href="/admin/drivers/{{ driver.id }}/edit" class="w-8 h-8 rounded-lg bg-ziggo-soft border border-ziggo-line text-ziggo inline-flex items-center justify-center hover:bg-ziggo hover:text-white hover:border-ziggo transition" title="Edit">
+                            {% set current_return = request.url.path ~ ('?' ~ request.url.query if request.url.query else ('?status=' ~ status if status and status != 'all' else '')) %}
+                            <a href="/admin/drivers/{{ driver.id }}/edit?return_to={{ current_return | urlencode }}" class="w-8 h-8 rounded-lg bg-ziggo-soft border border-ziggo-line text-ziggo inline-flex items-center justify-center hover:bg-ziggo hover:text-white hover:border-ziggo transition" title="Edit">
                                 <i class="fas fa-edit"></i>
                             </a>
                             {% if not driver.vehicle_number or not driver.nic_number %}

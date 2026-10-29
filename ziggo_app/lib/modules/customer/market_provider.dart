@@ -107,9 +107,10 @@ class MarketProvider extends ChangeNotifier {
       _cart.clear();
       _pendingPromoCode = null;
       _activeVendor = null;
+      _quote = null;
     }
     _activeVendorId = vendorId;
-    final pid = product['id'] as int;
+    final pid = (product['id'] as num).toInt();
     final existing = _cart[pid];
     _cart[pid] = {
       'product': product,
@@ -130,6 +131,8 @@ class MarketProvider extends ChangeNotifier {
     if (_cart.isEmpty) {
       _activeVendorId = null;
       _activeVendor = null;
+      _pendingPromoCode = null;
+      _quote = null;
     }
     notifyListeners();
   }
@@ -150,7 +153,11 @@ class MarketProvider extends ChangeNotifier {
     required double lat,
     required double lng,
   }) async {
-    if (_activeVendorId == null || _cart.isEmpty) return null;
+    if (_activeVendorId == null || _cart.isEmpty) {
+      _quote = null;
+      notifyListeners();
+      return null;
+    }
     final items = _cart.values
         .map((e) => {'product_id': (e['product'] as Map)['id'], 'quantity': e['quantity']})
         .toList();

@@ -246,10 +246,16 @@ async def test_driver_filters():
                 today = today_lk()
                 week = {"jobs_from": today - timedelta(days=7), "jobs_to": today}
                 assert await jobs(job_types=("rides",), **week) == {"veteran": 3, "newbie": 1, "car": 0}
+                assert await who(min_jobs=1, job_types=("rides",), **week) == ["newbie", "veteran"], "min 1 job in week"
                 assert await who(min_jobs=2, job_types=("rides",), **week) == ["veteran"]
                 assert await who(max_jobs=0, job_types=("rides",), **week) == ["car"], "no ride this week"
                 assert await who(min_jobs=1, max_jobs=2) == ["car", "newbie"]
                 assert await who(vehicle_type="tuk", new_days=30, new_by="joined", max_jobs=0) == []
+
+                # Search and driver date tests
+                assert await who(search="F1") == ["veteran"], "search by name"
+                assert await who(search=FILTER_PHONES[2]) == ["newbie"], "search by contact/phone"
+                assert await who(driver_from=today - timedelta(days=10), driver_to=today) == ["newbie", "veteran"]
 
                 f = DriverFilter(vehicle_type="tuk", new_days=30, min_jobs=10, job_types=("rides", "parcels"),
                                  jobs_from=today - timedelta(days=7), jobs_to=today)
@@ -258,6 +264,8 @@ async def test_driver_filters():
                 assert DriverFilter.from_json(f.to_json()) == f
                 assert DriverFilter().describe() == "All drivers" and DriverFilter().is_everyone()
                 assert DriverFilter(max_jobs=0).describe() == "All drivers · at most 0 completed jobs"
+                assert DriverFilter(search="Ijas").describe() == 'All drivers · matching "Ijas"'
+                assert not DriverFilter(search="Ijas").is_everyone()
             finally:
                 await _clean_filter_drivers(db)
     finally:

@@ -1270,6 +1270,7 @@ async def admin_drivers_edit_form(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
+    back_url = "/admin/drivers"
     try:
         q = await db.execute(
             select(Driver).options(selectinload(Driver.user)).where(Driver.id == driver_id)
@@ -1277,6 +1278,30 @@ async def admin_drivers_edit_form(
         d = q.scalars().first()
         if not d:
             raise HTTPException(status_code=404, detail="Driver not found")
+
+        # Determine back_url
+        return_to = request.query_params.get("return_to", "").strip()
+        if return_to and return_to.startswith("/admin/") and not return_to.startswith(f"/admin/drivers/{driver_id}/edit"):
+            back_url = return_to
+        elif request.query_params.get("from_status"):
+            back_url = f"/admin/drivers?status={urllib.parse.quote(request.query_params['from_status'])}"
+        elif request.query_params.get("status"):
+            back_url = f"/admin/drivers?status={urllib.parse.quote(request.query_params['status'])}"
+        else:
+            referer = request.headers.get("referer", "")
+            if referer:
+                try:
+                    parsed_ref = urllib.parse.urlparse(referer)
+                    if parsed_ref.path == "/admin/drivers":
+                        ref_query = f"?{parsed_ref.query}" if parsed_ref.query else ""
+                        back_url = f"/admin/drivers{ref_query}"
+                except Exception:
+                    pass
+
+        if not back_url or back_url == "/admin/drivers":
+            is_incomplete = not (d and d.vehicle_number and str(d.vehicle_number).strip())
+            if is_incomplete:
+                back_url = "/admin/drivers?status=incomplete"
 
         # BRD: load uploaded KYC documents so the admin can verify them inline
         from app.models import DriverDocument
@@ -1404,6 +1429,7 @@ async def admin_drivers_edit_form(
                 "vehicles": driver_vehicles,
                 "categories": categories,
                 "error": None,
+                "back_url": back_url,
             },
         )
     except HTTPException:
@@ -1417,7 +1443,7 @@ async def admin_drivers_edit_form(
             f"<h2 style='color:#b91c1c;'>Error Loading Driver #{driver_id}</h2>"
             f"<p style='color:#64748b;'>An error occurred while loading this driver details:</p>"
             f"<pre style='background:#f8fafc;border:1px solid #e2e8f0;padding:15px;border-radius:12px;overflow-x:auto;font-size:12px;'>{err_msg}</pre>"
-            f"<p><a href='/admin/drivers' style='color:#2563eb;text-decoration:none;font-weight:bold;'>← Back to Driver List</a></p>"
+            f"<p><a href='{back_url or '/admin/drivers'}' style='color:#2563eb;text-decoration:none;font-weight:bold;'>← Back to Driver List</a></p>"
             f"</div>",
             status_code=500,
         )
@@ -1439,6 +1465,7 @@ async def admin_drivers_edit_submit(
     is_approved: str = Form(""),
     remove_photo: str = Form(""),
     gender: str = Form("auto"),
+    return_to: str = Form(""),
     profile_photo: UploadFile | None = File(None),
     relative_name: str = Form(""),
     relative_contact: str = Form(""),
@@ -1466,6 +1493,16 @@ async def admin_drivers_edit_submit(
         raise HTTPException(status_code=404, detail="Driver not found")
     user = d.user
 
+    ret = (return_to or "").strip()
+    if not ret:
+        ret = request.query_params.get("return_to", "").strip()
+
+    if ret and ret.startswith("/admin/") and not ret.startswith(f"/admin/drivers/{driver_id}/edit"):
+        back_url = ret
+    else:
+        is_incomplete = not (d and d.vehicle_number and str(d.vehicle_number).strip())
+        back_url = "/admin/drivers?status=incomplete" if is_incomplete else "/admin/drivers"
+
     from app.models import FareSetting
     cats_q = await db.execute(
         select(FareSetting).where(FareSetting.is_active == True).order_by(FareSetting.display_order, FareSetting.id)
@@ -1484,6 +1521,7 @@ async def admin_drivers_edit_submit(
                 "documents": [],
                 "categories": categories,
                 "error": msg,
+                "back_url": back_url,
             },
             status_code=status,
         )
@@ -1627,12 +1665,28 @@ async def admin_drivers_edit_submit(
                     db.add(doc)
 
     await db.commit()
-    return RedirectResponse(url=f"/admin/drivers/{driver_id}/edit?success=Driver+updated+successfully", status_code=303)
+    redirect_url = f"/admin/drivers/{driver_id}/edit?success=Driver+updated+successfully"
+    if ret and ret.startswith("/admin/") and not ret.startswith(f"/admin/drivers/{driver_id}/edit"):
+        redirect_url += f"&return_to={urllib.parse.quote(ret)}"
+    return RedirectResponse(url=redirect_url, status_code=303)
+
+
+def _driver_list_redirect(request: Request, default_url: str = "/admin/drivers") -> RedirectResponse:
+    ref = request.headers.get("referer", "")
+    if ref:
+        try:
+            pref = urllib.parse.urlparse(ref)
+            if pref.path == "/admin/drivers":
+                return RedirectResponse(url=f"/admin/drivers{('?' + pref.query) if pref.query else ''}", status_code=303)
+        except Exception:
+            pass
+    return RedirectResponse(url=default_url, status_code=303)
 
 
 @router.post("/drivers/{driver_id}/approve")
 async def approve_driver_form(
     driver_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -1654,12 +1708,13 @@ async def approve_driver_form(
             })
         except Exception:
             pass
-    return RedirectResponse(url="/admin/drivers?success=Driver+approved+successfully", status_code=303)
+    return _driver_list_redirect(request, "/admin/drivers?success=Driver+approved+successfully")
 
 
 @router.post("/drivers/{driver_id}/suspend")
 async def suspend_driver_form(
     driver_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -1680,12 +1735,13 @@ async def suspend_driver_form(
             })
         except Exception:
             pass
-    return RedirectResponse(url="/admin/drivers", status_code=303)
+    return _driver_list_redirect(request, "/admin/drivers")
 
 
 @router.post("/drivers/{driver_id}/deactivate")
 async def deactivate_driver_form(
     driver_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -1702,12 +1758,13 @@ async def deactivate_driver_form(
         if d.user:
             d.user.is_active = False
         await db.commit()
-    return RedirectResponse(url="/admin/drivers", status_code=303)
+    return _driver_list_redirect(request, "/admin/drivers")
 
 
 @router.post("/drivers/{driver_id}/activate")
 async def activate_driver_form(
     driver_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -1721,7 +1778,7 @@ async def activate_driver_form(
         if d.user:
             d.user.is_active = True
         await db.commit()
-    return RedirectResponse(url="/admin/drivers", status_code=303)
+    return _driver_list_redirect(request, "/admin/drivers")
 
 
 @router.post("/drivers/applications/{id}/read")
@@ -1836,6 +1893,7 @@ async def _cleanup_customer_references(db: AsyncSession, customer_id: int):
 @router.get("/drivers/{driver_id}/delete")
 async def delete_driver_form(
     driver_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_superadmin_or_admin),
 ):
@@ -1859,7 +1917,7 @@ async def delete_driver_form(
     except Exception as e:
         logger.error(f"Error deleting driver {driver_id}: {e}", exc_info=True)
         await db.rollback()
-    return RedirectResponse(url="/admin/drivers", status_code=303)
+    return _driver_list_redirect(request, "/admin/drivers")
 
 
 
@@ -8077,6 +8135,7 @@ async def admin_notif_feed(
 async def admin_driver_doc_verify(
     driver_id: int,
     doc_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(current_admin),
 ):
@@ -8093,13 +8152,18 @@ async def admin_driver_doc_verify(
     doc.verified_by = admin.id
     doc.verified_at = datetime.now(timezone.utc)
     await db.commit()
-    return RedirectResponse(url=f"/admin/drivers/{driver_id}/edit", status_code=303)
+    ret = request.query_params.get("return_to", "").strip()
+    redirect_url = f"/admin/drivers/{driver_id}/edit"
+    if ret and ret.startswith("/admin/") and not ret.startswith(f"/admin/drivers/{driver_id}/edit"):
+        redirect_url += f"?return_to={urllib.parse.quote(ret)}"
+    return RedirectResponse(url=redirect_url, status_code=303)
 
 
 @router.post("/drivers/{driver_id}/documents/{doc_id}/reject")
 async def admin_driver_doc_reject(
     driver_id: int,
     doc_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -8116,7 +8180,11 @@ async def admin_driver_doc_reject(
     doc.verified_by = None
     doc.verified_at = None
     await db.commit()
-    return RedirectResponse(url=f"/admin/drivers/{driver_id}/edit", status_code=303)
+    ret = request.query_params.get("return_to", "").strip()
+    redirect_url = f"/admin/drivers/{driver_id}/edit"
+    if ret and ret.startswith("/admin/") and not ret.startswith(f"/admin/drivers/{driver_id}/edit"):
+        redirect_url += f"?return_to={urllib.parse.quote(ret)}"
+    return RedirectResponse(url=redirect_url, status_code=303)
 
 
 # ---------- Driver Multi-Vehicle verification ----------
@@ -8124,6 +8192,7 @@ async def admin_driver_doc_reject(
 async def admin_driver_vehicle_approve(
     driver_id: int,
     vehicle_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(current_admin),
 ):
@@ -8149,12 +8218,17 @@ async def admin_driver_vehicle_approve(
         d.vehicle_color = v.vehicle_color
 
     await db.commit()
-    return RedirectResponse(url=f"/admin/drivers/{driver_id}/edit", status_code=303)
+    ret = request.query_params.get("return_to", "").strip()
+    redirect_url = f"/admin/drivers/{driver_id}/edit"
+    if ret and ret.startswith("/admin/") and not ret.startswith(f"/admin/drivers/{driver_id}/edit"):
+        redirect_url += f"?return_to={urllib.parse.quote(ret)}"
+    return RedirectResponse(url=redirect_url, status_code=303)
 
 
 @router.post("/drivers/{driver_id}/vehicles/new")
 async def admin_driver_vehicle_add(
     driver_id: int,
+    request: Request,
     vehicle_type: str = Form(...),
     vehicle_number: str = Form(...),
     vehicle_model: str = Form(""),
@@ -8172,6 +8246,9 @@ async def admin_driver_vehicle_add(
     if not d:
         raise HTTPException(status_code=404, detail="Driver not found")
 
+    ret = request.query_params.get("return_to", "").strip()
+    ret_param = f"&return_to={urllib.parse.quote(ret)}" if (ret and ret.startswith("/admin/") and not ret.startswith(f"/admin/drivers/{driver_id}/edit")) else ""
+
     import re
     norm_v_num = re.sub(r'[^A-Z0-9]', '', v_num)
 
@@ -8180,7 +8257,7 @@ async def admin_driver_vehicle_add(
     # Check if driver already has this plate (case/space-insensitive)
     if any(re.sub(r'[^A-Z0-9]', '', (v.vehicle_number or '').upper()) == norm_v_num for v in all_veh):
         return RedirectResponse(
-            url=f"/admin/drivers/{driver_id}/edit?error=This+vehicle+plate+is+already+registered+for+this+driver",
+            url=f"/admin/drivers/{driver_id}/edit?error=This+vehicle+plate+is+already+registered+for+this+driver{ret_param}",
             status_code=303,
         )
 
@@ -8190,7 +8267,7 @@ async def admin_driver_vehicle_add(
     )).scalars().all()
     if any(re.sub(r'[^A-Z0-9]', '', (ov.vehicle_number or '').upper()) == norm_v_num for ov in other_vehs):
         return RedirectResponse(
-            url=f"/admin/drivers/{driver_id}/edit?error=Vehicle+plate+already+registered+to+another+driver",
+            url=f"/admin/drivers/{driver_id}/edit?error=Vehicle+plate+already+registered+to+another+driver{ret_param}",
             status_code=303,
         )
 
@@ -8220,13 +8297,17 @@ async def admin_driver_vehicle_add(
         d.vehicle_year = yr
 
     await db.commit()
-    return RedirectResponse(url=f"/admin/drivers/{driver_id}/edit", status_code=303)
+    redirect_url = f"/admin/drivers/{driver_id}/edit"
+    if ret and ret.startswith("/admin/") and not ret.startswith(f"/admin/drivers/{driver_id}/edit"):
+        redirect_url += f"?return_to={urllib.parse.quote(ret)}"
+    return RedirectResponse(url=redirect_url, status_code=303)
 
 
 @router.post("/drivers/{driver_id}/vehicles/{vehicle_id}/reject")
 async def admin_driver_vehicle_reject(
     driver_id: int,
     vehicle_id: int,
+    request: Request,
     reason: str = Form(""),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
@@ -8244,7 +8325,11 @@ async def admin_driver_vehicle_reject(
     v.rejection_reason = reason.strip() if reason else "Rejected by admin"
     v.approved_at = None
     await db.commit()
-    return RedirectResponse(url=f"/admin/drivers/{driver_id}/edit", status_code=303)
+    ret = request.query_params.get("return_to", "").strip()
+    redirect_url = f"/admin/drivers/{driver_id}/edit"
+    if ret and ret.startswith("/admin/") and not ret.startswith(f"/admin/drivers/{driver_id}/edit"):
+        redirect_url += f"?return_to={urllib.parse.quote(ret)}"
+    return RedirectResponse(url=redirect_url, status_code=303)
 
 
 # ---------- BRD: CD-17 — Emergency alerts ----------
@@ -8616,10 +8701,13 @@ async def admin_withdrawals_pay(
 async def admin_finance_drivers(
     request: Request,
     page: int = 1,
+    sort: str = "latest_ride",
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    rows = await fin.driver_finance_table(db)
+    if sort not in ("latest_ride", "earnings", "total_earnings"):
+        sort = "latest_ride"
+    rows = await fin.driver_finance_table(db, sort_by=sort)
     limit = 50
     offset = (page - 1) * limit
     total = len(rows)
@@ -8637,6 +8725,7 @@ async def admin_finance_drivers(
             "active_page": "finance",
             "rows": paginated_rows,
             "page": page,
+            "sort": sort,
             "total_pages": total_pages,
             "total_drivers": total,
             "start_idx": start_idx,
@@ -8715,11 +8804,20 @@ def _wallet_redirect(back: str, msg: str) -> RedirectResponse:
 
 
 def _wallet_date(value: str):
-    from datetime import date
-    try:
-        return date.fromisoformat((value or "").strip())
-    except ValueError:
+    from datetime import date, datetime
+    raw = (value or "").strip()
+    if not raw:
         return None
+    try:
+        return date.fromisoformat(raw)
+    except ValueError:
+        pass
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%d-%m-%Y", "%m-%d-%Y", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(raw, fmt).date()
+        except ValueError:
+            continue
+    return None
 
 
 def _wallet_filter(params):
@@ -8747,18 +8845,32 @@ def _wallet_filter(params):
         return d
 
     submitted = bool(params.get("f"))
+    min_j = number("min_jobs", "At least")
+    max_j = number("max_jobs", "At most")
+    j_from = day("jobs_from", "Jobs from")
+    j_to = day("jobs_to", "Jobs to")
+    # If the admin entered a completed jobs date range but left "at least" blank, default to >= 1 job
+    if min_j is None and max_j is None and submitted and (j_from or j_to):
+        if (params.get("min_jobs") or "").strip() == "":
+            min_j = 1
+
     f = DriverFilter(
         vehicle_type=(params.get("vehicle_type") or "").strip(),
+        search=(params.get("search") or "").strip(),
         new_days=number("new_days", "Days"),
         new_by="joined" if params.get("new_by") == "joined" else "approved",
-        min_jobs=number("min_jobs", "At least"),
-        max_jobs=number("max_jobs", "At most"),
+        driver_from=day("driver_from", "Driver date from"),
+        driver_to=day("driver_to", "Driver date to"),
+        min_jobs=min_j,
+        max_jobs=max_j,
         job_types=tuple(t for t in JOB_TYPES if t in params.getlist("job_types")) if submitted else JOB_TYPES,
-        jobs_from=day("jobs_from", "From"),
-        jobs_to=day("jobs_to", "To"),
+        jobs_from=j_from,
+        jobs_to=j_to,
     )
     if f.new_days == 0:
         errors.append("New drivers: enter at least 1 day.")
+    if f.driver_from and f.driver_to and f.driver_from > f.driver_to:
+        errors.append("Driver date range ends before it starts.")
     if f.min_jobs is not None and f.max_jobs is not None and f.min_jobs > f.max_jobs:
         errors.append("'At least' can't be more than 'at most'.")
     if f.jobs_from and f.jobs_to and f.jobs_from > f.jobs_to:
@@ -8770,10 +8882,18 @@ def _wallet_filter(params):
 
 def _wallet_filter_pairs(f) -> list[tuple[str, str]]:
     pairs = [("f", "1")]
+    if f.search:
+        pairs.append(("search", f.search))
     if f.vehicle_type:
         pairs.append(("vehicle_type", f.vehicle_type))
     if f.new_days is not None:
-        pairs += [("new_days", str(f.new_days)), ("new_by", f.new_by)]
+        pairs.append(("new_days", str(f.new_days)))
+    if f.driver_from:
+        pairs.append(("driver_from", f.driver_from.isoformat()))
+    if f.driver_to:
+        pairs.append(("driver_to", f.driver_to.isoformat()))
+    if f.new_days is not None or f.driver_from or f.driver_to:
+        pairs.append(("new_by", f.new_by))
     if f.min_jobs is not None:
         pairs.append(("min_jobs", str(f.min_jobs)))
     if f.max_jobs is not None:

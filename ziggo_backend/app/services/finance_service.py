@@ -404,7 +404,7 @@ async def launch_location_summary(db: AsyncSession) -> dict[int, dict]:
 # ---------------------------------------------------------------------------
 
 
-async def driver_finance_table(db: AsyncSession) -> list[dict]:
+async def driver_finance_table(db: AsyncSession, sort_by: str = "latest_ride") -> list[dict]:
     """One row per driver — total earnings (rides + food + market delivery
     share), plus today / week / month buckets."""
     today = _start_of_today_utc()
@@ -462,6 +462,7 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
         ride_count = 0
         food_count = 0
         market_count = 0
+        latest_earning_at: Optional[datetime] = None
 
         for b in b_list:
             if b.status != BookingStatus.COMPLETED:
@@ -475,6 +476,8 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
             ts = b.completed_at or b.booked_at
             if ts is not None:
                 ts_aware = ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
+                if latest_earning_at is None or ts_aware > latest_earning_at:
+                    latest_earning_at = ts_aware
                 if ts_aware >= today:
                     today_earn += earn
                 if ts_aware >= week:
@@ -493,6 +496,8 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
             ts = o.delivered_at or o.created_at
             if ts is not None:
                 ts_aware = ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
+                if latest_earning_at is None or ts_aware > latest_earning_at:
+                    latest_earning_at = ts_aware
                 if ts_aware >= today:
                     today_earn += earn
                 if ts_aware >= week:
@@ -511,6 +516,8 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
             ts = o.delivered_at or o.created_at
             if ts is not None:
                 ts_aware = ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
+                if latest_earning_at is None or ts_aware > latest_earning_at:
+                    latest_earning_at = ts_aware
                 if ts_aware >= today:
                     today_earn += earn
                 if ts_aware >= week:
@@ -543,9 +550,23 @@ async def driver_finance_table(db: AsyncSession) -> list[dict]:
             "branch_name": d.branch_name or "",
             "account_number": d.account_number or "",
             "account_holder_name": d.account_holder_name or "",
+            "latest_earning_at": latest_earning_at,
+            "latest_ride_at": latest_earning_at,
         })
 
-    rows.sort(key=lambda r: r["total_earnings"], reverse=True)
+    if sort_by in ("earnings", "total_earnings"):
+        rows.sort(key=lambda r: r["total_earnings"], reverse=True)
+    else:
+        # Default: latest driver who completed a ride/order and earned money to oldest.
+        # Drivers who have not completed any rides appear at the end, ordered by driver_id descending.
+        rows.sort(
+            key=lambda r: (
+                r["latest_earning_at"] is not None,
+                r["latest_earning_at"] if r["latest_earning_at"] is not None else datetime.min.replace(tzinfo=timezone.utc),
+                r["driver_id"],
+            ),
+            reverse=True,
+        )
     return rows
 
 
@@ -1115,7 +1136,7 @@ async def get_withdrawals_data(db: AsyncSession, page: int = 1, page_size: int =
         payout_by_driver[p.driver_id] = payout_by_driver.get(p.driver_id, Decimal("0")) + _dec(p.amount)
 
     # Use the existing driver_finance_table code to calculate total earnings dynamically
-    all_driver_rows = await driver_finance_table(db)
+    all_driver_rows = await driver_finance_table(db, sort_by="earnings")
     
     rows = []
     total_pending_all = Decimal("0")

@@ -138,27 +138,40 @@ class DriverFilter:
     vehicle_type: str = ""
     new_days: Optional[int] = None          # approved / signed up in the last N days
     new_by: str = "approved"                # approved | joined
+    driver_from: Optional[date] = None      # approved / signed up from date
+    driver_to: Optional[date] = None        # approved / signed up to date
     min_jobs: Optional[int] = None
     max_jobs: Optional[int] = None
     job_types: tuple = JOB_TYPES            # which completed jobs count
     jobs_from: Optional[date] = None        # Sri Lanka days, inclusive; None = no limit
     jobs_to: Optional[date] = None
+    search: str = ""                        # driver name, phone, email, or id
 
     def is_everyone(self) -> bool:
-        return not self.vehicle_type and self.new_days is None and self.min_jobs is None and self.max_jobs is None
+        return (
+            not self.vehicle_type
+            and not self.search
+            and self.new_days is None
+            and self.driver_from is None
+            and self.driver_to is None
+            and self.min_jobs is None
+            and self.max_jobs is None
+            and self.jobs_from is None
+            and self.jobs_to is None
+        )
 
     def to_json(self) -> dict:
         d = asdict(self)
         d["job_types"] = list(self.job_types)
-        d["jobs_from"] = self.jobs_from.isoformat() if self.jobs_from else None
-        d["jobs_to"] = self.jobs_to.isoformat() if self.jobs_to else None
+        for k in ("jobs_from", "jobs_to", "driver_from", "driver_to"):
+            d[k] = d[k].isoformat() if d.get(k) else None
         return d
 
     @classmethod
     def from_json(cls, d: dict) -> "DriverFilter":
         d = {k: v for k, v in (d or {}).items() if k in {f.name for f in fields(cls)}}
         d["job_types"] = tuple(d.get("job_types") or ())
-        for k in ("jobs_from", "jobs_to"):
+        for k in ("jobs_from", "jobs_to", "driver_from", "driver_to"):
             d[k] = date.fromisoformat(d[k]) if d.get(k) else None
         return cls(**d)
 
@@ -177,14 +190,27 @@ class DriverFilter:
 
     def describe(self) -> str:
         parts = [f"{self.vehicle_type.capitalize()} drivers" if self.vehicle_type else "All drivers"]
+        if self.search:
+            parts.append(f'matching "{self.search}"')
         if self.new_days is not None:
             verb = "approved" if self.new_by == "approved" else "signed up"
             parts.append(f"{verb} in the last {self.new_days} day{'s' if self.new_days != 1 else ''}")
-        if self.min_jobs is not None or self.max_jobs is not None:
-            if self.min_jobs is not None and self.max_jobs is not None:
-                n = f"{self.min_jobs} to {self.max_jobs}" if self.min_jobs != self.max_jobs else str(self.min_jobs)
-            elif self.min_jobs is not None:
-                n = f"at least {self.min_jobs}"
+        if self.driver_from or self.driver_to:
+            verb = "approved" if self.new_by == "approved" else "signed up"
+            if self.driver_from and self.driver_to:
+                parts.append(f"{verb} from {self.driver_from:%d %b %Y} to {self.driver_to:%d %b %Y}")
+            elif self.driver_from:
+                parts.append(f"{verb} since {self.driver_from:%d %b %Y}")
+            else:
+                parts.append(f"{verb} up to {self.driver_to:%d %b %Y}")
+        effective_min = self.min_jobs
+        if effective_min is None and self.max_jobs is None and (self.jobs_from or self.jobs_to):
+            effective_min = 1
+        if effective_min is not None or self.max_jobs is not None:
+            if effective_min is not None and self.max_jobs is not None:
+                n = f"{effective_min} to {self.max_jobs}" if effective_min != self.max_jobs else str(effective_min)
+            elif effective_min is not None:
+                n = f"at least {effective_min}"
             else:
                 n = f"at most {self.max_jobs}"
             parts.append(f"{n} completed {self.jobs_text()}")
@@ -246,8 +272,32 @@ async def find_drivers(db: AsyncSession, f: DriverFilter) -> list[dict]:
     if f.new_days is not None:
         since = datetime.now(timezone.utc) - timedelta(days=f.new_days)
         q = q.where((Driver.approved_at if f.new_by == "approved" else User.created_at) >= since)
+    if f.driver_from or f.driver_to:
+        target_col = Driver.approved_at if f.new_by == "approved" else User.created_at
+        if f.driver_from:
+            d_lo = datetime.combine(f.driver_from, time.min, _LK)
+            q = q.where(target_col >= d_lo)
+        if f.driver_to:
+            d_hi = datetime.combine(f.driver_to + timedelta(days=1), time.min, _LK)
+            q = q.where(target_col < d_hi)
+    if f.search:
+        raw_term = f.search.strip()
+        clean_term = raw_term.lstrip("#").strip()
+        search_pattern = f"%{raw_term}%"
+        clauses = [
+            User.full_name.ilike(search_pattern),
+            User.phone_number.ilike(search_pattern),
+        ]
+        if clean_term != raw_term:
+            clauses.append(User.full_name.ilike(f"%{clean_term}%"))
+            clauses.append(User.phone_number.ilike(f"%{clean_term}%"))
+        if clean_term.isdigit():
+            clauses.append(Driver.id == int(clean_term))
+        q = q.where(or_(*clauses))
+
     pairs = (await db.execute(q.order_by(Driver.id))).all()
     counts = await job_counts(db, [d.id for d, _ in pairs], f.job_types, f.jobs_from, f.jobs_to)
+
     rows = []
     for d, u in pairs:
         n = counts[d.id]
@@ -255,6 +305,8 @@ async def find_drivers(db: AsyncSession, f: DriverFilter) -> list[dict]:
             continue
         rows.append({"driver": d, "name": u.full_name, "phone": u.phone_number, "vehicle_type": d.vehicle_type,
                      "approved_at": d.approved_at, "joined_at": u.created_at, "jobs": n})
+    
+    rows.sort(key=lambda r: (-r["jobs"], r["driver"].id))
     return rows
 
 

@@ -262,6 +262,76 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
     }
 
+    if (food.cart.isEmpty) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: AppColors.background,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: const Text(
+            'Checkout',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 90,
+                  height: 90,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.shopping_bag_outlined,
+                    size: 46,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Your cart is empty',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Explore dishes from restaurants to add items to your cart.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 28),
+                PrimaryButton(
+                  label: 'BROWSE RESTAURANTS',
+                  icon: Icons.restaurant_rounded,
+                  gold: true,
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -385,6 +455,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   final it = e['item'] as Map<String, dynamic>;
                   final qty = e['quantity'] as int;
                   final portion = e['portion'] as String?;
+                  final cartKey = portion != null ? "${it['id']}_$portion" : "${it['id']}_none";
                   double price = (it['price'] as num).toDouble();
                   if (it['has_portions'] == true && portion == 'half') {
                     price = (it['price_half'] as num?)?.toDouble() ?? (price / 2.0);
@@ -394,29 +465,110 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       : it['name'].toString();
 
                   return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            '${qty}x',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.primary,
-                              fontSize: 11,
-                            ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                displayName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                formatRs(price),
+                                style: const TextStyle(
+                                  color: AppColors.textTertiary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(child: Text(displayName)),
-                        Text(
-                          formatRs(price * qty),
-                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        const SizedBox(width: 8),
+                        Container(
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceMuted,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: AppColors.primary.withOpacity(0.2),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () {
+                                  food.changeQty(cartKey, -1);
+                                  _refreshQuote();
+                                },
+                                child: Container(
+                                  width: 30,
+                                  height: 32,
+                                  alignment: Alignment.center,
+                                  child: Icon(
+                                    qty == 1
+                                        ? Icons.delete_outline_rounded
+                                        : Icons.remove_rounded,
+                                    size: 16,
+                                    color: qty == 1
+                                        ? AppColors.error
+                                        : AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 6),
+                                child: Text(
+                                  '$qty',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 13,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () {
+                                  food.changeQty(cartKey, 1);
+                                  _refreshQuote();
+                                },
+                                child: Container(
+                                  width: 30,
+                                  height: 32,
+                                  alignment: Alignment.center,
+                                  child: const Icon(
+                                    Icons.add_rounded,
+                                    size: 16,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: 75,
+                          child: Text(
+                            formatRs(price * qty),
+                            textAlign: TextAlign.right,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 14,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
                         ),
                       ],
                     ),

@@ -18,10 +18,18 @@
         <table class="w-full text-sm">
             <thead class="bg-gray-50 text-xs font-black uppercase text-gray-500 tracking-wider">
                 <tr>
-                    <th class="px-4 py-3 text-left">Driver</th>
+                    <th class="px-4 py-3 text-left">
+                        <a href="/admin/finance/drivers?sort=latest_ride" class="hover:text-ziggo inline-flex items-center gap-1 {% if sort == 'latest_ride' %}text-ziggo font-black{% endif %}" title="Sort by latest ride">
+                            Driver {% if sort == 'latest_ride' %}<i class="fas fa-sort-down text-xs"></i>{% endif %}
+                        </a>
+                    </th>
                     <th class="px-4 py-3 text-left">Vehicle</th>
                     <th class="px-4 py-3 text-left">Status</th>
-                    <th class="px-4 py-3 text-right">Total earnings</th>
+                    <th class="px-4 py-3 text-right">
+                        <a href="/admin/finance/drivers?sort=earnings" class="hover:text-ziggo inline-flex items-center gap-1 {% if sort == 'earnings' %}text-ziggo font-black{% endif %}" title="Sort by total earnings">
+                            Total earnings {% if sort == 'earnings' %}<i class="fas fa-sort-down text-xs"></i>{% endif %}
+                        </a>
+                    </th>
                     <th class="px-4 py-3 text-right">Settlement Owed</th>
                     <th class="px-4 py-3 text-right">This month</th>
                     <th class="px-4 py-3 text-right">This week</th>
@@ -37,6 +45,9 @@
                     <td class="px-4 py-3">
                         <p class="font-black text-ziggo">{{ r.name or '—' }}</p>
                         <p class="text-xs text-gray-400">{{ r.phone or '—' }}</p>
+                        {% if r.latest_ride_at %}
+                        <p class="text-[10px] text-gray-400 font-medium mt-0.5"><i class="far fa-clock text-[9px] mr-1"></i>Last trip: {{ r.latest_ride_at|colombo_dt("%d %b %Y, %I:%M %p") }}</p>
+                        {% endif %}
                     </td>
                     <td class="px-4 py-3 capitalize">{{ r.vehicle_type or '—' }}</td>
                     <td class="px-4 py-3">
@@ -74,7 +85,7 @@
             </p>
             <div class="flex items-center gap-1.5">
                 {% if page > 1 %}
-                    <a href="/admin/finance/drivers?page={{ page - 1 }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
+                    <a href="/admin/finance/drivers?page={{ page - 1 }}&sort={{ sort }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
                 {% else %}
                     <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Previous</span>
                 {% endif %}
@@ -83,12 +94,12 @@
                     {% if p == page %}
                         <span class="px-3 py-1.5 rounded-lg bg-ziggo text-white text-xs font-black">{{ p }}</span>
                     {% else %}
-                        <a href="/admin/finance/drivers?page={{ p }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
+                        <a href="/admin/finance/drivers?page={{ p }}&sort={{ sort }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
                     {% endif %}
                 {% endfor %}
 
                 {% if page < total_pages %}
-                    <a href="/admin/finance/drivers?page={{ page + 1 }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
+                    <a href="/admin/finance/drivers?page={{ page + 1 }}&sort={{ sort }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
                 {% else %}
                     <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Next</span>
                 {% endif %}

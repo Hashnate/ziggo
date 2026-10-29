@@ -47,6 +47,19 @@
             </div>
             <a href="/admin/driver-wallet" class="text-xs font-bold text-gray-500 hover:text-ziggo"><i class="fas fa-undo mr-1"></i> Clear filters</a>
         </div>
+
+        <!-- Driver Search (Name / Contact / Phone) -->
+        <div class="px-6 pt-5 pb-3 border-b border-gray-100 bg-white">
+            <label class="block text-xs font-black text-gray-500 mb-1.5 uppercase tracking-wider">Search driver (Name or Contact / Phone)</label>
+            <div class="relative max-w-xl flex items-center">
+                <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none flex items-center justify-center z-10">
+                    <i class="fas fa-search text-sm"></i>
+                </span>
+                <input type="text" name="search" value="{{ f.search }}" placeholder="Search by driver name, phone number (e.g. 077..., 076...), or driver ID..." style="padding-left: 38px !important;" class="w-full pr-4 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold outline-none focus:border-ziggo">
+            </div>
+            <p class="text-[11px] text-gray-400 mt-1">Quickly find a specific driver by their name, contact phone number, or driver ID.</p>
+        </div>
+
         <div class="p-6 grid md:grid-cols-3 gap-6 text-sm">
             <div class="space-y-4">
                 <div>
@@ -57,15 +70,22 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">New drivers only</label>
-                    <div class="flex items-center gap-2 flex-wrap font-bold text-gray-600">
-                        <select name="new_by" class="p-2 border border-gray-200 rounded-xl">
+                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Driver joined / approved</label>
+                    <div class="flex items-center gap-2 flex-wrap font-bold text-gray-600 mb-2">
+                        <select name="new_by" class="p-2 border border-gray-200 rounded-xl text-xs">
                             <option value="approved" {% if f.new_by == 'approved' %}selected{% endif %}>Approved</option>
                             <option value="joined" {% if f.new_by == 'joined' %}selected{% endif %}>Signed up</option>
                         </select>
                         <span>in the last</span>
-                        <input type="number" name="new_days" min="1" value="{{ f.new_days if f.new_days is not none else '' }}" placeholder="any" class="w-20 p-2 border border-gray-200 rounded-xl">
+                        <input type="number" name="new_days" min="1" value="{{ f.new_days if f.new_days is not none else '' }}" placeholder="any" class="w-20 p-2 border border-gray-200 rounded-xl text-xs">
                         <span>days</span>
+                    </div>
+                    <div>
+                        <span class="text-[11px] font-bold text-gray-400 block mb-1">or date range:</span>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="date" name="driver_from" value="{{ f.driver_from.isoformat() if f.driver_from else '' }}" class="w-full p-2 border border-gray-200 rounded-xl text-xs" title="From date">
+                            <input type="date" name="driver_to" value="{{ f.driver_to.isoformat() if f.driver_to else '' }}" class="w-full p-2 border border-gray-200 rounded-xl text-xs" title="To date">
+                        </div>
                     </div>
                     <p class="text-[11px] text-gray-400 mt-1">"Approved" restarts if an admin suspends and re-approves a driver; "signed up" never changes.</p>
                 </div>
@@ -98,9 +118,14 @@
                         <input type="date" name="jobs_from" value="{{ f.jobs_from.isoformat() if f.jobs_from else '' }}" class="w-full p-2 border border-gray-200 rounded-xl">
                         <input type="date" name="jobs_to" value="{{ f.jobs_to.isoformat() if f.jobs_to else '' }}" class="w-full p-2 border border-gray-200 rounded-xl">
                     </div>
-                    <p class="text-[11px] text-gray-400 mt-1">Both days included. Leave empty to count all jobs ever.</p>
+                    <p class="text-[11px] text-gray-400 mt-1">Both days included. Filters to drivers who completed jobs in this period.</p>
                 </div>
-                <button type="submit" class="w-full px-6 py-2.5 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light shadow-sm text-sm"><i class="fas fa-search mr-1"></i> Find drivers</button>
+                <div class="flex gap-2">
+                    <button type="submit" class="flex-1 px-6 py-2.5 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light shadow-sm text-sm transition"><i class="fas fa-search mr-1"></i> Find drivers</button>
+                    {% if not f.is_everyone() %}
+                    <a href="/admin/driver-wallet" class="px-3.5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl font-bold text-sm transition flex items-center justify-center" title="Reset all filters"><i class="fas fa-undo"></i></a>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </form>

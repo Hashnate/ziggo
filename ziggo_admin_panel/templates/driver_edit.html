@@ -1,11 +1,15 @@
 {% extends "base.html" %}
 
 {% block title %}Edit Driver | Ziggo Admin{% endblock %}
-{% block page_title %}Edit Driver — {{ (user.full_name if user else None) or (user.phone_number if user else None) or ('Driver #' ~ driver.id) }}{% endblock %}
+{% block page_title %}Edit Driver — {{ (user.full_name if user else None) or (user.phone_number if user else None) or
+('Driver #' ~ driver.id) }}{% endblock %}
 
 {% block content %}
 <div class="max-w-3xl mx-auto bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-    <form method="post" action="/admin/drivers/{{ driver.id }}/edit" enctype="multipart/form-data" class="p-8 space-y-6">
+    <form method="post"
+        action="/admin/drivers/{{ driver.id }}/edit{% if back_url %}?return_to={{ back_url | urlencode }}{% endif %}"
+        enctype="multipart/form-data" class="p-8 space-y-6">
+        <input type="hidden" name="return_to" value="{{ back_url or '' }}">
         {% if error %}
         <div class="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl font-bold text-sm">
             <i class="fas fa-exclamation-circle mr-1"></i> {{ error }}
@@ -17,12 +21,14 @@
             <div class="flex items-center gap-3 text-sm">
                 <span class="font-black text-ziggo">#{{ driver.id }}</span>
                 <span class="text-ziggo-faint">•</span>
-                <span class="font-bold text-ziggo-muted">{{ (driver.status.value if driver.status and driver.status.value is defined else (driver.status or 'PENDING')) | upper }}</span>
+                <span class="font-bold text-ziggo-muted">{{ (driver.status.value if driver.status and
+                    driver.status.value is defined else (driver.status or 'PENDING')) | upper }}</span>
                 {% if driver.is_online %}
-                <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black tracking-wider">ONLINE</span>
+                <span
+                    class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black tracking-wider">ONLINE</span>
                 {% endif %}
             </div>
-            <a href="/admin/drivers" class="text-sm font-bold text-ziggo-muted hover:text-ziggo">
+            <a href="{{ back_url or '/admin/drivers' }}" class="text-sm font-bold text-ziggo-muted hover:text-ziggo">
                 <i class="fas fa-arrow-left mr-1"></i> Back to drivers
             </a>
         </div>
@@ -30,28 +36,35 @@
         <div>
             <h3 class="text-lg font-black text-ziggo mb-4">Profile Photo</h3>
             <div class="flex items-center gap-5">
-                <div id="photoPreview" class="w-24 h-24 rounded-2xl bg-ziggo-soft/50 border-2 border-dashed border-ziggo-line flex items-center justify-center overflow-hidden">
+                <div id="photoPreview"
+                    class="w-24 h-24 rounded-2xl bg-ziggo-soft/50 border-2 border-dashed border-ziggo-line flex items-center justify-center overflow-hidden">
                     {% if user and user.profile_photo %}
                     <a href="{{ user.profile_photo }}" target="_blank" class="w-full h-full block">
-                        <img src="{{ user.profile_photo }}" class="w-full h-full object-cover hover:opacity-80 transition">
+                        <img src="{{ user.profile_photo }}"
+                            class="w-full h-full object-cover hover:opacity-80 transition">
                     </a>
                     {% else %}
                     <i class="fas fa-user text-ziggo-faint text-3xl"></i>
                     {% endif %}
                 </div>
                 <div class="flex-1">
-                    <label for="profile_photo" class="inline-flex items-center gap-2 cursor-pointer px-4 py-2.5 bg-ziggo-soft text-ziggo rounded-xl font-bold text-sm hover:bg-ziggo-soft/70 transition">
+                    <label for="profile_photo"
+                        class="inline-flex items-center gap-2 cursor-pointer px-4 py-2.5 bg-ziggo-soft text-ziggo rounded-xl font-bold text-sm hover:bg-ziggo-soft/70 transition">
                         <i class="fas fa-upload"></i>
-                        <span id="photoLabel">{% if user and user.profile_photo %}Replace photo{% else %}Choose photo{% endif %}</span>
+                        <span id="photoLabel">{% if user and user.profile_photo %}Replace photo{% else %}Choose photo{%
+                            endif %}</span>
                     </label>
-                    <input id="profile_photo" name="profile_photo" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="previewPhoto(this)">
+                    <input id="profile_photo" name="profile_photo" type="file" accept="image/jpeg,image/png,image/webp"
+                        class="hidden" onchange="previewPhoto(this)">
                     {% if user and user.profile_photo %}
                     <label class="ml-3 inline-flex items-center gap-2 cursor-pointer text-sm font-bold text-red-500">
-                        <input name="remove_photo" type="checkbox" value="1" class="w-4 h-4 text-red-500 border-gray-300 rounded">
+                        <input name="remove_photo" type="checkbox" value="1"
+                            class="w-4 h-4 text-red-500 border-gray-300 rounded">
                         Remove existing photo
                     </label>
                     {% endif %}
-                    <p class="text-xs text-ziggo-faint font-bold mt-2">JPG, PNG or WEBP. Max 5 MB. Leave empty to keep the current photo.</p>
+                    <p class="text-xs text-ziggo-faint font-bold mt-2">JPG, PNG or WEBP. Max 5 MB. Leave empty to keep
+                        the current photo.</p>
                 </div>
             </div>
         </div>
@@ -61,37 +74,40 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Phone Number</label>
-                    <input name="phone_number" required value="{{ user.phone_number if user else '' }}"
-                           type="tel" maxlength="13" minlength="10"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                    <input name="phone_number" required value="{{ user.phone_number if user else '' }}" type="tel"
+                        maxlength="13" minlength="10"
+                        class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                     <p class="text-[10px] text-amber-600 font-bold mt-1">⚠️ Changing this changes the driver's login</p>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Full Name</label>
                     <input name="full_name" required value="{{ user.full_name if user else '' }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                        class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Email (optional)</label>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Email</label>
                     <input name="email" type="email" value="{{ user.email if user else '' }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                        class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">NIC Number</label>
                     <input name="nic_number" required value="{{ driver.nic_number or '' }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                        class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                 </div>
                 <div>
                     {% set nic_g = gender_from_nic(driver.nic_number) %}
                     {% set admin_g = user.gender if (user and user.gender_source == 'admin') else '' %}
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Gender</label>
                     <select name="gender"
-                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
-                        <option value="auto" {% if not admin_g %}selected{% endif %}>From NIC ({{ nic_g|title if nic_g else "can't read the NIC" }})</option>
-                        <option value="female" {% if admin_g == 'female' %}selected{% endif %}>Female (set by admin)</option>
-                        <option value="male" {% if admin_g == 'male' %}selected{% endif %}>Male (set by admin)</option>
+                        class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
+                        <option value="auto" {% if not admin_g %}selected{% endif %}>From NIC ({{ nic_g|title if nic_g
+                            else "can't read the NIC" }})</option>
+                        <option value="female" {% if admin_g=='female' %}selected{% endif %}>Female (set by admin)
+                        </option>
+                        <option value="male" {% if admin_g=='male' %}selected{% endif %}>Male (set by admin)</option>
                     </select>
-                    <p class="text-[10px] text-gray-400 font-bold mt-1">Used for the lady-driver option. Only change it if the NIC gives the wrong answer.</p>
+                    <p class="text-[10px] text-gray-400 font-bold mt-1">Used for the lady-driver option. Only change it
+                        if the NIC gives the wrong answer.</p>
                 </div>
             </div>
         </div>
@@ -102,57 +118,60 @@
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">License Number</label>
                     <input name="license_number" required value="{{ driver.license_number or '' }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                        class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Vehicle Type</label>
                     <select name="vehicle_type" required
-                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
+                        class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
                         {% set selected = (driver.vehicle_type or '')|lower %}
                         {% for c in categories %}
-                        <option value="{{ c.service_type }}" {% if selected == c.service_type|lower %}selected{% endif %}>{{ c.display_name or c.service_type|title }}</option>
+                        <option value="{{ c.service_type }}" {% if selected==c.service_type|lower %}selected{% endif %}>
+                            {{ c.display_name or c.service_type|title }}</option>
                         {% endfor %}
-                        {% if selected and categories and selected not in categories|map(attribute='service_type')|list %}
+                        {% if selected and categories and selected not in categories|map(attribute='service_type')|list
+                        %}
                         <option value="{{ selected }}" selected>{{ selected|title }}</option>
                         {% endif %}
                         {% if not categories %}
-                        <option value="bike" {% if selected == 'bike' %}selected{% endif %}>Bike</option>
-                        <option value="tuk" {% if selected == 'tuk' %}selected{% endif %}>Tuk-tuk</option>
-                        <option value="car" {% if selected == 'car' %}selected{% endif %}>Car</option>
-                        <option value="van" {% if selected == 'van' %}selected{% endif %}>Van</option>
-                        <option value="truck" {% if selected == 'truck' %}selected{% endif %}>Truck</option>
+                        <option value="bike" {% if selected=='bike' %}selected{% endif %}>Bike</option>
+                        <option value="tuk" {% if selected=='tuk' %}selected{% endif %}>Tuk-tuk</option>
+                        <option value="car" {% if selected=='car' %}selected{% endif %}>Car</option>
+                        <option value="van" {% if selected=='van' %}selected{% endif %}>Van</option>
+                        <option value="truck" {% if selected=='truck' %}selected{% endif %}>Truck</option>
                         {% endif %}
                     </select>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Driver Type</label>
                     <select name="driver_type" required
-                            class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
+                        class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo bg-white">
                         {% set d_type = driver.driver_type or 'ride' %}
-                        <option value="ride" {% if d_type == 'ride' %}selected{% endif %}>Ride Driver</option>
-                        <option value="delivery" {% if d_type == 'delivery' %}selected{% endif %}>Delivery Driver</option>
+                        <option value="ride" {% if d_type=='ride' %}selected{% endif %}>Ride Driver</option>
+                        <option value="delivery" {% if d_type=='delivery' %}selected{% endif %}>Delivery Driver</option>
                     </select>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Vehicle Number</label>
                     <input name="vehicle_number" required value="{{ driver.vehicle_number or '' }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                        class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Vehicle Model</label>
                     <input name="vehicle_model" required value="{{ driver.vehicle_model or '' }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                        class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Vehicle Color</label>
                     <input name="vehicle_color" required value="{{ driver.vehicle_color or '' }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
+                        class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo">
                 </div>
                 <div class="flex items-center mt-6">
                     <label class="inline-flex items-center cursor-pointer">
-                        <input name="is_approved" type="checkbox" value="1" {% if driver.is_approved %}checked{% endif %}
-                               class="w-5 h-5 text-ziggo border-gray-300 rounded">
-                        <span class="ml-2 text-sm font-bold text-gray-700">Approved (can go online & accept rides)</span>
+                        <input name="is_approved" type="checkbox" value="1" {% if driver.is_approved %}checked{% endif
+                            %} class="w-5 h-5 text-ziggo border-gray-300 rounded">
+                        <span class="ml-2 text-sm font-bold text-gray-700">Approved (can go online & accept
+                            rides)</span>
                     </label>
                 </div>
             </div>
@@ -164,20 +183,20 @@
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Close Relative Name</label>
                     <input name="relative_name" value="{{ driver.relative_name or '' }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo"
-                           placeholder="John Doe">
+                        class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo"
+                        placeholder="John Doe">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Contact Number</label>
                     <input name="relative_contact" value="{{ driver.relative_contact or '' }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo"
-                           placeholder="0771234567">
+                        class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo"
+                        placeholder="0771234567">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Relationship</label>
                     <input name="relative_relationship" value="{{ driver.relative_relationship or '' }}"
-                           class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo"
-                           placeholder="Father, Spouse, etc.">
+                        class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-ziggo"
+                        placeholder="Father, Spouse, etc.">
                 </div>
             </div>
         </div>
@@ -190,61 +209,78 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {% for doc in documents %}
                 <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
-                    <div id="{{ doc.kind }}IconWrapper" class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
+                    <div id="{{ doc.kind }}IconWrapper"
+                        class="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center">
                         {% if doc.document_url %}
-                        <a href="{{ doc.document_url }}" target="_blank" class="w-full h-full flex items-center justify-center">
+                        <a href="{{ doc.document_url }}" target="_blank"
+                            class="w-full h-full flex items-center justify-center">
                             {% if doc.document_url.endswith('.pdf') %}
                             <i class="fas fa-file-pdf text-2xl text-rose-500 hover:opacity-80 transition"></i>
                             {% else %}
-                            <img src="{{ doc.document_url }}" alt="{{ doc.label }}" class="w-full h-full object-cover hover:opacity-80 transition">
+                            <img src="{{ doc.document_url }}" alt="{{ doc.label }}"
+                                class="w-full h-full object-cover hover:opacity-80 transition">
                             {% endif %}
                         </a>
                         {% else %}
-                            <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
+                        <i class="fas fa-file-circle-xmark text-gray-300 text-xl"></i>
                         {% endif %}
                     </div>
                     <div class="flex-1 min-w-0">
                         <p class="font-black text-sm text-ziggo-ink">
                             {{ doc.label }}
                             {% if doc.is_optional %}
-                            <span class="ml-1.5 px-2 py-0.5 text-[10px] font-bold text-gray-500 bg-gray-200/70 rounded-md uppercase tracking-wider">Optional</span>
+                            <span
+                                class="ml-1.5 px-2 py-0.5 text-[10px] font-bold text-gray-500 bg-gray-200/70 rounded-md uppercase tracking-wider">Optional</span>
                             {% endif %}
                         </p>
                         <div data-live="doc-{{ doc.kind }}">
-                        {% if doc.document_url %}
-                        <p class="text-[11px] text-ziggo-muted truncate" id="{{ doc.kind }}Status">Uploaded {{ doc.uploaded_at or '' }}</p>
-                        {% if doc.is_verified %}
-                        <span class="px-2 py-0.5 mt-1 inline-block text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700 rounded-full" id="{{ doc.kind }}VerifyBadge">Verified</span>
-                        {% else %}
-                        <span class="px-2 py-0.5 mt-1 inline-block text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-700 rounded-full" id="{{ doc.kind }}VerifyBadge">Pending review</span>
-                        {% endif %}
-                        {% else %}
-                            {% if doc.is_optional %}
-                            <p class="text-[11px] text-gray-400 font-medium" id="{{ doc.kind }}Status">Not uploaded (Optional)</p>
+                            {% if doc.document_url %}
+                            <p class="text-[11px] text-ziggo-muted truncate" id="{{ doc.kind }}Status">Uploaded {{
+                                doc.uploaded_at or '' }}</p>
+                            {% if doc.is_verified %}
+                            <span
+                                class="px-2 py-0.5 mt-1 inline-block text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700 rounded-full"
+                                id="{{ doc.kind }}VerifyBadge">Verified</span>
                             {% else %}
-                            <p class="text-[11px] text-rose-500 font-bold" id="{{ doc.kind }}Status">Not uploaded yet</p>
+                            <span
+                                class="px-2 py-0.5 mt-1 inline-block text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-700 rounded-full"
+                                id="{{ doc.kind }}VerifyBadge">Pending review</span>
                             {% endif %}
-                        {% endif %}
+                            {% else %}
+                            {% if doc.is_optional %}
+                            <p class="text-[11px] text-gray-400 font-medium" id="{{ doc.kind }}Status">Not uploaded
+                                (Optional)</p>
+                            {% else %}
+                            <p class="text-[11px] text-rose-500 font-bold" id="{{ doc.kind }}Status">Not uploaded yet
+                            </p>
+                            {% endif %}
+                            {% endif %}
                         </div>
                     </div>
                     <div class="flex flex-col gap-1.5 items-end">
-                        <label for="doc_{{ doc.kind }}" class="cursor-pointer px-3 py-1.5 bg-ziggo-soft text-ziggo rounded-lg text-xs font-black hover:bg-ziggo-soft/70 transition whitespace-nowrap">
-                            <i class="fas fa-upload mr-1"></i> {% if doc.document_url %}Replace{% else %}Upload{% endif %}
+                        <label for="doc_{{ doc.kind }}"
+                            class="cursor-pointer px-3 py-1.5 bg-ziggo-soft text-ziggo rounded-lg text-xs font-black hover:bg-ziggo-soft/70 transition whitespace-nowrap">
+                            <i class="fas fa-upload mr-1"></i> {% if doc.document_url %}Replace{% else %}Upload{% endif
+                            %}
                         </label>
-                        <input id="doc_{{ doc.kind }}" name="doc_{{ doc.kind }}" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden" onchange="previewDoc(this, '{{ doc.kind }}')">
+                        <input id="doc_{{ doc.kind }}" name="doc_{{ doc.kind }}" type="file"
+                            accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden"
+                            onchange="previewDoc(this, '{{ doc.kind }}')">
 
                         <div data-live="doc-{{ doc.kind }}" class="contents">
-                        {% if doc.id %}
+                            {% if doc.id %}
                             {% if not doc.is_verified %}
-                            <button form="verify_doc_{{ doc.id }}" class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-black hover:bg-emerald-700 whitespace-nowrap w-full text-center">
+                            <button form="verify_doc_{{ doc.id }}"
+                                class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-black hover:bg-emerald-700 whitespace-nowrap w-full text-center">
                                 <i class="fas fa-check mr-1"></i> Verify
                             </button>
                             {% else %}
-                            <button form="revoke_doc_{{ doc.id }}" class="px-3 py-1.5 border border-rose-300 text-rose-600 rounded-lg text-xs font-black hover:bg-rose-50 whitespace-nowrap w-full text-center">
+                            <button form="revoke_doc_{{ doc.id }}"
+                                class="px-3 py-1.5 border border-rose-300 text-rose-600 rounded-lg text-xs font-black hover:bg-rose-50 whitespace-nowrap w-full text-center">
                                 <i class="fas fa-times mr-1"></i> Revoke
                             </button>
                             {% endif %}
-                        {% endif %}
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -256,9 +292,11 @@
         <div class="pt-6 border-t border-gray-100">
             <div class="flex items-center justify-between mb-4">
                 <h4 class="font-black text-ziggo-ink flex items-center gap-2">
-                    <i class="fas fa-car-side text-ziggo"></i> Registered Vehicles ({{ vehicles | length if vehicles else 0 }})
+                    <i class="fas fa-car-side text-ziggo"></i> Registered Vehicles ({{ vehicles | length if vehicles
+                    else 0 }})
                 </h4>
-                <button type="button" onclick="document.getElementById('addVehicleModal').classList.remove('hidden')" class="px-3.5 py-1.5 bg-ziggo text-white rounded-xl text-xs font-black hover:bg-ziggo-light shadow-sm flex items-center gap-1.5 transition">
+                <button type="button" onclick="document.getElementById('addVehicleModal').classList.remove('hidden')"
+                    class="px-3.5 py-1.5 bg-ziggo text-white rounded-xl text-xs font-black hover:bg-ziggo-light shadow-sm flex items-center gap-1.5 transition">
                     <i class="fas fa-plus"></i> Add Vehicle
                 </button>
             </div>
@@ -266,64 +304,80 @@
             {% if vehicles %}
             <div class="space-y-3">
                 {% for veh in vehicles %}
-                <div data-live="veh-{{ veh.id }}" class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div data-live="veh-{{ veh.id }}"
+                    class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div class="flex items-center gap-3">
-                        <div class="w-12 h-12 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-xl text-ziggo">
+                        <div
+                            class="w-12 h-12 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-xl text-ziggo">
                             {% if veh.vehicle_type == 'bike' %}
-                                <i class="fas fa-motorcycle"></i>
+                            <i class="fas fa-motorcycle"></i>
                             {% elif veh.vehicle_type == 'tuk' %}
-                                <i class="fas fa-cubes"></i>
+                            <i class="fas fa-cubes"></i>
                             {% elif veh.vehicle_type == 'car' %}
-                                <i class="fas fa-car"></i>
+                            <i class="fas fa-car"></i>
                             {% elif veh.vehicle_type == 'van' %}
-                                <i class="fas fa-shuttle-van"></i>
+                            <i class="fas fa-shuttle-van"></i>
                             {% else %}
-                                <i class="fas fa-truck"></i>
+                            <i class="fas fa-truck"></i>
                             {% endif %}
                         </div>
                         <div>
                             <div class="flex items-center gap-2">
                                 <span class="font-black text-sm text-gray-900 uppercase">{{ veh.vehicle_number }}</span>
-                                <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-gray-200 text-gray-700">{{ veh.vehicle_type }}</span>
+                                <span
+                                    class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-gray-200 text-gray-700">{{
+                                    veh.vehicle_type }}</span>
                                 {% if veh.is_active %}
-                                <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700">ACTIVE NOW</span>
+                                <span
+                                    class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700">ACTIVE
+                                    NOW</span>
                                 {% endif %}
                                 {% if veh.is_approved %}
-                                <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700">APPROVED</span>
+                                <span
+                                    class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700">APPROVED</span>
                                 {% else %}
-                                <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-700">PENDING APPROVAL</span>
+                                <span
+                                    class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-700">PENDING
+                                    APPROVAL</span>
                                 {% endif %}
                             </div>
                             <p class="text-xs text-gray-500 mt-0.5">
-                                {{ veh.vehicle_model or 'Model not specified' }} • {{ veh.vehicle_color or 'Color not specified' }} • {{ veh.vehicle_year or 'Year N/A' }}
+                                {{ veh.vehicle_model or 'Model not specified' }} • {{ veh.vehicle_color or 'Color not
+                                specified' }} • {{ veh.vehicle_year or 'Year N/A' }}
                             </p>
                             {% if veh.rejection_reason %}
-                            <p class="text-xs text-rose-500 font-bold mt-0.5"><i class="fas fa-info-circle mr-1"></i>Rejection: {{ veh.rejection_reason }}</p>
+                            <p class="text-xs text-rose-500 font-bold mt-0.5"><i
+                                    class="fas fa-info-circle mr-1"></i>Rejection: {{ veh.rejection_reason }}</p>
                             {% endif %}
                         </div>
                     </div>
 
                     <div class="flex items-center gap-2 flex-wrap">
                         {% if veh.registration_doc_url %}
-                        <a href="{{ veh.registration_doc_url }}" target="_blank" class="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-100 transition">
+                        <a href="{{ veh.registration_doc_url }}" target="_blank"
+                            class="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-100 transition">
                             <i class="fas fa-file-alt mr-1"></i> CR Book
                         </a>
                         {% endif %}
                         {% if veh.insurance_doc_url %}
-                        <a href="{{ veh.insurance_doc_url }}" target="_blank" class="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-100 transition">
+                        <a href="{{ veh.insurance_doc_url }}" target="_blank"
+                            class="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-100 transition">
                             <i class="fas fa-shield-alt mr-1"></i> Insurance
                         </a>
                         {% endif %}
 
                         {% if not veh.is_approved %}
-                        <button form="approve_veh_{{ veh.id }}" type="submit" class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-black hover:bg-emerald-700 transition">
+                        <button form="approve_veh_{{ veh.id }}" type="submit"
+                            class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-black hover:bg-emerald-700 transition">
                             <i class="fas fa-check mr-1"></i> Approve
                         </button>
-                        <button form="reject_veh_{{ veh.id }}" type="submit" class="px-3 py-1.5 border border-rose-300 text-rose-600 rounded-lg text-xs font-black hover:bg-rose-50 transition">
+                        <button form="reject_veh_{{ veh.id }}" type="submit"
+                            class="px-3 py-1.5 border border-rose-300 text-rose-600 rounded-lg text-xs font-black hover:bg-rose-50 transition">
                             <i class="fas fa-times mr-1"></i> Reject
                         </button>
                         {% else %}
-                        <button form="reject_veh_{{ veh.id }}" type="submit" class="px-3 py-1.5 border border-amber-300 text-amber-700 rounded-lg text-xs font-black hover:bg-amber-50 transition">
+                        <button form="reject_veh_{{ veh.id }}" type="submit"
+                            class="px-3 py-1.5 border border-amber-300 text-amber-700 rounded-lg text-xs font-black hover:bg-amber-50 transition">
                             <i class="fas fa-ban mr-1"></i> Revoke
                         </button>
                         {% endif %}
@@ -332,15 +386,18 @@
                 {% endfor %}
             </div>
             {% else %}
-            <div class="p-4 bg-gray-50 border border-dashed border-gray-200 rounded-xl text-center text-xs text-gray-400 font-bold">
+            <div
+                class="p-4 bg-gray-50 border border-dashed border-gray-200 rounded-xl text-center text-xs text-gray-400 font-bold">
                 No secondary vehicles registered yet.
             </div>
             {% endif %}
         </div>
 
         <div class="pt-6 border-t border-gray-100 flex justify-end gap-3">
-            <a href="/admin/drivers" class="px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50">Cancel</a>
-            <button type="submit" class="px-8 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light shadow-brand">
+            <a href="{{ back_url or '/admin/drivers' }}"
+                class="px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50">Cancel</a>
+            <button type="submit"
+                class="px-8 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light shadow-brand">
                 <i class="fas fa-save mr-2"></i> Save changes
             </button>
         </div>
@@ -349,93 +406,102 @@
 
 {% if documents %}
 {% for doc in documents %}
-    {% if doc.id %}
-    <form id="verify_doc_{{ doc.id }}" data-inplace="doc-{{ doc.kind }}" method="POST" action="/admin/drivers/{{ driver.id }}/documents/{{ doc.id }}/verify" class="hidden"></form>
-    <form id="revoke_doc_{{ doc.id }}" data-inplace="doc-{{ doc.kind }}" method="POST" action="/admin/drivers/{{ driver.id }}/documents/{{ doc.id }}/reject" class="hidden" onsubmit="return confirm('Mark this document as not verified? The driver will need to re-upload.');"></form>
-    {% endif %}
+{% if doc.id %}
+<form id="verify_doc_{{ doc.id }}" data-inplace="doc-{{ doc.kind }}" method="POST"
+    action="/admin/drivers/{{ driver.id }}/documents/{{ doc.id }}/verify{% if back_url %}?return_to={{ back_url | urlencode }}{% endif %}"
+    class="hidden"></form>
+<form id="revoke_doc_{{ doc.id }}" data-inplace="doc-{{ doc.kind }}" method="POST"
+    action="/admin/drivers/{{ driver.id }}/documents/{{ doc.id }}/reject{% if back_url %}?return_to={{ back_url | urlencode }}{% endif %}"
+    class="hidden" onsubmit="return confirm('Mark this document as not verified? The driver will need to re-upload.');">
+</form>
+{% endif %}
 {% endfor %}
 {% endif %}
 
 {% if vehicles %}
 {% for veh in vehicles %}
-    <form id="approve_veh_{{ veh.id }}" data-inplace="veh-{{ veh.id }}" method="POST" action="/admin/drivers/{{ driver.id }}/vehicles/{{ veh.id }}/approve" class="hidden"></form>
-    <form id="reject_veh_{{ veh.id }}" data-inplace="veh-{{ veh.id }}" method="POST" action="/admin/drivers/{{ driver.id }}/vehicles/{{ veh.id }}/reject" class="hidden" onsubmit="return confirm('Reject this vehicle for the driver?');"></form>
+<form id="approve_veh_{{ veh.id }}" data-inplace="veh-{{ veh.id }}" method="POST"
+    action="/admin/drivers/{{ driver.id }}/vehicles/{{ veh.id }}/approve{% if back_url %}?return_to={{ back_url | urlencode }}{% endif %}"
+    class="hidden"></form>
+<form id="reject_veh_{{ veh.id }}" data-inplace="veh-{{ veh.id }}" method="POST"
+    action="/admin/drivers/{{ driver.id }}/vehicles/{{ veh.id }}/reject{% if back_url %}?return_to={{ back_url | urlencode }}{% endif %}"
+    class="hidden" onsubmit="return confirm('Reject this vehicle for the driver?');"></form>
 {% endfor %}
 {% endif %}
 
 <script>
-function previewPhoto(input) {
-    const preview = document.getElementById('photoPreview');
-    const label = document.getElementById('photoLabel');
-    if (!input.files || !input.files[0]) return;
-    const file = input.files[0];
-    if (file.size > 5 * 1024 * 1024) {
-        alert('Photo must be under 5 MB');
-        input.value = '';
-        return;
-    }
-    const reader = new FileReader();
-    reader.onload = function (e) {
-        preview.innerHTML = '<a href="' + e.target.result + '" target="_blank" class="w-full h-full block"><img src="' + e.target.result + '" class="w-full h-full object-cover hover:opacity-80 transition"></a>';
-    };
-    reader.readAsDataURL(file);
-    label.textContent = 'Change photo';
-}
-
-
-
-function previewDoc(input, kind) {
-    const wrapper = document.getElementById(kind + 'IconWrapper');
-    const status = document.getElementById(kind + 'Status');
-    const badge = document.getElementById(kind + 'VerifyBadge');
-    if (!input.files || !input.files[0]) return;
-    const file = input.files[0];
-    if (file.size > 25 * 1024 * 1024) {
-        alert('Document must be under 25 MB');
-        input.value = '';
-        return;
-    }
-    status.textContent = 'Ready to upload';
-    status.className = 'text-[11px] text-amber-500 font-bold';
-    if (badge) {
-        badge.style.display = 'none';
-    }
-    
-    const ext = file.name.split('.').pop().toLowerCase();
-    if (ext === 'pdf') {
-        wrapper.innerHTML = '<i class="fas fa-file-pdf text-2xl text-rose-500"></i>';
-    } else {
+    function previewPhoto(input) {
+        const preview = document.getElementById('photoPreview');
+        const label = document.getElementById('photoLabel');
+        if (!input.files || !input.files[0]) return;
+        const file = input.files[0];
+        if (file.size > 5 * 1024 * 1024) {
+            alert('Photo must be under 5 MB');
+            input.value = '';
+            return;
+        }
         const reader = new FileReader();
         reader.onload = function (e) {
-            wrapper.innerHTML = '<a href="' + e.target.result + '" target="_blank" class="w-full h-full flex items-center justify-center"><img src="' + e.target.result + '" class="w-full h-full object-cover hover:opacity-80 transition"></a>';
+            preview.innerHTML = '<a href="' + e.target.result + '" target="_blank" class="w-full h-full block"><img src="' + e.target.result + '" class="w-full h-full object-cover hover:opacity-80 transition"></a>';
         };
         reader.readAsDataURL(file);
+        label.textContent = 'Change photo';
     }
-}
 
-// Verify/Revoke and vehicle Approve/Reject swap in the re-rendered card instead of
-// reloading the page, so the admin keeps their place while reviewing.
-document.addEventListener('submit', async function (e) {
-    const form = e.target;
-    if (!form.dataset.inplace || e.defaultPrevented) return;
-    e.preventDefault();
-    document.querySelectorAll('button[form="' + form.id + '"]').forEach(function (b) {
-        b.disabled = true;
-        b.classList.add('opacity-60', 'cursor-wait');
-    });
-    try {
-        const resp = await fetch(form.action, { method: 'POST', body: new FormData(form), credentials: 'same-origin' });
-        if (!resp.ok || new URL(resp.url).pathname !== window.location.pathname) throw new Error('unexpected response');
-        const fresh = new DOMParser().parseFromString(await resp.text(), 'text/html');
-        const selector = '[data-live="' + form.dataset.inplace + '"]';
-        const next = fresh.querySelectorAll(selector);
-        document.querySelectorAll(selector).forEach(function (el, i) {
-            if (next[i]) el.replaceWith(next[i]);
-        });
-    } catch (err) {
-        form.submit();
+
+
+    function previewDoc(input, kind) {
+        const wrapper = document.getElementById(kind + 'IconWrapper');
+        const status = document.getElementById(kind + 'Status');
+        const badge = document.getElementById(kind + 'VerifyBadge');
+        if (!input.files || !input.files[0]) return;
+        const file = input.files[0];
+        if (file.size > 25 * 1024 * 1024) {
+            alert('Document must be under 25 MB');
+            input.value = '';
+            return;
+        }
+        status.textContent = 'Ready to upload';
+        status.className = 'text-[11px] text-amber-500 font-bold';
+        if (badge) {
+            badge.style.display = 'none';
+        }
+
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (ext === 'pdf') {
+            wrapper.innerHTML = '<i class="fas fa-file-pdf text-2xl text-rose-500"></i>';
+        } else {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                wrapper.innerHTML = '<a href="' + e.target.result + '" target="_blank" class="w-full h-full flex items-center justify-center"><img src="' + e.target.result + '" class="w-full h-full object-cover hover:opacity-80 transition"></a>';
+            };
+            reader.readAsDataURL(file);
+        }
     }
-});
+
+    // Verify/Revoke and vehicle Approve/Reject swap in the re-rendered card instead of
+    // reloading the page, so the admin keeps their place while reviewing.
+    document.addEventListener('submit', async function (e) {
+        const form = e.target;
+        if (!form.dataset.inplace || e.defaultPrevented) return;
+        e.preventDefault();
+        document.querySelectorAll('button[form="' + form.id + '"]').forEach(function (b) {
+            b.disabled = true;
+            b.classList.add('opacity-60', 'cursor-wait');
+        });
+        try {
+            const resp = await fetch(form.action, { method: 'POST', body: new FormData(form), credentials: 'same-origin' });
+            if (!resp.ok || new URL(resp.url).pathname !== window.location.pathname) throw new Error('unexpected response');
+            const fresh = new DOMParser().parseFromString(await resp.text(), 'text/html');
+            const selector = '[data-live="' + form.dataset.inplace + '"]';
+            const next = fresh.querySelectorAll(selector);
+            document.querySelectorAll(selector).forEach(function (el, i) {
+                if (next[i]) el.replaceWith(next[i]);
+            });
+        } catch (err) {
+            form.submit();
+        }
+    });
 </script>
 <!-- Add Vehicle Modal -->
 <div id="addVehicleModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -444,15 +510,19 @@ document.addEventListener('submit', async function (e) {
             <h3 class="text-base font-black text-ziggo-ink flex items-center gap-2">
                 <i class="fas fa-plus-circle text-ziggo"></i> Add Vehicle for Driver
             </h3>
-            <button type="button" onclick="document.getElementById('addVehicleModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 text-lg">
+            <button type="button" onclick="document.getElementById('addVehicleModal').classList.add('hidden')"
+                class="text-gray-400 hover:text-gray-600 text-lg">
                 <i class="fas fa-times"></i>
             </button>
         </div>
 
-        <form method="POST" action="/admin/drivers/{{ driver.id }}/vehicles/new" class="space-y-4">
+        <form method="POST"
+            action="/admin/drivers/{{ driver.id }}/vehicles/new{% if back_url %}?return_to={{ back_url | urlencode }}{% endif %}"
+            class="space-y-4">
             <div>
                 <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Vehicle Type</label>
-                <select name="vehicle_type" required class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm bg-white">
+                <select name="vehicle_type" required
+                    class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm bg-white">
                     {% for c in categories %}
                     <option value="{{ c.service_type }}">{{ c.display_name or c.service_type|title }}</option>
                     {% endfor %}
@@ -468,35 +538,43 @@ document.addEventListener('submit', async function (e) {
 
             <div>
                 <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Plate Number</label>
-                <input name="vehicle_number" required placeholder="e.g. WP BXX-1234" class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm uppercase">
+                <input name="vehicle_number" required placeholder="e.g. WP BXX-1234"
+                    class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm uppercase">
             </div>
 
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Model</label>
-                    <input name="vehicle_model" placeholder="e.g. Bajaj RE" class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                    <input name="vehicle_model" placeholder="e.g. Bajaj RE"
+                        class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Color</label>
-                    <input name="vehicle_color" placeholder="e.g. Red" class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                    <input name="vehicle_color" placeholder="e.g. Red"
+                        class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
                 </div>
             </div>
 
             <div>
                 <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">Manufacture Year</label>
-                <input name="vehicle_year" type="number" placeholder="2022" class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
+                <input name="vehicle_year" type="number" placeholder="2022"
+                    class="w-full p-2.5 border border-gray-200 rounded-xl outline-none focus:border-ziggo text-sm">
             </div>
 
             <div class="flex items-center gap-2 pt-2">
-                <input type="checkbox" id="auto_approve_chk" name="auto_approve" value="true" checked class="w-4 h-4 text-ziggo rounded border-gray-300">
-                <label for="auto_approve_chk" class="text-xs font-bold text-gray-700">Approve immediately (Ready to drive)</label>
+                <input type="checkbox" id="auto_approve_chk" name="auto_approve" value="true" checked
+                    class="w-4 h-4 text-ziggo rounded border-gray-300">
+                <label for="auto_approve_chk" class="text-xs font-bold text-gray-700">Approve immediately (Ready to
+                    drive)</label>
             </div>
 
             <div class="flex justify-end gap-2 pt-4 border-t border-gray-100">
-                <button type="button" onclick="document.getElementById('addVehicleModal').classList.add('hidden')" class="px-4 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50">
+                <button type="button" onclick="document.getElementById('addVehicleModal').classList.add('hidden')"
+                    class="px-4 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50">
                     Cancel
                 </button>
-                <button type="submit" class="px-5 py-2 bg-ziggo text-white rounded-xl text-xs font-black hover:bg-ziggo-light shadow-brand">
+                <button type="submit"
+                    class="px-5 py-2 bg-ziggo text-white rounded-xl text-xs font-black hover:bg-ziggo-light shadow-brand">
                     Save & Add Vehicle
                 </button>
             </div>

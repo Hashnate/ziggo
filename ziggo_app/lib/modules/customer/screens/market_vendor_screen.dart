@@ -908,7 +908,8 @@ class _AddControl extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mp = context.watch<MarketProvider>();
-    final qty = (mp.cart[product['id'] as int]?['quantity'] as int?) ?? 0;
+    final pid = (product['id'] as num).toInt();
+    final qty = (mp.cart[pid]?['quantity'] as int?) ?? 0;
 
     if (disabled) {
       return Container(
@@ -926,6 +927,7 @@ class _AddControl extends StatelessWidget {
 
     if (qty == 0) {
       return GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: () => mp.addToCart(vendorId, product),
         child: Container(
           width: 34,
@@ -954,7 +956,7 @@ class _AddControl extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _stepBtn(Icons.remove_rounded,
-              () => mp.changeQty(product['id'] as int, -1)),
+              () => mp.changeQty(pid, -1)),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 2),
             child: Text(
@@ -967,7 +969,7 @@ class _AddControl extends StatelessWidget {
             ),
           ),
           _stepBtn(Icons.add_rounded,
-              () => mp.changeQty(product['id'] as int, 1)),
+              () => mp.changeQty(pid, 1)),
         ],
       ),
     );
@@ -975,6 +977,7 @@ class _AddControl extends StatelessWidget {
 
   Widget _stepBtn(IconData icon, VoidCallback onTap) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: SizedBox(
         width: 26,

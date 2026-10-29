@@ -155,43 +155,6 @@
             <p id="tripsEmpty" class="p-10 text-center text-ziggo-muted font-bold hidden">No active trips right now.</p>
         </div>
     </div>
-
-    {% if is_superadmin %}
-    <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm overflow-hidden">
-        <div class="px-6 py-4 border-b border-ziggo-line flex items-center gap-3">
-            <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
-                <i class="fas fa-user-shield"></i>
-            </div>
-            <div>
-                <h3 class="text-base font-black text-ziggo-ink">Phone reveal log</h3>
-                <p class="text-[11px] text-ziggo-muted font-bold">Every customer phone shown on this page, latest first (last 50). Only super admins see this.</p>
-            </div>
-        </div>
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-                <thead class="bg-gray-50 text-[11px] uppercase tracking-wider text-ziggo-muted">
-                    <tr>
-                        <th class="text-left px-6 py-3 font-black">When</th>
-                        <th class="text-left px-6 py-3 font-black">Admin</th>
-                        <th class="text-left px-6 py-3 font-black">Customer</th>
-                        <th class="text-left px-6 py-3 font-black">Booking</th>
-                    </tr>
-                </thead>
-                <tbody id="revealBody">
-                    {% for r in reveals %}
-                    <tr class="border-t border-ziggo-line">
-                        <td class="px-6 py-3 font-bold text-ziggo-muted whitespace-nowrap">{{ r.at | colombo_dt }}</td>
-                        <td class="px-6 py-3 font-black text-ziggo-ink">{{ r.admin }}</td>
-                        <td class="px-6 py-3 font-bold">{{ r.customer }}</td>
-                        <td class="px-6 py-3 font-bold text-ziggo-muted">{{ r.booking_ref or '—' }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            <p id="revealEmpty" class="p-8 text-center text-ziggo-muted font-bold {% if reveals %}hidden{% endif %}">No phones revealed yet.</p>
-        </div>
-    </div>
-    {% endif %}
 </div>
 
 <script>
@@ -313,25 +276,10 @@
             const j = await r.json();
             btn.parentElement.innerHTML = `<a href="tel:${encodeURIComponent(j.phone)}" style="font-weight:900;color:#2563EB;font-size:13px;">
                 <i class="fas fa-phone"></i> ${escapeHtml(j.phone)}</a>`;
-            if (IS_SUPERADMIN) addRevealRow(j.name, bookingId ? (trips.get(bookingId) || {}).booking_ref : null);
         } catch (e) {
             btn.disabled = false;
             btn.textContent = 'Could not load the phone. Try again';
         }
-    }
-
-    function addRevealRow(customer, bookingRef) {
-        const body = document.getElementById('revealBody');
-        if (!body) return;
-        const now = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Colombo' }).slice(0, 16);
-        const tr = document.createElement('tr');
-        tr.className = 'border-t border-ziggo-line';
-        tr.innerHTML = `<td class="px-6 py-3 font-bold text-ziggo-muted whitespace-nowrap">${now}</td>
-            <td class="px-6 py-3 font-black text-ziggo-ink">${escapeHtml(ME)}</td>
-            <td class="px-6 py-3 font-bold">${escapeHtml(customer)}</td>
-            <td class="px-6 py-3 font-bold text-ziggo-muted">${escapeHtml(bookingRef || '—')}</td>`;
-        body.prepend(tr);
-        document.getElementById('revealEmpty').classList.add('hidden');
     }
 
     function openPopup(html, position) {
