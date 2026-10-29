@@ -1551,7 +1551,7 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
 // ====================================================================
 class MarketOutletCard extends StatelessWidget {
   final Map<String, dynamic> vendor;
-  const MarketOutletCard({required this.vendor});
+  const MarketOutletCard({super.key, required this.vendor});
 
   String? _resolveCover(String? path) {
     if (path == null || path.isEmpty) return null;

@@ -1421,6 +1421,7 @@ class _ProductTile extends StatelessWidget {
   final Map<String, dynamic>? vendor;
   final bool isOffer;
   const _ProductTile({
+    super.key,
     required this.product,
     required this.vendorId,
     this.vendor,
@@ -1501,6 +1502,7 @@ class _ProductRow extends StatelessWidget {
   final Map<String, dynamic>? vendor;
   final bool isOffer;
   const _ProductRow({
+    super.key,
     required this.product,
     required this.vendorId,
     this.vendor,
