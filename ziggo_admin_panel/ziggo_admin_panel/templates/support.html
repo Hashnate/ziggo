@@ -14,7 +14,7 @@
             </div>
             <div>
                 <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Total Tickets</p>
-                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">{{ total }}</p>
+                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">{{ total|num }}</p>
             </div>
         </div>
         <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
@@ -23,7 +23,7 @@
             </div>
             <div>
                 <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Open</p>
-                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">{{ open_count }}</p>
+                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">{{ open_count|num }}</p>
             </div>
         </div>
         <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
@@ -32,7 +32,7 @@
             </div>
             <div>
                 <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">In Progress</p>
-                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">{{ in_progress_count }}</p>
+                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">{{ in_progress_count|num }}</p>
             </div>
         </div>
         <div class="bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-5 flex items-center gap-4">
@@ -41,7 +41,7 @@
             </div>
             <div>
                 <p class="text-[11px] text-ziggo-muted uppercase font-black tracking-wider">Resolved</p>
-                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">{{ resolved_count }}</p>
+                <p class="text-3xl font-black text-ziggo-ink leading-none mt-1">{{ resolved_count|num }}</p>
             </div>
         </div>
     </div>
@@ -96,9 +96,21 @@
                         </td>
                         <td class="px-6 py-4">
                             <p class="text-sm font-black text-ziggo-ink">{{ t.subject or '—' }}</p>
-                            {% if t.category %}
-                            <p class="text-[11px] text-blue-500 font-bold uppercase tracking-wider">{{ t.category }}</p>
-                            {% endif %}
+                            <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                                {% if t.category %}
+                                <span class="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-bold uppercase tracking-wider">{{ t.category.replace('_', ' ') }}</span>
+                                {% endif %}
+                                {% if t.booking_id %}
+                                <span class="text-[10px] text-purple-700 bg-purple-50 px-2 py-0.5 rounded font-bold flex items-center gap-1">
+                                    <i class="fas fa-car text-[9px]"></i> Ride #{{ t.booking_id }}
+                                </span>
+                                {% endif %}
+                                {% if t.attachment_url %}
+                                <span class="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-bold flex items-center gap-1">
+                                    <i class="fas fa-paperclip text-[9px]"></i> Photo
+                                </span>
+                                {% endif %}
+                            </div>
                         </td>
                         <td class="px-6 py-4">
                             <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider
@@ -119,7 +131,7 @@
                                 class="px-3 py-2 bg-ziggo text-white rounded-lg text-xs font-black hover:bg-ziggo-light transition inline-flex items-center justify-center gap-1.5">
                                 <i class="fas fa-comments"></i> Open
                                 {% if t.messages|length %}
-                                <span class="bg-white/30 text-white px-1.5 py-0.5 rounded-full text-[10px] font-black">{{ t.messages|length }}</span>
+                                <span class="bg-white/30 text-white px-1.5 py-0.5 rounded-full text-[10px] font-black">{{ (t.messages|length)|num }}</span>
                                 {% endif %}
                             </button>
                         </td>
@@ -153,7 +165,7 @@
         </div>
 
         <div class="p-6 space-y-2 border-b border-ziggo-line bg-gray-50/30 flex-shrink-0">
-            <div class="grid grid-cols-3 gap-4 text-xs">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
                 <div>
                     <p class="text-ziggo-muted font-black uppercase tracking-wider">User</p>
                     <p class="text-ziggo-ink font-bold mt-0.5" id="tkUser">—</p>
@@ -163,9 +175,22 @@
                     <p class="text-ziggo-ink font-bold mt-0.5" id="tkCategory">—</p>
                 </div>
                 <div>
+                    <p class="text-ziggo-muted font-black uppercase tracking-wider">Booking</p>
+                    <p class="text-ziggo-ink font-bold mt-0.5" id="tkBooking">—</p>
+                </div>
+                <div>
                     <p class="text-ziggo-muted font-black uppercase tracking-wider">Subject</p>
                     <p class="text-ziggo-ink font-bold mt-0.5" id="tkSubject">—</p>
                 </div>
+            </div>
+            <!-- Attachment preview if present -->
+            <div id="tkAttachmentContainer" class="hidden mt-3 pt-3 border-t border-ziggo-line">
+                <p class="text-[11px] text-ziggo-muted font-black uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <i class="fas fa-paperclip text-ziggo"></i> Attached Photo / Screenshot
+                </p>
+                <a id="tkAttachmentLink" href="#" target="_blank" class="inline-block">
+                    <img id="tkAttachmentImg" src="" alt="Attachment" class="max-h-48 rounded-xl border border-ziggo-line shadow-sm hover:opacity-90 transition">
+                </a>
             </div>
         </div>
 
@@ -256,12 +281,29 @@ function renderThread(t) {
     // user bubble so the thread reads naturally.
     const opener = document.createElement('div');
     opener.className = 'flex justify-start mb-3';
+    let attachmentHtml = '';
+    if (t.attachment_url) {
+        attachmentHtml = `
+            <div class="mt-2.5 pt-2 border-t border-gray-100">
+                <a href="${escapeHtml(t.attachment_url)}" target="_blank" class="inline-block">
+                    <img src="${escapeHtml(t.attachment_url)}" class="max-h-44 rounded-lg border border-gray-200 shadow-sm hover:opacity-90" alt="Attachment">
+                </a>
+            </div>`;
+    }
+    let bookingHtml = '';
+    if (t.booking_id) {
+        bookingHtml = `<span class="inline-block bg-purple-100 text-purple-800 text-[10px] font-bold px-2 py-0.5 rounded mb-1.5"><i class="fas fa-car text-[9px] mr-1"></i>Ride #${escapeHtml(String(t.booking_id))}</span><br>`;
+    }
     opener.innerHTML = `
         <div class="flex flex-col items-start max-w-[85%] sm:max-w-[75%]">
             <div class="text-[10px] text-ziggo-muted font-black uppercase tracking-wider mb-1 px-1">
                 ${escapeHtml(t.user_name || 'Customer')} · ${escapeHtml(t.created_at)}
             </div>
-            <div class="zi-chat-bubble user">${escapeHtml(t.description || '(no description)')}</div>
+            <div class="zi-chat-bubble user">
+                ${bookingHtml}
+                ${escapeHtml(t.description || '(no description)')}
+                ${attachmentHtml}
+            </div>
         </div>`;
     wrap.appendChild(opener);
 
@@ -287,8 +329,20 @@ function openTicket(t) {
     document.getElementById('tkTitle').innerText = 'Ticket #' + t.id;
     document.getElementById('tkMeta').innerText = t.created_at + ' · ' + t.status.replace('_', ' ').toUpperCase();
     document.getElementById('tkUser').innerText = (t.user_name || '—') + (t.user_phone ? ' (' + t.user_phone + ')' : '');
-    document.getElementById('tkCategory').innerText = t.category || '—';
+    document.getElementById('tkCategory').innerText = (t.category || '—').replace('_', ' ').toUpperCase();
     document.getElementById('tkSubject').innerText = t.subject || '—';
+    document.getElementById('tkBooking').innerHTML = t.booking_id ? `<span class="inline-flex items-center gap-1 text-purple-700 bg-purple-50 px-2 py-0.5 rounded font-bold"><i class="fas fa-car text-[10px]"></i> Ride #${t.booking_id}</span>` : '—';
+
+    const attachBox = document.getElementById('tkAttachmentContainer');
+    const attachImg = document.getElementById('tkAttachmentImg');
+    const attachLink = document.getElementById('tkAttachmentLink');
+    if (t.attachment_url) {
+        attachImg.src = t.attachment_url;
+        attachLink.href = t.attachment_url;
+        attachBox.classList.remove('hidden');
+    } else {
+        attachBox.classList.add('hidden');
+    }
 
     const statusWrap = document.getElementById('tkStatusButtons');
     statusWrap.innerHTML = '';

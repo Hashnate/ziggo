@@ -894,7 +894,11 @@ class _Header extends StatelessWidget {
         if (auth.hasDriverProfile || auth.role == 'driver') ...[
           _IconBubble(
             icon: Icons.swap_horiz_rounded,
-            onTap: () => auth.switchRole('driver'),
+            busy: auth.isSwitchingRole,
+            onTap: () async {
+              if (auth.isSwitchingRole) return;
+              await auth.switchRole('driver');
+            },
           ),
           const SizedBox(width: 10),
         ],
@@ -946,12 +950,18 @@ class _IconBubble extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
   final bool badge;
-  const _IconBubble({required this.icon, required this.onTap, this.badge = false});
+  final bool busy;
+  const _IconBubble({
+    required this.icon,
+    required this.onTap,
+    this.badge = false,
+    this.busy = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: busy ? null : onTap,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -963,9 +973,20 @@ class _IconBubble extends StatelessWidget {
               borderRadius: BorderRadius.circular(AppStyles.radiusSm),
               boxShadow: AppStyles.shadowSm,
             ),
-            child: Icon(icon, color: AppColors.textPrimary, size: 22),
+            child: busy
+                ? const Center(
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  )
+                : Icon(icon, color: AppColors.textPrimary, size: 22),
           ),
-          if (badge)
+          if (badge && !busy)
             Positioned(
               right: -2,
               top: -2,

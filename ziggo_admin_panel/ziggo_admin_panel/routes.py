@@ -7128,6 +7128,7 @@ async def admin_complaints(
 
     q = await db.execute(
         select(Complaint)
+        .options(selectinload(Complaint.user))
         .order_by(Complaint.id.desc())
         .offset(offset)
         .limit(limit)
@@ -7932,6 +7933,8 @@ async def admin_support(
     for t in tickets:
         tickets_payload.append({
             "id": t.id,
+            "booking_id": t.booking_id,
+            "attachment_url": t.attachment_url or "",
             "subject": t.subject or "",
             "category": t.category or "",
             "description": t.description or "",

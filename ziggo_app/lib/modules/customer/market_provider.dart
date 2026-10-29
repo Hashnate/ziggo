@@ -22,6 +22,7 @@ class MarketProvider extends ChangeNotifier {
   /// Latest delivery quote (distance/weight/fee/in_range) for the current cart
   /// and chosen drop location. Null until checkout fetches one.
   Map<String, dynamic>? _quote;
+  bool _isQuoting = false;
 
   final Set<int> _favourites = {};
 
@@ -36,6 +37,7 @@ class MarketProvider extends ChangeNotifier {
   Map<String, dynamic>? get activeVendor => _activeVendor;
   String? get pendingPromoCode => _pendingPromoCode;
   Map<String, dynamic>? get quote => _quote;
+  bool get isQuoting => _isQuoting;
   Set<int> get favourites => _favourites;
 
   void toggleFavourite(int vendorId) {
@@ -161,6 +163,9 @@ class MarketProvider extends ChangeNotifier {
     final items = _cart.values
         .map((e) => {'product_id': (e['product'] as Map)['id'], 'quantity': e['quantity']})
         .toList();
+    _isQuoting = true;
+    _quote = null;
+    notifyListeners();
     try {
       final resp = await ApiClient.instance.dio.post('/market/quote', data: {
         'vendor_id': _activeVendorId,
@@ -169,12 +174,13 @@ class MarketProvider extends ChangeNotifier {
         'items': items,
       });
       _quote = Map<String, dynamic>.from(resp.data as Map);
-      notifyListeners();
       return _quote;
     } on DioException catch (e) {
       _error = e.response?.data?['detail']?.toString() ?? e.message;
-      notifyListeners();
       return null;
+    } finally {
+      _isQuoting = false;
+      notifyListeners();
     }
   }
 

@@ -3,8 +3,9 @@ from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from typing import List
 import os
+import secrets
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -360,7 +361,52 @@ _AUTO_REPLY_RULES = [
         "Promo codes need to be entered at the fare-estimate screen BEFORE booking — they can't be applied retroactively. "
         "Codes also have time/usage limits which we've checked against your account.",
     ),
+    (
+        ["lost", "found", "left item", "belonging", "wallet", "phone", "bag", "luggage"],
+        "We're sorry you misplaced your item. Our team is contacting the driver for this trip to check the vehicle. "
+        "Please keep this chat open for updates on recovering your belongings.",
+    ),
 ]
+
+
+def _find_admin_panel_dir() -> str:
+    curr = os.path.abspath(__file__)
+    for _ in range(10):
+        curr = os.path.dirname(curr)
+        candidate = os.path.join(curr, "ziggo_admin_panel")
+        if os.path.isdir(candidate):
+            return candidate
+    return os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
+        "ziggo_admin_panel",
+    )
+
+
+_ADMIN_PANEL_DIR = _find_admin_panel_dir()
+_COMPLAINT_ATTACHMENT_DIR = os.path.join(_ADMIN_PANEL_DIR, "static", "uploads", "complaints")
+os.makedirs(_COMPLAINT_ATTACHMENT_DIR, exist_ok=True)
+
+
+@router.post("/complaints/upload")
+async def upload_complaint_attachment(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+):
+    """Upload screenshot/photo attachment for a support ticket (max 5MB, JPG/PNG/WEBP/AVIF)."""
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in {".jpg", ".jpeg", ".png", ".webp", ".avif"}:
+        raise HTTPException(status_code=400, detail="Attachment must be JPG, PNG, WEBP, or AVIF")
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file")
+    if len(data) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Attachment must be under 5 MB")
+
+    fname = f"complaint_{secrets.token_hex(8)}{ext}"
+    fpath = os.path.join(_COMPLAINT_ATTACHMENT_DIR, fname)
+    with open(fpath, "wb") as f:
+        f.write(data)
+    return {"ok": True, "attachment_url": f"/static/uploads/complaints/{fname}"}
 
 
 def _auto_reply_for(complaint: "Complaint") -> str | None:
@@ -383,6 +429,7 @@ async def create_complaint(
         category=body.category,
         subject=body.subject,
         description=body.description,
+        attachment_url=body.attachment_url,
         status="open",
     )
     db.add(c)

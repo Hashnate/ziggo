@@ -7,6 +7,7 @@ import '../../../app/app_colors.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/services/floating_overlay_service.dart';
 import '../../auth/auth_provider.dart';
+import '../../common/screens/privacy_policy_screen.dart';
 import '../../customer/screens/support_screen.dart';
 import '../driver_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -377,6 +378,16 @@ class DriverProfileScreen extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                             builder: (_) => const SupportScreen(isDriver: true)),
+                      ),
+                    ),
+                    _divider(),
+                    _listTile(
+                      icon: Icons.policy_outlined,
+                      title: 'Privacy policy',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const PrivacyPolicyScreen(initialTab: 'privacy')),
                       ),
                     ),
                   ],

@@ -261,11 +261,17 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                         itemCount: _messages.length + 1, // +1 for the opening description
                         itemBuilder: (context, index) {
                           if (index == 0) {
+                            final bId = widget.ticket['booking_id'] != null
+                                ? int.tryParse(widget.ticket['booking_id'].toString())
+                                : null;
+                            final attach = widget.ticket['attachment_url']?.toString();
                             return _buildBubble(
                               body: widget.ticket['description']?.toString() ?? '',
                               isMe: true,
                               time: _formatTime(widget.ticket['created_at']?.toString()),
                               label: 'You',
+                              bookingId: bId,
+                              attachmentUrl: attach,
                             );
                           }
                           final msg = _messages[index - 1];
@@ -364,6 +370,8 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
     required bool isMe,
     required String time,
     required String label,
+    int? bookingId,
+    String? attachmentUrl,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -398,13 +406,61 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
                       bottomRight: Radius.circular(isMe ? 4 : 18),
                     ),
                   ),
-                  child: Text(
-                    body,
-                    style: TextStyle(
-                      color: isMe ? Colors.white : AppColors.textPrimary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (bookingId != null)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: isMe ? Colors.white.withOpacity(0.18) : AppColors.primary.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.confirmation_number_outlined,
+                                size: 12,
+                                color: isMe ? Colors.white70 : AppColors.primary,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Ride #$bookingId',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  color: isMe ? Colors.white : AppColors.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      Text(
+                        body,
+                        style: TextStyle(
+                          color: isMe ? Colors.white : AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                      if (attachmentUrl != null && attachmentUrl.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.network(
+                            attachmentUrl.startsWith('http')
+                                ? attachmentUrl
+                                : '${ApiConfig.baseHost}$attachmentUrl',
+                            height: 140,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const SizedBox(),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ],

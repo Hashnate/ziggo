@@ -19,6 +19,7 @@ import 'wallet_screen.dart';
 import 'payment_methods_screen.dart';
 import 'edit_profile_screen.dart';
 import 'earn_with_ziggo_screen.dart';
+import '../../common/screens/privacy_policy_screen.dart';
 import '../../../core/utils/amount_format.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -120,6 +121,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                TextButton.icon(
+                  onPressed: () => _open(const PrivacyPolicyScreen()),
+                  icon: const Icon(Icons.policy_outlined, size: 18, color: AppColors.textSecondary),
+                  label: const Text(
+                    'Privacy Policy & Terms',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),
@@ -240,10 +254,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 color: AppColors.primary,
                 label: 'Switch to Driver Mode',
                 subtitle: 'Go online and accept trips',
+                busy: auth.isSwitchingRole,
                 onTap: () async {
-                  await auth.switchRole('driver');
+                  if (auth.isSwitchingRole) return;
+                  final ok = await auth.switchRole('driver');
+                  if (ok && mounted) {
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  }
                 },
               ),
+          ]),
+          const SizedBox(height: 22),
+          _sectionLabel('LEGAL & POLICIES'),
+          const SizedBox(height: 10),
+          _menuCard(items: [
+            _MenuItem(
+              icon: Icons.policy_rounded,
+              color: AppColors.primary,
+              label: 'Privacy Policy',
+              subtitle: 'Data protection & privacy rights',
+              onTap: () => _open(const PrivacyPolicyScreen(initialTab: 'privacy')),
+            ),
+            _MenuItem(
+              icon: Icons.gavel_rounded,
+              color: AppColors.secondary,
+              label: 'Terms of Service',
+              subtitle: 'Terms, conditions & platform rules',
+              onTap: () => _open(const PrivacyPolicyScreen(initialTab: 'terms')),
+            ),
           ]),
           const SizedBox(height: 24),
           const Center(
@@ -572,7 +610,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _menuRow(_MenuItem item) {
     return InkWell(
-      onTap: item.onTap,
+      onTap: item.busy ? null : item.onTap,
       borderRadius: BorderRadius.circular(20),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -612,11 +650,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: AppColors.textTertiary,
-              size: 22,
-            ),
+            if (item.busy)
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: item.color,
+                ),
+              )
+            else
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textTertiary,
+                size: 22,
+              ),
           ],
         ),
       ),
@@ -705,6 +753,7 @@ class _MenuItem {
   final String label;
   final String subtitle;
   final VoidCallback onTap;
+  final bool busy;
 
   const _MenuItem({
     required this.icon,
@@ -712,5 +761,6 @@ class _MenuItem {
     required this.label,
     required this.subtitle,
     required this.onTap,
+    this.busy = false,
   });
 }

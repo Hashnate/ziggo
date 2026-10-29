@@ -5,6 +5,8 @@ import '../../../app/app_colors.dart';
 import '../../../core/widgets/motion.dart';
 import '../../auth/auth_provider.dart';
 
+import '../../common/screens/privacy_policy_screen.dart';
+
 class AdditionalSettingsScreen extends StatefulWidget {
   const AdditionalSettingsScreen({super.key});
 
@@ -84,6 +86,32 @@ class _AdditionalSettingsScreenState extends State<AdditionalSettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: staggered([
+          _listTile(
+            icon: Icons.policy_outlined,
+            title: 'Privacy Policy',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const PrivacyPolicyScreen(initialTab: 'privacy'),
+                ),
+              );
+            },
+          ),
+          const Divider(height: 1, indent: 60, color: AppColors.divider),
+          _listTile(
+            icon: Icons.gavel_outlined,
+            title: 'Terms of Service',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const PrivacyPolicyScreen(initialTab: 'terms'),
+                ),
+              );
+            },
+          ),
+          const Divider(height: 1, indent: 60, color: AppColors.divider),
           _listTile(
             icon: Icons.no_accounts_rounded,
             title: 'Delete my account',

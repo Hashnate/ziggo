@@ -5,6 +5,7 @@ import '../../../core/widgets/brand.dart';
 import '../../../core/widgets/motion.dart';
 import 'phone_login_screen.dart';
 import 'registration_screen.dart';
+import '../../common/screens/privacy_policy_screen.dart';
 
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({super.key});
@@ -181,6 +182,29 @@ class RoleSelectionScreen extends StatelessWidget {
                               ),
                             ],
                           ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  EntranceSlide(
+                    delay: const Duration(milliseconds: 400),
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const PrivacyPolicyScreen(),
+                          ),
+                        );
+                      },
+                      child: Text(
+                        'Privacy Policy & Terms',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: Colors.white.withOpacity(0.4),
+                          fontWeight: FontWeight.w600,
+                          decoration: TextDecoration.underline,
                         ),
                       ),
                     ),

@@ -34,6 +34,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
   bool _busy = false;
   bool _usePoints = false;
   bool _isSelfPickup = false;
+  bool _isQuoting = false;
   final _promoCheck = PromoCheck();
   final _instructionsCtrl = TextEditingController();
 
@@ -75,7 +76,12 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
       lng = _picked!.location.longitude;
     }
     if (lat != null && lng != null) {
-      await context.read<MarketProvider>().quoteDelivery(lat: lat, lng: lng);
+      if (mounted) setState(() => _isQuoting = true);
+      try {
+        await context.read<MarketProvider>().quoteDelivery(lat: lat, lng: lng);
+      } finally {
+        if (mounted) setState(() => _isQuoting = false);
+      }
     }
   }
 
@@ -216,7 +222,8 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
     final vendor = p.activeVendor;
     final quote = p.quote;
     final hasAddress = _saved != null || _picked != null;
-    final outOfRange = !_isSelfPickup && quote != null && quote['in_range'] == false;
+    final isCalculatingQuote = !_isSelfPickup && hasAddress && (_isQuoting || p.isQuoting);
+    final outOfRange = !_isSelfPickup && !isCalculatingQuote && quote != null && quote['in_range'] == false;
     // Show the live quoted fee once an address is chosen; before then the
     // delivery line is a placeholder and isn't added to the total.
     final deliveryFee = _isSelfPickup ? 0.0 : ((quote?['delivery_fee'] as num?)?.toDouble() ?? 0.0);
@@ -421,6 +428,54 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
           ),
           _section(
             'YOUR CART',
+            trailing: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    title: const Text('Clear cart?', style: TextStyle(fontWeight: FontWeight.w900)),
+                    content: const Text('Are you sure you want to remove all items from your cart?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('CANCEL', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          p.clearCart();
+                        },
+                        child: const Text('CLEAR', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.error)),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.delete_sweep_outlined, size: 14, color: AppColors.error),
+                    SizedBox(width: 4),
+                    Text(
+                      'Clear all',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.error,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             Column(
               children: p.cart.values.map((e) {
                 final pr = e['product'] as Map<String, dynamic>;
@@ -653,41 +708,60 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
                           ),
                         );
                       }),
-                      GestureDetector(
-                        onTap: _pickPlace,
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceMuted,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: AppColors.cardBorder),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 38,
-                                height: 38,
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: AppColors.market.withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(11),
-                                ),
-                                child: const Icon(Icons.add_location_alt_rounded,
-                                    color: AppColors.market, size: 18),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  _picked?.fullAddress ?? 'Pick another location',
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w900, fontSize: 14),
+                      Builder(
+                        builder: (context) {
+                          final pickedSelected = _picked != null && _saved == null;
+                          return GestureDetector(
+                            onTap: _pickPlace,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: pickedSelected
+                                    ? AppColors.market.withOpacity(0.08)
+                                    : AppColors.surfaceMuted,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: pickedSelected ? AppColors.market : AppColors.cardBorder,
+                                  width: pickedSelected ? 1.5 : 1,
                                 ),
                               ),
-                              const Icon(Icons.chevron_right_rounded,
-                                  color: AppColors.textTertiary),
-                            ],
-                          ),
-                        ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 38,
+                                    height: 38,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.market.withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(11),
+                                    ),
+                                    child: Icon(
+                                      pickedSelected ? Icons.location_on_rounded : Icons.add_location_alt_rounded,
+                                      color: AppColors.market,
+                                      size: 18,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      _picked?.fullAddress ?? 'Pick another location',
+                                      style: TextStyle(
+                                        fontWeight: pickedSelected ? FontWeight.w900 : FontWeight.w700,
+                                        fontSize: 14,
+                                        color: pickedSelected ? AppColors.textPrimary : AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                  if (pickedSelected)
+                                    const Icon(Icons.check_circle_rounded, color: AppColors.market)
+                                  else
+                                    const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -844,11 +918,36 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
                     'Delivery',
                     !hasAddress
                         ? 'Pick address'
-                        : quote == null
+                        : (isCalculatingQuote || quote == null)
                             ? 'Calculating…'
                             : 'Rs.${formatAmount(deliveryFee)}',
                   ),
-                  if (quote != null && hasAddress)
+                  if (hasAddress && isCalculatingQuote)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4, bottom: 2),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.market,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Measuring distance & fee…',
+                            style: TextStyle(
+                              color: AppColors.textTertiary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else if (quote != null && hasAddress)
                     Padding(
                       padding: const EdgeInsets.only(top: 2, bottom: 2),
                       child: Row(
@@ -884,19 +983,23 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: PrimaryButton(
-            label: outOfRange
-                ? 'OUT OF DELIVERY RANGE'
-                : 'PLACE ORDER • Rs.${formatAmount(total)}',
-            icon: outOfRange ? Icons.location_off_rounded : Icons.check_rounded,
+            label: isCalculatingQuote
+                ? 'CALCULATING DELIVERY FEE…'
+                : (outOfRange
+                    ? 'OUT OF DELIVERY RANGE'
+                    : 'PLACE ORDER • Rs.${formatAmount(total)}'),
+            icon: isCalculatingQuote
+                ? Icons.sync_rounded
+                : (outOfRange ? Icons.location_off_rounded : Icons.check_rounded),
             busy: _busy,
-            onPressed: outOfRange ? null : _placeOrder,
+            onPressed: (isCalculatingQuote || outOfRange) ? null : _placeOrder,
           ),
         ),
       ),
     );
   }
 
-  Widget _section(String title, Widget child) {
+  Widget _section(String title, Widget child, {Widget? trailing}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
@@ -908,14 +1011,20 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.textTertiary,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.4,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textTertiary,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.4,
+                ),
+              ),
+              if (trailing != null) trailing,
+            ],
           ),
           const SizedBox(height: 12),
           child,

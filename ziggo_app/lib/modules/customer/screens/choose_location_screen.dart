@@ -16,10 +16,18 @@ import 'set_location_map_screen.dart';
 /// a location (current GPS, search, set-on-map, a saved address or a recent).
 class ChooseLocationScreen extends StatefulWidget {
   final Place? initialPlace;
+  final bool isPickup;
+  final String? title;
+  final String? mapTitle;
+  final String? mapBadgeText;
 
   const ChooseLocationScreen({
     super.key,
     this.initialPlace,
+    this.isPickup = false,
+    this.title,
+    this.mapTitle,
+    this.mapBadgeText,
   });
 
   @override
@@ -47,9 +55,11 @@ class _ChooseLocationScreenState extends State<ChooseLocationScreen> {
   }
 
   Future<void> _search() async {
+    final searchTitle = widget.title ?? (widget.isPickup ? 'Search pickup location' : 'Search location');
     final p = await showPlaceSearch(
       context,
-      title: 'Search location',
+      title: searchTitle,
+      near: widget.initialPlace?.location,
       allowSetOnMap: true,
       allowCurrentLocation: true,
     );
@@ -62,14 +72,16 @@ class _ChooseLocationScreenState extends State<ChooseLocationScreen> {
   }
 
   Future<void> _openSetOnMap() async {
+    final defaultTitle = widget.isPickup ? 'Set pickup location' : 'Set delivery location';
+    final defaultBadge = widget.isPickup ? 'Pickup' : 'Delivery';
     final Place? picked = await Navigator.push<Place>(
       context,
       MaterialPageRoute(
         builder: (_) => SetLocationMapScreen(
           initialLocation: widget.initialPlace,
-          title: 'Set delivery location',
+          title: widget.mapTitle ?? defaultTitle,
           confirmButtonText: 'CONFIRM LOCATION',
-          badgeText: 'Delivery',
+          badgeText: widget.mapBadgeText ?? defaultBadge,
         ),
       ),
     );
@@ -138,9 +150,9 @@ class _ChooseLocationScreenState extends State<ChooseLocationScreen> {
           icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Location',
-          style: TextStyle(
+        title: Text(
+          widget.title ?? (widget.isPickup ? 'Pick up location' : 'Location'),
+          style: const TextStyle(
             color: AppColors.textPrimary,
             fontWeight: FontWeight.w900,
             fontSize: 19,
@@ -186,13 +198,13 @@ class _ChooseLocationScreenState extends State<ChooseLocationScreen> {
           color: AppColors.surfaceMuted,
           borderRadius: BorderRadius.circular(100),
         ),
-        child: const Row(
+        child: Row(
           children: [
-            Icon(Icons.search_rounded, color: AppColors.textSecondary, size: 22),
-            SizedBox(width: 12),
+            const Icon(Icons.search_rounded, color: AppColors.textSecondary, size: 22),
+            const SizedBox(width: 12),
             Text(
-              'Search location',
-              style: TextStyle(
+              widget.isPickup ? 'Search pickup location' : 'Search location',
+              style: const TextStyle(
                 color: AppColors.textTertiary,
                 fontWeight: FontWeight.w600,
                 fontSize: 15,

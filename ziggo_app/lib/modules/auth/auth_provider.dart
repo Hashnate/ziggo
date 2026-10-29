@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/notifications/fcm_service.dart';
+import '../../core/notifications/notification_router.dart';
 import '../../core/storage/token_storage.dart';
 
 enum AuthStatus { unauthenticated, authenticating, authenticated, error }
@@ -120,6 +121,7 @@ class AuthProvider extends ChangeNotifier {
         await _refreshMe();
         _isSwitchingRole = false;
         notifyListeners();
+        rootNavigatorKey.currentState?.popUntil((route) => route.isFirst);
         return true;
       }
       _isSwitchingRole = false;

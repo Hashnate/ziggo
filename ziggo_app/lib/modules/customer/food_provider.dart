@@ -250,7 +250,9 @@ class FoodProvider extends ChangeNotifier {
   }
 
   Map<String, dynamic>? _quote;
+  bool _isQuoting = false;
   Map<String, dynamic>? get quote => _quote;
+  bool get isQuoting => _isQuoting;
 
   void clearCart() {
     _cart.clear();
@@ -264,7 +266,14 @@ class FoodProvider extends ChangeNotifier {
     required double lat,
     required double lng,
   }) async {
-    if (_activeRestaurantId == null || _cart.isEmpty) return null;
+    if (_activeRestaurantId == null || _cart.isEmpty) {
+      _quote = null;
+      notifyListeners();
+      return null;
+    }
+    _isQuoting = true;
+    _quote = null;
+    notifyListeners();
     try {
       final resp = await ApiClient.instance.dio.post('/food/quote', data: {
         'restaurant_id': _activeRestaurantId,
@@ -277,10 +286,13 @@ class FoodProvider extends ChangeNotifier {
         }).toList(),
       });
       _quote = Map<String, dynamic>.from(resp.data as Map);
-      notifyListeners();
       return _quote;
     } on DioException catch (e) {
+      _error = e.response?.data?['detail']?.toString() ?? e.message;
       return null;
+    } finally {
+      _isQuoting = false;
+      notifyListeners();
     }
   }
 

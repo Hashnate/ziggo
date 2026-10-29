@@ -955,8 +955,10 @@ class _AddControl extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _stepBtn(Icons.remove_rounded,
-              () => mp.changeQty(pid, -1)),
+          _stepBtn(
+            qty == 1 ? Icons.delete_outline_rounded : Icons.remove_rounded,
+            () => mp.changeQty(pid, -1),
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 2),
             child: Text(

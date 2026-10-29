@@ -67,10 +67,11 @@ class LoyaltyTransactionResponse(BaseModel):
 
 
 class ComplaintCreate(BaseModel):
-    category: str  # driver_behavior, fare_issue, safety, technical, other
+    category: str  # driver_behavior, fare_issue, safety, technical, lost_found, other
     subject: str
     description: str
     booking_id: Optional[int] = None
+    attachment_url: Optional[str] = None
 
 
 class ComplaintResponse(BaseModel):
@@ -78,6 +79,8 @@ class ComplaintResponse(BaseModel):
     category: str
     subject: str
     description: str
+    booking_id: Optional[int] = None
+    attachment_url: Optional[str] = None
     status: str
     created_at: datetime
     resolved_at: Optional[datetime] = None

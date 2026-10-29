@@ -36,7 +36,15 @@ class _FlashDropDetailsScreenState extends State<FlashDropDetailsScreen> {
   Future<void> _selectLocation() async {
     final Place? result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const ChooseLocationScreen()),
+      MaterialPageRoute(
+        builder: (_) => ChooseLocationScreen(
+          initialPlace: _drop,
+          isPickup: false,
+          title: 'Delivery location',
+          mapTitle: 'Set delivery location',
+          mapBadgeText: 'Delivery',
+        ),
+      ),
     );
     if (result != null) {
       setState(() {

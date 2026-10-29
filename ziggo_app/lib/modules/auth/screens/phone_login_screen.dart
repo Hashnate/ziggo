@@ -5,6 +5,7 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/widgets/motion.dart';
 import '../auth_provider.dart';
+import '../../common/screens/privacy_policy_screen.dart';
 import 'otp_verification_screen.dart';
 
 class PhoneLoginScreen extends StatefulWidget {
@@ -254,24 +255,58 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                 ),
               ],
               const SizedBox(height: 18),
-              const Center(
+              Center(
                 child: Text.rich(
                   TextSpan(
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 11,
                       color: AppColors.textTertiary,
                       fontWeight: FontWeight.w600,
                     ),
                     children: [
-                      TextSpan(text: 'By continuing you agree to '),
-                      TextSpan(
-                        text: 'Terms',
-                        style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w900),
+                      const TextSpan(text: 'By continuing you agree to '),
+                      WidgetSpan(
+                        alignment: PlaceholderAlignment.middle,
+                        child: GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const PrivacyPolicyScreen(initialTab: 'terms'),
+                              ),
+                            );
+                          },
+                          child: const Text(
+                            'Terms',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
                       ),
-                      TextSpan(text: ' and '),
-                      TextSpan(
-                        text: 'Privacy Policy',
-                        style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w900),
+                      const TextSpan(text: ' and '),
+                      WidgetSpan(
+                        alignment: PlaceholderAlignment.middle,
+                        child: GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const PrivacyPolicyScreen(initialTab: 'privacy'),
+                              ),
+                            );
+                          },
+                          child: const Text(
+                            'Privacy Policy',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),

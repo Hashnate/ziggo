@@ -1484,7 +1484,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
   // ── PickMe-style driver home ─────────────────────────────────────────────
 
   Widget _buildTopBar(DriverProvider driver) {
-    final auth = context.read<AuthProvider>();
+    final auth = context.watch<AuthProvider>();
     final notifs = context.watch<NotificationsProvider>();
     final profile = driver.profile ?? const <String, dynamic>{};
     final name = auth.fullName ?? 'Driver';
@@ -1650,7 +1650,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
               ),
               const SizedBox(width: 8),
               GestureDetector(
-                onTap: () => context.read<AuthProvider>().toggleCustomerMode(),
+                onTap: auth.isSwitchingRole ? null : () => context.read<AuthProvider>().toggleCustomerMode(),
                 child: Container(
                   width: 48,
                   height: 48,
@@ -1660,11 +1660,20 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
                     color: _kPanel,
                     boxShadow: AppStyles.shadowSm,
                   ),
-                  child: const Icon(
-                    Icons.swap_horiz_rounded,
-                    color: AppColors.textSecondary,
-                    size: 24,
-                  ),
+                  child: auth.isSwitchingRole
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.primary,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.swap_horiz_rounded,
+                          color: AppColors.textSecondary,
+                          size: 24,
+                        ),
                 ),
               ),
             ],

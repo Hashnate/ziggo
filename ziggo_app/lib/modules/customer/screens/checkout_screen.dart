@@ -36,6 +36,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _busy = false;
   bool _usePoints = false;
   bool _isSelfPickup = false;
+  bool _isQuoting = false;
   String _promo = '';
   final _promoCheck = PromoCheck();
 
@@ -77,7 +78,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       lng = _deliveryPlace!.location.longitude;
     }
     if (lat != null && lng != null) {
-      await context.read<FoodProvider>().quoteDelivery(lat: lat, lng: lng);
+      if (mounted) setState(() => _isQuoting = true);
+      try {
+        await context.read<FoodProvider>().quoteDelivery(lat: lat, lng: lng);
+      } finally {
+        if (mounted) setState(() => _isQuoting = false);
+      }
     }
   }
 
@@ -221,6 +227,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final promos = context.watch<PromosProvider>();
     final restaurant = food.activeRestaurant;
     final quote = food.quote;
+    final hasAddress = _deliveryAddress != null || _deliveryPlace != null;
+    final isCalculatingQuote = !_isSelfPickup && hasAddress && (_isQuoting || food.isQuoting);
     final deliveryFee = _isSelfPickup ? 0.0 : ((quote?['delivery_fee'] as num?)?.toDouble() ??
         (restaurant?['delivery_fee'] as num?)?.toDouble() ?? 0.0);
     final appUsagePct = _isSelfPickup ? ((promos.loyalty['self_pickup_app_usage_charge'] as num?)?.toDouble() ?? 5.0) : 0.0;
@@ -230,7 +238,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
     final promoDiscount = _promoCheck.discount(_promo);
 
-    double total = food.cartTotal + deliveryFee + appUsageCharge + food.cartPackingCharge - promoDiscount;
+    double total = food.cartTotal + ((hasAddress && !_isSelfPickup) ? deliveryFee : 0.0) + appUsageCharge + food.cartPackingCharge - promoDiscount;
     if (total < 0) total = 0;
     int maxRedeemablePoints = 0;
     double potentialDiscount = 0.0;
@@ -423,6 +431,54 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
           _Section(
             title: 'YOUR ORDER',
+            trailing: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    title: const Text('Clear order?', style: TextStyle(fontWeight: FontWeight.w900)),
+                    content: const Text('Are you sure you want to remove all items from your order?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('CANCEL', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          food.clearCart();
+                        },
+                        child: const Text('CLEAR', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.error)),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.delete_sweep_outlined, size: 14, color: AppColors.error),
+                    SizedBox(width: 4),
+                    Text(
+                      'Clear all',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.error,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             child: Column(
               children: [
                 if (restaurant != null)
@@ -688,40 +744,60 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           ),
                         );
                       }),
-                      GestureDetector(
-                        onTap: _pickPlace,
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceMuted,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: AppColors.cardBorder),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 38,
-                                height: 38,
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(11),
-                                ),
-                                child: const Icon(Icons.add_location_alt_rounded,
-                                    color: AppColors.primary, size: 18),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  _deliveryPlace?.fullAddress ?? 'Pick another location',
-                                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+                      Builder(
+                        builder: (context) {
+                          final pickedSelected = _deliveryPlace != null && _deliveryAddress == null;
+                          return GestureDetector(
+                            onTap: _pickPlace,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: pickedSelected
+                                    ? AppColors.primary.withOpacity(0.08)
+                                    : AppColors.surfaceMuted,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: pickedSelected ? AppColors.primary : AppColors.cardBorder,
+                                  width: pickedSelected ? 1.5 : 1,
                                 ),
                               ),
-                              const Icon(Icons.chevron_right_rounded,
-                                  color: AppColors.textTertiary),
-                            ],
-                          ),
-                        ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 38,
+                                    height: 38,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(11),
+                                    ),
+                                    child: Icon(
+                                      pickedSelected ? Icons.location_on_rounded : Icons.add_location_alt_rounded,
+                                      color: AppColors.primary,
+                                      size: 18,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      _deliveryPlace?.fullAddress ?? 'Pick another location',
+                                      style: TextStyle(
+                                        fontWeight: pickedSelected ? FontWeight.w900 : FontWeight.w700,
+                                        fontSize: 14,
+                                        color: pickedSelected ? AppColors.textPrimary : AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                  if (pickedSelected)
+                                    const Icon(Icons.check_circle_rounded, color: AppColors.primary)
+                                  else
+                                    const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -842,7 +918,57 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               children: [
                 _row('Items total', formatRs(food.cartTotal)),
                 if (food.cartPackingCharge > 0) _row('Packing Charge', formatRs(food.cartPackingCharge)),
-                if (!_isSelfPickup) _row('Delivery fee', formatRs(deliveryFee)),
+                if (!_isSelfPickup) ...[
+                  _row(
+                    'Delivery fee',
+                    !hasAddress
+                        ? 'Pick address'
+                        : isCalculatingQuote
+                            ? 'Calculating…'
+                            : formatRs(deliveryFee),
+                  ),
+                  if (hasAddress && isCalculatingQuote)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4, bottom: 2),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Measuring distance & fee…',
+                            style: TextStyle(
+                              color: AppColors.textTertiary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else if (quote != null && hasAddress && quote['distance_km'] != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2, bottom: 2),
+                      child: Row(
+                        children: [
+                          Text(
+                            '${(quote['distance_km'] as num?)?.toStringAsFixed(1) ?? '—'} km',
+                            style: const TextStyle(
+                              color: AppColors.textTertiary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
                 if (_isSelfPickup && appUsageCharge > 0)
                   _row('App usage charge', formatRs(appUsageCharge)),
                 if (promoDiscount > 0)
@@ -861,10 +987,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: PrimaryButton(
-            label: 'PLACE ORDER • ${formatRs(total)}',
-            icon: Icons.check_rounded,
+            label: isCalculatingQuote
+                ? 'CALCULATING DELIVERY FEE…'
+                : 'PLACE ORDER • ${formatRs(total)}',
+            icon: isCalculatingQuote ? Icons.sync_rounded : Icons.check_rounded,
             busy: _busy,
-            onPressed: _placeOrder,
+            onPressed: isCalculatingQuote ? null : _placeOrder,
           ),
         ),
       ),
@@ -1035,7 +1163,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 class _Section extends StatelessWidget {
   final String title;
   final Widget child;
-  const _Section({required this.title, required this.child});
+  final Widget? trailing;
+  const _Section({required this.title, required this.child, this.trailing});
 
   @override
   Widget build(BuildContext context) {
@@ -1050,14 +1179,20 @@ class _Section extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.textTertiary,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.4,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textTertiary,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.4,
+                ),
+              ),
+              if (trailing != null) trailing!,
+            ],
           ),
           const SizedBox(height: 12),
           child,

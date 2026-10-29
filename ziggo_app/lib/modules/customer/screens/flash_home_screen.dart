@@ -29,7 +29,15 @@ class _FlashHomeScreenState extends State<FlashHomeScreen> {
   Future<void> _selectPickup() async {
     final Place? result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const ChooseLocationScreen()),
+      MaterialPageRoute(
+        builder: (_) => ChooseLocationScreen(
+          initialPlace: _pickup,
+          isPickup: true,
+          title: 'Pick up location',
+          mapTitle: 'Set pickup location',
+          mapBadgeText: 'Pickup',
+        ),
+      ),
     );
     if (result != null) {
       setState(() {

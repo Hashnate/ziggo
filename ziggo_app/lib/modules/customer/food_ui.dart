@@ -375,7 +375,10 @@ class DishTile extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _stepBtn(Icons.remove_rounded, () => food.changeQty("${id}_none", -1)),
+          _stepBtn(
+            qty == 1 ? Icons.delete_outline_rounded : Icons.remove_rounded,
+            () => food.changeQty("${id}_none", -1),
+          ),
           Text('$qty', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13)),
           _stepBtn(Icons.add_rounded, () => food.addToCart(item)),
         ],

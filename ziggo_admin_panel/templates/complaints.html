@@ -13,8 +13,11 @@
             <thead class="bg-ziggo-canvas/70 text-[11px] uppercase tracking-wider text-ziggo-faint font-black">
                 <tr>
                     <th class="px-6 py-3">ID</th>
+                    <th class="px-6 py-3">User</th>
                     <th class="px-6 py-3">Category</th>
+                    <th class="px-6 py-3">Booking</th>
                     <th class="px-6 py-3">Subject</th>
+                    <th class="px-6 py-3">Attachment</th>
                     <th class="px-6 py-3">Status</th>
                     <th class="px-6 py-3">Created</th>
                 </tr>
@@ -23,8 +26,41 @@
                 {% for c in complaints %}
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-3 text-sm font-medium">#{{ c.id }}</td>
-                    <td class="px-6 py-3 text-sm">{{ c.category or '' }}</td>
-                    <td class="px-6 py-3 text-sm">{{ c.subject or '' }}</td>
+                    <td class="px-6 py-3 text-sm">
+                        {% if c.user %}
+                        <p class="font-bold text-gray-900 leading-tight">{{ c.user.full_name or '—' }}</p>
+                        <p class="text-xs text-gray-500">{{ c.user.phone_number or '' }}</p>
+                        {% else %}
+                        <span class="text-gray-400">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-3 text-sm">
+                        <span class="px-2 py-0.5 rounded text-xs font-bold uppercase bg-gray-100 text-gray-700">
+                            {{ (c.category or '').replace('_', ' ') }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-3 text-sm">
+                        {% if c.booking_id %}
+                        <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700">
+                            Ride #{{ c.booking_id }}
+                        </span>
+                        {% else %}
+                        <span class="text-gray-400">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-3 text-sm">
+                        <p class="font-bold text-gray-900">{{ c.subject or '' }}</p>
+                        <p class="text-xs text-gray-500 truncate max-w-xs">{{ c.description or '' }}</p>
+                    </td>
+                    <td class="px-6 py-3">
+                        {% if c.attachment_url %}
+                        <a href="{{ c.attachment_url }}" target="_blank" class="inline-block group">
+                            <img src="{{ c.attachment_url }}" alt="Attachment" class="w-10 h-10 object-cover rounded-lg border border-gray-200 group-hover:opacity-80 shadow-xs">
+                        </a>
+                        {% else %}
+                        <span class="text-gray-400 text-xs">—</span>
+                        {% endif %}
+                    </td>
                     <td class="px-6 py-3">
                         <span class="px-2 py-1 rounded-full text-xs font-bold
                           {% if c.status == 'resolved' %}bg-green-100 text-green-700
@@ -34,7 +70,7 @@
                     <td class="px-6 py-3 text-xs text-gray-500">{{ c.created_at|colombo_dt("%Y-%m-%d %H:%M") }}</td>
                 </tr>
                 {% else %}
-                <tr><td colspan="5" class="px-6 py-10 text-center text-gray-400">No complaints</td></tr>
+                <tr><td colspan="8" class="px-6 py-10 text-center text-gray-400">No complaints</td></tr>
                 {% endfor %}
             </tbody>
         </table>

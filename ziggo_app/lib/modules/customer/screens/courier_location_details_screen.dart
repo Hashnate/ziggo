@@ -37,7 +37,15 @@ class _CourierLocationDetailsScreenState extends State<CourierLocationDetailsScr
   Future<void> _selectLocation() async {
     final Place? result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const ChooseLocationScreen()),
+      MaterialPageRoute(
+        builder: (_) => ChooseLocationScreen(
+          initialPlace: _location,
+          isPickup: widget.isPickup,
+          title: widget.isPickup ? 'Pick up location' : 'Delivery location',
+          mapTitle: widget.isPickup ? 'Set pickup location' : 'Set delivery location',
+          mapBadgeText: widget.isPickup ? 'Pickup' : 'Delivery',
+        ),
+      ),
     );
     if (result != null) {
       setState(() {
