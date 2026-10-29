@@ -147,12 +147,17 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
                   padding: EdgeInsets.fromLTRB(16, 0, 16, showCart ? 110 : 28),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
-                      (_, i) => _ProductRow(
-                        product: listProducts[i],
-                        vendorId: _vendorId,
-                        vendor: widget.vendor,
-                        isOffer: _isOffer(listProducts[i]),
-                      ),
+                      (_, i) {
+                        final p = listProducts[i];
+                        final pid = (p['id'] as num).toInt();
+                        return _ProductRow(
+                          key: ValueKey(pid),
+                          product: p,
+                          vendorId: _vendorId,
+                          vendor: widget.vendor,
+                          isOffer: _isOffer(p),
+                        );
+                      },
                       childCount: listProducts.length,
                     ),
                   ),
@@ -636,12 +641,17 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
               padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
               itemCount: items.length,
               separatorBuilder: (_, __) => const SizedBox(width: 12),
-              itemBuilder: (_, i) => _ProductTile(
-                product: items[i],
-                vendorId: _vendorId,
-                vendor: widget.vendor,
-                isOffer: _isOffer(items[i]),
-              ),
+              itemBuilder: (_, i) {
+                final p = items[i];
+                final pid = (p['id'] as num).toInt();
+                return _ProductTile(
+                  key: ValueKey(pid),
+                  product: p,
+                  vendorId: _vendorId,
+                  vendor: widget.vendor,
+                  isOffer: _isOffer(p),
+                );
+              },
             ),
           ),
         ],
@@ -903,6 +913,7 @@ class _AddControl extends StatelessWidget {
   final Map<String, dynamic>? vendor;
   final bool disabled;
   const _AddControl({
+    super.key,
     required this.product,
     required this.vendorId,
     this.vendor,
@@ -917,15 +928,22 @@ class _AddControl extends StatelessWidget {
 
     if (disabled) {
       return Container(
-        width: 36,
-        height: 36,
+        height: 30,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: AppColors.surfaceMuted,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: AppStyles.shadowSm,
         ),
-        child: const Icon(Icons.block_rounded,
-            color: AppColors.textTertiary, size: 16),
+        child: const Text(
+          'SOLD OUT',
+          style: TextStyle(
+            color: AppColors.textTertiary,
+            fontWeight: FontWeight.w900,
+            fontSize: 9,
+            letterSpacing: 0.5,
+          ),
+        ),
       );
     }
 
@@ -955,49 +973,53 @@ class _AddControl extends StatelessWidget {
           );
         },
         child: Container(
-          width: 38,
-          height: 38,
+          height: 30,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.primary, width: 1.5),
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.primary, width: 1.4),
             boxShadow: AppStyles.shadowSm,
           ),
-          child: const Icon(Icons.add_rounded,
-              color: AppColors.primary, size: 22),
+          child: const Text(
+            'ADD',
+            style: TextStyle(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w900,
+              fontSize: 12,
+              letterSpacing: 1,
+            ),
+          ),
         ),
       );
     }
 
     return Container(
-      height: 36,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      height: 30,
       decoration: BoxDecoration(
         color: AppColors.primary,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         boxShadow: AppStyles.shadowSm,
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           _stepBtn(
             qty == 1 ? Icons.delete_outline_rounded : Icons.remove_rounded,
             () => mp.changeQty(pid, -1),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Text(
-              '$qty',
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-                fontSize: 14,
-              ),
+          Text(
+            '$qty',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 13,
             ),
           ),
-          _stepBtn(Icons.add_rounded,
-              () => mp.changeQty(pid, 1)),
+          _stepBtn(
+            Icons.add_rounded,
+            () => mp.changeQty(pid, 1),
+          ),
         ],
       ),
     );
@@ -1008,9 +1030,9 @@ class _AddControl extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: SizedBox(
-        width: 30,
-        height: 34,
-        child: Icon(icon, color: Colors.white, size: 17),
+        width: 28,
+        height: 30,
+        child: Icon(icon, color: Colors.white, size: 16),
       ),
     );
   }
@@ -1433,7 +1455,8 @@ class _ProductTile extends StatelessWidget {
                     child: _productImage(product, 128),
                   ),
                   Positioned(
-                    right: 6,
+                    left: 14,
+                    right: 14,
                     bottom: 6,
                     child: _AddControl(
                       product: product,
@@ -1554,22 +1577,21 @@ class _ProductRow extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             SizedBox(
-              width: 96,
-              height: 96,
+              width: 92,
+              height: 92,
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  Positioned(
-                    left: 0,
-                    top: 0,
+                  Positioned.fill(
                     child: GestureDetector(
                       onTap: () => _showProductDetail(context, product, vendorId, vendor),
-                      child: _productImage(product, 86),
+                      child: _productImage(product, 92),
                     ),
                   ),
                   Positioned(
-                    right: 0,
-                    bottom: 0,
+                    left: 4,
+                    right: 4,
+                    bottom: 4,
                     child: _AddControl(
                       product: product,
                       vendorId: vendorId,

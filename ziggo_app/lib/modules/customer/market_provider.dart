@@ -93,11 +93,24 @@ class MarketProvider extends ChangeNotifier {
     }
   }
 
+  int getQuantity(int productId) => (_cart[productId]?['quantity'] as int?) ?? 0;
+
+  int vendorCartCount(int vendorId) {
+    if (_activeVendorId != vendorId) return 0;
+    return cartCount;
+  }
+
   void setActiveVendor(Map<String, dynamic> vendor) {
     final vendorId = (vendor['id'] as num).toInt();
+    if (_activeVendorId == vendorId) {
+      _activeVendor = vendor;
+      return;
+    }
     if (_activeVendorId != null && _activeVendorId != vendorId) {
       _cart.clear();
       _pendingPromoCode = null;
+      _activeVendor = null;
+      _quote = null;
     }
     _activeVendorId = vendorId;
     _activeVendor = vendor;

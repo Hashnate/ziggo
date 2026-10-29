@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../app/app_colors.dart';
 import '../../../core/widgets/motion.dart';
 import '../market_provider.dart';
+import '../widgets/market_cart_bar.dart';
 import 'market_home_screen.dart';
 
 class MarketFavouritesScreen extends StatelessWidget {
@@ -90,7 +91,7 @@ class MarketFavouritesScreen extends StatelessWidget {
               ),
             )
           : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+              padding: EdgeInsets.fromLTRB(16, 8, 16, provider.cart.isNotEmpty ? 110 : 28),
               itemCount: favVendors.length,
               itemBuilder: (context, i) {
                 return EntranceSlide(
@@ -99,6 +100,7 @@ class MarketFavouritesScreen extends StatelessWidget {
                 );
               },
             ),
+      bottomNavigationBar: provider.cart.isNotEmpty ? const MarketCartBar() : null,
     );
   }
 }

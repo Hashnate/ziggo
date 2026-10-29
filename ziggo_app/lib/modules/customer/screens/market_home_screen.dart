@@ -1571,6 +1571,10 @@ class MarketOutletCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mp = context.watch<MarketProvider>();
+    final vId = (vendor['id'] as num).toInt();
+    final itemsInCart = (mp.activeVendorId == vId) ? mp.cartCount : 0;
+
     final isOpenNow = vendor['is_open_now'] != false;
     final coverUrl = _resolveCover(vendor['image_url']?.toString());
     final rating = (vendor['rating'] as num?)?.toDouble() ?? 0;
@@ -1611,7 +1615,37 @@ class MarketOutletCard extends StatelessWidget {
                             errorBuilder: (_, __, ___) => _coverPlaceholder(),
                           ),
                   ),
-                  if (vendor['discount_tag'] != null && vendor['discount_tag'].toString().isNotEmpty)
+                  if (itemsInCart > 0)
+                    Positioned(
+                      left: 12,
+                      top: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(100),
+                          boxShadow: AppStyles.shadowSm,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.shopping_basket_rounded,
+                                color: Colors.white, size: 12),
+                            const SizedBox(width: 4),
+                            Text(
+                              '$itemsInCart in cart',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (vendor['discount_tag'] != null && vendor['discount_tag'].toString().isNotEmpty && itemsInCart == 0)
                     Positioned(
                       left: 12,
                       top: 12,
@@ -1708,6 +1742,31 @@ class MarketOutletCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    if (itemsInCart > 0) ...[
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.shopping_basket_rounded, color: AppColors.primary, size: 13),
+                            const SizedBox(width: 4),
+                            Text(
+                              '$itemsInCart in cart',
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Row(
                       children: [
