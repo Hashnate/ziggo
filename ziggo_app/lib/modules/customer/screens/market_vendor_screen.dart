@@ -847,19 +847,21 @@ class _AddControl extends StatelessWidget {
   final int vendorId;
   final Map<String, dynamic>? vendor;
   final bool disabled;
+  final int? quantity;
   const _AddControl({
     super.key,
     required this.product,
     required this.vendorId,
     this.vendor,
     this.disabled = false,
+    this.quantity,
   });
 
   @override
   Widget build(BuildContext context) {
     final mp = context.watch<MarketProvider>();
     final pid = (product['id'] as num).toInt();
-    final qty = (mp.cart[pid]?['quantity'] as int?) ?? 0;
+    final qty = quantity ?? mp.getQuantity(pid);
 
     if (disabled) {
       return Container(
@@ -886,7 +888,7 @@ class _AddControl extends StatelessWidget {
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
-          mp.addToCart(vendorId, product, vendor: vendor);
+          context.read<MarketProvider>().addToCart(vendorId, product, vendor: vendor);
           final name = product['name']?.toString() ?? 'Item';
           ScaffoldMessenger.of(context).hideCurrentSnackBar();
           ScaffoldMessenger.of(context).showSnackBar(
@@ -941,7 +943,7 @@ class _AddControl extends StatelessWidget {
         children: [
           _stepBtn(
             qty == 1 ? Icons.delete_outline_rounded : Icons.remove_rounded,
-            () => mp.changeQty(pid, -1),
+            () => context.read<MarketProvider>().changeQty(pid, -1),
           ),
           Text(
             '$qty',
@@ -953,7 +955,7 @@ class _AddControl extends StatelessWidget {
           ),
           _stepBtn(
             Icons.add_rounded,
-            () => mp.changeQty(pid, 1),
+            () => context.read<MarketProvider>().changeQty(pid, 1),
           ),
         ],
       ),
@@ -1265,10 +1267,10 @@ void _showProductDetail(
                               onPressed: () {
                                 if (currentCartQty > 0) {
                                   if (currentCartQty == 1) {
-                                    mp.removeFromCart(pid);
+                                    ctx.read<MarketProvider>().removeFromCart(pid);
                                     Navigator.pop(ctx);
                                   } else {
-                                    mp.changeQty(pid, -1);
+                                    ctx.read<MarketProvider>().changeQty(pid, -1);
                                   }
                                 } else {
                                   if (localQty > 1) {
@@ -1288,7 +1290,7 @@ void _showProductDetail(
                               icon: const Icon(Icons.add_rounded, size: 18, color: AppColors.primary),
                               onPressed: () {
                                 if (currentCartQty > 0) {
-                                  mp.changeQty(pid, 1);
+                                  ctx.read<MarketProvider>().changeQty(pid, 1);
                                 } else {
                                   setModalState(() => localQty++);
                                 }
@@ -1307,7 +1309,7 @@ void _showProductDetail(
                     icon: Icons.shopping_basket_rounded,
                     onPressed: () {
                       if (currentCartQty == 0) {
-                        mp.setProductQty(vendorId, product, effectiveQty, vendor: vendor);
+                        ctx.read<MarketProvider>().setProductQty(vendorId, product, effectiveQty, vendor: vendor);
                       }
                       Navigator.pop(ctx);
                       final name = product['name']?.toString() ?? 'Item';
@@ -1345,7 +1347,7 @@ void _showProductDetail(
                           ),
                         ),
                         onPressed: () {
-                          mp.removeFromCart(pid);
+                          ctx.read<MarketProvider>().removeFromCart(pid);
                           Navigator.pop(ctx);
                         },
                       ),
@@ -1390,6 +1392,9 @@ class _ProductTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mp = context.watch<MarketProvider>();
+    final pid = (product['id'] as num).toInt();
+    final qty = mp.getQuantity(pid);
     final out = _isOutOfStock(product);
     return Opacity(
       opacity: out ? 0.55 : 1,
@@ -1424,6 +1429,7 @@ class _ProductTile extends StatelessWidget {
                       vendorId: vendorId,
                       vendor: vendor,
                       disabled: out,
+                      quantity: qty,
                     ),
                   ),
                 ],
@@ -1471,6 +1477,9 @@ class _ProductRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mp = context.watch<MarketProvider>();
+    final pid = (product['id'] as num).toInt();
+    final qty = mp.getQuantity(pid);
     final out = _isOutOfStock(product);
     final unit = product['unit']?.toString() ?? '';
     return Opacity(
@@ -1559,6 +1568,7 @@ class _ProductRow extends StatelessWidget {
                       vendorId: vendorId,
                       vendor: vendor,
                       disabled: out,
+                      quantity: qty,
                     ),
                   ),
                 ],
