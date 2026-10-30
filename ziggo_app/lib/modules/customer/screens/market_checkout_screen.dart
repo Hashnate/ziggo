@@ -66,6 +66,8 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
   }
 
   Future<void> _refreshQuote() async {
+    final market = context.read<MarketProvider>();
+    if (market.cart.isEmpty) return;
     double? lat;
     double? lng;
     if (_saved != null) {
@@ -78,7 +80,7 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
     if (lat != null && lng != null) {
       if (mounted) setState(() => _isQuoting = true);
       try {
-        await context.read<MarketProvider>().quoteDelivery(lat: lat, lng: lng);
+        await market.quoteDelivery(lat: lat, lng: lng);
       } finally {
         if (mounted) setState(() => _isQuoting = false);
       }
@@ -578,9 +580,9 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       SizedBox(
-                        width: 75,
+                        width: 70,
                         child: Text(
                           'Rs.${formatAmount(itemTotal)}',
                           textAlign: TextAlign.right,
@@ -590,6 +592,21 @@ class _MarketCheckoutScreenState extends State<MarketCheckoutScreen> {
                             color: AppColors.textPrimary,
                           ),
                         ),
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          size: 20,
+                          color: AppColors.error,
+                        ),
+                        tooltip: 'Remove item',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        onPressed: () {
+                          p.removeFromCart(pid);
+                          _refreshQuote();
+                        },
                       ),
                     ],
                   ),

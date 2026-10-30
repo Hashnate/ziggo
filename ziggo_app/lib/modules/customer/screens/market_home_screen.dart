@@ -13,6 +13,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/widgets/motion.dart';
 import '../addresses_provider.dart';
 import '../market_provider.dart';
+import '../widgets/market_cart_bar.dart';
 import 'choose_location_screen.dart';
 import 'customer_shell.dart';
 import 'market_checkout_screen.dart';
@@ -1380,73 +1381,7 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
 
   // -------------------------------------------------------------- cart
   Widget _cartBar(MarketProvider p) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        child: GestureDetector(
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const MarketCheckoutScreen()),
-          ),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              gradient: AppColors.primaryGradient,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withOpacity(0.32),
-                  blurRadius: 22,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(100),
-                  ),
-                  child: Text(
-                    '${p.cartCount}',
-                    style: const TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Text(
-                  'View cart',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 15,
-                    letterSpacing: 0.4,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  'Rs.${formatAmount(p.cartTotal)}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(Icons.arrow_forward_rounded,
-                    color: Colors.white, size: 18),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+    return const MarketCartBar();
   }
 
   // ----------------------------------------------------- skeleton / empty

@@ -93,11 +93,23 @@ class MarketProvider extends ChangeNotifier {
     }
   }
 
+  int _quoteVersion = 0;
+
   int getQuantity(int productId) => (_cart[productId]?['quantity'] as int?) ?? 0;
 
   int vendorCartCount(int vendorId) {
     if (_activeVendorId != vendorId) return 0;
     return cartCount;
+  }
+
+  void _cleanupEmptyCart() {
+    if (_cart.isEmpty) {
+      _activeVendorId = null;
+      _activeVendor = null;
+      _pendingPromoCode = null;
+      _quote = null;
+      _isQuoting = false;
+    }
   }
 
   void setActiveVendor(Map<String, dynamic> vendor) {
@@ -108,9 +120,7 @@ class MarketProvider extends ChangeNotifier {
     }
     if (_activeVendorId != null && _activeVendorId != vendorId) {
       _cart.clear();
-      _pendingPromoCode = null;
-      _activeVendor = null;
-      _quote = null;
+      _cleanupEmptyCart();
     }
     _activeVendorId = vendorId;
     _activeVendor = vendor;
@@ -120,9 +130,7 @@ class MarketProvider extends ChangeNotifier {
   void addToCart(int vendorId, Map<String, dynamic> product, {Map<String, dynamic>? vendor}) {
     if (_activeVendorId != null && _activeVendorId != vendorId) {
       _cart.clear();
-      _pendingPromoCode = null;
-      _activeVendor = null;
-      _quote = null;
+      _cleanupEmptyCart();
     }
     _activeVendorId = vendorId;
     if (vendor != null) {
@@ -140,9 +148,7 @@ class MarketProvider extends ChangeNotifier {
   void setProductQty(int vendorId, Map<String, dynamic> product, int quantity, {Map<String, dynamic>? vendor}) {
     if (_activeVendorId != null && _activeVendorId != vendorId) {
       _cart.clear();
-      _pendingPromoCode = null;
-      _activeVendor = null;
-      _quote = null;
+      _cleanupEmptyCart();
     }
     _activeVendorId = vendorId;
     if (vendor != null) {
@@ -151,12 +157,7 @@ class MarketProvider extends ChangeNotifier {
     final pid = (product['id'] as num).toInt();
     if (quantity <= 0) {
       _cart.remove(pid);
-      if (_cart.isEmpty) {
-        _activeVendorId = null;
-        _activeVendor = null;
-        _pendingPromoCode = null;
-        _quote = null;
-      }
+      _cleanupEmptyCart();
     } else {
       _cart[pid] = {
         'product': product,
@@ -166,30 +167,29 @@ class MarketProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void removeFromCart(int productId) {
+    if (_cart.remove(productId) != null) {
+      _cleanupEmptyCart();
+      notifyListeners();
+    }
+  }
+
   void changeQty(int productId, int delta) {
     final e = _cart[productId];
     if (e == null) return;
     final q = (e['quantity'] as int) + delta;
     if (q <= 0) {
       _cart.remove(productId);
+      _cleanupEmptyCart();
     } else {
       _cart[productId] = {...e, 'quantity': q};
-    }
-    if (_cart.isEmpty) {
-      _activeVendorId = null;
-      _activeVendor = null;
-      _pendingPromoCode = null;
-      _quote = null;
     }
     notifyListeners();
   }
 
   void clearCart() {
     _cart.clear();
-    _activeVendorId = null;
-    _activeVendor = null;
-    _pendingPromoCode = null;
-    _quote = null;
+    _cleanupEmptyCart();
     notifyListeners();
   }
 
@@ -200,8 +200,10 @@ class MarketProvider extends ChangeNotifier {
     required double lat,
     required double lng,
   }) async {
+    final thisVersion = ++_quoteVersion;
     if (_activeVendorId == null || _cart.isEmpty) {
       _quote = null;
+      _isQuoting = false;
       notifyListeners();
       return null;
     }
@@ -218,14 +220,21 @@ class MarketProvider extends ChangeNotifier {
         'delivery_lng': lng,
         'items': items,
       });
+      if (thisVersion != _quoteVersion || _cart.isEmpty) {
+        // Discard stale response
+        return null;
+      }
       _quote = Map<String, dynamic>.from(resp.data as Map);
       return _quote;
     } on DioException catch (e) {
+      if (thisVersion != _quoteVersion || _cart.isEmpty) return null;
       _error = e.response?.data?['detail']?.toString() ?? e.message;
       return null;
     } finally {
-      _isQuoting = false;
-      notifyListeners();
+      if (thisVersion == _quoteVersion) {
+        _isQuoting = false;
+        notifyListeners();
+      }
     }
   }
 

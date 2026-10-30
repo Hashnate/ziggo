@@ -8,6 +8,7 @@ import '../../../core/network/api_client.dart';
 import '../market_provider.dart';
 import 'market_checkout_screen.dart';
 import '../../../core/utils/amount_format.dart';
+import '../widgets/market_cart_bar.dart';
 
 class MarketVendorScreen extends StatefulWidget {
   final Map<String, dynamic> vendor;
@@ -702,73 +703,7 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
 
   // --------------------------------------------------------------- cart
   Widget _cartBar(MarketProvider mp) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
-        child: GestureDetector(
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const MarketCheckoutScreen()),
-          ),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              gradient: AppColors.primaryGradient,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withOpacity(0.32),
-                  blurRadius: 22,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(100),
-                  ),
-                  child: Text(
-                    '${mp.cartCount}',
-                    style: const TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Text(
-                  'View cart',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 15,
-                    letterSpacing: 0.4,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  'Rs.${formatAmount(mp.cartTotal)}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(Icons.arrow_forward_rounded,
-                    color: Colors.white, size: 18),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+    return MarketCartBar(vendorId: _vendorId);
   }
 
   String? _resolveImg(String? path) {
@@ -1329,7 +1264,12 @@ void _showProductDetail(
                               ),
                               onPressed: () {
                                 if (currentCartQty > 0) {
-                                  mp.changeQty(pid, -1);
+                                  if (currentCartQty == 1) {
+                                    mp.removeFromCart(pid);
+                                    Navigator.pop(ctx);
+                                  } else {
+                                    mp.changeQty(pid, -1);
+                                  }
                                 } else {
                                   if (localQty > 1) {
                                     setModalState(() => localQty--);
@@ -1391,6 +1331,26 @@ void _showProductDetail(
                       );
                     },
                   ),
+                  if (currentCartQty > 0) ...[
+                    const SizedBox(height: 10),
+                    Center(
+                      child: TextButton.icon(
+                        icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 18),
+                        label: const Text(
+                          'REMOVE FROM CART',
+                          style: TextStyle(
+                            color: AppColors.error,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 13,
+                          ),
+                        ),
+                        onPressed: () {
+                          mp.removeFromCart(pid);
+                          Navigator.pop(ctx);
+                        },
+                      ),
+                    ),
+                  ],
                 ] else
                   const PrimaryButton(
                     label: 'OUT OF STOCK',

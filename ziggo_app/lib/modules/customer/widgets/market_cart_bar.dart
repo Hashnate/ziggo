@@ -18,6 +18,7 @@ class MarketCartBar extends StatelessWidget {
     if (vendorId != null && mp.activeVendorId != vendorId) return const SizedBox.shrink();
 
     return SafeArea(
+      top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
         child: GestureDetector(
@@ -26,43 +27,46 @@ class MarketCartBar extends StatelessWidget {
             MaterialPageRoute(builder: (_) => const MarketCheckoutScreen()),
           ),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            height: 56,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
-              gradient: AppColors.primaryGradient,
+              color: Colors.black,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withOpacity(0.32),
-                  blurRadius: 22,
-                  offset: const Offset(0, 10),
+                  color: Colors.black.withOpacity(0.25),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(100),
+                  width: 28,
+                  height: 28,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
                   ),
                   child: Text(
                     '${mp.cartCount}',
                     style: const TextStyle(
-                      color: AppColors.primary,
+                      color: Colors.white,
                       fontWeight: FontWeight.w900,
                       fontSize: 13,
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 const Text(
                   'View cart',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w900,
                     fontSize: 15,
-                    letterSpacing: 0.4,
+                    letterSpacing: 0.3,
                   ),
                 ),
                 const Spacer(),
@@ -71,12 +75,15 @@ class MarketCartBar extends StatelessWidget {
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w900,
-                    fontSize: 16,
+                    fontSize: 15,
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.arrow_forward_rounded,
-                    color: Colors.white, size: 18),
+                const Icon(
+                  Icons.arrow_forward_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
               ],
             ),
           ),
@@ -85,4 +92,3 @@ class MarketCartBar extends StatelessWidget {
     );
   }
 }
-

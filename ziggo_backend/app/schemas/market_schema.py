@@ -42,7 +42,7 @@ class MarketOrderItemRequest(BaseModel):
 
 class MarketOrderCreate(BaseModel):
     vendor_id: int
-    items: List[MarketOrderItemRequest]
+    items: List[MarketOrderItemRequest] = Field(..., min_length=1)
     delivery_address: Optional[str] = None
     delivery_lat: Optional[float] = None
     delivery_lng: Optional[float] = None

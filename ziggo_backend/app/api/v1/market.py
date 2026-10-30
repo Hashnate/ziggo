@@ -339,6 +339,9 @@ async def quote_delivery(
     except (KeyError, ValueError, TypeError):
         raise HTTPException(status_code=400, detail="vendor_id, delivery_lat, delivery_lng required")
 
+    if not items:
+        raise HTTPException(status_code=400, detail="Cart cannot be empty")
+
     v_q = await db.execute(select(MarketVendor).where(MarketVendor.id == vendor_id))
     vendor = v_q.scalars().first()
     if not vendor:
@@ -418,6 +421,9 @@ async def create_market_order(
             status_code=400,
             detail=f"Vendor only accepts orders between {vendor.opening_time} and {vendor.closing_time}",
         )
+
+    if not body.items:
+        raise HTTPException(status_code=400, detail="Cart cannot be empty")
 
     total = Decimal("0")
     lines = []
