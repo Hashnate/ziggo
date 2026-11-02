@@ -122,8 +122,18 @@
                     <th class="px-4 py-3 text-left">Phone</th>
                     <th class="px-4 py-3 text-left">Vehicle</th>
                     <th class="px-4 py-3 text-left">Status</th>
+                    <th class="px-4 py-3 text-left">Joined</th>
                     <th class="px-4 py-3 text-left">Approved</th>
-                    <th class="px-4 py-3 text-right">Online Time</th>
+                    <th class="px-4 py-3 text-right">
+                        Online Time
+                        {% if f.online_from and f.online_to %}
+                        <span class="block text-[10px] font-bold text-violet-600 normal-case tracking-normal">({{ f.online_from.strftime('%d %b') }} – {{ f.online_to.strftime('%d %b') }})</span>
+                        {% elif f.online_from %}
+                        <span class="block text-[10px] font-bold text-violet-600 normal-case tracking-normal">(from {{ f.online_from.strftime('%d %b') }})</span>
+                        {% elif f.online_to %}
+                        <span class="block text-[10px] font-bold text-violet-600 normal-case tracking-normal">(up to {{ f.online_to.strftime('%d %b') }})</span>
+                        {% endif %}
+                    </th>
                     <th class="px-4 py-3 text-right">Completed Jobs</th>
                 </tr>
             </thead>
@@ -144,7 +154,8 @@
                         </span>
                         {% endif %}
                     </td>
-                    <td class="px-4 py-2 text-xs text-gray-500">{{ m.approved_at|colombo_dt("%Y-%m-%d") if m.approved_at else '—' }}</td>
+                    <td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">{{ m.joined_at|colombo_dt("%b %d, %Y") if m.joined_at else '—' }}</td>
+                    <td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">{{ m.approved_at|colombo_dt("%b %d, %Y") if m.approved_at else '—' }}</td>
                     <td class="px-4 py-2 text-right">
                         <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-black {% if m.online_seconds > 0 %}bg-violet-50 text-violet-700 border border-violet-100{% else %}text-gray-400{% endif %}">
                             <i class="far fa-clock text-[11px] {% if m.online_seconds > 0 %}text-violet-500{% endif %}"></i> {{ m.online_text }}

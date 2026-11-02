@@ -300,15 +300,20 @@ async def start_online_session(db: AsyncSession, driver_id: int) -> DriverOnline
         .order_by(DriverOnlineSession.id.desc())
     )
     res = await db.execute(q)
-    active = res.scalars().first()
-    if active:
+    actives = res.scalars().all()
+    if actives:
+        most_recent = actives[0]
+        # Close any duplicate/older open sessions
+        for stale in actives[1:]:
+            stale.ended_at = stale.last_ping_at or now
+            stale.duration_seconds = max(0, int((stale.ended_at - stale.started_at).total_seconds()))
         # If pinged within the last 15 minutes, keep this session going
-        if active.last_ping_at and (now - active.last_ping_at).total_seconds() < 900:
-            active.last_ping_at = now
-            return active
+        if most_recent.last_ping_at and (now - most_recent.last_ping_at).total_seconds() < 900:
+            most_recent.last_ping_at = now
+            return most_recent
         # Otherwise close the stale session at last_ping_at
-        active.ended_at = active.last_ping_at or now
-        active.duration_seconds = max(0, int((active.ended_at - active.started_at).total_seconds()))
+        most_recent.ended_at = most_recent.last_ping_at or now
+        most_recent.duration_seconds = max(0, int((most_recent.ended_at - most_recent.started_at).total_seconds()))
 
     session = DriverOnlineSession(
         driver_id=driver_id,
@@ -330,8 +335,8 @@ async def end_online_session(db: AsyncSession, driver_id: int) -> None:
         .order_by(DriverOnlineSession.id.desc())
     )
     res = await db.execute(q)
-    active = res.scalars().first()
-    if active:
+    actives = res.scalars().all()
+    for active in actives:
         active.ended_at = now
         active.last_ping_at = now
         active.duration_seconds = max(0, int((now - active.started_at).total_seconds()))
@@ -346,8 +351,13 @@ async def ping_online_session(db: AsyncSession, driver_id: int) -> None:
         .order_by(DriverOnlineSession.id.desc())
     )
     res = await db.execute(q)
-    active = res.scalars().first()
-    if active:
+    actives = res.scalars().all()
+    if actives:
+        active = actives[0]
+        for extra in actives[1:]:
+            extra.ended_at = extra.last_ping_at or now
+            extra.duration_seconds = max(0, int((extra.ended_at - extra.started_at).total_seconds()))
+
         if active.last_ping_at and (now - active.last_ping_at).total_seconds() > 900:
             active.ended_at = active.last_ping_at
             active.duration_seconds = max(0, int((active.ended_at - active.started_at).total_seconds()))
@@ -409,17 +419,41 @@ async def driver_online_stats(
     sessions = res.scalars().all()
 
     now_utc = datetime.now(timezone.utc)
+    driver_intervals: dict[int, list[tuple[datetime, datetime]]] = {i: [] for i in driver_ids}
+
     for s in sessions:
         s_start = s.started_at
-        s_end = s.ended_at or min(now_utc, (s.last_ping_at + timedelta(minutes=15)) if s.last_ping_at else now_utc)
+        if s.ended_at:
+            s_end = s.ended_at
+        else:
+            last_p = s.last_ping_at or s_start
+            # If driver pinged within last 5 minutes, count up to now; otherwise count up to last ping
+            if (now_utc - last_p).total_seconds() <= 300:
+                s_end = now_utc
+            else:
+                s_end = last_p
 
         seg_start = max(s_start, lo) if lo else s_start
         seg_end = min(s_end, hi) if hi else s_end
 
-        if seg_end > seg_start:
-            secs = int((seg_end - seg_start).total_seconds())
-            if s.driver_id in stats:
-                stats[s.driver_id]["seconds"] += secs
+        if seg_end > seg_start and s.driver_id in driver_intervals:
+            driver_intervals[s.driver_id].append((seg_start, seg_end))
+
+    # Merge overlapping intervals per driver to guarantee no double-counting
+    for d_id, ivals in driver_intervals.items():
+        if not ivals:
+            continue
+        ivals.sort(key=lambda x: x[0])
+        merged = []
+        cur_s, cur_e = ivals[0]
+        for ns, ne in ivals[1:]:
+            if ns <= cur_e:
+                cur_e = max(cur_e, ne)
+            else:
+                merged.append((cur_s, cur_e))
+                cur_s, cur_e = ns, ne
+        merged.append((cur_s, cur_e))
+        stats[d_id]["seconds"] = sum(int((e - s).total_seconds()) for s, e in merged)
 
     # Fallback/supplemental check from bookings for drivers/periods without recorded sessions
     missing_drivers = [i for i in driver_ids if stats[i]["seconds"] == 0]
@@ -433,14 +467,30 @@ async def driver_online_stats(
         if hi:
             bq = bq.where(Booking.booked_at < hi)
         b_res = await db.execute(bq)
+        b_intervals: dict[int, list[tuple[datetime, datetime]]] = {i: [] for i in missing_drivers}
         for d_id, b_at, a_at, c_at, dur_min in b_res.all():
             b_start = a_at or b_at
             b_end = c_at or (b_start + timedelta(minutes=dur_min or 30))
             if b_start and b_end:
                 seg_start = max(b_start, lo) if lo else b_start
                 seg_end = min(b_end, hi) if hi else b_end
-                if seg_end > seg_start and d_id in stats:
-                    stats[d_id]["seconds"] += int((seg_end - seg_start).total_seconds())
+                if seg_end > seg_start and d_id in b_intervals:
+                    b_intervals[d_id].append((seg_start, seg_end))
+
+        for d_id, ivals in b_intervals.items():
+            if not ivals:
+                continue
+            ivals.sort(key=lambda x: x[0])
+            merged = []
+            cur_s, cur_e = ivals[0]
+            for ns, ne in ivals[1:]:
+                if ns <= cur_e:
+                    cur_e = max(cur_e, ne)
+                else:
+                    merged.append((cur_s, cur_e))
+                    cur_s, cur_e = ns, ne
+            merged.append((cur_s, cur_e))
+            stats[d_id]["seconds"] = sum(int((e - s).total_seconds()) for s, e in merged)
 
     for d_id, st in stats.items():
         st["hours"] = round(st["seconds"] / 3600.0, 2)
@@ -504,8 +554,9 @@ async def find_drivers(db: AsyncSession, f: DriverFilter) -> list[dict]:
         if f.max_online_hours is not None and hrs > f.max_online_hours:
             continue
 
-        # If admin specified a date range and no min/max hours, filter to drivers who were online (>0 seconds)
-        if has_date_filter and f.min_online_hours is None and f.max_online_hours is None:
+        # If admin specified a date range and no min/max hours (and not searching a specific driver),
+        # filter to drivers who were online (>0 seconds)
+        if has_date_filter and not f.search and f.min_online_hours is None and f.max_online_hours is None:
             if secs <= 0:
                 continue
 
