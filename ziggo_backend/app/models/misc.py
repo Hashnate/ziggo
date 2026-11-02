@@ -441,6 +441,20 @@ class DriverWalletCredit(Base):
     driver = relationship("Driver", foreign_keys=[driver_id])
 
 
+class DriverOnlineSession(Base):
+    """Tracks driver online sessions and durations for online hours filtering and analytics."""
+    __tablename__ = "driver_online_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    driver_id = Column(Integer, ForeignKey("drivers.id", ondelete="CASCADE"), nullable=False, index=True)
+    started_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    ended_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    last_ping_at = Column(DateTime(timezone=True), nullable=False)
+    duration_seconds = Column(Integer, default=0, nullable=False)
+
+    driver = relationship("Driver", foreign_keys=[driver_id])
+
+
 class DriverIncentive(Base):
     __tablename__ = "driver_incentives"
 

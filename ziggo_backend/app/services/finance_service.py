@@ -1425,6 +1425,8 @@ async def check_and_deactivate_driver(db: AsyncSession, driver_id: int) -> bool:
         if drv.status != DriverStatus.SUSPENDED:
             drv.status = DriverStatus.SUSPENDED
             drv.is_online = False
+            from app.services.driver_wallet_service import end_online_session
+            await end_online_session(db, drv.id)
             await db.commit()
             
             # Publish to ws so admin map updates instantly

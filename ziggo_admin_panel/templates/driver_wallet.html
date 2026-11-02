@@ -69,56 +69,29 @@
                         {% for vt, n in by_vehicle %}<option value="{{ vt }}" {% if f.vehicle_type == vt %}selected{% endif %}>{{ vt|capitalize }} ({{ n|num }} driver{{ 's' if n != 1 }})</option>{% endfor %}
                     </select>
                 </div>
-                <div>
-                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Driver joined / approved</label>
-                    <div class="flex items-center gap-2 flex-wrap font-bold text-gray-600 mb-2">
-                        <select name="new_by" class="p-2 border border-gray-200 rounded-xl text-xs">
-                            <option value="approved" {% if f.new_by == 'approved' %}selected{% endif %}>Approved</option>
-                            <option value="joined" {% if f.new_by == 'joined' %}selected{% endif %}>Signed up</option>
-                        </select>
-                        <span>in the last</span>
-                        <input type="number" name="new_days" min="1" value="{{ f.new_days if f.new_days is not none else '' }}" placeholder="any" class="w-20 p-2 border border-gray-200 rounded-xl text-xs">
-                        <span>days</span>
-                    </div>
-                    <div>
-                        <span class="text-[11px] font-bold text-gray-400 block mb-1">or date range:</span>
-                        <div class="grid grid-cols-2 gap-2">
-                            <input type="date" name="driver_from" value="{{ f.driver_from.isoformat() if f.driver_from else '' }}" class="w-full p-2 border border-gray-200 rounded-xl text-xs" title="From date">
-                            <input type="date" name="driver_to" value="{{ f.driver_to.isoformat() if f.driver_to else '' }}" class="w-full p-2 border border-gray-200 rounded-xl text-xs" title="To date">
-                        </div>
-                    </div>
-                    <p class="text-[11px] text-gray-400 mt-1">"Approved" restarts if an admin suspends and re-approves a driver; "signed up" never changes.</p>
-                </div>
             </div>
             <div class="space-y-4">
                 <div>
-                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Completed jobs</label>
+                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Online hours</label>
                     <div class="flex items-center gap-2 flex-wrap font-bold text-gray-600">
                         <span>at least</span>
-                        <input type="number" name="min_jobs" min="0" value="{{ f.min_jobs if f.min_jobs is not none else '' }}" placeholder="any" class="w-20 p-2 border border-gray-200 rounded-xl">
+                        <input type="number" step="0.5" name="min_online_hours" min="0" value="{{ f.min_online_hours if f.min_online_hours is not none else '' }}" placeholder="any" class="w-20 p-2 border border-gray-200 rounded-xl">
+                        <span>hrs</span>
                         <span>and at most</span>
-                        <input type="number" name="max_jobs" min="0" value="{{ f.max_jobs if f.max_jobs is not none else '' }}" placeholder="any" class="w-20 p-2 border border-gray-200 rounded-xl">
+                        <input type="number" step="0.5" name="max_online_hours" min="0" value="{{ f.max_online_hours if f.max_online_hours is not none else '' }}" placeholder="any" class="w-20 p-2 border border-gray-200 rounded-xl">
+                        <span>hrs</span>
                     </div>
-                    <p class="text-[11px] text-gray-400 mt-1">e.g. at most 0 = drivers with no completed job yet.</p>
-                </div>
-                <div>
-                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Jobs that count</label>
-                    <div class="grid grid-cols-2 gap-1 font-bold">
-                        {% for t in job_types %}
-                        <label><input type="checkbox" name="job_types" value="{{ t }}" {% if t in f.job_types %}checked{% endif %}> {{ job_names[t]|capitalize }}</label>
-                        {% endfor %}
-                    </div>
-                    <p class="text-[11px] text-gray-400 mt-1">Rides include rentals; parcels are Flash and courier.</p>
+                    <p class="text-[11px] text-gray-400 mt-1">e.g. at least 2 hrs online. Leave blank to match all drivers online in date range.</p>
                 </div>
             </div>
             <div class="space-y-4">
                 <div>
-                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Jobs done between</label>
+                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase tracking-wider">Online date range</label>
                     <div class="grid grid-cols-2 gap-2">
-                        <input type="date" name="jobs_from" value="{{ f.jobs_from.isoformat() if f.jobs_from else '' }}" class="w-full p-2 border border-gray-200 rounded-xl">
-                        <input type="date" name="jobs_to" value="{{ f.jobs_to.isoformat() if f.jobs_to else '' }}" class="w-full p-2 border border-gray-200 rounded-xl">
+                        <input type="date" name="online_from" value="{{ f.online_from.isoformat() if f.online_from else '' }}" class="w-full p-2 border border-gray-200 rounded-xl" title="From date">
+                        <input type="date" name="online_to" value="{{ f.online_to.isoformat() if f.online_to else '' }}" class="w-full p-2 border border-gray-200 rounded-xl" title="To date">
                     </div>
-                    <p class="text-[11px] text-gray-400 mt-1">Both days included. Filters to drivers who completed jobs in this period.</p>
+                    <p class="text-[11px] text-gray-400 mt-1">Both days included (e.g. 2026/11/01 – 2026/11/02). Filters to drivers online in this period.</p>
                 </div>
                 <div class="flex gap-2">
                     <button type="submit" class="flex-1 px-6 py-2.5 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light shadow-sm text-sm transition"><i class="fas fa-search mr-1"></i> Find drivers</button>
@@ -148,20 +121,36 @@
                     <th class="px-4 py-3 text-left">Driver</th>
                     <th class="px-4 py-3 text-left">Phone</th>
                     <th class="px-4 py-3 text-left">Vehicle</th>
+                    <th class="px-4 py-3 text-left">Status</th>
                     <th class="px-4 py-3 text-left">Approved</th>
-                    <th class="px-4 py-3 text-left">Signed up</th>
-                    <th class="px-4 py-3 text-right">Completed {{ f.jobs_text() if f.job_types else 'jobs' }}</th>
+                    <th class="px-4 py-3 text-right">Online Time</th>
+                    <th class="px-4 py-3 text-right">Completed Jobs</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
                 {% for m in matches %}
                 <tr class="hover:bg-gray-50">
                     <td class="px-4 py-2"><a href="/admin/finance/drivers/{{ m.driver.id }}" class="font-bold text-ziggo hover:underline">{{ m.name or ('Driver #' ~ m.driver.id) }}</a></td>
-                    <td class="px-4 py-2 text-xs">{{ m.phone or '—' }}</td>
+                    <td class="px-4 py-2 text-xs font-mono">{{ m.phone or '—' }}</td>
                     <td class="px-4 py-2 text-xs capitalize">{{ m.vehicle_type or '—' }}</td>
+                    <td class="px-4 py-2 text-xs">
+                        {% if m.is_online %}
+                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Online
+                        </span>
+                        {% else %}
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-gray-100 text-gray-500">
+                            Offline
+                        </span>
+                        {% endif %}
+                    </td>
                     <td class="px-4 py-2 text-xs text-gray-500">{{ m.approved_at|colombo_dt("%Y-%m-%d") if m.approved_at else '—' }}</td>
-                    <td class="px-4 py-2 text-xs text-gray-500">{{ m.joined_at|colombo_dt("%Y-%m-%d") if m.joined_at else '—' }}</td>
-                    <td class="px-4 py-2 text-right font-black">{{ m.jobs|num }}</td>
+                    <td class="px-4 py-2 text-right">
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-black {% if m.online_seconds > 0 %}bg-violet-50 text-violet-700 border border-violet-100{% else %}text-gray-400{% endif %}">
+                            <i class="far fa-clock text-[11px] {% if m.online_seconds > 0 %}text-violet-500{% endif %}"></i> {{ m.online_text }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-2 text-right font-bold text-gray-600">{{ m.jobs|num }}</td>
                 </tr>
                 {% endfor %}
             </tbody>

@@ -266,6 +266,12 @@ async def test_driver_filters():
                 assert DriverFilter(max_jobs=0).describe() == "All drivers · at most 0 completed jobs"
                 assert DriverFilter(search="Ijas").describe() == 'All drivers · matching "Ijas"'
                 assert not DriverFilter(search="Ijas").is_everyone()
+
+                # Online hours filter tests
+                f_online = DriverFilter(online_from=today - timedelta(days=1), online_to=today, min_online_hours=2.5)
+                assert f_online.describe() == f"All drivers · online from {(today - timedelta(days=1)):%d %b %Y} to {today:%d %b %Y} · at least 2.5 hrs online"
+                assert DriverFilter.from_json(f_online.to_json()) == f_online
+                assert not f_online.is_everyone()
             finally:
                 await _clean_filter_drivers(db)
     finally:

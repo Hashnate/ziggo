@@ -20,8 +20,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..models import (
-    Booking, BookingStatus, Driver, DriverPayout, DriverWalletCredit, DriverWalletGrant, FoodOrder,
-    FoodOrderStatus, MarketOrder, MarketOrderStatus, Notification, User,
+    Booking, BookingStatus, Driver, DriverOnlineSession, DriverPayout, DriverWalletCredit,
+    DriverWalletGrant, FoodOrder, FoodOrderStatus, MarketOrder, MarketOrderStatus,
+    Notification, User,
 )
 from .finance_service import WALLET_PAYMENT, get_driver_outstanding_commission
 from .launch_service import today_lk
@@ -146,6 +147,10 @@ class DriverFilter:
     jobs_from: Optional[date] = None        # Sri Lanka days, inclusive; None = no limit
     jobs_to: Optional[date] = None
     search: str = ""                        # driver name, phone, email, or id
+    min_online_hours: Optional[float] = None # at least N hours online in period
+    max_online_hours: Optional[float] = None # at most N hours online in period
+    online_from: Optional[date] = None       # Sri Lanka date range (inclusive)
+    online_to: Optional[date] = None
 
     def is_everyone(self) -> bool:
         return (
@@ -158,12 +163,16 @@ class DriverFilter:
             and self.max_jobs is None
             and self.jobs_from is None
             and self.jobs_to is None
+            and self.min_online_hours is None
+            and self.max_online_hours is None
+            and self.online_from is None
+            and self.online_to is None
         )
 
     def to_json(self) -> dict:
         d = asdict(self)
         d["job_types"] = list(self.job_types)
-        for k in ("jobs_from", "jobs_to", "driver_from", "driver_to"):
+        for k in ("jobs_from", "jobs_to", "driver_from", "driver_to", "online_from", "online_to"):
             d[k] = d[k].isoformat() if d.get(k) else None
         return d
 
@@ -171,7 +180,7 @@ class DriverFilter:
     def from_json(cls, d: dict) -> "DriverFilter":
         d = {k: v for k, v in (d or {}).items() if k in {f.name for f in fields(cls)}}
         d["job_types"] = tuple(d.get("job_types") or ())
-        for k in ("jobs_from", "jobs_to", "driver_from", "driver_to"):
+        for k in ("jobs_from", "jobs_to", "driver_from", "driver_to", "online_from", "online_to"):
             d[k] = date.fromisoformat(d[k]) if d.get(k) else None
         return cls(**d)
 
@@ -192,6 +201,21 @@ class DriverFilter:
         parts = [f"{self.vehicle_type.capitalize()} drivers" if self.vehicle_type else "All drivers"]
         if self.search:
             parts.append(f'matching "{self.search}"')
+        if self.online_from or self.online_to:
+            if self.online_from and self.online_to:
+                parts.append(f"online from {self.online_from:%d %b %Y} to {self.online_to:%d %b %Y}")
+            elif self.online_from:
+                parts.append(f"online since {self.online_from:%d %b %Y}")
+            else:
+                parts.append(f"online up to {self.online_to:%d %b %Y}")
+        if self.min_online_hours is not None or self.max_online_hours is not None:
+            if self.min_online_hours is not None and self.max_online_hours is not None:
+                h = f"{self.min_online_hours:g} to {self.max_online_hours:g} hrs online"
+            elif self.min_online_hours is not None:
+                h = f"at least {self.min_online_hours:g} hrs online"
+            else:
+                h = f"at most {self.max_online_hours:g} hrs online"
+            parts.append(h)
         if self.new_days is not None:
             verb = "approved" if self.new_by == "approved" else "signed up"
             parts.append(f"{verb} in the last {self.new_days} day{'s' if self.new_days != 1 else ''}")
@@ -262,10 +286,173 @@ async def job_counts(
     return counts
 
 
+# ---------------------------------------------------------------------------
+# Driver online session tracking & hours calculation
+# ---------------------------------------------------------------------------
+
+
+async def start_online_session(db: AsyncSession, driver_id: int) -> DriverOnlineSession:
+    """Start or resume an online session for a driver."""
+    now = datetime.now(timezone.utc)
+    q = (
+        select(DriverOnlineSession)
+        .where(DriverOnlineSession.driver_id == driver_id, DriverOnlineSession.ended_at == None)  # noqa: E711
+        .order_by(DriverOnlineSession.id.desc())
+    )
+    res = await db.execute(q)
+    active = res.scalars().first()
+    if active:
+        # If pinged within the last 15 minutes, keep this session going
+        if active.last_ping_at and (now - active.last_ping_at).total_seconds() < 900:
+            active.last_ping_at = now
+            return active
+        # Otherwise close the stale session at last_ping_at
+        active.ended_at = active.last_ping_at or now
+        active.duration_seconds = max(0, int((active.ended_at - active.started_at).total_seconds()))
+
+    session = DriverOnlineSession(
+        driver_id=driver_id,
+        started_at=now,
+        last_ping_at=now,
+        ended_at=None,
+        duration_seconds=0,
+    )
+    db.add(session)
+    return session
+
+
+async def end_online_session(db: AsyncSession, driver_id: int) -> None:
+    """End any currently active online session for this driver."""
+    now = datetime.now(timezone.utc)
+    q = (
+        select(DriverOnlineSession)
+        .where(DriverOnlineSession.driver_id == driver_id, DriverOnlineSession.ended_at == None)  # noqa: E711
+        .order_by(DriverOnlineSession.id.desc())
+    )
+    res = await db.execute(q)
+    active = res.scalars().first()
+    if active:
+        active.ended_at = now
+        active.last_ping_at = now
+        active.duration_seconds = max(0, int((now - active.started_at).total_seconds()))
+
+
+async def ping_online_session(db: AsyncSession, driver_id: int) -> None:
+    """Update last_ping_at while driver sends location pings."""
+    now = datetime.now(timezone.utc)
+    q = (
+        select(DriverOnlineSession)
+        .where(DriverOnlineSession.driver_id == driver_id, DriverOnlineSession.ended_at == None)  # noqa: E711
+        .order_by(DriverOnlineSession.id.desc())
+    )
+    res = await db.execute(q)
+    active = res.scalars().first()
+    if active:
+        if active.last_ping_at and (now - active.last_ping_at).total_seconds() > 900:
+            active.ended_at = active.last_ping_at
+            active.duration_seconds = max(0, int((active.ended_at - active.started_at).total_seconds()))
+            new_s = DriverOnlineSession(
+                driver_id=driver_id,
+                started_at=now,
+                last_ping_at=now,
+                ended_at=None,
+                duration_seconds=0,
+            )
+            db.add(new_s)
+        else:
+            active.last_ping_at = now
+            active.duration_seconds = max(0, int((now - active.started_at).total_seconds()))
+    else:
+        new_s = DriverOnlineSession(
+            driver_id=driver_id,
+            started_at=now,
+            last_ping_at=now,
+            ended_at=None,
+            duration_seconds=0,
+        )
+        db.add(new_s)
+
+
+def format_online_duration(seconds: int) -> str:
+    if seconds <= 0:
+        return "0h 0m"
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    return f"{hours}h {minutes}m"
+
+
+async def driver_online_stats(
+    db: AsyncSession,
+    driver_ids: list[int],
+    start: Optional[date] = None,
+    end: Optional[date] = None,
+) -> dict[int, dict]:
+    """Calculate exact online hours and seconds for drivers in a Sri Lanka date range (inclusive)."""
+    stats = {
+        i: {"seconds": 0, "hours": 0.0, "text": "0h 0m"}
+        for i in driver_ids
+    }
+    if not driver_ids:
+        return stats
+
+    lo = datetime.combine(start, time.min, _LK) if start else None
+    hi = datetime.combine(end + timedelta(days=1), time.min, _LK) if end else None
+
+    # Fetch recorded sessions
+    q = select(DriverOnlineSession).where(DriverOnlineSession.driver_id.in_(driver_ids))
+    if lo:
+        q = q.where(or_(DriverOnlineSession.ended_at == None, DriverOnlineSession.ended_at >= lo))  # noqa: E711
+    if hi:
+        q = q.where(DriverOnlineSession.started_at < hi)
+
+    res = await db.execute(q)
+    sessions = res.scalars().all()
+
+    now_utc = datetime.now(timezone.utc)
+    for s in sessions:
+        s_start = s.started_at
+        s_end = s.ended_at or min(now_utc, (s.last_ping_at + timedelta(minutes=15)) if s.last_ping_at else now_utc)
+
+        seg_start = max(s_start, lo) if lo else s_start
+        seg_end = min(s_end, hi) if hi else s_end
+
+        if seg_end > seg_start:
+            secs = int((seg_end - seg_start).total_seconds())
+            if s.driver_id in stats:
+                stats[s.driver_id]["seconds"] += secs
+
+    # Fallback/supplemental check from bookings for drivers/periods without recorded sessions
+    missing_drivers = [i for i in driver_ids if stats[i]["seconds"] == 0]
+    if missing_drivers:
+        bq = select(Booking.driver_id, Booking.booked_at, Booking.accepted_at, Booking.completed_at, Booking.duration_min).where(
+            Booking.driver_id.in_(missing_drivers),
+            Booking.status.in_([BookingStatus.COMPLETED, BookingStatus.ACCEPTED, BookingStatus.STARTED])
+        )
+        if lo:
+            bq = bq.where(func.coalesce(Booking.completed_at, Booking.booked_at) >= lo)
+        if hi:
+            bq = bq.where(Booking.booked_at < hi)
+        b_res = await db.execute(bq)
+        for d_id, b_at, a_at, c_at, dur_min in b_res.all():
+            b_start = a_at or b_at
+            b_end = c_at or (b_start + timedelta(minutes=dur_min or 30))
+            if b_start and b_end:
+                seg_start = max(b_start, lo) if lo else b_start
+                seg_end = min(b_end, hi) if hi else b_end
+                if seg_end > seg_start and d_id in stats:
+                    stats[d_id]["seconds"] += int((seg_end - seg_start).total_seconds())
+
+    for d_id, st in stats.items():
+        st["hours"] = round(st["seconds"] / 3600.0, 2)
+        st["text"] = format_online_duration(st["seconds"])
+
+    return stats
+
+
 async def find_drivers(db: AsyncSession, f: DriverFilter) -> list[dict]:
     """Approved drivers matching the filter, including those blocked for unpaid
     commission (they keep their approval); never pending, rejected or
-    admin-suspended ones. Each row carries the job count the filter uses."""
+    admin-suspended ones. Each row carries online duration and job count."""
     q = select(Driver, User).join(User, User.id == Driver.user_id).where(Driver.is_approved == True)  # noqa: E712
     if f.vehicle_type:
         q = q.where(Driver.vehicle_type == f.vehicle_type)
@@ -296,17 +483,47 @@ async def find_drivers(db: AsyncSession, f: DriverFilter) -> list[dict]:
         q = q.where(or_(*clauses))
 
     pairs = (await db.execute(q.order_by(Driver.id))).all()
-    counts = await job_counts(db, [d.id for d, _ in pairs], f.job_types, f.jobs_from, f.jobs_to)
+    driver_ids = [d.id for d, _ in pairs]
+    counts = await job_counts(db, driver_ids, f.job_types, f.jobs_from, f.jobs_to)
+    online_map = await driver_online_stats(db, driver_ids, f.online_from, f.online_to)
+
+    has_date_filter = bool(f.online_from or f.online_to)
 
     rows = []
     for d, u in pairs:
         n = counts[d.id]
         if (f.min_jobs is not None and n < f.min_jobs) or (f.max_jobs is not None and n > f.max_jobs):
             continue
-        rows.append({"driver": d, "name": u.full_name, "phone": u.phone_number, "vehicle_type": d.vehicle_type,
-                     "approved_at": d.approved_at, "joined_at": u.created_at, "jobs": n})
+
+        st = online_map[d.id]
+        hrs = st["hours"]
+        secs = st["seconds"]
+
+        if f.min_online_hours is not None and hrs < f.min_online_hours:
+            continue
+        if f.max_online_hours is not None and hrs > f.max_online_hours:
+            continue
+
+        # If admin specified a date range and no min/max hours, filter to drivers who were online (>0 seconds)
+        if has_date_filter and f.min_online_hours is None and f.max_online_hours is None:
+            if secs <= 0:
+                continue
+
+        rows.append({
+            "driver": d,
+            "name": u.full_name,
+            "phone": u.phone_number,
+            "vehicle_type": d.vehicle_type,
+            "approved_at": d.approved_at,
+            "joined_at": u.created_at,
+            "is_online": bool(d.is_online),
+            "online_seconds": secs,
+            "online_hours": hrs,
+            "online_text": st["text"],
+            "jobs": n,
+        })
     
-    rows.sort(key=lambda r: (-r["jobs"], r["driver"].id))
+    rows.sort(key=lambda r: (-r["online_seconds"], -r["jobs"], r["driver"].id))
     return rows
 
 

@@ -23,7 +23,7 @@ from sqlalchemy import inspect, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from ..database import Base
-from ..models import Event, EventTicketTier, EventOrder, EventOrderItem, FlashWeightTier, CorporateAccount, CorporateMember, DriverPayout, MarketAd, MarketDeal, DriverIncentive, ReferralBonus, PeakHourSetting, JobOpening, JobApplication, Driver, DriverVehicle  # noqa: F401 — ensures import for create_all
+from ..models import Event, EventTicketTier, EventOrder, EventOrderItem, FlashWeightTier, CorporateAccount, CorporateMember, DriverPayout, MarketAd, MarketDeal, DriverIncentive, ReferralBonus, PeakHourSetting, JobOpening, JobApplication, Driver, DriverVehicle, DriverOnlineSession  # noqa: F401 — ensures import for create_all
 
 # (table_name, column_name, column_ddl)
 PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (

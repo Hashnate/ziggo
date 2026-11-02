@@ -483,6 +483,9 @@ async def update_location(
     if body.heading is not None:
         d.current_heading = Decimal(str(body.heading))
     d.last_location_update = datetime.now(timezone.utc)
+    if d.is_online:
+        from ...services.driver_wallet_service import ping_online_session
+        await ping_online_session(db, d.id)
     await db.commit()
 
     # Push to the admin live-tracking channel so the map can update without polling.
@@ -549,6 +552,11 @@ async def toggle_online(
                 detail="Your account is deactivated due to outstanding commission. Please settle it.",
             )
     d.is_online = body.is_online
+    from ...services.driver_wallet_service import start_online_session, end_online_session
+    if body.is_online:
+        await start_online_session(db, d.id)
+    else:
+        await end_online_session(db, d.id)
     await db.commit()
 
     # Broadcast so the admin live map can swap the marker style instantly.

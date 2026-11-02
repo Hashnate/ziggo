@@ -175,11 +175,17 @@ async def verify_otp(request: OTPVerify, db: AsyncSession = Depends(get_db)):
                 # If switching to driver, only set online if already approved.
                 if request.role == UserRole.CUSTOMER and user.driver_profile:
                     user.driver_profile.is_online = False
+                    from ...services.driver_wallet_service import end_online_session
+                    await end_online_session(db, user.driver_profile.id)
                 elif request.role == UserRole.DRIVER and user.driver_profile:
                     if user.driver_profile.is_approved:
                         user.driver_profile.is_online = True
+                        from ...services.driver_wallet_service import start_online_session
+                        await start_online_session(db, user.driver_profile.id)
                     else:
                         user.driver_profile.is_online = False
+                        from ...services.driver_wallet_service import end_online_session
+                        await end_online_session(db, user.driver_profile.id)
 
                 # Switch the user's active role
                 user.role = request.role
@@ -251,6 +257,8 @@ async def switch_role(
         driver_prof = dq.scalars().first()
         if driver_prof:
             driver_prof.is_online = False
+            from ...services.driver_wallet_service import end_online_session
+            await end_online_session(db, driver_prof.id)
 
     elif request.role == UserRole.DRIVER:
         dq = await db.execute(select(Driver).where(Driver.user_id == user.id))
@@ -262,8 +270,12 @@ async def switch_role(
             # When switching back to driver mode, only go online if approved
             if driver_prof.is_approved:
                 driver_prof.is_online = True
+                from ...services.driver_wallet_service import start_online_session
+                await start_online_session(db, driver_prof.id)
             else:
                 driver_prof.is_online = False
+                from ...services.driver_wallet_service import end_online_session
+                await end_online_session(db, driver_prof.id)
 
     # 2. Update user's active role
     user.role = request.role

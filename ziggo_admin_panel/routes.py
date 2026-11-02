@@ -8847,6 +8847,20 @@ def _wallet_filter(params):
             errors.append(f"{label} is not a valid date.")
         return d
 
+    def float_num(key: str, label: str):
+        raw = (params.get(key) or "").strip()
+        if not raw:
+            return None
+        try:
+            val = float(raw)
+            if val < 0:
+                errors.append(f"{label} cannot be negative.")
+                return None
+            return val
+        except ValueError:
+            errors.append(f"{label} must be a number.")
+            return None
+
     submitted = bool(params.get("f"))
     min_j = number("min_jobs", "At least")
     max_j = number("max_jobs", "At most")
@@ -8857,6 +8871,17 @@ def _wallet_filter(params):
         if (params.get("min_jobs") or "").strip() == "":
             min_j = 1
 
+    min_online = float_num("min_online_hours", "Min online hours")
+    max_online = float_num("max_online_hours", "Max online hours")
+    on_from = day("online_from", "Online date from")
+    on_to = day("online_to", "Online date to")
+
+    if hasattr(params, "getlist"):
+        types_submitted = params.getlist("job_types")
+    else:
+        v = params.get("job_types")
+        types_submitted = [v] if isinstance(v, str) else (list(v) if v else [])
+
     f = DriverFilter(
         vehicle_type=(params.get("vehicle_type") or "").strip(),
         search=(params.get("search") or "").strip(),
@@ -8866,9 +8891,13 @@ def _wallet_filter(params):
         driver_to=day("driver_to", "Driver date to"),
         min_jobs=min_j,
         max_jobs=max_j,
-        job_types=tuple(t for t in JOB_TYPES if t in params.getlist("job_types")) if submitted else JOB_TYPES,
+        job_types=tuple(t for t in JOB_TYPES if t in types_submitted) if (submitted and types_submitted) else JOB_TYPES,
         jobs_from=j_from,
         jobs_to=j_to,
+        min_online_hours=min_online,
+        max_online_hours=max_online,
+        online_from=on_from,
+        online_to=on_to,
     )
     if f.new_days == 0:
         errors.append("New drivers: enter at least 1 day.")
@@ -8880,6 +8909,10 @@ def _wallet_filter(params):
         errors.append("The job period ends before it starts.")
     if not f.job_types and (f.min_jobs is not None or f.max_jobs is not None):
         errors.append("Tick at least one kind of job to count.")
+    if f.online_from and f.online_to and f.online_from > f.online_to:
+        errors.append("Online date range ends before it starts.")
+    if f.min_online_hours is not None and f.max_online_hours is not None and f.min_online_hours > f.max_online_hours:
+        errors.append("Min online hours cannot be more than max online hours.")
     return f, " ".join(errors)
 
 
@@ -8906,6 +8939,14 @@ def _wallet_filter_pairs(f) -> list[tuple[str, str]]:
         pairs.append(("jobs_from", f.jobs_from.isoformat()))
     if f.jobs_to:
         pairs.append(("jobs_to", f.jobs_to.isoformat()))
+    if f.min_online_hours is not None:
+        pairs.append(("min_online_hours", str(f.min_online_hours)))
+    if f.max_online_hours is not None:
+        pairs.append(("max_online_hours", str(f.max_online_hours)))
+    if f.online_from:
+        pairs.append(("online_from", f.online_from.isoformat()))
+    if f.online_to:
+        pairs.append(("online_to", f.online_to.isoformat()))
     return pairs
 
 
