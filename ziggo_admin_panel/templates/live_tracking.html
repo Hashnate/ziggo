@@ -251,7 +251,13 @@
     }
 
     function vehicleEmoji(t) {
-        return ({ bike: '🏍️', tuk: '🛺', car: '🚗', van: '🚐', truck: '🚚' })[t] || '🚗';
+        const vt = String(t || '').toLowerCase();
+        if (vt.includes('scooter') || (vt.includes('moto') && !vt.includes('motor'))) return '🛵';
+        if (vt.includes('bike') || vt.includes('motor')) return '🏍️';
+        if (vt.includes('tuk') || vt.includes('three') || vt.includes('auto')) return '🛺';
+        if (vt.includes('van')) return '🚐';
+        if (vt.includes('truck') || vt.includes('lorry') || vt.includes('mover')) return '🚚';
+        return '🚗';
     }
 
     function formatTime(iso) {
@@ -279,9 +285,10 @@
     function getVehicleTopAsset(type) {
         if (!type) return '/static/img/top_car.png';
         const vt = String(type).toLowerCase();
+        if (vt.includes('scooter') || (vt.includes('moto') && !vt.includes('motor'))) return '/static/img/top_scooter.png';
         if (vt.includes('bike') || vt.includes('motor')) return '/static/img/top_bike.png';
         if (vt.includes('tuk') || vt.includes('three') || vt.includes('auto')) return '/static/img/top_tuk.png';
-        if (vt.includes('truck') || vt.includes('lorry')) return '/static/img/top_truck.png';
+        if (vt.includes('truck') || vt.includes('lorry') || vt.includes('mover')) return '/static/img/top_truck.png';
         return '/static/img/top_car.png';
     }
 

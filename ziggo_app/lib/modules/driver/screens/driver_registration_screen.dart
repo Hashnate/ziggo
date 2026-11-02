@@ -62,11 +62,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
     'vehicle_back',
   ];
 
-  static const _optionalDocKeys = {
-    'vehicle_reg',
-    'eco_test',
-    'vehicle_side',
-  };
+  static const _optionalDocKeys = <String>{};
 
   static const _typeLabels = {
     'nic_front': 'NIC (front)',
@@ -812,19 +808,13 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                           const Divider(height: 20),
                           _docUploadRow('license_back', 'Driving License (back)'),
                           const Divider(height: 20),
-                          _docUploadRow('vehicle_reg', 'Vehicle Registration Book', isOptional: true),
-                          const Divider(height: 20),
                           _docUploadRow('insurance', 'Insurance Document'),
                           const Divider(height: 20),
                           _docUploadRow('year_license', 'Year License'),
                           const Divider(height: 20),
-                          _docUploadRow('eco_test', 'Eco Test Report', isOptional: true),
-                          const Divider(height: 20),
                           _docUploadRow('vehicle_front', 'Vehicle Photo (front)'),
                           const Divider(height: 20),
                           _docUploadRow('vehicle_back', 'Vehicle Photo (back)'),
-                          const Divider(height: 20),
-                          _docUploadRow('vehicle_side', 'Vehicle Photo (side)', isOptional: true),
                         ],
                       ),
                     ),

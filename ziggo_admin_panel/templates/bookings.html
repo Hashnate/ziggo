@@ -286,7 +286,7 @@
                 </p>
                 {% if b.driver %}
                 <p class="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
-                    <img src="/static/img/top_{{ b.driver.vehicle_type if b.driver.vehicle_type in ['bike','tuk','truck'] else 'car' }}.png" class="w-3.5 h-3.5 object-contain" alt="">
+                    <img src="/static/img/top_{% if 'scooter' in (b.driver.vehicle_type or '')|lower or ('moto' in (b.driver.vehicle_type or '')|lower and 'motor' not in (b.driver.vehicle_type or '')|lower) %}scooter{% elif b.driver.vehicle_type in ['bike','tuk','truck'] %}{{ b.driver.vehicle_type }}{% else %}car{% endif %}.png" class="w-3.5 h-3.5 object-contain" alt="">
                     <span>{{ b.driver.user.full_name if b.driver.user else '' }} • {{ b.driver.vehicle_number or '' }}</span>
                 </p>
                 {% endif %}
@@ -350,7 +350,7 @@
                     <td class="px-6 py-3 text-sm row-driver-cell">
                         {% if b.driver %}
                             <div class="flex items-center gap-1.5">
-                                <img src="/static/img/top_{{ b.driver.vehicle_type if b.driver.vehicle_type in ['bike','tuk','truck'] else 'car' }}.png" class="w-3.5 h-3.5 object-contain" alt="">
+                                <img src="/static/img/top_{% if 'scooter' in (b.driver.vehicle_type or '')|lower or ('moto' in (b.driver.vehicle_type or '')|lower and 'motor' not in (b.driver.vehicle_type or '')|lower) %}scooter{% elif b.driver.vehicle_type in ['bike','tuk','truck'] %}{{ b.driver.vehicle_type }}{% else %}car{% endif %}.png" class="w-3.5 h-3.5 object-contain" alt="">
                                 <span>{{ b.driver.user.full_name if b.driver.user else '' }}</span>
                             </div>
                             <span class="text-xs text-gray-400 block">{{ b.driver.vehicle_number or '' }}</span>
@@ -783,9 +783,10 @@
     function getVehicleTopAsset(vehicleType) {
         if (!vehicleType) return '/static/img/top_car.png';
         var vt = String(vehicleType).toLowerCase();
+        if (vt.includes('scooter') || (vt.includes('moto') && !vt.includes('motor'))) return '/static/img/top_scooter.png';
         if (vt.includes('bike') || vt.includes('motor')) return '/static/img/top_bike.png';
         if (vt.includes('tuk') || vt.includes('three') || vt.includes('auto')) return '/static/img/top_tuk.png';
-        if (vt.includes('truck') || vt.includes('lorry')) return '/static/img/top_truck.png';
+        if (vt.includes('truck') || vt.includes('lorry') || vt.includes('mover')) return '/static/img/top_truck.png';
         return '/static/img/top_car.png';
     }
 
