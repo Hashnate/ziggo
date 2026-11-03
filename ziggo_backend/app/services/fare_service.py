@@ -90,6 +90,7 @@ class _Rules:
     system_surge: Optional[float]     # system surge multiplier while its window is open
     district: Optional[str] = None    # pickup district, set when one of its district fares applies
     district_base_fares: dict = field(default_factory=dict)  # service_type -> that district's base fare
+    district_per_km_rates: dict = field(default_factory=dict)  # service_type -> that district's per-km rate
     launch_location: object = None    # commission-free launch location this job falls in, if any
     promo_check: object = None        # promo_service.PromoCheck for the code sent, if any
     road_distance: bool = False       # measure the road route instead of a straight line
@@ -141,14 +142,20 @@ async def _load_rules(db: AsyncSession, service_types: list[str], promo: Optiona
     now_local = datetime.now()
     open_zones = [z for z in zone_q.scalars().all() if is_time_in_range(z.start_time, z.end_time, now_local)]
 
-    # District base fares (Phase 2, feature 04): the pickup's district decides, using its
-    # switched-on fare whose period covers today. district_fare comes from a booking being
-    # re-priced: (district, base fare) it was booked with, or () for none; that stands
-    # even if the period has since ended or been switched off.
-    district, district_base_fares = None, {}
+    # District base fares and per-km rates (Phase 2, feature 04): the pickup's district decides,
+    # using its switched-on fare whose period covers today. district_fare comes from a booking being
+    # re-priced: (district, base fare, per_km_rate) or (district, base fare) it was booked with,
+    # or () for none; that stands even if the period has since ended or been switched off.
+    district, district_base_fares, district_per_km_rates = None, {}, {}
     if district_fare is not None:
         if district_fare:
-            district, district_base_fares = district_fare[0], {st: float(district_fare[1]) for st in service_types}
+            district = district_fare[0]
+            base_val = district_fare[1] if len(district_fare) > 1 else None
+            per_km_val = district_fare[2] if len(district_fare) > 2 else None
+            if base_val is not None:
+                district_base_fares = {st: float(base_val) for st in service_types}
+            if per_km_val is not None:
+                district_per_km_rates = {st: float(per_km_val) for st in service_types}
     elif pickup is not None:
         found = district_for(*pickup)
         if found:
@@ -160,8 +167,11 @@ async def _load_rules(db: AsyncSession, service_types: list[str], promo: Optiona
                 or_(DistrictFare.end_date == None, DistrictFare.end_date >= day),  # noqa: E711
             ).order_by(DistrictFare.start_date.desc().nullslast(), DistrictFare.id.desc()))
             for r in df_q.scalars().all():
-                district_base_fares.setdefault(r.service_type, float(r.base_fare))
-            if district_base_fares:
+                if r.base_fare is not None:
+                    district_base_fares.setdefault(r.service_type, float(r.base_fare))
+                if r.per_km_rate is not None:
+                    district_per_km_rates.setdefault(r.service_type, float(r.per_km_rate))
+            if district_base_fares or district_per_km_rates:
                 district = found
 
     # Commission-free launch locations (Phase 2, feature 02). launch_location_id comes
@@ -179,7 +189,8 @@ async def _load_rules(db: AsyncSession, service_types: list[str], promo: Optiona
         settings=ss, sys_commission=sys_commission, fare_settings=fare_settings,
         peaks=peak_q.scalars().all(), hhmm=now_colombo.strftime("%H:%M"), zones=open_zones,
         promo=promo_row, flash_tiers=flash_tiers, system_surge=system_surge,
-        district=district, district_base_fares=district_base_fares, launch_location=launch_location,
+        district=district, district_base_fares=district_base_fares,
+        district_per_km_rates=district_per_km_rates, launch_location=launch_location,
         promo_check=promo_check, road_distance=bool(ss is not None and ss.road_distance_enabled),
     )
 
@@ -371,6 +382,9 @@ def _standard_fare(rules: _Rules, service_type: str, setting, route, pickup_dist
     district_base = rules.district_base_fares.get(service_type)
     if district_base is not None:
         base = district_base
+    district_per_km = rules.district_per_km_rates.get(service_type)
+    if district_per_km is not None:
+        per_km = district_per_km
     platform_pct, normal_pct = _commission_pct(rules, setting)
 
     # Pickup fee: a percentage of the per-km charge for the driver's distance to the pickup
@@ -487,6 +501,9 @@ def _standard_fare(rules: _Rules, service_type: str, setting, route, pickup_dist
     if district_base is not None:
         result["district"] = rules.district
         result["district_base_fare"] = round(district_base, 2)
+    if district_per_km is not None:
+        result["district"] = rules.district
+        result["district_per_km_rate"] = round(district_per_km, 2)
     result.update(_launch_keys(rules, feeable_amount * (normal_pct / 100.0)))
     result.update(_promo_keys(promo_message))
     return result

@@ -135,6 +135,7 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("district_fares", "end_date", "DATE"),
     ("district_fares", "is_active", "BOOLEAN NOT NULL DEFAULT TRUE"),
     ("district_fares", "created_at", "TIMESTAMP WITH TIME ZONE DEFAULT now()"),
+    ("district_fares", "per_km_rate", "NUMERIC(10, 2)"),
     ("bookings", "launch_location_id", "INTEGER"),
     ("food_orders", "launch_location_id", "INTEGER"),
     ("food_orders", "waive_delivery_cut", "BOOLEAN NOT NULL DEFAULT FALSE"),
@@ -293,6 +294,8 @@ async def ensure_schema(engine: AsyncEngine) -> None:
             # dated period, so a district and vehicle can have several.
             await conn.execute(text(
                 "ALTER TABLE district_fares DROP CONSTRAINT IF EXISTS uq_district_fares_district_service"))
+            await conn.execute(text(
+                "ALTER TABLE district_fares ALTER COLUMN base_fare DROP NOT NULL"))
 
         await _seed_flash_tiers(conn)
         await _seed_sample_events(conn)

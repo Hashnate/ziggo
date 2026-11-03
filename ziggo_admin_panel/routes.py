@@ -3218,7 +3218,13 @@ async def _district_fare_clash(db: AsyncSession, f) -> Optional[str]:
         DistrictFare.is_active == True, DistrictFare.id != (f.id or 0)))  # noqa: E712
     for o in q.scalars().all():
         if (o.start_date or _date.min) <= hi and (o.end_date or _date.max) >= lo:
-            return (f"{o.district} already has a base fare of Rs.{o.base_fare:,.2f} for this vehicle from "
+            rates = []
+            if o.per_km_rate is not None:
+                rates.append(f"Rs.{o.per_km_rate:,.2f}/km")
+            if o.base_fare is not None:
+                rates.append(f"base Rs.{o.base_fare:,.2f}")
+            rate_desc = " & ".join(rates) or "custom fare"
+            return (f"{o.district} already has an active rate ({rate_desc}) for this vehicle from "
                     f"{o.start_date or 'the start'} to {o.end_date or 'no end date'}. Switched-on periods can't overlap: "
                     f"change the dates or switch that one off first.")
     return None
@@ -3242,20 +3248,25 @@ async def admin_district_fares(
         .order_by(FareSetting.display_order, FareSetting.id)
     )
     services = fq.scalars().all()
-    national = {f.service_type: float(f.base_fare or 0) for f in services}
+    national_base = {f.service_type: float(f.base_fare or 0) for f in services}
+    national_per_km = {f.service_type: float(f.per_km_rate or 0) for f in services}
     names = {f.service_type: f.display_name or f.service_type for f in services}
     fares = (await db.execute(select(DistrictFare).order_by(
-        DistrictFare.district, DistrictFare.service_type, desc(DistrictFare.start_date), desc(DistrictFare.id)))).scalars().all()
+        desc(DistrictFare.id)))).scalars().all()
     today = today_lk()
     rows = [{"fare": f, "status": _district_fare_status(f, today),
              "days_left": (f.end_date - today).days + 1 if f.end_date else None,
              "starts_in": (f.start_date - today).days if f.start_date else None,
-             "national": national.get(f.service_type), "vehicle": names.get(f.service_type, f.service_type)}
+             "national": national_base.get(f.service_type),
+             "national_base": national_base.get(f.service_type),
+             "national_per_km": national_per_km.get(f.service_type),
+             "vehicle": names.get(f.service_type, f.service_type)}
             for f in fares]
     current = next((f for f in fares if f.id == edit), None)
     return templates.TemplateResponse(
         request, "district_fares.html",
-        {"request": request, "active_page": "services", "services": services, "national": national,
+        {"request": request, "active_page": "services", "services": services,
+         "national": national_base, "national_base": national_base, "national_per_km": national_per_km,
          "districts": DISTRICTS, "rows": rows, "current": current, "today": today.isoformat(), "error": error},
     )
 
@@ -3286,12 +3297,31 @@ async def admin_district_fares_save(
         FareSetting.service_type == service_type, FareSetting.service_type != "courier"))).scalar()
     if not known:
         return fail("Please choose a vehicle type.")
-    try:
-        base = Decimal(str(form.get("base_fare") or "").strip())
-    except InvalidOperation:
-        return fail("Please give the base fare as a number.")
-    if base < 0:
-        return fail("The base fare can't be negative.")
+
+    base_raw = str(form.get("base_fare") or "").strip()
+    per_km_raw = str(form.get("per_km_rate") or "").strip()
+
+    if not base_raw and not per_km_raw:
+        return fail("Please enter at least a Per-KM Rate or Base Fare.")
+
+    base = None
+    if base_raw:
+        try:
+            base = Decimal(base_raw)
+        except InvalidOperation:
+            return fail("Please give the base fare as a number.")
+        if base < 0:
+            return fail("The base fare can't be negative.")
+
+    per_km = None
+    if per_km_raw:
+        try:
+            per_km = Decimal(per_km_raw)
+        except InvalidOperation:
+            return fail("Please give the Per-KM rate as a number.")
+        if per_km < 0:
+            return fail("The Per-KM rate can't be negative.")
+
     try:
         start = date.fromisoformat(str(form.get("start_date")))
         end = date.fromisoformat(str(form.get("end_date")))
@@ -3305,7 +3335,7 @@ async def admin_district_fares_save(
         f = (await db.execute(select(DistrictFare).where(DistrictFare.id == fare_id))).scalars().first()
     if f is None:
         f = DistrictFare()
-    f.district, f.service_type, f.base_fare = district, service_type, base
+    f.district, f.service_type, f.base_fare, f.per_km_rate = district, service_type, base, per_km
     f.start_date, f.end_date, f.is_active = start, end, form.get("is_active") == "on"
     clash = await _district_fare_clash(db, f)
     if clash:

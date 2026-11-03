@@ -1,10 +1,9 @@
-"""District base fares (Phase 2, feature 04).
+"""District base fares and per-km rates (Phase 2, feature 04).
 
-Only the base fare can differ per district; the pickup's district decides, and only a
-switched-on fare whose period covers today counts. A booking being re-priced keeps the
-base fare it was booked with. Expected differences are worked out by hand from
-fare_cases.install() (tuk: base 80, per-km 55, min 150, no surge or category discount at
-10:15).
+Base fares and per-km rates can differ per district; the pickup's district decides (Option A: origin-based),
+and only a switched-on fare whose period covers today counts. A booking being re-priced keeps the
+rates it was booked with. Expected differences are worked out by hand from
+fare_cases.install() (tuk: base 80, per-km 55, min 150, pickup_fee 10%, no surge or category discount at 10:15).
 """
 from datetime import timedelta
 from decimal import Decimal
@@ -25,7 +24,7 @@ NEGOMBO = (7.2008, 79.8737)         # Gampaha
 KANDY = (7.2906, 80.6337)           # Kandy
 PERADENIYA = (7.2690, 80.5970)      # Kandy
 PARTS = ("fare_amount", "discount_amount", "final_amount", "platform_fee", "driver_earnings",
-         "district", "district_base_fare")
+         "district", "district_base_fare", "district_per_km_rate")
 
 
 async def _quote(db, service_type, pickup, drop, **kw):
@@ -42,11 +41,20 @@ def _same_price(booking, card):
 
 
 async def _fares(db, *rows):
-    """Replace every district fare with rows of (district, vehicle, base, start, end, on)."""
+    """Replace every district fare with rows of (district, vehicle, base, start, end, on) or
+    (district, vehicle, base, per_km, start, end, on)."""
     await db.execute(delete(DistrictFare))
-    for district, st, base, start, end, on in rows:
-        db.add(DistrictFare(district=district, service_type=st, base_fare=Decimal(base),
-                            start_date=start, end_date=end, is_active=on))
+    for r in rows:
+        if len(r) == 7:
+            district, st, base, per_km, start, end, on = r
+            b_val = Decimal(str(base)) if base is not None else None
+            k_val = Decimal(str(per_km)) if per_km is not None else None
+        else:
+            district, st, base, start, end, on = r
+            b_val = Decimal(str(base)) if base is not None else None
+            k_val = None
+        db.add(DistrictFare(district=district, service_type=st, base_fare=b_val,
+                            per_km_rate=k_val, start_date=start, end_date=end, is_active=on))
     await db.commit()
 
 
@@ -81,6 +89,7 @@ async def test_district_base_fares():
                 expect(f"no district fares, {name}", "district" not in booking and _same_price(booking, card),
                        "district fare used or card differs")
 
+            # Test 1: Base fare configurations
             await _fares(db, ("Colombo", "tuk", "120", today, today + 6 * day, True),
                          ("Colombo", "car", "200", today - 3 * day, today, True),
                          ("Kandy", "car", "260", today, today, True))
@@ -122,32 +131,84 @@ async def test_district_base_fares():
             expect("courier keeps national rates", courier_on == courier_off, f"{courier_off} -> {courier_on}")
             expect("rental keeps national rates", rental_on == rental_off, f"{rental_off} -> {rental_on}")
 
+            # Test 2: District Per-KM rate (Option A: origin-based)
+            # National tuk per-km is 55. Set Colombo tuk per-km to 75 (+20/km), base_fare=None (national base 80)
+            await _fares(db, ("Colombo", "tuk", None, "75", today, today + 3 * day, True))
+            km_on = {name: await _quote(db, *t) for name, t in trips.items()}
+            for name, (booking, card) in km_on.items():
+                expect(f"per_km active, {name}: card = booking", _same_price(booking, card),
+                       f"card { {k: card.get(k) for k in PARTS} } vs booking { {k: booking.get(k) for k in PARTS} }")
+
+            b_km = km_on["tuk in Colombo"][0]
+            dist_col = b_km["distance_km"]
+            expected_km_diff = round(dist_col * 20, 2)
+            actual_km_diff = round(b_km["fare_amount"] - off["tuk in Colombo"][0]["fare_amount"], 2)
+            expect("tuk in Colombo uses Colombo's per-km rate (Rs. 75/km)",
+                   b_km.get("district") == "Colombo"
+                   and b_km.get("district_per_km_rate") == 75
+                   and b_km.get("district_base_fare") is None
+                   and abs(actual_km_diff - expected_km_diff) <= 0.15,
+                   f"district {b_km.get('district')}, per_km {b_km.get('district_per_km_rate')}, diff {actual_km_diff} vs expected {expected_km_diff}")
+
+            # Cross-district trip: Colombo -> Kandy (origin dictates rate for all km)
+            cross_trip = km_on["tuk Colombo -> Kandy"][0]
+            cross_dist = cross_trip["distance_km"]
+            expected_cross_diff = round(cross_dist * 20, 2)
+            actual_cross_diff = round(cross_trip["fare_amount"] - off["tuk Colombo -> Kandy"][0]["fare_amount"], 2)
+            expect("Option A origin-based: Colombo -> Kandy uses Colombo per-km for the whole trip",
+                   cross_trip.get("district") == "Colombo"
+                   and cross_trip.get("district_per_km_rate") == 75
+                   and abs(actual_cross_diff - expected_cross_diff) <= 0.20,
+                   f"cross diff {actual_cross_diff} vs expected {expected_cross_diff}")
+
+            # Test 3: Both Base Fare and Per-KM rate together
+            await _fares(db, ("Colombo", "tuk", "100", "75", today, today + 3 * day, True))
+            both_on, both_card = await _quote(db, "tuk", FORT, GALLE_FACE)
+            expect("both base and per-km: card = booking", _same_price(both_on, both_card), "card differs from booking")
+            expect("both base and per-km applied together",
+                   both_on.get("district") == "Colombo"
+                   and both_on.get("district_base_fare") == 100
+                   and both_on.get("district_per_km_rate") == 75
+                   and abs(round(both_on["fare_amount"] - off["tuk in Colombo"][0]["fare_amount"], 2) - (20 + actual_km_diff)) <= 0.05,
+                   f"fare {both_on.get('fare_amount')}")
+
+            # Test 4: Driver pickup fee scales with district per-km rate
+            # Bike has pickup_fee=20%. Set Colombo bike per_km to 60 (national 40).
+            await _fares(db, ("Colombo", "bike", None, "60", today, today + 3 * day, True))
+            with frozen_clock("10:15"):
+                drv_quote = await calculate_fare(db, "bike", *FORT, *GALLE_FACE,
+                                                 driver_accepted_lat=FORT[0] + 0.01, driver_accepted_lng=FORT[1])
+                expect("pickup fee uses district per-km rate",
+                       drv_quote.get("pickup_fee") > 0 and drv_quote.get("district_per_km_rate") == 60,
+                       f"pickup fee: {drv_quote.get('pickup_fee')}")
+
+            # Test 5: Re-pricing keeps booked district per-km rate
+            await _fares(db)  # remove active district fares
+            kept_km, _ = await _quote(db, "tuk", FORT, GALLE_FACE, district_fare=("Colombo", None, 75.0))
+            expect("re-pricing keeps the per-km rate the trip was booked with after period ended",
+                   kept_km.get("district") == "Colombo"
+                   and kept_km.get("district_per_km_rate") == 75
+                   and abs(round(kept_km["fare_amount"] - off["tuk in Colombo"][0]["fare_amount"], 2) - actual_km_diff) <= 0.05,
+                   str({k: kept_km.get(k) for k in PARTS}))
+
+            kept_both, _ = await _quote(db, "tuk", FORT, GALLE_FACE, district_fare=("Colombo", 100.0, 75.0))
+            expect("re-pricing keeps both base fare and per-km rate",
+                   kept_both.get("district") == "Colombo"
+                   and kept_both.get("district_base_fare") == 100
+                   and kept_both.get("district_per_km_rate") == 75,
+                   str({k: kept_both.get(k) for k in PARTS}))
+
+            # Test 6: Inactive periods and date limits
             await _fares(db, ("Colombo", "tuk", "120", today + day, today + 6 * day, True),
                          ("Colombo", "car", "260", today - 6 * day, today - day, True),
                          ("Kandy", "car", "260", today, today + day, False))
             later = {name: await _quote(db, *t) for name, t in trips.items()}
             expect("a period that starts tomorrow doesn't count yet",
                    "district" not in later["tuk in Colombo"][0] and diff("tuk in Colombo", later) == 0)
-            expect("after the end date the national base fare is back by itself",
+            expect("after the end date the national rates are back by themselves",
                    "district" not in later["car in Colombo (same as national)"][0])
             expect("a switched-off fare doesn't count", "district" not in later["car in Kandy"][0])
 
-            await _fares(db, ("Colombo", "tuk", "120", None, None, True),
-                         ("Colombo", "tuk", "100", today - day, today + day, True))
-            both, _ = await _quote(db, "tuk", FORT, GALLE_FACE)
-            expect("missing dates mean no limit; if two periods overlap, the one starting later wins",
-                   both.get("district_base_fare") == 100, str(both.get("district_base_fare")))
-
-            await _fares(db)
-            kept, _ = await _quote(db, "tuk", FORT, GALLE_FACE, district_fare=("Colombo", 120.0))
-            expect("re-pricing keeps the fare the trip was booked with after its period ended",
-                   kept.get("district") == "Colombo" and kept.get("district_base_fare") == 120
-                   and round(kept["fare_amount"] - off["tuk in Colombo"][0]["fare_amount"], 2) == 40,
-                   str({k: kept.get(k) for k in PARTS}))
-            await _fares(db, ("Colombo", "tuk", "120", today, today, True))
-            none, _ = await _quote(db, "tuk", FORT, GALLE_FACE, district_fare=())
-            expect("a trip booked without one stays national when a period starts mid-trip",
-                   "district" not in none and none["fare_amount"] == off["tuk in Colombo"][0]["fare_amount"])
             await _fares(db)
     finally:
         await engine.dispose()

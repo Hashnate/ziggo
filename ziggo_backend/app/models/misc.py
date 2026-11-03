@@ -135,17 +135,17 @@ class FareSetting(Base):
 
 
 class DistrictFare(Base):
-    """A district's own base fare for one vehicle type, for a period (Phase 2, feature 04).
+    """A district's own base fare and/or per-km rate for one vehicle type, for a period (Phase 2, feature 04).
     Trips starting in the district between start_date and end_date (Sri Lanka days,
-    inclusive) use it while is_active; before and after, the national base fare applies.
-    Only the base fare: per-km, per-minute and minimum fares stay national. Switched-on
-    periods of the same district and vehicle don't overlap (the admin page refuses it)."""
+    inclusive) use it while is_active; before and after, national rates apply.
+    Switched-on periods of the same district and vehicle don't overlap (the admin page refuses it)."""
     __tablename__ = "district_fares"
 
     id = Column(Integer, primary_key=True, index=True)
     district = Column(String(30), nullable=False, index=True)
     service_type = Column(String(20), nullable=False)
-    base_fare = Column(DECIMAL(10, 2), nullable=False)
+    base_fare = Column(DECIMAL(10, 2), nullable=True)
+    per_km_rate = Column(DECIMAL(10, 2), nullable=True)
     start_date = Column(Date)                # None = no start limit
     end_date = Column(Date)                  # None = no end limit
     is_active = Column(Boolean, nullable=False, default=True)

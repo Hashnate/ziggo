@@ -505,14 +505,18 @@ def _fare_snapshot(fare: dict) -> dict:
 
 
 def _booked_district_fare(b: Booking) -> Optional[tuple]:
-    """The district base fare a booking was priced with, so re-pricing keeps it:
-    (district, base fare), () for none, None if the booking has no saved quote."""
+    """The district fare (base fare and/or per-km rate) a booking was priced with, so re-pricing keeps it:
+    (district, base fare, per_km_rate), () for none, None if the booking has no saved quote."""
     fb = b.fare_breakdown if isinstance(b.fare_breakdown, dict) else None
     if fb is None:
         return None
-    if fb.get("district_base_fare") is None:
+    if fb.get("district_base_fare") is None and fb.get("district_per_km_rate") is None:
         return ()
-    return fb.get("district"), float(fb["district_base_fare"])
+    return (
+        fb.get("district"),
+        float(fb["district_base_fare"]) if fb.get("district_base_fare") is not None else None,
+        float(fb["district_per_km_rate"]) if fb.get("district_per_km_rate") is not None else None,
+    )
 
 
 async def _get_driver(db: AsyncSession, user: User) -> Driver:
