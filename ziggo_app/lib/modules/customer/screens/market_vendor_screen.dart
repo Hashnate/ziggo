@@ -30,9 +30,7 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
   @override
   void initState() {
     super.initState();
-    final mp = context.read<MarketProvider>();
-    mp.setActiveVendor(widget.vendor);
-    _future = mp.fetchProducts(_vendorId);
+    _future = context.read<MarketProvider>().fetchProducts(_vendorId);
   }
 
   @override
@@ -148,7 +146,6 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
                     children: [
                       for (final p in listProducts)
                         _ProductRow(
-                          key: ValueKey('row_${p['id']}'),
                           product: p,
                           vendorId: _vendorId,
                           vendor: widget.vendor,
@@ -642,7 +639,6 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
                 final p = items[i];
                 final pid = (p['id'] as num).toInt();
                 return _ProductTile(
-                  key: ValueKey('tile_$pid'),
                   product: p,
                   vendorId: _vendorId,
                   vendor: widget.vendor,
@@ -1354,7 +1350,7 @@ class _ProductTile extends StatelessWidget {
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
-          mp.addToCart(vendorId, product, vendor: vendor);
+          context.read<MarketProvider>().addToCart(vendorId, product, vendor: vendor);
         },
         child: Container(
           height: 30,
@@ -1389,7 +1385,7 @@ class _ProductTile extends StatelessWidget {
         children: [
           _stepBtn(
             qty == 1 ? Icons.delete_outline_rounded : Icons.remove_rounded,
-            () => mp.changeQty(pid, -1),
+            () => context.read<MarketProvider>().changeQty(pid, -1),
           ),
           Text(
             '$qty',
@@ -1401,7 +1397,7 @@ class _ProductTile extends StatelessWidget {
           ),
           _stepBtn(
             Icons.add_rounded,
-            () => mp.addToCart(vendorId, product, vendor: vendor),
+            () => context.read<MarketProvider>().addToCart(vendorId, product, vendor: vendor),
           ),
         ],
       ),
@@ -1563,7 +1559,7 @@ class _ProductRow extends StatelessWidget {
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
-          mp.addToCart(vendorId, product, vendor: vendor);
+          context.read<MarketProvider>().addToCart(vendorId, product, vendor: vendor);
         },
         child: Container(
           height: 30,
@@ -1599,7 +1595,7 @@ class _ProductRow extends StatelessWidget {
         children: [
           _stepBtn(
             qty == 1 ? Icons.delete_outline_rounded : Icons.remove_rounded,
-            () => mp.changeQty(pid, -1),
+            () => context.read<MarketProvider>().changeQty(pid, -1),
           ),
           Text(
             '$qty',
@@ -1611,7 +1607,7 @@ class _ProductRow extends StatelessWidget {
           ),
           _stepBtn(
             Icons.add_rounded,
-            () => mp.addToCart(vendorId, product, vendor: vendor),
+            () => context.read<MarketProvider>().addToCart(vendorId, product, vendor: vendor),
           ),
         ],
       ),

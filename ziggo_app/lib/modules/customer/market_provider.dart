@@ -95,10 +95,14 @@ class MarketProvider extends ChangeNotifier {
 
   int _quoteVersion = 0;
 
-  int getQuantity(int productId) => (_cart[productId]?['quantity'] as int?) ?? 0;
+  int getQuantity(dynamic productId) {
+    final id = productId is int ? productId : (int.tryParse(productId?.toString() ?? '') ?? 0);
+    return (_cart[id]?['quantity'] as int?) ?? 0;
+  }
 
-  int vendorCartCount(int vendorId) {
-    if (_activeVendorId != vendorId) return 0;
+  int vendorCartCount(dynamic vendorId) {
+    final vid = vendorId is int ? vendorId : (int.tryParse(vendorId?.toString() ?? '') ?? 0);
+    if (_activeVendorId != vid) return 0;
     return cartCount;
   }
 
@@ -113,7 +117,9 @@ class MarketProvider extends ChangeNotifier {
   }
 
   void setActiveVendor(Map<String, dynamic> vendor) {
-    final vendorId = (vendor['id'] as num).toInt();
+    final vendorId = vendor['id'] is int
+        ? (vendor['id'] as int)
+        : (int.tryParse(vendor['id']?.toString() ?? '') ?? (vendor['id'] as num).toInt());
     if (_activeVendorId == vendorId) {
       _activeVendor = vendor;
       return;
@@ -127,16 +133,21 @@ class MarketProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void addToCart(int vendorId, Map<String, dynamic> product, {Map<String, dynamic>? vendor}) {
-    if (_activeVendorId != null && _activeVendorId != vendorId) {
+  void addToCart(dynamic vendorId, Map<String, dynamic> product, {Map<String, dynamic>? vendor}) {
+    final vid = vendorId is int
+        ? vendorId
+        : (int.tryParse(vendorId?.toString() ?? '') ?? (vendorId as num).toInt());
+    if (_activeVendorId != null && _activeVendorId != vid) {
       _cart.clear();
       _cleanupEmptyCart();
     }
-    _activeVendorId = vendorId;
+    _activeVendorId = vid;
     if (vendor != null) {
       _activeVendor = vendor;
     }
-    final pid = (product['id'] as num).toInt();
+    final pid = product['id'] is int
+        ? (product['id'] as int)
+        : (int.tryParse(product['id']?.toString() ?? '') ?? (product['id'] as num).toInt());
     final existing = _cart[pid];
     _cart[pid] = {
       'product': product,
@@ -145,16 +156,21 @@ class MarketProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setProductQty(int vendorId, Map<String, dynamic> product, int quantity, {Map<String, dynamic>? vendor}) {
-    if (_activeVendorId != null && _activeVendorId != vendorId) {
+  void setProductQty(dynamic vendorId, Map<String, dynamic> product, int quantity, {Map<String, dynamic>? vendor}) {
+    final vid = vendorId is int
+        ? vendorId
+        : (int.tryParse(vendorId?.toString() ?? '') ?? (vendorId as num).toInt());
+    if (_activeVendorId != null && _activeVendorId != vid) {
       _cart.clear();
       _cleanupEmptyCart();
     }
-    _activeVendorId = vendorId;
+    _activeVendorId = vid;
     if (vendor != null) {
       _activeVendor = vendor;
     }
-    final pid = (product['id'] as num).toInt();
+    final pid = product['id'] is int
+        ? (product['id'] as int)
+        : (int.tryParse(product['id']?.toString() ?? '') ?? (product['id'] as num).toInt());
     if (quantity <= 0) {
       _cart.remove(pid);
       _cleanupEmptyCart();
@@ -167,22 +183,24 @@ class MarketProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void removeFromCart(int productId) {
-    if (_cart.remove(productId) != null) {
+  void removeFromCart(dynamic productId) {
+    final id = productId is int ? productId : (int.tryParse(productId?.toString() ?? '') ?? 0);
+    if (_cart.remove(id) != null) {
       _cleanupEmptyCart();
       notifyListeners();
     }
   }
 
-  void changeQty(int productId, int delta) {
-    final e = _cart[productId];
+  void changeQty(dynamic productId, int delta) {
+    final id = productId is int ? productId : (int.tryParse(productId?.toString() ?? '') ?? 0);
+    final e = _cart[id];
     if (e == null) return;
     final q = (e['quantity'] as int) + delta;
     if (q <= 0) {
-      _cart.remove(productId);
+      _cart.remove(id);
       _cleanupEmptyCart();
     } else {
-      _cart[productId] = {...e, 'quantity': q};
+      _cart[id] = {...e, 'quantity': q};
     }
     notifyListeners();
   }
