@@ -143,23 +143,19 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
               if (listProducts.isEmpty)
                 SliverToBoxAdapter(child: _emptyProducts(searching))
               else
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (_, i) {
-                        final p = listProducts[i];
-                        final pid = (p['id'] as num).toInt();
-                        return _ProductRow(
-                          key: ValueKey('row_$pid'),
+                SliverToBoxAdapter(
+                  child: Column(
+                    children: [
+                      for (final p in listProducts)
+                        _ProductRow(
+                          key: ValueKey('row_${p['id']}'),
                           product: p,
                           vendorId: _vendorId,
                           vendor: widget.vendor,
                           isOffer: _isOffer(p),
-                        );
-                      },
-                      childCount: listProducts.length,
-                    ),
+                        ),
+                      const SizedBox(height: 100),
+                    ],
                   ),
                 ),
             ],
@@ -878,121 +874,6 @@ class _TabsHeader extends SliverPersistentHeaderDelegate {
 }
 
 // ====================================================================
-//  Shared add-to-cart control (+ / quantity stepper)
-// ====================================================================
-class _AddControl extends StatelessWidget {
-  final Map<String, dynamic> product;
-  final int vendorId;
-  final Map<String, dynamic>? vendor;
-  final bool disabled;
-  const _AddControl({
-    super.key,
-    required this.product,
-    required this.vendorId,
-    this.vendor,
-    this.disabled = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final mp = context.watch<MarketProvider>();
-    final pid = (product['id'] as num).toInt();
-    final qty = mp.getQuantity(pid);
-
-    if (disabled) {
-      return Container(
-        height: 30,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: AppColors.surfaceMuted,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: AppStyles.shadowSm,
-        ),
-        child: const Text(
-          'SOLD OUT',
-          style: TextStyle(
-            color: AppColors.textTertiary,
-            fontWeight: FontWeight.w900,
-            fontSize: 9,
-            letterSpacing: 0.5,
-          ),
-        ),
-      );
-    }
-
-    if (qty == 0) {
-      return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () {
-          context.read<MarketProvider>().addToCart(vendorId, product, vendor: vendor);
-        },
-        child: Container(
-          height: 30,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.primary, width: 1.4),
-            boxShadow: AppStyles.shadowSm,
-          ),
-          child: const Text(
-            'ADD',
-            style: TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w900,
-              fontSize: 12,
-              letterSpacing: 1,
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      height: 30,
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: AppStyles.shadowSm,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          _stepBtn(
-            qty == 1 ? Icons.delete_outline_rounded : Icons.remove_rounded,
-            () => context.read<MarketProvider>().changeQty(pid, -1),
-          ),
-          Text(
-            '$qty',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-              fontSize: 13,
-            ),
-          ),
-          _stepBtn(
-            Icons.add_rounded,
-            () => context.read<MarketProvider>().addToCart(vendorId, product, vendor: vendor),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _stepBtn(IconData icon, VoidCallback onTap) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: SizedBox(
-        width: 28,
-        height: 30,
-        child: Icon(icon, color: Colors.white, size: 16),
-      ),
-    );
-  }
-}
-
-// ====================================================================
 //  Price + discount badge helpers
 // ====================================================================
 String _money(num v) => 'LKR ${formatAmount(v, 2)}';
@@ -1394,63 +1275,147 @@ class _ProductTile extends StatelessWidget {
     final pid = (product['id'] as num).toInt();
     final qty = mp.getQuantity(pid);
     final out = _isOutOfStock(product);
+    final available = !out;
+
     return Opacity(
       opacity: out ? 0.55 : 1,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => _showProductDetail(context, product, vendorId, vendor),
-        child: SizedBox(
-          width: 156,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    width: 144,
-                    height: 144,
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.cardBorder),
-                    ),
-                    child: _productImage(product, 128),
+      child: SizedBox(
+        width: 156,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 144,
+                  height: 144,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.cardBorder),
                   ),
-                  Positioned(
-                    left: 14,
-                    right: 14,
-                    bottom: 6,
-                    child: _AddControl(
-                      product: product,
-                      vendorId: vendorId,
-                      vendor: vendor,
-                      disabled: out,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                product['name']?.toString() ?? '',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 13,
-                  height: 1.15,
+                  child: _productImage(product, 128),
                 ),
-              ),
-              const SizedBox(height: 4),
-              if (isOffer) ...[
-                _discountBadge(product),
-                const SizedBox(height: 4),
+                Positioned(
+                  left: 14,
+                  right: 14,
+                  bottom: 6,
+                  child: _control(context, mp, pid, available, qty),
+                ),
               ],
-              _priceRow(product, isOffer),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              product['name']?.toString() ?? '',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 13,
+                height: 1.15,
+              ),
+            ),
+            const SizedBox(height: 4),
+            if (isOffer) ...[
+              _discountBadge(product),
+              const SizedBox(height: 4),
             ],
+            _priceRow(product, isOffer),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _control(BuildContext context, MarketProvider mp, int pid, bool available, int qty) {
+    if (!available) {
+      return Container(
+        height: 30,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceMuted,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: AppStyles.shadowSm,
+        ),
+        child: const Text(
+          'SOLD OUT',
+          style: TextStyle(
+            color: AppColors.textTertiary,
+            fontWeight: FontWeight.w900,
+            fontSize: 9,
+            letterSpacing: 0.5,
           ),
         ),
+      );
+    }
+    if (qty == 0) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          mp.addToCart(vendorId, product, vendor: vendor);
+        },
+        child: Container(
+          height: 30,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.primary, width: 1.4),
+            boxShadow: AppStyles.shadowSm,
+          ),
+          child: const Text(
+            'ADD',
+            style: TextStyle(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w900,
+              fontSize: 12,
+              letterSpacing: 1,
+            ),
+          ),
+        ),
+      );
+    }
+    return Container(
+      height: 30,
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: AppStyles.shadowSm,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          _stepBtn(
+            qty == 1 ? Icons.delete_outline_rounded : Icons.remove_rounded,
+            () => mp.changeQty(pid, -1),
+          ),
+          Text(
+            '$qty',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 13,
+            ),
+          ),
+          _stepBtn(
+            Icons.add_rounded,
+            () => mp.addToCart(vendorId, product, vendor: vendor),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _stepBtn(IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: SizedBox(
+        width: 28,
+        height: 30,
+        child: Icon(icon, color: Colors.white, size: 16),
       ),
     );
   }
@@ -1477,22 +1442,25 @@ class _ProductRow extends StatelessWidget {
     final mp = context.watch<MarketProvider>();
     final pid = (product['id'] as num).toInt();
     final qty = mp.getQuantity(pid);
-    final out = _isOutOfStock(product);
+    final available = !_isOutOfStock(product);
     final unit = product['unit']?.toString() ?? '';
-    return Opacity(
-      opacity: out ? 0.6 : 1,
+    final desc = product['description']?.toString() ?? '';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: AppColors.divider)),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppStyles.radiusMd),
+          boxShadow: AppStyles.shadowSm,
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => _showProductDetail(context, product, vendorId, vendor),
+        child: Opacity(
+          opacity: available ? 1 : 0.55,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1502,18 +1470,32 @@ class _ProductRow extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontWeight: FontWeight.w900,
-                        fontSize: 14.5,
+                        fontSize: 15,
                         height: 1.2,
                       ),
                     ),
                     if (unit.isNotEmpty) ...[
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 3),
                       Text(
                         'Per $unit',
                         style: const TextStyle(
-                          color: AppColors.textTertiary,
-                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                    if (desc.isNotEmpty) ...[
+                      const SizedBox(height: 5),
+                      Text(
+                        desc,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textTertiary,
+                          fontSize: 12,
+                          height: 1.3,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
@@ -1523,55 +1505,127 @@ class _ProductRow extends StatelessWidget {
                       const SizedBox(height: 6),
                     ],
                     _priceRow(product, isOffer),
-                    const SizedBox(height: 6),
-                    const Row(
-                      children: [
-                        Icon(Icons.thumb_up_alt_rounded,
-                            size: 13, color: AppColors.success),
-                        SizedBox(width: 4),
-                        Text(
-                          '96% (25+)',
-                          style: TextStyle(
-                            color: AppColors.textTertiary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 92,
+                height: 92,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned.fill(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: _productImage(product, 92),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 6,
+                      left: 6,
+                      right: 6,
+                      child: _control(context, mp, pid, available, qty),
                     ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            SizedBox(
-              width: 92,
-              height: 92,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Positioned.fill(
-                    child: GestureDetector(
-                      onTap: () => _showProductDetail(context, product, vendorId, vendor),
-                      child: _productImage(product, 92),
-                    ),
-                  ),
-                  Positioned(
-                    left: 4,
-                    right: 4,
-                    bottom: 4,
-                    child: _AddControl(
-                      product: product,
-                      vendorId: vendorId,
-                      vendor: vendor,
-                      disabled: out,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _control(BuildContext context, MarketProvider mp, int pid, bool available, int qty) {
+    if (!available) {
+      return Container(
+        height: 30,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceMuted,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: AppStyles.shadowSm,
+        ),
+        child: const Text(
+          'SOLD OUT',
+          style: TextStyle(
+            color: AppColors.textTertiary,
+            fontWeight: FontWeight.w900,
+            fontSize: 9,
+            letterSpacing: 0.5,
+          ),
+        ),
+      );
+    }
+
+    if (qty == 0) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          mp.addToCart(vendorId, product, vendor: vendor);
+        },
+        child: Container(
+          height: 30,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.primary, width: 1.4),
+            boxShadow: AppStyles.shadowSm,
+          ),
+          child: const Text(
+            'ADD',
+            style: TextStyle(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w900,
+              fontSize: 12,
+              letterSpacing: 1,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      height: 30,
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: AppStyles.shadowSm,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          _stepBtn(
+            qty == 1 ? Icons.delete_outline_rounded : Icons.remove_rounded,
+            () => mp.changeQty(pid, -1),
+          ),
+          Text(
+            '$qty',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 13,
+            ),
+          ),
+          _stepBtn(
+            Icons.add_rounded,
+            () => mp.addToCart(vendorId, product, vendor: vendor),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _stepBtn(IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: SizedBox(
+        width: 28,
+        height: 30,
+        child: Icon(icon, color: Colors.white, size: 16),
       ),
     );
   }
