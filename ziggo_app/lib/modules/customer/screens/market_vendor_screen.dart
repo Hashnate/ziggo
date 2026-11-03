@@ -82,7 +82,6 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
   @override
   Widget build(BuildContext context) {
     final mp = context.watch<MarketProvider>();
-    final showCart = mp.cart.isNotEmpty && mp.activeVendorId == _vendorId;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -145,14 +144,14 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
                 SliverToBoxAdapter(child: _emptyProducts(searching))
               else
                 SliverPadding(
-                  padding: EdgeInsets.fromLTRB(16, 0, 16, showCart ? 110 : 28),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (_, i) {
                         final p = listProducts[i];
                         final pid = (p['id'] as num).toInt();
                         return _ProductRow(
-                          key: ValueKey(pid),
+                          key: ValueKey('row_$pid'),
                           product: p,
                           vendorId: _vendorId,
                           vendor: widget.vendor,
@@ -167,7 +166,8 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
           );
         },
       ),
-      bottomNavigationBar: showCart ? _cartBar(mp) : null,
+      floatingActionButton: _buildCartFab(mp),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 
@@ -646,7 +646,7 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
                 final p = items[i];
                 final pid = (p['id'] as num).toInt();
                 return _ProductTile(
-                  key: ValueKey(pid),
+                  key: ValueKey('tile_$pid'),
                   product: p,
                   vendorId: _vendorId,
                   vendor: widget.vendor,
@@ -702,8 +702,46 @@ class _MarketVendorScreenState extends State<MarketVendorScreen> {
   }
 
   // --------------------------------------------------------------- cart
-  Widget _cartBar(MarketProvider mp) {
-    return MarketCartBar(vendorId: _vendorId);
+  Widget? _buildCartFab(MarketProvider mp) {
+    if (mp.cart.isEmpty || mp.activeVendorId != _vendorId) return null;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: GestureDetector(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const MarketCheckoutScreen()),
+        ),
+        child: Container(
+          height: 60,
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: AppStyles.shadowLg,
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${mp.cartCount}',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text('View cart', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+              const Spacer(),
+              Text('Rs.${formatAmount(mp.cartTotal)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   String? _resolveImg(String? path) {
@@ -847,21 +885,19 @@ class _AddControl extends StatelessWidget {
   final int vendorId;
   final Map<String, dynamic>? vendor;
   final bool disabled;
-  final int? quantity;
   const _AddControl({
     super.key,
     required this.product,
     required this.vendorId,
     this.vendor,
     this.disabled = false,
-    this.quantity,
   });
 
   @override
   Widget build(BuildContext context) {
     final mp = context.watch<MarketProvider>();
     final pid = (product['id'] as num).toInt();
-    final qty = quantity ?? mp.getQuantity(pid);
+    final qty = mp.getQuantity(pid);
 
     if (disabled) {
       return Container(
@@ -889,25 +925,6 @@ class _AddControl extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         onTap: () {
           context.read<MarketProvider>().addToCart(vendorId, product, vendor: vendor);
-          final name = product['name']?.toString() ?? 'Item';
-          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Added $name to cart'),
-              duration: const Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-              action: SnackBarAction(
-                label: 'VIEW CART',
-                textColor: Colors.white,
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const MarketCheckoutScreen()),
-                  );
-                },
-              ),
-            ),
-          );
         },
         child: Container(
           height: 30,
@@ -955,7 +972,7 @@ class _AddControl extends StatelessWidget {
           ),
           _stepBtn(
             Icons.add_rounded,
-            () => context.read<MarketProvider>().changeQty(pid, 1),
+            () => context.read<MarketProvider>().addToCart(vendorId, product, vendor: vendor),
           ),
         ],
       ),
@@ -1290,9 +1307,9 @@ void _showProductDetail(
                               icon: const Icon(Icons.add_rounded, size: 18, color: AppColors.primary),
                               onPressed: () {
                                 if (currentCartQty > 0) {
-                                  ctx.read<MarketProvider>().changeQty(pid, 1);
+                                  ctx.read<MarketProvider>().addToCart(vendorId, product, vendor: vendor);
                                 } else {
-                                  setModalState(() => localQty++);
+                                  ctx.read<MarketProvider>().addToCart(vendorId, product, vendor: vendor);
                                 }
                               },
                             ),
@@ -1312,25 +1329,6 @@ void _showProductDetail(
                         ctx.read<MarketProvider>().setProductQty(vendorId, product, effectiveQty, vendor: vendor);
                       }
                       Navigator.pop(ctx);
-                      final name = product['name']?.toString() ?? 'Item';
-                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Added $effectiveQty× $name to cart'),
-                          duration: const Duration(seconds: 2),
-                          behavior: SnackBarBehavior.floating,
-                          action: SnackBarAction(
-                            label: 'VIEW CART',
-                            textColor: Colors.white,
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => const MarketCheckoutScreen()),
-                              );
-                            },
-                          ),
-                        ),
-                      );
                     },
                   ),
                   if (currentCartQty > 0) ...[
@@ -1429,7 +1427,6 @@ class _ProductTile extends StatelessWidget {
                       vendorId: vendorId,
                       vendor: vendor,
                       disabled: out,
-                      quantity: qty,
                     ),
                   ),
                 ],
@@ -1568,7 +1565,6 @@ class _ProductRow extends StatelessWidget {
                       vendorId: vendorId,
                       vendor: vendor,
                       disabled: out,
-                      quantity: qty,
                     ),
                   ),
                 ],

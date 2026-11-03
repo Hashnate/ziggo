@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
+import '../../../app/app_styles.dart';
 import '../../../core/utils/amount_format.dart';
 import '../market_provider.dart';
 import '../screens/market_checkout_screen.dart';
@@ -27,28 +28,20 @@ class MarketCartBar extends StatelessWidget {
             MaterialPageRoute(builder: (_) => const MarketCheckoutScreen()),
           ),
           child: Container(
-            height: 56,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            height: 60,
+            padding: const EdgeInsets.symmetric(horizontal: 18),
             decoration: BoxDecoration(
-              color: Colors.black,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.25),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-              ],
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: AppStyles.shadowLg,
             ),
             child: Row(
               children: [
                 Container(
-                  width: 28,
-                  height: 28,
-                  alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     '${mp.cartCount}',
@@ -66,7 +59,6 @@ class MarketCartBar extends StatelessWidget {
                     color: Colors.white,
                     fontWeight: FontWeight.w900,
                     fontSize: 15,
-                    letterSpacing: 0.3,
                   ),
                 ),
                 const Spacer(),
@@ -78,12 +70,6 @@ class MarketCartBar extends StatelessWidget {
                     fontSize: 15,
                   ),
                 ),
-                const SizedBox(width: 8),
-                const Icon(
-                  Icons.arrow_forward_rounded,
-                  color: Colors.white,
-                  size: 18,
-                ),
               ],
             ),
           ),
@@ -92,3 +78,4 @@ class MarketCartBar extends StatelessWidget {
     );
   }
 }
+

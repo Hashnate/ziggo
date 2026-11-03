@@ -79,7 +79,7 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
-        title: const Text('My Trips'),
+        title: const Text('My Rides'),
       ),
       body: RefreshIndicator(
         onRefresh: _refresh,
@@ -388,7 +388,7 @@ class _RideHistoryScreenState extends State<RideHistoryScreen> {
                     size: 44, color: AppColors.textTertiary),
               ),
               const SizedBox(height: 18),
-              const Text('No trips yet',
+              const Text('No rides yet',
                   style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
               const SizedBox(height: 4),
               const Text('Book a ride to see it here',

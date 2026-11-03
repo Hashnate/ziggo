@@ -1771,7 +1771,7 @@ class CustomerDrawer extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 children: [
                   _item(Icons.stars_rounded, 'Ziggo Gold', onGold, color: AppColors.warning),
-                  _item(Icons.history_rounded, 'My Trips', () { Navigator.pop(context); onTrips(); }),
+                  _item(Icons.history_rounded, 'My Rides', () { Navigator.pop(context); onTrips(); }),
                   _item(Icons.bookmark_rounded, 'Saved Places', () { Navigator.pop(context); onPlaces(); }),
                   _item(Icons.local_offer_rounded, 'Promos & Offers', () { Navigator.pop(context); onPromos(); }),
                   _item(Icons.account_balance_wallet_rounded,
