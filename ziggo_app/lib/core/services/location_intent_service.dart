@@ -179,7 +179,7 @@ class LocationIntentService {
 
     // 1. Handle geo: scheme
     if (scheme == 'geo') {
-      return _parseGeoScheme(uri);
+      return _parseGeoScheme(uri, rawUri);
     }
 
     // 2. Handle google.navigation: scheme
@@ -202,7 +202,7 @@ class LocationIntentService {
     return null;
   }
 
-  ParsedLocationTarget? _parseGeoScheme(Uri uri) {
+  ParsedLocationTarget? _parseGeoScheme(Uri uri, String rawUri) {
     // A geo URI can be formatted as:
     // geo:6.9271,79.8420
     // geo:6.9271,79.8420?q=6.9271,79.8420
@@ -228,9 +228,9 @@ class LocationIntentService {
       }
     }
 
-    // If q is not present or didn't yield coords, parse schemeSpecificPart
-    final ssp = uri.schemeSpecificPart;
-    final coords = _extractCoords(ssp);
+    // If q is not present or didn't yield coords, parse path or rawUri
+    final rawPart = rawUri.contains(':') ? rawUri.substring(rawUri.indexOf(':') + 1) : uri.path;
+    final coords = _extractCoords(uri.path) ?? _extractCoords(rawPart);
     if (coords != null) {
       return ParsedLocationTarget(coordinates: coords);
     }
