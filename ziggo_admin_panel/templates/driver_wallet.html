@@ -211,8 +211,23 @@
     {% endif %}
 
     <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div class="p-6 border-b border-gray-100">
-            <h3 class="font-black text-ziggo">Bonuses given</h3>
+        <div class="p-5 md:p-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h3 class="font-black text-ziggo text-base">Bonuses given</h3>
+                <p class="text-xs text-gray-400 font-medium">Overview of promotional bonus grants, commission payments, and wallet balances</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="/admin/driver-wallet/export?format=xlsx" 
+                   class="inline-flex items-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-sm" 
+                   title="Export Bonuses Given to Excel (.xlsx)">
+                    <i class="fas fa-file-excel text-sm"></i> Export Excel
+                </a>
+                <a href="/admin/driver-wallet/export?format=csv" 
+                   class="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-xl text-xs font-bold transition shadow-sm" 
+                   title="Export Bonuses Given to CSV (.csv)">
+                    <i class="fas fa-file-csv text-gray-500"></i> CSV
+                </a>
+            </div>
         </div>
         <div class="overflow-x-auto">
         <table class="w-full text-sm">

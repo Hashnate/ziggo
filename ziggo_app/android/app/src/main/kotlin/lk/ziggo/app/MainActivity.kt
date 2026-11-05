@@ -22,8 +22,31 @@ class MainActivity : FlutterActivity() {
     private var referrerUrl: String? = null
     private var referrerClient: InstallReferrerClient? = null
 
+    private val LOCATION_CHANNEL = "lk.ziggo.app/location_intent"
+    private var locationMethodChannel: MethodChannel? = null
+    private var pendingLocationUri: String? = null
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        locationMethodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, LOCATION_CHANNEL).apply {
+            setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "getInitialLocation" -> {
+                        val uri = pendingLocationUri
+                        pendingLocationUri = null
+                        result.success(uri)
+                    }
+                    else -> {
+                        result.notImplemented()
+                    }
+                }
+            }
+        }
+
+        pendingLocationUri?.let { uri ->
+            locationMethodChannel?.invokeMethod("onLocationReceived", uri)
+        }
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             if (call.method == "getInstallReferrer") {
@@ -140,6 +163,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        extractAndQueueLocationIntent(intent)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
@@ -176,6 +200,31 @@ class MainActivity : FlutterActivity() {
             })
         } catch (e: Exception) {
             // Safe fallback if Google Play services are missing or disabled
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        extractAndQueueLocationIntent(intent)
+    }
+
+    private fun extractAndQueueLocationIntent(intent: Intent?) {
+        val uri: Uri = intent?.data ?: return
+        val scheme = uri.scheme?.lowercase() ?: return
+        val host = uri.host?.lowercase() ?: ""
+
+        val isGeo = scheme == "geo" || scheme == "google.navigation"
+        val isMapsUrl = (scheme == "http" || scheme == "https") &&
+                (host == "maps.google.com" || host == "maps.app.goo.gl" || (host == "goo.gl" && uri.path?.startsWith("/maps") == true))
+
+        if (isGeo || isMapsUrl) {
+            val uriString = uri.toString()
+            if (locationMethodChannel != null) {
+                locationMethodChannel?.invokeMethod("onLocationReceived", uriString)
+            } else {
+                pendingLocationUri = uriString
+            }
         }
     }
 }

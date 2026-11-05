@@ -19,7 +19,7 @@
             <div class="stat-icon bg-emerald-100 text-emerald-600"><i class="fas fa-check"></i></div>
             <div>
                 <p class="text-[10px] text-ziggo-faint uppercase font-bold">Drivers w/ earnings</p>
-                <p class="text-2xl font-black text-ziggo-ink">{{ rows | length }}</p>
+                <p class="text-2xl font-black text-ziggo-ink">{{ (rows | length)|num }}</p>
             </div>
         </div>
     </div>
@@ -28,21 +28,26 @@
             <div class="stat-icon bg-blue-100 text-ziggo"><i class="fas fa-history"></i></div>
             <div>
                 <p class="text-[10px] text-ziggo-faint uppercase font-bold">Past payouts</p>
-                <p class="text-2xl font-black text-ziggo">{{ history | length }}</p>
+                <p class="text-2xl font-black text-ziggo">{{ (history | length)|num }}</p>
             </div>
         </div>
     </div>
 </div>
 
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-6">
-    <div class="px-5 py-4 border-b border-ziggo-line bg-gray-50/40 flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white flex-shrink-0" style="background:linear-gradient(135deg,#1E40AF,#3B82F6);box-shadow:0 8px 18px -8px rgba(30,64,175,.5);">
-            <i class="fas fa-money-bill-wave"></i>
+    <div class="px-5 py-4 border-b border-ziggo-line bg-gray-50/40 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white flex-shrink-0" style="background:linear-gradient(135deg,#1E40AF,#3B82F6);box-shadow:0 8px 18px -8px rgba(30,64,175,.5);">
+                <i class="fas fa-money-bill-wave"></i>
+            </div>
+            <div>
+                <h3 class="text-base font-bold text-ziggo-ink tracking-tight leading-none">Pending payouts by driver</h3>
+                <p class="text-xs text-ziggo-muted mt-1" style="font-family:'Courier New',ui-monospace,monospace;letter-spacing:.2px;"><span class="text-ziggo font-bold">Pending</span> = total earnings − sum of withdrawals already paid out.</p>
+            </div>
         </div>
-        <div>
-            <h3 class="text-base font-bold text-ziggo-ink tracking-tight leading-none">Pending payouts by driver</h3>
-            <p class="text-xs text-ziggo-muted mt-1" style="font-family:'Courier New',ui-monospace,monospace;letter-spacing:.2px;"><span class="text-ziggo font-bold">Pending</span> = total earnings − sum of withdrawals already paid out.</p>
-        </div>
+        <a href="/admin/withdrawals/pending/export" class="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl text-xs font-bold transition shadow-sm" title="Export Pending Balances to Excel">
+            <i class="fas fa-file-excel text-emerald-600"></i> Export Pending
+        </a>
     </div>
     <div class="overflow-x-auto">
         <table class="w-full text-left">
@@ -104,7 +109,7 @@
         <p class="text-sm text-gray-500">
             Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
             <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
-            <span class="font-bold text-ziggo">{{ total_drivers }}</span> drivers
+            <span class="font-bold text-ziggo">{{ total_drivers|num }}</span> drivers
         </p>
         <div class="flex items-center gap-1.5">
             {% if page > 1 %}
@@ -132,12 +137,63 @@
 </div>
 
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-    <div class="p-5 border-b border-gray-100 flex items-center justify-between">
+    <div class="p-5 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
         <div>
             <h3 class="font-black text-ziggo-ink">Payout & Transfer History</h3>
             <p class="text-xs text-gray-400 mt-0.5">Audit log of all payouts issued to drivers.</p>
         </div>
-        <span class="text-xs font-bold text-gray-400 bg-gray-50 px-2.5 py-1 rounded-lg">{{ history | length }} records</span>
+        <div class="flex items-center gap-2">
+            <!-- Export dropdown / buttons -->
+            <div class="relative inline-block text-left" id="payoutExportDropdownContainer">
+                <div class="inline-flex rounded-xl shadow-sm">
+                    <a href="/admin/withdrawals/export?format=xlsx" 
+                       class="inline-flex items-center gap-2 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-l-xl text-xs font-bold transition shadow-sm"
+                       title="Export to Excel (.xlsx)">
+                        <i class="fas fa-file-excel"></i> Export Excel
+                    </a>
+                    <button type="button" 
+                            id="payoutExportMenuBtn"
+                            onclick="togglePayoutExportMenu(event)"
+                            class="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-r-xl border-l border-emerald-500/50 text-xs transition"
+                            title="More export options">
+                        <i class="fas fa-chevron-down text-[10px]"></i>
+                    </button>
+                </div>
+                
+                <div id="payoutExportMenu" class="hidden absolute right-0 mt-2 w-64 rounded-2xl bg-white shadow-xl border border-gray-100 z-50 py-2 ring-1 ring-black/5">
+                    <a href="/admin/withdrawals/export?format=xlsx" class="flex items-start gap-3 px-4 py-2.5 hover:bg-emerald-50/70 transition group text-left">
+                        <div class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <i class="fas fa-file-excel text-xs"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-gray-800 group-hover:text-emerald-700">Excel Spreadsheet (.xlsx)</p>
+                            <p class="text-[10px] text-gray-400">Formatted spreadsheet with totals & bank details</p>
+                        </div>
+                    </a>
+                    <a href="/admin/withdrawals/export?format=csv" class="flex items-start gap-3 px-4 py-2.5 hover:bg-blue-50/70 transition group text-left">
+                        <div class="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <i class="fas fa-file-csv text-xs"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-gray-800 group-hover:text-blue-700">CSV File (.csv)</p>
+                            <p class="text-[10px] text-gray-400">Standard comma-separated format</p>
+                        </div>
+                    </a>
+                    <div class="my-1.5 border-t border-gray-100"></div>
+                    <button type="button" onclick="openPayoutExportDateModal()" class="w-full flex items-start gap-3 px-4 py-2.5 hover:bg-purple-50/70 transition group text-left">
+                        <div class="w-7 h-7 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <i class="fas fa-calendar-alt text-xs"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-gray-800 group-hover:text-purple-700">Custom Date Range...</p>
+                            <p class="text-[10px] text-gray-400">Choose start & end dates to export</p>
+                        </div>
+                    </button>
+                </div>
+            </div>
+            
+            <span class="text-xs font-bold text-gray-400 bg-gray-50 px-2.5 py-1.5 rounded-xl border border-gray-100">{{ (history | length)|num }} records</span>
+        </div>
     </div>
     <div class="overflow-x-auto">
         <table class="w-full text-left">
@@ -284,7 +340,7 @@ function handleOpenPayout(btn) {
     document.getElementById('modalDriverType').textContent = `${d.vehicle ? (d.vehicle.charAt(0).toUpperCase() + d.vehicle.slice(1)) : 'Vehicle'} Driver`;
     
     const pendingVal = parseFloat(d.pending) || 0;
-    document.getElementById('modalDriverPending').textContent = `Rs. ${pendingVal.toFixed(2)}`;
+    document.getElementById('modalDriverPending').textContent = `Rs. ${fmtNum(pendingVal, 2)}`;
     
     const amountInput = document.getElementById('modalAmountInput');
     amountInput.value = pendingVal.toFixed(2);
@@ -313,5 +369,85 @@ function closePayoutModal() {
     modal.classList.add('hidden');
     modal.classList.remove('flex');
 }
+
+function togglePayoutExportMenu(e) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    const menu = document.getElementById('payoutExportMenu');
+    if (menu) menu.classList.toggle('hidden');
+}
+
+function openPayoutExportDateModal() {
+    const menu = document.getElementById('payoutExportMenu');
+    if (menu) menu.classList.add('hidden');
+    const modal = document.getElementById('payoutExportModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+}
+
+function closePayoutExportModal() {
+    const modal = document.getElementById('payoutExportModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+}
+
+document.addEventListener('click', function(e) {
+    const container = document.getElementById('payoutExportDropdownContainer');
+    const menu = document.getElementById('payoutExportMenu');
+    if (container && menu && !container.contains(e.target)) {
+        menu.classList.add('hidden');
+    }
+});
 </script>
+
+<!-- Date Range Export Modal -->
+<div id="payoutExportModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50 p-4 transition-opacity">
+    <div class="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col transform transition-all">
+        <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/80">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-lg">
+                    <i class="fas fa-file-excel"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-black text-ziggo-ink">Export Payout History</h3>
+                    <p class="text-xs text-gray-400">Select date range to export driver payout records</p>
+                </div>
+            </div>
+            <button type="button" onclick="closePayoutExportModal()" class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form method="GET" action="/admin/withdrawals/export" class="p-6 space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">From Date</label>
+                    <input type="date" name="start_date" class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:border-ziggo outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">To Date</label>
+                    <input type="date" name="end_date" class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:border-ziggo outline-none">
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Format</label>
+                <select name="format" class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:border-ziggo outline-none bg-white">
+                    <option value="xlsx">Excel Spreadsheet (.xlsx)</option>
+                    <option value="csv">CSV File (.csv)</option>
+                </select>
+            </div>
+            <div class="pt-2 flex items-center justify-end gap-3">
+                <button type="button" onclick="closePayoutExportModal()" class="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100">Cancel</button>
+                <button type="submit" onclick="closePayoutExportModal()" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-md flex items-center gap-2 transition">
+                    <i class="fas fa-download"></i> Download Export
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}

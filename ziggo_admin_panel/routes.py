@@ -8730,6 +8730,460 @@ async def admin_withdrawals_pay(
     return RedirectResponse(url="/admin/withdrawals", status_code=303)
 
 
+@router.get("/withdrawals/export")
+async def admin_withdrawals_export(
+    format: str = "xlsx",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    search: Optional[str] = None,
+    driver_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    import io
+    import csv
+    from decimal import Decimal
+    from datetime import datetime, time, timezone
+    from fastapi.responses import Response
+    from sqlalchemy import and_, or_
+    from sqlalchemy.orm import selectinload
+    from app.models import DriverPayout, Driver, User
+
+    where_clauses = [
+        or_(
+            DriverPayout.kind.is_(None),
+            and_(
+                DriverPayout.kind != fin.WALLET_PAYMENT,
+                DriverPayout.kind != fin.COMMISSION_PAYMENT,
+            ),
+        )
+    ]
+
+    if driver_id:
+        where_clauses.append(DriverPayout.driver_id == driver_id)
+
+    if start_date and start_date.strip():
+        try:
+            s_date = datetime.strptime(start_date.strip(), "%Y-%m-%d").date()
+            s_dt = datetime.combine(s_date, time.min, tzinfo=COLOMBO_TZ).astimezone(timezone.utc)
+            where_clauses.append(DriverPayout.created_at >= s_dt)
+        except ValueError:
+            pass
+
+    if end_date and end_date.strip():
+        try:
+            e_date = datetime.strptime(end_date.strip(), "%Y-%m-%d").date()
+            e_dt = datetime.combine(e_date, time.max, tzinfo=COLOMBO_TZ).astimezone(timezone.utc)
+            where_clauses.append(DriverPayout.created_at <= e_dt)
+        except ValueError:
+            pass
+
+    if search and search.strip():
+        term = f"%{search.strip()}%"
+        where_clauses.append(
+            or_(
+                User.full_name.ilike(term),
+                User.phone_number.ilike(term),
+                DriverPayout.description.ilike(term),
+                Driver.vehicle_number.ilike(term),
+            )
+        )
+
+    stmt = (
+        select(DriverPayout)
+        .outerjoin(User, DriverPayout.user_id == User.id)
+        .outerjoin(Driver, DriverPayout.driver_id == Driver.id)
+        .options(selectinload(DriverPayout.user), selectinload(DriverPayout.driver))
+        .where(*where_clauses)
+        .order_by(DriverPayout.created_at.desc(), DriverPayout.id.desc())
+    )
+
+    q = await db.execute(stmt)
+    payouts = q.scalars().all()
+
+    now_colombo = datetime.now(COLOMBO_TZ)
+    filename_base = f"ziggo-driver-payouts-{now_colombo.strftime('%Y%m%d')}"
+
+    headers = [
+        "Payout ID",
+        "Date & Time",
+        "Driver ID",
+        "Driver Name",
+        "Phone Number",
+        "Vehicle Type",
+        "Vehicle Plate",
+        "Bank Name",
+        "Branch",
+        "Account Number",
+        "Account Holder",
+        "Amount (Rs.)",
+        "Payout Type",
+        "Method / Reference / Notes",
+        "Status",
+    ]
+
+    def _csv_cell(val):
+        if val is None:
+            return ""
+        s = str(val).strip()
+        if s.startswith(("=", "+", "-", "@", "\t", "\r")):
+            return "'" + s
+        return s
+
+    if format.lower() == "csv":
+        buf = io.StringIO()
+        buf.write("\ufeff")
+        writer = csv.writer(buf)
+        writer.writerow(headers)
+
+        total_amount = Decimal("0")
+        for p in payouts:
+            driver = p.driver
+            user = p.user
+            amt = p.amount or Decimal("0")
+            total_amount += amt
+
+            kind = p.kind or "payout"
+            if kind == "payout":
+                payout_type = "Direct Payout"
+            elif kind in ("bonus", "incentive_paid"):
+                payout_type = "Incentive / Bonus"
+            else:
+                payout_type = kind.replace("_", " ").title()
+
+            date_str = format_colombo_dt(p.created_at, "%Y-%m-%d %H:%M:%S")
+
+            writer.writerow([
+                p.id,
+                date_str,
+                p.driver_id,
+                _csv_cell((user.full_name if user else "") or f"Driver #{p.driver_id}"),
+                _csv_cell(user.phone_number if user else ""),
+                _csv_cell(driver.vehicle_type.capitalize() if driver and driver.vehicle_type else ""),
+                _csv_cell(driver.vehicle_number if driver and driver.vehicle_number else ""),
+                _csv_cell(driver.bank_name if driver and driver.bank_name else ""),
+                _csv_cell(driver.branch_name if driver and driver.branch_name else ""),
+                _csv_cell(driver.account_number if driver and driver.account_number else ""),
+                _csv_cell(driver.account_holder_name if driver and driver.account_holder_name else ""),
+                f"{float(amt):.2f}",
+                payout_type,
+                _csv_cell(p.description or "Direct Settlement"),
+                "Settled",
+            ])
+
+        writer.writerow(["", "", "", "", "", "", "", "", "", "", "Total Amount:", f"{float(total_amount):.2f}", "", "", ""])
+
+        return Response(
+            content=buf.getvalue().encode("utf-8"),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename_base}.csv"'},
+        )
+
+    # XLSX format (default)
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Driver Payouts"
+    ws.append(headers)
+
+    header_fill = PatternFill(start_color="1E40AF", end_color="1E40AF", fill_type="solid")
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    thin_border = Border(
+        left=Side(style="thin", color="CBD5E1"),
+        right=Side(style="thin", color="CBD5E1"),
+        top=Side(style="thin", color="CBD5E1"),
+        bottom=Side(style="thin", color="CBD5E1"),
+    )
+
+    for col_idx, cell in enumerate(ws[1], 1):
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.border = thin_border
+        cell.alignment = Alignment(horizontal="center" if col_idx in (1, 3, 15) else "right" if col_idx == 12 else "left", vertical="center")
+    ws.row_dimensions[1].height = 28
+
+    total_amount = Decimal("0")
+    row_idx = 2
+    for p in payouts:
+        driver = p.driver
+        user = p.user
+        amount_val = float(p.amount or 0)
+        total_amount += (p.amount or Decimal("0"))
+
+        kind = p.kind or "payout"
+        if kind == "payout":
+            payout_type = "Direct Payout"
+        elif kind in ("bonus", "incentive_paid"):
+            payout_type = "Incentive / Bonus"
+        else:
+            payout_type = kind.replace("_", " ").title()
+
+        date_str = format_colombo_dt(p.created_at, "%Y-%m-%d %H:%M:%S")
+
+        row_data = [
+            p.id,
+            date_str,
+            p.driver_id,
+            str((user.full_name if user else "") or f"Driver #{p.driver_id}"),
+            str(user.phone_number if user else ""),
+            str(driver.vehicle_type.capitalize() if driver and driver.vehicle_type else ""),
+            str(driver.vehicle_number if driver and driver.vehicle_number else ""),
+            str(driver.bank_name if driver and driver.bank_name else ""),
+            str(driver.branch_name if driver and driver.branch_name else ""),
+            str(driver.account_number if driver and driver.account_number else ""),
+            str(driver.account_holder_name if driver and driver.account_holder_name else ""),
+            amount_val,
+            payout_type,
+            str(p.description or "Direct Settlement"),
+            "Settled",
+        ]
+        ws.append(row_data)
+
+        row_fill = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid") if row_idx % 2 == 0 else PatternFill(fill_type=None)
+        for col_idx, cell in enumerate(ws[row_idx], 1):
+            if row_idx % 2 == 0:
+                cell.fill = row_fill
+            cell.font = Font(name="Calibri", size=10)
+            cell.border = thin_border
+            if col_idx in (1, 3, 15):
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            elif col_idx == 12:
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                cell.number_format = "#,##0.00"
+                cell.font = Font(name="Calibri", size=10, bold=True, color="047857")
+            elif col_idx in (5, 7, 10):
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+                cell.number_format = "@"
+            else:
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+        ws.row_dimensions[row_idx].height = 22
+        row_idx += 1
+
+    total_row = [""] * len(headers)
+    total_row[10] = "Total Amount:"
+    total_row[11] = float(total_amount)
+    ws.append(total_row)
+
+    total_fill = PatternFill(start_color="EFF6FF", end_color="EFF6FF", fill_type="solid")
+    double_bottom_border = Border(
+        top=Side(style="thin", color="1E40AF"),
+        bottom=Side(style="double", color="1E40AF"),
+        left=Side(style="thin", color="CBD5E1"),
+        right=Side(style="thin", color="CBD5E1"),
+    )
+    for col_idx, cell in enumerate(ws[row_idx], 1):
+        cell.fill = total_fill
+        cell.font = Font(name="Calibri", size=11, bold=True)
+        cell.border = double_bottom_border
+        if col_idx == 11:
+            cell.alignment = Alignment(horizontal="right", vertical="center")
+        elif col_idx == 12:
+            cell.alignment = Alignment(horizontal="right", vertical="center")
+            cell.number_format = "#,##0.00"
+            cell.font = Font(name="Calibri", size=11, bold=True, color="1E40AF")
+    ws.row_dimensions[row_idx].height = 26
+    ws.freeze_panes = "A2"
+
+    for col in ws.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            if cell.value is not None:
+                val_str = str(cell.value)
+                if cell.column == 12:
+                    val_str = f"Rs. {val_str}"
+                max_len = max(max_len, len(val_str))
+        ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename_base}.xlsx"'},
+    )
+
+
+@router.get("/withdrawals/pending/export")
+async def admin_withdrawals_pending_export(
+    format: str = "xlsx",
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    import io
+    import csv
+    from decimal import Decimal
+    from datetime import datetime
+    from fastapi.responses import Response
+
+    data = await fin.get_withdrawals_data(db, page=1, page_size=100000)
+    rows = data.get("rows", [])
+    now_colombo = datetime.now(COLOMBO_TZ)
+    filename_base = f"ziggo-pending-driver-withdrawals-{now_colombo.strftime('%Y%m%d')}"
+
+    headers = [
+        "Driver ID", "Name", "Phone Number", "Vehicle Type",
+        "Total Earned (Rs.)", "Total Paid (Rs.)", "Settlement Owed (Rs.)", "Pending Balance (Rs.)",
+        "Bank Name", "Branch", "Account Number", "Account Holder"
+    ]
+
+    def _csv_cell(val):
+        if val is None:
+            return ""
+        s = str(val).strip()
+        if s.startswith(("=", "+", "-", "@", "\t", "\r")):
+            return "'" + s
+        return s
+
+    if format.lower() == "csv":
+        buf = io.StringIO()
+        buf.write("\ufeff")
+        writer = csv.writer(buf)
+        writer.writerow(headers)
+        total_pending = Decimal("0")
+        for r in rows:
+            pending = Decimal(str(r.get("pending", 0)))
+            total_pending += pending
+            writer.writerow([
+                r["driver_id"],
+                _csv_cell(r["name"]),
+                _csv_cell(r["phone"]),
+                _csv_cell(r["vehicle_type"].capitalize() if r.get("vehicle_type") else ""),
+                f"{float(r.get('earned', 0)):.2f}",
+                f"{float(r.get('paid', 0)):.2f}",
+                f"{float(r.get('settlement_amount', 0)):.2f}",
+                f"{float(pending):.2f}",
+                _csv_cell(r.get("bank_name", "")),
+                _csv_cell(r.get("branch_name", "")),
+                _csv_cell(r.get("account_number", "")),
+                _csv_cell(r.get("account_holder_name", "")),
+            ])
+        writer.writerow(["", "", "", "Total Pending:", "", "", "", f"{float(total_pending):.2f}", "", "", "", ""])
+        return Response(
+            content=buf.getvalue().encode("utf-8"),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename_base}.csv"'},
+        )
+
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Pending Withdrawals"
+    ws.append(headers)
+
+    header_fill = PatternFill(start_color="1E40AF", end_color="1E40AF", fill_type="solid")
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    thin_border = Border(
+        left=Side(style="thin", color="CBD5E1"),
+        right=Side(style="thin", color="CBD5E1"),
+        top=Side(style="thin", color="CBD5E1"),
+        bottom=Side(style="thin", color="CBD5E1"),
+    )
+
+    for col_idx, cell in enumerate(ws[1], 1):
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.border = thin_border
+        cell.alignment = Alignment(horizontal="center" if col_idx == 1 else "right" if col_idx in (5, 6, 7, 8) else "left", vertical="center")
+    ws.row_dimensions[1].height = 28
+
+    total_pending = Decimal("0")
+    row_idx = 2
+    for r in rows:
+        pending = Decimal(str(r.get("pending", 0)))
+        total_pending += pending
+
+        ws.append([
+            r["driver_id"],
+            str(r["name"]),
+            str(r["phone"]),
+            str(r["vehicle_type"].capitalize() if r.get("vehicle_type") else ""),
+            float(r.get("earned", 0)),
+            float(r.get("paid", 0)),
+            float(r.get("settlement_amount", 0)),
+            float(pending),
+            str(r.get("bank_name", "")),
+            str(r.get("branch_name", "")),
+            str(r.get("account_number", "")),
+            str(r.get("account_holder_name", "")),
+        ])
+
+        row_fill = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid") if row_idx % 2 == 0 else PatternFill(fill_type=None)
+        for col_idx, cell in enumerate(ws[row_idx], 1):
+            if row_idx % 2 == 0:
+                cell.fill = row_fill
+            cell.font = Font(name="Calibri", size=10)
+            cell.border = thin_border
+            if col_idx == 1:
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            elif col_idx in (5, 6, 7, 8):
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                cell.number_format = "#,##0.00"
+                if col_idx == 8 and pending > 0:
+                    cell.font = Font(name="Calibri", size=10, bold=True, color="D97706")
+            elif col_idx in (3, 11):
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+                cell.number_format = "@"
+            else:
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+        ws.row_dimensions[row_idx].height = 22
+        row_idx += 1
+
+    total_row = [""] * len(headers)
+    total_row[6] = "Total Pending:"
+    total_row[7] = float(total_pending)
+    ws.append(total_row)
+
+    total_fill = PatternFill(start_color="FEF3C7", end_color="FEF3C7", fill_type="solid")
+    double_bottom_border = Border(
+        top=Side(style="thin", color="D97706"),
+        bottom=Side(style="double", color="D97706"),
+        left=Side(style="thin", color="CBD5E1"),
+        right=Side(style="thin", color="CBD5E1"),
+    )
+    for col_idx, cell in enumerate(ws[row_idx], 1):
+        cell.fill = total_fill
+        cell.font = Font(name="Calibri", size=11, bold=True)
+        cell.border = double_bottom_border
+        if col_idx == 7:
+            cell.alignment = Alignment(horizontal="right", vertical="center")
+        elif col_idx == 8:
+            cell.alignment = Alignment(horizontal="right", vertical="center")
+            cell.number_format = "#,##0.00"
+            cell.font = Font(name="Calibri", size=11, bold=True, color="B45309")
+    ws.row_dimensions[row_idx].height = 26
+    ws.freeze_panes = "A2"
+
+    for col in ws.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            if cell.value is not None:
+                val_str = str(cell.value)
+                if cell.column in (5, 6, 7, 8):
+                    val_str = f"Rs. {val_str}"
+                max_len = max(max_len, len(val_str))
+        ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename_base}.xlsx"'},
+    )
+
+
 @router.get("/finance/drivers", response_class=HTMLResponse)
 async def admin_finance_drivers(
     request: Request,
@@ -9004,6 +9458,464 @@ async def admin_driver_wallet(
          "filter_pairs": _wallet_filter_pairs(f), "matches": matches,
          "job_types": wallet.JOB_TYPES, "job_names": wallet.JOB_NAMES,
          "today": overview["today"].isoformat(), "msg": request.query_params.get("msg", "")},
+    )
+
+
+@router.get("/driver-wallet/export")
+async def admin_driver_wallet_export(
+    format: str = "xlsx",
+    grant_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin_or_admin),
+):
+    import io
+    import csv
+    from decimal import Decimal
+    from datetime import datetime
+    from fastapi.responses import Response
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+    from app.models import DriverWalletGrant, DriverWalletCredit, Driver, User
+    from app.services import driver_wallet_service as wallet
+
+    overview = await wallet.grants_overview(db)
+    for r in overview["rows"]:
+        r["audience"] = await wallet.describe_audience(db, r["grant"])
+
+    rows = overview["rows"]
+    if grant_id:
+        rows = [r for r in rows if r["grant"].id == grant_id]
+
+    # Detailed credits
+    q_credits = (
+        select(DriverWalletCredit)
+        .options(
+            selectinload(DriverWalletCredit.grant),
+            selectinload(DriverWalletCredit.driver).selectinload(Driver.user),
+        )
+        .order_by(DriverWalletCredit.created_at.desc(), DriverWalletCredit.id.desc())
+    )
+    if grant_id:
+        q_credits = q_credits.where(DriverWalletCredit.grant_id == grant_id)
+    credits_res = (await db.execute(q_credits)).scalars().all()
+
+    now_colombo = datetime.now(COLOMBO_TZ)
+    filename_base = f"ziggo-bonuses-given-{now_colombo.strftime('%Y%m%d')}"
+
+    def _csv_cell(val):
+        if val is None:
+            return ""
+        s = str(val).strip()
+        if s.startswith(("=", "+", "-", "@", "\t", "\r")):
+            return "'" + s
+        return s
+
+    if format.lower() == "csv":
+        buf = io.StringIO()
+        buf.write("\ufeff")
+        writer = csv.writer(buf)
+        headers = [
+            "Grant ID",
+            "Given Date & Time",
+            "Given By",
+            "Note",
+            "Target Audience",
+            "Drivers Count",
+            "Active Drivers",
+            "Per Driver (Rs.)",
+            "Total Bonus Given (Rs.)",
+            "Paid Commission (Rs.)",
+            "Still in Wallets (Rs.)",
+            "Expired / Removed (Rs.)",
+            "Expires On",
+            "Expiry Details",
+            "Status",
+        ]
+        writer.writerow(headers)
+
+        tot_drivers = 0
+        tot_active_drivers = 0
+        tot_given = Decimal("0")
+        tot_used = Decimal("0")
+        tot_available = Decimal("0")
+        tot_lost = Decimal("0")
+
+        for r in rows:
+            g = r["grant"]
+            m = r["totals"]
+            date_str = format_colombo_dt(g.created_at, "%Y-%m-%d %H:%M:%S")
+            status_str = "Removed" if r["cancelled"] else ("Expired" if r["expired"] else "Active")
+            expiry_detail = "Removed" if r["cancelled"] else ("Expired" if r["expired"] else f"{r['days_left'] + 1} day(s) left")
+
+            tot_drivers += (g.drivers_count or 0)
+            tot_active_drivers += r.get("active_drivers", 0)
+            tot_given += Decimal(str(m["given"]))
+            tot_used += Decimal(str(m["used"]))
+            tot_available += Decimal(str(m["available"]))
+            tot_lost += Decimal(str(m["lost"]))
+
+            writer.writerow([
+                g.id,
+                date_str,
+                _csv_cell(r.get("by") or "Ziggo Admin"),
+                _csv_cell(g.note),
+                _csv_cell(r.get("audience") or ""),
+                g.drivers_count,
+                r.get("active_drivers", 0),
+                f"{float(g.amount):.2f}",
+                f"{float(m['given']):.2f}",
+                f"{float(m['used']):.2f}",
+                f"{float(m['available']):.2f}",
+                f"{float(m['lost']):.2f}",
+                g.expires_on.isoformat() if g.expires_on else "",
+                expiry_detail,
+                status_str,
+            ])
+
+        writer.writerow([
+            "", "", "", "TOTALS", "",
+            tot_drivers, tot_active_drivers, "",
+            f"{float(tot_given):.2f}",
+            f"{float(tot_used):.2f}",
+            f"{float(tot_available):.2f}",
+            f"{float(tot_lost):.2f}",
+            "", "", ""
+        ])
+
+        return Response(
+            content=buf.getvalue().encode("utf-8"),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename_base}.csv"'},
+        )
+
+    # XLSX format
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = openpyxl.Workbook()
+
+    # Sheet 1: Bonuses Summary
+    ws_sum = wb.active
+    ws_sum.title = "Bonuses Summary"
+
+    headers_sum = [
+        "Grant ID",
+        "Given Date & Time",
+        "Given By",
+        "Note",
+        "Target Audience",
+        "Drivers Count",
+        "Active Drivers",
+        "Per Driver (Rs.)",
+        "Total Bonus Given (Rs.)",
+        "Paid Commission (Rs.)",
+        "Still in Wallets (Rs.)",
+        "Expired / Removed (Rs.)",
+        "Expires On",
+        "Expiry Details",
+        "Status",
+    ]
+    ws_sum.append(headers_sum)
+
+    header_fill_purple = PatternFill(start_color="6D28D9", end_color="6D28D9", fill_type="solid")
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    thin_border = Border(
+        left=Side(style="thin", color="CBD5E1"),
+        right=Side(style="thin", color="CBD5E1"),
+        top=Side(style="thin", color="CBD5E1"),
+        bottom=Side(style="thin", color="CBD5E1"),
+    )
+
+    for col_idx, cell in enumerate(ws_sum[1], 1):
+        cell.fill = header_fill_purple
+        cell.font = header_font
+        cell.border = thin_border
+        if col_idx in (1, 2, 13, 14, 15):
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        elif col_idx in (6, 7, 8, 9, 10, 11, 12):
+            cell.alignment = Alignment(horizontal="right", vertical="center")
+        else:
+            cell.alignment = Alignment(horizontal="left", vertical="center")
+    ws_sum.row_dimensions[1].height = 28
+
+    tot_drivers = 0
+    tot_active_drivers = 0
+    tot_given = Decimal("0")
+    tot_used = Decimal("0")
+    tot_available = Decimal("0")
+    tot_lost = Decimal("0")
+
+    row_idx = 2
+    for r in rows:
+        g = r["grant"]
+        m = r["totals"]
+        date_str = format_colombo_dt(g.created_at, "%Y-%m-%d %H:%M:%S")
+        status_str = "Removed" if r["cancelled"] else ("Expired" if r["expired"] else "Active")
+        expiry_detail = "Removed" if r["cancelled"] else ("Expired" if r["expired"] else f"{r['days_left'] + 1} day(s) left")
+
+        tot_drivers += (g.drivers_count or 0)
+        tot_active_drivers += r.get("active_drivers", 0)
+        tot_given += Decimal(str(m["given"]))
+        tot_used += Decimal(str(m["used"]))
+        tot_available += Decimal(str(m["available"]))
+        tot_lost += Decimal(str(m["lost"]))
+
+        ws_sum.append([
+            g.id,
+            date_str,
+            str(r.get("by") or "Ziggo Admin"),
+            str(g.note or ""),
+            str(r.get("audience") or ""),
+            int(g.drivers_count or 0),
+            int(r.get("active_drivers", 0)),
+            float(g.amount or 0),
+            float(m["given"]),
+            float(m["used"]),
+            float(m["available"]),
+            float(m["lost"]),
+            g.expires_on.isoformat() if g.expires_on else "",
+            expiry_detail,
+            status_str,
+        ])
+
+        row_fill = PatternFill(start_color="F5F3FF", end_color="F5F3FF", fill_type="solid") if row_idx % 2 == 0 else PatternFill(fill_type=None)
+        for col_idx, cell in enumerate(ws_sum[row_idx], 1):
+            if row_idx % 2 == 0:
+                cell.fill = row_fill
+            cell.font = Font(name="Calibri", size=10)
+            cell.border = thin_border
+
+            if col_idx in (1, 2, 13, 14):
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            elif col_idx in (6, 7):
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                cell.number_format = "#,##0"
+            elif col_idx in (8, 9, 10, 11, 12):
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                cell.number_format = "#,##0.00"
+                if col_idx == 10 and float(m["used"]) > 0:
+                    cell.font = Font(name="Calibri", size=10, bold=True, color="D97706")
+                elif col_idx == 11 and float(m["available"]) > 0:
+                    cell.font = Font(name="Calibri", size=10, bold=True, color="6D28D9")
+                elif col_idx == 12 and float(m["lost"]) > 0:
+                    cell.font = Font(name="Calibri", size=10, color="9CA3AF")
+            elif col_idx == 15:
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+                if status_str == "Active":
+                    cell.font = Font(name="Calibri", size=10, bold=True, color="059669")
+                elif status_str == "Removed":
+                    cell.font = Font(name="Calibri", size=10, bold=True, color="DC2626")
+                else:
+                    cell.font = Font(name="Calibri", size=10, color="6B7280")
+            elif col_idx == 4:
+                cell.font = Font(name="Calibri", size=10, bold=True)
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+            else:
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+        ws_sum.row_dimensions[row_idx].height = 22
+        row_idx += 1
+
+    # Totals row for Summary
+    total_row = [""] * len(headers_sum)
+    total_row[3] = "TOTALS"
+    total_row[5] = int(tot_drivers)
+    total_row[6] = int(tot_active_drivers)
+    total_row[8] = float(tot_given)
+    total_row[9] = float(tot_used)
+    total_row[10] = float(tot_available)
+    total_row[11] = float(tot_lost)
+    ws_sum.append(total_row)
+
+    total_fill = PatternFill(start_color="EDE9FE", end_color="EDE9FE", fill_type="solid")
+    double_bottom_border = Border(
+        top=Side(style="thin", color="6D28D9"),
+        bottom=Side(style="double", color="6D28D9"),
+        left=Side(style="thin", color="CBD5E1"),
+        right=Side(style="thin", color="CBD5E1"),
+    )
+    for col_idx, cell in enumerate(ws_sum[row_idx], 1):
+        cell.fill = total_fill
+        cell.font = Font(name="Calibri", size=11, bold=True)
+        cell.border = double_bottom_border
+        if col_idx in (6, 7):
+            cell.alignment = Alignment(horizontal="right", vertical="center")
+            cell.number_format = "#,##0"
+        elif col_idx in (8, 9, 10, 11):
+            cell.alignment = Alignment(horizontal="right", vertical="center")
+            cell.number_format = "#,##0.00"
+            if col_idx == 10:
+                cell.font = Font(name="Calibri", size=11, bold=True, color="6D28D9")
+            elif col_idx == 9:
+                cell.font = Font(name="Calibri", size=11, bold=True, color="D97706")
+        elif col_idx == 4:
+            cell.alignment = Alignment(horizontal="left", vertical="center")
+    ws_sum.row_dimensions[row_idx].height = 26
+    ws_sum.freeze_panes = "A2"
+
+    for col in ws_sum.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            if cell.value is not None:
+                val_str = str(cell.value)
+                if cell.column in (8, 9, 10, 11, 12):
+                    val_str = f"Rs. {val_str}"
+                max_len = max(max_len, len(val_str))
+        ws_sum.column_dimensions[col_letter].width = max(max_len + 3, 12)
+
+    # Sheet 2: Driver Credits Detail
+    ws_det = wb.create_sheet(title="Driver Credits Detail")
+    headers_det = [
+        "Credit ID",
+        "Grant ID",
+        "Bonus Note",
+        "Given Date & Time",
+        "Driver ID",
+        "Driver Name",
+        "Phone Number",
+        "Vehicle Type",
+        "Vehicle Plate",
+        "Credit Amount (Rs.)",
+        "Commission Paid (Rs.)",
+        "Balance Remaining (Rs.)",
+        "Expires On",
+        "Status",
+        "Cancelled Date",
+    ]
+    ws_det.append(headers_det)
+
+    header_fill_blue = PatternFill(start_color="1E40AF", end_color="1E40AF", fill_type="solid")
+    for col_idx, cell in enumerate(ws_det[1], 1):
+        cell.fill = header_fill_blue
+        cell.font = header_font
+        cell.border = thin_border
+        if col_idx in (1, 2, 4, 5, 13, 14, 15):
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        elif col_idx in (10, 11, 12):
+            cell.alignment = Alignment(horizontal="right", vertical="center")
+        else:
+            cell.alignment = Alignment(horizontal="left", vertical="center")
+    ws_det.row_dimensions[1].height = 28
+
+    tot_credit_amt = Decimal("0")
+    tot_credit_used = Decimal("0")
+    tot_credit_rem = Decimal("0")
+
+    det_row_idx = 2
+    for c in credits_res:
+        driver = c.driver
+        user = driver.user if driver else None
+        rem = float(wallet.remaining(c))
+        st = wallet.status_of(c, overview["today"])
+        created_dt = format_colombo_dt(c.created_at, "%Y-%m-%d %H:%M:%S")
+        cancelled_dt = format_colombo_dt(c.cancelled_at, "%Y-%m-%d %H:%M:%S") if c.cancelled_at else "-"
+
+        tot_credit_amt += Decimal(str(c.amount or 0))
+        tot_credit_used += Decimal(str(c.used_amount or 0))
+        tot_credit_rem += Decimal(str(rem))
+
+        ws_det.append([
+            c.id,
+            c.grant_id,
+            str(c.grant.note if c.grant else ""),
+            created_dt,
+            c.driver_id,
+            str(user.full_name if user else f"Driver #{c.driver_id}"),
+            str(user.phone_number if user else ""),
+            str(driver.vehicle_type.capitalize() if driver and driver.vehicle_type else ""),
+            str(driver.vehicle_number if driver and driver.vehicle_number else ""),
+            float(c.amount or 0),
+            float(c.used_amount or 0),
+            float(rem),
+            c.expires_on.isoformat() if c.expires_on else "",
+            st.capitalize(),
+            cancelled_dt,
+        ])
+
+        row_fill = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid") if det_row_idx % 2 == 0 else PatternFill(fill_type=None)
+        for col_idx, cell in enumerate(ws_det[det_row_idx], 1):
+            if det_row_idx % 2 == 0:
+                cell.fill = row_fill
+            cell.font = Font(name="Calibri", size=10)
+            cell.border = thin_border
+            if col_idx in (1, 2, 4, 5, 13, 15):
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            elif col_idx in (10, 11, 12):
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                cell.number_format = "#,##0.00"
+                if col_idx == 11 and float(c.used_amount or 0) > 0:
+                    cell.font = Font(name="Calibri", size=10, bold=True, color="D97706")
+                elif col_idx == 12 and rem > 0:
+                    cell.font = Font(name="Calibri", size=10, bold=True, color="1E40AF")
+            elif col_idx == 14:
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+                if st == "active":
+                    cell.font = Font(name="Calibri", size=10, bold=True, color="059669")
+                elif st == "cancelled":
+                    cell.font = Font(name="Calibri", size=10, bold=True, color="DC2626")
+                elif st == "used":
+                    cell.font = Font(name="Calibri", size=10, bold=True, color="D97706")
+                else:
+                    cell.font = Font(name="Calibri", size=10, color="6B7280")
+            elif col_idx == 7:
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+                cell.number_format = "@"
+            else:
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+        ws_det.row_dimensions[det_row_idx].height = 22
+        det_row_idx += 1
+
+    # Totals row for Detail
+    det_total_row = [""] * len(headers_det)
+    det_total_row[2] = f"TOTALS ({len(credits_res)} credits)"
+    det_total_row[9] = float(tot_credit_amt)
+    det_total_row[10] = float(tot_credit_used)
+    det_total_row[11] = float(tot_credit_rem)
+    ws_det.append(det_total_row)
+
+    det_total_fill = PatternFill(start_color="DBEAFE", end_color="DBEAFE", fill_type="solid")
+    det_double_bottom_border = Border(
+        top=Side(style="thin", color="1E40AF"),
+        bottom=Side(style="double", color="1E40AF"),
+        left=Side(style="thin", color="CBD5E1"),
+        right=Side(style="thin", color="CBD5E1"),
+    )
+    for col_idx, cell in enumerate(ws_det[det_row_idx], 1):
+        cell.fill = det_total_fill
+        cell.font = Font(name="Calibri", size=11, bold=True)
+        cell.border = det_double_bottom_border
+        if col_idx in (9, 10, 11):
+            cell.alignment = Alignment(horizontal="right", vertical="center")
+            cell.number_format = "#,##0.00"
+            if col_idx == 11:
+                cell.font = Font(name="Calibri", size=11, bold=True, color="1E40AF")
+            elif col_idx == 10:
+                cell.font = Font(name="Calibri", size=11, bold=True, color="D97706")
+        elif col_idx == 3:
+            cell.alignment = Alignment(horizontal="left", vertical="center")
+    ws_det.row_dimensions[det_row_idx].height = 26
+    ws_det.freeze_panes = "A2"
+
+    for col in ws_det.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            if cell.value is not None:
+                val_str = str(cell.value)
+                if cell.column in (10, 11, 12):
+                    val_str = f"Rs. {val_str}"
+                max_len = max(max_len, len(val_str))
+        ws_det.column_dimensions[col_letter].width = max(max_len + 3, 12)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename_base}.xlsx"'},
     )
 
 

@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 import os
 import urllib.parse
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Request, Form, Depends, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -20,6 +20,15 @@ logger = logging.getLogger(__name__)
 
 from app.config import settings
 from app.database import get_db
+from app.services import customer_map_service
+from app.services.gender_service import (
+    LADY_DRIVER_SERVICE,
+    apply_nic_gender,
+    female_passengers_only,
+    gender_from_nic,
+    gender_label,
+    set_admin_gender,
+)
 from app.models import (
     User,
     UserRole,
@@ -97,8 +106,33 @@ def format_colombo_dt(dt: datetime | None, fmt: str = "%Y-%m-%d %H:%M") -> str:
     return str(dt)
 
 
+def format_number(value, decimals: Optional[int] = None):
+    """Comma every three digits: 200000 -> "200,000". Without `decimals` a number keeps
+    the decimals it has (Decimal("1500.00") -> "1,500.00", 3 -> "3"). None counts as 0;
+    anything that isn't a number is shown unchanged."""
+    if value is None or value == "":
+        value = 0
+    if isinstance(value, str):
+        try:
+            value = Decimal(value)
+        except InvalidOperation:
+            return value
+    if isinstance(value, bool) or not isinstance(value, (int, float, Decimal)):
+        return value
+    if decimals is None:
+        if isinstance(value, Decimal):
+            decimals = max(0, -value.as_tuple().exponent) if value.is_finite() else 0
+        elif isinstance(value, float):
+            decimals = 0 if value.is_integer() else 2
+        else:
+            decimals = 0
+    return f"{value:,.{decimals}f}"
+
+
 templates.env.filters["colombo_dt"] = format_colombo_dt
+templates.env.filters["num"] = format_number
 templates.env.filters["to_colombo"] = to_colombo_dt
+templates.env.globals["gender_from_nic"] = gender_from_nic
 
 UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "drivers")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -628,6 +662,22 @@ async def admin_dashboard(
     )
 
 
+DRIVER_GENDER_FILTERS = ("lady", "female", "male", "unknown")
+_on_scooter = func.lower(func.trim(Driver.vehicle_type)) == LADY_DRIVER_SERVICE
+
+
+def _driver_gender_clause(gender: str):
+    """Drivers-page gender filter; "unknown" finds drivers whose NIC couldn't be read and
+    "lady" the women on a Scooter, who are the ones offered lady-driver rides."""
+    if gender == "lady":
+        return and_(User.gender == "female", _on_scooter)
+    if gender == "unknown":
+        return User.gender.is_(None)
+    if gender in DRIVER_GENDER_FILTERS:
+        return User.gender == gender
+    return None
+
+
 @router.get("/drivers", response_class=HTMLResponse)
 async def admin_drivers(
     request: Request,
@@ -635,6 +685,7 @@ async def admin_drivers(
     status: str = "all",
     search: str = "",
     view: str = "drivers",
+    gender: str = "all",
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -643,6 +694,8 @@ async def admin_drivers(
 
     limit = 50
     offset = (page - 1) * limit
+    if gender not in DRIVER_GENDER_FILTERS:
+        gender = "all"
 
     is_submitted_driver = and_(Driver.vehicle_number.isnot(None), Driver.vehicle_number != "")
 
@@ -684,6 +737,19 @@ async def admin_drivers(
     )
     avg_rating = float(avg_rating_q.scalar() or 0)
 
+    is_online_now = and_(Driver.is_online == True, Driver.is_approved == True)  # noqa: E712
+    ladies, ladies_online, ladies_fpo = (
+        await db.execute(
+            select(
+                func.count(Driver.id),
+                func.count(Driver.id).filter(is_online_now),
+                func.count(Driver.id).filter(Driver.female_passengers_only == True),  # noqa: E712
+            )
+            .join(User, Driver.user_id == User.id)
+            .where(is_submitted_driver, User.gender == "female", _on_scooter)
+        )
+    ).one()
+
     stats = {
         "total": total_all,
         "online": online,
@@ -693,6 +759,9 @@ async def admin_drivers(
         "avg_rating": avg_rating,
         "total_apps": total_apps,
         "unread_apps": unread_apps,
+        "ladies": ladies or 0,
+        "ladies_online": ladies_online or 0,
+        "ladies_fpo": ladies_fpo or 0,
     }
 
     if view == "applications":
@@ -769,6 +838,9 @@ async def admin_drivers(
                     Driver.vehicle_model.ilike(search_term),
                 )
             )
+        gender_clause = _driver_gender_clause(gender)
+        if gender_clause is not None:
+            where_clauses.append(gender_clause)
 
         stmt = select(Driver).join(User, Driver.user_id == User.id)
         if where_clauses:
@@ -812,6 +884,7 @@ async def admin_drivers(
             "status": status,
             "search": search,
             "view": view,
+            "gender": gender,
         },
     )
 
@@ -822,6 +895,7 @@ async def admin_drivers_export(
     status: str = "all",
     search: str = "",
     scope: Optional[str] = None,
+    gender: str = "all",
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -881,6 +955,9 @@ async def admin_drivers_export(
                 Driver.vehicle_model.ilike(search_term),
             )
         )
+    gender_clause = _driver_gender_clause(gender)
+    if gender_clause is not None:
+        where_clauses.append(gender_clause)
 
     if where_clauses:
         stmt = stmt.where(*where_clauses)
@@ -903,7 +980,7 @@ async def admin_drivers_export(
     w.writerow([
         "ID", "Name", "Phone", "Email", "NIC", "License", "Vehicle Type", "Vehicle No",
         "Model", "Color", "Year", "Status", "Online", "Rating", "Total Rides",
-        "Total Earnings (Rs.)", "Joined Date",
+        "Total Earnings (Rs.)", "Joined Date", "Gender", "Female Passengers Only",
     ])
     for d in drivers:
         u = d.user
@@ -942,6 +1019,8 @@ async def admin_drivers_export(
             (u.total_rides if u and u.total_rides is not None else 0),
             float(d.total_earnings or 0),
             joined_str,
+            gender_label(u) if u else "Not set",
+            "Yes" if female_passengers_only(d) and u and u.gender == "female" else "No",
         ])
 
     return Response(
@@ -969,13 +1048,10 @@ async def admin_drivers_new_form(
         ("nic_back", "NIC Back"),
         ("license_front", "Driving License Front"),
         ("license_back", "Driving License Back"),
-        ("vehicle_reg", "Vehicle Registration"),
         ("insurance", "Insurance"),
         ("year_license", "Year License"),
-        ("eco_test", "Eco Test Report"),
         ("vehicle_front", "Vehicle Photo — Front"),
         ("vehicle_back", "Vehicle Photo — Back"),
-        ("vehicle_side", "Vehicle Photo — Side"),
     ]:
         docs.append({
             "kind": kind,
@@ -984,7 +1060,6 @@ async def admin_drivers_new_form(
             "document_url": None,
             "is_verified": False,
             "uploaded_at": None,
-            "is_optional": kind in ("vehicle_reg", "eco_test", "vehicle_side"),
         })
     return templates.TemplateResponse(
         request, "driver_new.html",
@@ -1050,13 +1125,10 @@ async def admin_drivers_new_submit(
         ("nic_back", "NIC Back"),
         ("license_front", "Driving License Front"),
         ("license_back", "Driving License Back"),
-        ("vehicle_reg", "Vehicle Registration"),
         ("insurance", "Insurance"),
         ("year_license", "Year License"),
-        ("eco_test", "Eco Test Report"),
         ("vehicle_front", "Vehicle Photo — Front"),
         ("vehicle_back", "Vehicle Photo — Back"),
-        ("vehicle_side", "Vehicle Photo — Side"),
     ]:
         docs.append({
             "kind": kind,
@@ -1065,7 +1137,6 @@ async def admin_drivers_new_submit(
             "document_url": None,
             "is_verified": False,
             "uploaded_at": None,
-            "is_optional": kind in ("vehicle_reg", "eco_test", "vehicle_side"),
         })
 
     from app.models import FareSetting
@@ -1117,6 +1188,7 @@ async def admin_drivers_new_submit(
         profile_photo=photo_url,
         is_active=True,
     )
+    apply_nic_gender(user, nic_number)
     db.add(user)
     await db.flush()
 
@@ -1198,6 +1270,7 @@ async def admin_drivers_edit_form(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
+    back_url = "/admin/drivers"
     try:
         q = await db.execute(
             select(Driver).options(selectinload(Driver.user)).where(Driver.id == driver_id)
@@ -1205,6 +1278,30 @@ async def admin_drivers_edit_form(
         d = q.scalars().first()
         if not d:
             raise HTTPException(status_code=404, detail="Driver not found")
+
+        # Determine back_url
+        return_to = request.query_params.get("return_to", "").strip()
+        if return_to and return_to.startswith("/admin/") and not return_to.startswith(f"/admin/drivers/{driver_id}/edit"):
+            back_url = return_to
+        elif request.query_params.get("from_status"):
+            back_url = f"/admin/drivers?status={urllib.parse.quote(request.query_params['from_status'])}"
+        elif request.query_params.get("status"):
+            back_url = f"/admin/drivers?status={urllib.parse.quote(request.query_params['status'])}"
+        else:
+            referer = request.headers.get("referer", "")
+            if referer:
+                try:
+                    parsed_ref = urllib.parse.urlparse(referer)
+                    if parsed_ref.path == "/admin/drivers":
+                        ref_query = f"?{parsed_ref.query}" if parsed_ref.query else ""
+                        back_url = f"/admin/drivers{ref_query}"
+                except Exception:
+                    pass
+
+        if not back_url or back_url == "/admin/drivers":
+            is_incomplete = not (d and d.vehicle_number and str(d.vehicle_number).strip())
+            if is_incomplete:
+                back_url = "/admin/drivers?status=incomplete"
 
         # BRD: load uploaded KYC documents so the admin can verify them inline
         from app.models import DriverDocument
@@ -1223,13 +1320,10 @@ async def admin_drivers_edit_form(
             ("nic_back", "NIC Back"),
             ("license_front", "Driving License Front"),
             ("license_back", "Driving License Back"),
-            ("vehicle_reg", "Vehicle Registration"),
             ("insurance", "Insurance"),
             ("year_license", "Year License"),
-            ("eco_test", "Eco Test Report"),
             ("vehicle_front", "Vehicle Photo — Front"),
             ("vehicle_back", "Vehicle Photo — Back"),
-            ("vehicle_side", "Vehicle Photo — Side"),
         ]:
             row = docs_by_kind.get(kind)
             up_str = ""
@@ -1246,7 +1340,6 @@ async def admin_drivers_edit_form(
                 "document_url": row.document_url if row else None,
                 "is_verified": bool(row.is_verified) if row else False,
                 "uploaded_at": up_str,
-                "is_optional": kind in ("vehicle_reg", "eco_test", "vehicle_side"),
             })
 
         # BRD: load registered vehicles for multi-vehicle management
@@ -1336,6 +1429,7 @@ async def admin_drivers_edit_form(
                 "vehicles": driver_vehicles,
                 "categories": categories,
                 "error": None,
+                "back_url": back_url,
             },
         )
     except HTTPException:
@@ -1349,7 +1443,7 @@ async def admin_drivers_edit_form(
             f"<h2 style='color:#b91c1c;'>Error Loading Driver #{driver_id}</h2>"
             f"<p style='color:#64748b;'>An error occurred while loading this driver details:</p>"
             f"<pre style='background:#f8fafc;border:1px solid #e2e8f0;padding:15px;border-radius:12px;overflow-x:auto;font-size:12px;'>{err_msg}</pre>"
-            f"<p><a href='/admin/drivers' style='color:#2563eb;text-decoration:none;font-weight:bold;'>← Back to Driver List</a></p>"
+            f"<p><a href='{back_url or '/admin/drivers'}' style='color:#2563eb;text-decoration:none;font-weight:bold;'>← Back to Driver List</a></p>"
             f"</div>",
             status_code=500,
         )
@@ -1370,6 +1464,8 @@ async def admin_drivers_edit_submit(
     vehicle_color: str = Form(...),
     is_approved: str = Form(""),
     remove_photo: str = Form(""),
+    gender: str = Form("auto"),
+    return_to: str = Form(""),
     profile_photo: UploadFile | None = File(None),
     relative_name: str = Form(""),
     relative_contact: str = Form(""),
@@ -1397,6 +1493,16 @@ async def admin_drivers_edit_submit(
         raise HTTPException(status_code=404, detail="Driver not found")
     user = d.user
 
+    ret = (return_to or "").strip()
+    if not ret:
+        ret = request.query_params.get("return_to", "").strip()
+
+    if ret and ret.startswith("/admin/") and not ret.startswith(f"/admin/drivers/{driver_id}/edit"):
+        back_url = ret
+    else:
+        is_incomplete = not (d and d.vehicle_number and str(d.vehicle_number).strip())
+        back_url = "/admin/drivers?status=incomplete" if is_incomplete else "/admin/drivers"
+
     from app.models import FareSetting
     cats_q = await db.execute(
         select(FareSetting).where(FareSetting.is_active == True).order_by(FareSetting.display_order, FareSetting.id)
@@ -1415,6 +1521,7 @@ async def admin_drivers_edit_submit(
                 "documents": [],
                 "categories": categories,
                 "error": msg,
+                "back_url": back_url,
             },
             status_code=status,
         )
@@ -1456,6 +1563,7 @@ async def admin_drivers_edit_submit(
     user.email = email or None
 
     d.nic_number = nic_number
+    set_admin_gender(user, gender, nic_number)
     d.license_number = license_number
     d.vehicle_type = vehicle_type
     d.vehicle_number = vehicle_number
@@ -1557,12 +1665,28 @@ async def admin_drivers_edit_submit(
                     db.add(doc)
 
     await db.commit()
-    return RedirectResponse(url=f"/admin/drivers/{driver_id}/edit?success=Driver+updated+successfully", status_code=303)
+    redirect_url = f"/admin/drivers/{driver_id}/edit?success=Driver+updated+successfully"
+    if ret and ret.startswith("/admin/") and not ret.startswith(f"/admin/drivers/{driver_id}/edit"):
+        redirect_url += f"&return_to={urllib.parse.quote(ret)}"
+    return RedirectResponse(url=redirect_url, status_code=303)
+
+
+def _driver_list_redirect(request: Request, default_url: str = "/admin/drivers") -> RedirectResponse:
+    ref = request.headers.get("referer", "")
+    if ref:
+        try:
+            pref = urllib.parse.urlparse(ref)
+            if pref.path == "/admin/drivers":
+                return RedirectResponse(url=f"/admin/drivers{('?' + pref.query) if pref.query else ''}", status_code=303)
+        except Exception:
+            pass
+    return RedirectResponse(url=default_url, status_code=303)
 
 
 @router.post("/drivers/{driver_id}/approve")
 async def approve_driver_form(
     driver_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -1584,12 +1708,13 @@ async def approve_driver_form(
             })
         except Exception:
             pass
-    return RedirectResponse(url="/admin/drivers?success=Driver+approved+successfully", status_code=303)
+    return _driver_list_redirect(request, "/admin/drivers?success=Driver+approved+successfully")
 
 
 @router.post("/drivers/{driver_id}/suspend")
 async def suspend_driver_form(
     driver_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -1610,12 +1735,13 @@ async def suspend_driver_form(
             })
         except Exception:
             pass
-    return RedirectResponse(url="/admin/drivers", status_code=303)
+    return _driver_list_redirect(request, "/admin/drivers")
 
 
 @router.post("/drivers/{driver_id}/deactivate")
 async def deactivate_driver_form(
     driver_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -1632,12 +1758,13 @@ async def deactivate_driver_form(
         if d.user:
             d.user.is_active = False
         await db.commit()
-    return RedirectResponse(url="/admin/drivers", status_code=303)
+    return _driver_list_redirect(request, "/admin/drivers")
 
 
 @router.post("/drivers/{driver_id}/activate")
 async def activate_driver_form(
     driver_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -1651,7 +1778,7 @@ async def activate_driver_form(
         if d.user:
             d.user.is_active = True
         await db.commit()
-    return RedirectResponse(url="/admin/drivers", status_code=303)
+    return _driver_list_redirect(request, "/admin/drivers")
 
 
 @router.post("/drivers/applications/{id}/read")
@@ -1766,6 +1893,7 @@ async def _cleanup_customer_references(db: AsyncSession, customer_id: int):
 @router.get("/drivers/{driver_id}/delete")
 async def delete_driver_form(
     driver_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_superadmin_or_admin),
 ):
@@ -1789,7 +1917,7 @@ async def delete_driver_form(
     except Exception as e:
         logger.error(f"Error deleting driver {driver_id}: {e}", exc_info=True)
         await db.rollback()
-    return RedirectResponse(url="/admin/drivers", status_code=303)
+    return _driver_list_redirect(request, "/admin/drivers")
 
 
 
@@ -2069,6 +2197,26 @@ async def admin_rider_deactivate(
     return RedirectResponse(url="/admin/riders", status_code=303)
 
 
+@router.post("/riders/{customer_id}/gender")
+async def admin_rider_gender(
+    customer_id: int,
+    gender: str = Form(...),
+    back: str = Form("/admin/riders"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    q = await db.execute(
+        select(Customer).options(selectinload(Customer.user).selectinload(User.driver_profile))
+        .where(Customer.id == customer_id)
+    )
+    c = q.scalars().first()
+    if c and c.user:
+        nic = c.user.driver_profile.nic_number if c.user.driver_profile else None
+        set_admin_gender(c.user, gender if gender in ("female", "male") else ("auto" if nic else "none"), nic)
+        await db.commit()
+    return RedirectResponse(url=back if back.startswith("/admin/riders") else "/admin/riders", status_code=303)
+
+
 @router.post("/riders/{customer_id}/activate")
 async def admin_rider_activate(
     customer_id: int,
@@ -2122,12 +2270,14 @@ async def admin_bookings(
     start: str = "",
     end: str = "",
     status: str = "all",
+    lady: str = "",
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
     from sqlalchemy import and_
 
     limit = 50
+    lady = "1" if lady == "1" else ""
     offset = (page - 1) * limit
 
     # Build query base. Rides exclude both parcel services (flash + courier),
@@ -2151,6 +2301,8 @@ async def admin_bookings(
             base_where.append(Booking.booked_at <= end_dt)
         except ValueError:
             pass
+    if lady:
+        base_where.append(Booking.lady_driver_requested == True)  # noqa: E712
 
     # Active bookings (not paginated, needed for live map tracking)
     active_statuses = [
@@ -2183,10 +2335,11 @@ async def admin_bookings(
             func.coalesce(func.sum(Booking.final_amount).filter(Booking.status == BookingStatus.COMPLETED), 0),
             func.count(Booking.id).filter(Booking.customer_rating.is_not(None)),
             func.coalesce(func.avg(Booking.customer_rating).filter(Booking.customer_rating.is_not(None)), 0),
+            func.count(Booking.id).filter(Booking.lady_driver_requested == True),  # noqa: E712
         )
         .where(and_(*base_where))
     )
-    stat_total, stat_completed, stat_cancelled, stat_revenue, stat_rated, stat_avg_rating = stats_q.one()
+    stat_total, stat_completed, stat_cancelled, stat_revenue, stat_rated, stat_avg_rating, stat_lady = stats_q.one()
 
     # Table query conditions (base + optional status filter)
     table_where = list(base_where)
@@ -2246,9 +2399,13 @@ async def admin_bookings(
             "driver_lat": float(b.driver.current_lat) if b.driver and b.driver.current_lat is not None else None,
             "driver_lng": float(b.driver.current_lng) if b.driver and b.driver.current_lng is not None else None,
             "driver_heading": float(b.driver.current_heading) if b.driver and b.driver.current_heading is not None else 0.0,
+            "driver_location_at": b.driver.last_location_update.isoformat(timespec="seconds") if b.driver and b.driver.last_location_update else None,
+            "driver_accepted_lat": float(b.driver_accepted_lat) if b.driver_accepted_lat is not None else None,
+            "driver_accepted_lng": float(b.driver_accepted_lng) if b.driver_accepted_lng is not None else None,
             "fare": float(b.final_amount or 0),
             "distance_km": float(b.distance_km or 0),
             "duration_min": int(b.duration_min or 0),
+            "lady_driver_requested": bool(b.lady_driver_requested),
             "booked_at": b.booked_at.isoformat() if b.booked_at else "",
         }
 
@@ -2276,6 +2433,8 @@ async def admin_bookings(
             "start_date": start,
             "end_date": end,
             "status": status,
+            "lady": lady,
+            "stat_lady": stat_lady or 0,
             "stat_total": stat_total,
             "stat_completed": stat_completed,
             "stat_cancelled": stat_cancelled,
@@ -2360,12 +2519,16 @@ async def admin_bookings_feed(
             "driver_lat": float(b.driver.current_lat) if b.driver and b.driver.current_lat is not None else None,
             "driver_lng": float(b.driver.current_lng) if b.driver and b.driver.current_lng is not None else None,
             "driver_heading": float(b.driver.current_heading) if b.driver and b.driver.current_heading is not None else 0.0,
+            "driver_location_at": b.driver.last_location_update.isoformat(timespec="seconds") if b.driver and b.driver.last_location_update else None,
+            "driver_accepted_lat": float(b.driver_accepted_lat) if b.driver_accepted_lat is not None else None,
+            "driver_accepted_lng": float(b.driver_accepted_lng) if b.driver_accepted_lng is not None else None,
             "fare": float(b.final_amount or 0),
             "distance_km": float(b.distance_km or 0),
             "duration_min": int(b.duration_min or 0),
             "customer_rating": float(b.customer_rating) if b.customer_rating is not None else None,
             "customer_feedback": b.customer_feedback or "",
             "promo_code": b.promo_code or "",
+            "lady_driver_requested": bool(b.lady_driver_requested),
             "booked_at": b.booked_at.strftime("%Y-%m-%d %H:%M") if b.booked_at else "",
         }
 
@@ -2973,10 +3136,26 @@ async def admin_fare_settings(
     from app.models import FareSetting
 
     q = await db.execute(select(FareSetting).order_by(FareSetting.display_order, FareSetting.id))
+    ss = await _get_or_create_settings(db)
     return templates.TemplateResponse(
         request, "settings.html",
-        {"request": request, "active_page": "fare-settings", "fares": q.scalars().all()},
+        {"request": request, "active_page": "fare-settings", "fares": q.scalars().all(),
+         "road_distance": bool(ss.road_distance_enabled)},
     )
+
+
+@router.post("/fare-settings/road-distance")
+async def admin_road_distance_switch(
+    enabled: str = Form(...),
+    back: str = Form("/admin/fare-settings"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    ss = await _get_or_create_settings(db)
+    ss.road_distance_enabled = enabled == "on"
+    await db.commit()
+    return RedirectResponse(url=back if back in ("/admin/fare-settings", "/admin/services") else "/admin/fare-settings",
+                            status_code=303)
 
 
 @router.post("/fare-settings/update")
@@ -3011,6 +3190,196 @@ async def admin_fare_settings_update(
         f.passenger_deductible = Decimal(str(passenger_deductible))
         await db.commit()
     return RedirectResponse(url="/admin/fare-settings", status_code=303)
+
+
+
+# ---------- District base fares (Phase 2, feature 04) ----------
+def _district_fare_status(f, today):
+    """upcoming | active | ended | off, as for launch locations; a missing date is no limit."""
+    if not f.is_active:
+        return "off"
+    if f.start_date and today < f.start_date:
+        return "upcoming"
+    if f.end_date and today > f.end_date:
+        return "ended"
+    return "active"
+
+
+async def _district_fare_clash(db: AsyncSession, f) -> Optional[str]:
+    """Another switched-on period of the same district and vehicle that overlaps f, described."""
+    from datetime import date as _date
+    from app.models import DistrictFare
+
+    if not f.is_active:
+        return None
+    lo, hi = f.start_date or _date.min, f.end_date or _date.max
+    q = await db.execute(select(DistrictFare).where(
+        DistrictFare.district == f.district, DistrictFare.service_type == f.service_type,
+        DistrictFare.is_active == True, DistrictFare.id != (f.id or 0)))  # noqa: E712
+    for o in q.scalars().all():
+        if (o.start_date or _date.min) <= hi and (o.end_date or _date.max) >= lo:
+            rates = []
+            if o.per_km_rate is not None:
+                rates.append(f"Rs.{o.per_km_rate:,.2f}/km")
+            if o.base_fare is not None:
+                rates.append(f"base Rs.{o.base_fare:,.2f}")
+            rate_desc = " & ".join(rates) or "custom fare"
+            return (f"{o.district} already has an active rate ({rate_desc}) for this vehicle from "
+                    f"{o.start_date or 'the start'} to {o.end_date or 'no end date'}. Switched-on periods can't overlap: "
+                    f"change the dates or switch that one off first.")
+    return None
+
+
+@router.get("/fare-settings/districts", response_class=HTMLResponse)
+async def admin_district_fares(
+    request: Request,
+    edit: int = 0,
+    error: str = "",
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    from app.models import DistrictFare, FareSetting
+    from app.services.district_service import DISTRICTS
+    from app.services.launch_service import today_lk
+
+    # Courier is weight-priced island-wide, so it has no district base fare.
+    fq = await db.execute(
+        select(FareSetting).where(FareSetting.service_type != "courier")
+        .order_by(FareSetting.display_order, FareSetting.id)
+    )
+    services = fq.scalars().all()
+    national_base = {f.service_type: float(f.base_fare or 0) for f in services}
+    national_per_km = {f.service_type: float(f.per_km_rate or 0) for f in services}
+    names = {f.service_type: f.display_name or f.service_type for f in services}
+    fares = (await db.execute(select(DistrictFare).order_by(
+        desc(DistrictFare.id)))).scalars().all()
+    today = today_lk()
+    rows = [{"fare": f, "status": _district_fare_status(f, today),
+             "days_left": (f.end_date - today).days + 1 if f.end_date else None,
+             "starts_in": (f.start_date - today).days if f.start_date else None,
+             "national": national_base.get(f.service_type),
+             "national_base": national_base.get(f.service_type),
+             "national_per_km": national_per_km.get(f.service_type),
+             "vehicle": names.get(f.service_type, f.service_type)}
+            for f in fares]
+    current = next((f for f in fares if f.id == edit), None)
+    return templates.TemplateResponse(
+        request, "district_fares.html",
+        {"request": request, "active_page": "services", "services": services,
+         "national": national_base, "national_base": national_base, "national_per_km": national_per_km,
+         "districts": DISTRICTS, "rows": rows, "current": current, "today": today.isoformat(), "error": error},
+    )
+
+
+@router.post("/fare-settings/districts/save")
+async def admin_district_fares_save(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    from datetime import date
+    from decimal import Decimal, InvalidOperation
+    from app.models import DistrictFare, FareSetting
+    from app.services.district_service import DISTRICTS
+
+    form = await request.form()
+    fare_id = int(form.get("id") or 0)
+    back = f"/admin/fare-settings/districts?edit={fare_id or -1}"
+
+    def fail(msg):
+        return RedirectResponse(url=back + "&error=" + urllib.parse.quote(msg), status_code=303)
+
+    district = str(form.get("district") or "")
+    service_type = str(form.get("service_type") or "")
+    if district not in DISTRICTS:
+        return fail("Please choose a district.")
+    known = (await db.execute(select(FareSetting.service_type).where(
+        FareSetting.service_type == service_type, FareSetting.service_type != "courier"))).scalar()
+    if not known:
+        return fail("Please choose a vehicle type.")
+
+    base_raw = str(form.get("base_fare") or "").strip()
+    per_km_raw = str(form.get("per_km_rate") or "").strip()
+
+    if not base_raw and not per_km_raw:
+        return fail("Please enter at least a Per-KM Rate or Base Fare.")
+
+    base = None
+    if base_raw:
+        try:
+            base = Decimal(base_raw)
+        except InvalidOperation:
+            return fail("Please give the base fare as a number.")
+        if base < 0:
+            return fail("The base fare can't be negative.")
+
+    per_km = None
+    if per_km_raw:
+        try:
+            per_km = Decimal(per_km_raw)
+        except InvalidOperation:
+            return fail("Please give the Per-KM rate as a number.")
+        if per_km < 0:
+            return fail("The Per-KM rate can't be negative.")
+
+    try:
+        start = date.fromisoformat(str(form.get("start_date")))
+        end = date.fromisoformat(str(form.get("end_date")))
+    except ValueError:
+        return fail("Please give a start and end date.")
+    if end < start:
+        return fail("The end date can't be before the start date.")
+
+    f = None
+    if fare_id:
+        f = (await db.execute(select(DistrictFare).where(DistrictFare.id == fare_id))).scalars().first()
+    if f is None:
+        f = DistrictFare()
+    f.district, f.service_type, f.base_fare, f.per_km_rate = district, service_type, base, per_km
+    f.start_date, f.end_date, f.is_active = start, end, form.get("is_active") == "on"
+    clash = await _district_fare_clash(db, f)
+    if clash:
+        return fail(clash)
+    if f.id is None:
+        db.add(f)
+    await db.commit()
+    return RedirectResponse(url="/admin/fare-settings/districts", status_code=303)
+
+
+@router.post("/fare-settings/districts/{fare_id}/switch")
+async def admin_district_fare_switch(
+    fare_id: int,
+    enabled: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    from app.models import DistrictFare
+
+    f = (await db.execute(select(DistrictFare).where(DistrictFare.id == fare_id))).scalars().first()
+    if f is not None:
+        f.is_active = enabled == "on"
+        clash = await _district_fare_clash(db, f)
+        if clash:
+            await db.rollback()
+            return RedirectResponse(url="/admin/fare-settings/districts?error=" + urllib.parse.quote(clash),
+                                    status_code=303)
+        await db.commit()
+    return RedirectResponse(url="/admin/fare-settings/districts", status_code=303)
+
+
+@router.post("/fare-settings/districts/{fare_id}/delete")
+async def admin_district_fare_delete(
+    fare_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    from app.models import DistrictFare
+
+    f = (await db.execute(select(DistrictFare).where(DistrictFare.id == fare_id))).scalars().first()
+    if f is not None:
+        await db.delete(f)
+        await db.commit()
+    return RedirectResponse(url="/admin/fare-settings/districts", status_code=303)
 
 
 # ---------- System settings (admin → Settings) ----------
@@ -3680,6 +4049,7 @@ async def admin_services(
         select(Driver.vehicle_type, func.count(Driver.id)).group_by(Driver.vehicle_type)
     )
     driver_counts = {vt: n for vt, n in counts_q.all()}
+    ss = await _get_or_create_settings(db)
     return templates.TemplateResponse(
         request,
         "services.html",
@@ -3687,6 +4057,7 @@ async def admin_services(
             "request": request,
             "active_page": "services",
             "categories": categories,
+            "road_distance": bool(ss.road_distance_enabled),
             "driver_counts": driver_counts,
         },
     )
@@ -6871,6 +7242,75 @@ def _zero_report_revenue(data: dict, report_type: str) -> dict:
     return data
 
 
+def _district_report_params(start: str, end: str, service: str):
+    from datetime import date
+    today = datetime.now(timezone(timedelta(hours=5, minutes=30))).date()
+
+    def day(raw, default):
+        try:
+            return date.fromisoformat(raw.strip()) if raw else default
+        except ValueError:
+            return default
+
+    s_day, e_day = day(start, today - timedelta(days=29)), day(end, today)
+    if e_day < s_day:
+        s_day, e_day = e_day, s_day
+    return s_day, e_day, (service if service in fin.REPORT_SERVICES else "all")
+
+
+@router.get("/reports/districts", response_class=HTMLResponse)
+async def admin_district_report(
+    request: Request,
+    start: str = "",
+    end: str = "",
+    service: str = "all",
+    vehicle: str = "",
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import FareSetting
+
+    s_day, e_day, service = _district_report_params(start, end, service)
+    data = await fin.district_report(db, s_day, e_day, service, vehicle)
+    vq = await db.execute(select(FareSetting.service_type).order_by(FareSetting.display_order, FareSetting.id))
+    return templates.TemplateResponse(
+        request, "district_report.html",
+        {"request": request, "active_page": "district-report", "data": data, "start": s_day.isoformat(),
+         "end": e_day.isoformat(), "service": service, "vehicle": vehicle,
+         "vehicles": [v for v in vq.scalars().all() if v != "courier"], "services": fin.REPORT_SERVICES},
+    )
+
+
+@router.get("/reports/districts.csv")
+async def admin_district_report_csv(
+    start: str = "",
+    end: str = "",
+    service: str = "all",
+    vehicle: str = "",
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    import csv
+    import io
+    from fastapi.responses import StreamingResponse
+
+    s_day, e_day, service = _district_report_params(start, end, service)
+    data = await fin.district_report(db, s_day, e_day, service, vehicle)
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow([f"Ziggo district report {s_day} to {e_day}", f"service: {service}", f"vehicle: {vehicle or 'all'}"])
+    cols = ["district", "completed", "cancelled", "income", "discounts", "commission", "driver_earnings", "cash", "card_wallet"]
+    w.writerow(["District", "Completed", "Cancelled", "Customers paid (Rs)", "Discounts (Rs)", "Ziggo commission (Rs)",
+                "Driver earnings (Rs)", "Paid in cash (Rs)", "Paid by card/wallet (Rs)"])
+    for r in data["rows"] + [data["totals"]]:
+        w.writerow([r[c] if c in ("district", "completed", "cancelled") else f"{r[c]:.2f}" for c in cols])
+    w.writerow([])
+    w.writerow(["District boundaries (c) OpenStreetMap contributors, ODbL"])
+    name = f"ziggo-districts-{s_day}-to-{e_day}-{service}{'-' + vehicle if vehicle else ''}.csv".replace(" ", "-")
+    return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
+                             headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
 @router.get("/reports", response_class=HTMLResponse)
 async def admin_reports(
     request: Request,
@@ -6946,6 +7386,13 @@ async def admin_promotions(
         .limit(limit)
     )
     promos = q.scalars().all()
+    from app.models import FareSetting
+    from app.services.promo_service import counted_uses, promo_vehicles
+
+    uses = {p.id: await counted_uses(db, p) for p in promos}
+    vq = await db.execute(select(FareSetting).order_by(FareSetting.display_order, FareSetting.id))
+    vehicle_options = [(f.service_type, f.display_name or f.service_type) for f in vq.scalars().all()]
+    vehicle_names = dict(vehicle_options)
 
     start_idx = (page - 1) * limit + 1 if total > 0 else 0
     end_idx = min(page * limit, total)
@@ -6957,6 +7404,9 @@ async def admin_promotions(
             "request": request,
             "active_page": "promotions",
             "promos": promos,
+            "uses": uses,
+            "vehicle_options": vehicle_options,
+            "promo_vehicle_names": {p.id: [vehicle_names.get(v, v) for v in promo_vehicles(p)] for p in promos},
             "page": page,
             "total_pages": total_pages,
             "total_promos": total,
@@ -6968,15 +7418,30 @@ async def admin_promotions(
 
 
 
-def _parse_admin_date(s: str):
+def _parse_admin_date(s: str, end_of_day: bool = False):
+    """A YYYY-MM-DD from a date input, as the start (or end) of that day in Sri Lanka, in UTC."""
     s = (s or "").strip()
     if not s:
         return None
-    # Form input type="date" sends YYYY-MM-DD
     try:
-        return datetime.strptime(s, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        d = datetime.strptime(s, "%Y-%m-%d").replace(tzinfo=COLOMBO_TZ)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid date '{s}', expected YYYY-MM-DD")
+    if end_of_day:
+        d = d.replace(hour=23, minute=59, second=59, microsecond=999999)
+    return d.astimezone(timezone.utc)
+
+
+def _promo_limits(per_customer_limit: str, new_customers_only: str, vehicle_types: list[str],
+                  return_use_on_cancel: str) -> dict:
+    """The per-customer / vehicle / cancellation controls from the promo form."""
+    per_customer = per_customer_limit.strip()
+    return {
+        "per_customer_limit": int(per_customer) if per_customer.isdigit() else None,
+        "new_customers_only": new_customers_only == "on",
+        "vehicle_types": ",".join(v.strip() for v in vehicle_types if v.strip()) or None,
+        "return_use_on_cancel": return_use_on_cancel == "on",
+    }
 
 
 @router.post("/promotions/new")
@@ -6992,6 +7457,10 @@ async def admin_promotions_new(
     valid_from: str = Form(""),
     valid_to: str = Form(""),
     is_active: str = Form("on"),
+    per_customer_limit: str = Form(""),
+    new_customers_only: str = Form(""),
+    vehicle_types: list[str] = Form([]),
+    return_use_on_cancel: str = Form(""),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -7023,8 +7492,9 @@ async def admin_promotions_new(
         usage_limit=int(usage_limit) if usage_limit.strip().isdigit() else None,
         used_count=0,
         valid_from=_parse_admin_date(valid_from),
-        valid_to=_parse_admin_date(valid_to),
+        valid_to=_parse_admin_date(valid_to, end_of_day=True),
         is_active=(is_active == "on"),
+        **_promo_limits(per_customer_limit, new_customers_only, vehicle_types, return_use_on_cancel),
     ))
     await db.commit()
     return RedirectResponse(url="/admin/promotions", status_code=303)
@@ -7043,6 +7513,10 @@ async def admin_promotions_edit(
     valid_from: str = Form(""),
     valid_to: str = Form(""),
     is_active: str = Form(""),
+    per_customer_limit: str = Form(""),
+    new_customers_only: str = Form(""),
+    vehicle_types: list[str] = Form([]),
+    return_use_on_cancel: str = Form(""),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -7068,8 +7542,11 @@ async def admin_promotions_edit(
     p.max_discount = Decimal(str(max_discount)) if max_discount.strip() else None
     p.usage_limit = int(usage_limit) if usage_limit.strip().isdigit() else None
     p.valid_from = _parse_admin_date(valid_from)
-    p.valid_to = _parse_admin_date(valid_to)
+    p.valid_to = _parse_admin_date(valid_to, end_of_day=True)
     p.is_active = (is_active == "on")
+    for field, value in _promo_limits(per_customer_limit, new_customers_only, vehicle_types,
+                                      return_use_on_cancel).items():
+        setattr(p, field, value)
     await db.commit()
     return RedirectResponse(url="/admin/promotions", status_code=303)
 
@@ -7245,6 +7722,58 @@ async def admin_live_tracking_feed(
         },
         "server_time": datetime.now(timezone.utc).isoformat(),
     }
+
+
+# ---------- Customer Map (Phase 2, feature 01) ----------
+# Superadmin and admin only: it shows customers' names and where they are, and
+# lets them reveal a phone (each reveal is logged). Data entry can't open it.
+@router.get("/customer-map", response_class=HTMLResponse)
+async def admin_customer_map(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_superadmin_or_admin),
+):
+    is_superadmin = (admin.admin_role or "admin") == "superadmin"
+    return templates.TemplateResponse(
+        request,
+        "customer_map.html",
+        {
+            "request": request,
+            "active_page": "customer-map",
+            "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY or "",
+            "score_days": customer_map_service.SCORE_DAYS,
+            "is_superadmin": is_superadmin,
+            "reveals": await customer_map_service.recent_reveals(db) if is_superadmin else [],
+        },
+    )
+
+
+@router.get("/customer-map/feed")
+async def admin_customer_map_feed(
+    part: str = "all",
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin_or_admin),
+):
+    """Active trips, and with part=all every other customer who has booked. No phones."""
+    now = datetime.now(timezone.utc)
+    active = await customer_map_service.active_trips(db, now)
+    out = {"active": active, "server_time": now.isoformat()}
+    if part != "active":
+        out.update(await customer_map_service.customer_dots(db, now))
+    return out
+
+
+@router.post("/customer-map/customers/{customer_id}/phone")
+async def admin_customer_map_phone(
+    customer_id: int,
+    booking_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_superadmin_or_admin),
+):
+    revealed = await customer_map_service.reveal_phone(db, admin, customer_id, booking_id)
+    if revealed is None:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return revealed
 
 
 # ---------- Help & Support Center ----------
@@ -7637,6 +8166,7 @@ async def admin_notif_feed(
 async def admin_driver_doc_verify(
     driver_id: int,
     doc_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(current_admin),
 ):
@@ -7653,13 +8183,18 @@ async def admin_driver_doc_verify(
     doc.verified_by = admin.id
     doc.verified_at = datetime.now(timezone.utc)
     await db.commit()
-    return RedirectResponse(url=f"/admin/drivers/{driver_id}/edit", status_code=303)
+    ret = request.query_params.get("return_to", "").strip()
+    redirect_url = f"/admin/drivers/{driver_id}/edit"
+    if ret and ret.startswith("/admin/") and not ret.startswith(f"/admin/drivers/{driver_id}/edit"):
+        redirect_url += f"?return_to={urllib.parse.quote(ret)}"
+    return RedirectResponse(url=redirect_url, status_code=303)
 
 
 @router.post("/drivers/{driver_id}/documents/{doc_id}/reject")
 async def admin_driver_doc_reject(
     driver_id: int,
     doc_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -7676,7 +8211,11 @@ async def admin_driver_doc_reject(
     doc.verified_by = None
     doc.verified_at = None
     await db.commit()
-    return RedirectResponse(url=f"/admin/drivers/{driver_id}/edit", status_code=303)
+    ret = request.query_params.get("return_to", "").strip()
+    redirect_url = f"/admin/drivers/{driver_id}/edit"
+    if ret and ret.startswith("/admin/") and not ret.startswith(f"/admin/drivers/{driver_id}/edit"):
+        redirect_url += f"?return_to={urllib.parse.quote(ret)}"
+    return RedirectResponse(url=redirect_url, status_code=303)
 
 
 # ---------- Driver Multi-Vehicle verification ----------
@@ -7684,6 +8223,7 @@ async def admin_driver_doc_reject(
 async def admin_driver_vehicle_approve(
     driver_id: int,
     vehicle_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(current_admin),
 ):
@@ -7709,12 +8249,17 @@ async def admin_driver_vehicle_approve(
         d.vehicle_color = v.vehicle_color
 
     await db.commit()
-    return RedirectResponse(url=f"/admin/drivers/{driver_id}/edit", status_code=303)
+    ret = request.query_params.get("return_to", "").strip()
+    redirect_url = f"/admin/drivers/{driver_id}/edit"
+    if ret and ret.startswith("/admin/") and not ret.startswith(f"/admin/drivers/{driver_id}/edit"):
+        redirect_url += f"?return_to={urllib.parse.quote(ret)}"
+    return RedirectResponse(url=redirect_url, status_code=303)
 
 
 @router.post("/drivers/{driver_id}/vehicles/new")
 async def admin_driver_vehicle_add(
     driver_id: int,
+    request: Request,
     vehicle_type: str = Form(...),
     vehicle_number: str = Form(...),
     vehicle_model: str = Form(""),
@@ -7732,6 +8277,9 @@ async def admin_driver_vehicle_add(
     if not d:
         raise HTTPException(status_code=404, detail="Driver not found")
 
+    ret = request.query_params.get("return_to", "").strip()
+    ret_param = f"&return_to={urllib.parse.quote(ret)}" if (ret and ret.startswith("/admin/") and not ret.startswith(f"/admin/drivers/{driver_id}/edit")) else ""
+
     import re
     norm_v_num = re.sub(r'[^A-Z0-9]', '', v_num)
 
@@ -7740,7 +8288,7 @@ async def admin_driver_vehicle_add(
     # Check if driver already has this plate (case/space-insensitive)
     if any(re.sub(r'[^A-Z0-9]', '', (v.vehicle_number or '').upper()) == norm_v_num for v in all_veh):
         return RedirectResponse(
-            url=f"/admin/drivers/{driver_id}/edit?error=This+vehicle+plate+is+already+registered+for+this+driver",
+            url=f"/admin/drivers/{driver_id}/edit?error=This+vehicle+plate+is+already+registered+for+this+driver{ret_param}",
             status_code=303,
         )
 
@@ -7750,7 +8298,7 @@ async def admin_driver_vehicle_add(
     )).scalars().all()
     if any(re.sub(r'[^A-Z0-9]', '', (ov.vehicle_number or '').upper()) == norm_v_num for ov in other_vehs):
         return RedirectResponse(
-            url=f"/admin/drivers/{driver_id}/edit?error=Vehicle+plate+already+registered+to+another+driver",
+            url=f"/admin/drivers/{driver_id}/edit?error=Vehicle+plate+already+registered+to+another+driver{ret_param}",
             status_code=303,
         )
 
@@ -7780,13 +8328,17 @@ async def admin_driver_vehicle_add(
         d.vehicle_year = yr
 
     await db.commit()
-    return RedirectResponse(url=f"/admin/drivers/{driver_id}/edit", status_code=303)
+    redirect_url = f"/admin/drivers/{driver_id}/edit"
+    if ret and ret.startswith("/admin/") and not ret.startswith(f"/admin/drivers/{driver_id}/edit"):
+        redirect_url += f"?return_to={urllib.parse.quote(ret)}"
+    return RedirectResponse(url=redirect_url, status_code=303)
 
 
 @router.post("/drivers/{driver_id}/vehicles/{vehicle_id}/reject")
 async def admin_driver_vehicle_reject(
     driver_id: int,
     vehicle_id: int,
+    request: Request,
     reason: str = Form(""),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
@@ -7804,7 +8356,11 @@ async def admin_driver_vehicle_reject(
     v.rejection_reason = reason.strip() if reason else "Rejected by admin"
     v.approved_at = None
     await db.commit()
-    return RedirectResponse(url=f"/admin/drivers/{driver_id}/edit", status_code=303)
+    ret = request.query_params.get("return_to", "").strip()
+    redirect_url = f"/admin/drivers/{driver_id}/edit"
+    if ret and ret.startswith("/admin/") and not ret.startswith(f"/admin/drivers/{driver_id}/edit"):
+        redirect_url += f"?return_to={urllib.parse.quote(ret)}"
+    return RedirectResponse(url=redirect_url, status_code=303)
 
 
 # ---------- BRD: CD-17 — Emergency alerts ----------
@@ -8174,14 +8730,471 @@ async def admin_withdrawals_pay(
     return RedirectResponse(url="/admin/withdrawals", status_code=303)
 
 
+@router.get("/withdrawals/export")
+async def admin_withdrawals_export(
+    format: str = "xlsx",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    search: Optional[str] = None,
+    driver_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    import io
+    import csv
+    from decimal import Decimal
+    from datetime import datetime, time, timezone
+    from fastapi.responses import Response
+    from sqlalchemy import and_, or_
+    from sqlalchemy.orm import selectinload
+    from app.models import DriverPayout, Driver, User
+
+    where_clauses = [
+        or_(
+            DriverPayout.kind.is_(None),
+            and_(
+                DriverPayout.kind != fin.WALLET_PAYMENT,
+                DriverPayout.kind != fin.COMMISSION_PAYMENT,
+            ),
+        )
+    ]
+
+    if driver_id:
+        where_clauses.append(DriverPayout.driver_id == driver_id)
+
+    if start_date and start_date.strip():
+        try:
+            s_date = datetime.strptime(start_date.strip(), "%Y-%m-%d").date()
+            s_dt = datetime.combine(s_date, time.min, tzinfo=COLOMBO_TZ).astimezone(timezone.utc)
+            where_clauses.append(DriverPayout.created_at >= s_dt)
+        except ValueError:
+            pass
+
+    if end_date and end_date.strip():
+        try:
+            e_date = datetime.strptime(end_date.strip(), "%Y-%m-%d").date()
+            e_dt = datetime.combine(e_date, time.max, tzinfo=COLOMBO_TZ).astimezone(timezone.utc)
+            where_clauses.append(DriverPayout.created_at <= e_dt)
+        except ValueError:
+            pass
+
+    if search and search.strip():
+        term = f"%{search.strip()}%"
+        where_clauses.append(
+            or_(
+                User.full_name.ilike(term),
+                User.phone_number.ilike(term),
+                DriverPayout.description.ilike(term),
+                Driver.vehicle_number.ilike(term),
+            )
+        )
+
+    stmt = (
+        select(DriverPayout)
+        .outerjoin(User, DriverPayout.user_id == User.id)
+        .outerjoin(Driver, DriverPayout.driver_id == Driver.id)
+        .options(selectinload(DriverPayout.user), selectinload(DriverPayout.driver))
+        .where(*where_clauses)
+        .order_by(DriverPayout.created_at.desc(), DriverPayout.id.desc())
+    )
+
+    q = await db.execute(stmt)
+    payouts = q.scalars().all()
+
+    now_colombo = datetime.now(COLOMBO_TZ)
+    filename_base = f"ziggo-driver-payouts-{now_colombo.strftime('%Y%m%d')}"
+
+    headers = [
+        "Payout ID",
+        "Date & Time",
+        "Driver ID",
+        "Driver Name",
+        "Phone Number",
+        "Vehicle Type",
+        "Vehicle Plate",
+        "Bank Name",
+        "Branch",
+        "Account Number",
+        "Account Holder",
+        "Amount (Rs.)",
+        "Payout Type",
+        "Method / Reference / Notes",
+        "Status",
+    ]
+
+    def _csv_cell(val):
+        if val is None:
+            return ""
+        s = str(val).strip()
+        if s.startswith(("=", "+", "-", "@", "\t", "\r")):
+            return "'" + s
+        return s
+
+    if format.lower() == "csv":
+        buf = io.StringIO()
+        buf.write("\ufeff")
+        writer = csv.writer(buf)
+        writer.writerow(headers)
+
+        total_amount = Decimal("0")
+        for p in payouts:
+            driver = p.driver
+            user = p.user
+            amt = p.amount or Decimal("0")
+            total_amount += amt
+
+            kind = p.kind or "payout"
+            if kind == "payout":
+                payout_type = "Direct Payout"
+            elif kind in ("bonus", "incentive_paid"):
+                payout_type = "Incentive / Bonus"
+            else:
+                payout_type = kind.replace("_", " ").title()
+
+            date_str = format_colombo_dt(p.created_at, "%Y-%m-%d %H:%M:%S")
+
+            writer.writerow([
+                p.id,
+                date_str,
+                p.driver_id,
+                _csv_cell((user.full_name if user else "") or f"Driver #{p.driver_id}"),
+                _csv_cell(user.phone_number if user else ""),
+                _csv_cell(driver.vehicle_type.capitalize() if driver and driver.vehicle_type else ""),
+                _csv_cell(driver.vehicle_number if driver and driver.vehicle_number else ""),
+                _csv_cell(driver.bank_name if driver and driver.bank_name else ""),
+                _csv_cell(driver.branch_name if driver and driver.branch_name else ""),
+                _csv_cell(driver.account_number if driver and driver.account_number else ""),
+                _csv_cell(driver.account_holder_name if driver and driver.account_holder_name else ""),
+                f"{float(amt):.2f}",
+                payout_type,
+                _csv_cell(p.description or "Direct Settlement"),
+                "Settled",
+            ])
+
+        writer.writerow(["", "", "", "", "", "", "", "", "", "", "Total Amount:", f"{float(total_amount):.2f}", "", "", ""])
+
+        return Response(
+            content=buf.getvalue().encode("utf-8"),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename_base}.csv"'},
+        )
+
+    # XLSX format (default)
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Driver Payouts"
+    ws.append(headers)
+
+    header_fill = PatternFill(start_color="1E40AF", end_color="1E40AF", fill_type="solid")
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    thin_border = Border(
+        left=Side(style="thin", color="CBD5E1"),
+        right=Side(style="thin", color="CBD5E1"),
+        top=Side(style="thin", color="CBD5E1"),
+        bottom=Side(style="thin", color="CBD5E1"),
+    )
+
+    for col_idx, cell in enumerate(ws[1], 1):
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.border = thin_border
+        cell.alignment = Alignment(horizontal="center" if col_idx in (1, 3, 15) else "right" if col_idx == 12 else "left", vertical="center")
+    ws.row_dimensions[1].height = 28
+
+    total_amount = Decimal("0")
+    row_idx = 2
+    for p in payouts:
+        driver = p.driver
+        user = p.user
+        amount_val = float(p.amount or 0)
+        total_amount += (p.amount or Decimal("0"))
+
+        kind = p.kind or "payout"
+        if kind == "payout":
+            payout_type = "Direct Payout"
+        elif kind in ("bonus", "incentive_paid"):
+            payout_type = "Incentive / Bonus"
+        else:
+            payout_type = kind.replace("_", " ").title()
+
+        date_str = format_colombo_dt(p.created_at, "%Y-%m-%d %H:%M:%S")
+
+        row_data = [
+            p.id,
+            date_str,
+            p.driver_id,
+            str((user.full_name if user else "") or f"Driver #{p.driver_id}"),
+            str(user.phone_number if user else ""),
+            str(driver.vehicle_type.capitalize() if driver and driver.vehicle_type else ""),
+            str(driver.vehicle_number if driver and driver.vehicle_number else ""),
+            str(driver.bank_name if driver and driver.bank_name else ""),
+            str(driver.branch_name if driver and driver.branch_name else ""),
+            str(driver.account_number if driver and driver.account_number else ""),
+            str(driver.account_holder_name if driver and driver.account_holder_name else ""),
+            amount_val,
+            payout_type,
+            str(p.description or "Direct Settlement"),
+            "Settled",
+        ]
+        ws.append(row_data)
+
+        row_fill = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid") if row_idx % 2 == 0 else PatternFill(fill_type=None)
+        for col_idx, cell in enumerate(ws[row_idx], 1):
+            if row_idx % 2 == 0:
+                cell.fill = row_fill
+            cell.font = Font(name="Calibri", size=10)
+            cell.border = thin_border
+            if col_idx in (1, 3, 15):
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            elif col_idx == 12:
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                cell.number_format = "#,##0.00"
+                cell.font = Font(name="Calibri", size=10, bold=True, color="047857")
+            elif col_idx in (5, 7, 10):
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+                cell.number_format = "@"
+            else:
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+        ws.row_dimensions[row_idx].height = 22
+        row_idx += 1
+
+    total_row = [""] * len(headers)
+    total_row[10] = "Total Amount:"
+    total_row[11] = float(total_amount)
+    ws.append(total_row)
+
+    total_fill = PatternFill(start_color="EFF6FF", end_color="EFF6FF", fill_type="solid")
+    double_bottom_border = Border(
+        top=Side(style="thin", color="1E40AF"),
+        bottom=Side(style="double", color="1E40AF"),
+        left=Side(style="thin", color="CBD5E1"),
+        right=Side(style="thin", color="CBD5E1"),
+    )
+    for col_idx, cell in enumerate(ws[row_idx], 1):
+        cell.fill = total_fill
+        cell.font = Font(name="Calibri", size=11, bold=True)
+        cell.border = double_bottom_border
+        if col_idx == 11:
+            cell.alignment = Alignment(horizontal="right", vertical="center")
+        elif col_idx == 12:
+            cell.alignment = Alignment(horizontal="right", vertical="center")
+            cell.number_format = "#,##0.00"
+            cell.font = Font(name="Calibri", size=11, bold=True, color="1E40AF")
+    ws.row_dimensions[row_idx].height = 26
+    ws.freeze_panes = "A2"
+
+    for col in ws.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            if cell.value is not None:
+                val_str = str(cell.value)
+                if cell.column == 12:
+                    val_str = f"Rs. {val_str}"
+                max_len = max(max_len, len(val_str))
+        ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename_base}.xlsx"'},
+    )
+
+
+@router.get("/withdrawals/pending/export")
+async def admin_withdrawals_pending_export(
+    format: str = "xlsx",
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    import io
+    import csv
+    from decimal import Decimal
+    from datetime import datetime
+    from fastapi.responses import Response
+
+    data = await fin.get_withdrawals_data(db, page=1, page_size=100000)
+    rows = data.get("rows", [])
+    now_colombo = datetime.now(COLOMBO_TZ)
+    filename_base = f"ziggo-pending-driver-withdrawals-{now_colombo.strftime('%Y%m%d')}"
+
+    headers = [
+        "Driver ID", "Name", "Phone Number", "Vehicle Type",
+        "Total Earned (Rs.)", "Total Paid (Rs.)", "Settlement Owed (Rs.)", "Pending Balance (Rs.)",
+        "Bank Name", "Branch", "Account Number", "Account Holder"
+    ]
+
+    def _csv_cell(val):
+        if val is None:
+            return ""
+        s = str(val).strip()
+        if s.startswith(("=", "+", "-", "@", "\t", "\r")):
+            return "'" + s
+        return s
+
+    if format.lower() == "csv":
+        buf = io.StringIO()
+        buf.write("\ufeff")
+        writer = csv.writer(buf)
+        writer.writerow(headers)
+        total_pending = Decimal("0")
+        for r in rows:
+            pending = Decimal(str(r.get("pending", 0)))
+            total_pending += pending
+            writer.writerow([
+                r["driver_id"],
+                _csv_cell(r["name"]),
+                _csv_cell(r["phone"]),
+                _csv_cell(r["vehicle_type"].capitalize() if r.get("vehicle_type") else ""),
+                f"{float(r.get('earned', 0)):.2f}",
+                f"{float(r.get('paid', 0)):.2f}",
+                f"{float(r.get('settlement_amount', 0)):.2f}",
+                f"{float(pending):.2f}",
+                _csv_cell(r.get("bank_name", "")),
+                _csv_cell(r.get("branch_name", "")),
+                _csv_cell(r.get("account_number", "")),
+                _csv_cell(r.get("account_holder_name", "")),
+            ])
+        writer.writerow(["", "", "", "Total Pending:", "", "", "", f"{float(total_pending):.2f}", "", "", "", ""])
+        return Response(
+            content=buf.getvalue().encode("utf-8"),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename_base}.csv"'},
+        )
+
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Pending Withdrawals"
+    ws.append(headers)
+
+    header_fill = PatternFill(start_color="1E40AF", end_color="1E40AF", fill_type="solid")
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    thin_border = Border(
+        left=Side(style="thin", color="CBD5E1"),
+        right=Side(style="thin", color="CBD5E1"),
+        top=Side(style="thin", color="CBD5E1"),
+        bottom=Side(style="thin", color="CBD5E1"),
+    )
+
+    for col_idx, cell in enumerate(ws[1], 1):
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.border = thin_border
+        cell.alignment = Alignment(horizontal="center" if col_idx == 1 else "right" if col_idx in (5, 6, 7, 8) else "left", vertical="center")
+    ws.row_dimensions[1].height = 28
+
+    total_pending = Decimal("0")
+    row_idx = 2
+    for r in rows:
+        pending = Decimal(str(r.get("pending", 0)))
+        total_pending += pending
+
+        ws.append([
+            r["driver_id"],
+            str(r["name"]),
+            str(r["phone"]),
+            str(r["vehicle_type"].capitalize() if r.get("vehicle_type") else ""),
+            float(r.get("earned", 0)),
+            float(r.get("paid", 0)),
+            float(r.get("settlement_amount", 0)),
+            float(pending),
+            str(r.get("bank_name", "")),
+            str(r.get("branch_name", "")),
+            str(r.get("account_number", "")),
+            str(r.get("account_holder_name", "")),
+        ])
+
+        row_fill = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid") if row_idx % 2 == 0 else PatternFill(fill_type=None)
+        for col_idx, cell in enumerate(ws[row_idx], 1):
+            if row_idx % 2 == 0:
+                cell.fill = row_fill
+            cell.font = Font(name="Calibri", size=10)
+            cell.border = thin_border
+            if col_idx == 1:
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            elif col_idx in (5, 6, 7, 8):
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                cell.number_format = "#,##0.00"
+                if col_idx == 8 and pending > 0:
+                    cell.font = Font(name="Calibri", size=10, bold=True, color="D97706")
+            elif col_idx in (3, 11):
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+                cell.number_format = "@"
+            else:
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+        ws.row_dimensions[row_idx].height = 22
+        row_idx += 1
+
+    total_row = [""] * len(headers)
+    total_row[6] = "Total Pending:"
+    total_row[7] = float(total_pending)
+    ws.append(total_row)
+
+    total_fill = PatternFill(start_color="FEF3C7", end_color="FEF3C7", fill_type="solid")
+    double_bottom_border = Border(
+        top=Side(style="thin", color="D97706"),
+        bottom=Side(style="double", color="D97706"),
+        left=Side(style="thin", color="CBD5E1"),
+        right=Side(style="thin", color="CBD5E1"),
+    )
+    for col_idx, cell in enumerate(ws[row_idx], 1):
+        cell.fill = total_fill
+        cell.font = Font(name="Calibri", size=11, bold=True)
+        cell.border = double_bottom_border
+        if col_idx == 7:
+            cell.alignment = Alignment(horizontal="right", vertical="center")
+        elif col_idx == 8:
+            cell.alignment = Alignment(horizontal="right", vertical="center")
+            cell.number_format = "#,##0.00"
+            cell.font = Font(name="Calibri", size=11, bold=True, color="B45309")
+    ws.row_dimensions[row_idx].height = 26
+    ws.freeze_panes = "A2"
+
+    for col in ws.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            if cell.value is not None:
+                val_str = str(cell.value)
+                if cell.column in (5, 6, 7, 8):
+                    val_str = f"Rs. {val_str}"
+                max_len = max(max_len, len(val_str))
+        ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename_base}.xlsx"'},
+    )
+
+
 @router.get("/finance/drivers", response_class=HTMLResponse)
 async def admin_finance_drivers(
     request: Request,
     page: int = 1,
+    sort: str = "latest_ride",
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    rows = await fin.driver_finance_table(db)
+    if sort not in ("latest_ride", "earnings", "total_earnings"):
+        sort = "latest_ride"
+    rows = await fin.driver_finance_table(db, sort_by=sort)
     limit = 50
     offset = (page - 1) * limit
     total = len(rows)
@@ -8199,6 +9212,7 @@ async def admin_finance_drivers(
             "active_page": "finance",
             "rows": paginated_rows,
             "page": page,
+            "sort": sort,
             "total_pages": total_pages,
             "total_drivers": total,
             "start_idx": start_idx,
@@ -8215,12 +9229,16 @@ async def admin_finance_driver_detail(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
+    from app.services import driver_wallet_service as wallet
+
     data = await fin.driver_finance_detail(db, driver_id)
     if data is None:
         raise HTTPException(status_code=404, detail="Driver not found")
     return templates.TemplateResponse(
         request, "finance_driver_detail.html",
-        {"request": request, "active_page": "finance", "data": data},
+        {"request": request, "active_page": "finance", "data": data,
+         "wallet": await wallet.driver_wallet(db, driver_id),
+         "today": wallet.today_lk().isoformat(), "msg": request.query_params.get("msg", "")},
     )
 
 
@@ -8233,8 +9251,805 @@ async def admin_finance_driver_pay_incentive(
     _: User = Depends(current_admin),
 ):
     from decimal import Decimal
-    await fin.execute_driver_payout(db, driver_id, Decimal(str(amount)), note)
+    await fin.execute_driver_payout(db, driver_id, Decimal(str(amount)), note, kind=fin.INCENTIVE_PAID)
     return RedirectResponse(url=f"/admin/finance/drivers/{driver_id}", status_code=303)
+
+
+@router.post("/finance/drivers/{driver_id}/commission_payment")
+async def admin_finance_driver_commission_payment(
+    driver_id: int,
+    amount: float = Form(...),
+    payment_method: str = Form("Cash at office"),
+    reference_id: str = Form(""),
+    note: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    """The driver paid their commission (e.g. cash at the office)."""
+    from decimal import Decimal
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be greater than zero")
+    await fin.record_driver_commission_payment(
+        db, driver_id, Decimal(str(amount)),
+        payment_method=payment_method, reference_id=reference_id, note=note,
+    )
+    return RedirectResponse(url=f"/admin/finance/drivers/{driver_id}", status_code=303)
+
+
+# ---------- Driver bonus wallet ----------
+# Bonus money that only pays a driver's commission, automatically, until it
+# expires (see app/services/driver_wallet_service.py).
+
+_WALLET_MAX_PER_DRIVER = Decimal("100000")
+
+
+def _wallet_redirect(back: str, msg: str) -> RedirectResponse:
+    if not back.startswith("/admin/"):
+        back = "/admin/driver-wallet"
+    sep = "&" if "?" in back else "?"
+    return RedirectResponse(url=f"{back}{sep}msg={urllib.parse.quote(msg)}", status_code=303)
+
+
+def _wallet_date(value: str):
+    from datetime import date, datetime
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    try:
+        return date.fromisoformat(raw)
+    except ValueError:
+        pass
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%d-%m-%Y", "%m-%d-%Y", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(raw, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def _wallet_filter(params):
+    """The admin's driver filter from the query string or form. Returns (filter, error)."""
+    from app.services.driver_wallet_service import JOB_TYPES, DriverFilter
+
+    errors: list[str] = []
+
+    def number(key: str, label: str):
+        raw = (params.get(key) or "").strip()
+        if not raw:
+            return None
+        if not raw.isdigit():
+            errors.append(f"{label} must be a whole number.")
+            return None
+        return int(raw)
+
+    def day(key: str, label: str):
+        raw = (params.get(key) or "").strip()
+        if not raw:
+            return None
+        d = _wallet_date(raw)
+        if d is None:
+            errors.append(f"{label} is not a valid date.")
+        return d
+
+    def float_num(key: str, label: str):
+        raw = (params.get(key) or "").strip()
+        if not raw:
+            return None
+        try:
+            val = float(raw)
+            if val < 0:
+                errors.append(f"{label} cannot be negative.")
+                return None
+            return val
+        except ValueError:
+            errors.append(f"{label} must be a number.")
+            return None
+
+    submitted = bool(params.get("f"))
+    min_j = number("min_jobs", "At least")
+    max_j = number("max_jobs", "At most")
+    j_from = day("jobs_from", "Jobs from")
+    j_to = day("jobs_to", "Jobs to")
+    # If the admin entered a completed jobs date range but left "at least" blank, default to >= 1 job
+    if min_j is None and max_j is None and submitted and (j_from or j_to):
+        if (params.get("min_jobs") or "").strip() == "":
+            min_j = 1
+
+    min_online = float_num("min_online_hours", "Min online hours")
+    max_online = float_num("max_online_hours", "Max online hours")
+    on_from = day("online_from", "Online date from")
+    on_to = day("online_to", "Online date to")
+
+    if hasattr(params, "getlist"):
+        types_submitted = params.getlist("job_types")
+    else:
+        v = params.get("job_types")
+        types_submitted = [v] if isinstance(v, str) else (list(v) if v else [])
+
+    f = DriverFilter(
+        vehicle_type=(params.get("vehicle_type") or "").strip(),
+        search=(params.get("search") or "").strip(),
+        new_days=number("new_days", "Days"),
+        new_by="joined" if params.get("new_by") == "joined" else "approved",
+        driver_from=day("driver_from", "Driver date from"),
+        driver_to=day("driver_to", "Driver date to"),
+        min_jobs=min_j,
+        max_jobs=max_j,
+        job_types=tuple(t for t in JOB_TYPES if t in types_submitted) if (submitted and types_submitted) else JOB_TYPES,
+        jobs_from=j_from,
+        jobs_to=j_to,
+        min_online_hours=min_online,
+        max_online_hours=max_online,
+        online_from=on_from,
+        online_to=on_to,
+    )
+    if f.new_days == 0:
+        errors.append("New drivers: enter at least 1 day.")
+    if f.driver_from and f.driver_to and f.driver_from > f.driver_to:
+        errors.append("Driver date range ends before it starts.")
+    if f.min_jobs is not None and f.max_jobs is not None and f.min_jobs > f.max_jobs:
+        errors.append("'At least' can't be more than 'at most'.")
+    if f.jobs_from and f.jobs_to and f.jobs_from > f.jobs_to:
+        errors.append("The job period ends before it starts.")
+    if not f.job_types and (f.min_jobs is not None or f.max_jobs is not None):
+        errors.append("Tick at least one kind of job to count.")
+    if f.online_from and f.online_to and f.online_from > f.online_to:
+        errors.append("Online date range ends before it starts.")
+    if f.min_online_hours is not None and f.max_online_hours is not None and f.min_online_hours > f.max_online_hours:
+        errors.append("Min online hours cannot be more than max online hours.")
+    return f, " ".join(errors)
+
+
+def _wallet_filter_pairs(f) -> list[tuple[str, str]]:
+    pairs = [("f", "1")]
+    if f.search:
+        pairs.append(("search", f.search))
+    if f.vehicle_type:
+        pairs.append(("vehicle_type", f.vehicle_type))
+    if f.new_days is not None:
+        pairs.append(("new_days", str(f.new_days)))
+    if f.driver_from:
+        pairs.append(("driver_from", f.driver_from.isoformat()))
+    if f.driver_to:
+        pairs.append(("driver_to", f.driver_to.isoformat()))
+    if f.new_days is not None or f.driver_from or f.driver_to:
+        pairs.append(("new_by", f.new_by))
+    if f.min_jobs is not None:
+        pairs.append(("min_jobs", str(f.min_jobs)))
+    if f.max_jobs is not None:
+        pairs.append(("max_jobs", str(f.max_jobs)))
+    pairs += [("job_types", t) for t in f.job_types]
+    if f.jobs_from:
+        pairs.append(("jobs_from", f.jobs_from.isoformat()))
+    if f.jobs_to:
+        pairs.append(("jobs_to", f.jobs_to.isoformat()))
+    if f.min_online_hours is not None:
+        pairs.append(("min_online_hours", str(f.min_online_hours)))
+    if f.max_online_hours is not None:
+        pairs.append(("max_online_hours", str(f.max_online_hours)))
+    if f.online_from:
+        pairs.append(("online_from", f.online_from.isoformat()))
+    if f.online_to:
+        pairs.append(("online_to", f.online_to.isoformat()))
+    return pairs
+
+
+@router.get("/driver-wallet", response_class=HTMLResponse)
+async def admin_driver_wallet(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin_or_admin),
+):
+    from app.services import driver_wallet_service as wallet
+
+    f, error = _wallet_filter(request.query_params)
+    overview = await wallet.grants_overview(db)
+    for r in overview["rows"]:
+        r["audience"] = await wallet.describe_audience(db, r["grant"])
+    by_vehicle: dict[str, int] = {}
+    for d in await wallet.eligible_drivers(db):
+        if d.vehicle_type:
+            by_vehicle[d.vehicle_type] = by_vehicle.get(d.vehicle_type, 0) + 1
+    matches = [] if error else await wallet.find_drivers(db, f)
+    return templates.TemplateResponse(
+        request, "driver_wallet.html",
+        {"request": request, "active_page": "driver_wallet", "overview": overview,
+         "by_vehicle": sorted(by_vehicle.items()), "filter": f, "filter_error": error,
+         "filter_pairs": _wallet_filter_pairs(f), "matches": matches,
+         "job_types": wallet.JOB_TYPES, "job_names": wallet.JOB_NAMES,
+         "today": overview["today"].isoformat(), "msg": request.query_params.get("msg", "")},
+    )
+
+
+@router.get("/driver-wallet/export")
+async def admin_driver_wallet_export(
+    format: str = "xlsx",
+    grant_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin_or_admin),
+):
+    import io
+    import csv
+    from decimal import Decimal
+    from datetime import datetime
+    from fastapi.responses import Response
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+    from app.models import DriverWalletGrant, DriverWalletCredit, Driver, User
+    from app.services import driver_wallet_service as wallet
+
+    overview = await wallet.grants_overview(db)
+    for r in overview["rows"]:
+        r["audience"] = await wallet.describe_audience(db, r["grant"])
+
+    rows = overview["rows"]
+    if grant_id:
+        rows = [r for r in rows if r["grant"].id == grant_id]
+
+    # Detailed credits
+    q_credits = (
+        select(DriverWalletCredit)
+        .options(
+            selectinload(DriverWalletCredit.grant),
+            selectinload(DriverWalletCredit.driver).selectinload(Driver.user),
+        )
+        .order_by(DriverWalletCredit.created_at.desc(), DriverWalletCredit.id.desc())
+    )
+    if grant_id:
+        q_credits = q_credits.where(DriverWalletCredit.grant_id == grant_id)
+    credits_res = (await db.execute(q_credits)).scalars().all()
+
+    now_colombo = datetime.now(COLOMBO_TZ)
+    filename_base = f"ziggo-bonuses-given-{now_colombo.strftime('%Y%m%d')}"
+
+    def _csv_cell(val):
+        if val is None:
+            return ""
+        s = str(val).strip()
+        if s.startswith(("=", "+", "-", "@", "\t", "\r")):
+            return "'" + s
+        return s
+
+    if format.lower() == "csv":
+        buf = io.StringIO()
+        buf.write("\ufeff")
+        writer = csv.writer(buf)
+        headers = [
+            "Grant ID",
+            "Given Date & Time",
+            "Given By",
+            "Note",
+            "Target Audience",
+            "Drivers Count",
+            "Active Drivers",
+            "Per Driver (Rs.)",
+            "Total Bonus Given (Rs.)",
+            "Paid Commission (Rs.)",
+            "Still in Wallets (Rs.)",
+            "Expired / Removed (Rs.)",
+            "Expires On",
+            "Expiry Details",
+            "Status",
+        ]
+        writer.writerow(headers)
+
+        tot_drivers = 0
+        tot_active_drivers = 0
+        tot_given = Decimal("0")
+        tot_used = Decimal("0")
+        tot_available = Decimal("0")
+        tot_lost = Decimal("0")
+
+        for r in rows:
+            g = r["grant"]
+            m = r["totals"]
+            date_str = format_colombo_dt(g.created_at, "%Y-%m-%d %H:%M:%S")
+            status_str = "Removed" if r["cancelled"] else ("Expired" if r["expired"] else "Active")
+            expiry_detail = "Removed" if r["cancelled"] else ("Expired" if r["expired"] else f"{r['days_left'] + 1} day(s) left")
+
+            tot_drivers += (g.drivers_count or 0)
+            tot_active_drivers += r.get("active_drivers", 0)
+            tot_given += Decimal(str(m["given"]))
+            tot_used += Decimal(str(m["used"]))
+            tot_available += Decimal(str(m["available"]))
+            tot_lost += Decimal(str(m["lost"]))
+
+            writer.writerow([
+                g.id,
+                date_str,
+                _csv_cell(r.get("by") or "Ziggo Admin"),
+                _csv_cell(g.note),
+                _csv_cell(r.get("audience") or ""),
+                g.drivers_count,
+                r.get("active_drivers", 0),
+                f"{float(g.amount):.2f}",
+                f"{float(m['given']):.2f}",
+                f"{float(m['used']):.2f}",
+                f"{float(m['available']):.2f}",
+                f"{float(m['lost']):.2f}",
+                g.expires_on.isoformat() if g.expires_on else "",
+                expiry_detail,
+                status_str,
+            ])
+
+        writer.writerow([
+            "", "", "", "TOTALS", "",
+            tot_drivers, tot_active_drivers, "",
+            f"{float(tot_given):.2f}",
+            f"{float(tot_used):.2f}",
+            f"{float(tot_available):.2f}",
+            f"{float(tot_lost):.2f}",
+            "", "", ""
+        ])
+
+        return Response(
+            content=buf.getvalue().encode("utf-8"),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename_base}.csv"'},
+        )
+
+    # XLSX format
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = openpyxl.Workbook()
+
+    # Sheet 1: Bonuses Summary
+    ws_sum = wb.active
+    ws_sum.title = "Bonuses Summary"
+
+    headers_sum = [
+        "Grant ID",
+        "Given Date & Time",
+        "Given By",
+        "Note",
+        "Target Audience",
+        "Drivers Count",
+        "Active Drivers",
+        "Per Driver (Rs.)",
+        "Total Bonus Given (Rs.)",
+        "Paid Commission (Rs.)",
+        "Still in Wallets (Rs.)",
+        "Expired / Removed (Rs.)",
+        "Expires On",
+        "Expiry Details",
+        "Status",
+    ]
+    ws_sum.append(headers_sum)
+
+    header_fill_purple = PatternFill(start_color="6D28D9", end_color="6D28D9", fill_type="solid")
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    thin_border = Border(
+        left=Side(style="thin", color="CBD5E1"),
+        right=Side(style="thin", color="CBD5E1"),
+        top=Side(style="thin", color="CBD5E1"),
+        bottom=Side(style="thin", color="CBD5E1"),
+    )
+
+    for col_idx, cell in enumerate(ws_sum[1], 1):
+        cell.fill = header_fill_purple
+        cell.font = header_font
+        cell.border = thin_border
+        if col_idx in (1, 2, 13, 14, 15):
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        elif col_idx in (6, 7, 8, 9, 10, 11, 12):
+            cell.alignment = Alignment(horizontal="right", vertical="center")
+        else:
+            cell.alignment = Alignment(horizontal="left", vertical="center")
+    ws_sum.row_dimensions[1].height = 28
+
+    tot_drivers = 0
+    tot_active_drivers = 0
+    tot_given = Decimal("0")
+    tot_used = Decimal("0")
+    tot_available = Decimal("0")
+    tot_lost = Decimal("0")
+
+    row_idx = 2
+    for r in rows:
+        g = r["grant"]
+        m = r["totals"]
+        date_str = format_colombo_dt(g.created_at, "%Y-%m-%d %H:%M:%S")
+        status_str = "Removed" if r["cancelled"] else ("Expired" if r["expired"] else "Active")
+        expiry_detail = "Removed" if r["cancelled"] else ("Expired" if r["expired"] else f"{r['days_left'] + 1} day(s) left")
+
+        tot_drivers += (g.drivers_count or 0)
+        tot_active_drivers += r.get("active_drivers", 0)
+        tot_given += Decimal(str(m["given"]))
+        tot_used += Decimal(str(m["used"]))
+        tot_available += Decimal(str(m["available"]))
+        tot_lost += Decimal(str(m["lost"]))
+
+        ws_sum.append([
+            g.id,
+            date_str,
+            str(r.get("by") or "Ziggo Admin"),
+            str(g.note or ""),
+            str(r.get("audience") or ""),
+            int(g.drivers_count or 0),
+            int(r.get("active_drivers", 0)),
+            float(g.amount or 0),
+            float(m["given"]),
+            float(m["used"]),
+            float(m["available"]),
+            float(m["lost"]),
+            g.expires_on.isoformat() if g.expires_on else "",
+            expiry_detail,
+            status_str,
+        ])
+
+        row_fill = PatternFill(start_color="F5F3FF", end_color="F5F3FF", fill_type="solid") if row_idx % 2 == 0 else PatternFill(fill_type=None)
+        for col_idx, cell in enumerate(ws_sum[row_idx], 1):
+            if row_idx % 2 == 0:
+                cell.fill = row_fill
+            cell.font = Font(name="Calibri", size=10)
+            cell.border = thin_border
+
+            if col_idx in (1, 2, 13, 14):
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            elif col_idx in (6, 7):
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                cell.number_format = "#,##0"
+            elif col_idx in (8, 9, 10, 11, 12):
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                cell.number_format = "#,##0.00"
+                if col_idx == 10 and float(m["used"]) > 0:
+                    cell.font = Font(name="Calibri", size=10, bold=True, color="D97706")
+                elif col_idx == 11 and float(m["available"]) > 0:
+                    cell.font = Font(name="Calibri", size=10, bold=True, color="6D28D9")
+                elif col_idx == 12 and float(m["lost"]) > 0:
+                    cell.font = Font(name="Calibri", size=10, color="9CA3AF")
+            elif col_idx == 15:
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+                if status_str == "Active":
+                    cell.font = Font(name="Calibri", size=10, bold=True, color="059669")
+                elif status_str == "Removed":
+                    cell.font = Font(name="Calibri", size=10, bold=True, color="DC2626")
+                else:
+                    cell.font = Font(name="Calibri", size=10, color="6B7280")
+            elif col_idx == 4:
+                cell.font = Font(name="Calibri", size=10, bold=True)
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+            else:
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+        ws_sum.row_dimensions[row_idx].height = 22
+        row_idx += 1
+
+    # Totals row for Summary
+    total_row = [""] * len(headers_sum)
+    total_row[3] = "TOTALS"
+    total_row[5] = int(tot_drivers)
+    total_row[6] = int(tot_active_drivers)
+    total_row[8] = float(tot_given)
+    total_row[9] = float(tot_used)
+    total_row[10] = float(tot_available)
+    total_row[11] = float(tot_lost)
+    ws_sum.append(total_row)
+
+    total_fill = PatternFill(start_color="EDE9FE", end_color="EDE9FE", fill_type="solid")
+    double_bottom_border = Border(
+        top=Side(style="thin", color="6D28D9"),
+        bottom=Side(style="double", color="6D28D9"),
+        left=Side(style="thin", color="CBD5E1"),
+        right=Side(style="thin", color="CBD5E1"),
+    )
+    for col_idx, cell in enumerate(ws_sum[row_idx], 1):
+        cell.fill = total_fill
+        cell.font = Font(name="Calibri", size=11, bold=True)
+        cell.border = double_bottom_border
+        if col_idx in (6, 7):
+            cell.alignment = Alignment(horizontal="right", vertical="center")
+            cell.number_format = "#,##0"
+        elif col_idx in (8, 9, 10, 11):
+            cell.alignment = Alignment(horizontal="right", vertical="center")
+            cell.number_format = "#,##0.00"
+            if col_idx == 10:
+                cell.font = Font(name="Calibri", size=11, bold=True, color="6D28D9")
+            elif col_idx == 9:
+                cell.font = Font(name="Calibri", size=11, bold=True, color="D97706")
+        elif col_idx == 4:
+            cell.alignment = Alignment(horizontal="left", vertical="center")
+    ws_sum.row_dimensions[row_idx].height = 26
+    ws_sum.freeze_panes = "A2"
+
+    for col in ws_sum.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            if cell.value is not None:
+                val_str = str(cell.value)
+                if cell.column in (8, 9, 10, 11, 12):
+                    val_str = f"Rs. {val_str}"
+                max_len = max(max_len, len(val_str))
+        ws_sum.column_dimensions[col_letter].width = max(max_len + 3, 12)
+
+    # Sheet 2: Driver Credits Detail
+    ws_det = wb.create_sheet(title="Driver Credits Detail")
+    headers_det = [
+        "Credit ID",
+        "Grant ID",
+        "Bonus Note",
+        "Given Date & Time",
+        "Driver ID",
+        "Driver Name",
+        "Phone Number",
+        "Vehicle Type",
+        "Vehicle Plate",
+        "Credit Amount (Rs.)",
+        "Commission Paid (Rs.)",
+        "Balance Remaining (Rs.)",
+        "Expires On",
+        "Status",
+        "Cancelled Date",
+    ]
+    ws_det.append(headers_det)
+
+    header_fill_blue = PatternFill(start_color="1E40AF", end_color="1E40AF", fill_type="solid")
+    for col_idx, cell in enumerate(ws_det[1], 1):
+        cell.fill = header_fill_blue
+        cell.font = header_font
+        cell.border = thin_border
+        if col_idx in (1, 2, 4, 5, 13, 14, 15):
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        elif col_idx in (10, 11, 12):
+            cell.alignment = Alignment(horizontal="right", vertical="center")
+        else:
+            cell.alignment = Alignment(horizontal="left", vertical="center")
+    ws_det.row_dimensions[1].height = 28
+
+    tot_credit_amt = Decimal("0")
+    tot_credit_used = Decimal("0")
+    tot_credit_rem = Decimal("0")
+
+    det_row_idx = 2
+    for c in credits_res:
+        driver = c.driver
+        user = driver.user if driver else None
+        rem = float(wallet.remaining(c))
+        st = wallet.status_of(c, overview["today"])
+        created_dt = format_colombo_dt(c.created_at, "%Y-%m-%d %H:%M:%S")
+        cancelled_dt = format_colombo_dt(c.cancelled_at, "%Y-%m-%d %H:%M:%S") if c.cancelled_at else "-"
+
+        tot_credit_amt += Decimal(str(c.amount or 0))
+        tot_credit_used += Decimal(str(c.used_amount or 0))
+        tot_credit_rem += Decimal(str(rem))
+
+        ws_det.append([
+            c.id,
+            c.grant_id,
+            str(c.grant.note if c.grant else ""),
+            created_dt,
+            c.driver_id,
+            str(user.full_name if user else f"Driver #{c.driver_id}"),
+            str(user.phone_number if user else ""),
+            str(driver.vehicle_type.capitalize() if driver and driver.vehicle_type else ""),
+            str(driver.vehicle_number if driver and driver.vehicle_number else ""),
+            float(c.amount or 0),
+            float(c.used_amount or 0),
+            float(rem),
+            c.expires_on.isoformat() if c.expires_on else "",
+            st.capitalize(),
+            cancelled_dt,
+        ])
+
+        row_fill = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid") if det_row_idx % 2 == 0 else PatternFill(fill_type=None)
+        for col_idx, cell in enumerate(ws_det[det_row_idx], 1):
+            if det_row_idx % 2 == 0:
+                cell.fill = row_fill
+            cell.font = Font(name="Calibri", size=10)
+            cell.border = thin_border
+            if col_idx in (1, 2, 4, 5, 13, 15):
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            elif col_idx in (10, 11, 12):
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                cell.number_format = "#,##0.00"
+                if col_idx == 11 and float(c.used_amount or 0) > 0:
+                    cell.font = Font(name="Calibri", size=10, bold=True, color="D97706")
+                elif col_idx == 12 and rem > 0:
+                    cell.font = Font(name="Calibri", size=10, bold=True, color="1E40AF")
+            elif col_idx == 14:
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+                if st == "active":
+                    cell.font = Font(name="Calibri", size=10, bold=True, color="059669")
+                elif st == "cancelled":
+                    cell.font = Font(name="Calibri", size=10, bold=True, color="DC2626")
+                elif st == "used":
+                    cell.font = Font(name="Calibri", size=10, bold=True, color="D97706")
+                else:
+                    cell.font = Font(name="Calibri", size=10, color="6B7280")
+            elif col_idx == 7:
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+                cell.number_format = "@"
+            else:
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+        ws_det.row_dimensions[det_row_idx].height = 22
+        det_row_idx += 1
+
+    # Totals row for Detail
+    det_total_row = [""] * len(headers_det)
+    det_total_row[2] = f"TOTALS ({len(credits_res)} credits)"
+    det_total_row[9] = float(tot_credit_amt)
+    det_total_row[10] = float(tot_credit_used)
+    det_total_row[11] = float(tot_credit_rem)
+    ws_det.append(det_total_row)
+
+    det_total_fill = PatternFill(start_color="DBEAFE", end_color="DBEAFE", fill_type="solid")
+    det_double_bottom_border = Border(
+        top=Side(style="thin", color="1E40AF"),
+        bottom=Side(style="double", color="1E40AF"),
+        left=Side(style="thin", color="CBD5E1"),
+        right=Side(style="thin", color="CBD5E1"),
+    )
+    for col_idx, cell in enumerate(ws_det[det_row_idx], 1):
+        cell.fill = det_total_fill
+        cell.font = Font(name="Calibri", size=11, bold=True)
+        cell.border = det_double_bottom_border
+        if col_idx in (9, 10, 11):
+            cell.alignment = Alignment(horizontal="right", vertical="center")
+            cell.number_format = "#,##0.00"
+            if col_idx == 11:
+                cell.font = Font(name="Calibri", size=11, bold=True, color="1E40AF")
+            elif col_idx == 10:
+                cell.font = Font(name="Calibri", size=11, bold=True, color="D97706")
+        elif col_idx == 3:
+            cell.alignment = Alignment(horizontal="left", vertical="center")
+    ws_det.row_dimensions[det_row_idx].height = 26
+    ws_det.freeze_panes = "A2"
+
+    for col in ws_det.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            if cell.value is not None:
+                val_str = str(cell.value)
+                if cell.column in (10, 11, 12):
+                    val_str = f"Rs. {val_str}"
+                max_len = max(max_len, len(val_str))
+        ws_det.column_dimensions[col_letter].width = max(max_len + 3, 12)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename_base}.xlsx"'},
+    )
+
+
+@router.post("/driver-wallet/give")
+async def admin_driver_wallet_give(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_superadmin_or_admin),
+):
+    from decimal import InvalidOperation
+    from app.models import Driver
+    from app.services import driver_wallet_service as wallet
+
+    form = await request.form()
+    single = form.get("audience") == "driver"
+    if single:
+        back = form.get("back") or "/admin/driver-wallet"
+    else:
+        f, error = _wallet_filter(form)
+        back = "/admin/driver-wallet?" + urllib.parse.urlencode(_wallet_filter_pairs(f))
+        if error:
+            return _wallet_redirect(back, error)
+
+    try:
+        amt = Decimal(str(form.get("amount") or "").strip()).quantize(Decimal("0.01"))
+    except (InvalidOperation, ValueError):
+        return _wallet_redirect(back, "Enter the bonus amount in rupees.")
+    if amt <= 0 or amt > _WALLET_MAX_PER_DRIVER:
+        return _wallet_redirect(back, f"The bonus must be between Rs.0.01 and Rs.{_WALLET_MAX_PER_DRIVER:,.0f} per driver.")
+    expiry = _wallet_date(form.get("expires_on") or "")
+    if expiry is None or expiry < wallet.today_lk():
+        return _wallet_redirect(back, "Choose an expiry date from today onwards.")
+    note = (form.get("note") or "").strip()[:150]
+    if not note:
+        return _wallet_redirect(back, "Add a short note, e.g. Avurudu bonus.")
+
+    if single:
+        driver_id = int(form.get("driver_id") or 0) if str(form.get("driver_id") or "").isdigit() else 0
+        d = (await db.execute(select(Driver).where(Driver.id == driver_id))).scalars().first()
+        if d is None:
+            return _wallet_redirect(back, "Driver not found.")
+        drivers, audience, filters = [d], f"driver:{d.id}", None
+    else:
+        drivers = [r["driver"] for r in await wallet.find_drivers(db, f)]
+        expected = str(form.get("expected_count") or "")
+        if not expected.isdigit() or int(expected) != len(drivers):
+            return _wallet_redirect(back, f"The drivers matching these filters changed ({len(drivers)} now). "
+                                          "Check the list and give the bonus again.")
+        audience, filters = ("all", None) if f.is_everyone() else ("filtered", f)
+    if not drivers:
+        return _wallet_redirect(back, "No approved drivers match, so no bonus was given.")
+
+    await wallet.give(db, drivers=drivers, amount=amt, expires_on=expiry, note=note, audience=audience,
+                      filters=filters, admin_id=admin.id)
+    who = "1 driver" if len(drivers) == 1 else f"{len(drivers)} drivers"
+    return _wallet_redirect(back, f"Rs.{amt:,.2f} bonus given to {who} (Rs.{amt * len(drivers):,.2f} in total), usable until {expiry:%d %b %Y}.")
+
+
+async def _wallet_credits(db: AsyncSession, grant_id: int = 0, credit_id: int = 0):
+    from app.models import DriverWalletCredit
+    q = select(DriverWalletCredit)
+    q = q.where(DriverWalletCredit.grant_id == grant_id) if grant_id else q.where(DriverWalletCredit.id == credit_id)
+    return list((await db.execute(q)).scalars().all())
+
+
+@router.post("/driver-wallet/grants/{grant_id}/expiry")
+async def admin_driver_wallet_grant_expiry(
+    grant_id: int,
+    expires_on: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin_or_admin),
+):
+    from app.models import DriverWalletGrant
+    from app.services import driver_wallet_service as wallet
+
+    expiry = _wallet_date(expires_on)
+    if expiry is None:
+        return _wallet_redirect("/admin/driver-wallet", "Choose a valid date.")
+    grant = (await db.execute(select(DriverWalletGrant).where(DriverWalletGrant.id == grant_id))).scalars().first()
+    if grant is None:
+        raise HTTPException(status_code=404, detail="Bonus not found")
+    grant.expires_on = expiry
+    await wallet.change_expiry(db, await _wallet_credits(db, grant_id=grant_id), expiry)
+    return _wallet_redirect("/admin/driver-wallet", f"\"{grant.note}\" now expires after {expiry:%d %b %Y}.")
+
+
+@router.post("/driver-wallet/grants/{grant_id}/cancel")
+async def admin_driver_wallet_grant_cancel(
+    grant_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin_or_admin),
+):
+    from app.services import driver_wallet_service as wallet
+
+    credits = await _wallet_credits(db, grant_id=grant_id)
+    if not credits:
+        raise HTTPException(status_code=404, detail="Bonus not found")
+    removed = await wallet.cancel(db, credits)
+    return _wallet_redirect("/admin/driver-wallet", f"Removed Rs.{removed:,.2f} that drivers had not used yet.")
+
+
+@router.post("/driver-wallet/credits/{credit_id}/expiry")
+async def admin_driver_wallet_credit_expiry(
+    credit_id: int,
+    expires_on: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin_or_admin),
+):
+    from app.services import driver_wallet_service as wallet
+
+    credits = await _wallet_credits(db, credit_id=credit_id)
+    if not credits:
+        raise HTTPException(status_code=404, detail="Bonus not found")
+    back = f"/admin/finance/drivers/{credits[0].driver_id}"
+    expiry = _wallet_date(expires_on)
+    if expiry is None:
+        return _wallet_redirect(back, "Choose a valid date.")
+    await wallet.change_expiry(db, credits, expiry)
+    return _wallet_redirect(back, f"Bonus now expires after {expiry:%d %b %Y}.")
+
+
+@router.post("/driver-wallet/credits/{credit_id}/cancel")
+async def admin_driver_wallet_credit_cancel(
+    credit_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin_or_admin),
+):
+    from app.services import driver_wallet_service as wallet
+
+    credits = await _wallet_credits(db, credit_id=credit_id)
+    if not credits:
+        raise HTTPException(status_code=404, detail="Bonus not found")
+    removed = await wallet.cancel(db, credits)
+    return _wallet_redirect(f"/admin/finance/drivers/{credits[0].driver_id}", f"Removed Rs.{removed:,.2f} from this driver's wallet.")
 
 
 
@@ -9799,7 +11614,7 @@ async def admin_incentives_delete(
 
 
 @router.get("/forbidden", response_class=HTMLResponse)
-async def admin_forbidden(request: Request):
+async def admin_forbidden(request: Request, _: User = Depends(current_admin)):
     return templates.TemplateResponse(request, "forbidden.html", {"request": request})
 
 
@@ -9918,6 +11733,116 @@ async def admin_delete_admin(
 
 # --- SURGE ZONES UI ---
 from app.models import SurgeZone
+
+# ---------- Launch locations: commission-free periods (Phase 2, feature 02) ----------
+@router.get("/launch-locations", response_class=HTMLResponse)
+async def admin_launch_locations(
+    request: Request,
+    edit: int = 0,
+    error: str = "",
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    from app.models import LaunchLocation
+    from app.services.district_service import DISTRICTS
+    from app.services.launch_service import LAUNCH_SERVICES, status_of, today_lk
+
+    locs = (await db.execute(select(LaunchLocation).order_by(desc(LaunchLocation.start_date), desc(LaunchLocation.id)))).scalars().all()
+    today = today_lk()
+    rows = [{"loc": l, "status": status_of(l, today), "days_left": (l.end_date - today).days + 1,
+             "starts_in": (l.start_date - today).days} for l in locs]
+    current = next((l for l in locs if l.id == edit), None)
+    summary = await fin.launch_location_summary(db)
+    for r in rows:
+        r["summary"] = summary.get(r["loc"].id, {"jobs": 0, "trips": 0, "orders": 0, "income": 0.0,
+                                                 "driver_earnings": 0.0, "waived": 0.0})
+    return templates.TemplateResponse(
+        request, "launch_locations.html",
+        {"request": request, "active_page": "launch_locations", "rows": rows, "current": current,
+         "districts": DISTRICTS, "services": LAUNCH_SERVICES, "today": today.isoformat(), "error": error,
+         "gmap_key": settings.GOOGLE_MAPS_API_KEY or ""},
+    )
+
+
+@router.post("/launch-locations/save")
+async def admin_launch_locations_save(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    import json as _json
+    from datetime import date
+    from app.models import LaunchLocation
+    from app.services.district_service import DISTRICTS
+    from app.services.launch_service import LAUNCH_SERVICES
+
+    form = await request.form()
+    loc_id = int(form.get("id") or 0)
+    back = f"/admin/launch-locations?edit={loc_id}" if loc_id else "/admin/launch-locations?edit=-1"
+
+    def fail(msg):
+        return RedirectResponse(url=back + "&error=" + urllib.parse.quote(msg), status_code=303)
+
+    name = str(form.get("name") or "").strip()
+    kind = str(form.get("kind") or "district")
+    district = str(form.get("district") or "")
+    services = [x for x in form.getlist("services") if x in LAUNCH_SERVICES]
+    try:
+        start = date.fromisoformat(str(form.get("start_date")))
+        end = date.fromisoformat(str(form.get("end_date")))
+    except ValueError:
+        return fail("Please give a start and end date.")
+    coords = None
+    if not name:
+        return fail("Please give the launch location a name.")
+    if kind == "district":
+        if district not in DISTRICTS:
+            return fail("Please choose a district.")
+    elif kind == "area":
+        try:
+            coords = _json.loads(str(form.get("coordinates") or "[]"))
+            coords = [{"lat": float(p["lat"]), "lng": float(p["lng"])} for p in coords]
+        except (ValueError, KeyError, TypeError):
+            coords = []
+        if len(coords) < 3:
+            return fail("Please draw the area on the map (at least 3 points).")
+        district = None
+    else:
+        return fail("Unknown area type.")
+    if end < start:
+        return fail("The end date can't be before the start date.")
+    if not services:
+        return fail("Tick at least one service.")
+
+    loc = None
+    if loc_id:
+        loc = (await db.execute(select(LaunchLocation).where(LaunchLocation.id == loc_id))).scalars().first()
+    if loc is None:
+        loc = LaunchLocation()
+        db.add(loc)
+    loc.name, loc.kind, loc.district, loc.coordinates = name, kind, district, coords
+    loc.start_date, loc.end_date, loc.services = start, end, services
+    loc.waive_delivery_cut = form.get("waive_delivery_cut") == "on"
+    loc.waive_merchant_commission = False  # merchants always pay their commission (owner's decision)
+    loc.is_active = form.get("is_active") == "on"
+    await db.commit()
+    return RedirectResponse(url="/admin/launch-locations", status_code=303)
+
+
+@router.post("/launch-locations/{loc_id}/delete")
+async def admin_launch_locations_delete(
+    loc_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    from app.models import LaunchLocation
+
+    loc = (await db.execute(select(LaunchLocation).where(LaunchLocation.id == loc_id))).scalars().first()
+    if loc is not None:
+        await db.delete(loc)
+        await db.commit()
+    return RedirectResponse(url="/admin/launch-locations", status_code=303)
+
 
 @router.get("/surge-zones", response_class=HTMLResponse)
 async def surge_zones_page(request: Request, db: AsyncSession = Depends(get_db), admin_user: User = Depends(current_admin)):

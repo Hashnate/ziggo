@@ -16,6 +16,7 @@ import 'core/notifications/fcm_service.dart';
 import 'core/notifications/notification_router.dart';
 import 'core/services/app_update_service.dart';
 import 'core/services/floating_overlay_service.dart';
+import 'core/services/location_intent_service.dart';
 import 'core/services/referral_tracker.dart';
 import 'modules/auth/auth_provider.dart';
 import 'modules/auth/screens/role_selection_screen.dart';
@@ -200,6 +201,7 @@ class _RootState extends State<_Root> with WidgetsBindingObserver {
         setState(() => _splashed = true);
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _checkPendingNotification();
+          LocationIntentService.instance.init(context);
           AppUpdateService.checkForUpdates(context);
         });
       }
@@ -239,6 +241,7 @@ class _RootState extends State<_Root> with WidgetsBindingObserver {
       // instead of rebuilding _Root, so initState's drain never runs.
       if (_splashed) {
         _checkPendingNotification();
+        LocationIntentService.instance.init(context);
         AppUpdateService.checkForUpdates(context);
       }
       // Drivers: pick up any ride offer that arrived while the app was asleep,

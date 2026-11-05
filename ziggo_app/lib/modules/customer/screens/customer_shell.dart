@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../app/app_colors.dart';
 import '../../../core/notifications/fcm_service.dart';
 import '../../../core/notifications/notification_router.dart';
+import '../../../core/services/location_intent_service.dart';
 import '../../../core/widgets/curved_navbar.dart';
 import '../../../core/widgets/guest_login_prompt.dart';
 import '../../auth/auth_provider.dart';
@@ -53,6 +54,7 @@ class CustomerShellState extends State<CustomerShell> {
     ];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _ensureLocationReady();
+      LocationIntentService.instance.init(context);
       final pending = FcmService.instance.consumePendingClick();
       if (pending != null) {
         NotificationRouter.handleNotification(pending.data);
