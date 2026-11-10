@@ -119,3 +119,122 @@ async def test_cancel_after_accept_tells_the_other_side_why(monkeypatch):
 ])
 def test_push_text(payload, expected):
     assert fcm_service._format("booking_update", payload) == expected
+
+
+async def test_admin_cancel_active_booking(monkeypatch):
+    import json
+    import sys
+    sys.path.append("/app")
+    from ziggo_admin_panel.routes import admin_cancel_booking
+    from starlette.requests import Request
+
+    sent = []
+    published = []
+
+    async def fake_send(user_id, event, payload):
+        sent.append((user_id, event, payload))
+
+    async def fake_publish(topic, event, payload):
+        published.append((topic, event, payload))
+
+    monkeypatch.setattr(manager, "send", fake_send)
+    monkeypatch.setattr(manager, "publish", fake_publish)
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with AsyncSessionLocal() as db:
+            await _clean(db)
+            try:
+                cust_user = User(phone_number=PHONES[0], role=UserRole.CUSTOMER, full_name="Amali")
+                drv_user = User(phone_number=PHONES[1], role=UserRole.DRIVER, full_name="Nimal")
+                admin_user = User(phone_number="0700000000", role=UserRole.ADMIN, full_name="Admin")
+                db.add_all([cust_user, drv_user, admin_user])
+                await db.flush()
+                customer = Customer(user_id=cust_user.id)
+                driver = Driver(user_id=drv_user.id, status=DriverStatus.APPROVED, is_approved=True)
+                db.add_all([customer, driver])
+                await db.flush()
+                active_ride = _ride("ZGTESTCN03", customer.id, driver.id, BookingStatus.ACCEPTED)
+                db.add(active_ride)
+                await db.commit()
+
+                # Mock request
+                scope = {
+                    "type": "http",
+                    "method": "POST",
+                    "headers": [(b"content-type", b"application/json")],
+                }
+                async def receive():
+                    return {"type": "http.request", "body": json.dumps({"reason": "Customer called support"}).encode("utf-8")}
+                req = Request(scope, receive)
+
+                resp = await admin_cancel_booking(active_ride.id, req, db, admin_user)
+                assert resp.status_code == 200
+                data = json.loads(resp.body.decode("utf-8"))
+                assert data["ok"] is True
+                assert data["status"] == "cancelled"
+
+                # Check DB status
+                await db.refresh(active_ride)
+                assert active_ride.status == BookingStatus.CANCELLED
+                assert active_ride.cancelled_by == "admin"
+                assert active_ride.cancellation_reason == "Customer called support"
+
+                # Check customer WS event
+                to_customer = [p for uid, ev, p in sent if uid == cust_user.id and ev == "booking_update"]
+                assert len(to_customer) == 1
+                assert to_customer[0]["status"] == "cancelled"
+                assert to_customer[0]["cancelled_by"] == "admin"
+
+                # Check driver WS event
+                to_driver = [p for uid, ev, p in sent if uid == drv_user.id and ev == "booking_update"]
+                assert len(to_driver) == 1
+                assert to_driver[0]["status"] == "cancelled"
+                assert to_driver[0]["cancelled_by"] == "admin"
+
+                # Check notifications
+                assert await _notices(db, cust_user.id) == [(
+                    "Ride Cancelled by Admin",
+                    "Booking ZGTESTCN03 was cancelled by Ziggo Admin. Reason: Customer called support",
+                )]
+                assert await _notices(db, drv_user.id) == [(
+                    "Ride Cancelled by Admin",
+                    "Booking ZGTESTCN03 was cancelled by Ziggo Admin. Reason: Customer called support",
+                )]
+
+                # Check admin_live publish event
+                admin_events = [p for top, ev, p in published if top == "admin_live" and ev == "booking_status_update"]
+                assert len(admin_events) == 1
+                assert admin_events[0]["booking_id"] == active_ride.id
+                assert admin_events[0]["status"] == "cancelled"
+
+                # Test cannot cancel already cancelled booking
+                resp_again = await admin_cancel_booking(active_ride.id, req, db, admin_user)
+                assert resp_again.status_code == 400
+
+            finally:
+                await db.rollback()
+                await _clean(db)
+    finally:
+        await engine.dispose()
+
+
+async def test_admin_driver_redirect():
+    import sys
+    sys.path.append("/app")
+    from ziggo_admin_panel.routes import admin_driver_detail_redirect
+    from starlette.requests import Request
+
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/admin/drivers/270",
+        "query_string": b"return_to=%2Fadmin%2Fwithdrawals",
+        "headers": [],
+    }
+    req = Request(scope)
+    resp = await admin_driver_detail_redirect(270, req)
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/admin/drivers/270/edit?return_to=%2Fadmin%2Fwithdrawals"
+

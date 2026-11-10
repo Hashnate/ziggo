@@ -91,7 +91,11 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final event = data['event'];
   unawaited(_bgLog('[fcm-bg] handler invoked event=$event booking_id=${data['booking_id']} platform=${Platform.operatingSystem}'));
 
-  if (event == 'booking_cancelled' || (event == 'booking_update' && data['status'] == 'cancelled')) {
+  if (event == 'ride_taken' ||
+      event == 'order_taken' ||
+      event == 'market_order_taken' ||
+      event == 'booking_cancelled' ||
+      (event == 'booking_update' && data['status'] == 'cancelled')) {
     try {
       await _stopAlarmAudio();
     } catch (_) {}
@@ -276,8 +280,10 @@ Future<void> createRideAlarmChannel(
 }
 
 final AudioPlayer _bgAlarmAudioPlayer = AudioPlayer();
+Timer? _bgAlarmStopTimer;
 
-Future<void> _playAlarmAudio() async {
+Future<void> _playAlarmAudio([int timeoutSeconds = 30]) async {
+  _bgAlarmStopTimer?.cancel();
   try {
     await _bgAlarmAudioPlayer.setAudioContext(
       AudioContext(
@@ -300,9 +306,23 @@ Future<void> _playAlarmAudio() async {
     await _bgAlarmAudioPlayer.setReleaseMode(ReleaseMode.loop);
     await _bgAlarmAudioPlayer.play(AssetSource('sounds/ride_alert.mp3'));
   } catch (_) {}
+
+  // Hard auto-stop timer: shuts off looping siren and cancels notification
+  // if the driver ignores or doesn't interact with it.
+  _bgAlarmStopTimer = Timer(Duration(seconds: timeoutSeconds), () async {
+    await _stopAlarmAudio();
+    try {
+      final local = FlutterLocalNotificationsPlugin();
+      const androidInit = AndroidInitializationSettings('@mipmap/launcher_icon');
+      await local.initialize(const InitializationSettings(android: androidInit));
+      await local.cancel(_rideAlertNotificationId);
+    } catch (_) {}
+  });
 }
 
 Future<void> _stopAlarmAudio() async {
+  _bgAlarmStopTimer?.cancel();
+  _bgAlarmStopTimer = null;
   try {
     await _bgAlarmAudioPlayer.stop();
   } catch (_) {}
@@ -318,7 +338,9 @@ Future<void> showRideAlarm(
   String body,
   Map<String, dynamic> data,
 ) async {
-  unawaited(_playAlarmAudio());
+  final int timeoutSeconds = (data['expires_in_seconds'] as num?)?.toInt() ??
+      int.tryParse(data['expires_in_seconds']?.toString() ?? '') ?? 30;
+  unawaited(_playAlarmAudio(timeoutSeconds));
   final vibrationPattern = Int64List.fromList([0, 1000, 500, 1000, 500, 1000]);
 
   try {
@@ -345,7 +367,7 @@ Future<void> showRideAlarm(
           vibrationPattern: vibrationPattern,
           ongoing: true,
           autoCancel: false,
-          timeoutAfter: 30000, // matches expires_in_seconds: 30 from backend
+          timeoutAfter: timeoutSeconds * 1000, // matches expires_in_seconds: 30 from backend
           visibility: NotificationVisibility.public,
         ),
       ),
@@ -374,7 +396,7 @@ Future<void> showRideAlarm(
             vibrationPattern: vibrationPattern,
             ongoing: true,
             autoCancel: false,
-            timeoutAfter: 30000,
+            timeoutAfter: timeoutSeconds * 1000,
             visibility: NotificationVisibility.public,
           ),
         ),

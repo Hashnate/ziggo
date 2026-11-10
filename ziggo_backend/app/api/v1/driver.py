@@ -587,7 +587,10 @@ def _find_admin_panel_dir() -> str:
 
 _ADMIN_PANEL_DIR = _find_admin_panel_dir()
 _DOC_UPLOAD_DIR = os.path.join(_ADMIN_PANEL_DIR, "static", "uploads", "driver_docs")
-os.makedirs(_DOC_UPLOAD_DIR, exist_ok=True)
+try:
+    os.makedirs(_DOC_UPLOAD_DIR, exist_ok=True)
+except OSError:
+    pass
 _VALID_DOC_TYPES = {"nic_front", "nic_back", "license_front", "license_back", "vehicle_reg", "insurance", "year_license", "eco_test", "vehicle_front", "vehicle_back", "vehicle_side"}
 _ALLOWED_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".pdf", ".avif"}
 _MAX_DOC_BYTES = 25 * 1024 * 1024  # 25 MB
@@ -709,7 +712,10 @@ async def list_my_documents(
 
 
 _PROFILE_PHOTO_DIR = os.path.join(_ADMIN_PANEL_DIR, "static", "uploads", "drivers")
-os.makedirs(_PROFILE_PHOTO_DIR, exist_ok=True)
+try:
+    os.makedirs(_PROFILE_PHOTO_DIR, exist_ok=True)
+except OSError:
+    pass
 
 
 async def _save_profile_photo(asset: UploadFile) -> str:

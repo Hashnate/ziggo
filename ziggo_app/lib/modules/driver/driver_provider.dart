@@ -282,8 +282,8 @@ class DriverProvider extends ChangeNotifier {
     } else if (event == 'market_order_update') {
       loadActiveMarketOrder();
     } else if (event == 'ride_taken' || event == 'order_taken' || event == 'market_order_taken') {
-      // Another driver claimed it. Match by booking_id, food_order_id, OR
-      // market_order_id depending on what was pending.
+      // Another driver claimed it. Always ensure any active ride alarm is silenced immediately.
+      FcmService.instance.cancelRideAlert();
       final pending = _pendingRequest;
       if (pending == null) return;
       final sameBooking = data['booking_id'] != null &&
@@ -294,7 +294,6 @@ class DriverProvider extends ChangeNotifier {
           pending['market_order_id'] == data['market_order_id'];
       if (sameBooking || sameFood || sameMarket) {
         _pendingRequest = null;
-        FcmService.instance.cancelRideAlert();
         notifyListeners();
       }
     } else if (event == 'queued_ride_activated') {
@@ -914,7 +913,12 @@ class DriverProvider extends ChangeNotifier {
     try {
       final resp = await ApiClient.instance.dio.get('/driver/pending-request');
       final data = resp.data;
-      if (data == null || data is! Map) return;
+      if (data == null || data is! Map) {
+        if (_pendingRequest == null) {
+          unawaited(FcmService.instance.cancelRideAlert());
+        }
+        return;
+      }
       final request = Map<String, dynamic>.from(data);
       final incoming = request['booking_id'];
       final current = _pendingRequest?['booking_id'];

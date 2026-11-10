@@ -5,7 +5,7 @@
 ('Driver #' ~ driver.id) }}{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+<div class="max-w-3xl mx-auto bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-12 sm:mb-8">
     <form method="post"
         action="/admin/drivers/{{ driver.id }}/edit{% if back_url %}?return_to={{ back_url | urlencode }}{% endif %}"
         enctype="multipart/form-data" class="p-8 space-y-6">
@@ -29,7 +29,7 @@
                 {% endif %}
             </div>
             <a href="{{ back_url or '/admin/drivers' }}" class="text-sm font-bold text-ziggo-muted hover:text-ziggo">
-                <i class="fas fa-arrow-left mr-1"></i> Back to drivers
+                <i class="fas fa-arrow-left mr-1"></i> {% if back_url and 'withdrawals' in back_url %}Back to withdrawals{% elif back_url and 'finance' in back_url %}Back to finance{% elif back_url and 'vehicles' in back_url %}Back to vehicles{% else %}Back to drivers{% endif %}
             </a>
         </div>
 
@@ -290,13 +290,13 @@
 
         {# Multi-Vehicle Management #}
         <div class="pt-6 border-t border-gray-100">
-            <div class="flex items-center justify-between mb-4">
-                <h4 class="font-black text-ziggo-ink flex items-center gap-2">
-                    <i class="fas fa-car-side text-ziggo"></i> Registered Vehicles ({{ vehicles | length if vehicles
-                    else 0 }})
+            <div class="flex items-center justify-between gap-3 mb-4">
+                <h4 class="font-black text-ziggo-ink flex items-center gap-2 text-sm sm:text-base">
+                    <i class="fas fa-car-side text-ziggo"></i>
+                    <span>Registered Vehicles ({{ vehicles | length if vehicles else 0 }})</span>
                 </h4>
                 <button type="button" onclick="document.getElementById('addVehicleModal').classList.remove('hidden')"
-                    class="px-3.5 py-1.5 bg-ziggo text-white rounded-xl text-xs font-black hover:bg-ziggo-light shadow-sm flex items-center gap-1.5 transition">
+                    class="shrink-0 px-3.5 py-1.5 bg-ziggo text-white rounded-xl text-xs font-black hover:bg-ziggo-light shadow-sm flex items-center gap-1.5 transition whitespace-nowrap">
                     <i class="fas fa-plus"></i> Add Vehicle
                 </button>
             </div>
@@ -305,10 +305,10 @@
             <div class="space-y-3">
                 {% for veh in vehicles %}
                 <div data-live="veh-{{ veh.id }}"
-                    class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div class="flex items-center gap-3">
+                    class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                         <div
-                            class="w-12 h-12 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-xl text-ziggo">
+                            class="w-12 h-12 shrink-0 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-xl text-ziggo">
                             {% if veh.vehicle_type == 'bike' %}
                             <i class="fas fa-motorcycle"></i>
                             {% elif veh.vehicle_type == 'tuk' %}
@@ -321,27 +321,25 @@
                             <i class="fas fa-truck"></i>
                             {% endif %}
                         </div>
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <span class="font-black text-sm text-gray-900 uppercase">{{ veh.vehicle_number }}</span>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center flex-wrap gap-1.5">
+                                <span class="font-black text-sm text-gray-900 uppercase whitespace-nowrap">{{ veh.vehicle_number }}</span>
                                 <span
-                                    class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-gray-200 text-gray-700">{{
+                                    class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-gray-200 text-gray-700 whitespace-nowrap">{{
                                     veh.vehicle_type }}</span>
                                 {% if veh.is_active %}
                                 <span
-                                    class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700">ACTIVE
-                                    NOW</span>
+                                    class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 whitespace-nowrap">ACTIVE NOW</span>
                                 {% endif %}
                                 {% if veh.is_approved %}
                                 <span
-                                    class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700">APPROVED</span>
+                                    class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700 whitespace-nowrap">APPROVED</span>
                                 {% else %}
                                 <span
-                                    class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-700">PENDING
-                                    APPROVAL</span>
+                                    class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-700 whitespace-nowrap">PENDING APPROVAL</span>
                                 {% endif %}
                             </div>
-                            <p class="text-xs text-gray-500 mt-0.5">
+                            <p class="text-xs text-gray-500 mt-1">
                                 {{ veh.vehicle_model or 'Model not specified' }} • {{ veh.vehicle_color or 'Color not
                                 specified' }} • {{ veh.vehicle_year or 'Year N/A' }}
                             </p>
@@ -352,32 +350,32 @@
                         </div>
                     </div>
 
-                    <div class="flex items-center gap-2 flex-wrap">
+                    <div class="flex items-center justify-end gap-2 flex-wrap pt-3 sm:pt-0 border-t sm:border-t-0 border-gray-200/60 shrink-0">
                         {% if veh.registration_doc_url %}
                         <a href="{{ veh.registration_doc_url }}" target="_blank"
-                            class="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-100 transition">
+                            class="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-100 transition whitespace-nowrap">
                             <i class="fas fa-file-alt mr-1"></i> CR Book
                         </a>
                         {% endif %}
                         {% if veh.insurance_doc_url %}
                         <a href="{{ veh.insurance_doc_url }}" target="_blank"
-                            class="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-100 transition">
+                            class="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-100 transition whitespace-nowrap">
                             <i class="fas fa-shield-alt mr-1"></i> Insurance
                         </a>
                         {% endif %}
 
                         {% if not veh.is_approved %}
                         <button form="approve_veh_{{ veh.id }}" type="submit"
-                            class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-black hover:bg-emerald-700 transition">
+                            class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-black hover:bg-emerald-700 transition whitespace-nowrap">
                             <i class="fas fa-check mr-1"></i> Approve
                         </button>
                         <button form="reject_veh_{{ veh.id }}" type="submit"
-                            class="px-3 py-1.5 border border-rose-300 text-rose-600 rounded-lg text-xs font-black hover:bg-rose-50 transition">
+                            class="px-3 py-1.5 border border-rose-300 text-rose-600 rounded-lg text-xs font-black hover:bg-rose-50 transition whitespace-nowrap">
                             <i class="fas fa-times mr-1"></i> Reject
                         </button>
                         {% else %}
                         <button form="reject_veh_{{ veh.id }}" type="submit"
-                            class="px-3 py-1.5 border border-amber-300 text-amber-700 rounded-lg text-xs font-black hover:bg-amber-50 transition">
+                            class="px-3 py-1.5 border border-amber-300 text-amber-700 rounded-lg text-xs font-black hover:bg-amber-50 transition whitespace-nowrap">
                             <i class="fas fa-ban mr-1"></i> Revoke
                         </button>
                         {% endif %}
@@ -393,11 +391,11 @@
             {% endif %}
         </div>
 
-        <div class="pt-6 border-t border-gray-100 flex justify-end gap-3">
+        <div class="pt-6 border-t border-gray-100 grid grid-cols-2 sm:flex sm:justify-end gap-3">
             <a href="{{ back_url or '/admin/drivers' }}"
-                class="px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50">Cancel</a>
+                class="px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50 text-center transition">Cancel</a>
             <button type="submit"
-                class="px-8 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light shadow-brand">
+                class="px-8 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light shadow-brand flex items-center justify-center transition">
                 <i class="fas fa-save mr-2"></i> Save changes
             </button>
         </div>

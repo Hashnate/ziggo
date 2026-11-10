@@ -35,6 +35,6 @@ docker run --rm --network host \
   -e DATABASE_URL="postgresql+asyncpg://$DB_USER:$DB_PASS@127.0.0.1:5434/$TEST_DB" \
   -e SYNC_DATABASE_URL="postgresql+psycopg://$DB_USER:$DB_PASS@127.0.0.1:5434/$TEST_DB" \
   -e SECRET_KEY=test-only -e DEV_MODE=true \
-  -v "$STAGING_DIR/ziggo_backend:/work:$mount" -v ziggo_test_pip_cache:/root/.cache/pip \
+  -v "$STAGING_DIR/ziggo_backend:/work:$mount" -v "$STAGING_DIR/ziggo_admin_panel:/app/ziggo_admin_panel:ro" -v ziggo_test_pip_cache:/root/.cache/pip \
   -w /work "$IMAGE" \
   sh -c "pip install -q --disable-pip-version-check --root-user-action=ignore -r requirements-dev.txt && $cmd"

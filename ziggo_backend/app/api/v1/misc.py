@@ -384,7 +384,10 @@ def _find_admin_panel_dir() -> str:
 
 _ADMIN_PANEL_DIR = _find_admin_panel_dir()
 _COMPLAINT_ATTACHMENT_DIR = os.path.join(_ADMIN_PANEL_DIR, "static", "uploads", "complaints")
-os.makedirs(_COMPLAINT_ATTACHMENT_DIR, exist_ok=True)
+try:
+    os.makedirs(_COMPLAINT_ATTACHMENT_DIR, exist_ok=True)
+except OSError:
+    pass
 
 
 @router.post("/complaints/upload")

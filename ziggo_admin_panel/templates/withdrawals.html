@@ -45,16 +45,49 @@
                 <p class="text-xs text-ziggo-muted mt-1" style="font-family:'Courier New',ui-monospace,monospace;letter-spacing:.2px;"><span class="text-ziggo font-bold">Pending</span> = total earnings − sum of withdrawals already paid out.</p>
             </div>
         </div>
-        <a href="/admin/withdrawals/pending/export" class="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl text-xs font-bold transition shadow-sm" title="Export Pending Balances to Excel">
+        <a href="/admin/withdrawals/pending/export{% if search %}?search={{ search|urlencode }}{% endif %}" class="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl text-xs font-bold transition shadow-sm" title="Export Pending Balances to Excel">
             <i class="fas fa-file-excel text-emerald-600"></i> Export Pending
         </a>
     </div>
+
+    <!-- Quick Search Bar (Vehicle #, Phone, Name) -->
+    <div class="px-5 py-3 border-b border-gray-100 bg-white">
+        <form method="get" action="/admin/withdrawals" class="flex flex-wrap items-center gap-2.5 max-w-2xl">
+            <div class="relative flex-1 min-w-[280px]">
+                <span class="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 flex items-center justify-center">
+                    <i class="fas fa-search text-xs"></i>
+                </span>
+                <input type="text" 
+                       name="search" 
+                       value="{{ search or '' }}" 
+                       placeholder="Search by vehicle # (e.g. ABZ-4380), phone, or name..." 
+                       style="padding-left: 38px !important;"
+                       class="w-full h-[38px] pr-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-ziggo focus:bg-white transition-all text-xs font-semibold text-gray-800 placeholder-gray-400 shadow-soft-sm">
+            </div>
+            <button type="submit" 
+                    class="h-[38px] px-4 bg-ziggo text-white rounded-xl font-bold text-xs shadow-sm hover:bg-ziggo-light transition inline-flex items-center justify-center gap-1.5 flex-shrink-0">
+                <i class="fas fa-search text-[11px]"></i> Search
+            </button>
+            {% if search %}
+            <a href="/admin/withdrawals" 
+               class="h-[38px] px-3.5 bg-gray-100 border border-gray-200 text-gray-700 rounded-xl font-bold text-xs hover:bg-gray-200 transition inline-flex items-center justify-center gap-1.5 flex-shrink-0">
+                <i class="fas fa-times text-[11px]"></i> Clear
+            </a>
+            <span class="text-xs text-gray-500 font-medium ml-1 flex items-center gap-1.5">
+                <span class="inline-block w-1.5 h-1.5 rounded-full bg-ziggo"></span>
+                Found: <strong class="text-ziggo font-bold">{{ total_drivers|num }}</strong>
+            </span>
+            {% endif %}
+        </form>
+    </div>
+
     <div class="overflow-x-auto">
         <table class="w-full text-left">
             <thead class="bg-ziggo-canvas/70 text-[11px] uppercase tracking-wider text-ziggo-faint font-black">
                 <tr>
                     <th class="px-6 py-3">Driver</th>
-                    <th class="px-6 py-3">Type</th>
+                    <th class="px-6 py-3">Vehicle</th>
+                    <th class="px-6 py-3 text-center">Status</th>
                     <th class="px-6 py-3 text-right">Earned</th>
                     <th class="px-6 py-3 text-right">Paid out</th>
                     <th class="px-6 py-3 text-right">Settlement Owed</th>
@@ -66,13 +99,53 @@
                 {% for r in rows %}
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-3">
-                        <p class="text-sm font-semibold text-ziggo-ink">{{ r.name }}</p>
-                        <p class="text-[10px] text-ziggo-faint">{{ r.phone }}</p>
+                        <p class="text-sm font-semibold text-ziggo-ink">
+                            <a href="/admin/drivers/{{ r.driver_id }}/edit?return_to=/admin/withdrawals" class="hover:text-ziggo hover:underline" title="View driver profile">{{ r.name }}</a>
+                        </p>
+                        <div class="flex items-center gap-2 mt-0.5">
+                            <span class="text-[10px] text-ziggo-faint font-mono">{{ r.phone }}</span>
+                            <span class="text-[10px] text-gray-300">•</span>
+                            <a href="/admin/finance/drivers/{{ r.driver_id }}" class="text-[10px] font-bold text-blue-600 hover:underline inline-flex items-center gap-1" title="View driver finance & earnings">
+                                <i class="fas fa-wallet text-[9px]"></i> Finance
+                            </a>
+                        </div>
                     </td>
-                    <td class="px-6 py-3 text-xs capitalize">{{ r.vehicle_type }}</td>
+                    <td class="px-6 py-3">
+                        {% if r.vehicle_number %}
+                        <p class="text-xs font-bold text-gray-800 font-mono tracking-tight">{{ r.vehicle_number }}</p>
+                        {% else %}
+                        <p class="text-xs text-gray-400 italic">No plate #</p>
+                        {% endif %}
+                        {% if r.vehicle_type %}
+                        <span class="inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-gray-100 text-gray-600">
+                            {{ r.vehicle_type }}
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-3 text-center">
+                        {% if r.is_blocked_for_arrears %}
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200" title="Cannot go online: unsettled arrears exceed platform limit">
+                            <i class="fas fa-ban text-[9px]"></i> Blocked (Arrears)
+                        </span>
+                        {% elif r.status == 'suspended' %}
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200">
+                            <i class="fas fa-exclamation-triangle text-[9px]"></i> Suspended
+                        </span>
+                        {% elif r.is_online %}
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Online
+                        </span>
+                        {% else %}
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600">
+                            <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span> Offline
+                        </span>
+                        {% endif %}
+                    </td>
                     <td class="px-6 py-3 text-right text-sm font-normal">Rs.{{ "{:,.2f}".format(r.earned) }}</td>
                     <td class="px-6 py-3 text-right text-sm">Rs.{{ "{:,.2f}".format(r.paid) }}</td>
-                    <td class="px-6 py-3 text-right text-sm {% if r.settlement_amount > 0 %}text-rose-600 font-bold{% else %}text-gray-400{% endif %}">Rs.{{ "{:,.2f}".format(r.settlement_amount) }}</td>
+                    <td class="px-6 py-3 text-right text-sm {% if r.settlement_amount > 0 %}text-rose-600 font-bold{% else %}text-gray-400{% endif %}">
+                        Rs.{{ "{:,.2f}".format(r.settlement_amount) }}
+                    </td>
                     <td class="px-6 py-3 text-right text-sm font-bold {% if r.pending > 0 %}text-amber-600{% else %}text-gray-400{% endif %}">
                         Rs.{{ "{:,.2f}".format(r.pending) }}
                     </td>
@@ -83,6 +156,7 @@
                                 data-name="{{ r.name or '' }}"
                                 data-phone="{{ r.phone or '' }}"
                                 data-vehicle="{{ r.vehicle_type or '' }}"
+                                data-vehicle-number="{{ r.vehicle_number or '' }}"
                                 data-pending="{{ "%.2f"|format(r.pending) }}"
                                 data-bank="{{ r.bank_name or '' }}"
                                 data-branch="{{ r.branch_name or '' }}"
@@ -98,7 +172,24 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="7" class="px-6 py-10 text-center text-gray-400">No driver earnings yet</td></tr>
+                <tr>
+                    <td colspan="8" class="px-6 py-12 text-center text-gray-400">
+                        {% if search %}
+                        <div class="flex flex-col items-center justify-center">
+                            <div class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 mb-2">
+                                <i class="fas fa-search text-base"></i>
+                            </div>
+                            <p class="text-sm font-bold text-gray-700">No matching drivers found</p>
+                            <p class="text-xs text-gray-400 mt-1">No driver matched vehicle number, phone, or name: "<span class="text-gray-600 font-semibold">{{ search }}</span>"</p>
+                            <a href="/admin/withdrawals" class="mt-3 px-3 py-1.5 bg-white border border-gray-200 text-ziggo text-xs font-bold rounded-lg hover:bg-gray-50 transition">
+                                Clear search filter
+                            </a>
+                        </div>
+                        {% else %}
+                        No driver earnings yet
+                        {% endif %}
+                    </td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -113,7 +204,7 @@
         </p>
         <div class="flex items-center gap-1.5">
             {% if page > 1 %}
-                <a href="/admin/withdrawals?page={{ page - 1 }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
+                <a href="/admin/withdrawals?page={{ page - 1 }}{% if search %}&search={{ search|urlencode }}{% endif %}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
             {% else %}
                 <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Previous</span>
             {% endif %}
@@ -122,12 +213,12 @@
                 {% if p == page %}
                     <span class="px-3 py-1.5 rounded-lg bg-ziggo text-white text-xs font-black">{{ p }}</span>
                 {% else %}
-                    <a href="/admin/withdrawals?page={{ p }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
+                    <a href="/admin/withdrawals?page={{ p }}{% if search %}&search={{ search|urlencode }}{% endif %}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
                 {% endif %}
             {% endfor %}
 
             {% if page < total_pages %}
-                <a href="/admin/withdrawals?page={{ page + 1 }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
+                <a href="/admin/withdrawals?page={{ page + 1 }}{% if search %}&search={{ search|urlencode }}{% endif %}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
             {% else %}
                 <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Next</span>
             {% endif %}
@@ -337,7 +428,8 @@ function handleOpenPayout(btn) {
     
     document.getElementById('modalDriverName').textContent = d.name || `Driver #${d.driverId}`;
     document.getElementById('modalDriverPhone').textContent = d.phone || '—';
-    document.getElementById('modalDriverType').textContent = `${d.vehicle ? (d.vehicle.charAt(0).toUpperCase() + d.vehicle.slice(1)) : 'Vehicle'} Driver`;
+    const vehType = d.vehicle ? (d.vehicle.charAt(0).toUpperCase() + d.vehicle.slice(1)) : 'Vehicle';
+    document.getElementById('modalDriverType').textContent = d.vehicleNumber ? `${d.vehicleNumber} • ${vehType}` : `${vehType} Driver`;
     
     const pendingVal = parseFloat(d.pending) || 0;
     document.getElementById('modalDriverPending').textContent = `Rs. ${fmtNum(pendingVal, 2)}`;

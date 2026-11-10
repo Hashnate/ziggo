@@ -27,6 +27,7 @@ from ..models import (
     BookingStatus,
     Customer,
     Driver,
+    DriverVehicle,
     FoodOrder,
     FoodOrderStatus,
     MarketOrder,
@@ -447,12 +448,33 @@ async def driver_finance_table(db: AsyncSession, sort_by: str = "latest_ride") -
             continue
         by_driver_m.setdefault(o.driver_id, []).append(o)
 
+    # Vehicles keyed by driver_id
+    dv_q = await db.execute(select(DriverVehicle))
+    d_vehicles = dv_q.scalars().all()
+    by_driver_v: dict[int, list[DriverVehicle]] = {}
+    for v in d_vehicles:
+        by_driver_v.setdefault(v.driver_id, []).append(v)
+
     rows: list[dict] = []
     for d in drivers:
         u = user_by_id.get(d.user_id or 0)
         b_list = by_driver_b.get(d.id, [])
         f_list = by_driver_f.get(d.id, [])
         m_list = by_driver_m.get(d.id, [])
+        v_list = by_driver_v.get(d.id, [])
+
+        veh_num = (d.vehicle_number or "").strip()
+        veh_type = (d.vehicle_type or "").strip()
+        if not veh_num and v_list:
+            active_v = next((v for v in v_list if v.is_active and v.vehicle_number), None)
+            if not active_v:
+                active_v = next((v for v in v_list if v.is_approved and v.vehicle_number), None)
+            if not active_v:
+                active_v = next((v for v in v_list if v.vehicle_number), None)
+            if active_v:
+                veh_num = (active_v.vehicle_number or "").strip()
+                if not veh_type:
+                    veh_type = (active_v.vehicle_type or "").strip()
 
         calculated_total = Decimal("0")
         online_earned = Decimal("0")
@@ -532,7 +554,8 @@ async def driver_finance_table(db: AsyncSession, sort_by: str = "latest_ride") -
             "user_id": d.user_id,
             "name": u.full_name if u else None,
             "phone": u.phone_number if u else None,
-            "vehicle_type": d.vehicle_type,
+            "vehicle_type": veh_type,
+            "vehicle_number": veh_num,
             "is_online": bool(d.is_online),
             "status": d.status.value if d.status else None,
             "rating": float(u.rating or 0) if u else 0,
@@ -1126,7 +1149,12 @@ async def vendor_finance_detail(db: AsyncSession, vendor_id: int) -> Optional[di
     }
 
 
-async def get_withdrawals_data(db: AsyncSession, page: int = 1, page_size: int = 10) -> dict:
+async def get_withdrawals_data(
+    db: AsyncSession,
+    page: int = 1,
+    page_size: int = 10,
+    search: Optional[str] = None,
+) -> dict:
     from app.models import DriverPayout
     # Fetch all driver payouts grouped by driver
     pq = await db.execute(select(DriverPayout))
@@ -1137,6 +1165,7 @@ async def get_withdrawals_data(db: AsyncSession, page: int = 1, page_size: int =
 
     # Use the existing driver_finance_table code to calculate total earnings dynamically
     all_driver_rows = await driver_finance_table(db, sort_by="earnings")
+    max_limit = float(await _driver_commission_limit(db))
     
     rows = []
     total_pending_all = Decimal("0")
@@ -1148,12 +1177,21 @@ async def get_withdrawals_data(db: AsyncSession, page: int = 1, page_size: int =
         paid = Decimal(str(stats["paid"]))
         pending = Decimal(str(stats["pending"]))
         total_pending_all += pending
+
+        status = r.get("status") or "pending"
+        is_online = bool(r.get("is_online", False))
+        settlement = float(r.get("settlement_amount", 0.0))
+        is_blocked = (settlement > max_limit) or (status == "suspended")
         
         rows.append({
             "driver_id": drv_id,
             "name": r["name"] or f"Driver #{drv_id}",
             "phone": r["phone"] or "",
-            "vehicle_type": r["vehicle_type"] or "",
+            "vehicle_type": r.get("vehicle_type") or "",
+            "vehicle_number": r.get("vehicle_number") or "",
+            "status": status,
+            "is_online": is_online,
+            "is_blocked_for_arrears": is_blocked,
             "bank_name": r.get("bank_name", ""),
             "branch_name": r.get("branch_name", ""),
             "account_number": r.get("account_number", ""),
@@ -1161,8 +1199,32 @@ async def get_withdrawals_data(db: AsyncSession, page: int = 1, page_size: int =
             "earned": float(earned),
             "paid": float(paid),
             "pending": float(pending),
-            "settlement_amount": r.get("settlement_amount", 0.0),
+            "settlement_amount": settlement,
         })
+
+    # Filter rows by search term if provided (matches vehicle plate #, phone, or name)
+    if search and search.strip():
+        q_raw = search.strip().lower()
+        q_alnum = re.sub(r"[^a-z0-9]", "", q_raw)
+        filtered = []
+        for r_item in rows:
+            name_lower = (r_item.get("name") or "").lower()
+            phone_lower = (r_item.get("phone") or "").lower()
+            phone_digits = re.sub(r"[^0-9]", "", phone_lower)
+            v_num = (r_item.get("vehicle_number") or "").lower()
+            v_num_alnum = re.sub(r"[^a-z0-9]", "", v_num)
+            
+            matched = False
+            if q_raw in name_lower:
+                matched = True
+            elif q_raw in phone_lower or (q_alnum and q_alnum in phone_digits):
+                matched = True
+            elif (q_raw in v_num) or (q_alnum and q_alnum in v_num_alnum):
+                matched = True
+            
+            if matched:
+                filtered.append(r_item)
+        rows = filtered
 
     # Pagination
     total_drivers = len(rows)

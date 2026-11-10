@@ -4,7 +4,7 @@
 {% block page_title %}Add New Driver{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+<div class="max-w-3xl mx-auto bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-12 sm:mb-8">
     <form method="post" action="/admin/drivers/new" enctype="multipart/form-data" class="p-8 space-y-6">
         {% if error %}
         <div class="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl font-bold text-sm">
@@ -229,11 +229,11 @@
             </div>
         </div>
 
-        <div class="pt-6 border-t border-gray-100 flex justify-end gap-3">
+        <div class="pt-6 border-t border-gray-100 grid grid-cols-2 sm:flex sm:justify-end gap-3">
             <a href="/admin/drivers"
-                class="px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50">Cancel</a>
+                class="px-6 py-3 border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-gray-50 text-center transition">Cancel</a>
             <button type="submit"
-                class="px-8 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light shadow-brand">
+                class="px-8 py-3 bg-ziggo text-white rounded-xl font-bold hover:bg-ziggo-light shadow-brand flex items-center justify-center transition">
                 <i class="fas fa-save mr-2"></i> Save changes
             </button>
         </div>

@@ -1263,6 +1263,15 @@ async def admin_drivers_new_submit(
 
 
 
+@router.get("/drivers/{driver_id}")
+async def admin_driver_detail_redirect(
+    driver_id: int,
+    request: Request,
+):
+    query_str = f"?{request.url.query}" if request.url.query else ""
+    return RedirectResponse(url=f"/admin/drivers/{driver_id}/edit{query_str}", status_code=303)
+
+
 @router.get("/drivers/{driver_id}/edit", response_class=HTMLResponse)
 async def admin_drivers_edit_form(
     driver_id: int,
@@ -1281,7 +1290,7 @@ async def admin_drivers_edit_form(
 
         # Determine back_url
         return_to = request.query_params.get("return_to", "").strip()
-        if return_to and return_to.startswith("/admin/") and not return_to.startswith(f"/admin/drivers/{driver_id}/edit"):
+        if return_to and return_to.startswith("/admin/") and not return_to.startswith(f"/admin/drivers/{driver_id}"):
             back_url = return_to
         elif request.query_params.get("from_status"):
             back_url = f"/admin/drivers?status={urllib.parse.quote(request.query_params['from_status'])}"
@@ -1292,9 +1301,9 @@ async def admin_drivers_edit_form(
             if referer:
                 try:
                     parsed_ref = urllib.parse.urlparse(referer)
-                    if parsed_ref.path == "/admin/drivers":
+                    if parsed_ref.path.startswith("/admin/") and not parsed_ref.path.startswith(f"/admin/drivers/{driver_id}"):
                         ref_query = f"?{parsed_ref.query}" if parsed_ref.query else ""
-                        back_url = f"/admin/drivers{ref_query}"
+                        back_url = f"{parsed_ref.path}{ref_query}"
                 except Exception:
                     pass
 

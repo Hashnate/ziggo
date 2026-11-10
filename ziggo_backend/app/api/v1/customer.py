@@ -115,7 +115,10 @@ def _find_admin_panel_dir() -> str:
 
 _ADMIN_PANEL_DIR = _find_admin_panel_dir()
 _PROFILE_PHOTO_DIR = os.path.join(_ADMIN_PANEL_DIR, "static", "uploads", "customers")
-os.makedirs(_PROFILE_PHOTO_DIR, exist_ok=True)
+try:
+    os.makedirs(_PROFILE_PHOTO_DIR, exist_ok=True)
+except OSError:
+    pass
 
 
 async def _save_profile_photo(asset: UploadFile) -> str:

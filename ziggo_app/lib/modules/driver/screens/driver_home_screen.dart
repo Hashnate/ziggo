@@ -406,6 +406,12 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       FloatingOverlayService.hideFloatingWidget();
+      if (mounted) {
+        final pending = context.read<DriverProvider>().pendingRequest;
+        if (pending == null) {
+          unawaited(FcmService.instance.cancelRideAlert());
+        }
+      }
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.hidden) {

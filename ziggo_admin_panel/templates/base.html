@@ -425,10 +425,16 @@
         .fixed.inset-0.z-50 {
             z-index: 1000 !important;
         }
+
+        /* Support dynamic viewport height for mobile browsers */
+        html, body {
+            height: 100vh;
+            height: 100dvh;
+        }
     </style>
     {% block head %}{% endblock %}
 </head>
-<body class="zi-canvas flex h-screen overflow-hidden text-ziggo-ink">
+<body class="zi-canvas flex h-screen h-[100dvh] overflow-hidden text-ziggo-ink" style="height: 100vh; height: 100dvh;">
 
     <!-- Sidebar -->
     <aside id="adminSidebar" class="w-56 zi-sidebar text-ziggo-ink flex flex-col fixed md:static inset-y-0 left-0 z-[1001] bg-white transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out">
@@ -661,7 +667,7 @@
         </header>
 
         <!-- Page Content -->
-        <div id="mainContent" class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        <div id="mainContent" class="flex-1 overflow-y-auto px-4 sm:px-5 pt-4 pb-24 md:pb-8 space-y-4" style="padding-bottom: max(6rem, env(safe-area-inset-bottom, 24px));">
             {% if request.query_params.get("error") %}
             <div class="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 flex items-start gap-3 text-sm max-w-6xl font-bold">
                 <i class="fas fa-circle-exclamation mt-0.5 shrink-0 text-red-500"></i>

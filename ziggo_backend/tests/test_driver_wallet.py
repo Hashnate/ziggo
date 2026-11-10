@@ -272,6 +272,31 @@ async def test_driver_filters():
                 assert f_online.describe() == f"All drivers · online from {(today - timedelta(days=1)):%d %b %Y} to {today:%d %b %Y} · at least 2.5 hrs online"
                 assert DriverFilter.from_json(f_online.to_json()) == f_online
                 assert not f_online.is_everyone()
+
+                # Withdrawals search tests (by name, phone, plate #)
+                res_name = await get_withdrawals_data(db, search="F1")
+                assert len(res_name["rows"]) == 1
+                assert res_name["rows"][0]["name"] == "F1"
+
+                res_phone = await get_withdrawals_data(db, search=FILTER_PHONES[2])
+                assert len(res_phone["rows"]) == 1
+                assert res_phone["rows"][0]["phone"] == FILTER_PHONES[2]
+
+                # Update veteran's vehicle plate to test plate normalization
+                v_drv = (await db.execute(select(Driver).where(Driver.user_id == users[1].id))).scalars().first()
+                v_drv.vehicle_number = "WP CAX - 9876"
+                await db.commit()
+
+                res_plate1 = await get_withdrawals_data(db, search="CAX9876")
+                assert len(res_plate1["rows"]) == 1
+                assert res_plate1["rows"][0]["vehicle_number"] == "WP CAX - 9876"
+
+                res_plate2 = await get_withdrawals_data(db, search="cax-9876")
+                assert len(res_plate2["rows"]) == 1
+
+                res_none = await get_withdrawals_data(db, search="NONEXISTENT999")
+                assert len(res_none["rows"]) == 0
+                assert res_none["total_drivers"] == 0
             finally:
                 await _clean_filter_drivers(db)
     finally:

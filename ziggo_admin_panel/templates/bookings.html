@@ -223,10 +223,34 @@
                             <span id="trackedDriver">Driver Name • Car</span>
                         </div>
                     </div>
-                    <button type="button" onclick="resetRideTracking()" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-xs flex-shrink-0 transition">
-                        <i class="fas fa-times"></i>
-                    </button>
+                    <div class="flex items-center gap-1.5 flex-shrink-0">
+                        <button type="button" id="trackedCancelBtn" class="hidden px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-bold transition flex items-center gap-1 shadow-sm" title="Cancel this active ride">
+                            <i class="fas fa-ban text-[10px]"></i> Cancel Ride
+                        </button>
+                        <button type="button" onclick="resetRideTracking()" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-xs flex-shrink-0 transition">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
                 </div>
+
+                <!-- From & To Trip Locations -->
+                <div class="mt-2.5 pt-2 border-t border-slate-100 space-y-1.5 text-xs">
+                    <div class="flex items-start gap-2">
+                        <span class="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[8px] mt-0.5 shrink-0 shadow-sm font-black">A</span>
+                        <div class="min-w-0 flex-1">
+                            <span class="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Pickup (From)</span>
+                            <span class="text-xs text-gray-800 font-semibold truncate block" id="trackedPickup">--</span>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <span class="w-4 h-4 rounded-full bg-red-600 text-white flex items-center justify-center text-[8px] mt-0.5 shrink-0 shadow-sm font-black">B</span>
+                        <div class="min-w-0 flex-1">
+                            <span class="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Drop-off (To)</span>
+                            <span class="text-xs text-gray-800 font-semibold truncate block" id="trackedDrop">--</span>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-gray-600 font-medium">
                     <span id="trackedDistance"><i class="fas fa-route text-blue-500 mr-1"></i> Road: -- km</span>
                     <span id="trackedDuration"><i class="fas fa-clock text-amber-500 mr-1"></i> Est: -- min</span>
@@ -290,9 +314,17 @@
                     <span>{{ b.driver.user.full_name if b.driver.user else '' }} • {{ b.driver.vehicle_number or '' }}</span>
                 </p>
                 {% endif %}
-                <p class="text-xs text-gray-400 mt-1">
-                    Rs.{{ "{:,.0f}".format(b.final_amount or 0) }} • {{ b.service_type }}
-                </p>
+                <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-100">
+                    <p class="text-xs text-gray-400">
+                        Rs.{{ "{:,.0f}".format(b.final_amount or 0) }} • {{ b.service_type }}
+                    </p>
+                    <button type="button"
+                            onclick="openAdminCancelModal({{ b.id }}, '{{ b.booking_ref }}', '{{ b.status.value }}', '{{ (b.customer.user.full_name or b.customer.user.phone_number if b.customer else '')|escape }}', '{{ (b.driver.user.full_name if b.driver and b.driver.user else '')|escape }}', event)"
+                            class="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-bold transition flex items-center gap-1 shadow-sm"
+                            title="Cancel this active ride">
+                        <i class="fas fa-ban text-[11px]"></i> Cancel
+                    </button>
+                </div>
             </div>
             {% else %}
             <div class="text-center py-10 px-3 space-y-3">
@@ -359,12 +391,23 @@
                     <td class="px-6 py-3 text-xs text-gray-600">
                         <div>{{ b.pickup_address[:30] if b.pickup_address else '' }}…</div>
                         <div class="text-gray-400">→ {{ b.drop_address[:30] if b.drop_address else '' }}…</div>
-                        {% if b.pickup_lat and b.drop_lat %}
-                        <button type="button" data-track-id="{{ b.id }}"
-                                class="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-ziggo hover:bg-ziggo hover:text-white transition font-black text-[11px] shadow-sm">
-                            <i class="fas fa-route"></i> Track on Map
-                        </button>
-                        {% endif %}
+                        <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                            {% if b.pickup_lat and b.drop_lat %}
+                            <button type="button" data-track-id="{{ b.id }}"
+                                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-ziggo hover:bg-ziggo hover:text-white transition font-black text-[11px] shadow-sm">
+                                <i class="fas fa-route"></i> Track on Map
+                            </button>
+                            {% endif %}
+                            {% if b.status.value in ['searching', 'accepted', 'arrived', 'started'] %}
+                            <button type="button"
+                                    data-row-cancel-id="{{ b.id }}"
+                                    onclick="openAdminCancelModal({{ b.id }}, '{{ b.booking_ref }}', '{{ b.status.value }}', '{{ (b.customer.user.full_name or b.customer.user.phone_number if b.customer else '')|escape }}', '{{ (b.driver.user.full_name if b.driver and b.driver.user else '')|escape }}', event)"
+                                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-200 transition font-bold text-[11px] shadow-sm"
+                                    title="Cancel this active ride">
+                                <i class="fas fa-ban text-[10px]"></i> Cancel
+                            </button>
+                            {% endif %}
+                        </div>
                     </td>
                     <td class="px-6 py-3 text-sm row-status-cell">
                         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide
@@ -446,6 +489,82 @@
         </div>
     </div>
     {% endif %}
+</div>
+
+<!-- Admin Cancel Active Ride Modal -->
+<div id="adminCancelModal" onclick="if(event.target === this) closeAdminCancelModal()" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[2500] hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden transform transition-all">
+        <!-- Modal Header -->
+        <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-red-50/50">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center text-lg flex-shrink-0">
+                    <i class="fas fa-ban"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-black text-ziggo-ink">Cancel Active Ride</h3>
+                    <p class="text-xs text-gray-500 mt-0.5">Ref: <span id="cancelModalRef" class="font-bold text-ziggo">ZG--------</span></p>
+                </div>
+            </div>
+            <button type="button" onclick="closeAdminCancelModal()" class="w-8 h-8 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-600 flex items-center justify-center transition">
+                <i class="fas fa-times text-sm"></i>
+            </button>
+        </div>
+
+        <!-- Modal Body -->
+        <div class="p-5 space-y-4">
+            <!-- Ride Details Card -->
+            <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs">
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-500 font-medium">Status:</span>
+                    <span id="cancelModalStatus" class="font-black px-2 py-0.5 rounded-full uppercase text-[10px] bg-amber-100 text-amber-700">SEARCHING</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-500 font-medium">Customer:</span>
+                    <span id="cancelModalCustomer" class="font-bold text-gray-800">--</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-500 font-medium">Driver:</span>
+                    <span id="cancelModalDriver" class="font-bold text-gray-800">Unassigned (Searching)</span>
+                </div>
+            </div>
+
+            <!-- Warning Notice -->
+            <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-xs flex items-start gap-2.5">
+                <i class="fas fa-exclamation-triangle text-amber-600 text-sm mt-0.5 flex-shrink-0"></i>
+                <p class="leading-relaxed">
+                    Cancelling this booking will <strong>automatically notify both the customer and driver</strong> in real-time. If searching, the dispatch request will be cleared.
+                </p>
+            </div>
+
+            <!-- Reason Selection -->
+            <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wide">Cancellation Reason</label>
+                <select id="cancelReasonPreset" onchange="onCancelReasonPresetChange()" class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-ziggo bg-white mb-2">
+                    <option value="Customer requested cancellation via support">Customer requested cancellation via support</option>
+                    <option value="Driver requested cancellation / unable to reach customer">Driver requested cancellation / unable to reach customer</option>
+                    <option value="Driver vehicle breakdown / stuck in heavy traffic">Driver vehicle breakdown / stuck in heavy traffic</option>
+                    <option value="Customer no-show / unreachable at pickup">Customer no-show / unreachable at pickup</option>
+                    <option value="Duplicate or test booking">Duplicate or test booking</option>
+                    <option value="Operational decision by Ziggo Admin">Operational decision by Ziggo Admin</option>
+                    <option value="Other">Other (custom reason)</option>
+                </select>
+                <textarea id="cancelReasonCustom" rows="2" placeholder="Enter custom cancellation reason or notes..." class="w-full p-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:border-ziggo resize-none hidden"></textarea>
+            </div>
+
+            <div id="cancelModalError" class="hidden p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-xs"></div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="p-5 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-2.5">
+            <button type="button" onclick="closeAdminCancelModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-white hover:border-slate-300 transition">
+                Keep Booking
+            </button>
+            <button type="button" id="confirmCancelBtn" onclick="submitAdminCancelBooking()" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                <i class="fas fa-ban text-[11px]" id="confirmCancelIcon"></i>
+                <span id="confirmCancelText">Confirm Cancellation</span>
+            </button>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -635,7 +754,14 @@
                         '<span>' + b.driver_name + (b.vehicle_number ? ' • ' + b.vehicle_number : '') + '</span>' +
                         '</p>';
             }
-            html += '<p class="text-xs text-gray-400 mt-1">Rs.' + fmtNum(b.fare) + ' • ' + b.service_type + '</p>' +
+            var custArg = encodeURIComponent(b.customer_name || 'Customer');
+            var drvArg = encodeURIComponent(b.driver_name || '');
+            html += '<div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-100">' +
+                    '<p class="text-xs text-gray-400">Rs.' + fmtNum(b.fare) + ' • ' + b.service_type + '</p>' +
+                    '<button type="button" onclick="openAdminCancelModal(' + b.id + ', \'' + b.booking_ref + '\', \'' + b.status + '\', decodeURIComponent(\'' + custArg + '\'), decodeURIComponent(\'' + drvArg + '\'), event)" class="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-bold transition flex items-center gap-1 shadow-sm" title="Cancel this active ride">' +
+                    '<i class="fas fa-ban text-[11px]"></i> Cancel' +
+                    '</button>' +
+                    '</div>' +
                     '</div>';
         });
         container.innerHTML = html;
@@ -681,6 +807,12 @@
                     '<span>' + b.driver_name + '</span>' +
                     '</div>' +
                     '<span class="text-xs text-gray-400 block">' + (b.vehicle_number || '') + '</span>';
+            }
+
+            // 3. Remove cancel button if booking is no longer active
+            if (b.status === 'completed' || b.status === 'cancelled') {
+                var rowCancelBtn = row.querySelector('[data-row-cancel-id]');
+                if (rowCancelBtn) rowCancelBtn.remove();
             }
         });
     }
@@ -730,9 +862,21 @@
                 (b.status === 'completed' ? 'bg-green-100 text-green-700' :
                  b.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700');
         }
+        var custEl = document.getElementById('trackedCustomer');
+        if (custEl) {
+            custEl.innerHTML = '<i class="fas fa-user text-gray-400 mr-1"></i> ' + (b.customer_name || 'Customer') + (b.customer_phone ? ' • ' + b.customer_phone : '');
+        }
         var driverEl = document.getElementById('trackedDriver');
         if (driverEl) {
             driverEl.textContent = (b.driver_name || 'Unassigned') + (b.vehicle_number ? ' • ' + b.vehicle_number : ' • ' + (b.vehicle_type || 'car').toUpperCase());
+        }
+        var pickupEl = document.getElementById('trackedPickup');
+        if (pickupEl) {
+            pickupEl.textContent = b.pickup_address || 'Pickup Location';
+        }
+        var dropEl = document.getElementById('trackedDrop');
+        if (dropEl) {
+            dropEl.textContent = b.drop_address || 'Drop-off Destination';
         }
         if (b.distance_km) {
             var distEl = document.getElementById('trackedDistance');
@@ -741,6 +885,17 @@
         if (b.duration_min) {
             var durEl = document.getElementById('trackedDuration');
             if (durEl) durEl.innerHTML = '<i class="fas fa-clock text-amber-500 mr-1"></i> Est: ' + b.duration_min + ' min';
+        }
+        var cancelBtn = document.getElementById('trackedCancelBtn');
+        if (cancelBtn) {
+            if (['searching', 'accepted', 'arrived', 'started'].includes(b.status)) {
+                cancelBtn.classList.remove('hidden');
+                cancelBtn.onclick = function(e) {
+                    openAdminCancelModal(b.id, b.booking_ref, b.status, b.customer_name || 'Customer', b.driver_name || '', e);
+                };
+            } else {
+                cancelBtn.classList.add('hidden');
+            }
         }
     }
 
@@ -1514,16 +1669,7 @@
         var card = document.getElementById('trackedRideCard');
         var resetBtn = document.getElementById('resetTrackingBtn');
         if (card) {
-            document.getElementById('trackedRef').textContent = b.booking_ref;
-            var statusBadge = document.getElementById('trackedStatusBadge');
-            statusBadge.textContent = b.status;
-            statusBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ' +
-                (b.status === 'completed' ? 'bg-green-100 text-green-700' :
-                 b.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700');
-            document.getElementById('trackedCustomer').innerHTML = '<i class="fas fa-user text-gray-400 mr-1"></i> ' + b.customer_name + (b.customer_phone ? ' • ' + b.customer_phone : '');
-            document.getElementById('trackedDriver').textContent = (b.driver_name || 'Unassigned') + (b.vehicle_number ? ' • ' + b.vehicle_number : ' • ' + b.vehicle_type.toUpperCase());
-            document.getElementById('trackedDistance').innerHTML = '<i class="fas fa-route text-blue-500 mr-1"></i> ' + (b.distance_km ? b.distance_km + ' km' : 'Calculating…');
-            document.getElementById('trackedDuration').innerHTML = '<i class="fas fa-clock text-amber-500 mr-1"></i> ' + (b.duration_min ? b.duration_min + ' min' : '--');
+            updateTrackedRideCard(b);
             setTrackedGps(b);
             card.classList.remove('hidden');
         }
@@ -1548,7 +1694,17 @@
         if (found) {
             trackBooking(found);
         } else {
-            console.warn('Booking ID not found in current dataset:', bookingId);
+            // Graceful fallback: query feed for booking details
+            fetch('/admin/bookings/feed')
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    var b = (data.active_bookings || []).find(function(item) { return item.id === bookingId; }) ||
+                            (data.recent_bookings || []).find(function(item) { return item.id === bookingId; });
+                    if (b) trackBooking(b);
+                })
+                .catch(function(err) {
+                    console.warn('Booking ID not found in current dataset:', bookingId, err);
+                });
         }
     }
 
@@ -1807,6 +1963,7 @@
 
         // Delegated click handler for active ride cards and table buttons
         document.addEventListener('click', function(e) {
+            // 1. First priority: Handle "Track on Map" button clicks
             var trackBtn = e.target.closest('[data-track-id]');
             if (trackBtn) {
                 e.preventDefault();
@@ -1815,8 +1972,17 @@
                 return;
             }
 
+            // 2. Ignore clicks on cancellation buttons or modal controls
+            if (e.target.closest('[data-row-cancel-id]') || e.target.closest('#trackedCancelBtn') || e.target.closest('#adminCancelModal')) {
+                return;
+            }
+
+            // 3. Handle active ride card clicks (excluding any buttons/links inside the card)
             var rideCard = e.target.closest('.active-ride-card[data-booking-id]');
             if (rideCard) {
+                if (e.target.closest('button') || e.target.closest('a')) {
+                    return;
+                }
                 e.preventDefault();
                 var bid = parseInt(rideCard.getAttribute('data-booking-id'), 10);
                 if (!isNaN(bid)) trackBookingById(bid);
@@ -1824,6 +1990,148 @@
             }
         });
     }
+
+    // Admin Cancel Active Ride Logic
+    var pendingCancelBookingId = null;
+
+    function openAdminCancelModal(bookingId, bookingRef, status, customerName, driverName, event) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        pendingCancelBookingId = bookingId;
+
+        var modal = document.getElementById('adminCancelModal');
+        var refEl = document.getElementById('cancelModalRef');
+        var statusEl = document.getElementById('cancelModalStatus');
+        var custEl = document.getElementById('cancelModalCustomer');
+        var drvEl = document.getElementById('cancelModalDriver');
+        var errEl = document.getElementById('cancelModalError');
+        var presetSelect = document.getElementById('cancelReasonPreset');
+        var customInput = document.getElementById('cancelReasonCustom');
+        var btn = document.getElementById('confirmCancelBtn');
+
+        if (refEl) refEl.textContent = bookingRef || ('BK-' + bookingId);
+        if (statusEl) {
+            var st = (status || 'SEARCHING').toUpperCase();
+            statusEl.textContent = st;
+            statusEl.className = 'font-black px-2 py-0.5 rounded-full uppercase text-[10px] ' +
+                (st === 'SEARCHING' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700');
+        }
+        if (custEl) custEl.textContent = customerName || 'Customer';
+        if (drvEl) drvEl.textContent = driverName || 'Unassigned (Searching)';
+
+        if (errEl) {
+            errEl.textContent = '';
+            errEl.classList.add('hidden');
+        }
+
+        if (presetSelect) presetSelect.selectedIndex = 0;
+        if (customInput) {
+            customInput.value = '';
+            customInput.classList.add('hidden');
+        }
+
+        if (btn) {
+            btn.disabled = false;
+            var btnText = document.getElementById('confirmCancelText');
+            var btnIcon = document.getElementById('confirmCancelIcon');
+            if (btnText) btnText.textContent = 'Confirm Cancellation';
+            if (btnIcon) btnIcon.className = 'fas fa-ban text-[11px]';
+        }
+
+        if (modal) {
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+    }
+
+    function closeAdminCancelModal() {
+        pendingCancelBookingId = null;
+        var modal = document.getElementById('adminCancelModal');
+        if (modal) {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+    }
+
+    function onCancelReasonPresetChange() {
+        var presetSelect = document.getElementById('cancelReasonPreset');
+        var customInput = document.getElementById('cancelReasonCustom');
+        if (!presetSelect || !customInput) return;
+        if (presetSelect.value === 'Other') {
+            customInput.classList.remove('hidden');
+            customInput.focus();
+        } else {
+            customInput.classList.add('hidden');
+        }
+    }
+
+    async function submitAdminCancelBooking() {
+        if (!pendingCancelBookingId) return;
+
+        var presetSelect = document.getElementById('cancelReasonPreset');
+        var customInput = document.getElementById('cancelReasonCustom');
+        var preset = presetSelect ? presetSelect.value : '';
+        var custom = customInput ? customInput.value.trim() : '';
+        var reason = (preset === 'Other') ? (custom || 'Cancelled by Ziggo Admin') : (preset || 'Cancelled by Ziggo Admin');
+
+        var btn = document.getElementById('confirmCancelBtn');
+        var btnText = document.getElementById('confirmCancelText');
+        var btnIcon = document.getElementById('confirmCancelIcon');
+        var errEl = document.getElementById('cancelModalError');
+
+        if (btn) btn.disabled = true;
+        if (btnText) btnText.textContent = 'Cancelling...';
+        if (btnIcon) btnIcon.className = 'fas fa-spinner fa-spin text-[11px]';
+        if (errEl) {
+            errEl.textContent = '';
+            errEl.classList.add('hidden');
+        }
+
+        try {
+            var response = await fetch('/admin/bookings/' + pendingCancelBookingId + '/cancel', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ reason: reason })
+            });
+            var data = await response.json();
+            if (!response.ok || !data.ok) {
+                throw new Error(data.detail || data.message || 'Failed to cancel booking');
+            }
+
+            var cancelledId = pendingCancelBookingId;
+            closeAdminCancelModal();
+
+            // Clear map focus if currently tracking this booking
+            if (currentTrackedBookingId === cancelledId) {
+                resetRideTracking();
+            }
+
+            // Immediately re-fetch real-time feed
+            if (typeof fetchBookingsFeed === 'function') {
+                fetchBookingsFeed();
+            }
+        } catch (err) {
+            if (btn) btn.disabled = false;
+            if (btnText) btnText.textContent = 'Confirm Cancellation';
+            if (btnIcon) btnIcon.className = 'fas fa-ban text-[11px]';
+            if (errEl) {
+                errEl.textContent = err.message || 'An error occurred while cancelling the ride.';
+                errEl.classList.remove('hidden');
+            }
+        }
+    }
+
+    // Escape key listener to close cancel modal
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && pendingCancelBookingId) {
+            closeAdminCancelModal();
+        }
+    });
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initLifecycle);

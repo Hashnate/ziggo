@@ -148,16 +148,11 @@ async def _send_to_token(
     payload_data["title"] = title
     payload_data["body"] = body
 
-    if event == "new_ride_request":
+    if event in ("new_ride_request", "ride_taken", "order_taken", "market_order_taken"):
         # Android: High-priority DATA-ONLY payload so that Android's FCM client
-        # immediately wakes up firebaseMessagingBackgroundHandler to display a
-        # full-screen incoming call overlay with insistent looping ringtone.
-        # Omitting the top-level notification block prevents Google Play Services
-        # from intercepting and downgrading the call to a static silent tray notification.
-        # iOS: a normal alert banner the driver taps to open the request sheet.
-        # "time-sensitive" lets it break through Focus modes and stay on the
-        # lock screen; it needs the Time Sensitive Notifications capability on
-        # the Runner target, and degrades to a normal alert without it.
+        # immediately wakes up firebaseMessagingBackgroundHandler.
+        # For new_ride_request: displays incoming alarm overlay.
+        # For ride_taken: silently cancels any ongoing alarm and notification on other drivers.
         msg = messaging.Message(
             token=token,
             data=payload_data,
@@ -168,9 +163,9 @@ async def _send_to_token(
                 headers={"apns-priority": "10"},
                 payload=messaging.APNSPayload(
                     aps=messaging.Aps(
-                        sound=ios_sound,
+                        sound=ios_sound if event == "new_ride_request" else None,
                         content_available=True,
-                        alert=messaging.ApsAlert(title=title, body=body),
+                        alert=messaging.ApsAlert(title=title, body=body) if event == "new_ride_request" else None,
                     ),
                 ),
             ),
@@ -443,11 +438,13 @@ def _format(event: str, payload: dict) -> tuple[str, str]:
     if event == "booking_cancelled":
         reason = payload.get("reason")
         ref = payload.get("booking_ref")
+        cancelled_by = payload.get("cancelled_by")
+        by_str = "Ziggo Admin" if cancelled_by == "admin" else "the customer"
         if reason:
-            return ("Ride Cancelled", f"Customer cancelled the ride: {reason}")
+            return ("Ride Cancelled", f"{by_str} cancelled the ride: {reason}")
         if ref:
-            return ("Ride Cancelled", f"Booking {ref} was cancelled by the customer.")
-        return ("Ride Cancelled", "The customer has cancelled the ride request.")
+            return ("Ride Cancelled", f"Booking {ref} was cancelled by {by_str}.")
+        return ("Ride Cancelled", f"The ride request was cancelled by {by_str}.")
     if event == "destination_updated":
         return ("Trip Updated", "The customer has added a stop or changed the destination.")
     if event == "booking_update":
@@ -489,4 +486,6 @@ def _format(event: str, payload: dict) -> tuple[str, str]:
     if event == "market_order_update":
         status = payload.get("status", "")
         return ("Order update", f"Your market order is now {status}.")
+    if event in ("ride_taken", "order_taken", "market_order_taken"):
+        return ("Ride taken", "Another driver accepted this request")
     return ("", "")

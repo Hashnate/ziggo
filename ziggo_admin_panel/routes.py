@@ -135,19 +135,18 @@ templates.env.filters["to_colombo"] = to_colombo_dt
 templates.env.globals["gender_from_nic"] = gender_from_nic
 
 UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "drivers")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
 CATEGORY_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "categories")
-os.makedirs(CATEGORY_UPLOAD_DIR, exist_ok=True)
 VEHICLE_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "vehicles")
-os.makedirs(VEHICLE_UPLOAD_DIR, exist_ok=True)
 BRANDING_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "branding")
-os.makedirs(BRANDING_UPLOAD_DIR, exist_ok=True)
 RESTAURANT_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "restaurants")
-os.makedirs(RESTAURANT_UPLOAD_DIR, exist_ok=True)
 PRODUCT_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "items")
-os.makedirs(PRODUCT_UPLOAD_DIR, exist_ok=True)
 JOB_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "jobs")
-os.makedirs(JOB_UPLOAD_DIR, exist_ok=True)
+
+for _d in (UPLOAD_DIR, CATEGORY_UPLOAD_DIR, VEHICLE_UPLOAD_DIR, BRANDING_UPLOAD_DIR, RESTAURANT_UPLOAD_DIR, PRODUCT_UPLOAD_DIR, JOB_UPLOAD_DIR):
+    try:
+        os.makedirs(_d, exist_ok=True)
+    except OSError:
+        pass
 ALLOWED_PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".avif"}
 MAX_PHOTO_BYTES = 5 * 1024 * 1024  # 5 MB
 
@@ -217,7 +216,10 @@ async def _save_product_image(photo: UploadFile | None) -> str | None:
 
 
 DOC_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "driver_docs")
-os.makedirs(DOC_UPLOAD_DIR, exist_ok=True)
+try:
+    os.makedirs(DOC_UPLOAD_DIR, exist_ok=True)
+except OSError:
+    pass
 ALLOWED_DOC_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".pdf", ".avif"}
 MAX_DOC_BYTES = 8 * 1024 * 1024  # 8 MB
 
@@ -1263,6 +1265,15 @@ async def admin_drivers_new_submit(
 
 
 
+@router.get("/drivers/{driver_id}")
+async def admin_driver_detail_redirect(
+    driver_id: int,
+    request: Request,
+):
+    query_str = f"?{request.url.query}" if request.url.query else ""
+    return RedirectResponse(url=f"/admin/drivers/{driver_id}/edit{query_str}", status_code=303)
+
+
 @router.get("/drivers/{driver_id}/edit", response_class=HTMLResponse)
 async def admin_drivers_edit_form(
     driver_id: int,
@@ -1281,7 +1292,7 @@ async def admin_drivers_edit_form(
 
         # Determine back_url
         return_to = request.query_params.get("return_to", "").strip()
-        if return_to and return_to.startswith("/admin/") and not return_to.startswith(f"/admin/drivers/{driver_id}/edit"):
+        if return_to and return_to.startswith("/admin/") and not return_to.startswith(f"/admin/drivers/{driver_id}"):
             back_url = return_to
         elif request.query_params.get("from_status"):
             back_url = f"/admin/drivers?status={urllib.parse.quote(request.query_params['from_status'])}"
@@ -1292,9 +1303,9 @@ async def admin_drivers_edit_form(
             if referer:
                 try:
                     parsed_ref = urllib.parse.urlparse(referer)
-                    if parsed_ref.path == "/admin/drivers":
+                    if parsed_ref.path.startswith("/admin/") and not parsed_ref.path.startswith(f"/admin/drivers/{driver_id}"):
                         ref_query = f"?{parsed_ref.query}" if parsed_ref.query else ""
-                        back_url = f"/admin/drivers{ref_query}"
+                        back_url = f"{parsed_ref.path}{ref_query}"
                 except Exception:
                     pass
 
@@ -1677,7 +1688,12 @@ def _driver_list_redirect(request: Request, default_url: str = "/admin/drivers")
         try:
             pref = urllib.parse.urlparse(ref)
             if pref.path == "/admin/drivers":
-                return RedirectResponse(url=f"/admin/drivers{('?' + pref.query) if pref.query else ''}", status_code=303)
+                ref_params = urllib.parse.parse_qs(pref.query)
+                def_parsed = urllib.parse.urlparse(default_url)
+                def_params = urllib.parse.parse_qs(def_parsed.query)
+                ref_params.update(def_params)
+                new_query = urllib.parse.urlencode({k: v[0] if isinstance(v, list) else v for k, v in ref_params.items()})
+                return RedirectResponse(url=f"/admin/drivers{('?' + new_query) if new_query else ''}", status_code=303)
         except Exception:
             pass
     return RedirectResponse(url=default_url, status_code=303)
@@ -1857,6 +1873,8 @@ async def _cleanup_driver_references(db: AsyncSession, driver_id: int):
         "UPDATE market_orders SET driver_id = NULL WHERE driver_id = :did",
         "UPDATE bookings SET driver_id = NULL WHERE driver_id = :did",
         "UPDATE food_orders SET driver_id = NULL WHERE driver_id = :did",
+        "DELETE FROM driver_wallet_credits WHERE driver_id = :did",
+        "DELETE FROM driver_online_sessions WHERE driver_id = :did",
         "DELETE FROM driver_documents WHERE driver_id = :did",
         "DELETE FROM driver_payouts WHERE driver_id = :did",
         "DELETE FROM driver_vehicles WHERE driver_id = :did",
@@ -1902,22 +1920,58 @@ async def delete_driver_form(
             select(Driver).options(selectinload(Driver.user)).where(Driver.id == driver_id)
         )
         d = q.scalars().first()
-        if d:
-            user = d.user
-            user_id = user.id if user else None
+        if not d:
+            return _driver_list_redirect(request, "/admin/drivers?error=Driver+not+found")
 
-            await _cleanup_driver_references(db, driver_id)
+        user = d.user
+        user_id = user.id if user else None
+
+        # 1. Safely unlink/delete all driver-specific references
+        await _cleanup_driver_references(db, driver_id)
+
+        # 2. Check if this user also has a customer profile
+        has_customer = False
+        if user_id:
+            cq = await db.execute(select(Customer).where(Customer.user_id == user_id))
+            customer = cq.scalars().first()
+            if customer:
+                has_customer = True
+
+        # 3. Always delete the Driver record
+        await db.delete(d)
+
+        # 4. Handle User account:
+        # If user is also a Customer, PRESERVE the user account so their customer
+        # profile, wallet, market/food orders, and ride history remain intact.
+        if has_customer:
+            if user and user.role == UserRole.DRIVER:
+                user.role = UserRole.CUSTOMER
+        else:
+            # User only registered as a Driver and has no customer profile,
+            # safe to delete user and its general references.
             if user_id:
                 await _cleanup_user_references(db, user_id)
-
-            await db.delete(d)
             if user:
                 await db.delete(user)
-            await db.commit()
+
+        await db.commit()
+
+        # Publish driver removed to live admin feed
+        try:
+            from app.services.ws_manager import manager
+            await manager.publish("admin_live", "driver_status_update", {
+                "id": driver_id,
+                "status": "deleted",
+                "is_approved": False,
+            })
+        except Exception:
+            pass
+
+        return _driver_list_redirect(request, "/admin/drivers?success=Driver+deleted+successfully")
     except Exception as e:
         logger.error(f"Error deleting driver {driver_id}: {e}", exc_info=True)
         await db.rollback()
-    return _driver_list_redirect(request, "/admin/drivers")
+        return _driver_list_redirect(request, "/admin/drivers?error=Failed+to+delete+driver")
 
 
 
@@ -2545,6 +2599,221 @@ async def admin_bookings_feed(
             "active_count": len(active_bookings),
         },
     }
+
+
+@router.post("/bookings/{booking_id}/cancel")
+async def admin_cancel_booking(
+    booking_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(current_admin),
+):
+    """Admin cancel active booking with automatic real-time sync to customer & driver."""
+    from fastapi.responses import JSONResponse
+    from app.models import Booking, Customer, Driver, Notification
+    from app.services.ws_manager import manager
+    from app.services.matching_service import (
+        find_all_nearby_drivers,
+        dispatch_vehicles,
+        drivers_for_customer,
+    )
+    from app.services.gender_service import is_passenger_trip
+    from app.api.v1.bookings import get_search_radius_for_service, _customer_gender
+    from app.services.loyalty_service import refund_redeemed_points
+    from app.services import passenger_location_service
+
+    reason = "Cancelled by Ziggo Admin"
+    try:
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in content_type:
+            body = await request.json()
+            if isinstance(body, dict) and body.get("reason"):
+                reason = str(body["reason"]).strip()
+        else:
+            form = await request.form()
+            if form.get("reason"):
+                reason = str(form["reason"]).strip()
+    except Exception:
+        pass
+
+    if len(reason) > 255:
+        reason = reason[:252] + "..."
+
+    q = await db.execute(
+        select(Booking)
+        .options(
+            selectinload(Booking.customer).selectinload(Customer.user),
+            selectinload(Booking.driver).selectinload(Driver.user),
+        )
+        .where(Booking.id == booking_id)
+    )
+    b = q.scalars().first()
+    if not b:
+        return JSONResponse({"ok": False, "detail": "Booking not found"}, status_code=404)
+
+    active_statuses = (
+        BookingStatus.SEARCHING,
+        BookingStatus.ACCEPTED,
+        BookingStatus.ARRIVED,
+        BookingStatus.STARTED,
+    )
+    if b.status not in active_statuses:
+        return JSONResponse(
+            {
+                "ok": False,
+                "detail": f"Cannot cancel booking: current status is {b.status.value.upper()}",
+            },
+            status_code=400,
+        )
+
+    now = datetime.now(timezone.utc)
+    b.status = BookingStatus.CANCELLED
+    b.cancelled_at = now
+    b.cancelled_by = "admin"
+    b.cancellation_reason = reason
+
+    # Clear passenger live location sharing if active
+    passenger_stopped = passenger_location_service.clear(b)
+
+    # Refund redeemed loyalty points if any were applied
+    await refund_redeemed_points(
+        db, b,
+        source_kind="booking",
+        description=f"Refund — {b.booking_ref} cancelled by admin",
+    )
+
+    await db.commit()
+    await db.refresh(b)
+
+    reason_msg = f" Reason: {reason}" if reason else ""
+
+    # 1. Real-time sync to Customer
+    if b.customer and b.customer.user_id:
+        customer_payload = {
+            "booking_id": b.id,
+            "status": "cancelled",
+            "booking_ref": b.booking_ref,
+            "reason": b.cancellation_reason,
+            "cancelled_by": "admin",
+        }
+        await manager.send(b.customer.user_id, "booking_update", customer_payload)
+        db.add(
+            Notification(
+                user_id=b.customer.user_id,
+                title="Ride Cancelled by Admin",
+                body=f"Booking {b.booking_ref} was cancelled by Ziggo Admin.{reason_msg}",
+                type="ride_update",
+            )
+        )
+
+    # 2. Real-time sync to Driver (if assigned) or searching drivers
+    if b.driver and b.driver.user_id:
+        driver_payload = {
+            "booking_id": b.id,
+            "status": "cancelled",
+            "reason": b.cancellation_reason,
+            "cancelled_by": "admin",
+            "booking_ref": b.booking_ref,
+        }
+        await manager.send(b.driver.user_id, "booking_update", driver_payload)
+        db.add(
+            Notification(
+                user_id=b.driver.user_id,
+                title="Ride Cancelled by Admin",
+                body=f"Booking {b.booking_ref} was cancelled by Ziggo Admin.{reason_msg}",
+                type="ride_cancelled",
+                data=f'{{"booking_id":{b.id},"booking_ref":"{b.booking_ref}"}}',
+            )
+        )
+
+        try:
+            dispatch_vehicle = None if (b.is_flash or b.is_courier) else b.service_type
+            max_radius = await get_search_radius_for_service(db, dispatch_vehicle)
+            other_drivers = await find_all_nearby_drivers(
+                db,
+                float(b.pickup_lat),
+                float(b.pickup_lng),
+                dispatch_vehicles(b),
+                max_distance_km=max_radius,
+                exclude_driver_id=b.driver_id,
+            )
+            for od in other_drivers:
+                await manager.send(
+                    od.user_id,
+                    "ride_taken",
+                    {"booking_id": b.id, "booking_ref": b.booking_ref},
+                )
+        except Exception as e:
+            logger.error(f"[admin_cancel] error notifying other drivers: {e}")
+
+    elif b.driver_id is None:
+        try:
+            dispatch_vehicle = None if (b.is_flash or b.is_courier) else b.service_type
+            max_radius = await get_search_radius_for_service(db, dispatch_vehicle)
+            nearby = await find_all_nearby_drivers(
+                db,
+                float(b.pickup_lat),
+                float(b.pickup_lng),
+                dispatch_vehicles(b),
+                max_distance_km=max_radius,
+                exclude_driver_id=None,
+            )
+            cust_gender = await _customer_gender(db, b.customer_id)
+            nearby = await drivers_for_customer(
+                db, nearby, cust_gender, b.lady_driver_requested,
+                is_passenger_trip(b.is_flash, b.is_courier),
+            )
+            for nd in nearby:
+                db.add(
+                    Notification(
+                        user_id=nd.user_id,
+                        title="Ride Request Cancelled",
+                        body=f"Ride request {b.booking_ref} was cancelled by Ziggo Admin.{reason_msg}",
+                        type="ride_cancelled",
+                        data=f'{{"booking_id":{b.id},"booking_ref":"{b.booking_ref}"}}',
+                    )
+                )
+                await manager.send(
+                    nd.user_id,
+                    "booking_cancelled",
+                    {
+                        "booking_id": b.id,
+                        "booking_ref": b.booking_ref,
+                        "reason": b.cancellation_reason,
+                        "cancelled_by": "admin",
+                    },
+                )
+        except Exception as e:
+            logger.error(f"[admin_cancel] error notifying searching drivers: {e}")
+
+    await db.commit()
+
+    # 3. Broadcast to admin live feed
+    try:
+        await manager.publish("admin_live", "booking_status_update", {
+            "booking_id": b.id,
+            "booking_ref": b.booking_ref,
+            "status": "cancelled",
+            "cancelled_by": "admin",
+            "reason": b.cancellation_reason,
+            "amount": float(b.final_amount or 0),
+        })
+    except Exception as e:
+        logger.error(f"[admin_cancel] admin_live publish error: {e}")
+
+    if passenger_stopped:
+        try:
+            await manager.publish(passenger_location_service.ADMIN_TOPIC, "customer_location_stopped", {"booking_id": b.id})
+        except Exception as e:
+            logger.error(f"[admin_cancel] passenger_location_service publish error: {e}")
+
+    return JSONResponse({
+        "ok": True,
+        "booking_id": b.id,
+        "booking_ref": b.booking_ref,
+        "status": "cancelled",
+        "message": f"Booking {b.booking_ref} has been cancelled successfully.",
+    })
 
 
 
@@ -5988,7 +6257,10 @@ async def admin_market_delete(
 # (drives the customer Market home screen via GET /api/v1/market/ads & deals)
 # ===========================================================================
 MARKET_HOME_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "market_home")
-os.makedirs(MARKET_HOME_UPLOAD_DIR, exist_ok=True)
+try:
+    os.makedirs(MARKET_HOME_UPLOAD_DIR, exist_ok=True)
+except OSError:
+    pass
 
 
 async def _save_market_home_image(photo: UploadFile | None) -> str | None:
@@ -8686,10 +8958,13 @@ async def admin_finance(
 async def admin_withdrawals(
     request: Request,
     page: int = 1,
+    search: Optional[str] = None,
+    q: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    data = await fin.get_withdrawals_data(db, page=page, page_size=20)
+    search_term = (search or q or "").strip()
+    data = await fin.get_withdrawals_data(db, page=page, page_size=20, search=search_term)
     return templates.TemplateResponse(
         request, "withdrawals.html",
         {
@@ -8704,6 +8979,7 @@ async def admin_withdrawals(
             "total_drivers": data["total_drivers"],
             "page": data["page"],
             "page_range": data["page_range"],
+            "search": search_term,
         },
     )
 
@@ -9012,6 +9288,8 @@ async def admin_withdrawals_export(
 @router.get("/withdrawals/pending/export")
 async def admin_withdrawals_pending_export(
     format: str = "xlsx",
+    search: Optional[str] = None,
+    q: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -9021,13 +9299,14 @@ async def admin_withdrawals_pending_export(
     from datetime import datetime
     from fastapi.responses import Response
 
-    data = await fin.get_withdrawals_data(db, page=1, page_size=100000)
+    search_term = (search or q or "").strip()
+    data = await fin.get_withdrawals_data(db, page=1, page_size=100000, search=search_term)
     rows = data.get("rows", [])
     now_colombo = datetime.now(COLOMBO_TZ)
     filename_base = f"ziggo-pending-driver-withdrawals-{now_colombo.strftime('%Y%m%d')}"
 
     headers = [
-        "Driver ID", "Name", "Phone Number", "Vehicle Type",
+        "Driver ID", "Name", "Phone Number", "Vehicle Number", "Vehicle Type",
         "Total Earned (Rs.)", "Total Paid (Rs.)", "Settlement Owed (Rs.)", "Pending Balance (Rs.)",
         "Bank Name", "Branch", "Account Number", "Account Holder"
     ]
@@ -9053,6 +9332,7 @@ async def admin_withdrawals_pending_export(
                 r["driver_id"],
                 _csv_cell(r["name"]),
                 _csv_cell(r["phone"]),
+                _csv_cell(r.get("vehicle_number", "")),
                 _csv_cell(r["vehicle_type"].capitalize() if r.get("vehicle_type") else ""),
                 f"{float(r.get('earned', 0)):.2f}",
                 f"{float(r.get('paid', 0)):.2f}",
@@ -9063,7 +9343,7 @@ async def admin_withdrawals_pending_export(
                 _csv_cell(r.get("account_number", "")),
                 _csv_cell(r.get("account_holder_name", "")),
             ])
-        writer.writerow(["", "", "", "Total Pending:", "", "", "", f"{float(total_pending):.2f}", "", "", "", ""])
+        writer.writerow(["", "", "", "", "Total Pending:", "", "", "", f"{float(total_pending):.2f}", "", "", "", ""])
         return Response(
             content=buf.getvalue().encode("utf-8"),
             media_type="text/csv; charset=utf-8",
@@ -9092,7 +9372,7 @@ async def admin_withdrawals_pending_export(
         cell.fill = header_fill
         cell.font = header_font
         cell.border = thin_border
-        cell.alignment = Alignment(horizontal="center" if col_idx == 1 else "right" if col_idx in (5, 6, 7, 8) else "left", vertical="center")
+        cell.alignment = Alignment(horizontal="center" if col_idx == 1 else "right" if col_idx in (6, 7, 8, 9) else "left", vertical="center")
     ws.row_dimensions[1].height = 28
 
     total_pending = Decimal("0")
@@ -9105,6 +9385,7 @@ async def admin_withdrawals_pending_export(
             r["driver_id"],
             str(r["name"]),
             str(r["phone"]),
+            str(r.get("vehicle_number", "")),
             str(r["vehicle_type"].capitalize() if r.get("vehicle_type") else ""),
             float(r.get("earned", 0)),
             float(r.get("paid", 0)),
@@ -9124,12 +9405,12 @@ async def admin_withdrawals_pending_export(
             cell.border = thin_border
             if col_idx == 1:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
-            elif col_idx in (5, 6, 7, 8):
+            elif col_idx in (6, 7, 8, 9):
                 cell.alignment = Alignment(horizontal="right", vertical="center")
                 cell.number_format = "#,##0.00"
-                if col_idx == 8 and pending > 0:
+                if col_idx == 9 and pending > 0:
                     cell.font = Font(name="Calibri", size=10, bold=True, color="D97706")
-            elif col_idx in (3, 11):
+            elif col_idx in (3, 4, 12):
                 cell.alignment = Alignment(horizontal="left", vertical="center")
                 cell.number_format = "@"
             else:
@@ -10301,7 +10582,10 @@ async def admin_events(
 
 
 EVENTS_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "events")
-os.makedirs(EVENTS_UPLOAD_DIR, exist_ok=True)
+try:
+    os.makedirs(EVENTS_UPLOAD_DIR, exist_ok=True)
+except OSError:
+    pass
 
 async def _save_event_image(photo: UploadFile | None) -> str | None:
     if photo is None or not getattr(photo, "filename", None):
@@ -10991,7 +11275,10 @@ async def admin_corporate_delete(
 # (drives the customer Food home screen via GET /api/v1/food/home)
 # ===========================================================================
 FOOD_HOME_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "food_home")
-os.makedirs(FOOD_HOME_UPLOAD_DIR, exist_ok=True)
+try:
+    os.makedirs(FOOD_HOME_UPLOAD_DIR, exist_ok=True)
+except OSError:
+    pass
 
 
 async def _save_food_home_image(photo: UploadFile | None) -> str | None:

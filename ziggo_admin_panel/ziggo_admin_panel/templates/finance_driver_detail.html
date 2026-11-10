@@ -21,10 +21,13 @@
         <div class="flex-1 min-w-[220px]">
             <h2 class="text-2xl font-black text-ziggo">{{ d.name or '—' }}</h2>
             <p class="text-sm text-gray-500">{{ d.phone or '—' }} · <span class="capitalize">{{ d.vehicle_type or '—' }}</span> · {{ d.vehicle_number or '—' }}</p>
-            <div class="mt-2 flex flex-wrap gap-3 text-xs text-gray-600 font-bold">
+            <div class="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-600 font-bold">
                 <span><i class="fas fa-star text-yellow-400"></i> {{ "{:.1f}".format((d.rating or 0)|float) }}</span>
                 <span class="px-2 py-0.5 rounded-full {% if d.is_online %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-500{% endif %}">{{ 'ONLINE' if d.is_online else 'OFFLINE' }}</span>
                 <span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 capitalize">{{ d.status or '—' }}</span>
+                <a href="/admin/drivers/{{ d.id }}/edit?return_to=/admin/finance/drivers/{{ d.id }}" class="inline-flex items-center gap-1 text-ziggo hover:underline ml-1" title="View profile & KYC documents">
+                    <i class="fas fa-id-card"></i> Driver Profile & KYC
+                </a>
             </div>
         </div>
     </div>
