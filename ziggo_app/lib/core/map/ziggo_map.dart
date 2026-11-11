@@ -484,7 +484,18 @@ class ZiggoMapController {
     _c = c;
     final pending = _pendingMove;
     _pendingMove = null;
-    if (pending != null) c.moveCamera(pending);
+    if (pending != null) {
+      // Delay slightly so the native platform map has finished initial layout sizing
+      Future.delayed(const Duration(milliseconds: 150), () {
+        try {
+          c.animateCamera(pending);
+        } catch (_) {
+          try {
+            c.moveCamera(pending);
+          } catch (_) {}
+        }
+      });
+    }
   }
 
   bool get isReady => _c != null;
@@ -503,7 +514,7 @@ class ZiggoMapController {
   }
 
   Future<void> fitBounds(List<LatLng> points, {double padding = 60}) async {
-    if (_c == null || points.isEmpty) return;
+    if (points.isEmpty) return;
     if (points.length == 1) {
       await moveTo(points.first, zoom: 15);
       return;
@@ -516,27 +527,48 @@ class ZiggoMapController {
       if (p.longitude < minLng) minLng = p.longitude;
       if (p.longitude > maxLng) maxLng = p.longitude;
     }
+
+    // Minimum span guard: if points are virtually the same spot (delta < 0.003, ~300m),
+    // prevent extreme over-zoom onto a single stretch of road.
+    double latDelta = maxLat - minLat;
+    double lngDelta = maxLng - minLng;
+    if (latDelta < 0.003 && lngDelta < 0.003) {
+      final center = LatLng((minLat + maxLat) / 2, (minLng + maxLng) / 2);
+      await moveTo(center, zoom: 16);
+      return;
+    }
+
     final bounds = gmaps.LatLngBounds(
       southwest: gmaps.LatLng(minLat, minLng),
       northeast: gmaps.LatLng(maxLat, maxLng),
     );
+    final update = gmaps.CameraUpdate.newLatLngBounds(bounds, padding);
+    if (_c == null) {
+      _pendingMove = update;
+      return;
+    }
     try {
-      await _c?.animateCamera(gmaps.CameraUpdate.newLatLngBounds(bounds, padding));
+      await _c?.animateCamera(update);
     } catch (e) {
       debugPrint("ZiggoMapController.fitBounds error: $e");
     }
   }
 
-  Future<void> startNavigation(LatLng target, {double zoom = 18.5, double tilt = 45.0, double bearing = 0.0}) async {
+  Future<void> startNavigation(LatLng target, {double zoom = 17.5, double tilt = 35.0, double bearing = 0.0}) async {
+    final update = gmaps.CameraUpdate.newCameraPosition(
+      gmaps.CameraPosition(
+        target: _g(target),
+        zoom: zoom,
+        tilt: tilt,
+        bearing: bearing,
+      ),
+    );
+    if (_c == null) {
+      _pendingMove = update;
+      return;
+    }
     try {
-      await _c?.animateCamera(gmaps.CameraUpdate.newCameraPosition(
-        gmaps.CameraPosition(
-          target: _g(target),
-          zoom: zoom,
-          tilt: tilt,
-          bearing: bearing,
-        ),
-      ));
+      await _c?.animateCamera(update);
     } catch (e) {
       debugPrint("ZiggoMapController.startNavigation error: $e");
     }
@@ -598,6 +630,7 @@ class ZiggoMap extends StatefulWidget {
   final bool darkMode;
   final void Function(LatLng)? onTap;
   final void Function(LatLng)? onPositionChanged;
+  final VoidCallback? onCameraMoveStarted;
   final VoidCallback? onMapCreated;
   final EdgeInsets padding;
 
@@ -615,6 +648,7 @@ class ZiggoMap extends StatefulWidget {
     this.darkMode = false,
     this.onTap,
     this.onPositionChanged,
+    this.onCameraMoveStarted,
     this.onMapCreated,
     this.padding = EdgeInsets.zero,
   });
@@ -850,6 +884,7 @@ class _ZiggoMapState extends State<ZiggoMap> {
       onTap: widget.onTap == null
           ? null
           : (pos) => widget.onTap!(LatLng(pos.latitude, pos.longitude)),
+      onCameraMoveStarted: widget.onCameraMoveStarted,
       onCameraMove: widget.onPositionChanged == null
           ? null
           : (pos) => widget.onPositionChanged!(LatLng(pos.target.latitude, pos.target.longitude)),

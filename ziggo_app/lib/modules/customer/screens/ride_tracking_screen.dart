@@ -50,6 +50,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
   bool _otpDialogShown = false;
   LatLng? _lastCameraDriverLatLng;
   String? _lastCameraStatus;
+  bool _userPanned = false;
 
   // While the booking is in SEARCHING we poll /driver/nearby every 6 s so the
   // customer sees the same wandering-vehicle pins they had on fare estimate.
@@ -104,7 +105,10 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await context.read<BookingProvider>().loadActive();
-      if (mounted) setState(() => _initialLoadDone = true);
+      if (mounted) {
+        setState(() => _initialLoadDone = true);
+        _fitRouteBounds(force: true);
+      }
     });
     // Start polling every 5 s as a WS fallback.
     _statusPollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
@@ -220,15 +224,65 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
     });
   }
 
+  void _fitRouteBounds({bool force = false}) {
+    if (!force && _userPanned) return;
+    final booking = context.read<BookingProvider>();
+    final live = booking.activeBooking;
+    final last = _lastActive;
+    final active = live ?? last;
+    if (active == null) return;
+
+    final pickup = LatLng(
+      (active['pickup_lat'] as num).toDouble(),
+      (active['pickup_lng'] as num).toDouble(),
+    );
+    final drop = LatLng(
+      (active['drop_lat'] as num).toDouble(),
+      (active['drop_lng'] as num).toDouble(),
+    );
+    final driver = active['driver'] as Map<String, dynamic>?;
+    final driverLat = driver?['current_lat'] as num?;
+    final driverLng = driver?['current_lng'] as num?;
+    final status = active['status'] as String?;
+
+    final effectiveDriverLoc = _animatedDriverLatLng ??
+        ((driverLat != null && driverLng != null)
+            ? LatLng(driverLat.toDouble(), driverLng.toDouble())
+            : (status == 'started' ? _customerLatLng : null));
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (status == 'started') {
+        if (effectiveDriverLoc != null) {
+          _mapController.fitBounds([effectiveDriverLoc, drop], padding: 80);
+        } else {
+          _mapController.fitBounds([pickup, drop], padding: 80);
+        }
+      } else if (status == 'accepted' || status == 'arrived') {
+        if (effectiveDriverLoc != null) {
+          _mapController.fitBounds([effectiveDriverLoc, pickup], padding: 80);
+        } else {
+          _mapController.moveTo(pickup, zoom: 15);
+        }
+      } else if (status == 'searching') {
+        _mapController.moveTo(pickup, zoom: 15);
+      }
+    });
+  }
+
   void _updateMapCamera(String? status, LatLng pickup, LatLng drop, LatLng? driverLatLng) {
     if (driverLatLng == null) return;
-    if (_lastCameraStatus == status &&
-        _lastCameraDriverLatLng?.latitude == driverLatLng.latitude &&
-        _lastCameraDriverLatLng?.longitude == driverLatLng.longitude) {
-      return;
-    }
+    final bool statusChanged = _lastCameraStatus != status;
+    final bool moved = _lastCameraDriverLatLng == null ||
+        _lastCameraDriverLatLng!.latitude != driverLatLng.latitude ||
+        _lastCameraDriverLatLng!.longitude != driverLatLng.longitude;
+
+    if (!statusChanged && !moved) return;
+
     _lastCameraStatus = status;
     _lastCameraDriverLatLng = driverLatLng;
+
+    if (_userPanned) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -422,11 +476,9 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
     final status = active['status'] as String?;
     final driverLatLng = status == 'cancelled'
         ? null
-        : (status == 'started' && _customerLatLng != null)
-            ? _customerLatLng
-            : ((driverLat != null && driverLng != null)
-                ? LatLng(driverLat.toDouble(), driverLng.toDouble())
-                : null);
+        : ((driverLat != null && driverLng != null)
+            ? LatLng(driverLat.toDouble(), driverLng.toDouble())
+            : (status == 'started' ? _customerLatLng : null));
 
     final double targetHeading = (status == 'started' && _customerHeading != null)
         ? _customerHeading!
@@ -505,12 +557,27 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
       body: Stack(
         children: [
           Positioned.fill(
-            child: ZiggoMap(
-              controller: _mapController,
-              center: pickup,
-              zoom: 14,
-              showMyLocation: true,
-              markers: [
+            child: Listener(
+              onPointerMove: (_) {
+                if (!_userPanned) {
+                  setState(() => _userPanned = true);
+                }
+              },
+              child: ZiggoMap(
+                controller: _mapController,
+                center: pickup,
+                zoom: 14,
+                showMyLocation: true,
+                padding: EdgeInsets.only(
+                  top: MediaQuery.of(context).padding.top + 70,
+                  bottom: _sheetExpanded ? 400 : 180,
+                  left: 24,
+                  right: 24,
+                ),
+                onMapCreated: () {
+                  _fitRouteBounds(force: true);
+                },
+                markers: [
                 // Wandering nearby drivers (only while SEARCHING) — render
                 // first so pickup/drop pins paint on top.
                 for (final d in _nearbyDrivers)
@@ -557,6 +624,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
               ],
             ),
           ),
+        ),
           // Top status pill (glassmorphic over map)
           SafeArea(
             child: Padding(
@@ -664,6 +732,41 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
               top: MediaQuery.of(context).padding.top + 70,
               left: 12, right: 12,
               child: _NextStepStrip(step: _routeSteps.first),
+            ),
+          // Floating Re-Center / Follow Driver Button
+          if (_userPanned && (status == 'accepted' || status == 'arrived' || status == 'started'))
+            Positioned(
+              right: 16,
+              bottom: _sheetExpanded ? 460 : 180,
+              child: GestureDetector(
+                onTap: () {
+                  setState(() => _userPanned = false);
+                  _fitRouteBounds(force: true);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: AppStyles.shadowMd,
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.navigation_rounded, color: AppColors.primary, size: 18),
+                      SizedBox(width: 6),
+                      Text(
+                        'Re-center',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           if (status == 'cancelled' && cancelled != null)
             _CancelledCard(

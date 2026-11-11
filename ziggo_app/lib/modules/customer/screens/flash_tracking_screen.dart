@@ -396,6 +396,11 @@ class _FlashTrackingScreenState extends State<FlashTrackingScreen> with SingleTi
               center: pickup,
               zoom: 14,
               showMyLocation: true,
+              padding: const EdgeInsets.only(top: 80, bottom: 320, left: 24, right: 24),
+              onMapCreated: () {
+                final targetLoc = currentDisplayLatLng ?? pickup;
+                _mapController.fitBounds([targetLoc, drop], padding: 80);
+              },
               markers: [
                 // Wandering couriers (only while SEARCHING) — drawn first so
                 // pickup/drop pins paint on top.
