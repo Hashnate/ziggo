@@ -374,7 +374,7 @@
                         {{ c.user.created_at|colombo_dt("%b %d, %Y") if c.user.created_at else '—' }}
                     </td>
                     <td class="px-5 py-3 text-sm font-bold text-gray-700 text-center">
-                        {{ (c.user.total_rides or 0)|num }}
+                        {{ (c.completed_rides if c.completed_rides is defined else (c.user.total_rides or 0))|num }}
                     </td>
                     <td class="px-5 py-3 text-sm font-bold text-gray-700">
                         Rs.{{ "{:,.2f}".format(c.wallet_balance or 0) }}

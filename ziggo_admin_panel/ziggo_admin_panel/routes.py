@@ -8,7 +8,7 @@ import urllib.parse
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Request, Form, Depends, HTTPException, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from itsdangerous import URLSafeSerializer, BadSignature
@@ -1952,6 +1952,19 @@ async def admin_customers(
     )
     customers = q.scalars().all()
 
+    cust_ids = [c.id for c in customers]
+    ride_counts = {}
+    if cust_ids:
+        rc_q = await db.execute(
+            select(Booking.customer_id, func.count(Booking.id))
+            .where(Booking.customer_id.in_(cust_ids), Booking.status == BookingStatus.COMPLETED)
+            .group_by(Booking.customer_id)
+        )
+        ride_counts = dict(rc_q.all())
+
+    for c in customers:
+        c.completed_rides = ride_counts.get(c.id, c.user.total_rides if (c.user and c.user.total_rides) else 0)
+
     start_idx = (page - 1) * limit + 1 if total > 0 else 0
     end_idx = min(page * limit, total)
     page_range = list(range(max(1, page - 3), min(total_pages, page + 3) + 1))
@@ -2088,6 +2101,20 @@ async def admin_riders(
             base_stmt.order_by(Customer.id.desc()).offset(offset).limit(limit)
         )
         riders = riders_q.scalars().all()
+
+        cust_ids = [c.id for c in riders]
+        ride_counts = {}
+        if cust_ids:
+            rc_q = await db.execute(
+                select(Booking.customer_id, func.count(Booking.id))
+                .where(Booking.customer_id.in_(cust_ids), Booking.status == BookingStatus.COMPLETED)
+                .group_by(Booking.customer_id)
+            )
+            ride_counts = dict(rc_q.all())
+
+        for c in riders:
+            c.completed_rides = ride_counts.get(c.id, c.user.total_rides if (c.user and c.user.total_rides) else 0)
+
         total_pages = (total + limit - 1) // limit
         preregistrations = []
 
@@ -2165,17 +2192,28 @@ async def admin_riders_export(
     )
     riders = q.scalars().all()
 
+    cust_ids = [c.id for c in riders]
+    ride_counts = {}
+    if cust_ids:
+        rc_q = await db.execute(
+            select(Booking.customer_id, func.count(Booking.id))
+            .where(Booking.customer_id.in_(cust_ids), Booking.status == BookingStatus.COMPLETED)
+            .group_by(Booking.customer_id)
+        )
+        ride_counts = dict(rc_q.all())
+
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["ID", "Name", "Email", "Phone", "Total Rides", "Wallet Balance", "Gold Member", "Status", "Joined"])
     for c in riders:
         u = c.user
+        rides_count = ride_counts.get(c.id, u.total_rides if (u and u.total_rides) else 0)
         writer.writerow([
             c.id,
             u.full_name or "",
             u.email or "",
             u.phone_number or "",
-            u.total_rides or 0,
+            rides_count,
             0.0,
             "Yes" if c.gold_member else "No",
             "Active" if u.is_active else "Inactive",
@@ -10941,17 +10979,64 @@ async def admin_corporate_members_json(
         select(CorporateMember)
         .options(selectinload(CorporateMember.user))
         .where(CorporateMember.corporate_id == account_id)
+        .order_by(CorporateMember.id.asc())
     )
     members = q.scalars().all()
     return [
         {
             "id": m.id,
+            "user_id": m.user_id,
             "phone_number": m.user.phone_number if m.user else "",
             "full_name": m.user.full_name if m.user else "",
             "status": m.status,
         }
         for m in members
     ]
+
+
+@router.post("/corporate/{account_id}/members/{member_id}/delete")
+@router.post("/corporate/{account_id}/members/{member_id}/remove")
+@router.delete("/corporate/{account_id}/members/{member_id}")
+async def admin_corporate_remove_member(
+    account_id: int,
+    member_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from app.models import CorporateAccount, CorporateMember
+    aq = await db.execute(select(CorporateAccount).where(CorporateAccount.id == account_id))
+    acct = aq.scalars().first()
+    if not acct:
+        raise HTTPException(status_code=404, detail="Corporate account not found")
+
+    mq = await db.execute(
+        select(CorporateMember).where(
+            CorporateMember.id == member_id,
+            CorporateMember.corporate_id == account_id,
+        )
+    )
+    member = mq.scalars().first()
+    if not member:
+        uq = await db.execute(
+            select(CorporateMember).where(
+                CorporateMember.user_id == member_id,
+                CorporateMember.corporate_id == account_id,
+            )
+        )
+        member = uq.scalars().first()
+
+    if not member:
+        raise HTTPException(status_code=404, detail="Corporate member not found")
+
+    await db.delete(member)
+    await db.commit()
+
+    accept = request.headers.get("accept", "")
+    if "application/json" in accept or request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JSONResponse({"success": True, "detail": "Member removed successfully"})
+
+    return RedirectResponse(url="/admin/corporate", status_code=303)
 
 
 @router.post("/corporate/{account_id}/edit")

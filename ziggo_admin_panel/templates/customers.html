@@ -36,7 +36,7 @@
                     </td>
                     <td class="px-6 py-3 text-sm">{{ c.user.phone_number }}</td>
                     <td class="px-6 py-3 text-sm font-bold">Rs.{{ "{:,.2f}".format(c.wallet_balance or 0) }}</td>
-                    <td class="px-6 py-3 text-sm text-center">{{ (c.user.total_rides or 0)|num }}</td>
+                    <td class="px-6 py-3 text-sm text-center">{{ (c.completed_rides if c.completed_rides is defined else (c.user.total_rides or 0))|num }}</td>
                     <td class="px-6 py-3 text-sm">
                         {% if c.gold_member %}
                             <span class="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 text-xs font-bold">Gold</span>

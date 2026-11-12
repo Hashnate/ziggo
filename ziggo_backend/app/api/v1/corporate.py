@@ -211,6 +211,42 @@ async def add_corporate_member(
     )
 
 
+@router.delete("/admin/corporate/{account_id}/members/{member_id}", status_code=200)
+async def remove_corporate_member(
+    account_id: int,
+    member_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _require_admin(user)
+    aq = await db.execute(select(CorporateAccount).where(CorporateAccount.id == account_id))
+    if not aq.scalars().first():
+        raise HTTPException(status_code=404, detail="Corporate account not found")
+
+    mq = await db.execute(
+        select(CorporateMember).where(
+            CorporateMember.id == member_id,
+            CorporateMember.corporate_id == account_id,
+        )
+    )
+    member = mq.scalars().first()
+    if not member:
+        uq = await db.execute(
+            select(CorporateMember).where(
+                CorporateMember.user_id == member_id,
+                CorporateMember.corporate_id == account_id,
+            )
+        )
+        member = uq.scalars().first()
+
+    if not member:
+        raise HTTPException(status_code=404, detail="Corporate member not found")
+
+    await db.delete(member)
+    await db.commit()
+    return {"success": True, "detail": "Member removed successfully"}
+
+
 @router.post("/admin/corporate/{account_id}/topup", response_model=CorporateAccountResponse)
 async def topup_corporate(
     account_id: int,

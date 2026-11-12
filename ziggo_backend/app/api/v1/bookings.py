@@ -2201,16 +2201,22 @@ async def update_booking_status(
         # BRD: RW-01 — award loyalty points on completion (based on the cash
         # paid, i.e. final_amount AFTER any redemption discount).
         from ...services.loyalty_service import award_points as _award
-        cq = await db.execute(select(Customer).where(Customer.id == b.customer_id))
+        cq = await db.execute(
+            select(Customer).options(selectinload(Customer.user)).where(Customer.id == b.customer_id)
+        )
         cust_for_points = cq.scalars().first()
-        if cust_for_points and b.final_amount:
-            await _award(
-                db, cust_for_points,
-                spend_amount=b.final_amount,
-                source_kind="booking",
-                source_id=b.id,
-                description=f"Earned on {b.booking_ref}",
-            )
+        if cust_for_points:
+            # Increment customer total completed rides
+            if cust_for_points.user:
+                cust_for_points.user.total_rides = (cust_for_points.user.total_rides or 0) + 1
+            if b.final_amount:
+                await _award(
+                    db, cust_for_points,
+                    spend_amount=b.final_amount,
+                    source_kind="booking",
+                    source_id=b.id,
+                    description=f"Earned on {b.booking_ref}",
+                )
 
         # CD-30 — process referral bonus on friend's first completed trip
         from ...services.referral_service import process_referral_on_first_trip
@@ -2587,11 +2593,19 @@ async def rate_booking(
                 uq = await db.execute(select(User).where(User.id == drv.user_id))
                 duser = uq.scalars().first()
                 if duser:
-                    prev = float(duser.rating or 0)
-                    total = duser.total_rides or 0
-                    new_total = total + 1
-                    duser.rating = Decimal(str(round((prev * total + body.rating) / new_total, 2)))
-                    duser.total_rides = new_total
+                    rat_stmt = select(
+                        func.avg(Booking.customer_rating),
+                        func.count(Booking.id)
+                    ).where(
+                        Booking.driver_id == drv.id,
+                        Booking.customer_rating.isnot(None),
+                        Booking.id != b.id
+                    )
+                    rat_res = (await db.execute(rat_stmt)).first()
+                    prev_avg = float(rat_res[0]) if (rat_res and rat_res[0] is not None) else float(duser.rating or 0)
+                    prev_count = rat_res[1] if (rat_res and rat_res[1] is not None) else 0
+                    new_count = prev_count + 1
+                    duser.rating = Decimal(str(round((prev_avg * prev_count + body.rating) / new_count, 2)))
         b.customer_rating = body.rating
         b.customer_feedback = body.feedback
     elif user.role == UserRole.DRIVER:
@@ -2606,11 +2620,19 @@ async def rate_booking(
                 uq = await db.execute(select(User).where(User.id == cust.user_id))
                 cuser = uq.scalars().first()
                 if cuser:
-                    prev = float(cuser.rating or 0)
-                    total = cuser.total_rides or 0
-                    new_total = total + 1
-                    cuser.rating = Decimal(str(round((prev * total + body.rating) / new_total, 2)))
-                    cuser.total_rides = new_total
+                    rat_stmt = select(
+                        func.avg(Booking.driver_rating),
+                        func.count(Booking.id)
+                    ).where(
+                        Booking.customer_id == cust.id,
+                        Booking.driver_rating.isnot(None),
+                        Booking.id != b.id
+                    )
+                    rat_res = (await db.execute(rat_stmt)).first()
+                    prev_avg = float(rat_res[0]) if (rat_res and rat_res[0] is not None) else float(cuser.rating or 0)
+                    prev_count = rat_res[1] if (rat_res and rat_res[1] is not None) else 0
+                    new_count = prev_count + 1
+                    cuser.rating = Decimal(str(round((prev_avg * prev_count + body.rating) / new_count, 2)))
         b.driver_rating = body.rating
         b.driver_feedback = body.feedback
 
