@@ -248,7 +248,6 @@ class _RootState extends State<_Root> with WidgetsBindingObserver {
       // whether or not a notification tap brought them back.
       if (auth.status == AuthStatus.authenticated && auth.role == 'driver') {
         unawaited(context.read<DriverProvider>().loadPendingRequest());
-        context.read<DriverProvider>().updateWakelock(force: true);
       }
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
@@ -277,11 +276,7 @@ class _RootState extends State<_Root> with WidgetsBindingObserver {
         _sessionCleared = true;
         _fcmRegistered = false;
         final booking = context.read<BookingProvider>();
-        final driver = context.read<DriverProvider>();
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          booking.resetSession();
-          driver.resetSession();
-        });
+        WidgetsBinding.instance.addPostFrameCallback((_) => booking.resetSession());
       }
       return const RoleSelectionScreen();
     }
