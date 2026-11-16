@@ -42,7 +42,7 @@
     </div>
     {% endif %}
 
-    <form method="POST" action="/admin/settings" enctype="multipart/form-data">
+    <form method="POST" action="/admin/settings" enctype="multipart/form-data" id="adminSettingsForm" novalidate>
         <input type="hidden" name="active_tab" id="activeTabInput" value="general">
         <div class="settings-layout">
 
@@ -57,6 +57,7 @@
                 <button type="button" class="settings-tab" data-tab="trips"><i class="fas fa-map-pin"></i> Trip Stops &amp; Waiting</button>
                 <button type="button" class="settings-tab" data-tab="incentives"><i class="fas fa-gift"></i> Incentives</button>
                 <button type="button" class="settings-tab" data-tab="branding"><i class="fas fa-image"></i> Logo &amp; Favicon</button>
+                <button type="button" class="settings-tab" data-tab="appversion"><i class="fas fa-mobile-alt"></i> App Updates</button>
             </aside>
 
             <!-- Right content -->
@@ -111,8 +112,8 @@
                             <input type="number" min="0" max="23" name="surge_start_hour" value="{{ s.surge_start_hour if s.surge_start_hour is not none else 17 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                         </div>
                         <div>
-                            <label class="block text-xs font-black text-ziggo-muted mb-1">Busy Hours End (0–23)</label>
-                            <input type="number" min="0" max="23" name="surge_end_hour" value="{{ s.surge_end_hour if s.surge_end_hour is not none else 20 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                            <label class="block text-xs font-black text-ziggo-muted mb-1">Busy Hours End (0–24)</label>
+                            <input type="number" min="0" max="24" name="surge_end_hour" value="{{ s.surge_end_hour if s.surge_end_hour is not none else 20 }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
                         </div>
                         <div>
                             <label class="block text-xs font-black text-ziggo-muted mb-1">Busy Hours Multiplier</label>
@@ -202,14 +203,14 @@
                                             </td>
                                             <td class="px-6 py-3">
                                                 {% if pk.is_active %}
-                                                <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600">Active</span>
+                                                <span class="status-badge px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600">Active</span>
                                                 {% else %}
-                                                <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-gray-100 text-gray-500">Inactive</span>
+                                                <span class="status-badge px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-gray-100 text-gray-500">Inactive</span>
                                                 {% endif %}
                                             </td>
                                             <td class="px-6 py-3 text-right">
                                                 <div class="flex items-center justify-end gap-2">
-                                                    <button type="button" onclick="togglePeak({{ pk.id }})" class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 {% if pk.is_active %}bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-100{% else %}bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100{% endif %}">
+                                                    <button type="button" onclick="togglePeak({{ pk.id }})" class="toggle-btn px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 {% if pk.is_active %}bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-100{% else %}bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100{% endif %}">
                                                         {% if pk.is_active %}
                                                         <i class="fas fa-power-off"></i> Deactivate
                                                         {% else %}
@@ -217,7 +218,7 @@
                                                         {% endif %}
                                                     </button>
                                                     {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}
-                                                    <button type="button" onclick="deletePeak({{ pk.id }})" class="px-3 py-1.5 rounded-xl text-xs font-bold transition bg-gray-50 text-gray-500 border border-gray-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 flex items-center gap-1.5">
+                                                    <button type="button" onclick="deletePeak({{ pk.id }})" class="delete-btn px-3 py-1.5 rounded-xl text-xs font-bold transition bg-gray-50 text-gray-500 border border-gray-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 flex items-center gap-1.5">
                                                         <i class="fas fa-trash-alt"></i> Delete
                                                     </button>
                                                     {% endif %}
@@ -236,11 +237,17 @@
                                 </table>
                             </div>
                             <div class="px-6 py-3.5 border-t border-ziggo-line bg-gray-50/50 flex items-center justify-between text-xs text-ziggo-muted">
-                                <span class="font-medium">Total <strong class="text-ziggo-ink">{{ peaks|length }}</strong> peak hour slot{{ 's' if peaks|length != 1 else '' }}</span>
+                                <span class="font-medium">Total <strong class="text-ziggo-ink" id="peakSlotCount">{{ (peaks|length)|num }}</strong> peak hour slot<span id="peakSlotPlural">{{ 's' if peaks|length != 1 else '' }}</span></span>
                                 <span class="text-[11px] font-semibold text-gray-400"><i class="fas fa-grip-vertical mr-1"></i>Drag rows to reorder</span>
                             </div>
                         </div>
                     </div>
+                    <template id="peakCategoryOptionsTpl">
+                        <option value="">All Categories</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.service_type }}">{{ cat.display_name }}</option>
+                        {% endfor %}
+                    </template>
                 </section>
 
                 <!-- Security -->
@@ -390,8 +397,8 @@
                                         <td class="px-6 py-4 text-sm text-ziggo-ink font-normal">
                                             {{ inc.limit_days }} {% if inc.limit_days == 1 %}Day{% else %}Days{% endif %}
                                         </td>
-                                        <td class="px-6 py-4 text-sm text-ziggo-ink font-normal">{{ inc.trips_required }}</td>
-                                        <td class="px-6 py-4 text-sm text-ziggo-ink font-semibold text-emerald-600">LKR {{ "%.2f"|format(inc.reward_amount or 0) }}</td>
+                                        <td class="px-6 py-4 text-sm text-ziggo-ink font-normal">{{ inc.trips_required|num }}</td>
+                                        <td class="px-6 py-4 text-sm text-ziggo-ink font-semibold text-emerald-600">LKR {{ "{:,.2f}".format(inc.reward_amount or 0) }}</td>
                                         <td class="px-6 py-4">
                                             {% if inc.is_active %}
                                             <span class="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600">Active</span>
@@ -456,6 +463,88 @@
                             </div>
                             <input type="file" name="favicon" id="faviconInput" accept="image/png,image/x-icon,image/vnd.microsoft.icon,image/svg+xml" class="w-full text-xs">
                             <p class="text-[10px] text-ziggo-faint font-bold mt-1">ICO/PNG/SVG, max 5 MB.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- App Updates -->
+                <section class="settings-panel bg-white rounded-2xl border border-ziggo-line shadow-soft-sm p-6" data-panel="appversion">
+                    <h3 class="flex items-center gap-2 text-base font-black text-ziggo-ink mb-2">
+                        <i class="fas fa-mobile-alt text-ziggo"></i> Mobile App Version &amp; Force Update
+                    </h3>
+                    <p class="text-xs text-ziggo-muted mb-6">
+                        Manage app versioning for Android &amp; iOS. When you raise the <b>Minimum Supported Version</b>, any user or driver on an older build will be blocked by a non-dismissible Force Update dialog until they update.
+                    </p>
+
+                    <div class="space-y-6">
+                        <!-- Android Version Control -->
+                        <div class="p-5 bg-emerald-50/50 border border-emerald-100 rounded-2xl">
+                            <h4 class="text-sm font-black text-emerald-900 mb-3 flex items-center gap-2">
+                                <i class="fab fa-android text-emerald-600"></i> Android (Google Play Store)
+                            </h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-black text-ziggo-muted mb-1">
+                                        Minimum Supported Version <span class="text-rose-500 font-bold">(Force Update Below This)</span>
+                                    </label>
+                                    <input type="text" name="app_min_version_android" value="{{ s.app_min_version_android or '1.0.0' }}" placeholder="e.g. 1.0.15" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo font-mono text-sm bg-white">
+                                    <p class="text-[10px] text-ziggo-faint mt-1">Users below this version cannot open or use the app.</p>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-black text-ziggo-muted mb-1">
+                                        Latest Released Version <span class="text-blue-500 font-bold">(Soft Prompt)</span>
+                                    </label>
+                                    <input type="text" name="app_latest_version_android" value="{{ s.app_latest_version_android or '1.0.15' }}" placeholder="e.g. 1.0.16" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo font-mono text-sm bg-white">
+                                    <p class="text-[10px] text-ziggo-faint mt-1">Users on older versions get a friendly "Update Available" popup.</p>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <label class="block text-xs font-black text-ziggo-muted mb-1">Google Play Store URL</label>
+                                <input type="url" name="app_play_store_url" value="{{ s.app_play_store_url or 'https://play.google.com/store/apps/details?id=lk.ziggo.app' }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-xs bg-white">
+                            </div>
+                        </div>
+
+                        <!-- iOS Version Control -->
+                        <div class="p-5 bg-sky-50/50 border border-sky-100 rounded-2xl">
+                            <h4 class="text-sm font-black text-sky-900 mb-3 flex items-center gap-2">
+                                <i class="fab fa-apple text-sky-600"></i> iOS (Apple App Store)
+                            </h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-black text-ziggo-muted mb-1">
+                                        Minimum Supported Version <span class="text-rose-500 font-bold">(Force Update Below This)</span>
+                                    </label>
+                                    <input type="text" name="app_min_version_ios" value="{{ s.app_min_version_ios or '1.0.0' }}" placeholder="e.g. 1.0.15" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo font-mono text-sm bg-white">
+                                    <p class="text-[10px] text-ziggo-faint mt-1">Users below this version cannot open or use the app.</p>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-black text-ziggo-muted mb-1">
+                                        Latest Released Version <span class="text-blue-500 font-bold">(Soft Prompt)</span>
+                                    </label>
+                                    <input type="text" name="app_latest_version_ios" value="{{ s.app_latest_version_ios or '1.0.15' }}" placeholder="e.g. 1.0.16" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo font-mono text-sm bg-white">
+                                    <p class="text-[10px] text-ziggo-faint mt-1">Users on older versions get a friendly "Update Available" popup.</p>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <label class="block text-xs font-black text-ziggo-muted mb-1">Apple App Store URL</label>
+                                <input type="url" name="app_app_store_url" value="{{ s.app_app_store_url or 'https://apps.apple.com/app/ziggo-app/id6778739956' }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-xs bg-white">
+                            </div>
+                        </div>
+
+                        <!-- Update Dialog Messages -->
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-black text-ziggo-muted mb-1">Popup Dialog Title</label>
+                                <input type="text" name="app_update_title" value="{{ s.app_update_title or 'Update Available' }}" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-black text-ziggo-muted mb-1">Optional Update Message (Soft Prompt)</label>
+                                <textarea name="app_update_message" rows="2" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">{{ s.app_update_message or 'A new version of Ziggo is ready with improvements and bug fixes.' }}</textarea>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-black text-ziggo-muted mb-1">Mandatory Update Message (Force Update)</label>
+                                <textarea name="app_force_update_message" rows="2" class="w-full p-3 border border-ziggo-line rounded-xl outline-none focus:border-ziggo">{{ s.app_force_update_message or 'This version of Ziggo is no longer supported. Please update to continue using Ziggo.' }}</textarea>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -630,42 +719,259 @@
             }
         };
 
-        window.togglePeak = function(id) {
-            var form = document.getElementById('togglePeakForm');
-            if (form) {
-                form.action = '/admin/settings/peak-hours/' + id + '/toggle';
-                form.submit();
+        function updatePeakSlotCount() {
+            const tbody = document.querySelector('[data-panel="peakhours"] tbody');
+            if (!tbody) return;
+            const count = tbody.querySelectorAll('tr.drag-row').length;
+            const el = document.getElementById('peakSlotCount');
+            const pl = document.getElementById('peakSlotPlural');
+            if (el) el.textContent = count;
+            if (pl) pl.textContent = count === 1 ? '' : 's';
+        }
+
+        window.togglePeak = async function(id) {
+            const row = document.querySelector(`tr[data-id="${id}"]`);
+            if (!row) {
+                var form = document.getElementById('togglePeakForm');
+                if (form) {
+                    form.action = '/admin/settings/peak-hours/' + id + '/toggle';
+                    form.submit();
+                }
+                return;
+            }
+
+            const startInput = row.querySelector(`[name="peak_start_hour_${id}"]`);
+            const endInput = row.querySelector(`[name="peak_end_hour_${id}"]`);
+            const catInput = row.querySelector(`[name="peak_vehicle_category_${id}"]`);
+            const amtInput = row.querySelector(`[name="peak_extra_amount_${id}"]`);
+
+            const payload = {
+                start_time: startInput ? startInput.value : null,
+                end_time: endInput ? endInput.value : null,
+                vehicle_category: catInput ? catInput.value : null,
+                extra_amount: amtInput ? amtInput.value : null
+            };
+
+            const toggleBtn = row.querySelector('.toggle-btn');
+            if (toggleBtn) {
+                toggleBtn.disabled = true;
+                toggleBtn.classList.add('opacity-50');
+            }
+
+            try {
+                const res = await fetch('/admin/settings/peak-hours/' + id + '/toggle', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) throw new Error('Toggle failed');
+                const data = await res.json();
+                if (data.status === 'success') {
+                    const badge = row.querySelector('.status-badge');
+                    if (data.is_active) {
+                        if (badge) {
+                            badge.className = 'status-badge px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600';
+                            badge.textContent = 'Active';
+                        }
+                        if (toggleBtn) {
+                            toggleBtn.className = 'toggle-btn px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-100';
+                            toggleBtn.innerHTML = '<i class="fas fa-power-off"></i> Deactivate';
+                        }
+                        showPeakToast('Peak hour slot activated and saved', 'success');
+                    } else {
+                        if (badge) {
+                            badge.className = 'status-badge px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-gray-100 text-gray-500';
+                            badge.textContent = 'Inactive';
+                        }
+                        if (toggleBtn) {
+                            toggleBtn.className = 'toggle-btn px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100';
+                            toggleBtn.innerHTML = '<i class="fas fa-play"></i> Activate';
+                        }
+                        showPeakToast('Peak hour slot deactivated and saved', 'success');
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+                showPeakToast('Failed to toggle peak hour slot', 'error');
+            } finally {
+                if (toggleBtn) {
+                    toggleBtn.disabled = false;
+                    toggleBtn.classList.remove('opacity-50');
+                }
             }
         };
 
-        window.addPeakHour = function() {
-            var form = document.createElement('form');
-            form.method = 'POST';
-            form.action = '/admin/settings/peak-hours/new';
-            document.body.appendChild(form);
-            form.submit();
-        };
+        window.addPeakHour = async function() {
+            try {
+                showPeakToast('Creating new peak hour slot...', 'info');
+                const res = await fetch('/admin/settings/peak-hours/new', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                });
+                if (!res.ok) throw new Error('Failed to create peak hour slot');
+                const data = await res.json();
+                if (data.status === 'success') {
+                    const tbody = document.querySelector('[data-panel="peakhours"] tbody');
+                    if (tbody) {
+                        const emptyRow = tbody.querySelector('td[colspan="7"]')?.closest('tr');
+                        if (emptyRow) emptyRow.remove();
 
-        window.deletePeak = function(id) {
-            if (confirm('Are you sure you want to delete this peak hour slot?')) {
-                var form = document.createElement('form');
-                form.method = 'POST';
-                form.action = '/admin/settings/peak-hours/' + id + '/delete';
-                document.body.appendChild(form);
-                form.submit();
+                        const catTpl = document.getElementById('peakCategoryOptionsTpl');
+                        const catOptions = catTpl ? catTpl.innerHTML.trim() : '<option value="">All Categories</option>';
+
+                        const newRow = document.createElement('tr');
+                        newRow.className = 'hover:bg-gray-50/50 drag-row bg-emerald-50/40 transition-colors duration-700';
+                        newRow.dataset.id = data.id;
+                        newRow.innerHTML = `
+                            <td class="px-4 py-3 w-10 text-center cursor-grab active:cursor-grabbing text-gray-400 hover:text-ziggo drag-handle" draggable="true" title="Drag to reorder">
+                                <i class="fas fa-grip-vertical"></i>
+                            </td>
+                            <td class="px-6 py-3">
+                                <input type="time" name="peak_start_hour_${data.id}" value="" class="p-2 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-semibold w-36">
+                            </td>
+                            <td class="px-6 py-3">
+                                <input type="time" name="peak_end_hour_${data.id}" value="" class="p-2 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-semibold w-36">
+                            </td>
+                            <td class="px-6 py-3">
+                                <select name="peak_vehicle_category_${data.id}" class="p-2 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-semibold w-40">
+                                    ${catOptions}
+                                </select>
+                            </td>
+                            <td class="px-6 py-3">
+                                <input type="number" step="0.01" min="0" name="peak_extra_amount_${data.id}" value="" placeholder="0.00" class="p-2 border border-ziggo-line rounded-xl outline-none focus:border-ziggo text-sm font-semibold w-32">
+                            </td>
+                            <td class="px-6 py-3">
+                                <span class="status-badge px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600">Active</span>
+                            </td>
+                            <td class="px-6 py-3 text-right">
+                                <div class="flex items-center justify-end gap-2">
+                                    <button type="button" onclick="togglePeak(${data.id})" class="toggle-btn px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-100">
+                                        <i class="fas fa-power-off"></i> Deactivate
+                                    </button>
+                                    <button type="button" onclick="deletePeak(${data.id})" class="delete-btn px-3 py-1.5 rounded-xl text-xs font-bold transition bg-gray-50 text-gray-500 border border-gray-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 flex items-center gap-1.5">
+                                        <i class="fas fa-trash-alt"></i> Delete
+                                    </button>
+                                </div>
+                            </td>
+                        `;
+                        tbody.insertBefore(newRow, tbody.firstChild);
+
+                        bindDragRow(newRow);
+                        bindRowAutoSave(newRow);
+                        updatePeakSlotCount();
+
+                        setTimeout(() => {
+                            newRow.classList.remove('bg-emerald-50/40');
+                            const firstInput = newRow.querySelector('input[type="time"]');
+                            if (firstInput) firstInput.focus();
+                        }, 500);
+
+                        showPeakToast('New peak hour slot added at the top', 'success');
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+                showPeakToast('Failed to add peak hour slot', 'error');
             }
         };
 
+        window.deletePeak = async function(id) {
+            if (!confirm('Are you sure you want to delete this peak hour slot?')) return;
+
+            const row = document.querySelector(`tr[data-id="${id}"]`);
+            const btn = row?.querySelector('.delete-btn');
+            if (btn) btn.disabled = true;
+
+            try {
+                const res = await fetch('/admin/settings/peak-hours/' + id + '/delete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                });
+                if (!res.ok) throw new Error('Delete failed');
+                const data = await res.json();
+                if (data.status === 'success') {
+                    if (row) {
+                        row.style.transition = 'opacity 0.25s, transform 0.25s';
+                        row.style.opacity = '0';
+                        row.style.transform = 'translateX(20px)';
+                        setTimeout(() => {
+                            row.remove();
+                            updatePeakSlotCount();
+                            const tbody = document.querySelector('[data-panel="peakhours"] tbody');
+                            if (tbody && tbody.querySelectorAll('tr.drag-row').length === 0) {
+                                tbody.innerHTML = `
+                                    <tr>
+                                        <td colspan="7" class="px-6 py-12 text-center text-gray-400 font-bold">
+                                            <i class="fas fa-clock text-3xl mb-2 text-ziggo-faint block"></i>
+                                            No peak hours configured yet. Click Add Peak Hour to create one.
+                                        </td>
+                                    </tr>
+                                `;
+                            }
+                        }, 250);
+                    }
+                    showPeakToast('Peak hour slot deleted', 'success');
+                }
+            } catch (err) {
+                console.error(err);
+                showPeakToast('Failed to delete peak hour slot', 'error');
+                if (btn) btn.disabled = false;
+            }
+        };
+
+        function savePeakRow(row) {
+            const id = row.dataset.id;
+            if (!id) return;
+            const startInput = row.querySelector(`[name="peak_start_hour_${id}"]`);
+            const endInput = row.querySelector(`[name="peak_end_hour_${id}"]`);
+            const catInput = row.querySelector(`[name="peak_vehicle_category_${id}"]`);
+            const amtInput = row.querySelector(`[name="peak_extra_amount_${id}"]`);
+
+            const payload = {
+                start_time: startInput ? startInput.value : null,
+                end_time: endInput ? endInput.value : null,
+                vehicle_category: catInput ? catInput.value : null,
+                extra_amount: amtInput ? amtInput.value : null
+            };
+
+            fetch('/admin/settings/peak-hours/' + id + '/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(res => res.json()).then(data => {
+                if (data.status === 'success') {
+                    showPeakToast('Peak hour slot auto-saved', 'success');
+                }
+            }).catch(err => {
+                console.error('Auto-save error', err);
+            });
+        }
+
+        function bindRowAutoSave(row) {
+            const inputs = row.querySelectorAll('input, select');
+            inputs.forEach(input => {
+                input.addEventListener('change', () => {
+                    savePeakRow(row);
+                });
+            });
+        }
 
         // Peak Hours Drag-and-Drop Reordering (like categories)
         const peakTbody = document.querySelector('[data-panel="peakhours"] tbody');
-        if (peakTbody) {
-            let peakDragEl = null;
+        let peakDragEl = null;
 
-            peakTbody.querySelectorAll('.drag-handle').forEach(handle => {
-                const row = handle.closest('tr.drag-row');
-                if (!row) return;
-
+        function bindDragRow(row) {
+            const handle = row.querySelector('.drag-handle');
+            if (handle) {
                 handle.addEventListener('dragstart', (e) => {
                     peakDragEl = row;
                     row.classList.add('bg-blue-50/80', 'opacity-60');
@@ -675,52 +981,60 @@
 
                 handle.addEventListener('dragend', () => {
                     row.classList.remove('bg-blue-50/80', 'opacity-60');
-                    peakTbody.querySelectorAll('tr.drag-row').forEach(r => r.classList.remove('bg-gray-50/50'));
+                    if (peakTbody) {
+                        peakTbody.querySelectorAll('tr.drag-row').forEach(r => r.classList.remove('bg-gray-50/50'));
+                    }
                     saveNewPeakOrder();
                 });
+            }
+
+            row.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+
+                const target = e.target.closest('tr.drag-row');
+                if (target && target !== peakDragEl && target.parentNode === peakTbody) {
+                    const rect = target.getBoundingClientRect();
+                    const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
+                    peakTbody.insertBefore(peakDragEl, next ? target.nextSibling : target);
+                }
             });
 
+            row.addEventListener('dragenter', (e) => {
+                const target = e.target.closest('tr.drag-row');
+                if (target && target !== peakDragEl) {
+                    target.classList.add('bg-gray-50/50');
+                }
+            });
+
+            row.addEventListener('dragleave', (e) => {
+                const target = e.target.closest('tr.drag-row');
+                if (target && target !== peakDragEl) {
+                    target.classList.remove('bg-gray-50/50');
+                }
+            });
+        }
+
+        if (peakTbody) {
             peakTbody.querySelectorAll('tr.drag-row').forEach(row => {
-                row.addEventListener('dragover', (e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
-
-                    const target = e.target.closest('tr.drag-row');
-                    if (target && target !== peakDragEl && target.parentNode === peakTbody) {
-                        const rect = target.getBoundingClientRect();
-                        const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
-                        peakTbody.insertBefore(peakDragEl, next ? target.nextSibling : target);
-                    }
-                });
-
-                row.addEventListener('dragenter', (e) => {
-                    const target = e.target.closest('tr.drag-row');
-                    if (target && target !== peakDragEl) {
-                        target.classList.add('bg-gray-50/50');
-                    }
-                });
-
-                row.addEventListener('dragleave', (e) => {
-                    const target = e.target.closest('tr.drag-row');
-                    if (target && target !== peakDragEl) {
-                        target.classList.remove('bg-gray-50/50');
-                    }
-                });
+                bindDragRow(row);
+                bindRowAutoSave(row);
             });
+        }
 
-            function saveNewPeakOrder() {
-                const rows = peakTbody.querySelectorAll('tr.drag-row');
-                const order = Array.from(rows).map(row => parseInt(row.dataset.id));
+        function saveNewPeakOrder() {
+            const rows = peakTbody.querySelectorAll('tr.drag-row');
+            const order = Array.from(rows).map(row => parseInt(row.dataset.id));
 
-                showPeakToast('Saving peak hours order...', 'info');
+            showPeakToast('Saving peak hours order...', 'info');
 
-                fetch('/admin/settings/peak-hours/reorder', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ order: order })
-                })
+            fetch('/admin/settings/peak-hours/reorder', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ order: order })
+            })
                 .then(response => {
                     if (!response.ok) throw new Error('Failed to save order');
                     return response.json();
@@ -760,7 +1074,6 @@
                     }, 3000);
                 }
             }
-        }
 
         var incModal = document.getElementById('incentiveModal');
         if (incModal) {

@@ -1,0 +1,854 @@
+{% extends "base.html" %}
+{% block title %}Custom Fare Zones - Admin{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <div>
+        <h2 class="text-2xl font-bold text-gray-900">Geographic Zone Pricing & Dispatch Overrides</h2>
+        <p class="text-sm text-gray-500 mt-1">Configure micro-geographic geofences with custom per-vehicle base fares, minimum fares, search radii, and total peak/surge exemption.</p>
+    </div>
+    <button class="zi-btn-primary" onclick="openZoneModal()">+ Create New Zone</button>
+</div>
+
+<div class="flex flex-col lg:flex-row gap-6">
+    <!-- Left List -->
+    <div class="w-full lg:w-5/12 flex flex-col">
+        <div class="zi-card overflow-hidden">
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+                <h5 class="font-bold text-lg m-0">Custom Fare Zones ({{ zones|length }})</h5>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 text-xs font-semibold text-gray-600 uppercase">
+                        <tr>
+                            <th class="text-left px-4 py-3">Zone Name</th>
+                            <th class="text-left px-4 py-3">Rates & Exemption</th>
+                            <th class="text-left px-4 py-3">Status</th>
+                            <th class="text-center px-4 py-3">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 text-sm">
+                        {% for z in zones %}
+                        <tr class="hover:bg-gray-50 cursor-pointer transition-colors" onclick='viewZone({{ z.id }})'>
+                            <td class="px-4 py-3 font-semibold text-gray-900">
+                                <div class="flex items-center gap-2.5">
+                                    <span class="w-3.5 h-3.5 rounded-full border border-black/10 shadow-sm shrink-0" style="background-color: {{ z.color }};"></span>
+                                    <span>{{ z.name }}</span>
+                                </div>
+                                <span class="text-xs text-gray-400 block ml-6">{{ z.created_at }}</span>
+                            </td>
+                            <td class="px-4 py-3">
+                                {% if z.exempt_peak_surge %}
+                                    <span class="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-800 mb-1">
+                                        <i class="fas fa-shield-alt text-[10px]"></i> 0 Surge & Peak
+                                    </span>
+                                {% endif %}
+                                <div class="flex flex-wrap gap-1">
+                                    {% for v_type, r in (z.rates or {}).items() %}
+                                        <span class="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[11px] font-medium border border-blue-200">
+                                            {{ v_type|upper }}: Rs.{{ r.base_fare|int if r.base_fare else '-' }} | {{ r.search_radius_km if r.search_radius_km is not none else '-' }}km
+                                        </span>
+                                    {% else %}
+                                        <span class="text-xs text-gray-400">No vehicle rates</span>
+                                    {% endfor %}
+                                </div>
+                            </td>
+                            <td class="px-4 py-3">
+                                {% if z.is_active %}
+                                    <button type="button" onclick="toggleZoneActive(event, {{ z.id }}, false)" class="px-2.5 py-1 rounded-md text-xs font-bold bg-green-100 text-green-800 hover:bg-green-200 transition-colors inline-flex items-center gap-1.5 cursor-pointer" title="Click to deactivate zone">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-green-600"></span> Active
+                                    </button>
+                                {% else %}
+                                    <button type="button" onclick="toggleZoneActive(event, {{ z.id }}, true)" class="px-2.5 py-1 rounded-md text-xs font-bold bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors inline-flex items-center gap-1.5 cursor-pointer" title="Click to activate zone">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-gray-500"></span> Inactive
+                                    </button>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-center">
+                                <div class="flex items-center justify-center gap-1.5" onclick="event.stopPropagation()">
+                                    {% if z.is_active %}
+                                    <button type="button" class="px-2.5 py-1 text-xs font-semibold border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg transition-colors flex items-center gap-1" onclick="toggleZoneActive(event, {{ z.id }}, false)" title="Deactivate Zone">
+                                        <i class="fas fa-pause-circle text-amber-600"></i> Deactivate
+                                    </button>
+                                    {% else %}
+                                    <button type="button" class="px-2.5 py-1 text-xs font-semibold border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg transition-colors flex items-center gap-1" onclick="toggleZoneActive(event, {{ z.id }}, true)" title="Activate Zone">
+                                        <i class="fas fa-play-circle text-emerald-600"></i> Activate
+                                    </button>
+                                    {% endif %}
+                                    <button type="button" class="px-2.5 py-1 text-xs font-semibold border border-gray-300 bg-white hover:bg-gray-100 text-gray-700 rounded-lg transition-colors flex items-center gap-1" onclick="editZone(event, {{ z.id }})" title="Edit Zone">
+                                        <i class="fas fa-edit text-gray-500"></i> Edit
+                                    </button>
+                                    <button type="button" class="px-2 py-1 text-xs font-semibold border border-red-200 bg-white hover:bg-red-50 text-red-600 rounded-lg transition-colors" onclick="deleteZone(event, {{ z.id }})" title="Delete Zone">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-gray-400 py-10">No custom fare zones created yet. Click "+ Create New Zone" above.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Right Map -->
+    <div class="w-full lg:w-7/12 flex flex-col">
+        <div class="zi-card relative h-[600px] overflow-hidden">
+            <div id="map" class="absolute inset-0"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Zone Modal -->
+<div id="zoneModal" class="hidden fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+  <form id="zoneForm" onsubmit="saveZone(event)" class="bg-white rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="flex justify-between items-center p-5 border-b border-gray-200 shrink-0">
+        <div>
+            <h5 class="text-xl font-bold text-gray-900" id="zoneModalTitle">Create Custom Fare Zone</h5>
+            <p class="text-xs text-gray-500 mt-0.5">Origin-based: trips starting inside this polygon adopt configured rates and bypass surge.</p>
+        </div>
+        <button type="button" class="text-gray-400 hover:text-gray-800 text-xl" onclick="closeZoneModal()">&times;</button>
+      </div>
+      
+      <div class="p-6 overflow-y-auto flex-1 min-h-0 space-y-6">
+        <input type="hidden" id="zoneId">
+        
+        <!-- Basic Settings -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-semibold mb-1 text-gray-700">Zone Name <span class="text-red-500">*</span></label>
+                <input type="text" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm" id="zoneName" required placeholder="e.g. Colombo Fort Tourist Zone">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-semibold mb-2 text-gray-700">Zone Colour</label>
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="relative w-10 h-10 rounded-lg border border-gray-300 overflow-hidden cursor-pointer shadow-sm">
+                        <input type="color" id="zoneColor" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full" value="#2563eb" oninput="onColorInputChange(this.value)">
+                        <div id="colorPreview" class="w-full h-full bg-[#2563eb]"></div>
+                    </div>
+                    <div class="flex items-center gap-2" id="colorSwatches">
+                        <button type="button" class="w-8 h-8 rounded-full border-2 border-white shadow-sm cursor-pointer transition-transform hover:scale-110" style="background-color: #2563eb;" onclick="selectSwatch('#2563eb')"></button>
+                        <button type="button" class="w-8 h-8 rounded-full border-2 border-white shadow-sm cursor-pointer transition-transform hover:scale-110" style="background-color: #059669;" onclick="selectSwatch('#059669')"></button>
+                        <button type="button" class="w-8 h-8 rounded-full border-2 border-white shadow-sm cursor-pointer transition-transform hover:scale-110" style="background-color: #d97706;" onclick="selectSwatch('#d97706')"></button>
+                        <button type="button" class="w-8 h-8 rounded-full border-2 border-white shadow-sm cursor-pointer transition-transform hover:scale-110" style="background-color: #dc2626;" onclick="selectSwatch('#dc2626')"></button>
+                        <button type="button" class="w-8 h-8 rounded-full border-2 border-white shadow-sm cursor-pointer transition-transform hover:scale-110" style="background-color: #7c3aed;" onclick="selectSwatch('#7c3aed')"></button>
+                        <button type="button" class="w-8 h-8 rounded-full border-2 border-white shadow-sm cursor-pointer transition-transform hover:scale-110" style="background-color: #0891b2;" onclick="selectSwatch('#0891b2')"></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Checkboxes -->
+        <div class="flex flex-wrap gap-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <label class="flex items-center gap-2.5 cursor-pointer">
+                <input type="checkbox" id="zoneActive" class="w-4 h-4 text-blue-600 rounded" checked>
+                <span class="text-sm font-semibold text-gray-800">Zone is Active</span>
+            </label>
+            <label class="flex items-center gap-2.5 cursor-pointer">
+                <input type="checkbox" id="zoneExempt" class="w-4 h-4 text-emerald-600 rounded" checked>
+                <span class="text-sm font-semibold text-gray-800">100% Exemption from Peak & Surge (Surge = 1.0x, Peak = Rs. 0.00)</span>
+            </label>
+        </div>
+
+        <!-- Polygon Map Section (Matches Surge Zone Pattern) -->
+        <div>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1.5">
+                <label class="font-semibold text-gray-800 m-0 flex items-center gap-1.5">
+                    <i class="fas fa-map-marked-alt text-blue-600"></i> Draw Zone Polygon <span class="text-red-500">*</span>
+                </label>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="toggleModalMapExpand()" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-200 transition-colors" title="Expand / Shrink map view">
+                        <i class="fas fa-expand-arrows-alt text-gray-500" id="expandIcon"></i>
+                        <span id="expandText">Expand map</span>
+                    </button>
+                    <label class="inline-flex items-center gap-1.5 cursor-pointer select-none text-xs text-gray-700 bg-gray-100 hover:bg-gray-200 px-2.5 py-1 rounded-md border border-gray-200 transition-colors">
+                        <input type="checkbox" id="toggleExistingZones" class="rounded text-blue-600 w-3.5 h-3.5" checked onchange="toggleReferenceZones(this.checked)">
+                        <span>Show existing zones</span>
+                        <span class="bg-white px-1.5 py-0.2 rounded text-[11px] font-bold text-gray-600 border border-gray-200">{{ zones|length }}</span>
+                    </label>
+                </div>
+            </div>
+            <p class="text-gray-500 text-xs mb-2.5">
+                Click the <i class="fas fa-draw-polygon text-blue-600"></i> tool in the top-right of the map to draw. Click points to outline the zone, and complete the shape by clicking the first vertex (or double-clicking).
+            </p>
+
+            <div id="modalMap" class="w-full h-[360px] bg-gray-100 rounded-xl overflow-hidden border border-gray-200"></div>
+            <input type="hidden" id="zoneCoordinates" required>
+        </div>
+
+        <!-- Per-Vehicle Granular Rates Editor -->
+        <div>
+            <div class="flex justify-between items-center mb-3">
+                <h6 class="font-bold text-sm text-gray-900 uppercase tracking-wide">Per-Vehicle Rates & Search Radius Overrides</h6>
+                <span class="text-xs text-gray-500">Enable only vehicle categories you want to override in this zone</span>
+            </div>
+            
+            <div class="space-y-3" id="vehicleRatesContainer">
+                {% for v in vehicles %}
+                <div class="border border-gray-200 rounded-xl p-4 transition-colors hover:border-gray-300" id="rateCard_{{ v.service_type }}">
+                    <div class="flex items-center justify-between mb-3">
+                        <label class="flex items-center gap-2 cursor-pointer font-bold text-gray-900 text-sm">
+                            <input type="checkbox" id="override_{{ v.service_type }}" onchange="toggleVehicleOverride('{{ v.service_type }}')" class="w-4 h-4 text-blue-600 rounded">
+                            <span>{{ v.display_name }} ({{ v.service_type }})</span>
+                        </label>
+                        <span class="text-xs text-gray-400">Default: Base Rs.{{ v.base_fare|int }} | Min Rs.{{ v.min_fare|int }} | Radius {{ v.search_radius_km }}km</span>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 opacity-40 pointer-events-none transition-opacity" id="fields_{{ v.service_type }}">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Base Fare (Rs.)</label>
+                            <input type="number" step="1" min="0" id="base_{{ v.service_type }}" class="w-full border border-gray-300 rounded-lg p-2 text-sm" placeholder="{{ v.base_fare|int }}">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Min Fare (Rs.)</label>
+                            <input type="number" step="1" min="0" id="min_{{ v.service_type }}" class="w-full border border-gray-300 rounded-lg p-2 text-sm" placeholder="{{ v.min_fare|int }}">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Search Radius (km)</label>
+                            <input type="number" step="any" min="0.1" max="50" id="radius_{{ v.service_type }}" class="w-full border border-gray-300 rounded-lg p-2 text-sm" placeholder="{{ v.search_radius_km }}">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Per-KM Rate (Rs., opt)</label>
+                            <input type="number" step="1" min="0" id="perkm_{{ v.service_type }}" class="w-full border border-gray-300 rounded-lg p-2 text-sm" placeholder="{{ v.per_km_rate|int if v.per_km_rate else 'National' }}">
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+      </div>
+      
+      <div class="p-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3 shrink-0">
+        <button type="button" class="px-4 py-2 text-sm font-semibold border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100" onclick="closeZoneModal()">Cancel</button>
+        <button type="submit" class="zi-btn-primary px-6 py-2 text-sm font-semibold" id="saveZoneBtn">Save Custom Fare Zone</button>
+      </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.zone-reference-label {
+    background: rgba(255, 255, 255, 0.94) !important;
+    color: #0f172a !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    padding: 2px 7px !important;
+    border-radius: 6px !important;
+    border: 1px solid rgba(0, 0, 0, 0.25) !important;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.18) !important;
+    white-space: nowrap !important;
+    pointer-events: none !important;
+    user-select: none !important;
+}
+</style>
+<!-- Google Maps SDK -->
+{% if gmap_key %}
+<script src="https://maps.googleapis.com/maps/api/js?key={{ gmap_key }}&v=3.64&libraries=drawing,geometry"></script>
+{% endif %}
+
+<script>
+    const allZones = {{ zones|tojson|safe }};
+    const allVehicles = {{ vehicles|tojson|safe }};
+    let mainMap;
+    let modalMap;
+    let drawingManager;
+    let currentModalPolygon = null;
+    let referencePolygons = [];
+    let referenceMarkers = [];
+    let isReferenceZonesVisible = true;
+    let customToolPanBtn = null;
+    let customToolPolygonBtn = null;
+
+    function initMainMap() {
+        if (!window.google || !google.maps) return;
+        const colombo = { lat: 6.9271, lng: 79.8612 };
+        mainMap = new google.maps.Map(document.getElementById("map"), {
+            zoom: 12,
+            center: colombo,
+            mapTypeId: 'roadmap'
+        });
+        
+        const bounds = new google.maps.LatLngBounds();
+        let hasBounds = false;
+
+        allZones.forEach(z => {
+            if (!z.coordinates || !Array.isArray(z.coordinates) || z.coordinates.length < 3) return;
+            const color = z.is_active ? (z.color || '#2563eb') : '#94a3b8';
+            const poly = new google.maps.Polygon({
+                paths: z.coordinates,
+                strokeColor: color,
+                strokeOpacity: 0.9,
+                strokeWeight: 2,
+                fillColor: color,
+                fillOpacity: 0.35,
+                map: mainMap
+            });
+            poly.addListener('click', () => {
+                viewZone(z.id);
+            });
+            z.coordinates.forEach(c => {
+                bounds.extend(new google.maps.LatLng(c.lat, c.lng));
+                hasBounds = true;
+            });
+        });
+
+        if (hasBounds) {
+            mainMap.fitBounds(bounds);
+        }
+    }
+
+    function initModalMap() {
+        if (modalMap) return;
+        try {
+            const initialCenter = mainMap ? mainMap.getCenter() : { lat: 6.9271, lng: 79.8612 };
+            const initialZoom = mainMap ? mainMap.getZoom() : 13;
+            modalMap = new google.maps.Map(document.getElementById("modalMap"), {
+                zoom: initialZoom,
+                center: initialCenter,
+                mapTypeId: 'roadmap',
+                fullscreenControl: true
+            });
+            
+            const initialColor = document.getElementById('zoneColor').value || '#2563eb';
+            drawingManager = new google.maps.drawing.DrawingManager({
+                drawingMode: google.maps.drawing.OverlayType.POLYGON,
+                drawingControl: false,
+                polygonOptions: { 
+                    fillColor: initialColor, 
+                    fillOpacity: 0.45, 
+                    strokeColor: initialColor, 
+                    strokeWeight: 2.5, 
+                    clickable: true, 
+                    editable: true, 
+                    zIndex: 10 
+                }
+            });
+            drawingManager.setMap(modalMap);
+            setupCustomDrawingToolbar(modalMap);
+            
+            google.maps.event.addListener(drawingManager, 'polygoncomplete', function(polygon) {
+                if (currentModalPolygon) currentModalPolygon.setMap(null);
+                currentModalPolygon = polygon;
+                drawingManager.setDrawingMode(null);
+                setDrawingToolActive('pan');
+                updateCoordinatesInput(polygon);
+
+                polygon.getPaths().forEach(function(path){
+                    google.maps.event.addListener(path, 'insert_at', function(){ 
+                        updateCoordinatesInput(polygon); 
+                    });
+                    google.maps.event.addListener(path, 'remove_at', function(){ 
+                        updateCoordinatesInput(polygon); 
+                    });
+                    google.maps.event.addListener(path, 'set_at', function(){ 
+                        updateCoordinatesInput(polygon); 
+                    });
+                });
+            });
+        } catch (error) {
+            console.error("Error initializing modal map or drawing manager:", error);
+            alert("Error loading drawing tools: " + error.message);
+        }
+    }
+
+    function setupCustomDrawingToolbar(map) {
+        if (document.getElementById('customDrawingToolbar')) return;
+
+        const toolbarDiv = document.createElement('div');
+        toolbarDiv.id = 'customDrawingToolbar';
+        toolbarDiv.style.marginRight = '10px';
+        toolbarDiv.style.marginTop = '8px';
+        toolbarDiv.style.boxShadow = '0 2px 6px rgba(0,0,0,0.2)';
+        toolbarDiv.className = 'flex flex-col bg-white rounded-lg border border-gray-300 overflow-hidden';
+
+        const btnPan = document.createElement('button');
+        btnPan.type = 'button';
+        btnPan.id = 'btnToolPan';
+        btnPan.title = 'Pan / Navigate Map (Stop Drawing)';
+        btnPan.className = 'w-10 h-10 flex items-center justify-center transition-all border-b border-gray-200 bg-blue-600 text-white font-bold shadow-inner cursor-pointer';
+        btnPan.innerHTML = '<i class="fas fa-hand text-base pointer-events-none"></i>';
+
+        const btnPolygon = document.createElement('button');
+        btnPolygon.type = 'button';
+        btnPolygon.id = 'btnToolPolygon';
+        btnPolygon.title = 'Draw Custom Fare Zone Polygon';
+        btnPolygon.className = 'w-10 h-10 flex items-center justify-center transition-all text-gray-700 hover:bg-gray-100 hover:text-black bg-white cursor-pointer';
+        btnPolygon.innerHTML = '<i class="fas fa-draw-polygon text-base pointer-events-none"></i>';
+
+        customToolPanBtn = btnPan;
+        customToolPolygonBtn = btnPolygon;
+
+        const handlePan = function(e) {
+            if (e) { e.preventDefault(); e.stopPropagation(); }
+            if (drawingManager) drawingManager.setDrawingMode(null);
+            if (currentModalPolygon) {
+                currentModalPolygon.setOptions({ clickable: true });
+            }
+            setDrawingToolActive('pan');
+        };
+
+        const handlePolygon = function(e) {
+            if (e) { e.preventDefault(); e.stopPropagation(); }
+            if (currentModalPolygon) {
+                currentModalPolygon.setMap(null);
+                currentModalPolygon = null;
+                document.getElementById('zoneCoordinates').value = '';
+            }
+            if (drawingManager) {
+                drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+            }
+            setDrawingToolActive('polygon');
+        };
+
+        btnPan.onclick = handlePan;
+        btnPolygon.onclick = handlePolygon;
+        btnPan.addEventListener('click', handlePan);
+        btnPolygon.addEventListener('click', handlePolygon);
+
+        toolbarDiv.appendChild(btnPan);
+        toolbarDiv.appendChild(btnPolygon);
+
+        map.controls[google.maps.ControlPosition.RIGHT_TOP].push(toolbarDiv);
+    }
+
+    function setDrawingToolActive(tool) {
+        const btnPan = customToolPanBtn || document.getElementById('btnToolPan');
+        const btnPolygon = customToolPolygonBtn || document.getElementById('btnToolPolygon');
+        if (!btnPan || !btnPolygon) return;
+
+        if (tool === 'polygon') {
+            btnPolygon.className = 'w-10 h-10 flex items-center justify-center transition-all bg-blue-600 text-white font-bold shadow-inner cursor-pointer';
+            btnPan.className = 'w-10 h-10 flex items-center justify-center transition-all border-b border-gray-200 text-gray-700 hover:bg-gray-100 hover:text-black bg-white cursor-pointer';
+        } else {
+            btnPan.className = 'w-10 h-10 flex items-center justify-center transition-all border-b border-gray-200 bg-blue-600 text-white font-bold shadow-inner cursor-pointer';
+            btnPolygon.className = 'w-10 h-10 flex items-center justify-center transition-all text-gray-700 hover:bg-gray-100 hover:text-black bg-white cursor-pointer';
+        }
+    }
+
+    function updateCoordinatesInput(polygon) {
+        const vertices = polygon.getPath();
+        const coords = [];
+        for (let i = 0; i < vertices.getLength(); i++) {
+            const xy = vertices.getAt(i);
+            coords.push({ lat: xy.lat(), lng: xy.lng() });
+        }
+        document.getElementById('zoneCoordinates').value = JSON.stringify(coords);
+    }
+
+    function clearReferenceZones() {
+        referencePolygons.forEach(p => p.setMap(null));
+        referencePolygons = [];
+        referenceMarkers.forEach(m => m.setMap(null));
+        referenceMarkers = [];
+    }
+
+    function renderReferenceZones(excludeZoneId = null) {
+        clearReferenceZones();
+        if (!modalMap) return;
+
+        allZones.forEach(z => {
+            if (excludeZoneId !== null && excludeZoneId !== undefined && String(z.id) === String(excludeZoneId)) {
+                return;
+            }
+            if (!z.coordinates || !Array.isArray(z.coordinates) || z.coordinates.length < 3) return;
+
+            const color = z.is_active ? (z.color || '#2563eb') : '#94a3b8';
+            const poly = new google.maps.Polygon({
+                paths: z.coordinates,
+                strokeColor: color,
+                strokeOpacity: 0.9,
+                strokeWeight: 2,
+                fillColor: color,
+                fillOpacity: 0.22,
+                clickable: false,
+                zIndex: 1,
+                map: isReferenceZonesVisible ? modalMap : null
+            });
+            poly._zoneData = z;
+            referencePolygons.push(poly);
+
+            const bounds = new google.maps.LatLngBounds();
+            z.coordinates.forEach(pt => bounds.extend(new google.maps.LatLng(pt.lat, pt.lng)));
+            const center = bounds.getCenter();
+
+            const marker = new google.maps.Marker({
+                position: center,
+                map: isReferenceZonesVisible ? modalMap : null,
+                clickable: false,
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 0
+                },
+                label: {
+                    text: z.name + (!z.is_active ? ' (Inactive)' : ''),
+                    className: 'zone-reference-label'
+                },
+                zIndex: 2
+            });
+            marker._zoneData = z;
+            referenceMarkers.push(marker);
+        });
+    }
+
+    window.toggleReferenceZones = function(show) {
+        isReferenceZonesVisible = show;
+        referencePolygons.forEach(p => p.setMap(show ? modalMap : null));
+        referenceMarkers.forEach(m => m.setMap(show ? modalMap : null));
+    };
+
+    let isModalMapExpanded = false;
+    window.toggleModalMapExpand = function() {
+        const mapDiv = document.getElementById('modalMap');
+        const icon = document.getElementById('expandIcon');
+        const text = document.getElementById('expandText');
+        const form = document.getElementById('zoneForm');
+        
+        isModalMapExpanded = !isModalMapExpanded;
+        if (isModalMapExpanded) {
+            mapDiv.classList.remove('h-[360px]');
+            mapDiv.classList.add('h-[550px]');
+            if (icon) icon.className = 'fas fa-compress-arrows-alt text-gray-500';
+            if (text) text.innerText = 'Collapse map';
+            if (form) {
+                form.classList.remove('max-w-4xl');
+                form.classList.add('max-w-5xl');
+            }
+        } else {
+            mapDiv.classList.remove('h-[550px]');
+            mapDiv.classList.add('h-[360px]');
+            if (icon) icon.className = 'fas fa-expand-arrows-alt text-gray-500';
+            if (text) text.innerText = 'Expand map';
+            if (form) {
+                form.classList.remove('max-w-5xl');
+                form.classList.add('max-w-4xl');
+            }
+        }
+        if (modalMap) {
+            google.maps.event.trigger(modalMap, 'resize');
+        }
+    };
+
+    window.onColorInputChange = function(val) {
+        document.getElementById('colorPreview').style.backgroundColor = val;
+        updatePolygonColor(val);
+    };
+
+    window.selectSwatch = function(color) {
+        document.getElementById('zoneColor').value = color;
+        document.getElementById('colorPreview').style.backgroundColor = color;
+        updatePolygonColor(color);
+    };
+
+    function updatePolygonColor(color) {
+        if (drawingManager) {
+            drawingManager.setOptions({
+                polygonOptions: { fillColor: color, fillOpacity: 0.45, strokeColor: color, strokeWeight: 2.5, clickable: true, editable: true, zIndex: 10 }
+            });
+        }
+        if (currentModalPolygon) {
+            currentModalPolygon.setOptions({
+                fillColor: color,
+                strokeColor: color
+            });
+        }
+    }
+
+    window.toggleVehicleOverride = function(st) {
+        const checked = document.getElementById(`override_${st}`).checked;
+        const fields = document.getElementById(`fields_${st}`);
+        if (checked) {
+            fields.classList.remove('opacity-40', 'pointer-events-none');
+        } else {
+            fields.classList.add('opacity-40', 'pointer-events-none');
+        }
+    };
+
+    window.openZoneModal = function() {
+        document.getElementById('zoneForm').reset();
+        document.getElementById('zoneId').value = '';
+        document.getElementById('zoneCoordinates').value = '';
+        document.getElementById('zoneColor').value = '#2563eb';
+        document.getElementById('colorPreview').style.backgroundColor = '#2563eb';
+        document.getElementById('zoneActive').checked = true;
+        document.getElementById('zoneExempt').checked = true;
+        document.getElementById('zoneModalTitle').innerText = 'Create Custom Fare Zone';
+
+        allVehicles.forEach(v => {
+            const cb = document.getElementById(`override_${v.service_type}`);
+            if (cb) {
+                cb.checked = false;
+                toggleVehicleOverride(v.service_type);
+            }
+        });
+
+        const toggleCheck = document.getElementById('toggleExistingZones');
+        if (toggleCheck) toggleCheck.checked = true;
+        isReferenceZonesVisible = true;
+
+        if (drawingManager) {
+            drawingManager.setOptions({
+                polygonOptions: { fillColor: '#2563eb', fillOpacity: 0.45, strokeColor: '#2563eb', strokeWeight: 2.5, clickable: true, editable: true, zIndex: 10 }
+            });
+        }
+        if (currentModalPolygon) { currentModalPolygon.setMap(null); currentModalPolygon = null; }
+        
+        document.getElementById('zoneModal').classList.remove('hidden');
+        
+        setTimeout(() => {
+            initModalMap();
+            google.maps.event.trigger(modalMap, 'resize');
+            renderReferenceZones(null);
+
+            if (mainMap) {
+                modalMap.setCenter(mainMap.getCenter());
+                modalMap.setZoom(mainMap.getZoom());
+            } else if (allZones && allZones.length > 0) {
+                const bounds = new google.maps.LatLngBounds();
+                let hasBounds = false;
+                allZones.forEach(z => {
+                    if (z.coordinates && z.coordinates.length > 0) {
+                        z.coordinates.forEach(c => { bounds.extend(new google.maps.LatLng(c.lat, c.lng)); hasBounds = true; });
+                    }
+                });
+                if (hasBounds) modalMap.fitBounds(bounds);
+            }
+            
+            if (drawingManager) drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+            setDrawingToolActive('polygon');
+        }, 150);
+    };
+
+    window.closeZoneModal = function() {
+        if (drawingManager) drawingManager.setDrawingMode(null);
+        if (isModalMapExpanded) toggleModalMapExpand();
+        document.getElementById('zoneModal').classList.add('hidden');
+    };
+
+    window.viewZone = function(id) {
+        const zone = allZones.find(z => z.id === id);
+        if (zone && zone.coordinates && zone.coordinates.length >= 3 && mainMap) {
+            const bounds = new google.maps.LatLngBounds();
+            zone.coordinates.forEach(pt => bounds.extend(new google.maps.LatLng(pt.lat, pt.lng)));
+            mainMap.fitBounds(bounds);
+        }
+    };
+
+    window.editZone = function(e, id) {
+        if (e) e.stopPropagation();
+        const zone = allZones.find(z => z.id === id);
+        if (!zone) return;
+
+        document.getElementById('zoneForm').reset();
+        document.getElementById('zoneId').value = zone.id;
+        document.getElementById('zoneName').value = zone.name;
+        document.getElementById('zoneColor').value = zone.color || '#2563eb';
+        document.getElementById('colorPreview').style.backgroundColor = zone.color || '#2563eb';
+        document.getElementById('zoneActive').checked = zone.is_active;
+        document.getElementById('zoneExempt').checked = zone.exempt_peak_surge;
+        document.getElementById('zoneModalTitle').innerText = 'Edit Custom Fare Zone';
+
+        allVehicles.forEach(v => {
+            const cb = document.getElementById(`override_${v.service_type}`);
+            if (cb) {
+                cb.checked = false;
+                toggleVehicleOverride(v.service_type);
+            }
+        });
+        const rates = zone.rates || {};
+        for (const [st, r] of Object.entries(rates)) {
+            const cb = document.getElementById(`override_${st}`);
+            if (cb) {
+                cb.checked = true;
+                toggleVehicleOverride(st);
+                if (r.base_fare != null) document.getElementById(`base_${st}`).value = r.base_fare;
+                if (r.min_fare != null) document.getElementById(`min_${st}`).value = r.min_fare;
+                if (r.search_radius_km != null) document.getElementById(`radius_${st}`).value = r.search_radius_km;
+                if (r.per_km_rate != null) document.getElementById(`perkm_${st}`).value = r.per_km_rate;
+            }
+        }
+
+        document.getElementById('zoneCoordinates').value = JSON.stringify(zone.coordinates || []);
+
+        if (currentModalPolygon) { currentModalPolygon.setMap(null); currentModalPolygon = null; }
+        
+        document.getElementById('zoneModal').classList.remove('hidden');
+
+        setTimeout(() => {
+            initModalMap();
+            google.maps.event.trigger(modalMap, 'resize');
+            renderReferenceZones(zone.id);
+
+            if (zone.coordinates && zone.coordinates.length >= 3) {
+                const bounds = new google.maps.LatLngBounds();
+                const color = zone.color || '#2563eb';
+                currentModalPolygon = new google.maps.Polygon({
+                    paths: zone.coordinates,
+                    fillColor: color,
+                    fillOpacity: 0.45,
+                    strokeColor: color,
+                    strokeWeight: 2.5,
+                    clickable: true,
+                    editable: true,
+                    zIndex: 10,
+                    map: modalMap
+                });
+                zone.coordinates.forEach(c => bounds.extend(new google.maps.LatLng(c.lat, c.lng)));
+                modalMap.fitBounds(bounds);
+
+                currentModalPolygon.getPaths().forEach(function(path){
+                    google.maps.event.addListener(path, 'insert_at', function(){ updateCoordinatesInput(currentModalPolygon); });
+                    google.maps.event.addListener(path, 'remove_at', function(){ updateCoordinatesInput(currentModalPolygon); });
+                    google.maps.event.addListener(path, 'set_at', function(){ updateCoordinatesInput(currentModalPolygon); });
+                });
+            }
+
+            if (drawingManager) drawingManager.setDrawingMode(null);
+            setDrawingToolActive('pan');
+        }, 150);
+    };
+
+    window.deleteZone = async function(e, id) {
+        if (e) e.stopPropagation();
+        if (!confirm('Are you sure you want to delete this custom fare zone? Active bookings will retain their locked rates.')) return;
+        try {
+            const res = await fetch(`/api/v1/custom-fare-zones/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                window.location.reload();
+            } else {
+                const err = await res.json();
+                alert(`Error deleting zone: ${err.detail || 'Unknown error'}`);
+            }
+        } catch (e) {
+            alert(`Error deleting zone: ${e.message}`);
+        }
+    };
+
+    window.toggleZoneActive = async function(e, id, willActivate) {
+        if (e) e.stopPropagation();
+        const action = willActivate ? 'activate' : 'deactivate';
+        if (!confirm(`Are you sure you want to ${action} this custom fare zone?`)) return;
+        try {
+            const res = await fetch(`/api/v1/custom-fare-zones/${id}/toggle-active`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            if (res.ok) {
+                window.location.reload();
+            } else {
+                const err = await res.json();
+                alert(`Error: ${err.detail || 'Could not update zone status'}`);
+            }
+        } catch (err) {
+            alert(`Network error: ${err.message}`);
+        }
+    };
+
+    window.saveZone = async function(e) {
+        e.preventDefault();
+        const coordsStr = document.getElementById('zoneCoordinates').value;
+        if (!coordsStr || coordsStr === '[]') {
+            alert('Please draw a polygon on the map to define the zone.');
+            return;
+        }
+
+        let coordinates = [];
+        try {
+            coordinates = JSON.parse(coordsStr);
+        } catch(err) {
+            alert('Invalid polygon data');
+            return;
+        }
+
+        if (coordinates.length < 3) {
+            alert('Polygon must have at least 3 vertices to enclose an area.');
+            return;
+        }
+
+        const zoneId = document.getElementById('zoneId').value;
+        const name = document.getElementById('zoneName').value.trim();
+        const color = document.getElementById('zoneColor').value;
+        const isActive = document.getElementById('zoneActive').checked;
+        const isExempt = document.getElementById('zoneExempt').checked;
+
+        // Collect vehicle rates
+        const rates = {};
+        allVehicles.forEach(v => {
+            const st = v.service_type;
+            const cb = document.getElementById(`override_${st}`);
+            if (cb && cb.checked) {
+                const baseVal = document.getElementById(`base_${st}`).value;
+                const minVal = document.getElementById(`min_${st}`).value;
+                const radiusVal = document.getElementById(`radius_${st}`).value;
+                const perkmVal = document.getElementById(`perkm_${st}`).value;
+
+                rates[st] = {
+                    base_fare: baseVal !== '' ? parseFloat(baseVal) : null,
+                    min_fare: minVal !== '' ? parseFloat(minVal) : null,
+                    search_radius_km: radiusVal !== '' ? parseFloat(radiusVal) : null,
+                    per_km_rate: perkmVal !== '' ? parseFloat(perkmVal) : null,
+                };
+            }
+        });
+
+        const payload = {
+            name: name,
+            coordinates: coordinates,
+            color: color,
+            is_active: isActive,
+            exempt_peak_surge: isExempt,
+            rates: rates
+        };
+
+        const btn = document.getElementById('saveZoneBtn');
+        btn.disabled = true;
+        btn.innerText = 'Saving...';
+
+        try {
+            const url = zoneId ? `/api/v1/custom-fare-zones/${zoneId}` : '/api/v1/custom-fare-zones';
+            const method = zoneId ? 'PUT' : 'POST';
+            const res = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                window.location.reload();
+            } else {
+                const data = await res.json();
+                alert(`Error: ${data.detail || 'Could not save zone'}`);
+                btn.disabled = false;
+                btn.innerText = 'Save Custom Fare Zone';
+            }
+        } catch (err) {
+            alert(`Network error: ${err.message}`);
+            btn.disabled = false;
+            btn.innerText = 'Save Custom Fare Zone';
+        }
+    };
+
+    function waitForGoogleMaps(callback, attempts = 50) {
+        if (window.google && window.google.maps) {
+            callback();
+        } else if (attempts > 0) {
+            setTimeout(() => waitForGoogleMaps(callback, attempts - 1), 100);
+        } else {
+            console.error('Google Maps API failed to load');
+        }
+    }
+
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        waitForGoogleMaps(initMainMap);
+    } else {
+        window.addEventListener('DOMContentLoaded', () => waitForGoogleMaps(initMainMap));
+        window.addEventListener('load', () => waitForGoogleMaps(initMainMap));
+    }
+</script>
+{% endblock %}

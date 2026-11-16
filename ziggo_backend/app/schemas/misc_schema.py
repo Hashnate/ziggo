@@ -135,3 +135,42 @@ class SurgeZoneResponse(SurgeZoneBase):
 
     class Config:
         from_attributes = True
+
+
+class ZoneVehicleRate(BaseModel):
+    base_fare: Optional[float] = None
+    min_fare: Optional[float] = None
+    search_radius_km: Optional[float] = None
+    per_km_rate: Optional[float] = None
+
+
+class CustomFareZoneBase(BaseModel):
+    name: str
+    coordinates: List[Dict[str, float]]
+    color: str = "#2563eb"
+    is_active: bool = True
+    exempt_peak_surge: bool = True
+    rates: Dict[str, Dict[str, Optional[float]]] = {}
+
+
+class CustomFareZoneCreate(CustomFareZoneBase):
+    pass
+
+
+class CustomFareZoneUpdate(BaseModel):
+    name: Optional[str] = None
+    coordinates: Optional[List[Dict[str, float]]] = None
+    color: Optional[str] = None
+    is_active: Optional[bool] = None
+    exempt_peak_surge: Optional[bool] = None
+    rates: Optional[Dict[str, Dict[str, Optional[float]]]] = None
+
+
+class CustomFareZoneResponse(CustomFareZoneBase):
+    id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+

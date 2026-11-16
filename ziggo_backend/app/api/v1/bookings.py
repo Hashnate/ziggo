@@ -74,7 +74,21 @@ def _gen_ref() -> str:
     return "ZG" + secrets.token_hex(4).upper()
 
 
-async def get_search_radius_for_service(db: AsyncSession, service_type: Optional[str]) -> int:
+async def get_search_radius_for_service(
+    db: AsyncSession,
+    service_type: Optional[str],
+    pickup_lat: Optional[float] = None,
+    pickup_lng: Optional[float] = None,
+) -> int:
+    if pickup_lat is not None and pickup_lng is not None and service_type:
+        from ...services.zone_pricing_service import find_custom_zone_for_point
+        custom_zone = await find_custom_zone_for_point(db, pickup_lat, pickup_lng)
+        if custom_zone and custom_zone.rates:
+            st_clean = service_type.strip().lower()
+            zone_rate = custom_zone.rates.get(st_clean)
+            if zone_rate and zone_rate.get("search_radius_km"):
+                return int(zone_rate["search_radius_km"])
+
     if service_type:
         from ...models import FareSetting
         from sqlalchemy import or_, func
@@ -102,7 +116,7 @@ async def get_search_radius_for_service(db: AsyncSession, service_type: Optional
 async def _lady_drivers_nearby(db: AsyncSession, lat: float, lng: float, service_type: str,
                                is_rental: bool, customer_gender: Optional[str]) -> int:
     """How many lady drivers a ride booked now would be offered to (same search as create_booking)."""
-    radius = await get_search_radius_for_service(db, service_type)
+    radius = await get_search_radius_for_service(db, service_type, lat, lng)
     nearby = await find_all_nearby_drivers(db, lat, lng, service_type, max_distance_km=radius,
                                            allow_back_to_back=not is_rental)
     nearby = [d for d in nearby if getattr(d, "driver_type", "ride") == "ride"]
@@ -519,6 +533,26 @@ def _booked_district_fare(b: Booking) -> Optional[tuple]:
     )
 
 
+def _booked_custom_zone(b: Booking) -> Optional[dict]:
+    """The custom fare zone a booking was priced with, so re-pricing keeps it:
+    dict with id, name, rates, exempt_peak_surge, or None if not priced in a custom zone."""
+    fb = b.fare_breakdown if isinstance(b.fare_breakdown, dict) else None
+    if not fb or not fb.get("custom_fare_zone_id"):
+        if b.custom_fare_zone_id:
+            return {"id": b.custom_fare_zone_id, "name": None, "rates": {}, "exempt_peak_surge": True}
+        return None
+    service_type = b.service_type
+    rates = {}
+    if fb.get("custom_zone_rate"):
+        rates[service_type] = fb["custom_zone_rate"]
+    return {
+        "id": fb["custom_fare_zone_id"],
+        "name": fb.get("custom_fare_zone_name"),
+        "rates": rates,
+        "exempt_peak_surge": bool(fb.get("exempt_peak_surge", True)),
+    }
+
+
 async def _get_driver(db: AsyncSession, user: User) -> Driver:
     if user.role != UserRole.DRIVER:
         raise HTTPException(status_code=403, detail="Driver role required")
@@ -769,6 +803,7 @@ async def create_booking(
         district=district_for(req.pickup_lat, req.pickup_lng),
         fare_breakdown=_fare_snapshot(fare),
         launch_location_id=fare.get("launch_location_id"),
+        custom_fare_zone_id=fare.get("custom_fare_zone_id"),
         is_rental=req.is_rental,
         rental_hours=req.rental_hours,
         is_corporate=req.payment_method == "corporate",
@@ -829,7 +864,7 @@ async def create_booking(
     # can carry a small parcel). Rides keep the strict vehicle-type filter.
     dispatch_vehicle = None if (req.is_flash or req.is_courier) else req.service_type
 
-    max_radius = await get_search_radius_for_service(db, dispatch_vehicle)
+    max_radius = await get_search_radius_for_service(db, dispatch_vehicle, req.pickup_lat, req.pickup_lng)
 
     is_scheduled_future = False
     if booking.scheduled_at is not None:
@@ -1104,6 +1139,7 @@ async def scan_and_go_booking(
         district=district_for(req.pickup_lat, req.pickup_lng),
         fare_breakdown=_fare_snapshot(fare),
         launch_location_id=fare.get("launch_location_id"),
+        custom_fare_zone_id=fare.get("custom_fare_zone_id"),
         is_rental=req.is_rental,
         rental_hours=req.rental_hours,
         pickup_fee=to_decimal(fare.get("pickup_fee", 0)),
@@ -1548,6 +1584,7 @@ async def accept_booking(
         packages=b.packages,
         launch_location_id=b.launch_location_id or 0,
         district_fare=_booked_district_fare(b),
+        custom_zone_override=_booked_custom_zone(b),
         customer=None, # Not modifying loyalty here
         redeem_points=int(b.redeem_points) if b.redeem_points else 0,
         stops=stops_list,
@@ -1580,7 +1617,9 @@ async def accept_booking(
     # Mirror create_booking: flash parcels were broadcast to ALL vehicle types,
     # so the dismissal needs to reach the same audience.
     dispatch_vehicle = None if (b.is_flash or b.is_courier) else b.service_type
-    max_radius = await get_search_radius_for_service(db, dispatch_vehicle)
+    b_plat = float(b.pickup_lat) if b.pickup_lat is not None else None
+    b_plng = float(b.pickup_lng) if b.pickup_lng is not None else None
+    max_radius = await get_search_radius_for_service(db, dispatch_vehicle, b_plat, b_plng)
     other_drivers = await find_all_nearby_drivers(
         db,
         float(b.pickup_lat),
@@ -2047,6 +2086,7 @@ async def update_booking_status(
                 packages=b.packages,
                 launch_location_id=b.launch_location_id or 0,
                 district_fare=_booked_district_fare(b),
+                custom_zone_override=_booked_custom_zone(b),
                 customer=customer,
                 redeem_points=int(b.redeem_points) if b.redeem_points else 0,
                 stops=stops_list,
@@ -2309,7 +2349,9 @@ async def update_booking_status(
                 )
     if b.status == BookingStatus.CANCELLED and b.driver_id is None:
         dispatch_vehicle = None if (b.is_flash or b.is_courier) else b.service_type
-        max_radius = await get_search_radius_for_service(db, dispatch_vehicle)
+        b_plat = float(b.pickup_lat) if b.pickup_lat is not None else None
+        b_plng = float(b.pickup_lng) if b.pickup_lng is not None else None
+        max_radius = await get_search_radius_for_service(db, dispatch_vehicle, b_plat, b_plng)
         nearby = await find_all_nearby_drivers(
             db,
             float(b.pickup_lat),
@@ -2419,7 +2461,9 @@ async def update_booking_status(
                     )
                 )
         dispatch_vehicle = None if (b.is_flash or b.is_courier) else b.service_type
-        max_radius = await get_search_radius_for_service(db, dispatch_vehicle)
+        b_plat = float(b.pickup_lat) if b.pickup_lat is not None else None
+        b_plng = float(b.pickup_lng) if b.pickup_lng is not None else None
+        max_radius = await get_search_radius_for_service(db, dispatch_vehicle, b_plat, b_plng)
 
         other_drivers = await find_all_nearby_drivers(
             db,
@@ -2695,6 +2739,7 @@ async def update_booking_destination(
         packages=b.packages,
         launch_location_id=b.launch_location_id or 0,
         district_fare=_booked_district_fare(b),
+        custom_zone_override=_booked_custom_zone(b),
         customer=c,
         redeem_points=int(b.redeem_points) if b.redeem_points else 0,
         stops=[s.model_dump() for s in (body.stops or [])],

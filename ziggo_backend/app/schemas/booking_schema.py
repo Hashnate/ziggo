@@ -106,6 +106,13 @@ class FareEstimateResponse(BaseModel):
     commission_waived: Optional[float] = None
     # Phase 2, feature 03 — only when the estimate asked for a lady driver
     lady_drivers_nearby: Optional[int] = None
+    # Geographic Custom Fare Zone fields
+    custom_fare_zone_id: Optional[int] = None
+    custom_fare_zone_name: Optional[str] = None
+    zone_inside_km: Optional[float] = None
+    zone_outside_km: Optional[float] = None
+    zone_per_km_rate: Optional[float] = None
+    regular_per_km_rate: Optional[float] = None
 
 
 class BookingCreate(BaseModel):

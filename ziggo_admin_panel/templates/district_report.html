@@ -64,7 +64,7 @@
                     <th class="px-4 py-3 text-right">Completed</th>
                     <th class="px-4 py-3 text-right">Cancelled</th>
                     <th class="px-4 py-3 text-right">Customers paid</th>
-                    <th class="px-4 py-3 text-left w-40">Share</th>
+                    <th class="px-4 py-3 text-left w-44">Share</th>
                     <th class="px-4 py-3 text-right">Discounts</th>
                     <th class="px-4 py-3 text-right">Ziggo commission</th>
                     <th class="px-4 py-3 text-right">Driver earnings</th>
@@ -81,8 +81,12 @@
                     <td class="px-4 py-2.5 text-right text-gray-500">{{ '{:,}'.format(r.cancelled) }}</td>
                     <td class="px-4 py-2.5 text-right font-bold">Rs.{{ '{:,.2f}'.format(r.income) }}</td>
                     <td class="px-4 py-2.5">
-                        <div class="h-2 rounded-full bg-gray-100"><div class="h-2 rounded-full bg-ziggo" style="width: {{ '%.1f' % share }}%"></div></div>
-                        <span class="text-[10px] text-gray-400">{{ '%.1f' % share }}%</span>
+                        <div class="flex items-center gap-2.5">
+                            <div class="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden min-w-[50px]">
+                                <div class="h-full rounded-full bg-[#1E3A8A] transition-all duration-300" style="width: {{ '%.1f' % share }}%; padding: 0 !important; border-radius: 9999px !important; min-width: {{ '4px' if share > 0 else '0' }};"></div>
+                            </div>
+                            <span class="text-xs font-semibold text-gray-500 tabular-nums shrink-0 w-11 text-right">{{ '%.1f' % share }}%</span>
+                        </div>
                     </td>
                     <td class="px-4 py-2.5 text-right text-purple-700">Rs.{{ '{:,.2f}'.format(r.discounts) }}</td>
                     <td class="px-4 py-2.5 text-right text-amber-600 font-bold">Rs.{{ '{:,.2f}'.format(r.commission) }}</td>
@@ -101,7 +105,7 @@
                     <td class="px-4 py-3 text-right">{{ '{:,}'.format(t.completed) }}</td>
                     <td class="px-4 py-3 text-right">{{ '{:,}'.format(t.cancelled) }}</td>
                     <td class="px-4 py-3 text-right">Rs.{{ '{:,.2f}'.format(t.income) }}</td>
-                    <td></td>
+                    <td class="px-4 py-3 text-right text-xs font-bold text-gray-500 pr-4">100.0%</td>
                     <td class="px-4 py-3 text-right">Rs.{{ '{:,.2f}'.format(t.discounts) }}</td>
                     <td class="px-4 py-3 text-right">Rs.{{ '{:,.2f}'.format(t.commission) }}</td>
                     <td class="px-4 py-3 text-right">Rs.{{ '{:,.2f}'.format(t.driver_earnings) }}</td>

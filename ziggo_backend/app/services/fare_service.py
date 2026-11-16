@@ -94,13 +94,19 @@ class _Rules:
     launch_location: object = None    # commission-free launch location this job falls in, if any
     promo_check: object = None        # promo_service.PromoCheck for the code sent, if any
     road_distance: bool = False       # measure the road route instead of a straight line
+    custom_zone_id: Optional[int] = None
+    custom_zone_name: Optional[str] = None
+    custom_zone_rates: dict = field(default_factory=dict)
+    exempt_peak_surge: bool = False
+    custom_zone_poly: Optional[object] = None
 
 
 async def _load_rules(db: AsyncSession, service_types: list[str], promo: Optional[str],
                       need_flash_tiers: bool, pickup: Optional[tuple] = None,
                       launch_service: Optional[str] = None, launch_location_id: Optional[int] = None,
                       customer_id: Optional[int] = None, promo_locked: bool = False,
-                      district_fare: Optional[tuple] = None) -> _Rules:
+                      district_fare: Optional[tuple] = None,
+                      custom_zone_override: Optional[dict] = None) -> _Rules:
     from ..models import DistrictFare, LaunchLocation, PeakHourSetting, SystemSettings
     from datetime import datetime, timezone, timedelta
 
@@ -185,6 +191,27 @@ async def _load_rules(db: AsyncSession, service_types: list[str], promo: Optiona
     elif launch_location_id is None and launch_service and pickup is not None:
         launch_location = await launch_location_for(db, pickup[0], pickup[1], launch_service)
 
+    # Geographic custom fare zones with per-vehicle overrides and peak/surge exemptions.
+    # custom_zone_override comes from a booking being re-priced.
+    custom_zone_id, custom_zone_name, custom_zone_rates, exempt_peak_surge, custom_zone_poly = None, None, {}, False, None
+    if custom_zone_override is not None:
+        custom_zone_id = custom_zone_override.get("id")
+        custom_zone_name = custom_zone_override.get("name")
+        custom_zone_rates = custom_zone_override.get("rates") or {}
+        exempt_peak_surge = bool(custom_zone_override.get("exempt_peak_surge", False))
+        if custom_zone_id:
+            from .zone_pricing_service import get_custom_zone_polygon
+            custom_zone_poly = await get_custom_zone_polygon(db, custom_zone_id)
+    elif pickup is not None and pickup[0] is not None and pickup[1] is not None:
+        from .zone_pricing_service import find_custom_zone_for_point, get_custom_zone_polygon
+        custom_zone = await find_custom_zone_for_point(db, pickup[0], pickup[1])
+        if custom_zone:
+            custom_zone_id = custom_zone.id
+            custom_zone_name = custom_zone.name
+            custom_zone_rates = custom_zone.rates or {}
+            exempt_peak_surge = bool(custom_zone.exempt_peak_surge)
+            custom_zone_poly = getattr(custom_zone, "_polygon", None) or await get_custom_zone_polygon(db, custom_zone.id)
+
     return _Rules(
         settings=ss, sys_commission=sys_commission, fare_settings=fare_settings,
         peaks=peak_q.scalars().all(), hhmm=now_colombo.strftime("%H:%M"), zones=open_zones,
@@ -192,6 +219,9 @@ async def _load_rules(db: AsyncSession, service_types: list[str], promo: Optiona
         district=district, district_base_fares=district_base_fares,
         district_per_km_rates=district_per_km_rates, launch_location=launch_location,
         promo_check=promo_check, road_distance=bool(ss is not None and ss.road_distance_enabled),
+        custom_zone_id=custom_zone_id, custom_zone_name=custom_zone_name,
+        custom_zone_rates=custom_zone_rates, exempt_peak_surge=exempt_peak_surge,
+        custom_zone_poly=custom_zone_poly,
     )
 
 
@@ -362,7 +392,9 @@ def _courier_fare(rules: _Rules, setting, pickup_lat, pickup_lng, drop_lat, drop
 
 
 def _standard_fare(rules: _Rules, service_type: str, setting, route, pickup_distance_km: float,
-                   zone_surcharge: float, is_flash: bool, parcel_weight_kg, trip_type: str) -> dict:
+                   zone_surcharge: float, is_flash: bool, parcel_weight_kg, trip_type: str,
+                   pickup_lat: Optional[float] = None, pickup_lng: Optional[float] = None,
+                   drop_lat: Optional[float] = None, drop_lng: Optional[float] = None) -> dict:
     """Rides and flash parcels."""
     clean_stops, distance_km, duration_min = route
     if setting:
@@ -385,16 +417,59 @@ def _standard_fare(rules: _Rules, service_type: str, setting, route, pickup_dist
     district_per_km = rules.district_per_km_rates.get(service_type)
     if district_per_km is not None:
         per_km = district_per_km
+
+    # regular_per_km is the standard/district per-km rate outside the custom zone
+    regular_per_km = per_km
+    zone_per_km = regular_per_km
+    inside_distance_km = distance_km
+    outside_distance_km = 0.0
+
+    # Geographic custom fare zone overrides (override district/national rates)
+    custom_zone_rate = rules.custom_zone_rates.get(service_type) if rules.custom_zone_rates else None
+    if custom_zone_rate:
+        if custom_zone_rate.get("base_fare") is not None:
+            base = float(custom_zone_rate["base_fare"])
+        if custom_zone_rate.get("min_fare") is not None:
+            min_fare = float(custom_zone_rate["min_fare"])
+        if custom_zone_rate.get("per_km_rate") is not None:
+            zone_per_km = float(custom_zone_rate["per_km_rate"])
+
+    if (
+        rules.custom_zone_id is not None
+        and rules.custom_zone_poly is not None
+        and pickup_lat is not None
+        and pickup_lng is not None
+        and drop_lat is not None
+        and drop_lng is not None
+        and (float(drop_lat) != 0.0 or float(drop_lng) != 0.0)
+    ):
+        from .zone_pricing_service import split_route_distance
+        inside_distance_km, outside_distance_km = split_route_distance(
+            rules.custom_zone_poly,
+            pickup_lat, pickup_lng,
+            drop_lat, drop_lng,
+            stops=clean_stops,
+            total_distance_km=distance_km,
+        )
+
+    # In-zone distance is charged at the zone rate; out-of-zone distance is charged at regular rate
+    distance_charge = (inside_distance_km * zone_per_km) + (outside_distance_km * regular_per_km)
+
     platform_pct, normal_pct = _commission_pct(rules, setting)
 
     # Pickup fee: a percentage of the per-km charge for the driver's distance to the pickup
-    base_pickup_fee = pickup_distance_km * per_km
+    effective_pickup_per_km = zone_per_km if (zone_per_km is not None and zone_per_km > 0) else regular_per_km
+    base_pickup_fee = pickup_distance_km * effective_pickup_per_km
     pickup_fee_val = base_pickup_fee * (pickup_fee_pct / 100.0)
 
     if rules.system_surge is not None:
         surge = rules.system_surge
 
-    raw = (base + per_km * distance_km + per_min * duration_min) * surge
+    # Total exemption from surge for trips originating in an exempt custom zone
+    if rules.exempt_peak_surge:
+        surge = 1.0
+
+    raw = (base + distance_charge + per_min * duration_min) * surge
     fare_val = max(raw, min_fare)
     fare_val_original = fare_val
 
@@ -412,24 +487,26 @@ def _standard_fare(rules: _Rules, service_type: str, setting, route, pickup_dist
 
     # Peak hours surcharge check
     peak_surcharge = 0.0
-    for ap in rules.peaks:
-        if ap.vehicle_category and ap.vehicle_category != service_type:
-            continue
-        in_peak = False
-        start = ap.start_time
-        end = ap.end_time
-        if start and end:
-            if start <= end:
-                in_peak = start <= rules.hhmm < end
-            else:
-                in_peak = rules.hhmm >= start or rules.hhmm < end
-        if in_peak:
-            peak_surcharge += float(ap.extra_amount or 0.0)
+    if not rules.exempt_peak_surge:
+        for ap in rules.peaks:
+            if ap.vehicle_category and ap.vehicle_category != service_type:
+                continue
+            in_peak = False
+            start = ap.start_time
+            end = ap.end_time
+            if start and end:
+                if start <= end:
+                    in_peak = start <= rules.hhmm < end
+                else:
+                    in_peak = rules.hhmm >= start or rules.hhmm < end
+            if in_peak:
+                peak_surcharge += float(ap.extra_amount or 0.0)
     fare_val += peak_surcharge
     fare_val_original += peak_surcharge
 
-    fare_val += zone_surcharge
-    fare_val_original += zone_surcharge
+    effective_zone_surcharge = 0.0 if rules.exempt_peak_surge else zone_surcharge
+    fare_val += effective_zone_surcharge
+    fare_val_original += effective_zone_surcharge
 
     # BRD: CD-19 — per-stop fee compensates the driver for the detour.
     stop_fee_total = 0.0
@@ -453,6 +530,8 @@ def _standard_fare(rules: _Rules, service_type: str, setting, route, pickup_dist
         fare_val_original *= RETURN_TRIP_MULTIPLIER
         distance_km *= 2
         duration_min = round(duration_min * 2)
+        inside_distance_km = round(inside_distance_km * 2, 2)
+        outside_distance_km = round(outside_distance_km * 2, 2)
 
     discount = 0.0
     discount_original = 0.0
@@ -487,7 +566,7 @@ def _standard_fare(rules: _Rules, service_type: str, setting, route, pickup_dist
         "surge_multiplier": surge,
         "flash_surcharge": round(flash_surcharge, 2),
         "peak_surcharge": round(peak_surcharge, 2),
-        "zone_surcharge": round(zone_surcharge, 2),
+        "zone_surcharge": round(effective_zone_surcharge, 2),
         # BRD: CD-19 — surface multi-stop snapshot so the UI can render it
         "stop_count": len(clean_stops),
         "stops_fee": round(stop_fee_total, 2),
@@ -504,6 +583,15 @@ def _standard_fare(rules: _Rules, service_type: str, setting, route, pickup_dist
     if district_per_km is not None:
         result["district"] = rules.district
         result["district_per_km_rate"] = round(district_per_km, 2)
+    if rules.custom_zone_id is not None:
+        result["custom_fare_zone_id"] = rules.custom_zone_id
+        result["custom_fare_zone_name"] = rules.custom_zone_name
+        result["custom_zone_rate"] = custom_zone_rate or {}
+        result["exempt_peak_surge"] = rules.exempt_peak_surge
+        result["zone_inside_km"] = round(inside_distance_km, 2)
+        result["zone_outside_km"] = round(outside_distance_km, 2)
+        result["zone_per_km_rate"] = round(zone_per_km, 2) if zone_per_km is not None else None
+        result["regular_per_km_rate"] = round(regular_per_km, 2)
     result.update(_launch_keys(rules, feeable_amount * (normal_pct / 100.0)))
     result.update(_promo_keys(promo_message))
     return result
@@ -538,6 +626,8 @@ async def calculate_fare(
     promo_locked: bool = False,
     # Re-pricing a booking: the district base fare it was booked with, see _load_rules.
     district_fare: Optional[tuple] = None,
+    # Re-pricing a booking: the custom fare zone it was booked with, see _load_rules.
+    custom_zone_override: Optional[dict] = None,
 ) -> dict:
     rules = await _load_rules(
         db, [service_type, "courier"], promo,
@@ -545,6 +635,7 @@ async def calculate_fare(
         pickup=(pickup_lat, pickup_lng),
         launch_service=service_of_booking(is_flash, is_courier), launch_location_id=launch_location_id,
         customer_id=getattr(customer, "id", None), promo_locked=promo_locked, district_fare=district_fare,
+        custom_zone_override=custom_zone_override,
     )
 
     if is_rental:
@@ -590,12 +681,16 @@ async def calculate_fare(
         return await _enrich_with_loyalty(db, courier_dict, customer, redeem_points)
 
     setting = rules.fare_settings.get(service_type)
+    search_radius = float(setting.search_radius_km) if (setting and setting.search_radius_km is not None) else 10.0
+    zone_rate = rules.custom_zone_rates.get(service_type) if rules.custom_zone_rates else None
+    if zone_rate and zone_rate.get("search_radius_km") is not None:
+        search_radius = float(zone_rate["search_radius_km"])
+
     pickup_distance_km = 0.0
     if driver_accepted_lat is not None and driver_accepted_lng is not None:
         pickup_distance_km = haversine_km(driver_accepted_lat, driver_accepted_lng, pickup_lat, pickup_lng)
     else:
         from .matching_service import find_nearest_driver
-        search_radius = float(setting.search_radius_km) if (setting and setting.search_radius_km is not None) else 10.0
         nearest = await find_nearest_driver(db, pickup_lat, pickup_lng, service_type, max_distance_km=search_radius)
         if nearest and nearest.current_lat is not None and nearest.current_lng is not None:
             pickup_distance_km = haversine_km(float(nearest.current_lat), float(nearest.current_lng), pickup_lat, pickup_lng)
@@ -603,7 +698,8 @@ async def calculate_fare(
     route, route_keys = await _trip_route(rules, pickup_lat, pickup_lng, drop_lat, drop_lng, stops)
     fare_dict = {
         **_standard_fare(rules, service_type, setting, route, pickup_distance_km,
-                         _zone_surcharge(rules, pickup_lat, pickup_lng), is_flash, parcel_weight_kg, trip_type),
+                         _zone_surcharge(rules, pickup_lat, pickup_lng), is_flash, parcel_weight_kg, trip_type,
+                         pickup_lat=pickup_lat, pickup_lng=pickup_lng, drop_lat=drop_lat, drop_lng=drop_lng),
         **route_keys,
     }
     return await _enrich_with_loyalty(db, fare_dict, customer, redeem_points)
@@ -787,6 +883,9 @@ async def calculate_fares_bulk(
                 # Standard Ride / Flash Calculation
                 setting = rules.fare_settings.get(service_type)
                 search_radius = float(setting.search_radius_km) if (setting and setting.search_radius_km is not None) else 10.0
+                zone_rate = rules.custom_zone_rates.get(service_type) if rules.custom_zone_rates else None
+                if zone_rate and zone_rate.get("search_radius_km") is not None:
+                    search_radius = float(zone_rate["search_radius_km"])
                 pickup_distance_km = 0.0
                 d_dist = nearest_dist_by_type.get(service_type)
                 if d_dist is not None and d_dist <= search_radius:
@@ -794,7 +893,8 @@ async def calculate_fares_bulk(
                 fare_dict = {
                     "service_type": service_type,
                     **_standard_fare(rules, service_type, setting, route, pickup_distance_km,
-                                     zone_surcharge, is_flash, parcel_weight_kg, trip_type),
+                                     zone_surcharge, is_flash, parcel_weight_kg, trip_type,
+                                     pickup_lat=pickup_lat, pickup_lng=pickup_lng, drop_lat=drop_lat, drop_lng=drop_lng),
                     **route_keys,
                 }
 

@@ -38,6 +38,7 @@ from .misc import (
     DriverIncentive,
     PeakHourSetting,
     SurgeZone,
+    CustomFareZone,
 )
 from .food import (
     Restaurant,
@@ -108,6 +109,7 @@ __all__ = [
     "DriverIncentive",
     "PeakHourSetting",
     "SurgeZone",
+    "CustomFareZone",
     "Restaurant",
     "MenuCategory",
     "MenuItem",

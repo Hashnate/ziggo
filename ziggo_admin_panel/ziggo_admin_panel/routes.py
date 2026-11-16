@@ -135,19 +135,18 @@ templates.env.filters["to_colombo"] = to_colombo_dt
 templates.env.globals["gender_from_nic"] = gender_from_nic
 
 UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "drivers")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
 CATEGORY_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "categories")
-os.makedirs(CATEGORY_UPLOAD_DIR, exist_ok=True)
 VEHICLE_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "vehicles")
-os.makedirs(VEHICLE_UPLOAD_DIR, exist_ok=True)
 BRANDING_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "branding")
-os.makedirs(BRANDING_UPLOAD_DIR, exist_ok=True)
 RESTAURANT_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "restaurants")
-os.makedirs(RESTAURANT_UPLOAD_DIR, exist_ok=True)
 PRODUCT_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "items")
-os.makedirs(PRODUCT_UPLOAD_DIR, exist_ok=True)
 JOB_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "jobs")
-os.makedirs(JOB_UPLOAD_DIR, exist_ok=True)
+
+for _d in (UPLOAD_DIR, CATEGORY_UPLOAD_DIR, VEHICLE_UPLOAD_DIR, BRANDING_UPLOAD_DIR, RESTAURANT_UPLOAD_DIR, PRODUCT_UPLOAD_DIR, JOB_UPLOAD_DIR):
+    try:
+        os.makedirs(_d, exist_ok=True)
+    except OSError:
+        pass
 ALLOWED_PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".avif"}
 MAX_PHOTO_BYTES = 5 * 1024 * 1024  # 5 MB
 
@@ -217,7 +216,10 @@ async def _save_product_image(photo: UploadFile | None) -> str | None:
 
 
 DOC_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "driver_docs")
-os.makedirs(DOC_UPLOAD_DIR, exist_ok=True)
+try:
+    os.makedirs(DOC_UPLOAD_DIR, exist_ok=True)
+except OSError:
+    pass
 ALLOWED_DOC_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".pdf", ".avif"}
 MAX_DOC_BYTES = 8 * 1024 * 1024  # 8 MB
 
@@ -1686,7 +1688,12 @@ def _driver_list_redirect(request: Request, default_url: str = "/admin/drivers")
         try:
             pref = urllib.parse.urlparse(ref)
             if pref.path == "/admin/drivers":
-                return RedirectResponse(url=f"/admin/drivers{('?' + pref.query) if pref.query else ''}", status_code=303)
+                ref_params = urllib.parse.parse_qs(pref.query)
+                def_parsed = urllib.parse.urlparse(default_url)
+                def_params = urllib.parse.parse_qs(def_parsed.query)
+                ref_params.update(def_params)
+                new_query = urllib.parse.urlencode({k: v[0] if isinstance(v, list) else v for k, v in ref_params.items()})
+                return RedirectResponse(url=f"/admin/drivers{('?' + new_query) if new_query else ''}", status_code=303)
         except Exception:
             pass
     return RedirectResponse(url=default_url, status_code=303)
@@ -1866,6 +1873,8 @@ async def _cleanup_driver_references(db: AsyncSession, driver_id: int):
         "UPDATE market_orders SET driver_id = NULL WHERE driver_id = :did",
         "UPDATE bookings SET driver_id = NULL WHERE driver_id = :did",
         "UPDATE food_orders SET driver_id = NULL WHERE driver_id = :did",
+        "DELETE FROM driver_wallet_credits WHERE driver_id = :did",
+        "DELETE FROM driver_online_sessions WHERE driver_id = :did",
         "DELETE FROM driver_documents WHERE driver_id = :did",
         "DELETE FROM driver_payouts WHERE driver_id = :did",
         "DELETE FROM driver_vehicles WHERE driver_id = :did",
@@ -1911,22 +1920,58 @@ async def delete_driver_form(
             select(Driver).options(selectinload(Driver.user)).where(Driver.id == driver_id)
         )
         d = q.scalars().first()
-        if d:
-            user = d.user
-            user_id = user.id if user else None
+        if not d:
+            return _driver_list_redirect(request, "/admin/drivers?error=Driver+not+found")
 
-            await _cleanup_driver_references(db, driver_id)
+        user = d.user
+        user_id = user.id if user else None
+
+        # 1. Safely unlink/delete all driver-specific references
+        await _cleanup_driver_references(db, driver_id)
+
+        # 2. Check if this user also has a customer profile
+        has_customer = False
+        if user_id:
+            cq = await db.execute(select(Customer).where(Customer.user_id == user_id))
+            customer = cq.scalars().first()
+            if customer:
+                has_customer = True
+
+        # 3. Always delete the Driver record
+        await db.delete(d)
+
+        # 4. Handle User account:
+        # If user is also a Customer, PRESERVE the user account so their customer
+        # profile, wallet, market/food orders, and ride history remain intact.
+        if has_customer:
+            if user and user.role == UserRole.DRIVER:
+                user.role = UserRole.CUSTOMER
+        else:
+            # User only registered as a Driver and has no customer profile,
+            # safe to delete user and its general references.
             if user_id:
                 await _cleanup_user_references(db, user_id)
-
-            await db.delete(d)
             if user:
                 await db.delete(user)
-            await db.commit()
+
+        await db.commit()
+
+        # Publish driver removed to live admin feed
+        try:
+            from app.services.ws_manager import manager
+            await manager.publish("admin_live", "driver_status_update", {
+                "id": driver_id,
+                "status": "deleted",
+                "is_approved": False,
+            })
+        except Exception:
+            pass
+
+        return _driver_list_redirect(request, "/admin/drivers?success=Driver+deleted+successfully")
     except Exception as e:
         logger.error(f"Error deleting driver {driver_id}: {e}", exc_info=True)
         await db.rollback()
-    return _driver_list_redirect(request, "/admin/drivers")
+        return _driver_list_redirect(request, "/admin/drivers?error=Failed+to+delete+driver")
 
 
 
@@ -2592,6 +2637,221 @@ async def admin_bookings_feed(
             "active_count": len(active_bookings),
         },
     }
+
+
+@router.post("/bookings/{booking_id}/cancel")
+async def admin_cancel_booking(
+    booking_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(current_admin),
+):
+    """Admin cancel active booking with automatic real-time sync to customer & driver."""
+    from fastapi.responses import JSONResponse
+    from app.models import Booking, Customer, Driver, Notification
+    from app.services.ws_manager import manager
+    from app.services.matching_service import (
+        find_all_nearby_drivers,
+        dispatch_vehicles,
+        drivers_for_customer,
+    )
+    from app.services.gender_service import is_passenger_trip
+    from app.api.v1.bookings import get_search_radius_for_service, _customer_gender
+    from app.services.loyalty_service import refund_redeemed_points
+    from app.services import passenger_location_service
+
+    reason = "Cancelled by Ziggo Admin"
+    try:
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in content_type:
+            body = await request.json()
+            if isinstance(body, dict) and body.get("reason"):
+                reason = str(body["reason"]).strip()
+        else:
+            form = await request.form()
+            if form.get("reason"):
+                reason = str(form["reason"]).strip()
+    except Exception:
+        pass
+
+    if len(reason) > 255:
+        reason = reason[:252] + "..."
+
+    q = await db.execute(
+        select(Booking)
+        .options(
+            selectinload(Booking.customer).selectinload(Customer.user),
+            selectinload(Booking.driver).selectinload(Driver.user),
+        )
+        .where(Booking.id == booking_id)
+    )
+    b = q.scalars().first()
+    if not b:
+        return JSONResponse({"ok": False, "detail": "Booking not found"}, status_code=404)
+
+    active_statuses = (
+        BookingStatus.SEARCHING,
+        BookingStatus.ACCEPTED,
+        BookingStatus.ARRIVED,
+        BookingStatus.STARTED,
+    )
+    if b.status not in active_statuses:
+        return JSONResponse(
+            {
+                "ok": False,
+                "detail": f"Cannot cancel booking: current status is {b.status.value.upper()}",
+            },
+            status_code=400,
+        )
+
+    now = datetime.now(timezone.utc)
+    b.status = BookingStatus.CANCELLED
+    b.cancelled_at = now
+    b.cancelled_by = "admin"
+    b.cancellation_reason = reason
+
+    # Clear passenger live location sharing if active
+    passenger_stopped = passenger_location_service.clear(b)
+
+    # Refund redeemed loyalty points if any were applied
+    await refund_redeemed_points(
+        db, b,
+        source_kind="booking",
+        description=f"Refund — {b.booking_ref} cancelled by admin",
+    )
+
+    await db.commit()
+    await db.refresh(b)
+
+    reason_msg = f" Reason: {reason}" if reason else ""
+
+    # 1. Real-time sync to Customer
+    if b.customer and b.customer.user_id:
+        customer_payload = {
+            "booking_id": b.id,
+            "status": "cancelled",
+            "booking_ref": b.booking_ref,
+            "reason": b.cancellation_reason,
+            "cancelled_by": "admin",
+        }
+        await manager.send(b.customer.user_id, "booking_update", customer_payload)
+        db.add(
+            Notification(
+                user_id=b.customer.user_id,
+                title="Ride Cancelled by Admin",
+                body=f"Booking {b.booking_ref} was cancelled by Ziggo Admin.{reason_msg}",
+                type="ride_update",
+            )
+        )
+
+    # 2. Real-time sync to Driver (if assigned) or searching drivers
+    if b.driver and b.driver.user_id:
+        driver_payload = {
+            "booking_id": b.id,
+            "status": "cancelled",
+            "reason": b.cancellation_reason,
+            "cancelled_by": "admin",
+            "booking_ref": b.booking_ref,
+        }
+        await manager.send(b.driver.user_id, "booking_update", driver_payload)
+        db.add(
+            Notification(
+                user_id=b.driver.user_id,
+                title="Ride Cancelled by Admin",
+                body=f"Booking {b.booking_ref} was cancelled by Ziggo Admin.{reason_msg}",
+                type="ride_cancelled",
+                data=f'{{"booking_id":{b.id},"booking_ref":"{b.booking_ref}"}}',
+            )
+        )
+
+        try:
+            dispatch_vehicle = None if (b.is_flash or b.is_courier) else b.service_type
+            max_radius = await get_search_radius_for_service(db, dispatch_vehicle)
+            other_drivers = await find_all_nearby_drivers(
+                db,
+                float(b.pickup_lat),
+                float(b.pickup_lng),
+                dispatch_vehicles(b),
+                max_distance_km=max_radius,
+                exclude_driver_id=b.driver_id,
+            )
+            for od in other_drivers:
+                await manager.send(
+                    od.user_id,
+                    "ride_taken",
+                    {"booking_id": b.id, "booking_ref": b.booking_ref},
+                )
+        except Exception as e:
+            logger.error(f"[admin_cancel] error notifying other drivers: {e}")
+
+    elif b.driver_id is None:
+        try:
+            dispatch_vehicle = None if (b.is_flash or b.is_courier) else b.service_type
+            max_radius = await get_search_radius_for_service(db, dispatch_vehicle)
+            nearby = await find_all_nearby_drivers(
+                db,
+                float(b.pickup_lat),
+                float(b.pickup_lng),
+                dispatch_vehicles(b),
+                max_distance_km=max_radius,
+                exclude_driver_id=None,
+            )
+            cust_gender = await _customer_gender(db, b.customer_id)
+            nearby = await drivers_for_customer(
+                db, nearby, cust_gender, b.lady_driver_requested,
+                is_passenger_trip(b.is_flash, b.is_courier),
+            )
+            for nd in nearby:
+                db.add(
+                    Notification(
+                        user_id=nd.user_id,
+                        title="Ride Request Cancelled",
+                        body=f"Ride request {b.booking_ref} was cancelled by Ziggo Admin.{reason_msg}",
+                        type="ride_cancelled",
+                        data=f'{{"booking_id":{b.id},"booking_ref":"{b.booking_ref}"}}',
+                    )
+                )
+                await manager.send(
+                    nd.user_id,
+                    "booking_cancelled",
+                    {
+                        "booking_id": b.id,
+                        "booking_ref": b.booking_ref,
+                        "reason": b.cancellation_reason,
+                        "cancelled_by": "admin",
+                    },
+                )
+        except Exception as e:
+            logger.error(f"[admin_cancel] error notifying searching drivers: {e}")
+
+    await db.commit()
+
+    # 3. Broadcast to admin live feed
+    try:
+        await manager.publish("admin_live", "booking_status_update", {
+            "booking_id": b.id,
+            "booking_ref": b.booking_ref,
+            "status": "cancelled",
+            "cancelled_by": "admin",
+            "reason": b.cancellation_reason,
+            "amount": float(b.final_amount or 0),
+        })
+    except Exception as e:
+        logger.error(f"[admin_cancel] admin_live publish error: {e}")
+
+    if passenger_stopped:
+        try:
+            await manager.publish(passenger_location_service.ADMIN_TOPIC, "customer_location_stopped", {"booking_id": b.id})
+        except Exception as e:
+            logger.error(f"[admin_cancel] passenger_location_service publish error: {e}")
+
+    return JSONResponse({
+        "ok": True,
+        "booking_id": b.id,
+        "booking_ref": b.booking_ref,
+        "status": "cancelled",
+        "message": f"Booking {b.booking_ref} has been cancelled successfully.",
+    })
 
 
 
@@ -3464,7 +3724,7 @@ async def admin_settings_get(
     s = await _get_or_create_settings(db)
     q = await db.execute(select(DriverIncentive).order_by(DriverIncentive.trips_required))
     incentives = q.scalars().all()
-    peaks_q = await db.execute(select(PeakHourSetting).order_by(PeakHourSetting.display_order, PeakHourSetting.id))
+    peaks_q = await db.execute(select(PeakHourSetting).order_by(PeakHourSetting.display_order.asc(), PeakHourSetting.id.desc()))
     peaks = peaks_q.scalars().all()
     cat_q = await db.execute(select(FareSetting).order_by(FareSetting.display_order, FareSetting.id))
     categories = cat_q.scalars().all()
@@ -3598,7 +3858,7 @@ async def admin_settings_save(
     s.max_settle_amount = Decimal(str(max_settle_amount))
     s.driver_search_radius_km = max(1, int(driver_search_radius_km))
     s.surge_start_hour = max(0, min(23, int(surge_start_hour)))
-    s.surge_end_hour = max(0, min(23, int(surge_end_hour)))
+    s.surge_end_hour = max(0, min(24, int(surge_end_hour)))
     s.surge_multiplier = Decimal(str(surge_multiplier))
     s.cancellation_fee = Decimal(str(cancellation_fee))
     s.cancellation_grace_period_minutes = max(0, int(cancellation_grace_period_minutes))
@@ -3641,7 +3901,7 @@ async def admin_settings_save(
 
     # Peak Hours saving
     from app.models import PeakHourSetting
-    peaks_q = await db.execute(select(PeakHourSetting).order_by(PeakHourSetting.display_order, PeakHourSetting.id))
+    peaks_q = await db.execute(select(PeakHourSetting).order_by(PeakHourSetting.display_order.asc(), PeakHourSetting.id.desc()))
     peaks = peaks_q.scalars().all()
     
     form_data = await request.form()
@@ -3653,39 +3913,54 @@ async def admin_settings_save(
         amt = form_data.get(f"peak_extra_amount_{pk.id}")
         vcat = form_data.get(f"peak_vehicle_category_{pk.id}")
         
-        if sh is None or eh is None or amt is None:
+        if sh is None and eh is None and amt is None:
             continue
             
         import re
         time_pat = re.compile(r"^\d{2}:\d{2}$")
         
-        clean_sh = sh.strip() if isinstance(sh, str) else "09:00"
-        clean_eh = eh.strip() if isinstance(eh, str) else "11:00"
-        
-        if not time_pat.match(clean_sh):
-            try:
-                clean_sh = f"{int(clean_sh):02d}:00"
-            except:
-                clean_sh = "09:00"
-        if not time_pat.match(clean_eh):
-            try:
-                clean_eh = f"{int(clean_eh):02d}:00"
-            except:
-                clean_eh = "11:00"
-                
-        try:
-            new_sh = int(clean_sh.split(":")[0])
-        except:
-            new_sh = 9
-        try:
-            new_eh = int(clean_eh.split(":")[0])
-        except:
-            new_eh = 11
+        clean_sh = sh.strip() if isinstance(sh, str) else ""
+        clean_eh = eh.strip() if isinstance(eh, str) else ""
+
+        new_sh = None
+        new_eh = None
+
+        if clean_sh:
+            if not time_pat.match(clean_sh):
+                try:
+                    clean_sh = f"{int(clean_sh):02d}:00"
+                except Exception:
+                    clean_sh = ""
+            if time_pat.match(clean_sh):
+                try:
+                    new_sh = int(clean_sh.split(":")[0])
+                except Exception:
+                    new_sh = None
+            else:
+                clean_sh = None
+        else:
+            clean_sh = None
+
+        if clean_eh:
+            if not time_pat.match(clean_eh):
+                try:
+                    clean_eh = f"{int(clean_eh):02d}:00"
+                except Exception:
+                    clean_eh = ""
+            if time_pat.match(clean_eh):
+                try:
+                    new_eh = int(clean_eh.split(":")[0])
+                except Exception:
+                    new_eh = None
+            else:
+                clean_eh = None
+        else:
+            clean_eh = None
 
         try:
             new_amt = Decimal(str(amt).strip() or "0")
         except Exception:
-            new_amt = Decimal("0")
+            new_amt = Decimal("0.00")
             
         clean_vcat = vcat.strip() if (vcat and isinstance(vcat, str)) else None
         if not clean_vcat:
@@ -3705,11 +3980,15 @@ async def admin_settings_save(
         pk.vehicle_category = clean_vcat
 
     peak_active = any(p.is_active for p in peaks)
+    s.peak_is_active = peak_active
     if len(peaks) > 0:
-        s.peak_is_active = peak_active
         s.peak_start_hour = peaks[0].start_hour
         s.peak_end_hour = peaks[0].end_hour
         s.peak_extra_amount = peaks[0].extra_amount
+    else:
+        s.peak_start_hour = None
+        s.peak_end_hour = None
+        s.peak_extra_amount = Decimal("0.00")
 
     # # Notify drivers if peak hours are active and configuration changed
     # if peak_active and peak_changed:
@@ -3754,31 +4033,145 @@ async def admin_settings_save(
 @router.post("/settings/peak-hours/{id}/toggle")
 async def admin_peak_hours_toggle(
     id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_superadmin),
 ):
+    from decimal import Decimal
     from app.models import PeakHourSetting
     q = await db.execute(select(PeakHourSetting).where(PeakHourSetting.id == id))
     p = q.scalars().first()
     if not p:
         raise HTTPException(status_code=404, detail="Peak hour setting not found")
+
+    content_type = request.headers.get("content-type", "")
+    accept = request.headers.get("accept", "")
+    is_json = "application/json" in content_type or "application/json" in accept
+
+    if is_json:
+        try:
+            body = await request.json()
+            if isinstance(body, dict):
+                import re
+                time_pat = re.compile(r"^\d{2}:\d{2}$")
+
+                if "start_time" in body:
+                    st = str(body["start_time"]).strip() if body["start_time"] else ""
+                    if st and time_pat.match(st):
+                        p.start_time = st
+                        p.start_hour = int(st.split(":")[0])
+                    elif not st:
+                        p.start_time = None
+                        p.start_hour = None
+
+                if "end_time" in body:
+                    et = str(body["end_time"]).strip() if body["end_time"] else ""
+                    if et and time_pat.match(et):
+                        p.end_time = et
+                        p.end_hour = int(et.split(":")[0])
+                    elif not et:
+                        p.end_time = None
+                        p.end_hour = None
+
+                if "extra_amount" in body:
+                    try:
+                        p.extra_amount = Decimal(str(body["extra_amount"]).strip() or "0")
+                    except Exception:
+                        pass
+
+                if "vehicle_category" in body:
+                    vc = str(body["vehicle_category"]).strip() if body["vehicle_category"] else None
+                    p.vehicle_category = vc if vc else None
+        except Exception:
+            pass
+
     p.is_active = not bool(p.is_active)
+
+    # Sync system_settings.peak_is_active
+    all_peaks_q = await db.execute(select(PeakHourSetting))
+    all_peaks = all_peaks_q.scalars().all()
+    s = await _get_or_create_settings(db)
+    s.peak_is_active = any(pk.is_active for pk in all_peaks)
+
     await db.commit()
+
+    if is_json:
+        return {
+            "status": "success",
+            "id": p.id,
+            "is_active": p.is_active,
+            "start_time": p.start_time or "",
+            "end_time": p.end_time or "",
+            "extra_amount": float(p.extra_amount or 0.0),
+            "vehicle_category": p.vehicle_category or "",
+        }
     return RedirectResponse(url="/admin/settings?tab=peakhours&saved=1", status_code=303)
 
 
-@router.post("/settings/peak-hours/new")
-async def admin_peak_hours_new(
+@router.post("/settings/peak-hours/{id}/update")
+async def admin_peak_hours_update(
+    id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_superadmin),
 ):
     from decimal import Decimal
-    from sqlalchemy import func
+    from app.models import PeakHourSetting
+    q = await db.execute(select(PeakHourSetting).where(PeakHourSetting.id == id))
+    p = q.scalars().first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Peak hour setting not found")
+
+    body = await request.json()
+    import re
+    time_pat = re.compile(r"^\d{2}:\d{2}$")
+
+    if "start_time" in body:
+        st = str(body["start_time"]).strip() if body["start_time"] else ""
+        if st and time_pat.match(st):
+            p.start_time = st
+            p.start_hour = int(st.split(":")[0])
+        elif not st:
+            p.start_time = None
+            p.start_hour = None
+
+    if "end_time" in body:
+        et = str(body["end_time"]).strip() if body["end_time"] else ""
+        if et and time_pat.match(et):
+            p.end_time = et
+            p.end_hour = int(et.split(":")[0])
+        elif not et:
+            p.end_time = None
+            p.end_hour = None
+
+    if "extra_amount" in body:
+        try:
+            p.extra_amount = Decimal(str(body["extra_amount"]).strip() or "0")
+        except Exception:
+            p.extra_amount = Decimal("0.00")
+
+    if "vehicle_category" in body:
+        vc = str(body["vehicle_category"]).strip() if body["vehicle_category"] else None
+        p.vehicle_category = vc if vc else None
+
+    await db.commit()
+    return {"status": "success", "id": p.id}
+
+
+@router.post("/settings/peak-hours/new")
+async def admin_peak_hours_new(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    from decimal import Decimal
+    from sqlalchemy import update
     from app.models import PeakHourSetting
 
-    max_order_res = await db.execute(select(func.max(PeakHourSetting.display_order)))
-    max_order = max_order_res.scalar()
-    display_order = (max_order + 1) if max_order is not None else 0
+    # Shift all existing display_orders up by 1 so new slot takes index 0 (appears FIRST)
+    await db.execute(
+        update(PeakHourSetting).values(display_order=PeakHourSetting.display_order + 1)
+    )
 
     p = PeakHourSetting(
         start_hour=None,
@@ -3787,10 +4180,26 @@ async def admin_peak_hours_new(
         end_time=None,
         extra_amount=Decimal("0.00"),
         is_active=True,
-        display_order=display_order,
+        display_order=0,
     )
     db.add(p)
     await db.commit()
+    await db.refresh(p)
+
+    content_type = request.headers.get("content-type", "")
+    accept = request.headers.get("accept", "")
+    if "application/json" in content_type or "application/json" in accept:
+        return {
+            "status": "success",
+            "id": p.id,
+            "display_order": p.display_order,
+            "is_active": p.is_active,
+            "start_time": "",
+            "end_time": "",
+            "extra_amount": "",
+            "vehicle_category": "",
+        }
+
     return RedirectResponse(url="/admin/settings?tab=peakhours&saved=1", status_code=303)
 
 
@@ -3817,6 +4226,7 @@ async def admin_peak_hours_reorder(
 @router.post("/settings/peak-hours/{id}/delete")
 async def admin_peak_hours_delete(
     id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_superadmin),
 ):
@@ -3826,7 +4236,20 @@ async def admin_peak_hours_delete(
     if not p:
         raise HTTPException(status_code=404, detail="Peak hour setting not found")
     await db.delete(p)
+
+    # Sync system_settings.peak_is_active
+    all_peaks_q = await db.execute(select(PeakHourSetting))
+    all_peaks = all_peaks_q.scalars().all()
+    s = await _get_or_create_settings(db)
+    s.peak_is_active = any(pk.is_active for pk in all_peaks if pk.id != id)
+
     await db.commit()
+
+    content_type = request.headers.get("content-type", "")
+    accept = request.headers.get("accept", "")
+    if "application/json" in content_type or "application/json" in accept:
+        return {"status": "success", "id": id}
+
     return RedirectResponse(url="/admin/settings?tab=peakhours&saved=1", status_code=303)
 
 
@@ -6035,7 +6458,10 @@ async def admin_market_delete(
 # (drives the customer Market home screen via GET /api/v1/market/ads & deals)
 # ===========================================================================
 MARKET_HOME_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "market_home")
-os.makedirs(MARKET_HOME_UPLOAD_DIR, exist_ok=True)
+try:
+    os.makedirs(MARKET_HOME_UPLOAD_DIR, exist_ok=True)
+except OSError:
+    pass
 
 
 async def _save_market_home_image(photo: UploadFile | None) -> str | None:
@@ -6653,10 +7079,14 @@ async def _reports_aggregate(db: AsyncSession, start_dt: datetime, end_dt_exclus
 
         return {
             "totals": {
-                "gross_total": gross_total,
-                "commission_total": commission_total,
-                "food_revenue": svc["food"]["gmv"],
-                "market_revenue": svc["market"]["gmv"],
+                "gross_total": round(gross_total, 2),
+                "commission_total": round(commission_total, 2),
+                "ride_revenue": round(svc["rides"]["gmv"], 2),
+                "delivery_revenue": round(svc["delivery"]["gmv"], 2),
+                "food_revenue": round(svc["food"]["gmv"], 2),
+                "market_revenue": round(svc["market"]["gmv"], 2),
+                "gold_revenue": round(svc["gold"]["gmv"], 2),
+                "total_orders": sum(svc[s]["orders"] for s in ("rides", "delivery", "food", "market", "gold")),
             },
             "services": services,
             "trend": trend,
@@ -6859,171 +7289,6 @@ async def _reports_aggregate(db: AsyncSession, start_dt: datetime, end_dt_exclus
             "rows": serialized_rows,
         }
 
-    elif type == "revenue":
-        # Per-day revenue broken down by every service line: rides, delivery
-        # (flash parcels), food and marketplace. Mirrors the commission model in
-        # services/finance_service.py — rides/flash use Booking.platform_fee,
-        # food/market take 20% of delivery_fee as platform commission.
-        from decimal import Decimal as D
-        from app.models import (
-            FoodOrder, FoodOrderStatus, MarketOrder, MarketOrderStatus,
-        )
-        PLATFORM_CUT = D("0.20")
-
-        rows_by_day = {}
-        cur = start_dt.date()
-        end_d = (end_dt_exclusive - timedelta(seconds=1)).date()
-        while cur <= end_d:
-            rows_by_day[cur.isoformat()] = {
-                "date": cur.isoformat(),
-                "rides": 0.0, "delivery": 0.0, "food": 0.0, "market": 0.0,
-                "ride_commission": 0.0, "delivery_commission": 0.0,
-                "food_commission": 0.0, "market_commission": 0.0,
-            }
-            cur = cur + timedelta(days=1)
-
-        services = {
-            "rides":    {"gmv": 0.0, "commission": 0.0, "orders": 0},
-            "delivery": {"gmv": 0.0, "commission": 0.0, "orders": 0},
-            "food":     {"gmv": 0.0, "commission": 0.0, "orders": 0},
-            "market":   {"gmv": 0.0, "commission": 0.0, "orders": 0},
-        }
-
-        # Rides + flash parcels (split by is_flash), completed only.
-        bq = await db.execute(
-            select(
-                bucket,
-                Booking.is_flash,
-                Booking.final_amount,
-                Booking.fare_amount,
-                Booking.platform_fee,
-            )
-            .where(
-                Booking.booked_at >= start_dt,
-                Booking.booked_at < end_dt_exclusive,
-                Booking.status == BookingStatus.COMPLETED,
-            )
-        )
-        for day, is_flash, final_amount, fare_amount, platform_fee in bq.all():
-            r = rows_by_day.get(day.isoformat())
-            if r is None:
-                continue
-            amt = float(final_amount if final_amount is not None else (fare_amount or 0))
-            fee = float(platform_fee or 0)
-            line = "delivery" if is_flash else "rides"
-            comm_key = "delivery_commission" if is_flash else "ride_commission"
-            r[line] += amt
-            r[comm_key] += fee
-            services[line]["gmv"] += amt
-            services[line]["commission"] += fee
-            services[line]["orders"] += 1
-
-        # Food — delivered only, commission = 20% of delivery_fee.
-        food_bucket = cast(FoodOrder.created_at, Date).label("day")
-        fq = await db.execute(
-            select(food_bucket, FoodOrder.final_amount, FoodOrder.delivery_fee)
-            .where(
-                FoodOrder.created_at >= start_dt,
-                FoodOrder.created_at < end_dt_exclusive,
-                FoodOrder.status == FoodOrderStatus.DELIVERED,
-            )
-        )
-        for day, final_amount, delivery_fee in fq.all():
-            r = rows_by_day.get(day.isoformat())
-            if r is None:
-                continue
-            amt = float(final_amount or 0)
-            comm = float((D(str(delivery_fee or 0)) * PLATFORM_CUT).quantize(D("0.01")))
-            r["food"] += amt
-            r["food_commission"] += comm
-            services["food"]["gmv"] += amt
-            services["food"]["commission"] += comm
-            services["food"]["orders"] += 1
-
-        # Marketplace — delivered only, same delivery-fee split as food.
-        market_bucket = cast(MarketOrder.created_at, Date).label("day")
-        mq = await db.execute(
-            select(market_bucket, MarketOrder.final_amount, MarketOrder.delivery_fee)
-            .where(
-                MarketOrder.created_at >= start_dt,
-                MarketOrder.created_at < end_dt_exclusive,
-                MarketOrder.status == MarketOrderStatus.DELIVERED,
-            )
-        )
-        for day, final_amount, delivery_fee in mq.all():
-            r = rows_by_day.get(day.isoformat())
-            if r is None:
-                continue
-            amt = float(final_amount or 0)
-            comm = float((D(str(delivery_fee or 0)) * PLATFORM_CUT).quantize(D("0.01")))
-            r["market"] += amt
-            r["market_commission"] += comm
-            services["market"]["gmv"] += amt
-            services["market"]["commission"] += comm
-            services["market"]["orders"] += 1
-
-        serialized_rows = []
-        for r in sorted(rows_by_day.values(), key=lambda x: x["date"], reverse=True):
-            total = r["rides"] + r["delivery"] + r["food"] + r["market"]
-            commission = (
-                r["ride_commission"] + r["delivery_commission"]
-                + r["food_commission"] + r["market_commission"]
-            )
-            serialized_rows.append({
-                "date": r["date"],
-                "rides": round(r["rides"], 2),
-                "delivery": round(r["delivery"], 2),
-                "food": round(r["food"], 2),
-                "market": round(r["market"], 2),
-                "total": round(total, 2),
-                "commission": round(commission, 2),
-            })
-
-        trend = [
-            {
-                "date": r["date"], "rides": r["rides"], "delivery": r["delivery"],
-                "food": r["food"], "market": r["market"], "total": r["total"],
-            }
-            for r in serialized_rows
-        ]
-        trend.reverse()
-
-        total_gmv = sum(s["gmv"] for s in services.values())
-        total_commission = sum(s["commission"] for s in services.values())
-        total_orders = sum(s["orders"] for s in services.values())
-
-        return {
-            "totals": {
-                "gross_total": round(total_gmv, 2),
-                "commission_total": round(total_commission, 2),
-                "ride_revenue": round(services["rides"]["gmv"], 2),
-                "delivery_revenue": round(services["delivery"]["gmv"], 2),
-                "food_revenue": round(services["food"]["gmv"], 2),
-                "market_revenue": round(services["market"]["gmv"], 2),
-                "total_orders": total_orders,
-            },
-            "services": [
-                {"key": "rides", "name": "Rides",
-                 "gmv": round(services["rides"]["gmv"], 2),
-                 "commission": round(services["rides"]["commission"], 2),
-                 "orders": services["rides"]["orders"]},
-                {"key": "delivery", "name": "Delivery (Parcels)",
-                 "gmv": round(services["delivery"]["gmv"], 2),
-                 "commission": round(services["delivery"]["commission"], 2),
-                 "orders": services["delivery"]["orders"]},
-                {"key": "food", "name": "Food",
-                 "gmv": round(services["food"]["gmv"], 2),
-                 "commission": round(services["food"]["commission"], 2),
-                 "orders": services["food"]["orders"]},
-                {"key": "market", "name": "Marketplace",
-                 "gmv": round(services["market"]["gmv"], 2),
-                 "commission": round(services["market"]["commission"], 2),
-                 "orders": services["market"]["orders"]},
-            ],
-            "trend": trend,
-            "rows": serialized_rows,
-        }
-
     elif type in ("revenue_rides", "revenue_delivery", "revenue_food", "revenue_market"):
         # ── Single-service revenue detail ──────────────────────────────────
         from decimal import Decimal as D
@@ -7128,7 +7393,12 @@ async def _reports_aggregate(db: AsyncSession, start_dt: datetime, end_dt_exclus
         trend = []
         for k in days_list:
             r = rows_by_day[k]
-            trend.append({"date": r["date"], "gmv": round(r["gmv"], 2), "commission": round(r["commission"], 2)})
+            trend.append({
+                "date": r["date"],
+                "gmv": round(r["gmv"], 2),
+                "commission": round(r["commission"], 2),
+                "orders": r["orders"],
+            })
         rows_sorted = list(reversed(trend))
 
         total_gmv = sum(r["gmv"] for r in trend)
@@ -7258,37 +7528,6 @@ def _default_reports_range() -> tuple[datetime, datetime]:
     return start_dt, end_dt
 
 
-def _zero_report_revenue(data: dict, report_type: str) -> dict:
-    if not data:
-        return data
-    if "totals" in data:
-        t = data["totals"]
-        for k in ["admin_net", "gross_bookings", "driver_earnings", "waiting_charge", 
-                  "promo_discount", "redeem_discount", "total_discount", "gross_total", 
-                  "commission_total", "food_revenue", "market_revenue", "ride_revenue", 
-                  "delivery_revenue", "avg_fare"]:
-            if k in t:
-                t[k] = 0.0
-    if "services" in data:
-        for s in data["services"]:
-            if "gmv" in s: s["gmv"] = 0.0
-            if "commission" in s: s["commission"] = 0.0
-    if "trend" in data:
-        for r in data["trend"]:
-            for k in ["gross", "commission", "total", "gmv", "revenue", "delivery", "food", "market", "gold"]:
-                if k in r: r[k] = 0.0
-            if report_type == "revenue" and "rides" in r:
-                r["rides"] = 0.0
-    if "rows" in data:
-        for r in data["rows"]:
-            for k in ["gross", "driver_earnings", "commission", "waiting_charge", "discount", 
-                      "revenue", "avg_fare", "total", "delivery", "food", "market", "gold"]:
-                if k in r: r[k] = 0.0
-            if report_type == "revenue" and "rides" in r:
-                r["rides"] = 0.0
-    return data
-
-
 def _district_report_params(start: str, end: str, service: str):
     from datetime import date
     today = datetime.now(timezone(timedelta(hours=5, minutes=30))).date()
@@ -7373,7 +7612,6 @@ async def admin_reports(
     if end_dt < start_dt:
         start_dt, end_dt = end_dt, start_dt
     data = await _reports_aggregate(db, start_dt, end_dt + timedelta(seconds=1), type)
-    data = _zero_report_revenue(data, type)
 
     return templates.TemplateResponse(
         request,
@@ -7403,7 +7641,6 @@ async def admin_reports_data(
     if end_dt < start_dt:
         start_dt, end_dt = end_dt, start_dt
     data = await _reports_aggregate(db, start_dt, end_dt + timedelta(seconds=1), type)
-    data = _zero_report_revenue(data, type)
     return {
         **data,
         "start_date": start_dt.strftime("%Y-%m-%d"),
@@ -8733,10 +8970,13 @@ async def admin_finance(
 async def admin_withdrawals(
     request: Request,
     page: int = 1,
+    search: Optional[str] = None,
+    q: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    data = await fin.get_withdrawals_data(db, page=page, page_size=20)
+    search_term = (search or q or "").strip()
+    data = await fin.get_withdrawals_data(db, page=page, page_size=20, search=search_term)
     return templates.TemplateResponse(
         request, "withdrawals.html",
         {
@@ -8751,6 +8991,7 @@ async def admin_withdrawals(
             "total_drivers": data["total_drivers"],
             "page": data["page"],
             "page_range": data["page_range"],
+            "search": search_term,
         },
     )
 
@@ -9059,6 +9300,8 @@ async def admin_withdrawals_export(
 @router.get("/withdrawals/pending/export")
 async def admin_withdrawals_pending_export(
     format: str = "xlsx",
+    search: Optional[str] = None,
+    q: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
@@ -9068,13 +9311,14 @@ async def admin_withdrawals_pending_export(
     from datetime import datetime
     from fastapi.responses import Response
 
-    data = await fin.get_withdrawals_data(db, page=1, page_size=100000)
+    search_term = (search or q or "").strip()
+    data = await fin.get_withdrawals_data(db, page=1, page_size=100000, search=search_term)
     rows = data.get("rows", [])
     now_colombo = datetime.now(COLOMBO_TZ)
     filename_base = f"ziggo-pending-driver-withdrawals-{now_colombo.strftime('%Y%m%d')}"
 
     headers = [
-        "Driver ID", "Name", "Phone Number", "Vehicle Type",
+        "Driver ID", "Name", "Phone Number", "Vehicle Number", "Vehicle Type",
         "Total Earned (Rs.)", "Total Paid (Rs.)", "Settlement Owed (Rs.)", "Pending Balance (Rs.)",
         "Bank Name", "Branch", "Account Number", "Account Holder"
     ]
@@ -9100,6 +9344,7 @@ async def admin_withdrawals_pending_export(
                 r["driver_id"],
                 _csv_cell(r["name"]),
                 _csv_cell(r["phone"]),
+                _csv_cell(r.get("vehicle_number", "")),
                 _csv_cell(r["vehicle_type"].capitalize() if r.get("vehicle_type") else ""),
                 f"{float(r.get('earned', 0)):.2f}",
                 f"{float(r.get('paid', 0)):.2f}",
@@ -9110,7 +9355,7 @@ async def admin_withdrawals_pending_export(
                 _csv_cell(r.get("account_number", "")),
                 _csv_cell(r.get("account_holder_name", "")),
             ])
-        writer.writerow(["", "", "", "Total Pending:", "", "", "", f"{float(total_pending):.2f}", "", "", "", ""])
+        writer.writerow(["", "", "", "", "Total Pending:", "", "", "", f"{float(total_pending):.2f}", "", "", "", ""])
         return Response(
             content=buf.getvalue().encode("utf-8"),
             media_type="text/csv; charset=utf-8",
@@ -9139,7 +9384,7 @@ async def admin_withdrawals_pending_export(
         cell.fill = header_fill
         cell.font = header_font
         cell.border = thin_border
-        cell.alignment = Alignment(horizontal="center" if col_idx == 1 else "right" if col_idx in (5, 6, 7, 8) else "left", vertical="center")
+        cell.alignment = Alignment(horizontal="center" if col_idx == 1 else "right" if col_idx in (6, 7, 8, 9) else "left", vertical="center")
     ws.row_dimensions[1].height = 28
 
     total_pending = Decimal("0")
@@ -9152,6 +9397,7 @@ async def admin_withdrawals_pending_export(
             r["driver_id"],
             str(r["name"]),
             str(r["phone"]),
+            str(r.get("vehicle_number", "")),
             str(r["vehicle_type"].capitalize() if r.get("vehicle_type") else ""),
             float(r.get("earned", 0)),
             float(r.get("paid", 0)),
@@ -9171,12 +9417,12 @@ async def admin_withdrawals_pending_export(
             cell.border = thin_border
             if col_idx == 1:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
-            elif col_idx in (5, 6, 7, 8):
+            elif col_idx in (6, 7, 8, 9):
                 cell.alignment = Alignment(horizontal="right", vertical="center")
                 cell.number_format = "#,##0.00"
-                if col_idx == 8 and pending > 0:
+                if col_idx == 9 and pending > 0:
                     cell.font = Font(name="Calibri", size=10, bold=True, color="D97706")
-            elif col_idx in (3, 11):
+            elif col_idx in (3, 4, 12):
                 cell.alignment = Alignment(horizontal="left", vertical="center")
                 cell.number_format = "@"
             else:
@@ -10348,7 +10594,10 @@ async def admin_events(
 
 
 EVENTS_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "events")
-os.makedirs(EVENTS_UPLOAD_DIR, exist_ok=True)
+try:
+    os.makedirs(EVENTS_UPLOAD_DIR, exist_ok=True)
+except OSError:
+    pass
 
 async def _save_event_image(photo: UploadFile | None) -> str | None:
     if photo is None or not getattr(photo, "filename", None):
@@ -11085,7 +11334,10 @@ async def admin_corporate_delete(
 # (drives the customer Food home screen via GET /api/v1/food/home)
 # ===========================================================================
 FOOD_HOME_UPLOAD_DIR = os.path.join(current_dir, "static", "uploads", "food_home")
-os.makedirs(FOOD_HOME_UPLOAD_DIR, exist_ok=True)
+try:
+    os.makedirs(FOOD_HOME_UPLOAD_DIR, exist_ok=True)
+except OSError:
+    pass
 
 
 async def _save_food_home_image(photo: UploadFile | None) -> str | None:
@@ -11964,6 +12216,62 @@ async def surge_zones_page(request: Request, db: AsyncSession = Depends(get_db),
         "admin": admin_user,
         "zones": zones,
         "gmap_key": gmap_key,
+    })
+
+
+@router.get("/custom-fare-zones", response_class=HTMLResponse)
+async def custom_fare_zones_page(request: Request, db: AsyncSession = Depends(get_db), admin_user: User = Depends(current_admin)):
+    from app.models import CustomFareZone, FareSetting
+    q = await db.execute(select(CustomFareZone).order_by(desc(CustomFareZone.id)))
+    zones_objs = q.scalars().all()
+
+    vq = await db.execute(
+        select(FareSetting)
+        .where(FareSetting.service_type != "courier")
+        .order_by(FareSetting.display_order, FareSetting.id)
+    )
+    vehicles = [
+        {
+            "service_type": v.service_type,
+            "display_name": v.display_name or v.service_type.title(),
+            "base_fare": float(v.base_fare or 0),
+            "min_fare": float(v.min_fare or 0),
+            "search_radius_km": int(v.search_radius_km or 10),
+            "per_km_rate": float(v.per_km_rate or 0),
+        }
+        for v in vq.scalars().all()
+    ]
+    if not vehicles:
+        vehicles = [
+            {"service_type": "tuk", "display_name": "Tuk-Tuk", "base_fare": 100.0, "min_fare": 100.0, "search_radius_km": 5, "per_km_rate": 80.0},
+            {"service_type": "car", "display_name": "Standard Car", "base_fare": 200.0, "min_fare": 200.0, "search_radius_km": 8, "per_km_rate": 120.0},
+            {"service_type": "van", "display_name": "Van", "base_fare": 350.0, "min_fare": 350.0, "search_radius_km": 10, "per_km_rate": 150.0},
+            {"service_type": "bike", "display_name": "Motorbike", "base_fare": 80.0, "min_fare": 80.0, "search_radius_km": 4, "per_km_rate": 60.0},
+            {"service_type": "delivery", "display_name": "Flash Delivery", "base_fare": 100.0, "min_fare": 100.0, "search_radius_km": 6, "per_km_rate": 70.0},
+        ]
+
+    zones = [
+        {
+            "id": z.id,
+            "name": z.name,
+            "coordinates": z.coordinates,
+            "color": z.color or "#2563eb",
+            "is_active": z.is_active,
+            "exempt_peak_surge": z.exempt_peak_surge,
+            "rates": z.rates or {},
+            "created_at": z.created_at.strftime("%Y-%m-%d %H:%M") if z.created_at else "",
+        }
+        for z in zones_objs
+    ]
+
+    gmap_key = settings.GOOGLE_MAPS_API_KEY or ""
+    return templates.TemplateResponse("custom_fare_zones.html", {
+        "request": request,
+        "admin": admin_user,
+        "zones": zones,
+        "vehicles": vehicles,
+        "gmap_key": gmap_key,
+        "active_page": "custom_fare_zones",
     })
 
 

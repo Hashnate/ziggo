@@ -121,6 +121,9 @@ class Booking(Base):
     # Commission-free launch location this trip was booked in (Phase 2, feature 02).
     # Re-pricing keeps the decision made at booking, even after the period ends.
     launch_location_id = Column(Integer, nullable=True)
+    # Geographic custom fare zone this trip was booked in.
+    # Re-pricing keeps the locked zone rates even if the zone is updated or deleted.
+    custom_fare_zone_id = Column(Integer, ForeignKey("custom_fare_zones.id", ondelete="SET NULL"), nullable=True, index=True)
     # The customer asked for a lady driver (Phase 2, feature 03). Cleared if she
     # switches to any driver while searching.
     lady_driver_requested = Column(Boolean, nullable=False, default=False)

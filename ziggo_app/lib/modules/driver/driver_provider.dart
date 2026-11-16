@@ -96,6 +96,11 @@ class DriverProvider extends ChangeNotifier {
         _currentLocation = LatLng(lat, lng);
         notifyListeners();
       }
+      final cachedOnline = prefs.getBool('driver_is_online');
+      if (cachedOnline != null && _profile == null) {
+        _isOnline = cachedOnline;
+        _updateWakelock();
+      }
     } catch (_) {}
 
     try {
@@ -397,6 +402,10 @@ class DriverProvider extends ChangeNotifier {
       final resp = await ApiClient.instance.dio.get('/driver/me');
       _profile = Map<String, dynamic>.from(resp.data);
       _isOnline = _profile?['is_online'] == true;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('driver_is_online', _isOnline);
+      } catch (_) {}
       notifyListeners();
     } on DioException {
       // ignore
@@ -624,6 +633,10 @@ class DriverProvider extends ChangeNotifier {
         data: {'is_online': online},
       );
       _isOnline = resp.data['is_online'] == true;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('driver_is_online', _isOnline);
+      } catch (_) {}
       notifyListeners();
 
       await _startLocationStream(online: _isOnline);
@@ -978,17 +991,29 @@ class DriverProvider extends ChangeNotifier {
     super.notifyListeners();
   }
 
-  void _updateWakelock() {
+  bool? _wakelockEnabled;
+
+  /// Keeps the mobile screen awake whenever the driver is online, has an active trip,
+  /// or has an incoming ride/order offer on screen.
+  void _updateWakelock({bool force = false}) {
     final bool hasActiveTrip = (_activeRide != null && !['completed', 'cancelled'].contains(_activeRide?['status'])) ||
         (_activeFoodOrder != null && !['delivered', 'cancelled'].contains(_activeFoodOrder?['status'])) ||
         (_activeMarketOrder != null && !['delivered', 'cancelled'].contains(_activeMarketOrder?['status']));
+    final bool shouldKeepScreenOn = _isOnline || hasActiveTrip || _pendingRequest != null;
+    if (!force && _wakelockEnabled == shouldKeepScreenOn) return;
     try {
-      if (hasActiveTrip) {
+      if (shouldKeepScreenOn) {
         WakelockPlus.enable();
       } else {
         WakelockPlus.disable();
       }
+      _wakelockEnabled = shouldKeepScreenOn;
     } catch (_) {}
+  }
+
+  /// Explicitly re-apply screen awake state (e.g. when app resumes from background).
+  void updateWakelock({bool force = false}) {
+    _updateWakelock(force: force);
   }
 
   // ---- Phase 2 feature 01 — the customer's live location ----------------
@@ -1071,11 +1096,36 @@ class DriverProvider extends ChangeNotifier {
     _passengerTimer = null;
   }
 
+  /// Reset driver session state on logout or account switch.
+  Future<void> resetSession() async {
+    _profileTimer?.cancel();
+    _profileTimer = null;
+    _stopLocationStream();
+    _clearPassengerPoint();
+    _isOnline = false;
+    _profile = null;
+    _activeRide = null;
+    _activeFoodOrder = null;
+    _activeMarketOrder = null;
+    _pendingRequest = null;
+    _queuedRide = null;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('driver_is_online', false);
+    } catch (_) {}
+    try {
+      await WakelockPlus.disable();
+      _wakelockEnabled = false;
+    } catch (_) {}
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     _clearPassengerPoint();
     try {
       WakelockPlus.disable();
+      _wakelockEnabled = false;
     } catch (_) {}
     _stopLocationStream();
     _positions.close();

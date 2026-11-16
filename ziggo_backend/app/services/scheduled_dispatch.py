@@ -36,7 +36,9 @@ async def dispatch_booking(db, booking: Booking) -> None:
     customer_phone = customer_user.phone_number if customer_user else ""
 
     dispatch_vehicle = None if (booking.is_flash or booking.is_courier) else booking.service_type
-    max_radius = await get_search_radius_for_service(db, dispatch_vehicle)
+    p_lat = float(booking.pickup_lat) if booking.pickup_lat is not None else None
+    p_lng = float(booking.pickup_lng) if booking.pickup_lng is not None else None
+    max_radius = await get_search_radius_for_service(db, dispatch_vehicle, p_lat, p_lng)
 
     nearby = await find_all_nearby_drivers(
         db, booking.pickup_lat, booking.pickup_lng, dispatch_vehicles(booking), max_distance_km=max_radius

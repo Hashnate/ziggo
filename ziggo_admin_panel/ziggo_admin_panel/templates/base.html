@@ -287,7 +287,10 @@
 
         /* ===== Buttons ===== */
         .zi-btn-primary,
-        .bg-ziggo:not(.sidebar-item):not(.zi-logo),
+        button.bg-ziggo:not(.sidebar-item):not(.zi-logo),
+        a.bg-ziggo:not(.sidebar-item):not(.zi-logo),
+        input[type="button"].bg-ziggo,
+        input[type="submit"].bg-ziggo,
         button[class*="px-6"][class*="py-3"]:not(.sidebar-item),
         a[class*="px-6"][class*="py-3"]:not(.sidebar-item) {
             background: #1E3A8A !important;
@@ -300,7 +303,10 @@
             border: none !important;
         }
         .zi-btn-primary:hover,
-        .bg-ziggo:not(.sidebar-item):not(.zi-logo):hover,
+        button.bg-ziggo:not(.sidebar-item):not(.zi-logo):hover,
+        a.bg-ziggo:not(.sidebar-item):not(.zi-logo):hover,
+        input[type="button"].bg-ziggo:hover,
+        input[type="submit"].bg-ziggo:hover,
         button[class*="px-6"][class*="py-3"]:not(.sidebar-item):hover,
         a[class*="px-6"][class*="py-3"]:not(.sidebar-item):hover {
             background: #18306e !important;
@@ -502,6 +508,9 @@
             </a>
             <a href="/admin/surge-zones" class="sidebar-item {% if active_page == 'surge_zones' %}active{% endif %}">
                 <i class="fas fa-map-marked-alt"></i><span>Surge Zones</span>
+            </a>
+            <a href="/admin/custom-fare-zones" class="sidebar-item {% if active_page == 'custom_fare_zones' %}active{% endif %}">
+                <i class="fas fa-draw-polygon"></i><span>Custom Fare Zones</span>
             </a>
 
             {% if not request.state.admin or request.state.admin.admin_role != 'data_entry' %}

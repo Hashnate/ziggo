@@ -495,3 +495,22 @@ class SurgeZone(Base):
     is_active = Column(Boolean, nullable=False, default=True)
     color = Column(String(7), nullable=False, server_default="#dc3545")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class CustomFareZone(Base):
+    """Geographic area with granular per-vehicle pricing overrides and peak/surge exemptions."""
+    __tablename__ = "custom_fare_zones"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    # Stored as a list of dicts: [{"lat": 6.9, "lng": 79.8}, ...]
+    coordinates = Column(JSON, nullable=False)
+    color = Column(String(7), nullable=False, default="#2563eb")
+    is_active = Column(Boolean, nullable=False, default=True)
+    exempt_peak_surge = Column(Boolean, nullable=False, default=True)
+    # JSON dictionary mapping vehicle types (tuk, car, van, etc.) to pricing configurations:
+    # {"tuk": {"base_fare": 200.0, "min_fare": 200.0, "search_radius_km": 3.0, "per_km_rate": 80.0}, ...}
+    rates = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
