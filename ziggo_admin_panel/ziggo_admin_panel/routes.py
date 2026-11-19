@@ -6215,6 +6215,13 @@ async def admin_market_detail(
     else:
         admin_owes_vendor = -net_owed_to_admin
 
+    products_q = await db.execute(
+        select(Product)
+        .where(Product.vendor_id == vendor_id)
+        .order_by(Product.id.asc())
+    )
+    products = products_q.scalars().all()
+
     return templates.TemplateResponse(
         request, "market_detail.html",
         {
@@ -6222,7 +6229,7 @@ async def admin_market_detail(
             "active_page": "market",
             "vendor": vendor,
             "owner": owner,
-            "products": vendor.products,
+            "products": products,
             "admin_owes_vendor": float(admin_owes_vendor),
             "vendor_owes_admin": float(vendor_owes_admin),
         },
@@ -6238,6 +6245,7 @@ async def admin_market_add_product(
     unit: str = Form(""),
     stock_quantity: int = Form(0),
     weight_kg: str = Form(""),
+    category: str = Form(""),
     image: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
@@ -6257,11 +6265,94 @@ async def admin_market_add_product(
             unit=unit.strip() or None,
             stock_quantity=stock_quantity,
             weight_kg=Decimal(weight_kg.strip()) if weight_kg.strip() else None,
+            category=category.strip() or None,
             image_url=saved_image_url,
             is_available=True,
         )
     )
     await db.commit()
+    return RedirectResponse(url=f"/admin/market/{vendor_id}", status_code=303)
+
+
+@router.post("/market/{vendor_id}/products/{product_id}/edit")
+async def admin_market_edit_product(
+    vendor_id: int,
+    product_id: int,
+    name: str = Form(...),
+    description: str = Form(""),
+    price: float = Form(...),
+    original_price: Optional[float] = Form(None),
+    unit: str = Form(""),
+    stock_quantity: int = Form(0),
+    weight_kg: str = Form(""),
+    category: str = Form(""),
+    is_available: str = Form(""),
+    is_popular: str = Form(""),
+    clear_image: str = Form(""),
+    image: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(current_admin),
+):
+    from decimal import Decimal
+    from app.models import Product
+
+    pq = await db.execute(
+        select(Product).where(Product.id == product_id, Product.vendor_id == vendor_id)
+    )
+    product = pq.scalars().first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    product.name = name.strip()
+    product.description = description.strip() or None
+    product.price = Decimal(str(price))
+    product.original_price = (
+        Decimal(str(original_price))
+        if original_price is not None and original_price > 0
+        else None
+    )
+    if product.original_price and product.original_price < product.price:
+        product.price, product.original_price = product.original_price, product.price
+    product.unit = unit.strip() or None
+    product.stock_quantity = max(0, stock_quantity)
+    product.weight_kg = Decimal(weight_kg.strip()) if weight_kg.strip() else None
+    product.category = category.strip() or None
+    product.is_available = bool(is_available)
+    product.is_popular = bool(is_popular)
+
+    if bool(clear_image):
+        product.image_url = None
+    elif image and image.filename:
+        saved_image_url = await _save_product_image(image)
+        if saved_image_url:
+            product.image_url = saved_image_url
+
+    await db.commit()
+    return RedirectResponse(url=f"/admin/market/{vendor_id}", status_code=303)
+
+
+@router.post("/market/{vendor_id}/products/{product_id}/delete")
+async def admin_market_delete_product(
+    vendor_id: int,
+    product_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin_or_admin),
+):
+    from app.models import Product, MarketOrderItem
+    from sqlalchemy import update
+
+    pq = await db.execute(
+        select(Product).where(Product.id == product_id, Product.vendor_id == vendor_id)
+    )
+    product = pq.scalars().first()
+    if product:
+        await db.execute(
+            update(MarketOrderItem)
+            .where(MarketOrderItem.product_id == product_id)
+            .values(product_id=None)
+        )
+        await db.delete(product)
+        await db.commit()
     return RedirectResponse(url=f"/admin/market/{vendor_id}", status_code=303)
 
 
