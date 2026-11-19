@@ -79,7 +79,7 @@ async def get_search_radius_for_service(
     service_type: Optional[str],
     pickup_lat: Optional[float] = None,
     pickup_lng: Optional[float] = None,
-) -> int:
+) -> float:
     if pickup_lat is not None and pickup_lng is not None and service_type:
         from ...services.zone_pricing_service import find_custom_zone_for_point
         custom_zone = await find_custom_zone_for_point(db, pickup_lat, pickup_lng)
@@ -87,7 +87,12 @@ async def get_search_radius_for_service(
             st_clean = service_type.strip().lower()
             zone_rate = custom_zone.rates.get(st_clean)
             if zone_rate and zone_rate.get("search_radius_km"):
-                return int(zone_rate["search_radius_km"])
+                try:
+                    val = float(zone_rate["search_radius_km"])
+                    if val > 0:
+                        return val
+                except (ValueError, TypeError):
+                    pass
 
     if service_type:
         from ...models import FareSetting
@@ -103,14 +108,14 @@ async def get_search_radius_for_service(
         )
         fs = q.scalars().first()
         if fs and fs.search_radius_km is not None and fs.search_radius_km > 0:
-            return fs.search_radius_km
+            return float(fs.search_radius_km)
 
     ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
     ss = ss_q.scalars().first()
-    if ss and ss.driver_search_radius_km is not None:
-        return ss.driver_search_radius_km
+    if ss and ss.driver_search_radius_km is not None and ss.driver_search_radius_km > 0:
+        return float(ss.driver_search_radius_km)
 
-    return 15
+    return 15.0
 
 
 async def _lady_drivers_nearby(db: AsyncSession, lat: float, lng: float, service_type: str,
