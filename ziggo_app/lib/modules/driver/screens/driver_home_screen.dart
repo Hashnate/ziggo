@@ -245,6 +245,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<DriverProvider>().setInDriverApp(true);
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
 
     _notificationSubscription = FcmService.instance.onNotificationClicked.listen((message) {
@@ -427,7 +432,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
     if (state == AppLifecycleState.resumed) {
       FloatingOverlayService.hideFloatingWidget();
       if (mounted) {
-        final pending = context.read<DriverProvider>().pendingRequest;
+        final driver = context.read<DriverProvider>();
+        driver.setInDriverApp(true);
+        driver.updateWakelock(force: true);
+        final pending = driver.pendingRequest;
         if (pending == null) {
           unawaited(FcmService.instance.cancelRideAlert());
         }
@@ -4977,11 +4985,18 @@ class _Drawer extends StatelessWidget {
                   label: 'KYC documents',
                   onTap: onDocuments,
                 ),
+                _drawerSwitchTile(
+                  icon: Icons.stay_current_portrait_rounded,
+                  label: 'Keep screen awake',
+                  value: driver.keepScreenOn,
+                  onChanged: (val) => driver.setKeepScreenOn(val),
+                ),
                 _drawerTile(
                   icon: Icons.swap_horiz_rounded,
                   label: 'Switch to User',
                   onTap: () {
                     Navigator.pop(context);
+                    context.read<DriverProvider>().setInDriverApp(false);
                     context.read<AuthProvider>().toggleCustomerMode();
                   },
                 ),
@@ -5100,6 +5115,40 @@ class _Drawer extends StatelessWidget {
     );
   }
 
+  static Widget _drawerSwitchTile({
+    required IconData icon,
+    required String label,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.textPrimary, size: 24),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+              ),
+            ),
+          ),
+          Switch(
+            value: value,
+            activeColor: AppColors.primary,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+
   static Future<void> _confirmLogout(BuildContext context) async {
     final yes = await showDialog<bool>(
       context: context,
@@ -5159,6 +5208,7 @@ class _Drawer extends StatelessWidget {
     if (yes != true) return;
     if (!context.mounted) return;
     final driver = context.read<DriverProvider>();
+    driver.setInDriverApp(false);
     if (driver.isOnline) {
       await driver.toggleOnline(false);
     }

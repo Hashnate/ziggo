@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart' show SchedulerBinding, AppLifecycleState;
+import 'package:flutter/widgets.dart' show WidgetsBinding, WidgetsBindingObserver;
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -15,12 +16,21 @@ import '../../core/network/ws_client.dart';
 import '../../core/notifications/fcm_service.dart';
 import '../../core/services/floating_overlay_service.dart';
 
-class DriverProvider extends ChangeNotifier {
+class DriverProvider extends ChangeNotifier with WidgetsBindingObserver {
   final WsClient _ws = WsClient();
   WsClient get ws => _ws;
 
   bool _isOnline = false;
   bool get isOnline => _isOnline;
+
+  bool _keepScreenOn = true;
+  bool get keepScreenOn => _keepScreenOn;
+
+  bool _inDriverApp = false;
+  bool get inDriverApp => _inDriverApp;
+
+  bool _isForeground = true;
+  bool? _wakelockEnabled;
 
   Map<String, dynamic>? _profile;
   Map<String, dynamic>? get profile => _profile;
@@ -85,6 +95,50 @@ class DriverProvider extends ChangeNotifier {
 
   DriverProvider() {
     _initLocation();
+    _initKeepScreenOn();
+    try {
+      WidgetsBinding.instance.addObserver(this);
+      _isForeground = (SchedulerBinding.instance.lifecycleState == AppLifecycleState.resumed);
+    } catch (_) {}
+  }
+
+  Future<void> _initKeepScreenOn() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _keepScreenOn = prefs.getBool('driver_keep_screen_on') ?? true;
+      _updateWakelock();
+    } catch (_) {}
+  }
+
+  Future<void> setKeepScreenOn(bool value) async {
+    if (_keepScreenOn == value) return;
+    _keepScreenOn = value;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('driver_keep_screen_on', value);
+    } catch (_) {}
+    _updateWakelock(force: true);
+    notifyListeners();
+  }
+
+  void setInDriverApp(bool active) {
+    if (_inDriverApp == active) return;
+    _inDriverApp = active;
+    _updateWakelock(force: true);
+    notifyListeners();
+  }
+
+  void updateWakelock({bool force = false}) {
+    _updateWakelock(force: force);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final wasForeground = _isForeground;
+    _isForeground = (state == AppLifecycleState.resumed);
+    if (wasForeground != _isForeground) {
+      _updateWakelock(force: true);
+    }
   }
 
   Future<void> _initLocation() async {
@@ -117,6 +171,8 @@ class DriverProvider extends ChangeNotifier {
   }
 
   Future<void> bootstrap(String token) async {
+    _inDriverApp = true;
+    _updateWakelock();
     _ws.connect(token);
     _ws.events.listen(_onWsEvent);
     unawaited(_pushLocationOnce());
@@ -978,16 +1034,24 @@ class DriverProvider extends ChangeNotifier {
     super.notifyListeners();
   }
 
-  void _updateWakelock() {
+  void _updateWakelock({bool force = false}) {
     final bool hasActiveTrip = (_activeRide != null && !['completed', 'cancelled'].contains(_activeRide?['status'])) ||
         (_activeFoodOrder != null && !['delivered', 'cancelled'].contains(_activeFoodOrder?['status'])) ||
         (_activeMarketOrder != null && !['delivered', 'cancelled'].contains(_activeMarketOrder?['status']));
+
+    // Keep screen always on when the driver is in the driver mobile app
+    // (until the driver turns off the screen toggle, locks/turns off the device screen, or leaves the app).
+    final bool shouldKeepScreenOn = _isForeground && _inDriverApp && (_keepScreenOn || hasActiveTrip);
+
+    if (!force && _wakelockEnabled == shouldKeepScreenOn) return;
+
     try {
-      if (hasActiveTrip) {
+      if (shouldKeepScreenOn) {
         WakelockPlus.enable();
       } else {
         WakelockPlus.disable();
       }
+      _wakelockEnabled = shouldKeepScreenOn;
     } catch (_) {}
   }
 
@@ -1073,9 +1137,14 @@ class DriverProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    try {
+      WidgetsBinding.instance.removeObserver(this);
+    } catch (_) {}
+    _inDriverApp = false;
     _clearPassengerPoint();
     try {
       WakelockPlus.disable();
+      _wakelockEnabled = false;
     } catch (_) {}
     _stopLocationStream();
     _positions.close();

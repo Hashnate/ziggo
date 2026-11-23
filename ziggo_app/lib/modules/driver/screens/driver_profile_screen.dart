@@ -371,6 +371,8 @@ class DriverProfileScreen extends StatelessWidget {
                       },
                     ),
                     _divider(),
+                    const _KeepScreenAwakeTile(),
+                    _divider(),
                     _listTile(
                       icon: Icons.support_agent_rounded,
                       title: 'Help & support',
@@ -1011,6 +1013,7 @@ class DriverProfileScreen extends StatelessWidget {
     if (yes != true) return;
     if (!context.mounted) return;
     final driver = context.read<DriverProvider>();
+    driver.setInDriverApp(false);
     if (driver.isOnline) {
       await driver.toggleOnline(false);
     }
@@ -1071,6 +1074,45 @@ class _FemalePassengersOnlyTileState extends State<_FemalePassengersOnlyTile> {
             value: on,
             activeColor: AppColors.ladies,
             onChanged: _saving ? null : _set,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _KeepScreenAwakeTile extends StatelessWidget {
+  const _KeepScreenAwakeTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final driver = context.watch<DriverProvider>();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+      child: Row(
+        children: [
+          const Icon(Icons.stay_current_portrait_rounded, color: AppColors.primary, size: 22),
+          const SizedBox(width: 14),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Keep screen awake',
+                  style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w800, fontSize: 14),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Keep mobile screen always on while in the app until turned off',
+                  style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: driver.keepScreenOn,
+            activeColor: AppColors.primary,
+            onChanged: (val) => driver.setKeepScreenOn(val),
           ),
         ],
       ),
