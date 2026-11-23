@@ -23,7 +23,7 @@ from sqlalchemy import inspect, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from ..database import Base
-from ..models import Event, EventTicketTier, EventOrder, EventOrderItem, FlashWeightTier, CorporateAccount, CorporateMember, DriverPayout, MarketAd, MarketDeal, DriverIncentive, ReferralBonus, PeakHourSetting, JobOpening, JobApplication, Driver, DriverVehicle, DriverOnlineSession, CustomFareZone  # noqa: F401 — ensures import for create_all
+from ..models import Event, EventTicketTier, EventOrder, EventOrderItem, FlashWeightTier, CorporateAccount, CorporateMember, DriverPayout, MarketAd, MarketDeal, DriverIncentive, ReferralBonus, PeakHourSetting, JobOpening, JobApplication, Driver, DriverVehicle, DriverOnlineSession, CustomFareZone, BookingDispatchLog  # noqa: F401 — ensures import for create_all
 
 # (table_name, column_name, column_ddl)
 PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
@@ -136,6 +136,7 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("district_fares", "is_active", "BOOLEAN NOT NULL DEFAULT TRUE"),
     ("district_fares", "created_at", "TIMESTAMP WITH TIME ZONE DEFAULT now()"),
     ("district_fares", "per_km_rate", "NUMERIC(10, 2)"),
+    ("district_fares", "display_order", "INTEGER NOT NULL DEFAULT 0"),
     ("bookings", "launch_location_id", "INTEGER"),
     ("food_orders", "launch_location_id", "INTEGER"),
     ("food_orders", "waive_delivery_cut", "BOOLEAN NOT NULL DEFAULT FALSE"),
@@ -160,6 +161,9 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("bookings", "passenger_lng", "NUMERIC(10, 7)"),
     ("bookings", "passenger_location_at", "TIMESTAMP WITH TIME ZONE"),
     ("bookings", "custom_fare_zone_id", "INTEGER"),
+    ("bookings", "applied_search_radius_km", "NUMERIC(6, 2)"),
+    ("bookings", "search_radius_source", "VARCHAR(100)"),
+    ("booking_dispatch_logs", "delivery_channel", "VARCHAR(50)"),
 )
 
 

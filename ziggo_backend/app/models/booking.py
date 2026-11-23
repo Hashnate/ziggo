@@ -165,6 +165,8 @@ class Booking(Base):
     # already hours past the timeout the moment it starts searching.
     dispatch_started_at = Column(DateTime(timezone=True), nullable=True)
 
+    applied_search_radius_km = Column(DECIMAL(6, 2), nullable=True)
+    search_radius_source = Column(String(100), nullable=True)
 
     customer = relationship("Customer", back_populates="bookings")
     driver = relationship("Driver", back_populates="bookings")
@@ -174,6 +176,12 @@ class Booking(Base):
         back_populates="booking",
         cascade="all, delete-orphan",
         order_by="BookingStop.order_index",
+    )
+    dispatch_logs = relationship(
+        "BookingDispatchLog",
+        back_populates="booking",
+        cascade="all, delete-orphan",
+        order_by="BookingDispatchLog.id",
     )
 
 
@@ -260,3 +268,24 @@ class BookingMessage(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     booking = relationship("Booking")
+
+
+class BookingDispatchLog(Base):
+    __tablename__ = "booking_dispatch_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    booking_id = Column(Integer, ForeignKey("bookings.id", ondelete="CASCADE"), nullable=False, index=True)
+    driver_id = Column(Integer, ForeignKey("drivers.id", ondelete="CASCADE"), nullable=False, index=True)
+    distance_km = Column(DECIMAL(8, 2), nullable=True)
+    was_alerted = Column(Boolean, default=True, nullable=False)
+    status = Column(String(30), default="offered", nullable=False)  # offered, accepted, declined, timed_out, missed, disqualified
+    disqualification_reason = Column(String(255), nullable=True)
+    delivery_channel = Column(String(50), nullable=True)  # in_app, push, unreachable
+    driver_lat = Column(DECIMAL(10, 7), nullable=True)
+    driver_lng = Column(DECIMAL(10, 7), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    responded_at = Column(DateTime(timezone=True), nullable=True)
+
+    booking = relationship("Booking", back_populates="dispatch_logs")
+    driver = relationship("Driver")
+

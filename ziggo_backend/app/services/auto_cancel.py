@@ -59,12 +59,52 @@ async def _check_and_reset_daily_stats(db) -> None:
     await db.commit()
 
 
+async def _sweep_stale_online_drivers(db) -> None:
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    from .matching_service import strictly_busy_driver_ids
+    from .driver_wallet_service import end_online_session
+    busy_ids = await strictly_busy_driver_ids(db)
+
+    q = select(Driver).where(
+        Driver.is_online == True,
+        (Driver.last_location_update < cutoff) | (Driver.last_location_update.is_(None)),
+    )
+    if busy_ids:
+        q = q.where(~Driver.id.in_(busy_ids))
+
+    res = await db.execute(q)
+    stale_drivers = res.scalars().all()
+    if stale_drivers:
+        count = 0
+        for drv in stale_drivers:
+            drv.is_online = False
+            await end_online_session(db, drv.id)
+            count += 1
+            try:
+                await manager.publish("admin_live", "driver_status_update", {
+                    "id": drv.id,
+                    "is_online": False,
+                    "lat": float(drv.current_lat) if drv.current_lat is not None else None,
+                    "lng": float(drv.current_lng) if drv.current_lng is not None else None,
+                })
+            except Exception:
+                pass
+        await db.commit()
+        print(f"[auto_cancel] auto-offlined {count} stale driver(s) (no GPS ping in >24h)")
+
+
 async def _run_once() -> None:
     async with AsyncSessionLocal() as db:
         try:
             await _check_and_reset_daily_stats(db)
         except Exception as e:
             print(f"[auto_cancel] failed to check/reset daily stats: {e!r}")
+
+    async with AsyncSessionLocal() as db:
+        try:
+            await _sweep_stale_online_drivers(db)
+        except Exception as e:
+            print(f"[auto_cancel] failed to sweep stale online drivers: {e!r}")
 
     async with AsyncSessionLocal() as db:
         try:
@@ -226,6 +266,19 @@ async def _run_once() -> None:
                     source_kind="booking",
                     description=f"Refund — {b.booking_ref} auto-cancelled",
                 )
+
+                try:
+                    from ..models import BookingDispatchLog
+                    await db.execute(
+                        update(BookingDispatchLog)
+                        .where(
+                            BookingDispatchLog.booking_id == b.id,
+                            BookingDispatchLog.status == "offered",
+                        )
+                        .values(status="timed_out")
+                    )
+                except Exception as e:
+                    print(f"[auto_cancel] failed to update dispatch log timeout: {e}")
 
                 cq = await db.execute(
                     select(Customer).where(Customer.id == b.customer_id)

@@ -81,11 +81,16 @@
     </script>
     {% endif %}
 
+    <div class="flex items-center justify-between">
+        <p class="text-xs text-ziggo-muted font-bold"><i class="fas fa-grip-vertical mr-1 text-gray-400"></i> Drag &amp; drop rows to change display order</p>
+    </div>
+
     <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
         <table class="w-full text-sm">
             <thead class="bg-gray-50 text-xs font-black uppercase text-gray-500 tracking-wider">
                 <tr>
+                    <th class="px-4 py-3 w-10"></th>
                     <th class="px-4 py-3 text-left">District</th>
                     <th class="px-4 py-3 text-left">Vehicle</th>
                     <th class="px-4 py-3 text-right">Per-KM rate</th>
@@ -95,9 +100,12 @@
                     <th class="px-4 py-3"></th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-100">
+            <tbody id="districtFaresTbody" class="divide-y divide-gray-100">
                 {% for r in rows %}{% set f = r.fare %}
-                <tr class="hover:bg-gray-50">
+                <tr class="hover:bg-gray-50/50 drag-row" data-id="{{ f.id }}">
+                    <td class="px-4 py-3 w-10 text-center cursor-grab active:cursor-grabbing text-gray-400 hover:text-ziggo drag-handle" draggable="true" title="Drag to reorder">
+                        <i class="fas fa-grip-vertical"></i>
+                    </td>
                     <td class="px-4 py-3 font-bold text-ziggo">{{ f.district }}</td>
                     <td class="px-4 py-3">{{ r.vehicle }}</td>
                     <td class="px-4 py-3 text-right font-bold">
@@ -137,12 +145,131 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="7" class="p-10 text-center text-gray-400 text-sm font-bold">No district fares yet. Every trip uses national rates.</td></tr>
+                <tr><td colspan="8" class="p-10 text-center text-gray-400 text-sm font-bold">No district fares yet. Every trip uses national rates.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
         </div>
+        <div class="px-6 py-3.5 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between text-xs text-gray-500">
+            <span class="font-medium">Total <strong class="text-gray-800">{{ (rows|length)|num }}</strong> district rates</span>
+            <span class="text-[11px] font-semibold text-gray-400">Drag rows to reorder</span>
+        </div>
     </div>
     <p class="text-[11px] text-gray-400">District boundaries © OpenStreetMap contributors (ODbL).</p>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const tbody = document.getElementById('districtFaresTbody');
+    if (!tbody) return;
+
+    let dragEl = null;
+    let initialOrder = [];
+
+    function getCurrentOrder() {
+        return Array.from(tbody.querySelectorAll('tr.drag-row')).map(row => parseInt(row.dataset.id));
+    }
+
+    tbody.querySelectorAll('.drag-handle').forEach(handle => {
+        const row = handle.closest('tr.drag-row');
+        if (!row) return;
+
+        handle.addEventListener('dragstart', (e) => {
+            dragEl = row;
+            initialOrder = getCurrentOrder();
+            row.classList.add('bg-blue-50/80', 'opacity-60');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', row.dataset.id);
+        });
+
+        handle.addEventListener('dragend', () => {
+            row.classList.remove('bg-blue-50/80', 'opacity-60');
+            tbody.querySelectorAll('tr.drag-row').forEach(r => r.classList.remove('bg-gray-50/50'));
+            
+            const newOrder = getCurrentOrder();
+            if (JSON.stringify(initialOrder) !== JSON.stringify(newOrder)) {
+                saveNewDistrictOrder(newOrder);
+            }
+        });
+    });
+
+    tbody.querySelectorAll('tr.drag-row').forEach(row => {
+        row.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            
+            const target = e.target.closest('tr.drag-row');
+            if (target && target !== dragEl && target.parentNode === tbody) {
+                const rect = target.getBoundingClientRect();
+                const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
+                tbody.insertBefore(dragEl, next ? target.nextSibling : target);
+            }
+        });
+
+        row.addEventListener('dragenter', (e) => {
+            const target = e.target.closest('tr.drag-row');
+            if (target && target !== dragEl) {
+                target.classList.add('bg-gray-50/50');
+            }
+        });
+
+        row.addEventListener('dragleave', (e) => {
+            const target = e.target.closest('tr.drag-row');
+            if (target && target !== dragEl) {
+                target.classList.remove('bg-gray-50/50');
+            }
+        });
+    });
+
+    function saveNewDistrictOrder(order) {
+        showDistrictToast('Saving district rates order...', 'info');
+
+        fetch('/admin/fare-settings/districts/reorder', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ order: order })
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('Failed to save order');
+            return response.json();
+        })
+        .then(data => {
+            showDistrictToast('Order saved successfully!', 'success');
+        })
+        .catch(err => {
+            console.error(err);
+            showDistrictToast('Failed to save district rates order', 'error');
+        });
+    }
+
+    function showDistrictToast(message, type = 'info') {
+        let toast = document.getElementById('district-drag-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'district-drag-toast';
+            toast.className = 'fixed bottom-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg text-white font-bold transition-all duration-300 transform translate-y-10 opacity-0 flex items-center gap-2';
+            document.body.appendChild(toast);
+        }
+        
+        if (type === 'success') {
+            toast.className = 'fixed bottom-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg text-white font-semibold transition-all duration-300 transform translate-y-0 opacity-100 bg-emerald-500 flex items-center gap-2';
+            toast.innerHTML = '<i class="fas fa-check-circle"></i> ' + message;
+        } else if (type === 'error') {
+            toast.className = 'fixed bottom-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg text-white font-semibold transition-all duration-300 transform translate-y-0 opacity-100 bg-rose-500 flex items-center gap-2';
+            toast.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + message;
+        } else {
+            toast.className = 'fixed bottom-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg text-white font-semibold transition-all duration-300 transform translate-y-0 opacity-100 bg-blue-500 flex items-center gap-2';
+            toast.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + message;
+        }
+
+        if (type !== 'info') {
+            setTimeout(() => {
+                toast.className = 'fixed bottom-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg text-white font-semibold transition-all duration-300 transform translate-y-10 opacity-0 bg-blue-500 flex items-center gap-2';
+            }, 3000);
+        }
+    }
+});
+</script>
 {% endblock %}

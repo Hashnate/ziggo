@@ -305,6 +305,13 @@ async def update_fcm_token(
     """
     token = (payload.get("token") or "").strip() or None
     user.notification_token = token
+    if not token:
+        dq = await db.execute(select(Driver).where(Driver.user_id == user.id))
+        drv = dq.scalars().first()
+        if drv and drv.is_online:
+            drv.is_online = False
+            from ...services.driver_wallet_service import end_online_session
+            await end_online_session(db, drv.id)
     await db.commit()
     return {"ok": True, "saved": bool(token)}
 

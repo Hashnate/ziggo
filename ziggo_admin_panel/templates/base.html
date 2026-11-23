@@ -467,6 +467,9 @@
             <a href="/admin/bookings" class="sidebar-item {% if active_page == 'bookings' %}active{% endif %}">
                 <i class="fas fa-car"></i><span>Bookings</span>
             </a>
+            <a href="/admin/dispatch-tracker" class="sidebar-item {% if active_page == 'dispatch-tracker' %}active{% endif %}">
+                <i class="fas fa-satellite-dish"></i><span>Dispatch Tracker</span>
+            </a>
             <a href="/admin/drivers" class="sidebar-item {% if active_page == 'drivers' %}active{% endif %}">
                 <i class="fas fa-id-card"></i><span>Drivers</span>
             </a>
@@ -677,6 +680,7 @@
 
         <!-- Page Content -->
         <div id="mainContent" class="flex-1 overflow-y-auto px-4 sm:px-5 pt-4 pb-24 md:pb-8 space-y-4" style="padding-bottom: max(6rem, env(safe-area-inset-bottom, 24px));">
+            {% block alerts %}
             {% if request.query_params.get("error") %}
             <div class="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 flex items-start gap-3 text-sm max-w-6xl font-bold">
                 <i class="fas fa-circle-exclamation mt-0.5 shrink-0 text-red-500"></i>
@@ -695,6 +699,7 @@
                 </div>
             </div>
             {% endif %}
+            {% endblock alerts %}
             {% block content %}{% endblock %}
         </div>
     </main>
@@ -911,6 +916,15 @@
           saveScrollPosition();
         }, true);
 
+        // Hook programmatic form.submit() calls so scroll position is preserved
+        if (typeof HTMLFormElement !== 'undefined' && HTMLFormElement.prototype) {
+          var origFormSubmit = HTMLFormElement.prototype.submit;
+          HTMLFormElement.prototype.submit = function () {
+            saveScrollPosition();
+            return origFormSubmit.apply(this, arguments);
+          };
+        }
+
         // Also save when unloading page
         window.addEventListener('beforeunload', function () {
           saveScrollPosition();
@@ -1072,6 +1086,7 @@
             }
           }, 5500);
         }
+        window.showToast = showToast;
 
         var lastKeystrokeTime = 0;
         var isSilentRefreshing = false;

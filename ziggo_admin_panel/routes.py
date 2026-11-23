@@ -1,6 +1,7 @@
 """Server-rendered admin panel with real DB queries + simple session auth."""
 import asyncio
 import logging
+import time
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 import os
@@ -415,7 +416,8 @@ async def require_superadmin_or_admin(request: Request, admin: User = Depends(cu
 
 
 # ---------- Auth ----------
-_FAILED_LOGIN_ATTEMPTS: dict[str, int] = {}
+_FAILED_LOGIN_ATTEMPTS: dict[str, tuple[int, float]] = {}
+_LOCKOUT_DURATION_SECONDS = 900  # 15 minutes lockout duration
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -433,11 +435,21 @@ async def admin_login_post(
     """Dev login: phone + 'admin123'. Seed script creates admin@0700000000 by default."""
     s = await _get_or_create_settings(db)
     max_attempts = s.max_login_attempts or 5
-    attempts = _FAILED_LOGIN_ATTEMPTS.get(phone_number, 0)
+    now = time.time()
+    entry = _FAILED_LOGIN_ATTEMPTS.get(phone_number)
+    if entry:
+        attempts, last_attempt = entry
+        if now - last_attempt > _LOCKOUT_DURATION_SECONDS:
+            attempts = 0
+            _FAILED_LOGIN_ATTEMPTS.pop(phone_number, None)
+    else:
+        attempts, last_attempt = 0, now
+
     if attempts >= max_attempts:
+        minutes_left = max(1, int((_LOCKOUT_DURATION_SECONDS - (now - last_attempt)) // 60) + 1)
         return templates.TemplateResponse(
             request, "login.html",
-            {"request": request, "error": "Account locked due to too many failed attempts. Contact support."},
+            {"request": request, "error": f"Account locked due to too many failed attempts. Try again in {minutes_left} minute(s) or reset password below."},
             status_code=403,
         )
 
@@ -447,14 +459,14 @@ async def admin_login_post(
     user = q.scalars().first()
     expected = user.password if (user and user.password) else "admin123"
     if not user or password != expected:
-        _FAILED_LOGIN_ATTEMPTS[phone_number] = attempts + 1
+        _FAILED_LOGIN_ATTEMPTS[phone_number] = (attempts + 1, now)
         return templates.TemplateResponse(
             request, "login.html",
             {"request": request, "error": "Invalid credentials"},
             status_code=401,
         )
     
-    _FAILED_LOGIN_ATTEMPTS[phone_number] = 0
+    _FAILED_LOGIN_ATTEMPTS.pop(phone_number, None)
     resp = RedirectResponse(url="/admin/dashboard", status_code=303)
     timeout_mins = s.session_timeout_minutes or 30
     resp.set_cookie(SESSION_COOKIE, _make_session(user.id), httponly=True, max_age=60 * timeout_mins)
@@ -515,6 +527,7 @@ async def admin_forgot_password_reset(
     
     user.password = new_password
     await db.commit()
+    _FAILED_LOGIN_ATTEMPTS.pop(phone_number, None)
     return {"ok": True, "message": "Password reset successful"}
 
 
@@ -666,6 +679,54 @@ async def admin_dashboard(
 
 DRIVER_GENDER_FILTERS = ("lady", "female", "male", "unknown")
 _on_scooter = func.lower(func.trim(Driver.vehicle_type)) == LADY_DRIVER_SERVICE
+
+DRIVER_REQUIRED_FIELDS = [
+    ("full_name", "Full Name", lambda d, u: bool(u and u.full_name and u.full_name.strip())),
+    ("photo", "Profile Photo", lambda d, u: bool((u and u.profile_photo) or (d and d.vehicle_photo_url))),
+    ("nic_number", "NIC Number", lambda d, u: bool(d and d.nic_number and d.nic_number.strip())),
+    ("license_number", "Driving License", lambda d, u: bool(d and d.license_number and d.license_number.strip())),
+    ("vehicle_type", "Vehicle Type", lambda d, u: bool(d and d.vehicle_type and d.vehicle_type.strip())),
+    ("vehicle_number", "Vehicle Plate No", lambda d, u: bool(d and d.vehicle_number and d.vehicle_number.strip())),
+    ("vehicle_model", "Vehicle Model", lambda d, u: bool(d and d.vehicle_model and d.vehicle_model.strip())),
+    ("vehicle_color", "Vehicle Color", lambda d, u: bool(d and d.vehicle_color and d.vehicle_color.strip())),
+]
+
+DRIVER_REQUIRED_DOCS = [
+    ("nic_front", "NIC Front"),
+    ("nic_back", "NIC Back"),
+    ("license_front", "Driving License Front"),
+    ("license_back", "Driving License Back"),
+    ("insurance", "Insurance"),
+    ("year_license", "Revenue License"),
+    ("vehicle_front", "Vehicle Photo (Front)"),
+    ("vehicle_back", "Vehicle Photo (Back)"),
+]
+
+
+def calculate_driver_completion(driver, user, uploaded_doc_types: set):
+    """Calculate profile fields and uploaded KYC documents completion percentage for a driver."""
+    done_fields = [label for key, label, fn in DRIVER_REQUIRED_FIELDS if fn(driver, user)]
+    missing_fields = [label for key, label, fn in DRIVER_REQUIRED_FIELDS if not fn(driver, user)]
+
+    done_docs = [label for dt, label in DRIVER_REQUIRED_DOCS if dt in uploaded_doc_types]
+    missing_docs = [label for dt, label in DRIVER_REQUIRED_DOCS if dt not in uploaded_doc_types]
+
+    total_items = len(DRIVER_REQUIRED_FIELDS) + len(DRIVER_REQUIRED_DOCS)  # 16 items
+    completed_items = len(done_fields) + len(done_docs)
+    pct = int(round((completed_items / total_items) * 100)) if total_items > 0 else 0
+
+    return {
+        "completion_pct": pct,
+        "completed_fields_count": len(done_fields),
+        "total_fields_count": len(DRIVER_REQUIRED_FIELDS),
+        "completed_docs_count": len(done_docs),
+        "total_docs_count": len(DRIVER_REQUIRED_DOCS),
+        "done_fields": done_fields,
+        "missing_fields": missing_fields,
+        "done_docs": done_docs,
+        "missing_docs": missing_docs,
+        "missing_items": missing_fields + missing_docs,
+    }
 
 
 def _driver_gender_clause(gender: str):
@@ -861,8 +922,41 @@ async def admin_drivers(
             .limit(limit)
         )
         drivers = q.scalars().all()
+
+        # Batch load uploaded KYC documents for completion calculation
+        driver_ids = [d.id for d in drivers]
+        from collections import defaultdict
+        docs_by_driver = defaultdict(set)
+        if driver_ids:
+            from app.models import DriverDocument
+            doc_rows = (await db.execute(
+                select(DriverDocument.driver_id, DriverDocument.document_type)
+                .where(
+                    DriverDocument.driver_id.in_(driver_ids),
+                    DriverDocument.document_url.isnot(None),
+                    DriverDocument.document_url != "",
+                )
+            )).all()
+            for did, dtype in doc_rows:
+                if dtype:
+                    docs_by_driver[did].add(dtype)
+
         for drv in drivers:
-            drv.settlement_amount = float(await fin.get_driver_outstanding_commission(db, drv.id))
+            comp = calculate_driver_completion(drv, drv.user, docs_by_driver.get(drv.id, set()))
+            drv.completion_pct = comp["completion_pct"]
+            drv.completed_fields_count = comp["completed_fields_count"]
+            drv.total_fields_count = comp["total_fields_count"]
+            drv.completed_docs_count = comp["completed_docs_count"]
+            drv.total_docs_count = comp["total_docs_count"]
+            drv.done_fields = comp["done_fields"]
+            drv.missing_fields = comp["missing_fields"]
+            drv.done_docs = comp["done_docs"]
+            drv.missing_docs = comp["missing_docs"]
+            drv.missing_items = comp["missing_items"]
+            if status != "incomplete":
+                drv.settlement_amount = float(await fin.get_driver_outstanding_commission(db, drv.id))
+            else:
+                drv.settlement_amount = 0.0
         applications = []
 
     start_idx = (page - 1) * limit + 1 if total > 0 else 0
@@ -968,6 +1062,24 @@ async def admin_drivers_export(
     q = await db.execute(stmt)
     drivers = q.scalars().all()
 
+    # Batch load uploaded KYC documents for completion calculation in CSV
+    driver_ids = [d.id for d in drivers]
+    from collections import defaultdict
+    docs_by_driver = defaultdict(set)
+    if driver_ids:
+        from app.models import DriverDocument
+        doc_rows = (await db.execute(
+            select(DriverDocument.driver_id, DriverDocument.document_type)
+            .where(
+                DriverDocument.driver_id.in_(driver_ids),
+                DriverDocument.document_url.isnot(None),
+                DriverDocument.document_url != "",
+            )
+        )).all()
+        for did, dtype in doc_rows:
+            if dtype:
+                docs_by_driver[did].add(dtype)
+
     def _csv_cell(val):
         if val is None:
             return ""
@@ -981,11 +1093,13 @@ async def admin_drivers_export(
     w = csv.writer(buf)
     w.writerow([
         "ID", "Name", "Phone", "Email", "NIC", "License", "Vehicle Type", "Vehicle No",
-        "Model", "Color", "Year", "Status", "Online", "Rating", "Total Rides",
+        "Model", "Color", "Year", "Status", "Completion %", "Completed Fields", "Completed Docs",
+        "Missing Items", "Online", "Rating", "Total Rides",
         "Total Earnings (Rs.)", "Joined Date", "Gender", "Female Passengers Only",
     ])
     for d in drivers:
         u = d.user
+        comp = calculate_driver_completion(d, u, docs_by_driver.get(d.id, set()))
 
         # Human-readable status accurately distinguishing drafts vs verified/pending
         if not d.vehicle_number or not d.nic_number:
@@ -1016,6 +1130,10 @@ async def admin_drivers_export(
             _csv_cell(d.vehicle_color or ""),
             _csv_cell(d.vehicle_year or ""),
             status_label,
+            f"{comp['completion_pct']}%",
+            f"{comp['completed_fields_count']}/{comp['total_fields_count']}",
+            f"{comp['completed_docs_count']}/{comp['total_docs_count']}",
+            _csv_cell(", ".join(comp["missing_items"])),
             "Yes" if d.is_online else "No",
             (u.rating if u and u.rating is not None else 0),
             (u.total_rides if u and u.total_rides is not None else 0),
@@ -2291,12 +2409,24 @@ async def admin_rider_deactivate(
 
 @router.post("/riders/{customer_id}/gender")
 async def admin_rider_gender(
+    request: Request,
     customer_id: int,
-    gender: str = Form(...),
+    gender: Optional[str] = Form(None),
     back: str = Form("/admin/riders"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
+    if not gender:
+        try:
+            body = await request.json()
+            if isinstance(body, dict):
+                gender = body.get("gender")
+                back = body.get("back", back)
+        except Exception:
+            pass
+    if not gender:
+        gender = "none"
+
     q = await db.execute(
         select(Customer).options(selectinload(Customer.user).selectinload(User.driver_profile))
         .where(Customer.id == customer_id)
@@ -2306,6 +2436,21 @@ async def admin_rider_gender(
         nic = c.user.driver_profile.nic_number if c.user.driver_profile else None
         set_admin_gender(c.user, gender if gender in ("female", "male") else ("auto" if nic else "none"), nic)
         await db.commit()
+
+    accept = request.headers.get("accept", "")
+    x_requested_with = request.headers.get("x-requested-with", "")
+    if "application/json" in accept or x_requested_with == "XMLHttpRequest":
+        if not (c and c.user):
+            return JSONResponse({"success": False, "error": "Rider not found"}, status_code=404)
+        source = c.user.gender_source
+        source_labels = {'self': 'by rider', 'admin': 'by admin', 'nic': 'from NIC'}
+        return JSONResponse({
+            "success": True,
+            "gender": c.user.gender,
+            "gender_source": source,
+            "gender_source_label": source_labels.get(source, '') if source else ''
+        })
+
     return RedirectResponse(url=back if back.startswith("/admin/riders") else "/admin/riders", status_code=303)
 
 
@@ -2852,6 +2997,230 @@ async def admin_cancel_booking(
         "status": "cancelled",
         "message": f"Booking {b.booking_ref} has been cancelled successfully.",
     })
+
+
+@router.get("/bookings/{booking_id}/dispatch-logs")
+async def get_booking_dispatch_logs(
+    booking_id: int,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(current_admin),
+):
+    from fastapi.responses import JSONResponse
+    from app.models import Booking, Customer, Driver, BookingDispatchLog, Notification
+    from sqlalchemy.orm import selectinload
+
+    q = await db.execute(
+        select(Booking)
+        .options(
+            selectinload(Booking.customer).selectinload(Customer.user),
+            selectinload(Booking.driver).selectinload(Driver.user),
+        )
+        .where(Booking.id == booking_id)
+    )
+    b = q.scalars().first()
+    if not b:
+        return JSONResponse({"ok": False, "detail": "Booking not found"}, status_code=404)
+
+    logs_q = await db.execute(
+        select(BookingDispatchLog)
+        .options(selectinload(BookingDispatchLog.driver).selectinload(Driver.user))
+        .where(BookingDispatchLog.booking_id == booking_id)
+        .order_by(BookingDispatchLog.id.asc())
+    )
+    logs = logs_q.scalars().all()
+
+    alerted_drivers = []
+    skipped_drivers = []
+
+    if logs:
+        for l in logs:
+            drv = l.driver
+            u = drv.user if drv else None
+            drv_name = (u.full_name or u.phone_number) if u else f"Driver #{l.driver_id}"
+            drv_phone = u.phone_number if u else "-"
+            veh_info = f"{drv.vehicle_type or 'Vehicle'} • {drv.vehicle_number or ''}" if drv else "-"
+            
+            resp_sec = None
+            if l.responded_at and l.created_at:
+                resp_sec = max(0, int((l.responded_at - l.created_at).total_seconds()))
+
+            rec = {
+                "driver_id": l.driver_id,
+                "name": drv_name,
+                "phone": drv_phone,
+                "vehicle": veh_info,
+                "distance_km": float(l.distance_km) if l.distance_km is not None else None,
+                "status": l.status,
+                "delivery_channel": getattr(l, "delivery_channel", None),
+                "disqualification_reason": l.disqualification_reason,
+                "offered_at": l.created_at.isoformat() if l.created_at else None,
+                "responded_at": l.responded_at.isoformat() if l.responded_at else None,
+                "responded_seconds": resp_sec,
+            }
+            if l.was_alerted:
+                alerted_drivers.append(rec)
+            else:
+                skipped_drivers.append(rec)
+    else:
+        # Fallback for historical bookings: check Notification table
+        notifs_q = await db.execute(
+            select(Notification)
+            .where(
+                Notification.type.in_(("ride_request", "next_ride_request")),
+                Notification.data.like(f'%"booking_id":{booking_id}%'),
+            )
+            .order_by(Notification.id.asc())
+        )
+        notifs = notifs_q.scalars().all()
+        for n in notifs:
+            dq = await db.execute(
+                select(Driver).options(selectinload(Driver.user)).where(Driver.user_id == n.user_id)
+            )
+            drv = dq.scalars().first()
+            u = drv.user if drv else None
+            drv_name = (u.full_name or u.phone_number) if u else f"User #{n.user_id}"
+            drv_phone = u.phone_number if u else "-"
+            veh_info = f"{drv.vehicle_type or 'Vehicle'} • {drv.vehicle_number or ''}" if drv else "-"
+            st = "accepted" if b.driver_id and drv and b.driver_id == drv.id else "offered"
+            alerted_drivers.append({
+                "driver_id": drv.id if drv else None,
+                "name": drv_name,
+                "phone": drv_phone,
+                "vehicle": veh_info,
+                "distance_km": None,
+                "status": st,
+                "disqualification_reason": None,
+                "offered_at": n.created_at.isoformat() if n.created_at else None,
+                "responded_at": None,
+                "responded_seconds": None,
+            })
+
+    applied_radius = float(b.applied_search_radius_km) if getattr(b, "applied_search_radius_km", None) is not None else None
+    radius_source = getattr(b, "search_radius_source", None)
+    if applied_radius is None:
+        from app.api.v1.bookings import get_search_radius_and_source
+        try:
+            plat = float(b.pickup_lat) if b.pickup_lat else None
+            plng = float(b.pickup_lng) if b.pickup_lng else None
+            applied_radius, radius_source = await get_search_radius_and_source(db, b.service_type, plat, plng)
+            radius_source = f"{radius_source} (Current config)"
+        except Exception:
+            applied_radius = 15.0
+            radius_source = "Standard Default (15 km)"
+
+    total_scanned = len(alerted_drivers) + len(skipped_drivers)
+    accepted_count = sum(1 for d in alerted_drivers if d["status"] == "accepted")
+    declined_count = sum(1 for d in alerted_drivers if d["status"] == "declined")
+    timed_out_count = sum(1 for d in alerted_drivers if d["status"] in ("timed_out", "missed"))
+
+    return JSONResponse({
+        "ok": True,
+        "booking_id": b.id,
+        "booking_ref": b.booking_ref,
+        "status": b.status.value,
+        "service_type": b.service_type,
+        "pickup_address": b.pickup_address,
+        "drop_address": b.drop_address,
+        "pickup_lat": float(b.pickup_lat) if b.pickup_lat else None,
+        "pickup_lng": float(b.pickup_lng) if b.pickup_lng else None,
+        "applied_radius_km": applied_radius,
+        "radius_source": radius_source,
+        "booked_at": b.booked_at.isoformat() if b.booked_at else None,
+        "summary": {
+            "total_evaluated": total_scanned,
+            "alerted_count": len(alerted_drivers),
+            "skipped_count": len(skipped_drivers),
+            "accepted_count": accepted_count,
+            "declined_count": declined_count,
+            "timed_out_count": timed_out_count,
+        },
+        "alerted_drivers": alerted_drivers,
+        "skipped_drivers": skipped_drivers,
+    })
+
+
+@router.get("/dispatch-tracker", response_class=HTMLResponse)
+async def admin_dispatch_tracker(
+    request: Request,
+    booking_id: Optional[int] = None,
+    q: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(current_admin),
+):
+    from app.models import Booking, Customer, Driver
+    from sqlalchemy.orm import selectinload
+    from sqlalchemy import or_
+    import json
+
+    stmt = (
+        select(Booking)
+        .options(
+            selectinload(Booking.customer).selectinload(Customer.user),
+            selectinload(Booking.driver).selectinload(Driver.user),
+        )
+        .order_by(Booking.id.desc())
+        .limit(40)
+    )
+    if q and q.strip():
+        search_term = f"%{q.strip()}%"
+        stmt = (
+            select(Booking)
+            .options(
+                selectinload(Booking.customer).selectinload(Customer.user),
+                selectinload(Booking.driver).selectinload(Driver.user),
+            )
+            .where(
+                or_(
+                    Booking.booking_ref.ilike(search_term),
+                    Booking.pickup_address.ilike(search_term),
+                    Booking.drop_address.ilike(search_term),
+                )
+            )
+            .order_by(Booking.id.desc())
+            .limit(40)
+        )
+
+    res = await db.execute(stmt)
+    recent_bookings = res.scalars().all()
+
+    target_id = booking_id
+    if target_id is None and recent_bookings:
+        target_id = recent_bookings[0].id
+
+    dispatch_data = None
+    selected_b = None
+    if target_id:
+        for b in recent_bookings:
+            if b.id == target_id:
+                selected_b = b
+                break
+        if not selected_b:
+            q_single = await db.execute(
+                select(Booking)
+                .options(
+                    selectinload(Booking.customer).selectinload(Customer.user),
+                    selectinload(Booking.driver).selectinload(Driver.user),
+                )
+                .where(Booking.id == target_id)
+            )
+            selected_b = q_single.scalars().first()
+
+        if selected_b:
+            raw_resp = await get_booking_dispatch_logs(booking_id=selected_b.id, db=db, admin=admin)
+            if hasattr(raw_resp, "body"):
+                dispatch_data = json.loads(raw_resp.body.decode())
+
+    return templates.TemplateResponse(
+        "dispatch_tracker.html",
+        {
+            "request": request,
+            "active_page": "dispatch-tracker",
+            "recent_bookings": recent_bookings,
+            "selected_booking": selected_b,
+            "dispatch_data": dispatch_data,
+            "search_q": q or "",
+        },
+    )
 
 
 
@@ -3559,7 +3928,7 @@ async def admin_district_fares(
     national_per_km = {f.service_type: float(f.per_km_rate or 0) for f in services}
     names = {f.service_type: f.display_name or f.service_type for f in services}
     fares = (await db.execute(select(DistrictFare).order_by(
-        desc(DistrictFare.id)))).scalars().all()
+        DistrictFare.display_order.asc(), desc(DistrictFare.id)))).scalars().all()
     today = today_lk()
     rows = [{"fare": f, "status": _district_fare_status(f, today),
              "days_left": (f.end_date - today).days + 1 if f.end_date else None,
@@ -3648,6 +4017,9 @@ async def admin_district_fares_save(
     if clash:
         return fail(clash)
     if f.id is None:
+        max_order_q = await db.execute(select(func.max(DistrictFare.display_order)))
+        max_order = max_order_q.scalar()
+        f.display_order = (max_order + 1) if max_order is not None else 0
         db.add(f)
     await db.commit()
     return RedirectResponse(url="/admin/fare-settings/districts", status_code=303)
@@ -3687,6 +4059,27 @@ async def admin_district_fare_delete(
         await db.delete(f)
         await db.commit()
     return RedirectResponse(url="/admin/fare-settings/districts", status_code=303)
+
+
+class ReorderDistrictFaresRequest(BaseModel):
+    order: list[int]
+
+
+@router.post("/fare-settings/districts/reorder")
+async def admin_district_fares_reorder(
+    payload: ReorderDistrictFaresRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    from app.models import DistrictFare
+
+    for index, fare_id in enumerate(payload.order):
+        q = await db.execute(select(DistrictFare).where(DistrictFare.id == fare_id))
+        f = q.scalars().first()
+        if f:
+            f.display_order = index
+    await db.commit()
+    return {"status": "success"}
 
 
 # ---------- System settings (admin → Settings) ----------

@@ -149,6 +149,7 @@ class DistrictFare(Base):
     start_date = Column(Date)                # None = no start limit
     end_date = Column(Date)                  # None = no end limit
     is_active = Column(Boolean, nullable=False, default=True)
+    display_order = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

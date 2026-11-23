@@ -74,12 +74,12 @@ def _gen_ref() -> str:
     return "ZG" + secrets.token_hex(4).upper()
 
 
-async def get_search_radius_for_service(
+async def get_search_radius_and_source(
     db: AsyncSession,
     service_type: Optional[str],
     pickup_lat: Optional[float] = None,
     pickup_lng: Optional[float] = None,
-) -> float:
+) -> tuple[float, str]:
     if pickup_lat is not None and pickup_lng is not None and service_type:
         from ...services.zone_pricing_service import find_custom_zone_for_point
         custom_zone = await find_custom_zone_for_point(db, pickup_lat, pickup_lng)
@@ -90,7 +90,8 @@ async def get_search_radius_for_service(
                 try:
                     val = float(zone_rate["search_radius_km"])
                     if val > 0:
-                        return val
+                        z_name = getattr(custom_zone, "name", None) or f"Zone #{custom_zone.id}"
+                        return val, f"Custom Zone: {z_name}"
                 except (ValueError, TypeError):
                     pass
 
@@ -108,14 +109,25 @@ async def get_search_radius_for_service(
         )
         fs = q.scalars().first()
         if fs and fs.search_radius_km is not None and fs.search_radius_km > 0:
-            return float(fs.search_radius_km)
+            c_name = fs.display_name or fs.service_type
+            return float(fs.search_radius_km), f"Vehicle Category: {c_name}"
 
     ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
     ss = ss_q.scalars().first()
     if ss and ss.driver_search_radius_km is not None and ss.driver_search_radius_km > 0:
-        return float(ss.driver_search_radius_km)
+        return float(ss.driver_search_radius_km), "Global System Settings"
 
-    return 15.0
+    return 15.0, "Default Fallback (15.0 km)"
+
+
+async def get_search_radius_for_service(
+    db: AsyncSession,
+    service_type: Optional[str],
+    pickup_lat: Optional[float] = None,
+    pickup_lng: Optional[float] = None,
+) -> float:
+    radius, _ = await get_search_radius_and_source(db, service_type, pickup_lat, pickup_lng)
+    return radius
 
 
 async def _lady_drivers_nearby(db: AsyncSession, lat: float, lng: float, service_type: str,
@@ -869,7 +881,9 @@ async def create_booking(
     # can carry a small parcel). Rides keep the strict vehicle-type filter.
     dispatch_vehicle = None if (req.is_flash or req.is_courier) else req.service_type
 
-    max_radius = await get_search_radius_for_service(db, dispatch_vehicle, req.pickup_lat, req.pickup_lng)
+    max_radius, radius_source = await get_search_radius_and_source(db, dispatch_vehicle, req.pickup_lat, req.pickup_lng)
+    booking.applied_search_radius_km = max_radius
+    booking.search_radius_source = radius_source
 
     is_scheduled_future = False
     if booking.scheduled_at is not None:
@@ -878,6 +892,7 @@ async def create_booking(
         is_scheduled_future = sched > now_naive + timedelta(minutes=2)
 
     nearby = []
+    audit_records = []
     if not is_scheduled_future:
         nearby = await find_all_nearby_drivers(
             db,
@@ -886,6 +901,7 @@ async def create_booking(
             dispatch_vehicles(booking),
             max_distance_km=max_radius,
             allow_back_to_back=not (booking.is_flash or booking.is_courier or booking.is_rental),
+            audit_records=audit_records,
         )
         # Only ride-type drivers receive ride-hailing/parcel booking dispatches
         nearby = [d for d in nearby if getattr(d, 'driver_type', 'ride') == 'ride']
@@ -908,6 +924,34 @@ async def create_booking(
             db, nearby, user.gender, booking.lady_driver_requested,
             is_passenger_trip(booking.is_flash, booking.is_courier),
         )
+
+        dispatch_log_map = {}
+        try:
+            from ...models import BookingDispatchLog
+            alerted_driver_ids = {d.id for d in nearby}
+            seen_drivers = set()
+            for rec in audit_records:
+                d_id = rec.get("driver_id")
+                if not d_id or d_id in seen_drivers:
+                    continue
+                seen_drivers.add(d_id)
+                is_alerted = d_id in alerted_driver_ids
+                st_val = "offered" if is_alerted else "disqualified"
+                reas_val = None if is_alerted else (rec.get("disqualification_reason") or "Filtered out")
+                log_entry = BookingDispatchLog(
+                    booking_id=booking.id,
+                    driver_id=d_id,
+                    distance_km=rec.get("distance_km"),
+                    was_alerted=is_alerted,
+                    status=st_val,
+                    disqualification_reason=reas_val,
+                    driver_lat=rec.get("driver_lat"),
+                    driver_lng=rec.get("driver_lng"),
+                )
+                db.add(log_entry)
+                dispatch_log_map[d_id] = log_entry
+        except Exception as e:
+            print(f"[dispatch-log] failed to record audit entries: {e}")
     if booking.is_courier:
         n_title = "New courier delivery"
         n_body = (
@@ -987,7 +1031,19 @@ async def create_booking(
                 "is_back_to_back": is_b2b,
                 "current_drop_address": curr_drop,
             }
-            await manager.send(driver.user_id, "new_ride_request", driver_payload)
+            ws_res = await manager.send(driver.user_id, "new_ride_request", driver_payload)
+            delivered = ws_res.get("delivered", 0) if isinstance(ws_res, dict) else 0
+            u = getattr(driver, "user", None)
+            has_token = bool(u and u.notification_token and u.notification_token.strip())
+            channel = "in_app" if delivered > 0 else ("push" if has_token else "unreachable")
+
+            log_entry = dispatch_log_map.get(driver.id) if "dispatch_log_map" in locals() else None
+            if log_entry:
+                log_entry.delivery_channel = channel
+                if channel == "unreachable":
+                    log_entry.was_alerted = False
+                    log_entry.status = "unreachable"
+                    log_entry.disqualification_reason = "Device unreachable (App closed & no push token)"
             req_title = "Next ride request" if is_b2b else n_title
             req_body = (
                 f"Next ride: {n_body} (starts after current drop-off)"
@@ -1540,6 +1596,28 @@ async def accept_booking(
     b.driver_id = driver.id
     b.status = BookingStatus.ACCEPTED
     b.accepted_at = now
+
+    try:
+        from ...models import BookingDispatchLog
+        await db.execute(
+            update(BookingDispatchLog)
+            .where(
+                BookingDispatchLog.booking_id == booking_id,
+                BookingDispatchLog.driver_id == driver.id,
+            )
+            .values(status="accepted", responded_at=now)
+        )
+        await db.execute(
+            update(BookingDispatchLog)
+            .where(
+                BookingDispatchLog.booking_id == booking_id,
+                BookingDispatchLog.driver_id != driver.id,
+                BookingDispatchLog.status == "offered",
+            )
+            .values(status="missed")
+        )
+    except Exception as e:
+        print(f"[dispatch-log] failed to update accepted dispatch log: {e}")
     
     if is_b2b:
         curr_b_q = await db.execute(
@@ -1697,12 +1775,28 @@ async def decline_booking(
     """
     if user.role != UserRole.DRIVER:
         raise HTTPException(status_code=403, detail="Driver role required")
-    await _get_driver(db, user)
+    driver = await _get_driver(db, user)
 
     q = await db.execute(select(Booking).where(Booking.id == booking_id))
     b = q.scalars().first()
     if not b:
         raise HTTPException(status_code=404, detail="Booking not found")
+
+    try:
+        from ...models import BookingDispatchLog
+        now_utc = datetime.now(timezone.utc)
+        await db.execute(
+            update(BookingDispatchLog)
+            .where(
+                BookingDispatchLog.booking_id == booking_id,
+                BookingDispatchLog.driver_id == driver.id,
+            )
+            .values(status="declined", responded_at=now_utc)
+        )
+        await db.commit()
+    except Exception as e:
+        print(f"[dispatch-log] failed to update declined dispatch log: {e}")
+
     return {"ok": True, "status": b.status.value}
 
 

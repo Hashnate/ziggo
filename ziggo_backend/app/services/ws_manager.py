@@ -29,7 +29,7 @@ class WSManager:
             if not self._connections[user_id]:
                 self._connections.pop(user_id, None)
 
-    async def send(self, user_id: int, event: str, payload: dict) -> None:
+    async def send(self, user_id: int, event: str, payload: dict) -> dict:
         async with self._lock:
             targets = list(self._connections.get(user_id, ()))
         msg = json.dumps({"event": event, "data": payload}, default=str)
@@ -46,11 +46,19 @@ class WSManager:
         # Piggyback FCM so the user still gets notified when their WS is dead
         # (app killed, phone asleep, carrier NAT closed the socket). Safe
         # no-op when Firebase isn't configured.
+        fcm_dispatched = False
         try:
             from . import fcm_service
             fcm_service.fire_and_forget(user_id, event, payload)
+            fcm_dispatched = True
         except Exception:
             pass
+
+        return {
+            "sockets": len(targets),
+            "delivered": delivered,
+            "fcm_dispatched": fcm_dispatched,
+        }
 
     async def broadcast(self, user_ids, event: str, payload: dict) -> None:
         for uid in user_ids:

@@ -140,7 +140,7 @@
 <!-- View Tabs -->
 <div class="flex border-b border-gray-200 mb-6 gap-6">
     <span class="pb-3 text-sm font-black border-b-2 border-ziggo text-ziggo">
-        Registered Riders ({{ stats.total_riders }})
+        Registered Riders ({{ stats.total_riders|num }})
     </span>
 </div>
 
@@ -151,7 +151,7 @@
     <div class="rider-stat-card rsc-blue">
         <div class="rsc-icon blue"><i class="fas fa-users"></i></div>
         <div>
-            <div class="rsc-val">{{ total_riders }}</div>
+            <div class="rsc-val">{{ total_riders|num }}</div>
             <div class="rsc-lbl">Total Riders</div>
         </div>
     </div>
@@ -159,7 +159,7 @@
     <div class="rider-stat-card rsc-green">
         <div class="rsc-icon green"><i class="fas fa-user-check"></i></div>
         <div>
-            <div class="rsc-val">{{ active_riders }}</div>
+            <div class="rsc-val">{{ active_riders|num }}</div>
             <div class="rsc-lbl">Active</div>
         </div>
     </div>
@@ -167,7 +167,7 @@
     <div class="rider-stat-card rsc-red">
         <div class="rsc-icon red"><i class="fas fa-user-slash"></i></div>
         <div>
-            <div class="rsc-val">{{ inactive_riders }}</div>
+            <div class="rsc-val">{{ inactive_riders|num }}</div>
             <div class="rsc-lbl">Inactive</div>
         </div>
     </div>
@@ -186,7 +186,7 @@
     <div class="rider-stat-card rsc-blue">
         <div class="rsc-icon blue"><i class="fas fa-user-tag"></i></div>
         <div>
-            <div class="rsc-val">{{ stats.total_preregs }}</div>
+            <div class="rsc-val">{{ stats.total_preregs|num }}</div>
             <div class="rsc-lbl">Total Preregistrations</div>
         </div>
     </div>
@@ -202,7 +202,7 @@
     <div class="rider-stat-card rsc-green">
         <div class="rsc-icon green"><i class="fas fa-check-double"></i></div>
         <div>
-            <div class="rsc-val">{{ stats.total_preregs - stats.unread_preregs }}</div>
+            <div class="rsc-val">{{ (stats.total_preregs - stats.unread_preregs)|num }}</div>
             <div class="rsc-lbl">Processed</div>
         </div>
     </div>
@@ -327,6 +327,7 @@
                     <th class="px-5 py-3">Rider</th>
                     <th class="px-5 py-3">Email</th>
                     <th class="px-5 py-3">Phone</th>
+                    <th class="px-5 py-3">Gender</th>
                     <th class="px-5 py-3">Joined</th>
                     <th class="px-5 py-3 text-center">Rides</th>
                     <th class="px-5 py-3">Wallet</th>
@@ -355,6 +356,21 @@
                     </td>
                     <td class="px-5 py-3 text-sm text-gray-500">{{ c.user.email or '—' }}</td>
                     <td class="px-5 py-3 text-sm font-semibold text-gray-700">{{ c.user.phone_number or '—' }}</td>
+                    <td class="px-5 py-3">
+                        <form method="post" action="/admin/riders/{{ c.id }}/gender" class="flex items-center gap-1.5"
+                              onsubmit="return false;">
+                            <input type="hidden" name="back" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                            <select name="gender"
+                                    data-current-val="{{ c.user.gender or 'none' }}"
+                                    onchange="handleRiderGenderChange(this)"
+                                    class="text-xs font-bold border border-gray-200 rounded-lg px-2 py-1 bg-white cursor-pointer transition-all duration-150 focus:outline-none focus:ring-1 focus:ring-ziggo">
+                                <option value="none" {% if not c.user.gender %}selected{% endif %}>Not set</option>
+                                <option value="female" {% if c.user.gender == 'female' %}selected{% endif %}>Female</option>
+                                <option value="male" {% if c.user.gender == 'male' %}selected{% endif %}>Male</option>
+                            </select>
+                            <span class="gender-source-badge text-[10px] text-gray-400 font-bold" title="Who set it">{% if c.user.gender_source %}{{ {'self': 'by rider', 'admin': 'by admin', 'nic': 'from NIC'}[c.user.gender_source] or '' }}{% endif %}</span>
+                        </form>
+                    </td>
                     <td class="px-5 py-3 text-xs text-gray-400 whitespace-nowrap">
                         {{ c.user.created_at|colombo_dt("%b %d, %Y") if c.user.created_at else '—' }}
                     </td>
@@ -404,7 +420,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="8">
+                    <td colspan="9">
                         <div class="empty-state">
                             <div class="icon"><i class="fas fa-users"></i></div>
                             <p>No riders found{% if search or status != 'all' %} matching your filters{% endif %}.</p>
@@ -425,7 +441,7 @@
     <div class="px-5 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50/40">
         <p class="text-xs text-gray-400 font-medium">
             Showing <strong class="text-ziggo">{{ start_idx }}–{{ end_idx }}</strong> of
-            <strong class="text-ziggo">{{ total_riders }}</strong> {% if view == 'preregistrations' %}preregistrations{% else %}riders{% endif %}
+            <strong class="text-ziggo">{{ total_riders|num }}</strong> {% if view == 'preregistrations' %}preregistrations{% else %}riders{% endif %}
         </p>
         <div class="flex items-center gap-1">
             {% if page > 1 %}
@@ -464,13 +480,94 @@
     <div class="px-5 py-3 border-t border-gray-100">
         <p class="text-xs text-gray-400">
             {% if view == 'preregistrations' %}
-                {{ preregistrations | length }} preregistration{{ '' if preregistrations|length == 1 else 's' }} shown
+                {{ (preregistrations | length)|num }} preregistration{{ '' if preregistrations|length == 1 else 's' }} shown
             {% else %}
-                {{ riders | length }} rider{{ '' if riders|length == 1 else 's' }} shown
+                {{ (riders | length)|num }} rider{{ '' if riders|length == 1 else 's' }} shown
             {% endif %}
         </p>
     </div>
     {% endif %}
 
 </div><!-- /main card -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function handleRiderGenderChange(selectEl) {
+    const prevVal = selectEl.dataset.currentVal || 'none';
+    const newVal = selectEl.value;
+
+    if (newVal === prevVal) return;
+
+    if (!confirm("Change this rider's gender?")) {
+        selectEl.value = prevVal;
+        return;
+    }
+
+    const form = selectEl.closest('form');
+    const badgeEl = form.querySelector('.gender-source-badge');
+
+    // Visual loading state without disabling input so form state remains accessible
+    selectEl.classList.add('opacity-50');
+    selectEl.style.pointerEvents = 'none';
+
+    try {
+        const params = new URLSearchParams();
+        params.append('gender', newVal);
+        const backInput = form.querySelector('input[name="back"]');
+        if (backInput && backInput.value) {
+            params.append('back', backInput.value);
+        }
+
+        const res = await fetch(form.action, {
+            method: 'POST',
+            body: params,
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+
+        if (!res.ok) {
+            throw new Error('HTTP ' + res.status);
+        }
+
+        const data = await res.json();
+        if (data.success) {
+            selectEl.dataset.currentVal = newVal;
+
+            // Flash green border to confirm successful save
+            selectEl.classList.remove('border-gray-200');
+            selectEl.classList.add('border-emerald-500', 'bg-emerald-50');
+            setTimeout(() => {
+                selectEl.classList.remove('border-emerald-500', 'bg-emerald-50');
+                selectEl.classList.add('border-gray-200');
+            }, 1200);
+
+            if (badgeEl) {
+                badgeEl.textContent = data.gender_source_label || (newVal !== 'none' ? 'by admin' : '');
+            }
+
+            if (typeof window.showToast === 'function') {
+                window.showToast({
+                    type: 'booking-complete',
+                    title: 'Gender Updated',
+                    message: 'Rider gender saved successfully.',
+                    icon: 'fa-check'
+                });
+            }
+        } else {
+            throw new Error(data.error || 'Update failed');
+        }
+    } catch (err) {
+        console.error('Failed to update rider gender:', err);
+        selectEl.value = prevVal;
+        alert('Could not update rider gender. Please try again.');
+    } finally {
+        selectEl.classList.remove('opacity-50');
+        selectEl.style.pointerEvents = '';
+    }
+}
+</script>
 {% endblock %}

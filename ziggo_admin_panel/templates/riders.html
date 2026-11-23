@@ -358,16 +358,17 @@
                     <td class="px-5 py-3 text-sm font-semibold text-gray-700">{{ c.user.phone_number or '—' }}</td>
                     <td class="px-5 py-3">
                         <form method="post" action="/admin/riders/{{ c.id }}/gender" class="flex items-center gap-1.5"
-                              onchange="if (confirm('Change this rider\'s gender?')) this.submit(); else this.reset();">
+                              onsubmit="return false;">
                             <input type="hidden" name="back" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
-                            <select name="gender" class="text-xs font-bold border border-gray-200 rounded-lg px-2 py-1 bg-white">
+                            <select name="gender"
+                                    data-current-val="{{ c.user.gender or 'none' }}"
+                                    onchange="handleRiderGenderChange(this)"
+                                    class="text-xs font-bold border border-gray-200 rounded-lg px-2 py-1 bg-white cursor-pointer transition-all duration-150 focus:outline-none focus:ring-1 focus:ring-ziggo">
                                 <option value="none" {% if not c.user.gender %}selected{% endif %}>Not set</option>
                                 <option value="female" {% if c.user.gender == 'female' %}selected{% endif %}>Female</option>
                                 <option value="male" {% if c.user.gender == 'male' %}selected{% endif %}>Male</option>
                             </select>
-                            {% if c.user.gender_source %}
-                            <span class="text-[10px] text-gray-400 font-bold" title="Who set it">{{ {'self': 'by rider', 'admin': 'by admin', 'nic': 'from NIC'}[c.user.gender_source] or '' }}</span>
-                            {% endif %}
+                            <span class="gender-source-badge text-[10px] text-gray-400 font-bold" title="Who set it">{% if c.user.gender_source %}{{ {'self': 'by rider', 'admin': 'by admin', 'nic': 'from NIC'}[c.user.gender_source] or '' }}{% endif %}</span>
                         </form>
                     </td>
                     <td class="px-5 py-3 text-xs text-gray-400 whitespace-nowrap">
@@ -488,4 +489,85 @@
     {% endif %}
 
 </div><!-- /main card -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function handleRiderGenderChange(selectEl) {
+    const prevVal = selectEl.dataset.currentVal || 'none';
+    const newVal = selectEl.value;
+
+    if (newVal === prevVal) return;
+
+    if (!confirm("Change this rider's gender?")) {
+        selectEl.value = prevVal;
+        return;
+    }
+
+    const form = selectEl.closest('form');
+    const badgeEl = form.querySelector('.gender-source-badge');
+
+    // Visual loading state without disabling input so form state remains accessible
+    selectEl.classList.add('opacity-50');
+    selectEl.style.pointerEvents = 'none';
+
+    try {
+        const params = new URLSearchParams();
+        params.append('gender', newVal);
+        const backInput = form.querySelector('input[name="back"]');
+        if (backInput && backInput.value) {
+            params.append('back', backInput.value);
+        }
+
+        const res = await fetch(form.action, {
+            method: 'POST',
+            body: params,
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+
+        if (!res.ok) {
+            throw new Error('HTTP ' + res.status);
+        }
+
+        const data = await res.json();
+        if (data.success) {
+            selectEl.dataset.currentVal = newVal;
+
+            // Flash green border to confirm successful save
+            selectEl.classList.remove('border-gray-200');
+            selectEl.classList.add('border-emerald-500', 'bg-emerald-50');
+            setTimeout(() => {
+                selectEl.classList.remove('border-emerald-500', 'bg-emerald-50');
+                selectEl.classList.add('border-gray-200');
+            }, 1200);
+
+            if (badgeEl) {
+                badgeEl.textContent = data.gender_source_label || (newVal !== 'none' ? 'by admin' : '');
+            }
+
+            if (typeof window.showToast === 'function') {
+                window.showToast({
+                    type: 'booking-complete',
+                    title: 'Gender Updated',
+                    message: 'Rider gender saved successfully.',
+                    icon: 'fa-check'
+                });
+            }
+        } else {
+            throw new Error(data.error || 'Update failed');
+        }
+    } catch (err) {
+        console.error('Failed to update rider gender:', err);
+        selectEl.value = prevVal;
+        alert('Could not update rider gender. Please try again.');
+    } finally {
+        selectEl.classList.remove('opacity-50');
+        selectEl.style.pointerEvents = '';
+    }
+}
+</script>
 {% endblock %}

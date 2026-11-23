@@ -1,0 +1,364 @@
+{% extends "base.html" %}
+
+{% block title %}Dispatch Tracker | Ziggo Admin{% endblock %}
+{% block page_title %}Dispatch Tracker{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between pb-1">
+        <div>
+            <h1 class="text-xl font-bold text-slate-900 tracking-tight">Dispatch Tracker</h1>
+            <p class="text-xs text-slate-500 mt-0.5">Audit broadcast search radius, driver evaluations, and alert outcomes.</p>
+        </div>
+    </div>
+
+    <!-- Main Workspace (Two Columns) -->
+    <div class="flex flex-col lg:flex-row gap-4 items-start">
+        
+        <!-- Left Column: Search & Booking Selector -->
+        <div class="w-full lg:w-80 bg-white rounded-xl border border-gray-200 shadow-soft-sm overflow-hidden flex flex-col flex-shrink-0">
+            <div class="p-3 border-b border-gray-100 bg-gray-50/50">
+                <form method="GET" action="/admin/dispatch-tracker" class="relative flex items-center">
+                    <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none flex items-center justify-center z-10">
+                        <i class="fas fa-search text-xs"></i>
+                    </span>
+                    <input type="text" name="q" value="{{ search_q }}" placeholder="Search booking ref or address..." 
+                           style="padding-left: 36px !important; padding-right: 28px !important;"
+                           class="w-full text-xs rounded-lg border border-gray-200 bg-white outline-none focus:border-ziggo transition">
+                    {% if search_q %}
+                    <a href="/admin/dispatch-tracker" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs z-10">
+                        <i class="fas fa-times"></i>
+                    </a>
+                    {% endif %}
+                </form>
+            </div>
+
+            <!-- Recent Bookings List -->
+            <div class="divide-y divide-gray-100 max-h-[calc(100vh-250px)] overflow-y-auto">
+                {% if recent_bookings %}
+                    {% for b in recent_bookings %}
+                    {% set is_selected = selected_booking and selected_booking.id == b.id %}
+                    <a href="/admin/dispatch-tracker?booking_id={{ b.id }}{% if search_q %}&q={{ search_q }}{% endif %}" 
+                       class="block p-3 transition text-left {% if is_selected %}bg-blue-50/50 border-l-4 border-ziggo font-medium{% else %}hover:bg-gray-50 text-gray-700{% endif %}">
+                        <div class="flex items-center justify-between gap-1.5 mb-1">
+                            <span class="text-xs font-bold text-gray-900 font-mono">{{ b.booking_ref }}</span>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase
+                                  {% if b.status.value == 'completed' %}bg-emerald-50 text-emerald-700 border border-emerald-200/60
+                                  {% elif b.status.value == 'cancelled' %}bg-rose-50 text-rose-700 border border-rose-200/60
+                                  {% elif b.status.value in ['searching', 'accepted', 'arrived', 'started'] %}bg-amber-50 text-amber-700 border border-amber-200/60
+                                  {% else %}bg-gray-100 text-gray-600 border border-gray-200{% endif %}">
+                                {{ b.status.value }}
+                            </span>
+                        </div>
+                        <div class="text-[11px] text-gray-500 truncate">
+                            <span class="uppercase font-bold text-gray-700 mr-1">{{ b.service_type }}</span>
+                            <span>{{ b.pickup_address or 'No pickup address' }}</span>
+                        </div>
+                        <div class="flex items-center justify-between text-[10px] text-gray-400 mt-1">
+                            <span>{{ b.booked_at.strftime('%d %b, %H:%M') if b.booked_at else '-' }}</span>
+                            {% if b.final_amount %}
+                            <span class="text-gray-700 font-semibold">Rs.{{ "{:,.0f}".format(b.final_amount) }}</span>
+                            {% endif %}
+                        </div>
+                    </a>
+                    {% endfor %}
+                {% else %}
+                    <div class="p-8 text-center text-xs text-gray-400">
+                        <p>No bookings found.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Right Column: Dispatch Details & Diagnostics -->
+        <div class="flex-1 min-w-0 w-full space-y-4">
+            {% if selected_booking and dispatch_data %}
+            
+            <!-- Booking Context Card -->
+            <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-soft-sm">
+                <!-- Top Row: Ref, Status, Assigned Driver -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-gray-100">
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <h2 class="text-base font-bold text-gray-900 font-mono">{{ selected_booking.booking_ref }}</h2>
+                            <span class="px-2 py-0.5 rounded text-[11px] font-semibold uppercase
+                                  {% if selected_booking.status.value == 'completed' %}bg-emerald-50 text-emerald-700 border border-emerald-200/60
+                                  {% elif selected_booking.status.value == 'cancelled' %}bg-rose-50 text-rose-700 border border-rose-200/60
+                                  {% else %}bg-amber-50 text-amber-700 border border-amber-200/60{% endif %}">
+                                {{ selected_booking.status.value }}
+                            </span>
+                            <span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-gray-100 text-gray-700 uppercase border border-gray-200">
+                                {{ selected_booking.service_type }}
+                            </span>
+                        </div>
+                        <p class="text-xs text-gray-500">
+                            Booked on {{ selected_booking.booked_at.strftime('%d %B %Y at %I:%M %p') if selected_booking.booked_at else '-' }}
+                            {% if selected_booking.customer and selected_booking.customer.user %}
+                            • Customer: <span class="text-gray-700 font-semibold">{{ selected_booking.customer.user.full_name or selected_booking.customer.user.phone_number }}</span>
+                            {% endif %}
+                        </p>
+                    </div>
+
+                    {% if selected_booking.driver and selected_booking.driver.user %}
+                    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-xs">
+                        <span class="text-gray-500 font-medium">Assigned Driver:</span>
+                        <span class="font-bold text-gray-900">{{ selected_booking.driver.user.full_name }}</span>
+                        {% if selected_booking.driver.vehicle_number %}
+                        <span class="text-gray-500 font-mono text-[11px]">({{ selected_booking.driver.vehicle_number }})</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Radius & Route Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+                    <!-- Search Radius Card -->
+                    <div class="p-3.5 bg-gray-50/70 rounded-lg border border-gray-200">
+                        <div class="text-[10px] uppercase font-bold text-gray-400 tracking-wider mb-1">
+                            Broadcast Search Radius
+                        </div>
+                        <div class="text-2xl font-black text-gray-900 leading-tight">
+                            {{ dispatch_data.applied_radius_km if dispatch_data.applied_radius_km is not none else '--' }} <span class="text-xs font-normal text-gray-500">km</span>
+                        </div>
+                        <div class="mt-2 text-xs text-gray-600 flex items-center gap-1.5 truncate" title="{{ dispatch_data.radius_source }}">
+                            <i class="fas fa-layer-group text-gray-400 text-[10px]"></i>
+                            <span class="truncate">Source: <strong class="text-gray-800">{{ dispatch_data.radius_source or 'System Setting' }}</strong></span>
+                        </div>
+                    </div>
+
+                    <!-- Pickup & Drop-off Card -->
+                    <div class="p-3.5 bg-gray-50/70 rounded-lg border border-gray-200 md:col-span-2 flex flex-col justify-between">
+                        <div>
+                            <div class="text-[10px] uppercase font-bold text-gray-400 tracking-wider mb-1">
+                                Pickup Point (Dispatch Origin)
+                            </div>
+                            <div class="text-xs text-gray-800 font-medium truncate" title="{{ selected_booking.pickup_address }}">
+                                {{ selected_booking.pickup_address or '-' }}
+                            </div>
+                        </div>
+                        <div class="text-xs text-gray-500 pt-2 border-t border-gray-200/60 mt-2 truncate">
+                            <span class="text-gray-400 mr-1">Drop-off:</span>
+                            <span class="text-gray-700 font-medium" title="{{ selected_booking.drop_address }}">{{ selected_booking.drop_address or '-' }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Clean KPI Counters Grid (Enterprise Metric Cards) -->
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center mt-4">
+                    <div class="p-3 rounded-lg bg-white border border-gray-200 shadow-soft-sm">
+                        <div class="text-[10px] uppercase font-semibold text-gray-500 tracking-wider">Total Evaluated</div>
+                        <div class="text-xl font-black text-gray-900 mt-1">{{ dispatch_data.summary.total_evaluated or 0 }}</div>
+                    </div>
+                    <div class="p-3 rounded-lg bg-white border border-gray-200 shadow-soft-sm">
+                        <div class="text-[10px] uppercase font-semibold text-gray-500 tracking-wider">Alerts Sent</div>
+                        <div class="text-xl font-black text-blue-700 mt-1">{{ dispatch_data.summary.alerted_count or 0 }}</div>
+                    </div>
+                    <div class="p-3 rounded-lg bg-white border border-gray-200 shadow-soft-sm">
+                        <div class="text-[10px] uppercase font-semibold text-gray-500 tracking-wider">Accepted</div>
+                        <div class="text-xl font-black text-emerald-700 mt-1">{{ dispatch_data.summary.accepted_count or 0 }}</div>
+                    </div>
+                    <div class="p-3 rounded-lg bg-white border border-gray-200 shadow-soft-sm">
+                        <div class="text-[10px] uppercase font-semibold text-gray-500 tracking-wider">Declined</div>
+                        <div class="text-xl font-black {% if (dispatch_data.summary.declined_count or 0) > 0 %}text-rose-600{% else %}text-gray-900{% endif %} mt-1">
+                            {{ dispatch_data.summary.declined_count or 0 }}
+                        </div>
+                    </div>
+                    <div class="p-3 rounded-lg bg-white border border-gray-200 shadow-soft-sm col-span-2 sm:col-span-1">
+                        <div class="text-[10px] uppercase font-semibold text-gray-500 tracking-wider">Skipped / Out of Range</div>
+                        <div class="text-xl font-black text-gray-600 mt-1">{{ dispatch_data.summary.skipped_count or 0 }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabbed Driver Evaluation Tables -->
+            <div class="bg-white rounded-xl border border-gray-200 shadow-soft-sm overflow-hidden">
+                <!-- Tab Headers -->
+                <div class="flex items-center gap-6 border-b border-gray-200 px-5 pt-3 bg-gray-50/50">
+                    <button type="button" id="tabBtnAlerted" onclick="switchTab('alerted')"
+                            class="pb-3 text-xs font-bold border-b-2 border-ziggo text-ziggo flex items-center gap-2 transition">
+                        <span>Dispatched Drivers</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">
+                            {{ dispatch_data.alerted_drivers|length }}
+                        </span>
+                    </button>
+                    <button type="button" id="tabBtnSkipped" onclick="switchTab('skipped')"
+                            class="pb-3 text-xs font-semibold border-b-2 border-transparent text-gray-500 hover:text-gray-800 flex items-center gap-2 transition">
+                        <span>Skipped in Vicinity</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600">
+                            {{ dispatch_data.skipped_drivers|length }}
+                        </span>
+                    </button>
+                </div>
+
+                <!-- Tab 1: Alerted Drivers -->
+                <div id="tabContentAlerted" class="p-4">
+                    {% if dispatch_data.alerted_drivers %}
+                    <div class="border border-gray-200 rounded-lg overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-gray-50 text-gray-500 uppercase tracking-wider text-[10px] font-bold border-b border-gray-200">
+                                <tr>
+                                    <th class="px-4 py-2.5">Driver</th>
+                                    <th class="px-4 py-2.5">Vehicle</th>
+                                    <th class="px-4 py-2.5 text-center">Distance from Pickup</th>
+                                    <th class="px-4 py-2.5 text-center">Response Status</th>
+                                    <th class="px-4 py-2.5 text-right">Response Time</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 bg-white">
+                                {% for d in dispatch_data.alerted_drivers %}
+                                <tr class="hover:bg-gray-50/70 transition">
+                                    <td class="px-4 py-3">
+                                        <div class="font-bold text-gray-900">{{ d.name or 'Driver' }}</div>
+                                        <div class="text-[11px] text-gray-400 font-mono">{{ d.phone or '-' }}</div>
+                                    </td>
+                                    <td class="px-4 py-3 text-gray-600 font-medium">{{ d.vehicle or '-' }}</td>
+                                    <td class="px-4 py-3 text-center font-semibold text-gray-800">
+                                        {% if d.distance_km is not none %}{{ d.distance_km }} km{% else %}--{% endif %}
+                                    </td>
+                                    <td class="px-4 py-3 text-center">
+                                        {% if d.status == 'accepted' %}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                                            Accepted
+                                        </span>
+                                        {% elif d.status == 'declined' %}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/60">
+                                            Declined
+                                        </span>
+                                        {% elif d.status == 'timed_out' %}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/60">
+                                            Timed Out (30s)
+                                        </span>
+                                        {% elif d.status == 'missed' %}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200/60">
+                                            Claimed by Other
+                                        </span>
+                                        {% elif d.status == 'unreachable' %}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/60" title="Device unreachable: app closed & no push token">
+                                            Device Unreachable
+                                        </span>
+                                        {% else %}
+                                            {% if d.delivery_channel == 'in_app' %}
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200/60" title="Delivered to active screen in driver app">
+                                                Alert Sent (In-App)
+                                            </span>
+                                            {% elif d.delivery_channel == 'push' %}
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60" title="Sent via background push notification">
+                                                Alert Sent (Push)
+                                            </span>
+                                            {% else %}
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200/60">
+                                                Alert Sent
+                                            </span>
+                                            {% endif %}
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-4 py-3 text-right font-semibold">
+                                        {% if d.responded_seconds is not none %}
+                                        <span class="{% if d.status == 'accepted' %}text-emerald-700{% else %}text-gray-600{% endif %}">
+                                            {{ d.responded_seconds }}s
+                                        </span>
+                                        {% elif d.status == 'timed_out' %}
+                                        <span class="text-amber-700">30s timeout</span>
+                                        {% else %}
+                                        <span class="text-gray-400 font-normal">—</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="py-12 text-center text-xs text-gray-400">
+                        <p class="font-semibold text-gray-600">No drivers received alerts for this booking.</p>
+                        <p class="text-[11px] mt-1 text-gray-400">No eligible drivers were within the {{ dispatch_data.applied_radius_km }} km search radius.</p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Tab 2: Skipped Drivers -->
+                <div id="tabContentSkipped" class="p-4 hidden">
+                    {% if dispatch_data.skipped_drivers %}
+                    <div class="border border-gray-200 rounded-lg overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-gray-50 text-gray-500 uppercase tracking-wider text-[10px] font-bold border-b border-gray-200">
+                                <tr>
+                                    <th class="px-4 py-2.5">Driver</th>
+                                    <th class="px-4 py-2.5">Vehicle</th>
+                                    <th class="px-4 py-2.5 text-center">Distance from Pickup</th>
+                                    <th class="px-4 py-2.5">Reason Filtered</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 bg-white">
+                                {% for d in dispatch_data.skipped_drivers %}
+                                <tr class="hover:bg-gray-50/70 transition">
+                                    <td class="px-4 py-3">
+                                        <div class="font-bold text-gray-900">{{ d.name or 'Driver' }}</div>
+                                        <div class="text-[11px] text-gray-400 font-mono">{{ d.phone or '-' }}</div>
+                                    </td>
+                                    <td class="px-4 py-3 text-gray-600 font-medium">{{ d.vehicle or '-' }}</td>
+                                    <td class="px-4 py-3 text-center font-semibold text-gray-800">
+                                        {% if d.distance_km is not none %}{{ d.distance_km }} km{% else %}--{% endif %}
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-gray-100 text-gray-700 border border-gray-200">
+                                            {{ d.disqualification_reason or 'Filtered out' }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="py-12 text-center text-xs text-gray-400">
+                        <p class="font-semibold text-gray-600">No skipped drivers recorded in this area.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% else %}
+            <!-- Empty state when no booking selected -->
+            <div class="bg-white p-14 rounded-xl border border-gray-200 text-center">
+                <div class="w-12 h-12 rounded-xl bg-gray-100 text-gray-400 flex items-center justify-center text-lg mx-auto mb-3">
+                    <i class="fas fa-satellite-dish"></i>
+                </div>
+                <h3 class="text-sm font-bold text-gray-800">Select a Booking</h3>
+                <p class="text-xs text-gray-500 mt-1">Choose a booking from the list to view its dispatch evaluation audit.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function switchTab(tab) {
+    var tabAlerted = document.getElementById('tabContentAlerted');
+    var tabSkipped = document.getElementById('tabContentSkipped');
+    var btnAlerted = document.getElementById('tabBtnAlerted');
+    var btnSkipped = document.getElementById('tabBtnSkipped');
+
+    if (tab === 'alerted') {
+        if (tabAlerted) tabAlerted.classList.remove('hidden');
+        if (tabSkipped) tabSkipped.classList.add('hidden');
+        if (btnAlerted) {
+            btnAlerted.className = 'pb-3 text-xs font-bold border-b-2 border-ziggo text-ziggo flex items-center gap-2 transition';
+        }
+        if (btnSkipped) {
+            btnSkipped.className = 'pb-3 text-xs font-semibold border-b-2 border-transparent text-gray-500 hover:text-gray-800 flex items-center gap-2 transition';
+        }
+    } else {
+        if (tabAlerted) tabAlerted.classList.add('hidden');
+        if (tabSkipped) tabSkipped.classList.remove('hidden');
+        if (btnAlerted) {
+            btnAlerted.className = 'pb-3 text-xs font-semibold border-b-2 border-transparent text-gray-500 hover:text-gray-800 flex items-center gap-2 transition';
+        }
+        if (btnSkipped) {
+            btnSkipped.className = 'pb-3 text-xs font-bold border-b-2 border-ziggo text-ziggo flex items-center gap-2 transition';
+        }
+    }
+}
+</script>
+{% endblock %}

@@ -1,8 +1,10 @@
 """Driver matching: pick the nearest online + approved driver of the right vehicle type."""
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from ..models import (
     Driver,
@@ -227,6 +229,7 @@ async def find_all_nearby_drivers(
     max_distance_km: float = 10.0,
     exclude_driver_id: Optional[int] = None,
     allow_back_to_back: bool = False,
+    audit_records: Optional[list] = None,
 ) -> List[Driver]:
     """Return every online + approved driver within `max_distance_km` of the
     pickup, sorted nearest-first. If `vehicle_type` is set (one type, or a list
@@ -237,9 +240,13 @@ async def find_all_nearby_drivers(
     If `allow_back_to_back` is True, drivers currently in-progress with a ride
     (BookingStatus.STARTED) whose drop-off is near the pickup are also included.
     """
-    stmt = select(Driver).where(
-        Driver.is_online == True,  # noqa: E712
-        Driver.status == DriverStatus.APPROVED,
+    stmt = (
+        select(Driver)
+        .options(selectinload(Driver.user))
+        .where(
+            Driver.is_online == True,  # noqa: E712
+            Driver.status == DriverStatus.APPROVED,
+        )
     )
     if isinstance(vehicle_type, (list, tuple)):
         stmt = stmt.where(Driver.vehicle_type.in_(vehicle_type))
@@ -263,9 +270,27 @@ async def find_all_nearby_drivers(
 
     for d in candidates:
         if exclude_driver_id is not None and d.id == exclude_driver_id:
+            if audit_records is not None:
+                audit_records.append({
+                    "driver_id": d.id,
+                    "distance_km": None,
+                    "was_alerted": False,
+                    "disqualification_reason": "Excluded from ride search",
+                    "driver_lat": d.current_lat,
+                    "driver_lng": d.current_lng,
+                })
             continue
         if d.id in strictly_busy:
             skipped_busy += 1
+            if audit_records is not None:
+                audit_records.append({
+                    "driver_id": d.id,
+                    "distance_km": None,
+                    "was_alerted": False,
+                    "disqualification_reason": "Busy on active ride or delivery",
+                    "driver_lat": d.current_lat,
+                    "driver_lng": d.current_lng,
+                })
             continue
 
         if d.id in mid_trip_map:
@@ -285,11 +310,29 @@ async def find_all_nearby_drivers(
 
             if not dists:
                 skipped_no_loc += 1
+                if audit_records is not None:
+                    audit_records.append({
+                        "driver_id": d.id,
+                        "distance_km": None,
+                        "was_alerted": False,
+                        "disqualification_reason": "No GPS location available",
+                        "driver_lat": d.current_lat,
+                        "driver_lng": d.current_lng,
+                    })
                 continue
 
             dist = min(dists)
             if dist > max_distance_km:
                 too_far += 1
+                if audit_records is not None:
+                    audit_records.append({
+                        "driver_id": d.id,
+                        "distance_km": round(dist, 2),
+                        "was_alerted": False,
+                        "disqualification_reason": f"Too Far ({dist:.1f} km > {max_distance_km:.1f} km radius)",
+                        "driver_lat": d.current_lat,
+                        "driver_lng": d.current_lng,
+                    })
                 continue
 
             # Flag driver as back-to-back candidate
@@ -298,21 +341,86 @@ async def find_all_nearby_drivers(
             d._current_booking_id = current_b.id
             in_range.append((dist, d))
             b2b_count += 1
+            if audit_records is not None:
+                audit_records.append({
+                    "driver_id": d.id,
+                    "distance_km": round(dist, 2),
+                    "was_alerted": True,
+                    "disqualification_reason": None,
+                    "driver_lat": d.current_lat,
+                    "driver_lng": d.current_lng,
+                    "is_back_to_back": True,
+                })
         else:
             # Idle driver
             if d.current_lat is None or d.current_lng is None:
                 skipped_no_loc += 1
+                if audit_records is not None:
+                    audit_records.append({
+                        "driver_id": d.id,
+                        "distance_km": None,
+                        "was_alerted": False,
+                        "disqualification_reason": "No GPS location available",
+                        "driver_lat": None,
+                        "driver_lng": None,
+                    })
                 continue
             dist = haversine_km(
                 pickup_lat, pickup_lng, float(d.current_lat), float(d.current_lng)
             )
             if dist > max_distance_km:
                 too_far += 1
+                if audit_records is not None:
+                    audit_records.append({
+                        "driver_id": d.id,
+                        "distance_km": round(dist, 2),
+                        "was_alerted": False,
+                        "disqualification_reason": f"Too Far ({dist:.1f} km > {max_distance_km:.1f} km radius)",
+                        "driver_lat": d.current_lat,
+                        "driver_lng": d.current_lng,
+                    })
                 continue
             d._is_back_to_back = False
             d._current_drop_address = None
             d._current_booking_id = None
             in_range.append((dist, d))
+            if audit_records is not None:
+                audit_records.append({
+                    "driver_id": d.id,
+                    "distance_km": round(dist, 2),
+                    "was_alerted": True,
+                    "disqualification_reason": None,
+                    "driver_lat": d.current_lat,
+                    "driver_lng": d.current_lng,
+                    "is_back_to_back": False,
+                })
+
+    if audit_records is not None:
+        try:
+            stmt_off = select(Driver).where(
+                Driver.is_online == False,  # noqa: E712
+                Driver.status == DriverStatus.APPROVED,
+                Driver.current_lat.is_not(None),
+                Driver.current_lng.is_not(None),
+            )
+            if isinstance(vehicle_type, (list, tuple)):
+                stmt_off = stmt_off.where(Driver.vehicle_type.in_(vehicle_type))
+            elif vehicle_type:
+                stmt_off = stmt_off.where(Driver.vehicle_type == vehicle_type)
+            q_off = await db.execute(stmt_off)
+            for d_off in q_off.scalars().all():
+                d_dist = haversine_km(pickup_lat, pickup_lng, float(d_off.current_lat), float(d_off.current_lng))
+                if d_dist <= max(max_distance_km * 2.0, 10.0):
+                    audit_records.append({
+                        "driver_id": d_off.id,
+                        "distance_km": round(d_dist, 2),
+                        "was_alerted": False,
+                        "disqualification_reason": f"Offline ({d_dist:.1f} km away)",
+                        "driver_lat": d_off.current_lat,
+                        "driver_lng": d_off.current_lng,
+                    })
+        except Exception as e:
+            print(f"[match-all] offline audit error: {e}")
 
     in_range.sort(key=lambda t: t[0])
     print(

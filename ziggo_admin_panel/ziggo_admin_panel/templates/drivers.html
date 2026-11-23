@@ -25,27 +25,28 @@
 </style>
 {% endblock %}
 
-{% block content %}
-<!-- Error / Success Alerts -->
+{% block alerts %}
 {% if request.query_params.get('error') %}
-<div class="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-bold flex items-center gap-2">
+<div class="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-bold flex items-center gap-2">
     <i class="fas fa-exclamation-circle text-red-500"></i>
     <span>{{ request.query_params.get('error') }}</span>
 </div>
 {% endif %}
 {% if request.query_params.get('success') %}
-<div class="mb-6 p-4 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm font-bold flex items-center gap-2">
+<div class="p-4 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm font-bold flex items-center gap-2">
     <i class="fas fa-check-circle text-green-500"></i>
     <span>{{ request.query_params.get('success') }}</span>
 </div>
 {% endif %}
+{% endblock alerts %}
 
+{% block content %}
 <!-- View Tabs -->
 <div class="flex border-b border-gray-200 mb-6 gap-6">
     {% if status == 'incomplete' %}
     <a href="/admin/drivers?status=all" class="pb-3 text-sm font-bold text-gray-400 hover:text-ziggo transition flex items-center gap-1.5">
         <span>Registered Drivers</span>
-        <span class="px-2 py-0.5 rounded-full text-xs font-black bg-gray-100 text-gray-600">{{ stats.total }}</span>
+        <span class="px-2 py-0.5 rounded-full text-xs font-black bg-gray-100 text-gray-600">{{ stats.total|num }}</span>
     </a>
     <a href="/admin/drivers?status=incomplete" class="pb-3 text-sm font-black border-b-2 border-ziggo text-ziggo flex items-center gap-1.5">
         <span>Incomplete Signups</span>
@@ -54,7 +55,7 @@
     {% else %}
     <a href="/admin/drivers?status=all" class="pb-3 text-sm font-black border-b-2 border-ziggo text-ziggo flex items-center gap-1.5">
         <span>Registered Drivers</span>
-        <span class="px-2 py-0.5 rounded-full text-xs font-black bg-blue-100 text-blue-700">{{ stats.total }}</span>
+        <span class="px-2 py-0.5 rounded-full text-xs font-black bg-blue-100 text-blue-700">{{ stats.total|num }}</span>
     </a>
     {% if stats.incomplete and stats.incomplete > 0 %}
     <a href="/admin/drivers?status=incomplete" class="pb-3 text-sm font-bold text-gray-400 hover:text-amber-600 transition flex items-center gap-1.5">
@@ -67,7 +68,7 @@
 
 <!-- Driver Stats Bar -->
 {% if view != 'applications' %}
-<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+<div class="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
     <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
         <div class="flex items-center justify-between mb-4">
             <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
@@ -75,27 +76,27 @@
             </div>
         </div>
         <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Registered Drivers</p>
-        <p class="text-2xl font-black text-ziggo">{{ stats.total }}</p>
+        <p class="text-2xl font-black text-ziggo">{{ stats.total|num }}</p>
     </div>
     <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
         <div class="flex items-center justify-between mb-4">
             <div class="w-10 h-10 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center">
                 <i class="fas fa-signal"></i>
             </div>
-            <span class="text-xs font-black text-ziggo">{{ stats.online_pct }}%</span>
+            <span class="text-xs font-black text-ziggo">{{ stats.online_pct|num }}%</span>
         </div>
         <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Online Now</p>
-        <p class="text-2xl font-black text-ziggo">{{ stats.online }}</p>
+        <p class="text-2xl font-black text-ziggo">{{ stats.online|num }}</p>
     </div>
     <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
         <div class="flex items-center justify-between mb-4">
             <div class="w-10 h-10 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center">
                 <i class="fas fa-clock"></i>
             </div>
-            <span class="text-xs font-black text-orange-500">{{ stats.pending }} Pending</span>
+            <span class="text-xs font-black text-orange-500">{{ stats.pending|num }} Pending</span>
         </div>
         <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Pending Review</p>
-        <p class="text-2xl font-black text-ziggo">{{ stats.pending }}</p>
+        <p class="text-2xl font-black text-ziggo">{{ stats.pending|num }}</p>
     </div>
     <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
         <div class="flex items-center justify-between mb-4">
@@ -106,6 +107,19 @@
         <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Platform Rating</p>
         <p class="text-2xl font-black text-ziggo">{{ "{:.2f}".format(stats.avg_rating) }}</p>
     </div>
+    <a href="/admin/drivers?gender=lady" class="block bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:border-pink-200 transition" title="Show lady drivers: women on a Scooter">
+        <div class="flex items-center justify-between mb-4">
+            <div class="w-10 h-10 bg-pink-50 text-pink-600 rounded-2xl flex items-center justify-center">
+                <i class="fas fa-person-dress"></i>
+            </div>
+            <span class="text-xs font-black text-pink-600">{{ stats.ladies_online|num }} online</span>
+        </div>
+        <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Lady Drivers (Scooter)</p>
+        <p class="text-2xl font-black text-ziggo">{{ stats.ladies }}</p>
+        {% if stats.ladies_fpo %}
+        <p class="text-[11px] text-pink-700 font-bold mt-1">{{ stats.ladies_fpo }} female passengers only</p>
+        {% endif %}
+    </a>
 </div>
 {% else %}
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -116,7 +130,7 @@
             </div>
         </div>
         <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Total Applications</p>
-        <p class="text-2xl font-black text-ziggo">{{ stats.total_apps }}</p>
+        <p class="text-2xl font-black text-ziggo">{{ stats.total_apps|num }}</p>
     </div>
     <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
         <div class="flex items-center justify-between mb-4">
@@ -125,7 +139,7 @@
             </div>
         </div>
         <p class="text-xs font-black text-gray-400 uppercase tracking-widest">New / Unread</p>
-        <p class="text-2xl font-black text-blue-600">{{ stats.unread_apps }}</p>
+        <p class="text-2xl font-black text-blue-600">{{ stats.unread_apps|num }}</p>
     </div>
     <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
         <div class="flex items-center justify-between mb-4">
@@ -134,7 +148,7 @@
             </div>
         </div>
         <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Processed</p>
-        <p class="text-2xl font-black text-ziggo">{{ stats.total_apps - stats.unread_apps }}</p>
+        <p class="text-2xl font-black text-ziggo">{{ (stats.total_apps - stats.unread_apps)|num }}</p>
     </div>
 </div>
 {% endif %}
@@ -157,15 +171,25 @@
                     <option value="incomplete" {% if status == 'incomplete' %}selected{% endif %}>⚪ Incomplete / Draft</option>
                 </select>
             </div>
+            <div>
+                <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Gender</label>
+                <select name="gender" onchange="this.form.submit()" class="bg-white border border-gray-200 rounded-lg px-4 py-2 text-sm font-semibold outline-none shadow-soft-sm cursor-pointer hover:border-ziggo transition-all min-w-[140px]">
+                    <option value="all" {% if gender == 'all' %}selected{% endif %}>All</option>
+                    <option value="lady" {% if gender == 'lady' %}selected{% endif %}>Lady drivers (Scooter)</option>
+                    <option value="female" {% if gender == 'female' %}selected{% endif %}>Female</option>
+                    <option value="male" {% if gender == 'male' %}selected{% endif %}>Male</option>
+                    <option value="unknown" {% if gender == 'unknown' %}selected{% endif %}>Not known (check NIC)</option>
+                </select>
+            </div>
             {% endif %}
-            <div class="flex-1 max-w-sm">
+            <div class="flex-1 min-w-[260px] max-w-sm">
                 <label class="block text-[10px] font-black text-ziggo-muted mb-1 uppercase tracking-wider">Quick Search</label>
                 <input type="text" name="search" value="{{ search }}" placeholder="{% if view == 'applications' %}Search name / city / type / nic..{% else %}Search name / email / phone..{% endif %}" class="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg outline-none focus:border-ziggo transition-all text-sm font-semibold shadow-soft-sm">
             </div>
             <button type="submit" class="px-4 py-2 bg-ziggo text-white rounded-lg font-black text-xs shadow-brand hover:bg-ziggo-light transition flex items-center gap-1.5 h-[38px] items-center">
                 <i class="fas fa-search"></i> Search
             </button>
-            {% if status != 'all' or search %}
+            {% if status != 'all' or search or (gender and gender != 'all') %}
             <a href="/admin/drivers?view={{ view }}" class="px-4 py-2 bg-slate-100 border border-gray-200 text-gray-700 rounded-lg font-black text-xs hover:bg-slate-200 transition flex items-center gap-1.5 h-[38px] items-center">
                 Clear Filter
             </a>
@@ -198,7 +222,7 @@
                         </div>
                         <div>
                             <div class="text-sm font-bold text-gray-800 group-hover:text-ziggo">All Drivers (Inc. Drafts)</div>
-                            <div class="text-xs text-gray-500">All {{ (stats.total or 0) + (stats.incomplete or 0) }} registered & draft signups</div>
+                            <div class="text-xs text-gray-500">All {{ ((stats.total or 0) + (stats.incomplete or 0))|num }} registered & draft signups</div>
                         </div>
                     </a>
 
@@ -220,14 +244,14 @@
                         </div>
                         <div>
                             <div class="text-sm font-bold text-gray-800 group-hover:text-emerald-700">Registered Drivers Only</div>
-                            <div class="text-xs text-gray-500">{{ stats.total or 0 }} completed vehicle registrations</div>
+                            <div class="text-xs text-gray-500">{{ (stats.total or 0)|num }} completed vehicle registrations</div>
                         </div>
                     </a>
 
                     {% if status and status != 'all' and status != 'incomplete' and status != 'all_with_draft' %}
                     <div class="border-t border-gray-100 my-1"></div>
                     <!-- Option 4: Current Filtered View -->
-                    <a href="/admin/drivers/export?status={{ status }}{% if search %}&search={{ search }}{% endif %}" class="flex items-start gap-3 px-4 py-2.5 hover:bg-purple-50/70 transition group text-left">
+                    <a href="/admin/drivers/export?status={{ status }}{% if search %}&search={{ search }}{% endif %}{% if gender and gender != 'all' %}&gender={{ gender }}{% endif %}" class="flex items-start gap-3 px-4 py-2.5 hover:bg-purple-50/70 transition group text-left">
                         <div class="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-purple-600 group-hover:text-white transition">
                             <i class="fas fa-filter text-xs"></i>
                         </div>
@@ -317,11 +341,16 @@
                     <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20">ID</th>
                     <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20 min-w-[220px]">Driver Name</th>
                     <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20 min-w-[150px]">Vehicle</th>
+                    {% if status == 'incomplete' %}
+                    <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20 min-w-[240px]">Application Progress</th>
+                    {% endif %}
                     <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20 min-w-[130px]">Status</th>
                     <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20 min-w-[110px]">Joined</th>
+                    {% if status != 'incomplete' %}
                     <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20 min-w-[80px]">Rating</th>
                     <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20 min-w-[120px]">Total Earnings</th>
                     <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20 min-w-[130px]">Settlement Owed</th>
+                    {% endif %}
                     <th class="px-6 py-4 sticky top-0 bg-[#F8FAFC] z-20 min-w-[180px]">Action</th>
                 </tr>
             </thead>
@@ -335,6 +364,19 @@
                             <div class="min-w-0 flex-1">
                                 <p class="text-sm font-bold text-ziggo truncate" title="{{ driver.user.full_name or 'N/A' }}">{{ driver.user.full_name or 'N/A' }}</p>
                                 <p class="text-xs text-gray-400 truncate">{{ driver.user.phone_number }}</p>
+                                {% if driver.user.gender == 'female' %}
+                                {% set on_scooter = (driver.vehicle_type or '')|trim|lower == 'moto scooter' %}
+                                <div class="flex flex-wrap gap-1 mt-1">
+                                    {% if on_scooter %}
+                                    <span class="px-1.5 py-0.5 rounded bg-pink-50 text-pink-700 text-[10px] font-black uppercase tracking-wide">Lady</span>
+                                    {% else %}
+                                    <span class="px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 text-[10px] font-black uppercase tracking-wide" title="Lady-driver rides are for Scooter drivers only">Female</span>
+                                    {% endif %}
+                                    {% if on_scooter and driver.female_passengers_only %}
+                                    <span class="px-1.5 py-0.5 rounded bg-pink-50 text-pink-700 text-[10px] font-black uppercase tracking-wide">Female passengers only</span>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
                     </td>
@@ -342,11 +384,37 @@
                         <p class="text-sm font-medium text-slate-800 truncate" title="{{ driver.vehicle_model or 'N/A' }}">{{ driver.vehicle_model or 'N/A' }}</p>
                         <p class="text-xs text-gray-400 truncate" title="{{ driver.vehicle_number or 'N/A' }}">{{ driver.vehicle_number or 'N/A' }}</p>
                     </td>
+                    {% if status == 'incomplete' %}
+                    <td class="px-6 py-4 min-w-[240px]">
+                        <div class="flex items-center justify-between gap-2 mb-1.5">
+                            <div class="flex items-center gap-1.5">
+                                <span class="inline-flex items-center justify-center font-black font-mono text-xs px-2 py-0.5 rounded-md border shadow-soft-sm {% if driver.completion_pct >= 75 %}bg-emerald-50 text-emerald-700 border-emerald-200{% elif driver.completion_pct >= 35 %}bg-amber-50 text-amber-700 border-amber-200{% elif driver.completion_pct > 0 %}bg-blue-50 text-blue-700 border-blue-200{% else %}bg-slate-50 text-slate-500 border-slate-200{% endif %}">
+                                    {{ driver.completion_pct }}%
+                                </span>
+                                <span class="text-[11px] font-bold text-gray-500">
+                                    {{ driver.completed_fields_count }}/{{ driver.total_fields_count }} fields · {{ driver.completed_docs_count }}/{{ driver.total_docs_count }} docs
+                                </span>
+                            </div>
+                        </div>
+                        <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden shadow-inner">
+                            <div class="h-2 rounded-full transition-all duration-300 {% if driver.completion_pct >= 75 %}bg-gradient-to-r from-emerald-500 to-teal-500{% elif driver.completion_pct >= 35 %}bg-gradient-to-r from-amber-400 to-orange-500{% elif driver.completion_pct > 0 %}bg-gradient-to-r from-blue-400 to-indigo-500{% else %}bg-gray-200{% endif %}" style="width: {{ driver.completion_pct }}%"></div>
+                        </div>
+                        {% if driver.missing_items %}
+                        <div class="mt-1 text-[11px] text-gray-400 truncate" title="Missing: {{ driver.missing_items|join(', ') }}">
+                            <span class="text-amber-600 font-bold">Needs:</span> {{ driver.missing_items[:3]|join(', ') }}{% if driver.missing_items|length > 3 %} <span class="text-gray-400">+{{ driver.missing_items|length - 3 }} more</span>{% endif %}
+                        </div>
+                        {% else %}
+                        <div class="mt-1 text-[11px] text-emerald-600 font-bold flex items-center gap-1">
+                            <i class="fas fa-check-circle text-[10px]"></i> All items submitted
+                        </div>
+                        {% endif %}
+                    </td>
+                    {% endif %}
                     <td class="px-6 py-4">
                         {% if not driver.vehicle_number or not driver.nic_number %}
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-bold">
-                            <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                            Incomplete Signup
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-bold" title="{{ driver.completed_fields_count }}/{{ driver.total_fields_count }} fields, {{ driver.completed_docs_count }}/{{ driver.total_docs_count }} docs completed">
+                            <span class="w-1.5 h-1.5 rounded-full {% if driver.completion_pct >= 50 %}bg-amber-400{% else %}bg-slate-400{% endif %}"></span>
+                            Incomplete Signup{% if status != 'incomplete' %} ({{ driver.completion_pct }}%){% endif %}
                         </span>
                         {% elif not driver.is_approved or driver.status == 'pending' %}
                         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-bold">
@@ -373,6 +441,7 @@
                     <td class="px-6 py-4">
                         <p class="text-xs text-gray-400 font-semibold">{{ driver.user.created_at|colombo_dt("%b %d, %Y") if driver.user.created_at else '—' }}</p>
                     </td>
+                    {% if status != 'incomplete' %}
                     <td class="px-6 py-4">
                         <div class="flex items-center gap-1 text-sm font-bold">
                             <i class="fas fa-star text-yellow-400"></i> {{ "{:.1f}".format((driver.user.rating or 0)|float) }}
@@ -380,9 +449,11 @@
                     </td>
                     <td class="px-6 py-4 text-sm font-normal">Rs.{{ "{:,.2f}".format(driver.total_earnings or 0) }}</td>
                     <td class="px-6 py-4 text-sm font-normal {% if (driver.settlement_amount or 0) > 0 %}text-amber-600 font-bold{% else %}text-gray-400{% endif %}">Rs.{{ "{:,.0f}".format(driver.settlement_amount or 0) }}</td>
+                    {% endif %}
                     <td class="px-6 py-4">
                         <div class="flex items-center gap-2">
-                            <a href="/admin/drivers/{{ driver.id }}/edit" class="w-8 h-8 rounded-lg bg-ziggo-soft border border-ziggo-line text-ziggo inline-flex items-center justify-center hover:bg-ziggo hover:text-white hover:border-ziggo transition" title="Edit">
+                            {% set current_return = request.url.path ~ ('?' ~ request.url.query if request.url.query else ('?status=' ~ status if status and status != 'all' else '')) %}
+                            <a href="/admin/drivers/{{ driver.id }}/edit?return_to={{ current_return | urlencode }}" class="w-8 h-8 rounded-lg bg-ziggo-soft border border-ziggo-line text-ziggo inline-flex items-center justify-center hover:bg-ziggo hover:text-white hover:border-ziggo transition" title="Edit">
                                 <i class="fas fa-edit"></i>
                             </a>
                             {% if not driver.vehicle_number or not driver.nic_number %}
@@ -417,7 +488,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="8" class="px-6 py-10 text-center text-gray-400">
+                    <td colspan="{% if status == 'incomplete' %}7{% else %}9{% endif %}" class="px-6 py-10 text-center text-gray-400">
                         <i class="fas fa-info-circle mr-2"></i> No drivers found in database
                     </td>
                 </tr>
@@ -433,11 +504,11 @@
         <p class="text-sm text-gray-500">
             Showing <span class="font-bold text-ziggo">{{ start_idx }}</span> to 
             <span class="font-bold text-ziggo">{{ end_idx }}</span> of 
-            <span class="font-bold text-ziggo">{{ total_drivers }}</span> {% if view == 'applications' %}applications{% else %}drivers{% endif %}
+            <span class="font-bold text-ziggo">{{ total_drivers|num }}</span> {% if view == 'applications' %}applications{% else %}drivers{% endif %}
         </p>
         <div class="flex items-center gap-1.5">
             {% if page > 1 %}
-                <a href="/admin/drivers?page={{ page - 1 }}&status={{ status }}&search={{ search }}&view={{ view }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
+                <a href="/admin/drivers?page={{ page - 1 }}&status={{ status }}&search={{ search }}&view={{ view }}&gender={{ gender }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Previous</a>
             {% else %}
                 <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Previous</span>
             {% endif %}
@@ -446,12 +517,12 @@
                 {% if p == page %}
                     <span class="px-3 py-1.5 rounded-lg bg-ziggo text-white text-xs font-black">{{ p }}</span>
                 {% else %}
-                    <a href="/admin/drivers?page={{ p }}&status={{ status }}&search={{ search }}&view={{ view }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
+                    <a href="/admin/drivers?page={{ p }}&status={{ status }}&search={{ search }}&view={{ view }}&gender={{ gender }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">{{ p }}</a>
                 {% endif %}
             {% endfor %}
 
             {% if page < total_pages %}
-                <a href="/admin/drivers?page={{ page + 1 }}&status={{ status }}&search={{ search }}&view={{ view }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
+                <a href="/admin/drivers?page={{ page + 1 }}&status={{ status }}&search={{ search }}&view={{ view }}&gender={{ gender }}" class="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-xs font-bold transition">Next</a>
             {% else %}
                 <span class="px-3 py-1.5 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 text-xs font-bold cursor-not-allowed">Next</span>
             {% endif %}
@@ -461,9 +532,9 @@
     <div class="p-6 border-t border-gray-100">
         <p class="text-sm text-gray-500">
             {% if view == 'applications' %}
-                {{ applications | length }} application{{ '' if applications|length == 1 else 's' }} shown
+                {{ (applications | length)|num }} application{{ '' if applications|length == 1 else 's' }} shown
             {% else %}
-                {{ drivers | length }} driver{{ '' if drivers|length == 1 else 's' }} shown
+                {{ (drivers | length)|num }} driver{{ '' if drivers|length == 1 else 's' }} shown
             {% endif %}
         </p>
     </div>
