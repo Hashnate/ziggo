@@ -30,6 +30,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+          flutter-version: '3.27.4'
           cache: true
 
       - name: Install Flutter dependencies
@@ -89,7 +90,7 @@ jobs:
           mv build/ios/ipa/*.ipa build/ios/ipa/app.ipa
 
       - name: Upload app to TestFlight
-        uses: apple-actions/upload-testflight-build@v3
+        uses: apple-actions/upload-testflight-build@v5
         with:
           app-path: ziggo_app/build/ios/ipa/app.ipa
           issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
