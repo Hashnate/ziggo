@@ -586,7 +586,7 @@ class _AddVehicleSheetState extends State<_AddVehicleSheet> {
               const Text('Vehicle Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                initialValue: _vehicleType,
+                value: _vehicleType,
                 decoration: InputDecoration(
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
