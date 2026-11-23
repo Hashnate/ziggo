@@ -427,7 +427,7 @@ class InvoiceService {
                       pw.SizedBox(height: 4),
                       pw.Text(
                           '  (Destination ended early from: $selectedDrop)',
-                          style: const pw.TextStyle(
+                          style: pw.TextStyle(
                               fontSize: 9,
                               color: PdfColors.orange800,
                               fontStyle: pw.FontStyle.italic)),
