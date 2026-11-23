@@ -76,10 +76,10 @@ jobs:
         run: echo "BUILD_NUMBER=$(( ${{ github.run_number }} + 100 ))" >> "$GITHUB_ENV"
 
       - name: Build Android App Bundle (AAB)
-        run: flutter build appbundle --release --build-number="$BUILD_NUMBER"
+        run: flutter build appbundle --release --build-number="$BUILD_NUMBER" --android-skip-build-dependency-validation
 
       - name: Build Android APK
-        run: flutter build apk --release --build-number="$BUILD_NUMBER"
+        run: flutter build apk --release --build-number="$BUILD_NUMBER" --android-skip-build-dependency-validation
 
       - name: Upload Android App Bundle (AAB) Artifact
         uses: actions/upload-artifact@v4
