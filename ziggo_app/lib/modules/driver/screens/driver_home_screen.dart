@@ -40,6 +40,7 @@ import '../../customer/notifications_provider.dart';
 import '../../customer/screens/food_order_details_screen.dart';
 import '../../customer/screens/market_order_details_screen.dart';
 import '../../../core/utils/amount_format.dart';
+import '../../../core/widgets/app_version_text.dart';
 
 // Ziggo light driver UI tokens — clean light brand surfaces + gold accent.
 const Color _kPanel = AppColors.surface;       // clean white (matching surface)
@@ -5060,8 +5061,8 @@ class _Drawer extends StatelessWidget {
           const SizedBox(height: 6),
           const Padding(
             padding: EdgeInsets.only(bottom: 16),
-            child: Text(
-              'Version 1.0.10',
+            child: AppVersionText(
+              prefix: 'Version ',
               style: TextStyle(
                 color: AppColors.textTertiary,
                 fontWeight: FontWeight.w600,

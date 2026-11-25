@@ -1,12 +1,12 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/app_colors.dart';
 import '../network/api_client.dart';
+import 'app_version_service.dart';
 
 class AppUpdateService {
   static const String _keyLastPromptTime = 'app_update_last_soft_prompt_ms';
@@ -22,8 +22,8 @@ class AppUpdateService {
     if (_isDialogShowing) return;
 
     try {
-      final packageInfo = await PackageInfo.fromPlatform();
-      final currentVersion = packageInfo.version.trim(); // e.g. "1.0.15"
+      final currentVersion = await AppVersionService.getVersion(); // e.g. "1.0.15"
+      if (currentVersion.isEmpty) return;
 
       final response = await ApiClient.instance.dio.get('/misc/app-version');
       if (response.statusCode != 200 || response.data == null) return;

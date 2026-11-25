@@ -1,9 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 
+import '../services/app_version_service.dart';
 import '../storage/token_storage.dart';
 import 'host_resolver.dart';
 
@@ -41,7 +42,7 @@ class ApiClient {
           }
           // Lets the server count how many people have updated before an
           // update is forced (recorded on GET /auth/me).
-          final version = await _appVersion();
+          final version = await AppVersionService.getVersion();
           if (version.isNotEmpty) options.headers['X-App-Version'] = version;
           options.headers['X-App-Platform'] = _platform;
           handler.next(options);
@@ -149,19 +150,6 @@ class ApiClient {
   late final Dio _dio;
   Dio get dio => _dio;
 
-  static String? _version;
-
-  /// The app's version name ("1.1.5"), read once; empty if it can't be read.
-  static Future<String> _appVersion() async {
-    if (_version != null) return _version!;
-    try {
-      _version = (await PackageInfo.fromPlatform()).version.trim();
-    } catch (_) {
-      _version = '';
-    }
-    return _version!;
-  }
-
   static String get _platform {
     if (kIsWeb) return 'web';
     if (Platform.isAndroid) return 'android';
@@ -170,6 +158,7 @@ class ApiClient {
   }
 
   static Future<void> init() async {
+    unawaited(AppVersionService.getVersion());
     await HostResolver.resolve();
     _instance._dio.options.baseUrl = ApiConfig.baseUrl;
   }

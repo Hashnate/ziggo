@@ -21,6 +21,7 @@ import 'edit_profile_screen.dart';
 import 'earn_with_ziggo_screen.dart';
 import '../../common/screens/privacy_policy_screen.dart';
 import '../../../core/utils/amount_format.dart';
+import '../../../core/widgets/app_version_text.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -285,8 +286,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ]),
           const SizedBox(height: 24),
           const Center(
-            child: Text(
-              'Ziggo • v1.0.1',
+            child: AppVersionText(
+              prefix: 'Ziggo • v',
+              fallbackText: 'Ziggo',
               style: TextStyle(
                 color: AppColors.textTertiary,
                 fontSize: 11,
