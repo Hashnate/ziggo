@@ -62,3 +62,6 @@ Thumbs.db
 
 # APNs .p8 auth key — never commit
 secrets/
+
+# Claude Code personal settings (they held an API key in a command line)
+.claude/settings.local.json
