@@ -1184,7 +1184,11 @@ async def accept_food_order(
     if await driver_blocked_for_commission(db, driver):
         raise HTTPException(status_code=403, detail=COMMISSION_BLOCK_MESSAGE)
 
-    q = await db.execute(select(FoodOrder).where(FoodOrder.id == order_id))
+    q = await db.execute(
+        select(FoodOrder)
+        .where(FoodOrder.id == order_id)
+        .with_for_update()
+    )
     order = q.scalars().first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")

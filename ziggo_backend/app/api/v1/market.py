@@ -950,7 +950,11 @@ async def accept_market_order(
     if await driver_blocked_for_commission(db, driver):
         raise HTTPException(status_code=403, detail=COMMISSION_BLOCK_MESSAGE)
 
-    q = await db.execute(select(MarketOrder).where(MarketOrder.id == order_id))
+    q = await db.execute(
+        select(MarketOrder)
+        .where(MarketOrder.id == order_id)
+        .with_for_update()
+    )
     order = q.scalars().first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")

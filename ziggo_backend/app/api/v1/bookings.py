@@ -671,6 +671,35 @@ async def create_booking(
 ):
     customer = await _get_customer(db, user)
 
+    # Prevent duplicate/simultaneous immediate passenger rides while one is
+    # still SEARCHING, ACCEPTED, or ARRIVED. Once the trip has STARTED
+    # ("halfway"), the customer may book another ride.
+    if not req.is_flash and not req.is_courier and not req.scheduled_time:
+        # Lock the customer row so concurrent double-taps serialize cleanly.
+        await db.execute(
+            select(Customer.id).where(Customer.id == customer.id).with_for_update()
+        )
+        existing_q = await db.execute(
+            select(Booking.id)
+            .where(
+                Booking.customer_id == customer.id,
+                Booking.is_flash.is_not(True),
+                Booking.is_courier.is_not(True),
+                Booking.scheduled_at.is_(None),
+                Booking.status.in_([
+                    BookingStatus.SEARCHING,
+                    BookingStatus.ACCEPTED,
+                    BookingStatus.ARRIVED,
+                ]),
+            )
+            .limit(1)
+        )
+        if existing_q.scalars().first() is not None:
+            raise HTTPException(
+                status_code=409,
+                detail="You already have an active ride request. You can book another ride once your current trip has started.",
+            )
+
     # BRD: CD-19 — clamp to admin-configured max stops before pricing.
     from ...models import SystemSettings
     ss_q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
@@ -1566,7 +1595,11 @@ async def accept_booking(
     if await driver_blocked_for_commission(db, driver):
         raise HTTPException(status_code=403, detail=COMMISSION_BLOCK_MESSAGE)
 
-    q = await db.execute(select(Booking).where(Booking.id == booking_id))
+    q = await db.execute(
+        select(Booking)
+        .where(Booking.id == booking_id)
+        .with_for_update()
+    )
     b = q.scalars().first()
     if not b:
         raise HTTPException(status_code=404, detail="Booking not found")
@@ -2128,7 +2161,11 @@ async def update_booking_status(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    q = await db.execute(select(Booking).where(Booking.id == booking_id))
+    q = await db.execute(
+        select(Booking)
+        .where(Booking.id == booking_id)
+        .with_for_update()
+    )
     b = q.scalars().first()
     if not b:
         raise HTTPException(status_code=404, detail="Booking not found")
