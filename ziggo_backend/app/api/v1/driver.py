@@ -522,6 +522,13 @@ async def update_location(
                 "lng": float(d.current_lng),
                 "heading": float(d.current_heading) if d.current_heading is not None else 0.0,
             })
+
+    # A new road route for the trip once the driver has left the drawn one.
+    try:
+        from ...services import route_service
+        await route_service.check_off_route(db, d, float(body.lat), float(body.lng))
+    except Exception as e:
+        print(f"[route] off-route check failed: {e!r}")
     return {"ok": True}
 
 

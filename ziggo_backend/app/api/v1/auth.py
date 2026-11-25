@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -316,11 +316,37 @@ async def update_fcm_token(
     return {"ok": True, "saved": bool(token)}
 
 
+OLD_APP_VERSION = "<=1.1.4"
+
+
+def _note_app_version(user: User, request: Request) -> bool:
+    """Remember the app version and platform the user runs. The app sends them from
+    1.1.5; anything older is recorded as OLD_APP_VERSION. True if something changed."""
+    if user.role == UserRole.ADMIN:
+        return False
+    version = (request.headers.get("x-app-version") or "").strip()[:20] or OLD_APP_VERSION
+    platform = (request.headers.get("x-app-platform") or "").strip().lower()[:10] or None
+    changed = False
+    if user.app_version != version:
+        user.app_version = version
+        changed = True
+    if platform and user.app_platform != platform:
+        user.app_platform = platform
+        changed = True
+    return changed
+
+
 @router.get("/me", response_model=UserResponse)
 async def get_me(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
+    if _note_app_version(user, request):
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
     if not user.referral_code:
         from ...models.user import generate_referral_code
         user.referral_code = generate_referral_code()

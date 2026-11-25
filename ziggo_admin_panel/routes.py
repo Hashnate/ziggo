@@ -2678,7 +2678,7 @@ async def admin_bookings(
             "stat_revenue": stat_revenue,
             "stat_rated": stat_rated,
             "stat_avg_rating": float(stat_avg_rating or 0),
-            "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY or "",
+            "google_maps_api_key": (settings.GOOGLE_MAPS_BROWSER_KEY or settings.GOOGLE_MAPS_API_KEY or ""),
         },
     )
 
@@ -6241,7 +6241,7 @@ async def admin_market(
             "page_range": page_range,
             "search": search,
             "status": status,
-            "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY or "",
+            "google_maps_api_key": (settings.GOOGLE_MAPS_BROWSER_KEY or settings.GOOGLE_MAPS_API_KEY or ""),
             "total_commission": total_commission,
             "total_payout": total_payout,
         },
@@ -6261,7 +6261,7 @@ async def admin_market_new_form(
             "active_page": "market",
             "error": None,
             "form": {},
-            "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY or "",
+            "google_maps_api_key": (settings.GOOGLE_MAPS_BROWSER_KEY or settings.GOOGLE_MAPS_API_KEY or ""),
         },
     )
 
@@ -6359,7 +6359,7 @@ async def admin_market_new_submit(
                 "active_page": "market",
                 "error": "Owner phone must be exactly 10 digits.",
                 "form": form_echo,
-                "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY or "",
+                "google_maps_api_key": (settings.GOOGLE_MAPS_BROWSER_KEY or settings.GOOGLE_MAPS_API_KEY or ""),
             },
         )
 
@@ -6388,7 +6388,7 @@ async def admin_market_new_submit(
                     "active_page": "market",
                     "error": f"User {phone} already owns a market vendor.",
                     "form": form_echo,
-                    "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY or "",
+                    "google_maps_api_key": (settings.GOOGLE_MAPS_BROWSER_KEY or settings.GOOGLE_MAPS_API_KEY or ""),
                 },
             )
             
@@ -8424,7 +8424,7 @@ async def admin_live_tracking(
             "total_drivers": total,
             "online_drivers": online,
             "offline_drivers": (total or 0) - (online or 0),
-            "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY or "",
+            "google_maps_api_key": (settings.GOOGLE_MAPS_BROWSER_KEY or settings.GOOGLE_MAPS_API_KEY or ""),
         },
     )
 
@@ -8508,7 +8508,7 @@ async def admin_customer_map(
         {
             "request": request,
             "active_page": "customer-map",
-            "google_maps_api_key": settings.GOOGLE_MAPS_API_KEY or "",
+            "google_maps_api_key": (settings.GOOGLE_MAPS_BROWSER_KEY or settings.GOOGLE_MAPS_API_KEY or ""),
             "score_days": customer_map_service.SCORE_DAYS,
             "is_superadmin": is_superadmin,
             "reveals": await customer_map_service.recent_reveals(db) if is_superadmin else [],
@@ -12590,7 +12590,7 @@ async def admin_launch_locations(
         request, "launch_locations.html",
         {"request": request, "active_page": "launch_locations", "rows": rows, "current": current,
          "districts": DISTRICTS, "services": LAUNCH_SERVICES, "today": today.isoformat(), "error": error,
-         "gmap_key": settings.GOOGLE_MAPS_API_KEY or ""},
+         "gmap_key": (settings.GOOGLE_MAPS_BROWSER_KEY or settings.GOOGLE_MAPS_API_KEY or "")},
     )
 
 
@@ -12694,7 +12694,7 @@ async def surge_zones_page(request: Request, db: AsyncSession = Depends(get_db),
     ]
 
     # Need GOOGLE_MAPS_API_KEY
-    gmap_key = settings.GOOGLE_MAPS_API_KEY or ""
+    gmap_key = (settings.GOOGLE_MAPS_BROWSER_KEY or settings.GOOGLE_MAPS_API_KEY or "")
     return templates.TemplateResponse("surge_zones.html", {
         "request": request,
         "admin": admin_user,
@@ -12748,7 +12748,7 @@ async def custom_fare_zones_page(request: Request, db: AsyncSession = Depends(ge
         for z in zones_objs
     ]
 
-    gmap_key = settings.GOOGLE_MAPS_API_KEY or ""
+    gmap_key = (settings.GOOGLE_MAPS_BROWSER_KEY or settings.GOOGLE_MAPS_API_KEY or "")
     return templates.TemplateResponse("custom_fare_zones.html", {
         "request": request,
         "admin": admin_user,

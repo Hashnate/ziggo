@@ -92,6 +92,8 @@ services:
       # TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:-}
       # STRIPE_API_KEY: ${STRIPE_API_KEY:-}
       GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      GOOGLE_MAPS_BROWSER_KEY: ${GOOGLE_MAPS_BROWSER_KEY:-}
+      MAPS_PROXY_ENABLED: ${MAPS_PROXY_ENABLED:-true}
 
     volumes:
       # Persist admin panel uploads (driver photos etc.) across container

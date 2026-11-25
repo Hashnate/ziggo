@@ -136,6 +136,9 @@ class Booking(Base):
     passenger_lat = Column(DECIMAL(10, 7), nullable=True)
     passenger_lng = Column(DECIMAL(10, 7), nullable=True)
     passenger_location_at = Column(DateTime(timezone=True), nullable=True)
+    # The road route the apps draw for this trip, kept only while it is on; see
+    # route_service. none_as_null so clearing it stores SQL NULL, not JSON null.
+    trip_route = Column(JSON(none_as_null=True), nullable=True)
 
     # Rental / vehicle-hire fields. is_rental=True means the customer hires a
     # vehicle for `rental_hours` and the fare is hourly_rate * hours (no drop

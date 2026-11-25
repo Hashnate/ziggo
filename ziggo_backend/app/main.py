@@ -13,6 +13,7 @@ from fastapi.responses import RedirectResponse
 from .config import settings
 from .database import engine
 from .api.v1 import auth, customer, driver, admin, bookings, ws, event, food, market, market_vendor, misc, payments, restaurant, trip_share, public, corporate, surge_zones, custom_fare_zones
+from .api.v1 import booking_routes, maps
 from ziggo_admin_panel import routes as admin_panel_routes
 from ziggo_admin_panel.routes import _AdminRedirect, _AdminForbidden
 from .services.schema_sync import ensure_schema
@@ -197,6 +198,8 @@ app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["aut
 app.include_router(customer.router, prefix=f"{settings.API_V1_STR}/customer", tags=["customer"])
 app.include_router(driver.router, prefix=f"{settings.API_V1_STR}/driver", tags=["driver"])
 app.include_router(bookings.router, prefix=f"{settings.API_V1_STR}/bookings", tags=["bookings"])
+app.include_router(booking_routes.router, prefix=f"{settings.API_V1_STR}/bookings", tags=["bookings"])
+app.include_router(maps.router, prefix=f"{settings.API_V1_STR}/maps", tags=["maps"])
 app.include_router(food.router, prefix=f"{settings.API_V1_STR}/food", tags=["food"])
 app.include_router(market.router, prefix=f"{settings.API_V1_STR}/market", tags=["market"])
 app.include_router(restaurant.router, prefix=f"{settings.API_V1_STR}/restaurant", tags=["restaurant"])

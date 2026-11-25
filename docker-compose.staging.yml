@@ -82,6 +82,8 @@ services:
       PAYHERE_MODE: ${PAYHERE_MODE:-sandbox}
       PAYHERE_NOTIFY_URL: ${PAYHERE_NOTIFY_URL:-}
       GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      GOOGLE_MAPS_BROWSER_KEY: ${GOOGLE_MAPS_BROWSER_KEY:-}
+      MAPS_PROXY_ENABLED: ${MAPS_PROXY_ENABLED:-true}
     volumes:
       - ziggo_staging_uploads:/app/ziggo_admin_panel/static/uploads
       # Mirrors production: admin templates are editable without a rebuild.

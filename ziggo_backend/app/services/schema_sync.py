@@ -164,6 +164,9 @@ PENDING_COLUMNS: Iterable[tuple[str, str, str]] = (
     ("bookings", "applied_search_radius_km", "NUMERIC(6, 2)"),
     ("bookings", "search_radius_source", "VARCHAR(100)"),
     ("booking_dispatch_logs", "delivery_channel", "VARCHAR(50)"),
+    ("bookings", "trip_route", "JSON"),
+    ("users", "app_version", "VARCHAR(20)"),
+    ("users", "app_platform", "VARCHAR(10)"),
 )
 
 

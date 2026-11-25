@@ -259,6 +259,8 @@ class BookingResponse(BaseModel):
     # Customer live location while waiting for pickup: {lat, lng, at}, only while fresh.
     passenger_sharing: bool = False
     passenger_location: Optional[dict] = None
+    # Goes up when the road route changes; the apps fetch GET /bookings/{id}/route again.
+    route_version: Optional[int] = None
 
     class Config:
         from_attributes = True

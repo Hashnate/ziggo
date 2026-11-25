@@ -181,6 +181,15 @@ Rates come from `FareSetting` rows (admin-editable at `/admin/fare-settings`); f
 
 **Trip distance** is a straight line (`haversine_km`) unless `SystemSettings.road_distance_enabled` is on (switch on `/admin/fare-settings`, off by default). Then rides and flash parcels use Google's driving route via [road_distance_service.py](ziggo_backend/app/services/road_distance_service.py) (Directions API, backend `GOOGLE_MAPS_API_KEY`; that key needs the Directions API enabled). Stops are passed through in order; the result is never shorter than the straight line; the 25 km/h time estimate follows it; answers are cached 30 min per route (points rounded to ~11 m). Google failing falls back to the straight line, and quotes then say `distance_source: "straight"` (`"road"` otherwise; no key while the switch is off). At COMPLETE TRIP the route is measured to where the driver tapped it. The pickup fee (driver → pickup), courier, rental and food/Mart delivery fees still use straight lines.
 
+### Google Maps for the apps (server-side; see [maps_service.py](ziggo_backend/app/services/maps_service.py), [route_service.py](ziggo_backend/app/services/route_service.py))
+
+The apps never call Google web services themselves (from app 1.1.5; older apps still do until the forced update). Each Google call logs `[maps] <api> <status> <ms>`; `MAPS_PROXY_ENABLED=false` switches them all off and the apps fall back to straight lines and built-in landmarks.
+- `/api/v1/maps/*` (login required; Sri Lanka only; per-user hourly limits, 429 when over): `POST /route` (2–12 points, 30-min in-memory cache per route rounded to ~11 m), `GET /reverse-geocode`, `GET /autocomplete` + `GET /place` (one search = one Google session via the `session` token). A Google failure gives an empty answer, never an error. Addresses are not cached (Google's terms only allow keeping coordinates for a while).
+- **One route per booking leg**, shared by driver and customer: `GET /bookings/{id}/route` ([booking_routes.py](ziggo_backend/app/api/v1/booking_routes.py)) returns `{version, leg, route}`. SEARCHING → `trip` (pickup→stops→drop, the driver's request-popup preview; any online approved driver may read it); ACCEPTED/ARRIVED → `to_pickup` (not while the driver finishes a prior trip); STARTED → `to_drop` (reuses the trip route when started at the pickup). Each leg is worked out once and stored in `bookings.trip_route`; `BookingResponse.route_version` shows when to fetch again.
+- **Off route:** `POST /driver/location` calls `route_service.check_off_route`; more than 60 m from the route on 2 updates in a row → a new route in the background (at most once a minute, 15 per leg) and `route_changed` to both apps.
+- `trip_route` is cleared when a trip completes or is cancelled (`update_booking_status`), on a new destination, and by the auto-cancel sweep (`forget_finished`) for every other way a booking ends. A new path that ends a booking is covered by the sweep.
+- **Keys:** `GOOGLE_MAPS_API_KEY` is the server key (meant to be locked to this server's IP); the admin pages' browser maps use `GOOGLE_MAPS_BROWSER_KEY` (falls back to the server key); the app's key (CI secret `MAPS_API_KEY`) only needs the Maps SDKs for Android/iOS. `users.app_version` / `app_platform` (from the app's `X-App-Version` / `X-App-Platform` on `GET /auth/me`; older apps show `<=1.1.4`) tell how many have updated before forcing an update.
+
 ### Flash (parcel) deliveries
 
 A `Booking` row with `is_flash=True`. Same state machine, but requires `receiver_phone`, and `booking_ref` is prefixed `FL` instead of `ZG`. The admin panel splits them: `/admin/bookings` shows rides (where `is_flash=False`) and `/admin/flash` shows parcels.
@@ -196,6 +205,7 @@ A `Booking` row with `is_flash=True`. Same state machine, but requires `receiver
 | `passenger_location_stopped` | driver | `booking_id` — the customer switched sharing off |
 | `customer_location_update` | admins on `/ws/admin/customers` | `booking_id`, `lat`, `lng`, `at`, `customer_id`, `status` (no name or phone) |
 | `customer_location_stopped` | admins on `/ws/admin/customers` | `booking_id` |
+| `route_changed` | both | `booking_id`, `version` — fetch `GET /bookings/{id}/route` again (no push notification) |
 
 Customer dispatch: when a booking is created, **every** available online, approved driver within the search radius gets `new_ride_request` at once (`find_all_nearby_drivers`). Rides go only to the booked vehicle type, flash and courier parcels to any type, and a driver about to finish a nearby trip can get a ride as a back-to-back request. The first to accept (`POST /bookings/{id}/accept`) wins, and the others get `ride_taken`.
 

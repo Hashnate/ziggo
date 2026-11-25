@@ -73,6 +73,11 @@ class User(Base):
     # "female" / "male" / empty; gender_source = nic | self | admin (see gender_service)
     gender = Column(String(10), nullable=True)
     gender_source = Column(String(10), nullable=True)
+    # App version and platform last seen on GET /auth/me (the app sends X-App-Version
+    # from 1.1.5; older apps are recorded as "<=1.1.4"). Shows how many have updated
+    # before an update is forced.
+    app_version = Column(String(20), nullable=True)
+    app_platform = Column(String(10), nullable=True)
 
     customer_profile = relationship("Customer", back_populates="user", uselist=False, cascade="all, delete-orphan")
     driver_profile = relationship("Driver", back_populates="user", uselist=False, cascade="all, delete-orphan")

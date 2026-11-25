@@ -65,7 +65,7 @@ from ...services.matching_service import (
     can_driver_accept_ride,
 )
 from ...services.ws_manager import manager
-from ...services import ipay_service, passenger_location_service
+from ...services import ipay_service, passenger_location_service, route_service
 
 router = APIRouter()
 
@@ -269,6 +269,7 @@ async def _booking_to_response(db: AsyncSession, booking: Booking) -> BookingRes
         include_bikes=bool(b.include_bikes),
         passenger_sharing=bool(b.passenger_sharing),
         passenger_location=passenger_location_service.live_point(b),
+        route_version=route_service.version(b) or None,
         stops=[
             {
                 "order_index": s.order_index,
@@ -2181,6 +2182,7 @@ async def update_booking_status(
     now = datetime.now(timezone.utc)
     b.status = new_status
     passenger_stopped = new_status not in passenger_location_service.PRE_PICKUP and passenger_location_service.clear(b)
+    route_service.after_status_change(b)
 
     if new_status == BookingStatus.ARRIVED:
         b.arrived_at = now
@@ -2925,8 +2927,10 @@ async def update_booking_destination(
         await db.execute(BookingStop.__table__.delete().where(BookingStop.booking_id == b.id))
         b.stop_count = 0
 
+    route_service.destination_changed(b)
     await db.commit()
     await db.refresh(b)
+    await route_service.tell_apps(db, b)
 
     if b.driver_id:
         dq = await db.execute(select(Driver).where(Driver.id == b.driver_id))

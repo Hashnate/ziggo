@@ -21,6 +21,14 @@ class Settings(BaseSettings):
     STRIPE_API_KEY: Optional[str] = None
     STRIPE_WEBHOOK_SECRET: Optional[str] = None
     GOOGLE_MAPS_API_KEY: Optional[str] = None
+    # The admin pages' browser maps use their own key (restricted to the admin
+    # site), so GOOGLE_MAPS_API_KEY can be locked to this server's IP address.
+    # Falls back to GOOGLE_MAPS_API_KEY while it is not set.
+    GOOGLE_MAPS_BROWSER_KEY: Optional[str] = None
+    # Off switch for the server's Google calls for the apps (routes, addresses,
+    # place search; see services/maps_service.py). The apps then draw straight
+    # lines and show their built-in landmarks.
+    MAPS_PROXY_ENABLED: bool = True
 
     # Notify.lk — Sri Lankan SMS gateway. When any of these are empty the
     # service no-ops and OTP just lands in the uvicorn console (DEV_MODE flow).
