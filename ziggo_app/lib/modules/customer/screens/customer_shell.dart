@@ -44,10 +44,12 @@ class CustomerShellState extends State<CustomerShell> {
   void initState() {
     super.initState();
     _screens = [
-      // Mart is opened as a full-screen route (see navbar onTap), so this slot
-      // is never shown — keep a placeholder to preserve the navbar's indices.
+      // Mart and Rides are opened as full-screen routes (see navbar onTap), so
+      // these slots are never shown — placeholders keep the navbar's indices.
+      // (A hidden Rides screen here used to look the address up on every app
+      // start and resume, and poll /driver/nearby every 6 s, for nobody.)
       const SizedBox.shrink(),
-      const FareEstimateScreen(),
+      const SizedBox.shrink(),
       HomeScreen(onMenu: () => _scaffoldKey.currentState?.openDrawer()),
       const NotificationsScreen(),
       const ProfileScreen(),

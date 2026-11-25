@@ -7,6 +7,7 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/map/location_permission_helper.dart';
 import '../../../core/map/maps_service.dart';
+import '../../../core/map/pin_address.dart';
 import '../../../core/map/places.dart';
 import '../../../core/map/ziggo_map.dart';
 import 'vehicle_selection_screen.dart';
@@ -39,6 +40,10 @@ class _MapLocationSelectionScreenState extends State<MapLocationSelectionScreen>
   bool _isSelectingPickup = false;
 
   Place? _currentPlace;
+  // The place the pin is on (the start place, the pickup or drop being edited, a
+  // looked-up address, the GPS place). Less than 15 m from it needs no lookup,
+  // and a searched place keeps its name.
+  Place? _knownPlace;
   bool _isResolving = false;
   Timer? _debounceTimer;
 
@@ -68,6 +73,7 @@ class _MapLocationSelectionScreenState extends State<MapLocationSelectionScreen>
     
     setState(() {
       _currentPlace = startPlace;
+      _knownPlace = startPlace;
     });
 
     _mapController.moveTo(startPlace.location, zoom: 16);
@@ -75,13 +81,19 @@ class _MapLocationSelectionScreenState extends State<MapLocationSelectionScreen>
 
   void _onMapPositionChanged(LatLng center) {
     if (_currentPlace == null) return;
-    
+
     final latDiff = (center.latitude - _currentPlace!.location.latitude).abs();
     final lngDiff = (center.longitude - _currentPlace!.location.longitude).abs();
     if (latDiff < 0.00001 && lngDiff < 0.00001) {
       return;
     }
-    
+
+    if (pinStillOn(_knownPlace, center)) {
+      _debounceTimer?.cancel();
+      setState(() => _currentPlace = placeAt(_knownPlace!, center));
+      return;
+    }
+
     setState(() {
       _currentPlace = Place(
         _isSelectingPickup ? 'Pickup Location' : 'Dropoff Location',
@@ -105,25 +117,29 @@ class _MapLocationSelectionScreenState extends State<MapLocationSelectionScreen>
     final address = await MapsService.instance.reverseGeocode(center);
 
     if (!mounted) return;
-
-    if (address != null) {
-      final resolvedPlace = Place(
-        address.split(',').first, // Main text
-        address,                  // Full address
-        center,
-      );
-
-      setState(() {
-        _currentPlace = resolvedPlace;
-        if (_isSelectingPickup) {
-          _pickup = resolvedPlace;
-        } else {
-          _drop = resolvedPlace;
-        }
-      });
+    if (pinMovedOn(_currentPlace?.location, center)) {
+      setState(() => _isResolving = false);
+      return;
     }
 
-    setState(() => _isResolving = false);
+    final resolvedPlace = address != null
+        ? Place(
+            address.split(',').first, // Main text
+            address,                  // Full address
+            center,
+          )
+        : pinnedPlace(center);
+
+    setState(() {
+      _currentPlace = resolvedPlace;
+      if (address != null) _knownPlace = resolvedPlace;
+      if (_isSelectingPickup) {
+        _pickup = resolvedPlace;
+      } else {
+        _drop = resolvedPlace;
+      }
+      _isResolving = false;
+    });
   }
 
   void _moveToCurrentLocation() async {
@@ -139,6 +155,7 @@ class _MapLocationSelectionScreenState extends State<MapLocationSelectionScreen>
       _mapController.moveTo(here.location, zoom: 16);
       setState(() {
         _currentPlace = here;
+        _knownPlace = here;
         if (_isSelectingPickup) {
           _pickup = here;
         } else {
@@ -334,6 +351,7 @@ class _MapLocationSelectionScreenState extends State<MapLocationSelectionScreen>
                               onTap: () {
                                 setState(() {
                                   _isSelectingPickup = true;
+                                  if (_pickup != null) _knownPlace = _pickup;
                                 });
                                 if (_pickup != null) {
                                   _mapController.moveTo(_pickup!.location, zoom: 16);
@@ -359,6 +377,7 @@ class _MapLocationSelectionScreenState extends State<MapLocationSelectionScreen>
                               onTap: () {
                                 setState(() {
                                   _isSelectingPickup = false;
+                                  if (_drop != null) _knownPlace = _drop;
                                 });
                                 if (_drop != null) {
                                   _mapController.moveTo(_drop!.location, zoom: 16);

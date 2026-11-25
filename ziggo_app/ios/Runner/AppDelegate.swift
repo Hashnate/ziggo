@@ -22,13 +22,17 @@ import FirebaseMessaging
 
     application.registerForRemoteNotifications() // Force APNs registration on boot
 
-    // Guaranteed Google Maps initialization: always provide a key to prevent GMSInvalidAPIKeyException crash
-    let fallbackMapsKey = "AIzaSyAFtdjwK5SdMdo7c4F7jvJHWE-OE2LDSCk"
+    // Google Maps needs some key at start-up or it throws GMSInvalidAPIKeyException.
+    // The real key comes from Info.plist (CI writes it via Secrets.xcconfig); none
+    // is kept in source. Without it the map stays blank instead of crashing.
+    let fallbackMapsKey = "MAPS_API_KEY_MISSING"
     var mapsKey = fallbackMapsKey
     if let key = Bundle.main.object(forInfoDictionaryKey: "MAPS_API_KEY") as? String,
        !key.isEmpty,
        !key.contains("$") {
       mapsKey = key
+    } else {
+      NSLog("[ios-startup] MAPS_API_KEY missing from Info.plist; maps will not load")
     }
     GMSServices.provideAPIKey(mapsKey)
 

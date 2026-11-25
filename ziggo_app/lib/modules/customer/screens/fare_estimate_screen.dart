@@ -10,6 +10,7 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/map/location_permission_helper.dart';
 import '../../../core/map/maps_service.dart';
+import '../../../core/map/pin_address.dart';
 import '../../../core/map/places.dart';
 import '../../../core/map/ziggo_map.dart';
 import '../../../core/network/api_client.dart';
@@ -31,6 +32,9 @@ class FareEstimateScreen extends StatefulWidget {
 class _FareEstimateScreenState extends State<FareEstimateScreen> with WidgetsBindingObserver {
   final ZiggoMapController _mapController = ZiggoMapController();
   Place? _currentLocation;
+  // The last place the pin showed with a real address (or the GPS place); moving
+  // the map less than 15 m from it needs no new address lookup (pin_address.dart).
+  Place? _knownPlace;
   List<Map<String, dynamic>> _nearbyDrivers = const [];
   Timer? _nearbyTimer;
   DateTime? _scheduledTime;
@@ -139,8 +143,26 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> with WidgetsBin
       });
     }
 
-    if (wasRestricted || _currentLocation == null || fromResume) {
+    if (wasRestricted || _currentLocation == null) {
       await _initLocation();
+    } else if (fromResume && await _movedSinceLastFix()) {
+      await _initLocation();
+    }
+  }
+
+  // Back in the app: look up the location again only if the phone has moved
+  // 50 m or more since the screen last placed the pin on it.
+  Future<bool> _movedSinceLastFix() async {
+    final last = _deviceLocation;
+    if (last == null) return true;
+    try {
+      final p = await Geolocator.getLastKnownPosition();
+      if (p == null) return false;
+      return Geolocator.distanceBetween(
+              last.latitude, last.longitude, p.latitude, p.longitude) >=
+          50;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -159,6 +181,7 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> with WidgetsBin
     }
     setState(() {
       _currentLocation = here;
+      _knownPlace = here;
       _deviceLocation = here.location;
       _locationPermissionDenied = false;
       _locationServiceDisabled = false;
@@ -174,6 +197,17 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> with WidgetsBin
     final latDiff = (center.latitude - _currentLocation!.location.latitude).abs();
     final lngDiff = (center.longitude - _currentLocation!.location.longitude).abs();
     if (latDiff < 0.00001 && lngDiff < 0.00001) {
+      return;
+    }
+
+    // Still on the known place (the app's own camera moves end here too): keep
+    // its address, no lookup.
+    if (pinStillOn(_knownPlace, center)) {
+      _debounceTimer?.cancel();
+      setState(() {
+        _isDragging = false;
+        _currentLocation = placeAt(_knownPlace!, center);
+      });
       return;
     }
 
@@ -204,17 +238,24 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> with WidgetsBin
     final address = await MapsService.instance.reverseGeocode(center);
 
     if (!mounted) return;
+    if (pinMovedOn(_currentLocation?.location, center)) {
+      setState(() => _isResolving = false);
+      return;
+    }
 
-    if (address != null) {
-      setState(() {
+    setState(() {
+      if (address != null) {
         _currentLocation = Place(
           address.split(',').first, // Main text
           address,                  // Full address
           center,
         );
-      });
-    }
-    setState(() => _isResolving = false);
+        _knownPlace = _currentLocation;
+      } else {
+        _currentLocation = pinnedPlace(center);
+      }
+      _isResolving = false;
+    });
   }
 
   Future<void> _moveToCurrentLocation() async {
@@ -240,6 +281,7 @@ class _FareEstimateScreenState extends State<FareEstimateScreen> with WidgetsBin
       _locationPermissionDenied = false;
       _locationServiceDisabled = false;
       _currentLocation = here;
+      _knownPlace = here;
       _deviceLocation = here.location;
     });
     _mapController.moveTo(here.location, zoom: 16);

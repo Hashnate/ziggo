@@ -439,10 +439,13 @@ class ZiggoPolyline {
   final List<LatLng> points;
   final double strokeWidth;
   final Color color;
+  // Drawn as dashes, e.g. a straight "as the crow flies" line rather than a road.
+  final bool dashed;
   const ZiggoPolyline({
     required this.points,
     this.strokeWidth = 4,
     required this.color,
+    this.dashed = false,
   });
 }
 
@@ -828,6 +831,9 @@ class _ZiggoMapState extends State<ZiggoMap> {
           points: p.points.map(_g).toList(),
           width: p.strokeWidth.round(),
           color: p.color,
+          patterns: p.dashed
+              ? [gmaps.PatternItem.dash(18), gmaps.PatternItem.gap(12)]
+              : const <gmaps.PatternItem>[],
         ),
       );
     }

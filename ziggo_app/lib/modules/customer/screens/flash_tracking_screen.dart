@@ -38,6 +38,9 @@ class _FlashTrackingScreenState extends State<FlashTrackingScreen> with SingleTi
   List<Map<String, dynamic>> _nearbyDrivers = const [];
   bool _navigatedToRating = false;
   List<LatLng> _routePoints = const [];
+  // When the route was last asked for: build() asks only while there is none,
+  // at most every 30 s (it used to ask on every rebuild when no route came back).
+  DateTime? _routeAskedAt;
 
   StreamSubscription<Position>? _positionSubscription;
   LatLng? _customerLatLng;
@@ -377,7 +380,9 @@ class _FlashTrackingScreenState extends State<FlashTrackingScreen> with SingleTi
       });
     }
 
-    if (_routePoints.isEmpty) {
+    if (_routePoints.isEmpty &&
+        (_routeAskedAt == null || DateTime.now().difference(_routeAskedAt!) > const Duration(seconds: 30))) {
+      _routeAskedAt = DateTime.now();
       _fetchRoute(pickup, drop);
     }
 

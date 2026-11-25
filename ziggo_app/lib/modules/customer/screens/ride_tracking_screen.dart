@@ -40,11 +40,6 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
   // eject the user the moment they arrive from a flow that didn't prime the
   // provider (e.g. Scan & Go).
   bool _initialLoadDone = false;
-  List<LatLng> _routePoints = const [];
-  List<DirectionStep> _routeSteps = const [];
-  String? _routeKey;
-  LatLng? _lastRouteFrom;
-  LatLng? _lastRouteTo;
   bool _sheetExpanded = true;
   String? _lastStatus;
   bool _otpDialogShown = false;
@@ -194,33 +189,12 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
     super.dispose();
   }
 
-  /// Fetches the road route dynamically with distance checks to prevent excessive API requests.
-  void _ensureRoute(LatLng from, LatLng to) {
-    if (_lastRouteFrom != null && _lastRouteTo != null) {
-      final distFrom = Geolocator.distanceBetween(
-        _lastRouteFrom!.latitude, _lastRouteFrom!.longitude,
-        from.latitude, from.longitude,
-      );
-      final distTo = Geolocator.distanceBetween(
-        _lastRouteTo!.latitude, _lastRouteTo!.longitude,
-        to.latitude, to.longitude,
-      );
-      if (distFrom < 20 && distTo < 20 && _routePoints.isNotEmpty) {
-        return;
-      }
-    }
-    _lastRouteFrom = from;
-    _lastRouteTo = to;
-    final key = '${from.latitude},${from.longitude}'
-        '-${to.latitude},${to.longitude}';
-    _routeKey = key;
-    MapsService.instance.directions(from, to).then((dir) {
-      if (mounted && dir != null && dir.points.isNotEmpty) {
-        setState(() {
-          _routePoints = dir.points;
-          _routeSteps = dir.steps;
-        });
-      }
+  /// Asks the server for the booking's road route when the phone needs one (a new
+  /// leg, or a newer route after the driver left the old one); cheap when it
+  /// doesn't. The driver's app draws the same route.
+  void _syncRoute(BookingProvider booking, Map<String, dynamic> active) {
+    booking.routes.ensure(active).then((changed) {
+      if (changed && mounted) setState(() {});
     });
   }
 
@@ -417,26 +391,6 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
     }
   }
 
-  List<LatLng> _getRemainingRoute(List<LatLng> routePoints, LatLng? driverLoc) {
-    if (routePoints.isEmpty) return [];
-    if (driverLoc == null) return routePoints;
-    int closestIndex = 0;
-    double minSqDistance = double.infinity;
-    for (int i = 0; i < routePoints.length; i++) {
-      final p = routePoints[i];
-      final dLat = driverLoc.latitude - p.latitude;
-      final dLng = driverLoc.longitude - p.longitude;
-      final sqDist = dLat * dLat + dLng * dLng;
-      if (sqDist < minSqDistance) {
-        minSqDistance = sqDist;
-        closestIndex = i;
-      }
-    }
-    if (closestIndex >= routePoints.length - 1) {
-      return [driverLoc, routePoints.last];
-    }
-    return [driverLoc, ...routePoints.sublist(closestIndex)];
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -520,7 +474,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
       routeTo = drop;
     }
 
-    if (status != 'cancelled') _ensureRoute(routeFrom, routeTo);
+    if (status != 'cancelled') _syncRoute(booking, active);
     _updateMapCamera(status, pickup, drop, driverLatLng);
 
     // Show wandering driver pins only while we're still hunting for a driver.
@@ -547,10 +501,21 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
       });
     }
 
+    // The road route from the server for the booking's current leg, shrunk to
+    // what is still ahead of the driver; a straight line until it arrives.
+    final routeGeometry = booking.routes.current(active)?.geometry;
     final showRemainingRoute = status == 'accepted' || status == 'arrived' || status == 'started';
-    final activeRoutePoints = (showRemainingRoute && currentDisplayLatLng != null)
-        ? _getRemainingRoute(_routePoints, currentDisplayLatLng)
-        : (_routePoints.isNotEmpty ? _routePoints : [routeFrom, routeTo]);
+    final activeRoutePoints = routeGeometry == null
+        ? [routeFrom, routeTo]
+        : (showRemainingRoute && currentDisplayLatLng != null)
+            ? routeGeometry.remaining(currentDisplayLatLng)
+            : routeGeometry.points;
+    // The driver's next turn and the distance to it.
+    final nextTurn = (routeGeometry != null &&
+            currentDisplayLatLng != null &&
+            (status == 'started' || status == 'accepted'))
+        ? routeGeometry.nextTurn(currentDisplayLatLng)
+        : null;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -727,11 +692,11 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> with SingleTick
           ),
           // BRD: Turn-by-turn — first upcoming instruction overlayed below the
           // top status pill while the ride is in motion.
-          if (_routeSteps.isNotEmpty && (active['status'] == 'started' || active['status'] == 'accepted'))
+          if (nextTurn != null)
             Positioned(
               top: MediaQuery.of(context).padding.top + 70,
               left: 12, right: 12,
-              child: _NextStepStrip(step: _routeSteps.first),
+              child: _NextStepStrip(step: nextTurn),
             ),
           // Floating Re-Center / Follow Driver Button
           if (_userPanned && (status == 'accepted' || status == 'arrived' || status == 'started'))

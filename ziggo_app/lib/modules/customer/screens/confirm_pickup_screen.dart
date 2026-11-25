@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../core/map/location_permission_helper.dart';
 import '../../../core/map/maps_service.dart';
+import '../../../core/map/pin_address.dart';
 import '../../../core/map/places.dart';
 import '../../../core/map/ziggo_map.dart';
 
@@ -22,6 +23,8 @@ class ConfirmPickupScreen extends StatefulWidget {
 class _ConfirmPickupScreenState extends State<ConfirmPickupScreen> {
   final ZiggoMapController _mapController = ZiggoMapController();
   late Place _currentPlace;
+  // The place the pin is on; less than 15 m from it needs no address lookup.
+  late Place _knownPlace;
   bool _isResolving = false;
   Timer? _debounceTimer;
 
@@ -29,6 +32,7 @@ class _ConfirmPickupScreenState extends State<ConfirmPickupScreen> {
   void initState() {
     super.initState();
     _currentPlace = widget.initialLocation;
+    _knownPlace = widget.initialLocation;
   }
 
   @override
@@ -44,13 +48,24 @@ class _ConfirmPickupScreenState extends State<ConfirmPickupScreen> {
       return;
     }
 
-    // Only update position coordinates immediately to keep marker centered
+    if (pinStillOn(_knownPlace, center)) {
+      _debounceTimer?.cancel();
+      setState(() {
+        _currentPlace = placeAt(_knownPlace, center);
+        _isResolving = false;
+      });
+      return;
+    }
+
+    // Keep the marker's coordinates current; Confirm waits for the new address
+    // so a confirmed pickup never pairs an old name with new coordinates.
     setState(() {
       _currentPlace = Place(
         _currentPlace.name,
-        _currentPlace.fullAddress,
+        _currentPlace.area,
         center,
       );
+      _isResolving = true;
     });
 
     _debounceTimer?.cancel();
@@ -68,18 +83,21 @@ class _ConfirmPickupScreenState extends State<ConfirmPickupScreen> {
     final address = await MapsService.instance.reverseGeocode(center);
 
     if (!mounted) return;
+    if (pinMovedOn(_currentPlace.location, center)) return; // a newer lookup answers
 
-    if (address != null) {
-      setState(() {
+    setState(() {
+      if (address != null) {
         _currentPlace = Place(
           address.split(',').first, // Main text
           address,                  // Full address
           center,
         );
-      });
-    }
-
-    setState(() => _isResolving = false);
+        _knownPlace = _currentPlace;
+      } else {
+        _currentPlace = pinnedPlace(center);
+      }
+      _isResolving = false;
+    });
   }
 
   void _onConfirm() {
@@ -99,6 +117,8 @@ class _ConfirmPickupScreenState extends State<ConfirmPickupScreen> {
       _mapController.moveTo(here.location, zoom: 16);
       setState(() {
         _currentPlace = here;
+        _knownPlace = here;
+        _isResolving = false;
       });
     }
   }

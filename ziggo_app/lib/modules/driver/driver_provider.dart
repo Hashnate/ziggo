@@ -11,6 +11,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/map/trip_routes.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/ws_client.dart';
 import '../../core/notifications/fcm_service.dart';
@@ -19,6 +20,10 @@ import '../../core/services/floating_overlay_service.dart';
 class DriverProvider extends ChangeNotifier with WidgetsBindingObserver {
   final WsClient _ws = WsClient();
   WsClient get ws => _ws;
+
+  /// Road routes for this driver's rides and ride requests, worked out by the
+  /// server (the phone no longer asks Google every 20 m).
+  final TripRoutes routes = TripRoutes();
 
   bool _isOnline = false;
   bool get isOnline => _isOnline;
@@ -228,7 +233,18 @@ class DriverProvider extends ChangeNotifier with WidgetsBindingObserver {
       }
       return;
     }
-    
+    // A new road route for a ride (the driver left the old one, or the customer
+    // changed the destination). Handled before the request catch-all below.
+    if (event == 'route_changed') {
+      final bid = data['booking_id'];
+      if (bid is int) {
+        routes.fetch(bid).then((changed) {
+          if (changed) notifyListeners();
+        });
+      }
+      return;
+    }
+
     // Aggressive catch-all: If it looks like a request, show it!
     // Exclude cancellation events and broadcast notifications.
     final isCancelEvent = event.toString().contains('cancel');

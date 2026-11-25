@@ -60,6 +60,8 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
   bool _loading = false;
   bool _resolving = false;
   Timer? _debounce;
+  // One search with Google: the suggestions typed here and the place picked.
+  final String _session = MapsService.newSessionToken();
 
   @override
   void initState() {
@@ -97,9 +99,9 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
     }
     setState(() => _loading = true);
     _debounce = Timer(const Duration(milliseconds: 350), () async {
-      final remote = await MapsService.instance.autocomplete(q, near: widget.near);
-      // Offline fallback: when the Places API is unavailable (no API key) or
-      // returns nothing, search the curated Sri Lanka landmark list so the
+      final remote = await MapsService.instance.autocomplete(q, near: widget.near, sessionToken: _session);
+      // Offline fallback: when place search is unavailable (signed out, offline)
+      // or returns nothing, search the curated Sri Lanka landmark list so the
       // location picker still works without any paid API.
       final results = remote.isNotEmpty
           ? remote
@@ -123,7 +125,7 @@ class _PlaceSearchSheetState extends State<_PlaceSearchSheet> {
       return;
     }
     setState(() => _resolving = true);
-    final coords = await MapsService.instance.placeLatLng(p.placeId!);
+    final coords = await MapsService.instance.placeLatLng(p.placeId!, sessionToken: _session);
     if (!mounted) return;
     setState(() => _resolving = false);
     if (coords == null) {

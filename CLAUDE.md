@@ -280,8 +280,10 @@ Pattern: each provider holds a `Map<String, dynamic>?` of the current entity (e.
 
 ### Map
 
-- Maps use Google Maps (`google_maps_flutter`), wrapped by [`ZiggoMap`](ziggo_app/lib/core/map/ziggo_map.dart). The key comes from the build: `MAPS_API_KEY` in CI, `GOOGLE_MAPS_API_KEY` in the app's `.env`.
-- Place search uses Google Places via [maps_service.dart](ziggo_app/lib/core/map/maps_service.dart); [places.dart](ziggo_app/lib/core/map/places.dart) still holds Sri Lanka POIs used by some screens.
+- Maps use Google Maps (`google_maps_flutter`), wrapped by [`ZiggoMap`](ziggo_app/lib/core/map/ziggo_map.dart). The key comes from the build: `MAPS_API_KEY` in CI, `GOOGLE_MAPS_API_KEY` in the app's `.env`; it only displays maps (no key literal in source; a release build without one fails).
+- Routes, addresses and place search go through the backend (`/api/v1/maps/*`, see "Google Maps for the apps" in §3) via [maps_service.dart](ziggo_app/lib/core/map/maps_service.dart); the app never calls Google web services. Signed out (guest) it gets nothing back and falls back to [places.dart](ziggo_app/lib/core/map/places.dart) landmarks, "Current location" and straight lines.
+- Ride routes are one per booking leg from `GET /bookings/{id}/route`, kept in `BookingProvider.routes` / `DriverProvider.routes` ([trip_routes.dart](ziggo_app/lib/core/map/trip_routes.dart)) and shrunk on the phone with [route_progress.dart](ziggo_app/lib/core/map/route_progress.dart) (`RouteGeometry.remaining`, `nextTurn`). Never re-fetch a route as the driver moves; the server sends `route_changed` when it re-routes.
+- Pin-drop screens look an address up only when the pin stops 15 m or more from the place it showed ([pin_address.dart](ziggo_app/lib/core/map/pin_address.dart)). Search screens pass one `MapsService.newSessionToken()` per search.
 - Live location uses the OS GPS via `geolocator`.
 
 ### Theming — "soft-shadow" design language
@@ -344,7 +346,7 @@ Material 3, royal-blue brand seed in [app_colors.dart](ziggo_app/lib/app/app_col
 - **Decline forwarding hits the DB twice with nested executes** — see `decline_booking`'s `(await db.execute(select(Customer.user_id)...))` inside a `select(User)`. Works, but ugly. If you touch it, use two clean queries.
 - **`Booking.is_flash` index split**: `/admin/bookings` filters `is_flash == False`, `/admin/flash` filters `is_flash == True`. Anything booking-listing-related on the admin side has to honor this split.
 - **Schemas mismatch with model fields**: some response models (e.g. `FoodOrderResponse`) don't include `items` even though the model has them. Re-check the schema before assuming a field is round-tripped.
-- **Places**: the backend stores lat/lng plus free-form address strings everywhere; the app's place search uses Google Places (`core/map/maps_service.dart`) plus the static POIs in `core/map/places.dart`.
+- **Places**: the backend stores lat/lng plus free-form address strings everywhere; the app's place search goes through the backend's `/api/v1/maps/autocomplete` (`core/map/maps_service.dart`) plus the static POIs in `core/map/places.dart`.
 - **Tests**: the backend tests in `ziggo_backend/tests/` (fare golden, districts, launch locations, genders, customer location, Customer Map) run with `deploy/staging/run-backend-tests.sh`; `deploy/staging/*_checks.py` exercise staging end to end. `ziggo_app/test/` is still the default Flutter scaffold, so app changes are only compiled by the staging APK build; try them on a phone.
 
 ---

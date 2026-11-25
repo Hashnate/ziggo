@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/map/trip_routes.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/ws_client.dart';
 import '../../core/notifications/fcm_service.dart';
@@ -15,6 +16,9 @@ import '../../core/notifications/fcm_service.dart';
 class BookingProvider extends ChangeNotifier with WidgetsBindingObserver {
   final WsClient _ws = WsClient();
   WsClient get ws => _ws;
+
+  /// Road routes of this customer's bookings, worked out by the server.
+  final TripRoutes routes = TripRoutes();
 
   final _adminUpdateController = StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get adminUpdates => _adminUpdateController.stream;
@@ -124,6 +128,15 @@ class BookingProvider extends ChangeNotifier with WidgetsBindingObserver {
           driverData['current_heading'] = data['heading'];
           _activeBooking = {..._activeBooking!, 'driver': driverData};
           notifyListeners();
+        }
+      } else if (event == 'route_changed') {
+        // The server worked out a new road route (the driver left the old one,
+        // or the destination changed).
+        final bid = data['booking_id'];
+        if (bid is int) {
+          routes.fetch(bid).then((changed) {
+            if (changed) notifyListeners();
+          });
         }
       } else if (event == 'admin_config_update') {
         _adminUpdateController.add(data ?? {});

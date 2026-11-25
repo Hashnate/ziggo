@@ -26,8 +26,10 @@ if (mapsApiKey.isBlank()) {
         mapsApiKey = envProps.getProperty("GOOGLE_MAPS_API_KEY") ?: ""
     }
 }
-if (mapsApiKey.isBlank()) {
-    mapsApiKey = "AIzaSyAFtdjwK5SdMdo7c4F7jvJHWE-OE2LDSCk"
+// No key in source: CI writes MAPS_API_KEY into local.properties. A release
+// build without one would ship blank maps, so it stops here instead.
+if (mapsApiKey.isBlank() && gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }) {
+    throw GradleException("MAPS_API_KEY is not set (android/local.properties or ziggo_app/.env)")
 }
 
 val keystoreProperties = Properties().apply {

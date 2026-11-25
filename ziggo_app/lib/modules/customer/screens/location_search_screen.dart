@@ -59,7 +59,10 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
   bool _loading = false;
   bool _resolving = false;
   Timer? _debounce;
-  
+  // One search with Google: the suggestions typed and the place picked. A new
+  // token after each pick (the pickup and the drop are two searches).
+  String _session = MapsService.newSessionToken();
+
   bool get _isPickupFocused => _pickupFocus.hasFocus;
 
   @override
@@ -119,7 +122,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
     }
     setState(() => _loading = true);
     _debounce = Timer(const Duration(milliseconds: 350), () async {
-      final r = await MapsService.instance.autocomplete(q, near: _pickup?.location);
+      final r = await MapsService.instance.autocomplete(q, near: _pickup?.location, sessionToken: _session);
       if (!mounted) return;
       setState(() {
         _results = r;
@@ -130,10 +133,11 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
 
   Future<void> _selectPrediction(PlacePrediction p) async {
     setState(() => _resolving = true);
-    final coords = await MapsService.instance.placeLatLng(p.placeId);
+    final coords = await MapsService.instance.placeLatLng(p.placeId, sessionToken: _session);
     if (!mounted) return;
+    _session = MapsService.newSessionToken();
     setState(() => _resolving = false);
-    
+
     if (coords == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not resolve that location')),

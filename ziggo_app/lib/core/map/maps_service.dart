@@ -1,15 +1,14 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart';
-import 'package:dio/io.dart';
-import 'package:dio/dio.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'dart:math';
+
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../network/api_client.dart';
+import '../storage/token_storage.dart';
 import 'places.dart';
 
-/// A Google Places autocomplete prediction (no coordinates — those are
-/// resolved on selection via [MapsService.placeLatLng]).
+/// A place suggestion (no coordinates — those are resolved on selection via
+/// [MapsService.placeLatLng]).
 class PlacePrediction {
   final String placeId;
   final String mainText;
@@ -25,7 +24,6 @@ class PlacePrediction {
       secondaryText.isEmpty ? mainText : '$mainText, $secondaryText';
 }
 
-/// Result of a Directions API call.
 /// One step in a turn-by-turn route (BRD: Turn-by-turn navigation).
 class DirectionStep {
   final String instruction;   // HTML-stripped human text ("Turn right onto X")
@@ -45,6 +43,7 @@ class DirectionStep {
   });
 }
 
+/// A road route: the line to draw, its distance and duration, and its steps.
 class DirectionsResult {
   final List<LatLng> points;
   final double distanceKm;
@@ -58,47 +57,66 @@ class DirectionsResult {
     required this.durationMin,
     this.steps = const [],
   });
+
+  /// From the server's route JSON: {polyline, distance_m, duration_s, steps}.
+  factory DirectionsResult.fromServer(Map<String, dynamic> json) {
+    LatLng at(List<dynamic> v) =>
+        LatLng((v[0] as num).toDouble(), (v[1] as num).toDouble());
+
+    final steps = <DirectionStep>[];
+    for (final s in (json['steps'] as List?) ?? const []) {
+      if (s is! Map) continue;
+      final start = s['start'];
+      final end = s['end'];
+      if (start is! List || end is! List || start.length < 2 || end.length < 2) continue;
+      steps.add(DirectionStep(
+        instruction: (s['instruction'] ?? '').toString(),
+        maneuver: (s['maneuver'] ?? '').toString(),
+        distanceM: ((s['distance_m'] as num?) ?? 0).toDouble(),
+        durationS: ((s['duration_s'] as num?) ?? 0).toInt(),
+        startLocation: at(start),
+        endLocation: at(end),
+      ));
+    }
+    return DirectionsResult(
+      points: decodePolyline((json['polyline'] ?? '').toString()),
+      distanceKm: ((json['distance_m'] as num?) ?? 0) / 1000.0,
+      durationMin: (((json['duration_s'] as num?) ?? 0) / 60).round(),
+      steps: steps,
+    );
+  }
 }
 
-/// Thin client over the Google Maps web-service APIs (Places + Directions).
+/// Google Maps through the Ziggo server (/api/v1/maps). The app holds no Google
+/// web-service key; the server shares answers between users and counts the calls.
 ///
-/// The API key is loaded at app startup from `ziggo_app/.env` (gitignored)
-/// via `flutter_dotenv` — never hardcoded in source. For full
-/// defence-in-depth, restrict the key in Google Cloud Console to your app's
-/// Android package / iOS bundle ID / web referrer + the specific APIs used.
+/// A login is needed. Guests get empty answers, and the screens fall back to the
+/// built-in landmarks, "Current location" and straight lines — as they always did
+/// when Google gave nothing back.
 class MapsService {
-  MapsService._() {
-    if (!kIsWeb) {
-      (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
-        final client = HttpClient();
-        client.badCertificateCallback = (cert, host, port) => true;
-        return client;
-      };
-    }
-  }
+  MapsService._();
   static final MapsService instance = MapsService._();
 
-  // Read at every call so a hot-reload that re-loads .env is picked up.
-  // Falls back to empty string if the .env file is missing, in which case
-  // every API call short-circuits to an empty result.
-  String get _apiKey {
-    final key = (dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '').trim();
-    if (key.isEmpty) {
-      print('MapsService: GOOGLE_MAPS_API_KEY not found in .env. Using fallback API Key.');
-      return 'AIzaSyAFtdjwK5SdMdo7c4F7jvJHWE-OE2LDSCk';
-    }
-    print('MapsService: GOOGLE_MAPS_API_KEY successfully loaded from .env.');
-    return key;
+  static const double _reuseAddressMeters = 30;
+  static const Duration _reuseAddressFor = Duration(minutes: 10);
+
+  // The last current-location address, reused while the phone stays near it so
+  // opening the app or a screen again doesn't look the same place up again.
+  LatLng? _hereAt;
+  String? _hereAddress;
+  DateTime? _hereWhen;
+
+  Future<bool> _signedIn() async {
+    final token = await TokenStorage.getToken();
+    return token != null && token.isNotEmpty;
   }
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 8),
-      receiveTimeout: const Duration(seconds: 10),
-    ),
-  );
-
-  static const double _maxGeocodeDistanceMeters = 10000;
+  /// A new token for one place search: the suggestions typed for it and the
+  /// place finally picked count as a single search with Google.
+  static String newSessionToken() {
+    final r = Random.secure();
+    return List.generate(16, (_) => r.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+  }
 
   /// The device's last known position, without prompting or waiting for a fix.
   Future<LatLng?> _lastKnownPoint() async {
@@ -110,208 +128,113 @@ class MapsService {
     }
   }
 
-  /// Places Autocomplete — limited to Sri Lanka, biased to [near] or else to
-  /// where the device is (otherwise Google guesses from the IP, usually Colombo).
-  Future<List<PlacePrediction>> autocomplete(String query, {LatLng? near}) async {
-    if (query.trim().length < 2) return const [];
-    if (_apiKey.isEmpty) return const [];
+  /// Place suggestions in Sri Lanka, biased to [near] or else to where the
+  /// device is. Pass the same [sessionToken] for every search of one pick.
+  Future<List<PlacePrediction>> autocomplete(
+    String query, {
+    LatLng? near,
+    String? sessionToken,
+  }) async {
+    final text = query.trim();
+    if (text.length < 2 || !await _signedIn()) return const [];
     near ??= await _lastKnownPoint();
     try {
-      final resp = await _dio.get(
-        'https://maps.googleapis.com/maps/api/place/autocomplete/json',
+      final resp = await ApiClient.instance.dio.get(
+        '/maps/autocomplete',
         queryParameters: {
-          'input': query.trim(),
-          'key': _apiKey,
-          'components': 'country:lk',
-          if (near != null) 'location': '${near.latitude},${near.longitude}',
-          if (near != null) 'radius': 50000,
+          'input': text,
+          if (sessionToken != null) 'session': sessionToken,
+          if (near != null) 'lat': near.latitude,
+          if (near != null) 'lng': near.longitude,
         },
       );
-      final preds = (resp.data['predictions'] as List?) ?? const [];
-      return preds.map<PlacePrediction>((p) {
-        final sf = (p['structured_formatting'] as Map?) ?? const {};
-        return PlacePrediction(
-          placeId: (p['place_id'] ?? '').toString(),
-          mainText: (sf['main_text'] ?? p['description'] ?? '').toString(),
-          secondaryText: (sf['secondary_text'] ?? '').toString(),
-        );
-      }).toList();
+      final data = resp.data;
+      final preds = (data is Map ? data['predictions'] as List? : null) ?? const [];
+      return preds
+          .whereType<Map>()
+          .map((p) => PlacePrediction(
+                placeId: (p['place_id'] ?? '').toString(),
+                mainText: (p['main_text'] ?? '').toString(),
+                secondaryText: (p['secondary_text'] ?? '').toString(),
+              ))
+          .where((p) => p.placeId.isNotEmpty)
+          .toList();
     } catch (_) {
       return const [];
     }
   }
 
-  /// Resolves a place_id to its coordinates.
-  Future<LatLng?> placeLatLng(String placeId) async {
-    if (_apiKey.isEmpty) return null;
+  /// Coordinates of a picked suggestion. Pass the search's [sessionToken].
+  Future<LatLng?> placeLatLng(String placeId, {String? sessionToken}) async {
+    if (placeId.isEmpty || !await _signedIn()) return null;
     try {
-      final resp = await _dio.get(
-        'https://maps.googleapis.com/maps/api/place/details/json',
+      final resp = await ApiClient.instance.dio.get(
+        '/maps/place',
         queryParameters: {
           'place_id': placeId,
-          'key': _apiKey,
-          'fields': 'geometry',
+          if (sessionToken != null) 'session': sessionToken,
         },
       );
-      final loc = resp.data['result']?['geometry']?['location'];
-      if (loc == null) return null;
-      return LatLng(
-        (loc['lat'] as num).toDouble(),
-        (loc['lng'] as num).toDouble(),
-      );
+      final data = resp.data;
+      final loc = data is Map ? data['location'] : null;
+      if (loc is! Map || loc['lat'] == null || loc['lng'] == null) return null;
+      return LatLng((loc['lat'] as num).toDouble(), (loc['lng'] as num).toDouble());
     } catch (_) {
       return null;
     }
   }
 
-  /// Reverse-geocode a coordinate to a human-readable address.
-  ///
-  /// Plus codes (e.g. "G52J+XF5, B541") get filtered out at two levels:
-  /// (a) results whose `types` contains `plus_code` are skipped, and
-  /// (b) any `formatted_address` that still leads with a plus-code prefix has
-  ///     that prefix stripped. If nothing readable is left, the address is
-  ///     rebuilt from `address_components` (route / sublocality / locality).
+  /// A readable address for a point (plus codes and far-away matches are
+  /// filtered out by the server), or null.
   Future<String?> reverseGeocode(LatLng point) async {
-    if (_apiKey.isEmpty) return null;
+    if (!await _signedIn()) return null;
     try {
-      final resp = await _dio.get(
-        'https://maps.googleapis.com/maps/api/geocode/json',
-        queryParameters: {
-          'latlng': '${point.latitude},${point.longitude}',
-          'key': _apiKey,
-        },
+      final resp = await ApiClient.instance.dio.get(
+        '/maps/reverse-geocode',
+        queryParameters: {'lat': point.latitude, 'lng': point.longitude},
       );
-      // Google sometimes ranks an unrelated place first (points in Kinniya come
-      // back with a street in Hanoi), so only use results near the point.
-      final results = ((resp.data['results'] as List?) ?? const []).where((r) {
-        final loc = r['geometry']?['location'];
-        final lat = (loc?['lat'] as num?)?.toDouble();
-        final lng = (loc?['lng'] as num?)?.toDouble();
-        return lat != null &&
-            lng != null &&
-            Geolocator.distanceBetween(point.latitude, point.longitude, lat, lng) <=
-                _maxGeocodeDistanceMeters;
-      }).toList();
-      final plusCodeRe = RegExp(r'^[A-Z0-9]{4,8}\+[A-Z0-9]{2,7}\b');
-
-      String stripPlusPrefix(String s) {
-        var out = s;
-        if (plusCodeRe.hasMatch(out)) {
-          out = out.replaceFirst(plusCodeRe, '').trim();
-          if (out.startsWith(',')) out = out.substring(1).trim();
-        }
-        return out;
-      }
-
-      for (final r in results) {
-        final types = (r['types'] as List?)?.cast<String>() ?? const [];
-        if (types.contains('plus_code')) continue;
-        final addr = r['formatted_address']?.toString() ?? '';
-        final cleaned = stripPlusPrefix(addr);
-        if (cleaned.isNotEmpty) return cleaned;
-      }
-
-      // Fallback: rebuild from address_components on the first result.
-      if (results.isNotEmpty) {
-        final comps =
-            (results.first['address_components'] as List?) ?? const [];
-        String? route, neighborhood, sublocality, locality;
-        for (final c in comps) {
-          final t = (c['types'] as List?)?.cast<String>() ?? const [];
-          final name = c['long_name']?.toString() ?? '';
-          if (name.isEmpty) continue;
-          if (t.contains('route')) route ??= name;
-          if (t.contains('neighborhood')) neighborhood ??= name;
-          if (t.contains('sublocality')) sublocality ??= name;
-          if (t.contains('locality')) locality ??= name;
-        }
-        final primary = route ?? neighborhood ?? sublocality ?? locality;
-        final secondary = locality ?? sublocality ?? neighborhood;
-        if (primary != null) {
-          return secondary != null && secondary != primary
-              ? '$primary, $secondary'
-              : primary;
-        }
-      }
-      return null;
+      final data = resp.data;
+      final address = data is Map ? data['address'] : null;
+      return address is String && address.trim().isNotEmpty ? address.trim() : null;
     } catch (_) {
       return null;
     }
   }
 
-  /// Directions between two points — returns the decoded route polyline plus
-  /// the road distance and duration.
-  Future<DirectionsResult?> directions(LatLng origin, LatLng dest) async {
-    if (_apiKey.isEmpty) return null;
+  /// Road route from [origin] to [dest].
+  Future<DirectionsResult?> directions(LatLng origin, LatLng dest) =>
+      route([origin, dest]);
+
+  /// Road route through [points] in order (start, stops, end), as one request.
+  Future<DirectionsResult?> route(List<LatLng> points) async {
+    if (points.length < 2 || points.length > 12 || !await _signedIn()) return null;
     try {
-      final resp = await _dio.get(
-        'https://maps.googleapis.com/maps/api/directions/json',
-        queryParameters: {
-          'origin': '${origin.latitude},${origin.longitude}',
-          'destination': '${dest.latitude},${dest.longitude}',
-          'key': _apiKey,
+      final resp = await ApiClient.instance.dio.post(
+        '/maps/route',
+        data: {
+          'points': [
+            for (final p in points) {'lat': p.latitude, 'lng': p.longitude},
+          ],
         },
       );
-      final status = resp.data['status'] as String?;
-      final routes = (resp.data['routes'] as List?) ?? const [];
-      if (routes.isEmpty) {
-        print('MapsService directions response status: $status, error: ${resp.data['error_message']}');
-        return null;
-      }
-      final route = routes.first;
-      final legs = (route['legs'] as List?) ?? const [];
-      if (legs.isEmpty) return null;
-      final leg = legs.first;
-      final encoded = route['overview_polyline']?['points'] as String?;
-
-      // BRD: Turn-by-turn — parse Google's per-step instructions. The
-      // `html_instructions` field has light HTML (<b>, <div>) which we strip.
-      final rawSteps = (leg['steps'] as List?) ?? const [];
-      final steps = <DirectionStep>[];
-      for (final s in rawSteps) {
-        if (s is! Map) continue;
-        final txt = (s['html_instructions'] ?? '').toString().replaceAll(
-              RegExp(r'<[^>]+>'),
-              ' ',
-            ).replaceAll(RegExp(r'\s+'), ' ').trim();
-        final start = s['start_location'] as Map?;
-        final end = s['end_location'] as Map?;
-        if (start == null || end == null) continue;
-        steps.add(DirectionStep(
-          instruction: txt,
-          maneuver: (s['maneuver'] ?? '').toString(),
-          distanceM: ((s['distance']?['value'] as num?) ?? 0).toDouble(),
-          durationS: ((s['duration']?['value'] as num?) ?? 0).toInt(),
-          startLocation: LatLng(
-            (start['lat'] as num).toDouble(),
-            (start['lng'] as num).toDouble(),
-          ),
-          endLocation: LatLng(
-            (end['lat'] as num).toDouble(),
-            (end['lng'] as num).toDouble(),
-          ),
-        ));
-      }
-
-      return DirectionsResult(
-        points: encoded == null ? const [] : _decodePolyline(encoded),
-        distanceKm: ((leg['distance']?['value'] as num?) ?? 0) / 1000.0,
-        durationMin: (((leg['duration']?['value'] as num?) ?? 0) / 60).round(),
-        steps: steps,
-      );
-    } catch (e, s) {
-      print('MapsService directions error: $e\n$s');
+      final data = resp.data;
+      final raw = data is Map ? data['route'] : null;
+      if (raw is! Map) return null;
+      final result = DirectionsResult.fromServer(Map<String, dynamic>.from(raw));
+      return result.points.length < 2 ? null : result;
+    } catch (_) {
       return null;
     }
   }
 
-  /// Resolve the device's current GPS position into a [Place], reverse-geocoded
-  /// for a readable address.
+  /// Resolve the device's current GPS position into a [Place], with a readable
+  /// address when one can be found.
   ///
   /// To stay responsive: first tries `getLastKnownPosition` (instant on devices
   /// that have any recent fix), and falls back to a fresh fix with an 8-second
-  /// time limit so we never hang. Reverse-geocoding failure is non-fatal — the
-  /// returned [Place] just shows "Current location" in that case.
+  /// time limit so we never hang. The address is reused while the phone stays
+  /// within 30 m of where it was looked up (for 10 minutes). Without an address
+  /// the returned [Place] just shows "Current location".
   Future<Place?> currentLocationAsPlace() async {
     try {
       if (!await Geolocator.isLocationServiceEnabled()) return null;
@@ -337,7 +260,25 @@ class MapsService {
       );
 
       final point = LatLng(pos.latitude, pos.longitude);
-      final addr = await reverseGeocode(point);
+      final now = DateTime.now();
+      final reuse = _hereAt != null &&
+          _hereAddress != null &&
+          _hereWhen != null &&
+          now.difference(_hereWhen!) < _reuseAddressFor &&
+          Geolocator.distanceBetween(
+                _hereAt!.latitude, _hereAt!.longitude, point.latitude, point.longitude) <=
+              _reuseAddressMeters;
+      String? addr;
+      if (reuse) {
+        addr = _hereAddress;
+      } else {
+        addr = await reverseGeocode(point);
+        if (addr != null) {
+          _hereAt = point;
+          _hereAddress = addr;
+          _hereWhen = now;
+        }
+      }
       if (addr == null || addr.isEmpty) {
         return Place('Current location', 'Live GPS', point);
       }
@@ -349,29 +290,32 @@ class MapsService {
       return null;
     }
   }
+}
 
-  /// Standard Google "encoded polyline algorithm" decoder.
-  List<LatLng> _decodePolyline(String encoded) {
-    final List<LatLng> points = [];
-    int index = 0, lat = 0, lng = 0;
-    while (index < encoded.length) {
-      int b, shift = 0, result = 0;
-      do {
-        b = encoded.codeUnitAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      lat += (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
-      shift = 0;
-      result = 0;
-      do {
-        b = encoded.codeUnitAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      lng += (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
-      points.add(LatLng(lat / 1e5, lng / 1e5));
-    }
-    return points;
+/// Google's "encoded polyline" format -> points.
+List<LatLng> decodePolyline(String encoded) {
+  final List<LatLng> points = [];
+  int index = 0, lat = 0, lng = 0;
+  final len = encoded.length;
+  while (index < len) {
+    int b, shift = 0, result = 0;
+    do {
+      if (index >= len) return points;
+      b = encoded.codeUnitAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    lat += (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
+    shift = 0;
+    result = 0;
+    do {
+      if (index >= len) return points;
+      b = encoded.codeUnitAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    lng += (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
+    points.add(LatLng(lat / 1e5, lng / 1e5));
   }
+  return points;
 }

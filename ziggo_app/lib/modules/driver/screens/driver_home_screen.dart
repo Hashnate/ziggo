@@ -19,6 +19,7 @@ import '../../../app/app_colors.dart';
 import '../../../app/app_styles.dart';
 import '../../../core/map/ziggo_map.dart';
 import '../../../core/map/maps_service.dart';
+import '../../../core/map/route_progress.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/ws_client.dart';
 import '../../auth/auth_provider.dart';
@@ -70,71 +71,57 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
   int _activeIncentiveIndex = 0;
   final PageController _incentivePageController = PageController(initialPage: 0);
 
+  // Food/Mart deliveries: one road route per leg (POST /maps/route, through the
+  // server), shrunk here as the driver moves. A new one only when the driver has
+  // been more than 60 m off it for 20 s, at most once a minute.
   String? _lastRouteOrderType; // 'food' or 'market'
   int? _lastRouteOrderId;
   String? _lastRouteOrderStatus;
-  LatLng? _lastDriverLatLng;
   List<LatLng> _driverToPickupPoints = [];
   List<LatLng> _pickupToDeliveryPoints = [];
+  RouteGeometry? _orderLegGeometry;
+  DateTime? _orderRouteAskedAt;
+  DateTime? _orderOffRouteSince;
+  bool _orderRouteLoading = false;
 
   LatLng? _pendingPickupLatLng;
-  List<LatLng> _pendingRoutePoints = [];
   String? _pendingPickupLabel;
   bool _requestSheetCollapsed = false;
   int? _lastPendingRequestId;
 
-  int? _lastRideId;
-  String? _lastRideStatus;
-  LatLng? _lastRideDriverLatLng;
-  List<LatLng> _rideRoutePoints = [];
+  // Rides: the road route comes from the server (DriverProvider.routes) and is
+  // shrunk here. These only drive the camera and the off-route safety net.
+  String? _lastRideCameraKey;
+  DateTime? _rideOffRouteSince;
+  DateTime? _rideRouteAskedAt;
   LatLng? _lastFollowLatLng;
 
   void _foodMarketRoutePointsCleaned() {
     _lastRouteOrderId = null;
     _lastRouteOrderType = null;
     _lastRouteOrderStatus = null;
-    _lastDriverLatLng = null;
     _driverToPickupPoints = [];
     _pickupToDeliveryPoints = [];
-  }
-
-  List<LatLng> _getRemainingRoute(List<LatLng> routePoints, LatLng? driverLoc) {
-    if (routePoints.isEmpty) return [];
-    if (driverLoc == null) return routePoints;
-    int closestIndex = 0;
-    double minSqDistance = double.infinity;
-    for (int i = 0; i < routePoints.length; i++) {
-      final p = routePoints[i];
-      final dLat = driverLoc.latitude - p.latitude;
-      final dLng = driverLoc.longitude - p.longitude;
-      final sqDist = dLat * dLat + dLng * dLng;
-      if (sqDist < minSqDistance) {
-        minSqDistance = sqDist;
-        closestIndex = i;
-      }
-    }
-    if (closestIndex >= routePoints.length - 1) {
-      return [driverLoc, routePoints.last];
-    }
-    return [driverLoc, ...routePoints.sublist(closestIndex)];
+    _orderLegGeometry = null;
+    _orderRouteAskedAt = null;
+    _orderOffRouteSince = null;
   }
 
   List<LatLng> get _foodMarketRoutePoints {
     final driver = context.read<DriverProvider>();
-    final food = driver.activeFoodOrder;
-    final market = driver.activeMarketOrder;
-    final activeOrder = food ?? market;
-    if (activeOrder == null || _lastDriverLatLng == null) return [];
+    final activeOrder = driver.activeFoodOrder ?? driver.activeMarketOrder;
+    if (activeOrder == null || _driverToPickupPoints.isEmpty) return [];
 
     final status = (activeOrder['status'] ?? '').toString();
     final headingToCustomer = status == 'out_for_delivery';
-
-    final remainingDriverToPickup = _getRemainingRoute(_driverToPickupPoints, _lastDriverLatLng);
+    final here = driver.currentLocation;
+    final geo = _orderLegGeometry;
+    final remaining = (geo != null && here != null) ? geo.remaining(here) : _driverToPickupPoints;
 
     if (headingToCustomer) {
-      return remainingDriverToPickup;
+      return remaining;
     } else {
-      return [...remainingDriverToPickup, ..._pickupToDeliveryPoints];
+      return [...remaining, ..._pickupToDeliveryPoints];
     }
   }
 
@@ -152,94 +139,118 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
 
     final pickup = LatLng(pickupLat, pickupLng);
     final drop = LatLng(dropLat, dropLng);
+    final type = isMarket ? 'market' : 'food';
 
-    final isNewOrder = _lastRouteOrderId != orderId || _lastRouteOrderType != (isMarket ? 'market' : 'food');
-    if (isNewOrder) {
+    // A new order: the shop -> customer part, once.
+    if (_lastRouteOrderId != orderId || _lastRouteOrderType != type) {
+      _foodMarketRoutePointsCleaned();
       _lastRouteOrderId = orderId;
-      _lastRouteOrderType = isMarket ? 'market' : 'food';
-      _pickupToDeliveryPoints = [];
-      _driverToPickupPoints = [];
-      _lastRouteOrderStatus = null;
-      _lastDriverLatLng = null;
-
+      _lastRouteOrderType = type;
       final dir = await MapsService.instance.directions(pickup, drop);
-      if (dir != null && dir.points.isNotEmpty) {
-        _pickupToDeliveryPoints = dir.points;
-      } else {
-        _pickupToDeliveryPoints = [pickup, drop];
-      }
+      if (!mounted || _lastRouteOrderId != orderId) return;
+      _pickupToDeliveryPoints = (dir != null && dir.points.isNotEmpty) ? dir.points : [pickup, drop];
     }
 
-    final statusChanged = _lastRouteOrderStatus != status;
-    final driverMoved = _lastDriverLatLng == null ||
-        Geolocator.distanceBetween(
-          _lastDriverLatLng!.latitude, _lastDriverLatLng!.longitude,
-          driverLoc.latitude, driverLoc.longitude
-        ) > 20;
-
-    if (statusChanged || driverMoved || isNewOrder) {
-      _lastRouteOrderStatus = status;
-      _lastDriverLatLng = driverLoc;
-
-      final headingToCustomer = status == 'out_for_delivery';
-      final target = headingToCustomer ? drop : pickup;
-
-      final dir = await MapsService.instance.directions(driverLoc, target);
-      if (dir != null && dir.points.isNotEmpty) {
-        _driverToPickupPoints = dir.points;
+    // The driver's own leg: when it starts or changes, or after 20 s off it.
+    final now = DateTime.now();
+    var fetch = _lastRouteOrderStatus != status;
+    if (!fetch && _orderLegGeometry != null) {
+      if (_orderLegGeometry!.locate(driverLoc).offMeters <= 60) {
+        _orderOffRouteSince = null;
       } else {
-        _driverToPickupPoints = [driverLoc, target];
+        _orderOffRouteSince ??= now;
+        fetch = now.difference(_orderOffRouteSince!) >= const Duration(seconds: 20) &&
+            (_orderRouteAskedAt == null || now.difference(_orderRouteAskedAt!) >= const Duration(seconds: 60));
       }
-      if (mounted) {
-        setState(() {});
-      }
+    }
+    if (!fetch || _orderRouteLoading) return;
+
+    _lastRouteOrderStatus = status;
+    _orderRouteAskedAt = now;
+    _orderOffRouteSince = null;
+    _orderRouteLoading = true;
+    final target = status == 'out_for_delivery' ? drop : pickup;
+    try {
+      final dir = await MapsService.instance.directions(driverLoc, target);
+      if (!mounted || _lastRouteOrderId != orderId) return;
+      _driverToPickupPoints = (dir != null && dir.points.isNotEmpty) ? dir.points : [driverLoc, target];
+      _orderLegGeometry = RouteGeometry(_driverToPickupPoints, const []);
+      setState(() {});
+    } finally {
+      _orderRouteLoading = false;
     }
   }
 
-  Future<void> _updateActiveRideRoute(LatLng driverLoc, Map<String, dynamic> ride) async {
-    final rideId = ride['id'] as int?;
-    final status = (ride['status'] ?? '').toString();
+  /// The ride's road route from the server, shrunk to what is still ahead of the
+  /// driver; a straight line to where the driver is going until it arrives.
+  List<LatLng> _rideRoutePoints(DriverProvider driver, Map<String, dynamic> ride) {
+    final here = driver.currentLocation;
+    final geo = driver.routes.current(ride)?.geometry;
+    if (geo != null) return here == null ? geo.points : geo.remaining(here);
+    final started = ride['status'] == 'started';
+    final lat = ((started ? ride['drop_lat'] : ride['pickup_lat']) as num?)?.toDouble();
+    final lng = ((started ? ride['drop_lng'] : ride['pickup_lng']) as num?)?.toDouble();
+    if (here == null || lat == null || lng == null) return const [];
+    return [here, LatLng(lat, lng)];
+  }
+
+  /// Asks the server for the ride's route when the phone needs one (cheap when
+  /// it doesn't), and frames driver and pickup once a ride is accepted.
+  void _syncRideRoute(DriverProvider driver, Map<String, dynamic> ride) {
+    driver.routes.ensure(ride).then((changed) {
+      if (changed && mounted) setState(() {});
+    });
+    final key = '${ride['id']}:${ride['status']}';
+    if (_lastRideCameraKey == key) return;
+    _lastRideCameraKey = key;
+    _rideOffRouteSince = null;
+    final here = driver.currentLocation;
     final pickupLat = (ride['pickup_lat'] as num?)?.toDouble();
     final pickupLng = (ride['pickup_lng'] as num?)?.toDouble();
-    final dropLat = (ride['drop_lat'] as num?)?.toDouble();
-    final dropLng = (ride['drop_lng'] as num?)?.toDouble();
-
-    if (pickupLat == null || pickupLng == null || dropLat == null || dropLng == null || rideId == null) {
-      return;
-    }
-
-    final target = status == 'started' ? LatLng(dropLat, dropLng) : LatLng(pickupLat, pickupLng);
-
-    final isNewRide = _lastRideId != rideId;
-    final statusChanged = _lastRideStatus != status;
-    final driverMoved = _lastRideDriverLatLng == null ||
-        Geolocator.distanceBetween(
-          _lastRideDriverLatLng!.latitude, _lastRideDriverLatLng!.longitude,
-          driverLoc.latitude, driverLoc.longitude
-        ) > 20;
-
-    if (isNewRide || statusChanged || driverMoved) {
-      _lastRideId = rideId;
-      _lastRideStatus = status;
-      _lastRideDriverLatLng = driverLoc;
-
-      final dir = await MapsService.instance.directions(driverLoc, target);
-      if (dir != null && dir.points.isNotEmpty) {
-        _rideRoutePoints = dir.points;
-      } else {
-        _rideRoutePoints = [driverLoc, target];
-      }
-      if (mounted) {
-        setState(() {});
-        if (isNewRide || statusChanged) {
-          if (status == 'accepted') {
-            _centerMapOnDriverAndPickup(driverLoc, target);
-          }
-        }
-      }
+    if (ride['status'] == 'accepted' && here != null && pickupLat != null && pickupLng != null) {
+      _centerMapOnDriverAndPickup(here, LatLng(pickupLat, pickupLng));
     }
   }
 
+  /// Safety net for a missed route_changed event: more than 80 m off the drawn
+  /// route for 30 s, ask the server for the ride's route again (the server
+  /// decides whether Google is asked).
+  void _checkRideOffRoute(DriverProvider driver, Map<String, dynamic> ride, LatLng here) {
+    final id = ride['id'];
+    final geo = driver.routes.current(ride)?.geometry;
+    if (id is! int || geo == null || ride['status'] == 'arrived' || geo.locate(here).offMeters <= 80) {
+      _rideOffRouteSince = null;
+      return;
+    }
+    final now = DateTime.now();
+    _rideOffRouteSince ??= now;
+    if (now.difference(_rideOffRouteSince!) < const Duration(seconds: 30)) return;
+    if (_rideRouteAskedAt != null && now.difference(_rideRouteAskedAt!) < const Duration(seconds: 30)) return;
+    _rideRouteAskedAt = now;
+    driver.routes.fetch(id).then((changed) {
+      if (changed && mounted) setState(() {});
+    });
+  }
+
+  /// The destination of a ride request (not food/Mart orders), if it has one.
+  LatLng? _pendingDrop(Map<String, dynamic>? pending) {
+    if (pending == null || pending['is_food'] == true || pending['is_market'] == true) return null;
+    final lat = (pending['drop_lat'] as num?)?.toDouble();
+    final lng = (pending['drop_lng'] as num?)?.toDouble();
+    return (lat == null || lng == null) ? null : LatLng(lat, lng);
+  }
+
+  /// A ride request in view: the driver, the pickup and the destination.
+  void _fitPendingRequest(LatLng loc) {
+    final pickup = _pendingPickupLatLng;
+    if (pickup == null) return;
+    final drop = _pendingDrop(context.read<DriverProvider>().pendingRequest);
+    try {
+      _mapController.fitBounds([loc, pickup, if (drop != null) drop], padding: 80);
+    } catch (e) {
+      _mapController.moveTo(pickup, zoom: 14);
+    }
+  }
 
   @override
   void initState() {
@@ -402,11 +413,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
           _isNavigating = true;
           _mapController.startNavigation(currentLoc, bearing: _heading);
         } else if (_pendingPickupLatLng != null) {
-          _centerMapOnDriverAndPickup(currentLoc, _pendingPickupLatLng!);
+          _fitPendingRequest(currentLoc);
         } else {
           _mapController.moveTo(currentLoc, zoom: 16);
         }
       }
+
+      final activeRide = driver.activeRide;
+      if (activeRide != null) _checkRideOffRoute(driver, activeRide, currentLoc);
 
       if (food != null) {
         _updateFoodMarketRoute(currentLoc, food, false);
@@ -1159,20 +1173,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
     }
 
     if (ride == null) {
-      _rideRoutePoints = [];
-      _lastRideId = null;
-      _lastRideStatus = null;
-      _lastRideDriverLatLng = null;
-    } else if (driver.currentLocation != null) {
+      _lastRideCameraKey = null;
+      _rideOffRouteSince = null;
+    } else {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _updateActiveRideRoute(driver.currentLocation!, ride);
+        if (mounted) _syncRideRoute(driver, ride);
       });
     }
 
     if (food == null && market == null) {
       _foodMarketRoutePointsCleaned();
     } else if (driver.currentLocation != null) {
-      _lastDriverLatLng ??= driver.currentLocation;
       if (food != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _updateFoodMarketRoute(driver.currentLocation!, food, false);
@@ -1191,17 +1202,23 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
         _lastPendingRequestId = currentId;
         _requestSheetCollapsed = false;
         _pendingPickupLatLng = null;
-        _pendingRoutePoints = [];
         _pendingPickupLabel = null;
+        // Uber-style preview: the trip on the roads, worked out once per booking
+        // by the server and shared by every driver shown the request.
+        final previewId = pending['booking_id'];
+        if (previewId is int && pending['is_food'] != true && pending['is_market'] != true) {
+          driver.routes.preview(previewId).then((arrived) {
+            if (arrived && mounted) setState(() {});
+          });
+        }
       }
     } else {
       _lastPendingRequestId = null;
-      if (_pendingPickupLatLng != null || _pendingRoutePoints.isNotEmpty) {
+      if (_pendingPickupLatLng != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             setState(() {
               _pendingPickupLatLng = null;
-              _pendingRoutePoints = [];
               _pendingPickupLabel = null;
               _requestSheetCollapsed = false;
             });
@@ -1232,6 +1249,20 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
       }
       return ZiggoPolygon(points: points, fillColor: fillColor, strokeColor: strokeColor);
     }).toList();
+
+    final rideRoute = ride == null ? const <LatLng>[] : _rideRoutePoints(driver, ride);
+    // A ride request on the map: driver, pickup, stops and destination, with the
+    // trip on the roads (server preview) and a dashed line to the pickup.
+    final pendingDrop = _pendingPickupLatLng == null ? null : _pendingDrop(pending);
+    final pendingTrip = pendingDrop == null
+        ? const <LatLng>[]
+        : (driver.routes[pending?['booking_id']]?.route?.points ?? const <LatLng>[]);
+    final pendingStops = <LatLng>[
+      if (pendingDrop != null)
+        for (final s in (pending?['stops'] as List?) ?? const [])
+          if (s is Map && s['lat'] is num && s['lng'] is num)
+            LatLng((s['lat'] as num).toDouble(), (s['lng'] as num).toDouble()),
+    ];
 
     return Scaffold(
       key: _scaffoldKey,
@@ -1276,15 +1307,22 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
                       strokeWidth: 10,
                       color: Colors.black,
                     ),
-                  if (_pendingRoutePoints.isNotEmpty)
+                  if (_pendingPickupLatLng != null && driver.currentLocation != null)
                     ZiggoPolyline(
-                      points: _pendingRoutePoints,
-                      strokeWidth: 10,
+                      points: [driver.currentLocation!, _pendingPickupLatLng!],
+                      strokeWidth: 5,
+                      color: AppColors.primaryDark,
+                      dashed: true,
+                    ),
+                  if (pendingTrip.length >= 2)
+                    ZiggoPolyline(
+                      points: pendingTrip,
+                      strokeWidth: 8,
                       color: AppColors.primaryDark,
                     ),
-                  if (_rideRoutePoints.isNotEmpty)
+                  if (rideRoute.length >= 2)
                     ZiggoPolyline(
-                      points: _rideRoutePoints,
+                      points: rideRoute,
                       strokeWidth: 10,
                       color: AppColors.primaryDark,
                     ),
@@ -1308,6 +1346,22 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
                       label: (_pendingPickupLabel == null || _pendingPickupLabel!.trim().isEmpty || _pendingPickupLabel == 'Pickup')
                           ? 'Pickup'
                           : 'Pickup | $_pendingPickupLabel',
+                    ),
+                  for (int i = 0; i < pendingStops.length; i++)
+                    pinMarker(
+                      point: pendingStops[i],
+                      icon: Icons.location_on_rounded,
+                      color: AppColors.warning,
+                      size: 30,
+                      label: 'Stop ${i + 1}',
+                    ),
+                  if (pendingDrop != null)
+                    pinMarker(
+                      point: pendingDrop,
+                      icon: Icons.location_on_rounded,
+                      color: AppColors.primaryDark,
+                      size: 30,
+                      label: 'Drop | ${pending?['drop_address'] ?? ''}',
                     ),
                   if (ride != null) ...[
                     pinMarker(
@@ -1417,17 +1471,12 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
                 onShowPickupOnMap: (pickup, routePoints, label) {
                   setState(() {
                     _pendingPickupLatLng = pickup;
-                    _pendingRoutePoints = routePoints;
                     _pendingPickupLabel = label;
                     _requestSheetCollapsed = false;
                   });
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (!mounted) return;
-                    if (loc != null) {
-                      _centerMapOnDriverAndPickup(loc, pickup);
-                    } else {
-                      _mapController.moveTo(pickup, zoom: 13);
-                    }
+                    _fitPendingRequest(loc);
                   });
                 },
                 isCollapsed: _requestSheetCollapsed,
@@ -3914,7 +3963,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
         onShowPickupOnMap: (pickup, routePoints, label) {
           setState(() {
             _pendingPickupLatLng = pickup;
-            _pendingRoutePoints = routePoints;
             _pendingPickupLabel = label;
           });
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -3931,7 +3979,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with WidgetsBinding
       _isShowingRideRequest = false;
       setState(() {
         _pendingPickupLatLng = null;
-        _pendingRoutePoints = [];
         _pendingPickupLabel = null;
       });
     });
@@ -4005,19 +4052,11 @@ class _RideRequestSheetState extends State<_RideRequestSheet>
       final pickup = LatLng(lat, lng);
       final label = (r['restaurant_name'] ?? r['vendor_name'] ?? 'Pickup').toString();
       
-      // Trigger camera centering immediately
+      // Show the request on the map. The home screen draws a dashed line to the
+      // pickup and the trip from the server's preview: no route request per
+      // driver shown the request.
       if (mounted) {
         widget.onShowPickupOnMap(pickup, [], label);
-      }
-      
-      // Load directions route in the background
-      if (widget.driverLocation != null) {
-        try {
-          final dir = await MapsService.instance.directions(widget.driverLocation!, pickup);
-          if (dir != null && mounted) {
-            widget.onShowPickupOnMap(pickup, dir.points, label);
-          }
-        } catch (_) {}
       }
     }
   }

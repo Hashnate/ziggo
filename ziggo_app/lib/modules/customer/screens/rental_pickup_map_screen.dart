@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../core/map/maps_service.dart';
+import '../../../core/map/pin_address.dart';
 import '../../../core/map/places.dart';
 import '../../../core/map/ziggo_map.dart';
 
@@ -22,6 +23,11 @@ class RentalPickupMapScreen extends StatefulWidget {
 class _RentalPickupMapScreenState extends State<RentalPickupMapScreen> {
   final ZiggoMapController _mapController = ZiggoMapController();
   late Place _currentPlace;
+  // The place the pin is on; less than 15 m from it needs no address lookup.
+  late Place _knownPlace;
+  // Where the map centre is now (this screen updates _currentPlace only once
+  // the pin settles).
+  LatLng? _pinCenter;
   bool _isMoving = false;
   bool _isResolving = false;
   Timer? _debounceTimer;
@@ -30,12 +36,30 @@ class _RentalPickupMapScreenState extends State<RentalPickupMapScreen> {
   void initState() {
     super.initState();
     _currentPlace = widget.initialLocation;
+    _knownPlace = widget.initialLocation;
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    super.dispose();
   }
 
   void _onMapPositionChanged(LatLng center) {
     final latDiff = (center.latitude - _currentPlace.location.latitude).abs();
     final lngDiff = (center.longitude - _currentPlace.location.longitude).abs();
     if (latDiff < 0.00001 && lngDiff < 0.00001) {
+      return;
+    }
+    _pinCenter = center;
+
+    if (pinStillOn(_knownPlace, center)) {
+      _debounceTimer?.cancel();
+      setState(() {
+        _isMoving = false;
+        _isResolving = false;
+        _currentPlace = placeAt(_knownPlace, center);
+      });
       return;
     }
 
@@ -49,26 +73,31 @@ class _RentalPickupMapScreenState extends State<RentalPickupMapScreen> {
   }
 
   Future<void> _resolveLocation(LatLng center) async {
+    if (!mounted) return;
     setState(() {
       _isMoving = false;
       _isResolving = true;
     });
 
     final address = await MapsService.instance.reverseGeocode(center);
-    
-    if (!mounted) return;
 
-    if (address != null) {
-      setState(() {
+    if (!mounted) return;
+    if (pinMovedOn(_pinCenter, center)) return; // the pin moved on: a newer lookup answers
+
+    // Without an address the pin still takes the new coordinates.
+    setState(() {
+      if (address != null) {
         _currentPlace = Place(
           address.split(',').first, // Main text
           address,                  // Full address
           center,
         );
-      });
-    }
-
-    setState(() => _isResolving = false);
+        _knownPlace = _currentPlace;
+      } else {
+        _currentPlace = pinnedPlace(center);
+      }
+      _isResolving = false;
+    });
   }
 
   void _onConfirm() {
@@ -79,7 +108,10 @@ class _RentalPickupMapScreenState extends State<RentalPickupMapScreen> {
     final here = await MapsService.instance.currentLocationAsPlace();
     if (here != null && mounted) {
       _mapController.moveTo(here.location, zoom: 16);
-      setState(() => _currentPlace = here);
+      setState(() {
+        _currentPlace = here;
+        _knownPlace = here;
+      });
     }
   }
 
@@ -271,7 +303,7 @@ class _RentalPickupMapScreenState extends State<RentalPickupMapScreen> {
                         width: double.infinity,
                         height: 50,
                         child: ElevatedButton(
-                          onPressed: _isResolving ? null : _onConfirm,
+                          onPressed: (_isResolving || _isMoving) ? null : _onConfirm,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF2C3E50), // Dark blue/grey
                             foregroundColor: Colors.white,

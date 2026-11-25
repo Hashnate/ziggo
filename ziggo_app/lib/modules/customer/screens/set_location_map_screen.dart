@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../app/app_colors.dart';
 import '../../../core/map/location_permission_helper.dart';
 import '../../../core/map/maps_service.dart';
+import '../../../core/map/pin_address.dart';
 import '../../../core/map/place_search_sheet.dart';
 import '../../../core/map/places.dart';
 import '../../../core/map/ziggo_map.dart';
@@ -34,6 +35,9 @@ class SetLocationMapScreen extends StatefulWidget {
 class _SetLocationMapScreenState extends State<SetLocationMapScreen> {
   final ZiggoMapController _mapController = ZiggoMapController();
   late Place _currentPlace;
+  // The place the pin is on (start, GPS, searched or looked-up place); less than
+  // 15 m from it needs no address lookup and keeps a searched place's name.
+  late Place _knownPlace;
   bool _isResolving = false;
   bool _isDragging = false;
   Timer? _debounceTimer;
@@ -42,6 +46,7 @@ class _SetLocationMapScreenState extends State<SetLocationMapScreen> {
   void initState() {
     super.initState();
     _currentPlace = widget.initialLocation ?? kColomboPlaces[0];
+    _knownPlace = _currentPlace;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initLocation();
     });
@@ -61,7 +66,10 @@ class _SetLocationMapScreenState extends State<SetLocationMapScreen> {
 
     final here = await MapsService.instance.currentLocationAsPlace();
     if (here != null && mounted) {
-      setState(() => _currentPlace = here);
+      setState(() {
+        _currentPlace = here;
+        _knownPlace = here;
+      });
       _mapController.moveTo(here.location, zoom: 16);
     } else if (mounted) {
       _mapController.moveTo(_currentPlace.location, zoom: 16);
@@ -75,11 +83,20 @@ class _SetLocationMapScreenState extends State<SetLocationMapScreen> {
       return;
     }
 
+    if (pinStillOn(_knownPlace, center)) {
+      _debounceTimer?.cancel();
+      setState(() {
+        _isDragging = false;
+        _currentPlace = placeAt(_knownPlace, center);
+      });
+      return;
+    }
+
     setState(() {
       _isDragging = true;
       _currentPlace = Place(
         _currentPlace.name,
-        _currentPlace.fullAddress,
+        _currentPlace.area,
         center,
       );
     });
@@ -99,6 +116,10 @@ class _SetLocationMapScreenState extends State<SetLocationMapScreen> {
 
     final address = await MapsService.instance.reverseGeocode(center);
     if (!mounted) return;
+    if (pinMovedOn(_currentPlace.location, center)) {
+      setState(() => _isResolving = false); // a newer lookup answers
+      return;
+    }
 
     if (address != null && address.trim().isNotEmpty) {
       final name = address.split(',').first.trim();
@@ -108,6 +129,7 @@ class _SetLocationMapScreenState extends State<SetLocationMapScreen> {
           address,
           center,
         );
+        _knownPlace = _currentPlace;
       });
     } else {
       setState(() {
@@ -135,6 +157,7 @@ class _SetLocationMapScreenState extends State<SetLocationMapScreen> {
       _mapController.moveTo(here.location, zoom: 16);
       setState(() {
         _currentPlace = here;
+        _knownPlace = here;
       });
     }
   }
@@ -142,7 +165,10 @@ class _SetLocationMapScreenState extends State<SetLocationMapScreen> {
   Future<void> _searchAndMove() async {
     final p = await showPlaceSearch(context, title: 'Search location');
     if (p != null && mounted) {
-      setState(() => _currentPlace = p);
+      setState(() {
+        _currentPlace = p;
+        _knownPlace = p;
+      });
       _mapController.moveTo(p.location, zoom: 16);
     }
   }

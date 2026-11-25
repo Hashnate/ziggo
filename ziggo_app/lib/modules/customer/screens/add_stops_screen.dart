@@ -73,18 +73,11 @@ class _AddStopsScreenState extends State<AddStopsScreen> {
       
       _mapController.fitBounds(pointsToVisit, padding: 60);
 
-      // We need to fetch route across all points.
-      // Since our MapsService.directions currently takes (start, end), we might need to stitch them.
-      List<LatLng> fullRoute = [];
-      for (int i = 0; i < pointsToVisit.length - 1; i++) {
-        final dir = await MapsService.instance.directions(pointsToVisit[i], pointsToVisit[i+1]);
-        if (dir != null && dir.points.isNotEmpty) {
-          fullRoute.addAll(dir.points);
-        } else {
-          fullRoute.add(pointsToVisit[i]);
-          fullRoute.add(pointsToVisit[i+1]);
-        }
-      }
+      // One request for the whole route through every stop; straight lines
+      // between the points if no route comes back.
+      final dir = await MapsService.instance.route(pointsToVisit);
+      final List<LatLng> fullRoute =
+          (dir != null && dir.points.isNotEmpty) ? dir.points : List<LatLng>.of(pointsToVisit);
 
       if (mounted) {
         setState(() {
