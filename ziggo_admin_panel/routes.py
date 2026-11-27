@@ -5,6 +5,7 @@ import time
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 import os
+import re
 import urllib.parse
 from decimal import Decimal, InvalidOperation
 
@@ -105,6 +106,13 @@ def format_colombo_dt(dt: datetime | None, fmt: str = "%Y-%m-%d %H:%M") -> str:
     if hasattr(dt, "strftime"):
         return dt.strftime(fmt)
     return str(dt)
+
+
+def colombo_today_utc_bounds() -> tuple[datetime, datetime]:
+    """Return (start_utc, end_utc) for the current calendar day in Asia/Colombo."""
+    today_lk_date = datetime.now(COLOMBO_TZ).date()
+    start_utc = datetime.combine(today_lk_date, datetime.min.time(), tzinfo=COLOMBO_TZ).astimezone(timezone.utc)
+    return start_utc, start_utc + timedelta(days=1)
 
 
 def format_number(value, decimals: Optional[int] = None):
@@ -813,12 +821,22 @@ async def admin_drivers(
         )
     ).one()
 
+    today_start_utc, today_end_utc = colombo_today_utc_bounds()
+    joined_today = (
+        await db.execute(
+            select(func.count(Driver.id))
+            .join(Driver.user)
+            .where(is_submitted_driver, User.created_at >= today_start_utc, User.created_at < today_end_utc)
+        )
+    ).scalar() or 0
+
     stats = {
         "total": total_all,
         "online": online,
         "online_pct": int(round((online / total_all * 100) if total_all else 0)),
         "pending": pending,
         "incomplete": incomplete,
+        "joined_today": joined_today,
         "avg_rating": avg_rating,
         "total_apps": total_apps,
         "unread_apps": unread_apps,
@@ -2161,7 +2179,6 @@ async def admin_riders(
     _: User = Depends(current_admin),
 ):
     from sqlalchemy import or_, and_
-    from datetime import date
     from app.api.v1.public import UserPreregistration
 
     limit = 50
@@ -2176,10 +2193,12 @@ async def admin_riders(
     ).scalar() or 0
     inactive_riders = total_riders - active_riders
 
-    today = date.today()
+    today_start_utc, today_end_utc = colombo_today_utc_bounds()
     joined_today = (
         await db.execute(
-            select(func.count(Customer.id)).join(Customer.user).where(func.date(User.created_at) == today)
+            select(func.count(Customer.id))
+            .join(Customer.user)
+            .where(User.created_at >= today_start_utc, User.created_at < today_end_utc)
         )
     ).scalar() or 0
     
@@ -2766,7 +2785,7 @@ async def admin_bookings_feed(
             "customer_feedback": b.customer_feedback or "",
             "promo_code": b.promo_code or "",
             "lady_driver_requested": bool(b.lady_driver_requested),
-            "booked_at": b.booked_at.strftime("%Y-%m-%d %H:%M") if b.booked_at else "",
+            "booked_at": format_colombo_dt(b.booked_at, "%Y-%m-%d %H:%M") if b.booked_at else "",
         }
 
     return {
@@ -4205,10 +4224,10 @@ async def admin_settings_save(
     peak_end_hour_6: str = Form("23:00"),
     peak_extra_amount_6: float = Form(50.00),
     # App Version Management
-    app_min_version_android: str = Form("1.0.0"),
-    app_latest_version_android: str = Form("1.0.15"),
-    app_min_version_ios: str = Form("1.0.0"),
-    app_latest_version_ios: str = Form("1.0.15"),
+    app_min_version_android: str = Form(""),
+    app_latest_version_android: str = Form(""),
+    app_min_version_ios: str = Form(""),
+    app_latest_version_ios: str = Form(""),
     app_update_title: str = Form("Update Available"),
     app_update_message: str = Form("A new version of Ziggo is ready with improvements and bug fixes."),
     app_force_update_message: str = Form("This version of Ziggo is no longer supported. Please update to continue using Ziggo."),
@@ -4221,6 +4240,58 @@ async def admin_settings_save(
     admin: User = Depends(require_superadmin),
 ):
     from decimal import Decimal
+    from app.services.app_version_service import (
+        parse_admin_version_input,
+        validate_store_url,
+    )
+
+    safe_tab = re.sub(r"[^a-zA-Z0-9_-]", "", active_tab or "") or "pricing"
+    form_data = await request.form()
+
+    def _submitted_str(field_name: str, fallback: str) -> tuple[bool, str]:
+        if field_name in form_data:
+            raw_val = form_data.get(field_name)
+            return True, raw_val if isinstance(raw_val, str) else ""
+        return False, fallback
+
+    version_specs = (
+        ("app_min_version_android", app_min_version_android, "Android Minimum Supported Version"),
+        ("app_latest_version_android", app_latest_version_android, "Android Latest Released Version"),
+        ("app_min_version_ios", app_min_version_ios, "iOS Minimum Supported Version"),
+        ("app_latest_version_ios", app_latest_version_ios, "iOS Latest Released Version"),
+    )
+    parsed_versions: dict[str, str] = {}
+    try:
+        for field_name, param_val, label in version_specs:
+            present, raw_val = _submitted_str(field_name, param_val)
+            if present:
+                parsed_versions[field_name] = parse_admin_version_input(raw_val, label)
+
+        play_present, raw_play_url = _submitted_str("app_play_store_url", app_play_store_url)
+        clean_play_url = (
+            validate_store_url(
+                raw_play_url,
+                "https://play.google.com/store/apps/details?id=lk.ziggo.app",
+                "Google Play Store URL",
+            )
+            if play_present
+            else None
+        )
+        app_present, raw_app_url = _submitted_str("app_app_store_url", app_app_store_url)
+        clean_app_url = (
+            validate_store_url(
+                raw_app_url,
+                "https://apps.apple.com/app/ziggo-app/id6778739956",
+                "Apple App Store URL",
+            )
+            if app_present
+            else None
+        )
+    except ValueError as exc:
+        return RedirectResponse(
+            url=f"/admin/settings?tab={safe_tab}&error={urllib.parse.quote(str(exc))}",
+            status_code=303,
+        )
 
     s = await _get_or_create_settings(db)
     s.site_name = site_name.strip() or "Ziggo"
@@ -4228,19 +4299,16 @@ async def admin_settings_save(
     
     cleaned_phone = contact_phone.strip()
     if cleaned_phone:
-        import re
         if not re.match(r"^\d{10}$", cleaned_phone):
-            import urllib.parse
             err_msg = "Contact phone must be a 10-digit login phone number (e.g. 0773095788)"
-            return RedirectResponse(url=f"/admin/settings?tab={active_tab}&error={urllib.parse.quote(err_msg)}", status_code=303)
+            return RedirectResponse(url=f"/admin/settings?tab={safe_tab}&error={urllib.parse.quote(err_msg)}", status_code=303)
         
         # Check if another user already has this phone number
         q_dup = await db.execute(select(User).where(User.phone_number == cleaned_phone, User.id != admin.id))
         dup_user = q_dup.scalars().first()
         if dup_user:
-            import urllib.parse
             err_msg = f"Phone number {cleaned_phone} is already registered under another account (role: {dup_user.role.value}). Please use a different phone number."
-            return RedirectResponse(url=f"/admin/settings?tab={active_tab}&error={urllib.parse.quote(err_msg)}", status_code=303)
+            return RedirectResponse(url=f"/admin/settings?tab={safe_tab}&error={urllib.parse.quote(err_msg)}", status_code=303)
         
         # Update admin's login phone number
         admin.phone_number = cleaned_phone
@@ -4281,23 +4349,21 @@ async def admin_settings_save(
     s.multi_stop_excess_per_minute = Decimal(str(multi_stop_excess_per_minute))
     s.multi_stop_fee_per_stop = Decimal(str(multi_stop_fee_per_stop))
 
-    # Mobile App Version & Force Update
-    s.app_min_version_android = app_min_version_android.strip() or "1.0.0"
-    s.app_latest_version_android = app_latest_version_android.strip() or "1.0.15"
-    s.app_min_version_ios = app_min_version_ios.strip() or "1.0.0"
-    s.app_latest_version_ios = app_latest_version_ios.strip() or "1.0.15"
+    # Mobile App Version & Force Update (empty or 0 disables that prompt)
+    for field_name, parsed_val in parsed_versions.items():
+        setattr(s, field_name, parsed_val)
     s.app_update_title = app_update_title.strip() or "Update Available"
     s.app_update_message = app_update_message.strip() or "A new version of Ziggo is ready with improvements and bug fixes."
     s.app_force_update_message = app_force_update_message.strip() or "This version of Ziggo is no longer supported. Please update to continue using Ziggo."
-    s.app_play_store_url = app_play_store_url.strip() or "https://play.google.com/store/apps/details?id=lk.ziggo.app"
-    s.app_app_store_url = app_app_store_url.strip() or "https://apps.apple.com/app/ziggo-app/id6778739956"
+    if clean_play_url is not None:
+        s.app_play_store_url = clean_play_url
+    if clean_app_url is not None:
+        s.app_app_store_url = clean_app_url
 
     # Peak Hours saving
     from app.models import PeakHourSetting
     peaks_q = await db.execute(select(PeakHourSetting).order_by(PeakHourSetting.display_order.asc(), PeakHourSetting.id.desc()))
     peaks = peaks_q.scalars().all()
-    
-    form_data = await request.form()
     
     peak_changed = False
     for pk in peaks:
@@ -4309,7 +4375,6 @@ async def admin_settings_save(
         if sh is None and eh is None and amt is None:
             continue
             
-        import re
         time_pat = re.compile(r"^\d{2}:\d{2}$")
         
         clean_sh = sh.strip() if isinstance(sh, str) else ""
@@ -4420,7 +4485,7 @@ async def admin_settings_save(
         s.favicon_url = new_favicon
 
     await db.commit()
-    return RedirectResponse(url=f"/admin/settings?tab={active_tab}&saved=1", status_code=303)
+    return RedirectResponse(url=f"/admin/settings?tab={safe_tab}&saved=1", status_code=303)
 
 
 @router.post("/settings/peak-hours/{id}/toggle")
@@ -5478,6 +5543,11 @@ async def admin_restaurants(
             "opening_time": r.opening_time,
             "closing_time": r.closing_time,
             "eta_minutes": r.eta_minutes,
+            "pickup_fee": r.pickup_fee,
+            "per_km_rate": r.per_km_rate,
+            "boost": r.boost,
+            "commission_percentage": r.commission_percentage,
+            "max_settle_amount": r.max_settle_amount,
             "is_active": r.is_active,
             "owner_id": r.owner_id,
             "owner_phone": owner_info_by_id.get(r.owner_id or 0, {}).get("phone"),
@@ -5778,6 +5848,7 @@ async def admin_restaurant_new_submit(
         "per_km_rate": per_km_rate,
         "boost": boost,
         "commission_percentage": commission_percentage,
+        "max_settle_amount": max_settle_amount,
     }
 
     phone = owner_phone.strip()
@@ -8402,19 +8473,25 @@ async def admin_complaints(
 
 
 # ---------- Live Tracking ----------
+async def _live_tracking_driver_totals(db: AsyncSession) -> tuple[int, int]:
+    """Return (total, online) counts for approved drivers."""
+    totals_q = await db.execute(
+        select(
+            func.count(Driver.id),
+            func.count(Driver.id).filter(Driver.is_online == True),  # noqa: E712
+        ).where(Driver.status == DriverStatus.APPROVED)
+    )
+    total, online = totals_q.one()
+    return (total or 0), (online or 0)
+
+
 @router.get("/live-tracking", response_class=HTMLResponse)
 async def admin_live_tracking(
     request: Request,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(current_admin),
 ):
-    totals_q = await db.execute(
-        select(
-            func.count(Driver.id),
-            func.count(Driver.id).filter(Driver.is_online == True),  # noqa: E712
-        )
-    )
-    total, online = totals_q.one()
+    total, online = await _live_tracking_driver_totals(db)
     return templates.TemplateResponse(
         request,
         "live_tracking.html",
@@ -8423,7 +8500,7 @@ async def admin_live_tracking(
             "active_page": "live-tracking",
             "total_drivers": total,
             "online_drivers": online,
-            "offline_drivers": (total or 0) - (online or 0),
+            "offline_drivers": total - online,
             "google_maps_api_key": (settings.GOOGLE_MAPS_BROWSER_KEY or settings.GOOGLE_MAPS_API_KEY or ""),
         },
     )
@@ -8449,13 +8526,8 @@ async def admin_live_tracking_feed(
     )
     drivers = q.scalars().all()
 
-    totals_q = await db.execute(
-        select(
-            func.count(Driver.id),
-            func.count(Driver.id).filter(Driver.is_online == True),  # noqa: E712
-        )
-    )
-    total, online = totals_q.one()
+    total = len(drivers)
+    online = sum(1 for d in drivers if d.is_online)
 
     active_q = await db.execute(
         select(func.count(Booking.id)).where(
@@ -8483,9 +8555,9 @@ async def admin_live_tracking_feed(
             for d in drivers
         ],
         "totals": {
-            "online": online or 0,
-            "offline": (total or 0) - (online or 0),
-            "total": total or 0,
+            "online": online,
+            "offline": total - online,
+            "total": total,
             "active_bookings": active_bookings_count or 0,
         },
         "server_time": datetime.now(timezone.utc).isoformat(),

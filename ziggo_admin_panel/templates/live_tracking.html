@@ -119,7 +119,7 @@
                 <div>
                     <h3 class="text-base font-black text-ziggo-ink">All Drivers</h3>
                     <p class="text-[11px] text-ziggo-muted font-bold">
-                        <span id="listOnlineCount">0</span> active · <span id="listOfflineCount">0</span> inactive
+                        <span id="listOnlineCount">{{ online_drivers|num }}</span> active · <span id="listOfflineCount">{{ offline_drivers|num }}</span> inactive
                     </p>
                 </div>
             </div>

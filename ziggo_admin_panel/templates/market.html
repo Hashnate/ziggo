@@ -208,7 +208,7 @@
                                     </form>
                                 {% endif %}
                                 <button
-                                    onclick='openEditVendor({{ v.id }}, {{ v.name|tojson }}, {{ (v.category or "")|tojson }}, {{ (v.description or "")|tojson }}, {{ (v.address or "")|tojson }}, {{ (v.phone_number or "")|tojson }}, {{ (v.opening_time or "")|tojson }}, {{ (v.closing_time or "")|tojson }}, {{ (v.delivery_fee or 0)|float }}, {{ (v.eta_minutes or 40) }}, {{ (v.commission_percentage or 10)|float }}, {{ (v.priority_level or "standard")|tojson }}, {{ ("yes" if v.is_featured else "no")|tojson }}, {{ (v.bank_name or "")|tojson }}, {{ (v.account_holder_name or "")|tojson }}, {{ (v.account_number or "")|tojson }}, {{ (v.branch_name or "")|tojson }}, {{ (v.pickup_fee or 70.0)|float }}, {{ (v.per_km_rate or 40.0)|float }}, {{ (v.boost or 0.0)|float }}, {{ (v.lat or 6.9271)|float }}, {{ (v.lng or 79.8612)|float }}, {{ (v.max_settle_amount or 1000.0)|float }})'
+                                    onclick='openEditVendor({{ v.id }}, {{ v.name|tojson }}, {{ (v.category or "")|tojson }}, {{ (v.description or "")|tojson }}, {{ (v.address or "")|tojson }}, {{ (v.phone_number or "")|tojson }}, {{ (v.opening_time or "")|tojson }}, {{ (v.closing_time or "")|tojson }}, {{ (v.delivery_fee if v.delivery_fee is not none else 0)|float }}, {{ (v.eta_minutes if v.eta_minutes is not none else 40) }}, {{ (v.commission_percentage if v.commission_percentage is not none else 10)|float }}, {{ (v.priority_level or "standard")|tojson }}, {{ ("yes" if v.is_featured else "no")|tojson }}, {{ (v.bank_name or "")|tojson }}, {{ (v.account_holder_name or "")|tojson }}, {{ (v.account_number or "")|tojson }}, {{ (v.branch_name or "")|tojson }}, {{ (v.pickup_fee if v.pickup_fee is not none else 70.0)|float }}, {{ (v.per_km_rate if v.per_km_rate is not none else 40.0)|float }}, {{ (v.boost if v.boost is not none else 0.0)|float }}, {{ (v.lat if v.lat is not none else 6.9271)|float }}, {{ (v.lng if v.lng is not none else 79.8612)|float }}, {{ (v.max_settle_amount if v.max_settle_amount is not none else 1000.0)|float }})'
                                     class="px-3 py-1.5 rounded-xl bg-blue-50 text-blue-600 text-xs font-bold hover:bg-blue-600 hover:text-white transition inline-flex items-center gap-1"
                                     title="Edit Vendor">
                                     <i class="fas fa-pen text-[10px]"></i>
@@ -631,20 +631,20 @@
         document.getElementById('ev_category').value = category || 'Other';
         document.getElementById('ev_description').value = description || '';
         document.getElementById('ev_address').value = address || '';
-        document.getElementById('ev_lat').value = lat !== undefined ? lat : 6.9271;
-        document.getElementById('ev_lng').value = lng !== undefined ? lng : 79.8612;
+        document.getElementById('ev_lat').value = lat != null ? lat : 6.9271;
+        document.getElementById('ev_lng').value = lng != null ? lng : 79.8612;
         document.getElementById('ev_phone').value = phone || '';
         document.getElementById('ev_opening').value = opening || '';
         document.getElementById('ev_closing').value = closing || '';
-        document.getElementById('ev_delivery_fee').value = delivery_fee || 0;
-        document.getElementById('ev_eta').value = eta || 40;
-        document.getElementById('ev_commission').value = commission || 10;
-        document.getElementById('ev_max_settle').value = max_settle || 1000;
+        document.getElementById('ev_delivery_fee').value = delivery_fee != null ? delivery_fee : 0;
+        document.getElementById('ev_eta').value = eta != null ? eta : 40;
+        document.getElementById('ev_commission').value = commission != null ? commission : 10;
+        document.getElementById('ev_max_settle').value = max_settle != null ? max_settle : 1000;
         document.getElementById('ev_priority').value = priority || 'standard';
         document.getElementById('ev_featured').value = featured || 'no';
-        document.getElementById('ev_pickup_fee').value = pickup_fee !== undefined ? pickup_fee : 70.00;
-        document.getElementById('ev_per_km_rate').value = per_km_rate !== undefined ? per_km_rate : 40.00;
-        document.getElementById('ev_boost').value = boost !== undefined ? boost : 0.00;
+        document.getElementById('ev_pickup_fee').value = pickup_fee != null ? pickup_fee : 70.00;
+        document.getElementById('ev_per_km_rate').value = per_km_rate != null ? per_km_rate : 40.00;
+        document.getElementById('ev_boost').value = boost != null ? boost : 0.00;
         document.getElementById('editVendorModal').style.display = 'flex';
     }
 

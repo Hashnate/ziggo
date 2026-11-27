@@ -68,7 +68,7 @@
 
 <!-- Driver Stats Bar -->
 {% if view != 'applications' %}
-<div class="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
+<div class="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-5 mb-8">
     <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
         <div class="flex items-center justify-between mb-4">
             <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
@@ -77,6 +77,15 @@
         </div>
         <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Registered Drivers</p>
         <p class="text-2xl font-black text-ziggo">{{ stats.total|num }}</p>
+    </div>
+    <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+            <div class="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
+                <i class="fas fa-user-plus"></i>
+            </div>
+        </div>
+        <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Joined Today</p>
+        <p class="text-2xl font-black text-ziggo">{{ stats.joined_today|num }}</p>
     </div>
     <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
         <div class="flex items-center justify-between mb-4">

@@ -56,7 +56,7 @@
                             <span>{{ b.pickup_address or 'No pickup address' }}</span>
                         </div>
                         <div class="flex items-center justify-between text-[10px] text-gray-400 mt-1">
-                            <span>{{ b.booked_at.strftime('%d %b, %H:%M') if b.booked_at else '-' }}</span>
+                            <span>{{ b.booked_at|colombo_dt('%d %b, %H:%M') if b.booked_at else '-' }}</span>
                             {% if b.final_amount %}
                             <span class="text-gray-700 font-semibold">Rs.{{ "{:,.0f}".format(b.final_amount) }}</span>
                             {% endif %}
@@ -93,7 +93,7 @@
                             </span>
                         </div>
                         <p class="text-xs text-gray-500">
-                            Booked on {{ selected_booking.booked_at.strftime('%d %B %Y at %I:%M %p') if selected_booking.booked_at else '-' }}
+                            Booked on {{ selected_booking.booked_at|colombo_dt('%d %B %Y at %I:%M %p') if selected_booking.booked_at else '-' }}
                             {% if selected_booking.customer and selected_booking.customer.user %}
                             • Customer: <span class="text-gray-700 font-semibold">{{ selected_booking.customer.user.full_name or selected_booking.customer.user.phone_number }}</span>
                             {% endif %}

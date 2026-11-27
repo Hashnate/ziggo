@@ -168,7 +168,7 @@
                                 </form>
                             {% endif %}
                             <button
-                                onclick='openEditRestaurant({{ r.id }}, {{ r.name|tojson }}, {{ (r.description or "")|tojson }}, {{ (r.cuisine or "")|tojson }}, {{ (r.address or "")|tojson }}, {{ (r.phone_number or "")|tojson }}, {{ (r.opening_time or "")|tojson }}, {{ (r.closing_time or "")|tojson }}, {{ (r.delivery_fee or 0)|float }}, {{ (r.eta_minutes or 30) }}, {{ (r.owner_phone or "")|tojson }}, {{ (r.owner_full_name or "")|tojson }}, {{ (r.lat or 6.9271)|float }}, {{ (r.lng or 79.8612)|float }}, {{ (r.image_url or "")|tojson }}, {{ (r.pickup_fee or 70.0)|float }}, {{ (r.per_km_rate or 40.0)|float }}, {{ (r.boost or 0.0)|float }}, {{ (r.commission_percentage or 20.0)|float }}, {{ (r.max_settle_amount or 1000.0)|float }})'
+                                onclick='openEditRestaurant({{ r.id }}, {{ r.name|tojson }}, {{ (r.description or "")|tojson }}, {{ (r.cuisine or "")|tojson }}, {{ (r.address or "")|tojson }}, {{ (r.phone_number or "")|tojson }}, {{ (r.opening_time or "")|tojson }}, {{ (r.closing_time or "")|tojson }}, {{ (r.delivery_fee if r.delivery_fee is not none else 0)|float }}, {{ (r.eta_minutes if r.eta_minutes is not none else 30) }}, {{ (r.owner_phone or "")|tojson }}, {{ (r.owner_full_name or "")|tojson }}, {{ (r.lat if r.lat is not none else 6.9271)|float }}, {{ (r.lng if r.lng is not none else 79.8612)|float }}, {{ (r.image_url or "")|tojson }}, {{ (r.pickup_fee if r.pickup_fee is not none else 70.0)|float }}, {{ (r.per_km_rate if r.per_km_rate is not none else 40.0)|float }}, {{ (r.boost if r.boost is not none else 0.0)|float }}, {{ (r.commission_percentage if r.commission_percentage is not none else 20.0)|float }}, {{ (r.max_settle_amount if r.max_settle_amount is not none else 1000.0)|float }})'
                                 class="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-xs font-bold hover:bg-blue-600 hover:text-white transition inline-flex items-center gap-1"
                                 title="Edit Restaurant">
                                 <i class="fas fa-pen text-[10px]"></i>
@@ -337,18 +337,18 @@
         document.getElementById('edit_r_phone').value = phone || '';
         document.getElementById('edit_r_opening').value = opening || '';
         document.getElementById('edit_r_closing').value = closing || '';
-        document.getElementById('edit_r_delivery_fee').value = delivery_fee || 0;
-        document.getElementById('edit_r_eta').value = eta || 30;
+        document.getElementById('edit_r_delivery_fee').value = delivery_fee != null ? delivery_fee : 0;
+        document.getElementById('edit_r_eta').value = eta != null ? eta : 30;
         document.getElementById('edit_r_owner_phone').value = owner_phone || '';
         document.getElementById('edit_r_owner_name').value = owner_name || '';
-        document.getElementById('edit_r_lat').value = lat || 6.9271;
-        document.getElementById('edit_r_lng').value = lng || 79.8612;
+        document.getElementById('edit_r_lat').value = lat != null ? lat : 6.9271;
+        document.getElementById('edit_r_lng').value = lng != null ? lng : 79.8612;
         document.getElementById('edit_r_image').value = '';
-        document.getElementById('edit_r_pickup_fee').value = pickup_fee !== undefined ? pickup_fee : 70.00;
-        document.getElementById('edit_r_per_km_rate').value = per_km_rate !== undefined ? per_km_rate : 40.00;
-        document.getElementById('edit_r_boost').value = boost !== undefined ? boost : 0.00;
-        document.getElementById('edit_r_commission_percentage').value = commission_percentage !== undefined ? commission_percentage : 20.00;
-        document.getElementById('edit_r_max_settle_amount').value = max_settle_amount !== undefined ? max_settle_amount : 1000.00;
+        document.getElementById('edit_r_pickup_fee').value = pickup_fee != null ? pickup_fee : 70.00;
+        document.getElementById('edit_r_per_km_rate').value = per_km_rate != null ? per_km_rate : 40.00;
+        document.getElementById('edit_r_boost').value = boost != null ? boost : 0.00;
+        document.getElementById('edit_r_commission_percentage').value = commission_percentage != null ? commission_percentage : 20.00;
+        document.getElementById('edit_r_max_settle_amount').value = max_settle_amount != null ? max_settle_amount : 1000.00;
         document.getElementById('editRestaurantModal').style.display = 'flex';
     }
 

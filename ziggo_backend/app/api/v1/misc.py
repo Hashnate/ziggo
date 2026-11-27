@@ -5,7 +5,7 @@ from typing import List
 import os
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, File, Response, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -40,6 +40,7 @@ from ...schemas import (
 )
 from ...services.auth_service import get_current_user, require_role
 from ...services import loyalty_service as L
+from ...services.app_version_service import api_version_value
 
 router = APIRouter()
 
@@ -63,27 +64,28 @@ async def download_apk():
 
 @router.get("/app-version")
 @router.get("/misc/app-version")
-async def get_app_version(db: AsyncSession = Depends(get_db)):
+async def get_app_version(response: Response, db: AsyncSession = Depends(get_db)):
     """Public endpoint called by the Ziggo mobile app on startup to determine
     if an update is available or required (force update)."""
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     q = await db.execute(select(SystemSettings).where(SystemSettings.id == 1))
     s = q.scalars().first()
     return {
         "android": {
-            "min_version": s.app_min_version_android if (s and s.app_min_version_android) else "1.0.0",
-            "latest_version": s.app_latest_version_android if (s and s.app_latest_version_android) else "1.0.15",
-            "store_url": s.app_play_store_url if (s and s.app_play_store_url) else "https://play.google.com/store/apps/details?id=lk.ziggo.app",
+            "min_version": api_version_value(s.app_min_version_android if s else None),
+            "latest_version": api_version_value(s.app_latest_version_android if s else None),
+            "store_url": s.app_play_store_url.strip() if (s and s.app_play_store_url and s.app_play_store_url.strip()) else "https://play.google.com/store/apps/details?id=lk.ziggo.app",
             "market_url": "market://details?id=lk.ziggo.app",
         },
         "ios": {
-            "min_version": s.app_min_version_ios if (s and s.app_min_version_ios) else "1.0.0",
-            "latest_version": s.app_latest_version_ios if (s and s.app_latest_version_ios) else "1.0.15",
-            "store_url": s.app_app_store_url if (s and s.app_app_store_url) else "https://apps.apple.com/app/ziggo-app/id6778739956",
+            "min_version": api_version_value(s.app_min_version_ios if s else None),
+            "latest_version": api_version_value(s.app_latest_version_ios if s else None),
+            "store_url": s.app_app_store_url.strip() if (s and s.app_app_store_url and s.app_app_store_url.strip()) else "https://apps.apple.com/app/ziggo-app/id6778739956",
             "market_url": "itms-apps://itunes.apple.com/app/id6778739956",
         },
-        "title": s.app_update_title if (s and s.app_update_title) else "Update Available",
-        "message": s.app_update_message if (s and s.app_update_message) else "A new version of Ziggo is ready with improvements and bug fixes.",
-        "force_message": s.app_force_update_message if (s and s.app_force_update_message) else "This version of Ziggo is no longer supported. Please update to continue using Ziggo.",
+        "title": s.app_update_title.strip() if (s and s.app_update_title and s.app_update_title.strip()) else "Update Available",
+        "message": s.app_update_message.strip() if (s and s.app_update_message and s.app_update_message.strip()) else "A new version of Ziggo is ready with improvements and bug fixes.",
+        "force_message": s.app_force_update_message.strip() if (s and s.app_force_update_message and s.app_force_update_message.strip()) else "This version of Ziggo is no longer supported. Please update to continue using Ziggo.",
     }
 
 
